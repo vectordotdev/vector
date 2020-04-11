@@ -222,6 +222,11 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
 
     insert_fields_from_syslog(&mut event, parsed);
 
+    // Add source type
+    event
+        .as_mut_log()
+        .try_insert(event::log_schema().source_type_key(), "syslog");
+
     trace!(
         message = "processing one event.",
         event = &field::debug(&event)

@@ -849,7 +849,7 @@ impl ContainerLogInfo {
         // merging.
         // Otherwise mark partial events and return all the events with no
         // merging.
-        let log_event = if auto_partial_merge {
+        let mut log_event = if auto_partial_merge {
             // Partial event events merging logic.
 
             // If event is partial, stash it and return `None`.
@@ -889,6 +889,9 @@ impl ContainerLogInfo {
             // Return the log event as is, partial or not. No merging here.
             log_event
         };
+
+        // Add source type
+        log_event.try_insert(event::log_schema().source_type_key(), "docker");
 
         // Partial or not partial - we return the event we got here, because all
         // other cases were handeled earlier.

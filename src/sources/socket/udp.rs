@@ -1,5 +1,5 @@
 use crate::{
-    event::Event,
+    event::{self, Event},
     internal_events::{UdpEventReceived, UdpSocketError},
     shutdown::ShutdownSignal,
     sources::Source,
@@ -59,6 +59,10 @@ pub fn udp(
                     event
                         .as_mut_log()
                         .insert(host_key.clone(), addr.to_string());
+
+                    event
+                        .as_mut_log()
+                        .try_insert(event::log_schema().source_type_key(), "socket");
 
                     emit!(UdpEventReceived { byte_size });
                     event

@@ -464,6 +464,11 @@ impl<R: Read> Stream for EventStream<R> {
             de.extract(log, &mut json);
         }
 
+        // Add source type
+        event
+            .as_mut_log()
+            .try_insert(event::log_schema().source_type_key(), "splunk_hec");
+
         self.events += 1;
 
         Ok(Async::Ready(Some(event)))
@@ -559,6 +564,11 @@ fn raw_event(
 
     // Add timestamp
     log.insert(event::log_schema().timestamp_key().clone(), Utc::now());
+
+    // Add source type
+    event
+        .as_mut_log()
+        .try_insert(event::log_schema().source_type_key(), "splunk_hec");
 
     Ok(event)
 }

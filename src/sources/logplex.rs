@@ -32,7 +32,15 @@ impl HttpSource for LogplexSource {
         body: FullBody,
         header_map: HeaderMap,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        decode_message(body, header_map)
+        decode_message(body, header_map).map(|mut events| {
+            // Add source type
+            for event in events.iter_mut() {
+                event
+                    .as_mut_log()
+                    .try_insert(event::log_schema().source_type_key(), "logplex");
+            }
+            events
+        })
     }
 }
 

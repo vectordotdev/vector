@@ -54,6 +54,15 @@ impl HttpSource for SimpleHttpSource {
     ) -> Result<Vec<Event>, ErrorMessage> {
         decode_body(body, self.encoding)
             .map(|events| add_headers(events, &self.headers, header_map))
+            .map(|mut events| {
+                // Add source type
+                for event in events.iter_mut() {
+                    event
+                        .as_mut_log()
+                        .try_insert(event::log_schema().source_type_key(), "http");
+                }
+                events
+            })
     }
 }
 

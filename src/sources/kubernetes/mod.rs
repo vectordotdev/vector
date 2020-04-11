@@ -85,6 +85,12 @@ impl SourceConfig for KubernetesConfig {
             .filter_map(move |event| now.filter(event))
             .map(remove_ending_newline)
             .filter_map(move |event| transform_pod_uid.transform(event))
+            .map(|mut event| {
+                event
+                    .as_mut_log()
+                    .try_insert(event::log_schema().source_type_key(), "kubernetes");
+                event
+            })
             .forward(out.sink_map_err(drop))
             .map(drop)
             .join(file_source)

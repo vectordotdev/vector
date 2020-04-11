@@ -66,6 +66,10 @@ impl TcpSource for RawTcpSource {
 
         event.as_mut_log().insert(host_key.clone(), host);
 
+        event
+            .as_mut_log()
+            .try_insert(event::log_schema().source_type_key(), "socket");
+
         trace!(
             message = "Received one event.",
             event = field::debug(&event)

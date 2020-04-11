@@ -327,6 +327,11 @@ fn create_event(
         event.as_mut_log().insert(host_key, hostname.clone());
     }
 
+    // Add source type
+    event
+        .as_mut_log()
+        .try_insert(event::log_schema().source_type_key(), "file");
+
     event
 }
 

@@ -1,5 +1,5 @@
 use crate::{
-    event::Event,
+    event::{self, Event},
     internal_events::UnixSocketEventReceived,
     sources::{util::build_unix_source, Source},
 };
@@ -41,6 +41,9 @@ fn build_event(host_key: &str, received_from: Option<Bytes>, line: &str) -> Opti
     if let Some(host) = received_from {
         event.as_mut_log().insert(host_key, host);
     }
+    event
+        .as_mut_log()
+        .try_insert(event::log_schema().source_type_key(), "socket");
     emit!(UnixSocketEventReceived { byte_size });
     Some(event)
 }

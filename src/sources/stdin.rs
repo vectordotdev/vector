@@ -110,6 +110,11 @@ fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event
         event.as_mut_log().insert(host_key, hostname.clone());
     }
 
+    // Add source type
+    event
+        .as_mut_log()
+        .try_insert(event::log_schema().source_type_key(), "stdin");
+
     event
 }
 
