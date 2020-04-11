@@ -70,6 +70,12 @@ function Layout(props) {
           {metaImage && (
             <meta name="twitter:image:alt" content={`Image for ${metaTitle}`} />
           )}
+          {metaImage && (
+            <meta name="twitter:site" content="@vectordotdev" />
+          )}
+          {metaImage && (
+            <meta name="twitter:creator" content="@vectordotdev" />
+          )}
           {canonURL && (
             <meta property="og:url" content={canonURL} />
           )}
