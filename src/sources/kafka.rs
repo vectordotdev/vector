@@ -310,5 +310,9 @@ mod integration_test {
             events[0].as_log()[&Atom::from("message_key")],
             "my key".into()
         );
+        assert_eq!(
+            events[0].as_log()[event::log_schema().source_type_key()],
+            "kafka".into()
+        );
     }
 }

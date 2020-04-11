@@ -821,6 +821,10 @@ mod tests {
             .as_log()
             .get(&event::log_schema().timestamp_key())
             .is_some());
+        assert_eq!(
+            event.as_log()[event::log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
     }
 
     #[test]
@@ -838,6 +842,10 @@ mod tests {
             .as_log()
             .get(&event::log_schema().timestamp_key())
             .is_some());
+        assert_eq!(
+            event.as_log()[event::log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
     }
 
     #[test]
@@ -860,6 +868,10 @@ mod tests {
                 .as_log()
                 .get(&event::log_schema().timestamp_key())
                 .is_some());
+            assert_eq!(
+                event.as_log()[event::log_schema().source_type_key()],
+                "splunk_hec".into()
+            );
         }
     }
 
@@ -878,6 +890,10 @@ mod tests {
             .as_log()
             .get(&event::log_schema().timestamp_key())
             .is_some());
+        assert_eq!(
+            event.as_log()[event::log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
     }
 
     #[test]
@@ -900,6 +916,10 @@ mod tests {
                 .as_log()
                 .get(&event::log_schema().timestamp_key())
                 .is_some());
+            assert_eq!(
+                event.as_log()[event::log_schema().source_type_key()],
+                "splunk_hec".into()
+            );
         }
     }
 
@@ -921,6 +941,10 @@ mod tests {
             .as_log()
             .get(&event::log_schema().timestamp_key())
             .is_some());
+        assert_eq!(
+            event.as_log()[event::log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
     }
 
     #[test]
@@ -958,6 +982,10 @@ mod tests {
             .as_log()
             .get(&event::log_schema().timestamp_key())
             .is_some());
+        assert_eq!(
+            event.as_log()[event::log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
     }
 
     #[test]
@@ -1018,6 +1046,10 @@ mod tests {
             .as_log()
             .get(&event::log_schema().timestamp_key())
             .is_some());
+        assert_eq!(
+            event.as_log()[event::log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
     }
 
     #[test]

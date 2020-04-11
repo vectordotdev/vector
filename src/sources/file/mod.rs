@@ -465,6 +465,7 @@ mod tests {
             log[&event::log_schema().message_key()],
             "hello world".into()
         );
+        assert_eq!(log[event::log_schema().source_type_key()], "file".into());
     }
 
     #[test]
@@ -822,7 +823,8 @@ mod tests {
                 vec![
                     event::log_schema().host_key().to_string(),
                     event::log_schema().message_key().to_string(),
-                    event::log_schema().timestamp_key().to_string()
+                    event::log_schema().timestamp_key().to_string(),
+                    event::log_schema().source_type_key().to_string()
                 ]
                 .into_iter()
                 .collect::<HashSet<_>>()

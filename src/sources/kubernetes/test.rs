@@ -526,6 +526,12 @@ fn kube_one_log() {
     wait_for(|| {
         for line in logs(&kube, &vector) {
             if line["message"].as_str().unwrap() == message {
+                assert_eq!(
+                    line[event::log_schema().source_type_key().as_str()]
+                        .as_str()
+                        .unwrap(),
+                    "kubernetes"
+                );
                 // DONE
                 return true;
             } else {

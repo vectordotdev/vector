@@ -141,6 +141,7 @@ mod tests {
             log[&event::log_schema().message_key()],
             "hello world".into()
         );
+        assert_eq!(log[event::log_schema().source_type_key()], "stdin".into());
     }
 
     #[test]

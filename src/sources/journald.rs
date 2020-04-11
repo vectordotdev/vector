@@ -527,6 +527,10 @@ mod tests {
             message(&received[0]),
             Value::Bytes("System Initialization".into())
         );
+        assert_eq!(
+            received[0].as_log()[event::log_schema().source_type_key()],
+            "journald".into()
+        );
         assert_eq!(message(&received[1]), Value::Bytes("unit message".into()));
     }
 
