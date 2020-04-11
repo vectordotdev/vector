@@ -6,7 +6,7 @@ lazy_static! {
     static ref FAST_RE: Regex = Regex::new(r"\A\w+(\.\w+)*\z").unwrap();
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum PathComponent {
     /// For example, in "a.b[0].c[2]" the keys are "a", "b", and "c".
     Key(String),
