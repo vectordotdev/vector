@@ -385,7 +385,6 @@ fn main() {
 
         info!("Shutting down.");
         let shutdown = topology.stop();
-        metrics_trigger.cancel();
 
         match rt.block_on(shutdown.select2(ctrl_c)) {
             Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
