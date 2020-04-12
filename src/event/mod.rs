@@ -17,6 +17,9 @@ pub mod metric;
 mod util;
 
 pub use metric::Metric;
+pub(crate) use util::log::PathComponent;
+#[cfg(feature = "transforms-grok_parser")]
+pub(crate) use util::log::PathIter;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -120,6 +123,13 @@ impl LogEvent {
         V: Into<Value>,
     {
         util::log::insert(&mut self.fields, key.as_ref(), value.into())
+    }
+
+    pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
+    where
+        V: Into<Value>,
+    {
+        util::log::insert_path(&mut self.fields, key, value.into())
     }
 
     pub fn insert_flat<K, V>(&mut self, key: K, value: V)

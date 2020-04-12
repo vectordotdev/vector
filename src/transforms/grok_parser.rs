@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    event::{self, Event},
+    event::{self, Event, PathComponent, PathIter},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_conversion_map_no_atoms, Conversion},
 };
@@ -52,6 +52,7 @@ impl TransformConfig for GrokParserConfig {
                     field: field.clone(),
                     drop_field: self.drop_field,
                     types,
+                    paths: HashMap::new(),
                 })
             })
             .context(InvalidGrok)?)
@@ -75,6 +76,7 @@ pub struct GrokParser {
     field: Atom,
     drop_field: bool,
     types: HashMap<String, Conversion>,
+    paths: HashMap<String, Vec<PathComponent>>,
 }
 
 impl Transform for GrokParser {
@@ -89,7 +91,13 @@ impl Transform for GrokParser {
                     let conv = self.types.get(name).unwrap_or(&Conversion::Bytes);
                     match conv.convert(value.into()) {
                         Ok(value) => {
-                            event.insert(name, value);
+                            if let Some(path) = self.paths.get(name) {
+                                event.insert_path(path.to_vec(), value);
+                            } else {
+                                let path = PathIter::new(name).collect::<Vec<_>>();
+                                self.paths.insert(name.to_string(), path.clone());
+                                event.insert_path(path, value);
+                            }
                         }
                         Err(error) => {
                             debug!(
