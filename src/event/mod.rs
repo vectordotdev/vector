@@ -17,7 +17,9 @@ pub mod metric;
 mod util;
 
 pub use metric::Metric;
-pub(crate) use util::log::{PathComponent, PathIter};
+pub(crate) use util::log::PathComponent;
+#[cfg(feature = "transform-grok_parser")]
+pub(crate) use util::log::PathIter;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
