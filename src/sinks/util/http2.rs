@@ -1,19 +1,10 @@
-#![allow(unused_imports)]
-
-use super::{
-    retries::{RetryAction, RetryLogic},
-    service::{TowerBatchedSink, TowerRequestSettings},
-    Batch, BatchSettings,
-};
+use super::retries::{RetryAction, RetryLogic};
 use crate::{
     dns::Resolver,
-    event::Event,
     tls::{tls_connector_builder, MaybeTlsSettings},
-    topology::config::SinkContext,
 };
 use bytes05::{Buf, Bytes};
-use futures::{compat::Future01CompatExt, future::BoxFuture, FutureExt};
-use futures01::{Async, AsyncSink, Future, Poll as Poll01, Sink, StartSend, Stream};
+use futures::future::BoxFuture;
 use http02::header::HeaderValue;
 use http02::{Request, StatusCode};
 use http_body::Body as HttpBody;
@@ -245,8 +236,7 @@ mod test {
     use super::*;
     use crate::test_util::runtime;
     use bytes05::Buf;
-    use futures::{FutureExt, TryFutureExt};
-    use futures01::{Future, Sink, Stream};
+    use futures01::{Future, Stream};
     use http02::Method;
     use hyper13::service::{make_service_fn, service_fn};
     use hyper13::{Body, Response, Server, Uri};
