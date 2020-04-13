@@ -493,6 +493,10 @@ TODO
 
 TODO
 
+### Changes to Vector release process
+
+TODO
+
 ## Prior Art
 
 1. [Filebeat k8s integration]
