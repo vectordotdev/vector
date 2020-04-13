@@ -317,7 +317,7 @@ controller), but that doesn't make a lot of sense for us to work on, since
 
 ### Deployment configuration
 
-It is important that provide a well-thought for deployment configuration for
+It is important that provide a well-thought deployment configuration for
 Vector as part of our Kubernetes integration. We want to ensure good user
 experience, and it includes installation, configuration and upgrading.
 
@@ -372,7 +372,8 @@ a config file with the common configuration part in of our YAML / Helm suite,
 and let users keep their custom config part in a separate file.
 
 We will then mount two `ConfigMap`s into a container, and start Vector in
-multiple configuration files mode.
+multiple configuration files mode
+(`vector --config .../common.toml --config .../custom.toml`).
 
 ### Annotating events with metadata from Kubernetes
 
