@@ -107,7 +107,8 @@ TODO: insert diagram
     ```shell
     kubectl create namespace vector
     kubectl apply --namespace vector -f vector-configmap.yaml
-    kubectl apply --namespace vector -f https://packages.timber.io/vector/latest/kubernetes/vector.yaml
+    kubectl apply -f https://packages.timber.io/vector/latest/kubernetes/vector-global.yaml
+    kubectl apply --namespace vector -f https://packages.timber.io/vector/latest/kubernetes/vector-namespaced.yaml
     ```
 
     - _See [outstanding questions 3, 4, 5, 6, and 7](#outstanding-questions)._
@@ -353,6 +354,8 @@ requirement is that it has to have a `ReadWriteMany` access mode.
 
 #### Vector config files
 
+> This section is about Vector `.toml` config files.
+
 Vector configuration in the Kubernetes environment can generally be split into
 two logical parts: a common Kubernetes-related configuration, and a custom
 user-supplied configuration.
@@ -374,6 +377,51 @@ and let users keep their custom config part in a separate file.
 We will then mount two `ConfigMap`s into a container, and start Vector in
 multiple configuration files mode
 (`vector --config .../common.toml --config .../custom.toml`).
+
+#### Strategy on YAML file grouping
+
+> This section is about Kubernetes `.yaml` files.
+
+YAML files storing Kubernetes API objects configuration can be grouped
+differently.
+
+The layout proposed in [guide above](#kubectl-interface) is what we're planing
+to use. It is in line with the sections above on Vector configuration splitting
+into the common and custom parts.
+
+The idea is to have a single file with a namespaced configuration (`DaemonSet`,
+`ServiceAccount`, `ClusterRoleBinding`, common `ConfigMap`, etc), a single file
+with a global (non-namespaced) configuration (mainly just `ClusterRole`) and a
+user-supplied file containing just a `ConfigMap` with the custom part of the
+Vector configuration. Three `.yaml` files in total, two of which are supplied by
+us, and one is created by the user.
+
+Ideally we'd want to make the presence of the user-supplied optional, but it
+just doesn't make sense, because sink has to be configured somewhere.
+
+We can offer some simple "typical custom configurations" at our documentation as
+an example:
+
+- with a sink to push data to our Alloy;
+- with a cluster-agnosic `elasticsearch` sink;
+- for AWS clusters, with a `cloudwatch` sink;
+- etc...
+
+We must be careful with our `.yaml` files to make them play well with not just
+`kubectl create -f`, but also with `kubectl apply -f`. There are often issues
+with impotency when labels and selectors aren't configured properly and we
+should be wary of that.
+
+##### Considered Alternatives
+
+We can use a separate `.yaml` file per object.
+That's more inconvenient since we'll need users to execute more commands, yet it
+doesn't seems like it provides any benefit.
+
+We expect users to "fork" and adjust our config files as they see fit, so
+they'll be able to split the files if required. They then maintain their
+configuration on their own, and we assume they're capable and know what they're
+doing.
 
 ### Annotating events with metadata from Kubernetes
 
