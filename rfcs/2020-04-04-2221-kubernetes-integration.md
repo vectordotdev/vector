@@ -116,7 +116,35 @@ TODO: insert diagram
 
 #### Helm Interface
 
-TODO: fill in
+1.  Install [`helm`][helm_install].
+
+2.  Add our Helm Chart repo.
+
+    ```shell
+    helm repo add vector https://charts.vector.dev
+    helm repo update
+    ```
+
+3.  Configure Vector.
+
+    TODO: address this when we decide on the helm chart internals.
+
+4.  Deploy Vector!
+
+    ```shell
+    kubectl create namespace vector
+
+    # Helm v3
+    helm install \
+      cert-manager vector/vector \
+      --namespace vector
+
+    # Helm v2
+    helm install \
+      --name vector \
+      --namespace vector \
+      vector/vector
+    ```
 
 ## Design considerations
 
@@ -575,6 +603,7 @@ See [motivation](#motivation).
 [fluentd_daemonset]: https://github.com/fluent/fluentd-kubernetes-daemonset/blob/master/fluentd-daemonset-papertrail.yaml
 [guide_example]: https://vector.dev/guides/integrate/sources/syslog/aws_kinesis_firehose/
 [gvisor]: https://github.com/google/gvisor
+[helm_install]: https://cert-manager.io/docs/installation/kubernetes/
 [honeycomb integration]: https://docs.honeycomb.io/getting-data-in/integrations/kubernetes/
 [influx helm charts]: https://github.com/influxdata/helm-charts
 [issue#1293]: https://github.com/timberio/vector/issues/1293
