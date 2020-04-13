@@ -86,9 +86,12 @@ impl SourceConfig for KubernetesConfig {
             .map(remove_ending_newline)
             .filter_map(move |event| transform_pod_uid.transform(event))
             .map(|mut event| {
-                event
-                    .as_mut_log()
-                    .try_insert(event::log_schema().source_type_key(), "kubernetes");
+                // Add source type
+                let key = event::log_schema().source_type_key();
+                // We need to insert here to overwrite files source type.
+                if event.as_log().get(key) == Some(&"file".into()) {
+                    event.as_mut_log().insert(key, "kubernetes");
+                }
                 event
             })
             .forward(out.sink_map_err(drop))
