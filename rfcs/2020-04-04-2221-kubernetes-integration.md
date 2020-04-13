@@ -336,6 +336,116 @@ and let users keep their custom config part in a separate file.
 We will then mount two `ConfigMap`s into a container, and start Vector in
 multiple configuration files mode.
 
+### Annotating events with metadata from Kubernetes
+
+Kubernetes has a lot of metadata that can be associated with the logs, and most
+of the users expect us to add some parts of that metadata as fields to the
+event.
+
+We already have an implementation that does this in the form of
+`kubernetes_pod_metadata` transform.
+
+It works great, however, as can be seen from the next section, we might need
+to implement a very similar functionality at the `kubernetes` source as well to
+perform log filtering. So, if we'll be obtaining pod metadata at the
+`kubernetes` source, we might as well enhance the event right there. This would
+render `kubernetes_pod_metadata` useless, as there would be no use case for
+it that wouldn't be covered by `kubernetes` source.
+
+What parts of metadata we inject into events should be configurable, but we can
+and want to offer a sane default here.
+
+### Origin filtering
+
+We can do a highly efficient filtering based on the log file path, and a more
+comprehensive filtering via metadata from the k8s API, that is, unfortunately,
+has a bit move overhead.
+
+The best user experience is via k8s API, because then we can support filtering
+by labels/annotations, which is a standard way of doing things with k8s.
+
+#### Filtering based on path
+
+We already do that in our current implementation.
+
+The idea we can derive some useful parameters from the logs file paths.
+For more info on the logs file paths, see the
+[File locations][anchor_file_locations] section of this RFC.
+
+So, Kubernetes 1.14+ [exposes][k8s_src_build_container_logs_directory] the
+following information via the file path:
+
+- `pod namespace`
+- `pod name`
+- `pod uuid`
+
+This is enough information for the basic filtering, and the best part is it's
+available to us without and extra work - we're reading the files anyways.
+
+#### Filtering based on Kubernetes API metadata
+
+Filtering bu Kubernetes metadata is way more advanced and flexible from the user
+perspective.
+
+The idea of doing filtering like that is when Vector picks up a new log file to
+process at `kubernetes` source, it has to be able to somehow make a decision on
+whether to consume the logs from that file, or to ignore it, based on the state
+at the k8s API and Vector configuration.
+
+This means that there has to be way of making the data from the k8s API related
+to the log file available for Vector.
+
+Based on the k8s API structure, it looks like we should aim for obtaining the
+`Pod` object, since it contains the essential information about the containers
+that produced the log file. Also, is is the `Pod` objects that `kubelet` relies
+on to manage the workloads on the node, so this makes `Pod` objects the best
+option for our case, i.e. better than fetching `Deployment` objects.
+
+There in a number of approaches to get the required `Pod` objects:
+
+1. Per-file requests.
+
+   The file paths provide enough data for us to make a query to the k8s API. In
+   fact, we only need a `pod namespace` and a `pod uuid` to successfully obtain
+   the `Pod` object.
+
+2. Per-node requests.
+
+   This approach is to list all the pods that are running at the same node as
+   Vector runs. This effectively lists all the `Pod` objects we could possibly
+   care about.
+
+One important thing to note is metadata for the given pod can change over time,
+and the implementation has to take that into account, and update the filtering
+state accordingly.
+
+We also can't overload the k8s API with requests. General rule of thumb is we
+shouldn't do requests much more often that k8s itself generates events.
+
+Each approach has very different properties. It is hard to estimate which ones
+are a better fit.
+
+A single watch call for a list of pods running per node (2) should generate
+less overhead and would probably be easier to implement.
+
+Issuing a watch per individual pod (1) is more straightforward, but will
+definitely use more sockets. We could speculate that we'll get a smaller latency
+than with doing per-node filtering, however it's very unclear if that's the
+case.
+
+Either way, we probably want to keep some form of cache + a circuit breaker to
+avoid hitting the k8s API too often.
+
+#### Filtering based on event fields after annotation
+
+This is an alternative approach to the previous implementation.
+
+Current implementation allows doing this, but is has a certain downsides -
+the main problem is we're paying the price of reading the log files that are
+filtered out completely.
+
+In most scenarios it'd be a significant overhead, and can lead to cycles.
+
 ## Prior Art
 
 1. [Filebeat k8s integration]
@@ -440,6 +550,7 @@ See [motivation](#motivation).
 - [ ] Add Kubernetes setup/integration guide.
 - [ ] Release `0.10.0` and announce.
 
+[anchor_file_locations]: #file-locations
 [bonzai logging operator]: https://github.com/banzaicloud/logging-operator
 [container_runtimes]: https://kubernetes.io/docs/setup/production-environment/container-runtimes/
 [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
