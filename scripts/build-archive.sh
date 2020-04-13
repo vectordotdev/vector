@@ -20,6 +20,7 @@ RUST_LTO=${RUST_LTO:-}
 STRIP=${STRIP:-}
 FEATURES=${FEATURES:-}
 ARCHIVE_TYPE=${ARCHIVE_TYPE:-tar.gz}
+RUSTFLAGS=${RUSTFLAGS:--C codegen-units=1}
 
 if [ -z "$FEATURES" ]; then
     FEATURES="default"
@@ -74,6 +75,7 @@ if [ -n "$RUST_LTO" ]; then
   printf "[profile.release]\nlto = $lto_value" >> Cargo.toml
 fi
 
+export RUSTFLAGS
 if [ "$FEATURES" != "default" ]; then
     cargo build $build_flags --no-default-features --features "$FEATURES"
 else
