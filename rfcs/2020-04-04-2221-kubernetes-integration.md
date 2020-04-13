@@ -211,6 +211,7 @@ configuration, but we shouldn't oversimplify it either. It has to be
 production-ready. But it also has to be portable, in a sense that it should work
 without tweaking with as much cluster setups as possible.
 We should support both `kubectl create` and `kubectl apply` flows.
+`kubectl apply` is generally more limiting than `kubectl create`.
 
 ### Reading container logs
 
@@ -527,8 +528,10 @@ See [motivation](#motivation).
 
 ### From Ben
 
-1. What is the minimal Kubernetes version that we want to support. See
-   [this comment][kubernetes_version_comment].
+1. ~~What is the minimal Kubernetes version that we want to support. See
+   [this comment][kubernetes_version_comment].~~
+   See the [Minimal supported Kubernetes version][anchor_minimal_supported_kubernetes_version]
+   section.
 1. What is the best to avoid Vector from ingesting it's own logs? I'm assuming
    that my [`kubectl` tutorial](#kubectl-interface) handles this with namespaces?
    We'd just need to configure Vector to exclude this namespace?
@@ -537,8 +540,9 @@ See [motivation](#motivation).
    offers [four separate configuration files][fluentbit_installation]
    (`service-account.yaml`, `role.yaml`, `role-binding.yaml`, `configmap.yaml`).
    Which approach is better? Why are they different?
-1. Should we prefer `kubectl create ...` or `kubectl apply ...`? The examples
-   in the [prior art](#prior-art) section use both.
+1. ~~Should we prefer `kubectl create ...` or `kubectl apply ...`? The examples
+   in the [prior art](#prior-art) section use both.~~
+   See [Helm vs raw YAML files][anchor_helm_vs_raw_yaml_files] section.
 1. From what I understand, Vector requires the Kubernetes `watch` verb in order
    to receive updates to k8s cluster changes. This is required for the
    `kubernetes_pod_metadata` transform. Yet, Fluentbit [requires the `get`,
@@ -602,6 +606,8 @@ See [motivation](#motivation).
 - [ ] Release `0.10.0` and announce.
 
 [anchor_file_locations]: #file-locations
+[anchor_helm_vs_raw_yaml_files]: #helm-vs-raw-yaml-files
+[anchor_minimal_supported_kubernetes_version]: #minimal-supported-kubernetes-version
 [bonzai logging operator]: https://github.com/banzaicloud/logging-operator
 [chartmuseum]: https://chartmuseum.com/
 [container_runtimes]: https://kubernetes.io/docs/setup/production-environment/container-runtimes/
