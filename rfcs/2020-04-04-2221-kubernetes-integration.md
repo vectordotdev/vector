@@ -281,6 +281,15 @@ installations easily upgradable.
 Everything we need to do to achieve this is outlined at the
 [The Chart Repository Guide].
 
+We can use a tool like [ChartMuseum] to manage our repo. Alternatively, we can
+use a bare HTTP server, like AWS S3 or Github Pages. A tool like like
+[ChartMuseum] has a benefit of doing some things for us. It can use S3
+for storage, and offers a convenient [helm plugin][helm_push] to release charts,
+so the release process should be very simple.
+
+From the user experience perspective, it would be cool if we expose our chart
+repo at `https://charts.vector.dev` - short and easy to remember or even guess.
+
 ### Deployment Variants
 
 We have two ways to deploy vector:
@@ -590,6 +599,7 @@ See [motivation](#motivation).
 
 [anchor_file_locations]: #file-locations
 [bonzai logging operator]: https://github.com/banzaicloud/logging-operator
+[chartmuseum]: https://chartmuseum.com/
 [container_runtimes]: https://kubernetes.io/docs/setup/production-environment/container-runtimes/
 [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
 [daemonset]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
@@ -604,6 +614,7 @@ See [motivation](#motivation).
 [guide_example]: https://vector.dev/guides/integrate/sources/syslog/aws_kinesis_firehose/
 [gvisor]: https://github.com/google/gvisor
 [helm_install]: https://cert-manager.io/docs/installation/kubernetes/
+[helm_push]: https://github.com/chartmuseum/helm-push
 [honeycomb integration]: https://docs.honeycomb.io/getting-data-in/integrations/kubernetes/
 [influx helm charts]: https://github.com/influxdata/helm-charts
 [issue#1293]: https://github.com/timberio/vector/issues/1293
