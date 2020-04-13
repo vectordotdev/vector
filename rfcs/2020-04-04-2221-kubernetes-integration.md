@@ -446,6 +446,16 @@ filtered out completely.
 
 In most scenarios it'd be a significant overhead, and can lead to cycles.
 
+### Configuring Vector via Kubernetes API
+
+#### Annotations and labels on vector pod via downward API
+
+TODO
+
+#### Custom CRDs
+
+TODO
+
 ## Prior Art
 
 1. [Filebeat k8s integration]
