@@ -319,6 +319,11 @@ fn create_event(
 ) -> Event {
     let mut event = Event::from(line);
 
+    // Add source type
+    event
+        .as_mut_log()
+        .insert(event::log_schema().source_type_key(), "file");
+
     if let Some(file_key) = &file_key {
         event.as_mut_log().insert(file_key.clone(), file);
     }
@@ -326,11 +331,6 @@ fn create_event(
     if let Some(hostname) = &hostname {
         event.as_mut_log().insert(host_key, hostname.clone());
     }
-
-    // Add source type
-    event
-        .as_mut_log()
-        .try_insert(event::log_schema().source_type_key(), "file");
 
     event
 }

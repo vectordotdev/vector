@@ -124,6 +124,11 @@ fn kafka_source(
                         };
                         let mut event = Event::from(payload);
 
+                        // Add source type
+                        event
+                            .as_mut_log()
+                            .insert(event::log_schema().source_type_key(), "kafka");
+
                         if let Some(key_field) = &config.key_field {
                             match msg.key_view::<[u8]>() {
                                 None => (),
@@ -135,10 +140,6 @@ fn kafka_source(
                                 }
                             }
                         }
-                        // Add source type
-                        event
-                            .as_mut_log()
-                            .try_insert(event::log_schema().source_type_key(), "kafka");
 
                         consumer_ref.store_offset(&msg).map_err(
                             |e| error!(message = "Cannot store offset for the message", error = ?e),

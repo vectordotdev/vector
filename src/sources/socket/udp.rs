@@ -58,11 +58,11 @@ pub fn udp(
 
                     event
                         .as_mut_log()
-                        .insert(host_key.clone(), addr.to_string());
+                        .insert(event::log_schema().source_type_key(), "socket");
 
                     event
                         .as_mut_log()
-                        .try_insert(event::log_schema().source_type_key(), "socket");
+                        .insert(host_key.clone(), addr.to_string());
 
                     emit!(UdpEventReceived { byte_size });
                     event

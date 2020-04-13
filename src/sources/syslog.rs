@@ -206,6 +206,11 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
     let mut event = Event::from(&parsed.msg[..]);
 
+    // Add source type
+    event
+        .as_mut_log()
+        .insert(event::log_schema().source_type_key(), "syslog");
+
     if let Some(host) = &parsed.hostname {
         event.as_mut_log().insert(host_key, host.clone());
     } else if let Some(default_host) = default_host {
@@ -221,11 +226,6 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
         .insert(event::log_schema().timestamp_key().clone(), timestamp);
 
     insert_fields_from_syslog(&mut event, parsed);
-
-    // Add source type
-    event
-        .as_mut_log()
-        .try_insert(event::log_schema().source_type_key(), "syslog");
 
     trace!(
         message = "processing one event.",

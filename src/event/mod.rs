@@ -130,15 +130,12 @@ impl LogEvent {
         self.fields.insert(key.into(), value.into());
     }
 
-    pub fn try_insert<V>(&mut self, key: &Atom, value: V) -> Option<V>
+    pub fn try_insert<V>(&mut self, key: &Atom, value: V)
     where
         V: Into<Value>,
     {
-        if self.contains(key) {
-            Some(value)
-        } else {
+        if !self.contains(key) {
             self.insert(key.clone(), value);
-            None
         }
     }
 

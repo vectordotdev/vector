@@ -56,10 +56,9 @@ impl HttpSource for SimpleHttpSource {
             .map(|events| add_headers(events, &self.headers, header_map))
             .map(|mut events| {
                 // Add source type
+                let key = event::log_schema().source_type_key();
                 for event in events.iter_mut() {
-                    event
-                        .as_mut_log()
-                        .try_insert(event::log_schema().source_type_key(), "http");
+                    event.as_mut_log().try_insert(key, "http");
                 }
                 events
             })
