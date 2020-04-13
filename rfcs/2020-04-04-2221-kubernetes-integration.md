@@ -378,6 +378,16 @@ We will then mount two `ConfigMap`s into a container, and start Vector in
 multiple configuration files mode
 (`vector --config .../common.toml --config .../custom.toml`).
 
+#### Vector config file reloads
+
+It is best to explicitly disable reloads in our default deployment
+configuration, because this provides more reliability that [eventually consistent
+`ConfigMap` updates][configmap_updates].
+
+Users can recreate the `Pod`s (thus restarting Vector, and making it aware of
+the new config) via
+[`kubectl rollout restart -n vector daemonset/vector`][kubectl_rollout_restart].
+
 #### Strategy on YAML file grouping
 
 > This section is about Kubernetes `.yaml` files.
@@ -659,6 +669,7 @@ See [motivation](#motivation).
 [anchor_minimal_supported_kubernetes_version]: #minimal-supported-kubernetes-version
 [bonzai logging operator]: https://github.com/banzaicloud/logging-operator
 [chartmuseum]: https://chartmuseum.com/
+[configmap_updates]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
 [container_runtimes]: https://kubernetes.io/docs/setup/production-environment/container-runtimes/
 [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
 [daemonset]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
@@ -699,6 +710,7 @@ See [motivation](#motivation).
 [k8s_src_parse_funcs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L116
 [k8s_src_read_logs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L277
 [k8s_src_var_log_pods]: https://github.com/kubernetes/kubernetes/blob/58596b2bf5eb0d84128fa04d0395ddd148d96e51/pkg/kubelet/kuberuntime/kuberuntime_manager.go#L60
+[kubectl_rollout_restart]: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-em-restart-em-
 [kubernetes version and version skew support policy]: https://kubernetes.io/docs/setup/release/version-skew-policy/
 [kubernetes_version_comment]: https://github.com/timberio/vector/pull/2188#discussion_r403120481
 [logdna k8s integration]: https://docs.logdna.com/docs/kubernetes
