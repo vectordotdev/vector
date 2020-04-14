@@ -1,10 +1,10 @@
 import React from 'react';
 
 import Avatar from '@site/src/components/Avatar';
+import CTA from '@site/src/components/CTA';
 import Layout from '@theme/Layout';
 import BlogPostItem from '@theme/BlogPostItem';
 import BlogPostPaginator from '@theme/BlogPostPaginator';
-import MailingListForm from '@site/src/components/MailingListForm';
 import MDXComponents from '@theme/MDXComponents';
 import {MDXProvider} from '@mdx-js/react';
 import Tags from '@site/src/components/Tags';
@@ -53,17 +53,12 @@ function BlogPostPage(props) {
           </div>
         </header>
         <div className="container container--xs margin-vert--xl">
-          <section className="markdown align-text-edges dropcap">
+          <section className="markdown dropcap">
             <MDXProvider components={MDXComponents}><BlogPostContents /></MDXProvider>
           </section>
-          <section className={classnames('panel', styles.mailingList)} style={{textAlign: 'center'}}>
-            <div className={styles.mailingListTitle}>
-              <i className="feather icon-mail"></i> Vector In Your Inbox!
-            </div>
-            <p>
-              One email on the 1st of the month. No spam, ever.
-            </p>
-            <MailingListForm center={true} description={false} size="lg" />
+          <section>
+            <h2>Like What You See?</h2>
+            <CTA />
           </section>
           {(metadata.nextItem || metadata.prevItem) && (
             <div className="margin-vert--xl">

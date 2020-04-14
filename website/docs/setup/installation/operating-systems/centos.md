@@ -178,7 +178,7 @@ The following diagram demonstrates how it works.
 <ConfigExample
   format="toml"
   path={"vector.toml"}
-  sourceName={"file"}
+  sourceName={"journald"}
   sinkName={null} />
 
 </li>

@@ -66,7 +66,7 @@
 }
 
 .performance-tests--switcher .react-select__menu {
-  background: var(--ifm-panel-background-solid);
+  background: var(--ifm-panel-background-color-solid);
   border-radius: var(--ifm-global-radius);
   color: var(--ifm-color-content);
 }
@@ -82,7 +82,7 @@
 }
 
 .performance-tests--switcher .react-select__option--is-focused {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-color-active);
   color: var(--ifm-color-content);
 }
 

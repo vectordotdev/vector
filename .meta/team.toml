@@ -55,12 +55,6 @@ ago before helping to launch Vector.\
 """
 
 [[team]]
-id = "brady"
-avatar = "https://github.com/timber-bradybot.png"
-github = "https://github.com/timber-bradybot"
-name = "Brady"
-
-[[team]]
 id = "bruce"
 avatar = "https://github.com/bruceg.png"
 github = "https://github.com/bruceg"

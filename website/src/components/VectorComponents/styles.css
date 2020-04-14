@@ -36,7 +36,7 @@
 }
 
 .vector-component:hover {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-color-active);
   border-color: var(--ifm-panel-border-color-active);
   box-shadow: var(--ifm-panel-box-shadow-active);
   color: var(--ifm-panel-color-active);

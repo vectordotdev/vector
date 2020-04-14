@@ -16,7 +16,7 @@
 }
 
 .integrations g.item:hover circle {
-  fill: var(--ifm-panel-background-active);
+  fill: var(--ifm-panel-background-color-active);
   stroke: var(--ifm-panel-border-color-active);
 }
 

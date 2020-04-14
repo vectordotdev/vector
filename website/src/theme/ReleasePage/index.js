@@ -1,6 +1,7 @@
 import React from 'react';
 
 import Alert from '@site/src/components/Alert';
+import CTA from '@site/src/components/CTA';
 import DownloadDiagram from '@site/src/components/DownloadDiagram';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
@@ -181,35 +182,13 @@ function ReleasePage(props) {
           {warnings.length > 0 && <Alert icon={false} fill={true} type="danger" className="list--warnings margin-bottom--lg">
             <ul>{warnings}</ul>
           </Alert>}
-          {warnings.length == 0 && <Alert fill={true} icon="check-circle" type="primary" className="margin-bottom--lg">
-            This release can be cleanly upgraded. There no breaking changes or special upgrade actions.
-          </Alert>}
           <section className="markdown">
             <MDXProvider components={MDXComponents}><ReleaseContents /></MDXProvider>
           </section>
           <section>
             <h2>Like What You See?</h2>
 
-            <div className="row">
-              <div className="col">
-                <a href="https://twitter.com/vectordotdev" target="_blank" className={classnames('panel', styles.mailingList)} style={{textAlign: 'center'}}>
-                  <div className="panel--icon">
-                    <i className="feather icon-twitter" title="Twitter"></i>
-                  </div>
-                  <div className="panel--title">Follow @vectordotdev</div>
-                  <div className="panel--description">Get real-time updates!</div>
-                </a>
-              </div>
-              <div className="col">
-                <a href="https://github.com/timberio/vector" target="_blank" className="panel text--center">
-                  <div className="panel--icon">
-                    <i className="feather icon-github"></i>
-                  </div>
-                  <div className="panel--title">Star timberio/vector</div>
-                  <div className="panel--description">Star the repo to support us.</div>
-                </a>
-              </div>
-            </div>
+            <CTA />
           </section>
         </div>
         {(metadata.nextItem || metadata.prevItem) && (

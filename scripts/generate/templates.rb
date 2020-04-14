@@ -290,6 +290,7 @@ class Templates
         {
           authorGithub: author ? highlight.author_github : nil,
           dateString: "#{highlight.date}T00:00:00",
+          description: highlight.description,
           permalink: highlight.permalink,
           prNumbers: highlight.pr_numbers,
           release: highlight.release,

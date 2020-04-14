@@ -17,8 +17,8 @@ function normalizeItems(items) {
     if (item.content) {
       const {content: HighlightContents} = item;
       const {frontMatter, metadata} = HighlightContents;
-      const {author_github: authorGithub, description, pr_numbers: prNumbers, release, title} = frontMatter;
-      const {date: dateString, permalink, tags} = metadata;
+      const {author_github: authorGithub, pr_numbers: prNumbers, release, title} = frontMatter;
+      const {date: dateString, description, permalink, tags} = metadata;
 
       let map = {};
       map['authorGithub'] = authorGithub;

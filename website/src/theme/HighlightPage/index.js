@@ -1,6 +1,7 @@
 import React from 'react';
 
 import Avatar from '@site/src/components/Avatar';
+import CTA from '@site/src/components/CTA';
 import Layout from '@theme/Layout';
 import MDXComponents from '@theme/MDXComponents';
 import {MDXProvider} from '@mdx-js/react';
@@ -59,27 +60,7 @@ function HighlightPage(props) {
           </section>
           <section>
             <h2>Like What You See?</h2>
-
-            <div className="row">
-              <div className="col">
-                <a href="https://twitter.com/vectordotdev" target="_blank" className={classnames('panel', styles.mailingList)} style={{textAlign: 'center'}}>
-                  <div className="panel--icon">
-                    <i className="feather icon-twitter" title="Twitter"></i>
-                  </div>
-                  <div className="panel--title">Follow @vectordotdev</div>
-                  <div className="panel--description">Get real-time updates!</div>
-                </a>
-              </div>
-              <div className="col">
-                <a href="https://github.com/timberio/vector" target="_blank" className="panel text--center">
-                  <div className="panel--icon">
-                    <i className="feather icon-github"></i>
-                  </div>
-                  <div className="panel--title">Star timberio/vector</div>
-                  <div className="panel--description">Star the repo to support us.</div>
-                </a>
-              </div>
-            </div>
+            <CTA />
           </section>
           {(metadata.nextItem || metadata.prevItem) && (
             <div className="margin-vert--xl">

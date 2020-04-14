@@ -25,7 +25,7 @@ class Highlight
     front_matter = parsed.front_matter
 
     @author_github = front_matter.fetch("author_github")
-    @description = (parsed.content.split("\n\n").first || "").remove_markdown_links
+    @description = front_matter.fetch("description")
     @id = front_matter["id"] || @path.split("/").last.gsub(/\.md$/, '')
     @importance = front_matter.fetch("importance")
     @permalink = "#{HIGHLIGHTS_BASE_PATH}/#{id}/"

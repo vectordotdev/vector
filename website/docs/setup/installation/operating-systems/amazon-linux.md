@@ -85,7 +85,7 @@ The following diagram demonstrates how it works.
     <ConfigExample
       format="toml"
       path={"/etc/vector/vector.toml"}
-      sourceName={"journald"}
+      sourceName={"file"}
       sinkName={null} />
 
 4.  ### Start Vector
@@ -116,7 +116,7 @@ The following diagram demonstrates how it works.
     <ConfigExample
       format="toml"
       path={"/etc/vector/vector.toml"}
-      sourceName={"journald"}
+      sourceName={"file"}
       sinkName={null} />
 
 4.  ### Start Vector
@@ -147,7 +147,7 @@ The following diagram demonstrates how it works.
     <ConfigExample
       format="toml"
       path={"/etc/vector/vector.toml"}
-      sourceName={"journald"}
+      sourceName={"file"}
       sinkName={null} />
 
 4.  ### Start Vector
@@ -179,7 +179,7 @@ The following diagram demonstrates how it works.
 <ConfigExample
   format="toml"
   path={"vector.toml"}
-  sourceName={"file"}
+  sourceName={"journald"}
   sinkName={null} />
 
 </li>

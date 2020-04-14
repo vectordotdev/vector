@@ -2505,7 +2505,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-10-21",
-      "description": "The dynamic `encoding` concept in Vector was confusing users, so we've made\nit required an explicit. Simply add `encode = \"json\"` to your `console` and\n`file` sinks.",
+      "description": "The `encoding` option is now required for these sinks",
       "id": "2019-10-21-require-encoding-option-for-console-and-file-sinks",
       "importance": "low",
       "path": "website/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks.md",
@@ -2521,7 +2521,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-11-19",
-      "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
+      "description": "These architectures are widely used in embeded devices & servers",
       "id": "2019-11-19-arm-support-on-linux",
       "importance": "high",
       "path": "website/highlights/2019-11-19-arm-support-on-linux.md",
@@ -2537,7 +2537,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-11-21",
-      "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
+      "description": "Bringing the performance and reliability of Vector to Windows",
       "id": "2019-11-21-windows-support",
       "importance": "high",
       "path": "website/highlights/2019-11-21-windows-support.md",
@@ -2552,7 +2552,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-11-25",
-      "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
+      "description": "Treating your Vector configuration files as code",
       "id": "2019-11-25-unit-testing-vector-config-files",
       "importance": "medium",
       "path": "website/highlights/2019-11-25-unit-testing-vector-config-files.md",
@@ -2566,7 +2566,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-12-04",
-      "description": "The `datadog` sink has been renamed to `datadog_metrics` to make way for the\nupcoming `datadog_logs` sink.",
+      "description": "This ensures that naming is consistent for the upcoming `datadog_logs` sink",
       "id": "2019-12-04-rename-datadog-sink-to-datadog_metrics",
       "importance": "low",
       "path": "website/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics.md",
@@ -2581,7 +2581,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2019-12-13",
-      "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
+      "description": "Point Vector to custom DNS servers",
       "id": "2019-12-13-custom-dns",
       "importance": "low",
       "path": "website/highlights/2019-12-13-custom-dns.md",
@@ -2595,7 +2595,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2019-12-14",
-      "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
+      "description": "Early adopters have a new Kuberenetes source to chew on",
       "id": "2019-12-14-kubernetes-source-alpha",
       "importance": "low",
       "path": "website/highlights/2019-12-14-kubernetes-source-alpha.md",
@@ -2610,7 +2610,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2019-12-16",
-      "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
+      "description": "Enrich your events with EC2 metadata",
       "id": "2019-12-16-ec2-metadata",
       "importance": "high",
       "path": "website/highlights/2019-12-16-ec2-metadata.md",
@@ -2625,7 +2625,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2020-01-03",
-      "description": "The `tcp` and `udp` sources no longer exist and have been merged into a new\n`socket` type.",
+      "description": "We've simplified our socket based sources into a single `socket` source",
       "id": "2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source",
       "importance": "low",
       "path": "website/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source.md",
@@ -2641,7 +2641,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-01-03",
-      "description": "The `tcp` sink has been renamed to `socket`, upgrading is easy!",
+      "description": "This renames the existing `tcp` sink to `socket`",
       "id": "2020-01-03-move-existing-tcp-sink-into-socket-sink",
       "importance": "low",
       "path": "website/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink.md",
@@ -2656,7 +2656,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2020-01-07",
-      "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
+      "description": "Scrape prometheus metrics with Vector",
       "id": "2020-01-07-prometheus-source",
       "importance": "high",
       "path": "website/highlights/2020-01-07-prometheus-source.md",
@@ -2671,7 +2671,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-01-12",
-      "description": "Request based sinks have had their request fields nested under the table\n`request` and no longer use fixed retry intervals, instead using a fibonacci\nsequence for backing off retry attempts.",
+      "description": "<fill-in>",
       "id": "2020-01-12-request-options-refactored",
       "importance": "low",
       "path": "website/highlights/2020-01-12-request-options-refactored.md",
@@ -2687,7 +2687,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-01-12",
-      "description": "The `kafka` sink field `bootstrap_servers` has been changed from an array to a\nstring, expecting a comma separated list of bootstrap servers similar to the\n`kafka` source:",
+      "description": "This change achieve consistency with our `kafka` source and other Kafka clients",
       "id": "2020-01-12-use-comma-delim-server-list-instead-of-an-array",
       "importance": "low",
       "path": "website/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array.md",
@@ -2702,7 +2702,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-01-14",
-      "description": "The `splunk_hec` source now emits events with a `message` key instead of a\n`line` key. This can be renamed via the global `log_schema`\noptions.",
+      "description": "This change ensures the `splunk_hec` source conforms to Vector's schema",
       "id": "2020-01-14-rename-line-field-to-message",
       "importance": "low",
       "path": "website/highlights/2020-01-14-rename-line-field-to-message.md",
@@ -2717,7 +2717,7 @@ module.exports = {
     {
       "author_github": "https://github.com/MOZGIII",
       "date": "2020-01-20",
-      "description": "There is no longer a distinction within Vector between explicit and implicit\nevent fields. All fields are now implicit and therefore the `splunk_hec` sink\nwill _not_ index any fields by default.",
+      "description": "This gives you full control over which fields are indexed",
       "id": "2020-01-20-splunk-hec-specify-indexed-fields",
       "importance": "low",
       "path": "website/highlights/2020-01-20-splunk-hec-specify-indexed-fields.md",
@@ -2732,7 +2732,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-05",
-      "description": "The `endpoint` and `region` options have been dropped in the `elasticsearch`\nsink in favor of using the `host` option. If you\nare one of the rare users that set these options please set the `host` option\nto the full domain of your AWS elasticsearch cluster.",
+      "description": "We've dropped redundant AWS options that may break backward compatibility",
       "id": "2020-02-05-drop-aws-options",
       "importance": "low",
       "path": "website/highlights/2020-02-05-drop-aws-options.md",
@@ -2748,7 +2748,7 @@ module.exports = {
     {
       "author_github": "https://github.com/MOZGIII",
       "date": "2020-02-05",
-      "description": "Anyone that was worked with Docker logs knows how frustrating this problem\ncan be. Docker, by default, splits log messages that exceed 16kb. While 16kb\nseems like a lot, it can easily be exceeded if you're logging rich structured\nevents. This can be a very difficult and frustrating problem to solve with\nother tools (we speak from experience). In this release Vector solves this\nautomatically with a new `auto_partial_merge` option in the `docker` source.",
+      "description": "Docker splits long messages by default, and now Vector merges them back for you",
       "id": "2020-02-05-merge-partial-docker-events",
       "importance": "high",
       "path": "website/highlights/2020-02-05-merge-partial-docker-events.md",
@@ -2764,7 +2764,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2020-02-05",
-      "description": "import Vic from '@site/src/components/Vic';",
+      "description": "The official Vector mascot",
       "id": "2020-02-05-vic-the-vector-mascot",
       "importance": "low",
       "path": "website/highlights/2020-02-05-vic-the-vector-mascot.md",
@@ -2778,7 +2778,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2020-02-07",
-      "description": "Vector is now able to execute a topology spread across multiple config files,\nwhich allows you to break large pipelines down into bite size, easier managed,\nchunks. Running them is as simple as:",
+      "description": "A better way to manage complex Vector configurations",
       "id": "2020-02-07-multi-config-files",
       "importance": "low",
       "path": "website/highlights/2020-02-07-multi-config-files.md",
@@ -2792,7 +2792,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-11",
-      "description": "Anyone that dealth with Syslog knows that the format specification is a \"goal\".\nIt's very common for formats to deviate slightly. To account for this we've\nupdated our Syslog parsing to follow the RFC 3164,\nRFC 5424, and other common formats. With these changes\nVector is very likely to parse a Syslog format, or anything like it. And, as\nalways, if Vector's `syslog` source fails to parse your\nformat you can always use the `socket` source and the\n`regex_parser` transform to roll your own\ncollection parsing pipeline.",
+      "description": "Best effort parsing support for Syslog",
       "id": "2020-02-11-improved-syslog-parsing",
       "importance": "low",
       "path": "website/highlights/2020-02-11-improved-syslog-parsing.md",
@@ -2807,7 +2807,7 @@ module.exports = {
     {
       "author_github": "https://github.com/hoverbear",
       "date": "2020-02-14",
-      "description": "Vector does not require a rigid schema for it's `log`\nevents. You are welcome to use any field names you like,\nsuch as the `timestamp`, `message`, and `host`. Until recently, the\ndefault names of these fields were not easily customizable. You either had to\nset these names within the source itself, or rename these fields\nusing the `rename_fields` transform. While this\nworks, it's combersome and is not obvious to anyone reading your Vector\nconfiguration file. Enter Vector's new global log\nschema. These new options allow you to change\nthe default names for the `message_key`, and more:",
+      "description": "Set defaults for Vector's common log key names",
       "id": "2020-02-14-global-log-schema",
       "importance": "low",
       "path": "website/highlights/2020-02-14-global-log-schema.md",
@@ -2821,7 +2821,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-17",
-      "description": "Vector offers a templating syntax that you can use to build\ndynamic values in your Vector configuration files. This\nhas now been added to the `add_fields` transform,\nenabling the ability to create fields from other fields values.",
+      "description": "Use Vector's templating syntax to add new fields",
       "id": "2020-02-17-add-fields-transform-templating",
       "importance": "low",
       "path": "website/highlights/2020-02-17-add-fields-transform-templating.md",
@@ -2836,7 +2836,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2020-02-20",
-      "description": "We all love a good sink. Now you can enjoy our latest offerings:",
+      "description": "7 new sinks have been added to Vector",
       "id": "2020-02-20-new-sinks",
       "importance": "medium",
       "path": "website/highlights/2020-02-20-new-sinks.md",
@@ -2850,7 +2850,7 @@ module.exports = {
     {
       "author_github": "https://github.com/MOZGIII",
       "date": "2020-02-21",
-      "description": "One of the biggest frustrations we've heard from users in this space is the\ninability to merge lines together. Such a simple task can be incredibly\ncomplex and hard. Fear not! We plan to add first-class support for solving\nthis problem.",
+      "description": "Merge multiple lines together based on rules",
       "id": "2020-02-21-file-source-multiline-support",
       "importance": "medium",
       "path": "website/highlights/2020-02-21-file-source-multiline-support.md",
@@ -2865,7 +2865,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-24",
-      "description": "We are currently working to improve and optimize our `log` data\nmodel. Initial versions of this data model were\nrepresented as a flat map for key access optimizations. This proved over time\nto not be as helpful as we had hoped. As a result we are working to move our\ndata model to be as close to JSON as possible. This means:",
+      "description": "We're bringing our log data model closer to JSON",
       "id": "2020-02-24-log-data-model-changes",
       "importance": "low",
       "path": "website/highlights/2020-02-24-log-data-model-changes.md",
@@ -2880,7 +2880,7 @@ module.exports = {
     {
       "author_github": "https://github.com/hoverbear",
       "date": "2020-02-24",
-      "description": "Vector has a long overdue `rename_fields` transform.\nThis does exactly what it says, rename fields :).",
+      "description": "An easier way to rename fields",
       "id": "2020-02-24-rename-fields-transform",
       "importance": "low",
       "path": "website/highlights/2020-02-24-rename-fields-transform.md",
@@ -2895,7 +2895,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2020-02-24",
-      "description": "The new `swimlanes` transform makes it much easier\nto configure conditional branches of transforms and sinks. For example, you can\neasily create if/else pipelines.",
+      "description": "Split log streams with ease",
       "id": "2020-02-24-swimlanes-transform",
       "importance": "medium",
       "path": "website/highlights/2020-02-24-swimlanes-transform.md",
@@ -2910,7 +2910,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-27",
-      "description": "Vector is lovingly maintained by the NixOS ecosystem,\nand we've now officially adopted it as a supported platform. This means we'll\nproduce installation docs for the NixOS and\nhelp ensure it stays up to date. We 💖 Nixos.",
+      "description": "Bringing Vector to NixOS",
       "id": "2020-02-27-nixos-support",
       "importance": "low",
       "path": "website/highlights/2020-02-27-nixos-support.md",
@@ -2925,7 +2925,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-28",
-      "description": "We've implemented a feature flag system that lets you build custom versions\nof Vector with selected components. This is handy if:",
+      "description": "Build Vector with select components",
       "id": "2020-02-28-custom-vector-builds",
       "importance": "medium",
       "path": "website/highlights/2020-02-28-custom-vector-builds.md",
@@ -2940,7 +2940,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-03",
-      "description": "In addition to our security policy, we've added\na new privacy policy. It's our pledge that Vector\nwill _never_ implement any tactics, grey-area or not, to unknowingly collect\ndata.",
+      "description": "Our commitment to privacy",
       "id": "2020-03-03-privacy-policy",
       "importance": "low",
       "path": "website/highlights/2020-03-03-privacy-policy.md",
@@ -2953,7 +2953,7 @@ module.exports = {
     {
       "author_github": "https://github.com/hoverbear",
       "date": "2020-03-04",
-      "description": "We've added the ability to whitelist and blacklist fields during the encoding\nprocess within sinks. This is useful if you have metadata fields\nthat you do not want to send downstream. For example, you might have an\n`application_id` fields that you use for partitioning, but you don't want to\ninclude it inthe actual data since it would be duplicative.",
+      "description": "More control over which fields are included when encoding",
       "id": "2020-03-04-encoding-whitelist-blacklist",
       "importance": "low",
       "path": "website/highlights/2020-03-04-encoding-whitelist-blacklist.md",
@@ -2967,7 +2967,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-09",
-      "description": "Compression for Vector's `kafka` sink is now available.\nBefore we take credit for this feature, Vector uses\n`librdkafka` under the hood, and to maintain consistency\nwe just mapped the appropriate options. In addition, we added a\nnew `librdkafka_options` that enables\ntransparent pass-through of `librdkafka`'s options.",
+      "description": "Improve throughput by compressing data before writing it to Kafka",
       "id": "2020-03-09-kafka-sink-compression",
       "importance": "low",
       "path": "website/highlights/2020-03-09-kafka-sink-compression.md",
@@ -2982,7 +2982,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-10",
-      "description": "For certain use cases log deduplication can be a useful tool. Not only does\nthis promote your data integrity, but it can help protect against upstream\nmistakes that accidentally doplicate logs. This mistake can easily double\n(or more!) your log volume. To protect against this you can use our new\n`dedupe` transform.",
+      "description": "Shed duplicate logs",
       "id": "2020-03-10-dedupe-transform",
       "importance": "medium",
       "path": "website/highlights/2020-03-10-dedupe-transform.md",
@@ -2997,7 +2997,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-11",
-      "description": "High cardinality labels got you up at night...literally? Check out our new\n`tag_cardinality_limit` transform.\nIt protects your metrics storage from label misuse and let's your sleep at\nnight.",
+      "description": "Protect downstream metrics storages from high cardinality tags",
       "id": "2020-03-11-tag-cardinality-limit-transform",
       "importance": "medium",
       "path": "website/highlights/2020-03-11-tag-cardinality-limit-transform.md",
@@ -3012,7 +3012,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-11",
-      "description": "A highly requested feature of Vector is to support the TLS protocol for the\n`vector` source and `vector` sink.\nThis is now available. Check out the `tls.*` options.",
+      "description": "Securely forward data between Vector instances",
       "id": "2020-03-11-vector-sink-tls",
       "importance": "low",
       "path": "website/highlights/2020-03-11-vector-sink-tls.md",
@@ -3027,7 +3027,7 @@ module.exports = {
     {
       "author_github": "https://github.com/LucioFranco",
       "date": "2020-03-12",
-      "description": "Tried, true, and simple. Our new `papertrail` sink\nlets you send logs to the Papertrail loggign service.",
+      "description": "Sink logs to the Papertrail logging service",
       "id": "2020-03-12-papertrail-sink",
       "importance": "low",
       "path": "website/highlights/2020-03-12-papertrail-sink.md",
@@ -3042,7 +3042,7 @@ module.exports = {
     {
       "author_github": "https://github.com/hoverbear",
       "date": "2020-03-14",
-      "description": "For you Honeycomb fans we have a new\n`honeycomb` sink. Keep an eye on\nPR#1991, which will introduce a new `transaction` transform.\nThis tranformed is designed to produce \"canoncial\" events. These are flattened,\nwide events that represent an entire transaction, the concept that Honeycomb\nis built upon. Vector + Honeycomb = 👯.",
+      "description": "Sink logs to the Honeycomb logging service",
       "id": "2020-03-14-honeycomb-sink",
       "importance": "low",
       "path": "website/highlights/2020-03-14-honeycomb-sink.md",
@@ -3057,7 +3057,7 @@ module.exports = {
     {
       "author_github": "https://github.com/hoverbear",
       "date": "2020-03-19",
-      "description": "We have a new `pulsar` sink! This was a community\ncontribution and effort. Thanks to Evan for his\nhelp building this sink!",
+      "description": "Sink logs to the Apache Pulsar service",
       "id": "2020-03-19-apache-pulsar-sink",
       "importance": "low",
       "path": "website/highlights/2020-03-19-apache-pulsar-sink.md",
@@ -3072,7 +3072,7 @@ module.exports = {
     {
       "author_github": "https://github.com/LucioFranco",
       "date": "2020-03-23",
-      "description": "In addition to our `datadog_metrics` sink, we've\nintroduced a new `datadog_logs` sink. This is part\nof our broader effort to expand Vector's integrations.",
+      "description": "Sink logs to the Datadog logging service",
       "id": "2020-03-23-datadog-logs-sink",
       "importance": "low",
       "path": "website/highlights/2020-03-23-datadog-logs-sink.md",
@@ -3087,7 +3087,7 @@ module.exports = {
     {
       "author_github": "https://github.com/bruceg",
       "date": "2020-03-31",
-      "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
+      "description": "Filter and route your logs based on defined conditions",
       "id": "2020-03-31-filter-transform",
       "importance": "medium",
       "path": "website/highlights/2020-03-31-filter-transform.md",
@@ -3102,7 +3102,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-31",
-      "description": "import Jump from '@site/src/components/Jump';",
+      "description": "High quality guides and education for Vector",
       "id": "2020-03-31-guides-section",
       "importance": "high",
       "path": "website/highlights/2020-03-31-guides-section.md",
@@ -3116,7 +3116,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-04-01",
-      "description": "The Vector team is working hard to deliver a best-in-class Kubernetes\nintegration (scheduled for `0.10.0`). We have not officially announced this\nintegration because it is still in alpha. We are testing with a number of large\nclusters and finalizing the integration details in RFC#2222\n(feel free to chime in!). To that end, we've released a new\n`kubernetes_pod_metadata` transform\nthat enriches your Kubernetes logs with juicy Kubernetes metadata. Some details:",
+      "description": "Easily rnrich your logs with Kubernetes metadata",
       "id": "2020-04-01-kubernetes-pod-metadata-transform",
       "importance": "high",
       "path": "website/highlights/2020-04-01-kubernetes-pod-metadata-transform.md",
@@ -3131,7 +3131,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-04-01",
-      "description": "Vector has a concept \"conditions\" that are used to qualify events. For example,\nthis is used in Vector's unit testing feature,\n`swimlanes` transform, and\n`filter` transform. This change adds new predicates\nthat enable powerful matching and condition expression. Specifically, the\nfollowing predicates were added:",
+      "description": "More options when filtering and routing events",
       "id": "2020-04-01-more-condition-predicates",
       "importance": "low",
       "path": "website/highlights/2020-04-01-more-condition-predicates.md",
@@ -3148,7 +3148,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-04-07",
-      "description": "import Alert from '@site/src/components/Alert';\nimport Jump from '@site/src/components/Jump';\nimport Vic from '@site/src/components/Vic';",
+      "description": "The next iteration of our Lua transform",
       "id": "2020-04-07-lua-transform-version-2",
       "importance": "high",
       "path": "website/highlights/2020-04-07-lua-transform-version-2.md",
@@ -3163,7 +3163,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-04-07",
-      "description": "import SVG from 'react-inlinesvg';",
+      "description": "It's not possible to forward metrics between Vector instances",
       "id": "2020-04-07-vector-to-vector-metrics",
       "importance": "low",
       "path": "website/highlights/2020-04-07-vector-to-vector-metrics.md",
@@ -3178,7 +3178,7 @@ module.exports = {
     {
       "author_github": "https://github.com/lukesteensen",
       "date": "2020-04-11",
-      "description": "After some hard profiling work, we're pleased to announce that Vector is now\n~36% faster for most use cases. The improvements are two-fold:",
+      "description": "Significant performance gains for all Vector users",
       "id": "2020-04-11-overall-performance-increase",
       "importance": "high",
       "path": "website/highlights/2020-04-11-overall-performance-increase.md",
@@ -3613,7 +3613,7 @@ module.exports = {
   "latest_highlight": {
     "author_github": "https://github.com/lukesteensen",
     "date": "2020-04-11",
-    "description": "After some hard profiling work, we're pleased to announce that Vector is now\n~36% faster for most use cases. The improvements are two-fold:",
+    "description": "Significant performance gains for all Vector users",
     "id": "2020-04-11-overall-performance-increase",
     "importance": "high",
     "path": "website/highlights/2020-04-11-overall-performance-increase.md",
@@ -15536,7 +15536,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-10-21",
-          "description": "The dynamic `encoding` concept in Vector was confusing users, so we've made\nit required an explicit. Simply add `encode = \"json\"` to your `console` and\n`file` sinks.",
+          "description": "The `encoding` option is now required for these sinks",
           "id": "2019-10-21-require-encoding-option-for-console-and-file-sinks",
           "importance": "low",
           "path": "website/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks.md",
@@ -15552,7 +15552,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-12-04",
-          "description": "The `datadog` sink has been renamed to `datadog_metrics` to make way for the\nupcoming `datadog_logs` sink.",
+          "description": "This ensures that naming is consistent for the upcoming `datadog_logs` sink",
           "id": "2019-12-04-rename-datadog-sink-to-datadog_metrics",
           "importance": "low",
           "path": "website/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics.md",
@@ -15567,7 +15567,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-11-19",
-          "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
+          "description": "These architectures are widely used in embeded devices & servers",
           "id": "2019-11-19-arm-support-on-linux",
           "importance": "high",
           "path": "website/highlights/2019-11-19-arm-support-on-linux.md",
@@ -15583,7 +15583,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-11-21",
-          "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
+          "description": "Bringing the performance and reliability of Vector to Windows",
           "id": "2019-11-21-windows-support",
           "importance": "high",
           "path": "website/highlights/2019-11-21-windows-support.md",
@@ -15598,7 +15598,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-11-25",
-          "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
+          "description": "Treating your Vector configuration files as code",
           "id": "2019-11-25-unit-testing-vector-config-files",
           "importance": "medium",
           "path": "website/highlights/2019-11-25-unit-testing-vector-config-files.md",
@@ -15612,7 +15612,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2019-12-13",
-          "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
+          "description": "Point Vector to custom DNS servers",
           "id": "2019-12-13-custom-dns",
           "importance": "low",
           "path": "website/highlights/2019-12-13-custom-dns.md",
@@ -15626,7 +15626,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2019-12-14",
-          "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
+          "description": "Early adopters have a new Kuberenetes source to chew on",
           "id": "2019-12-14-kubernetes-source-alpha",
           "importance": "low",
           "path": "website/highlights/2019-12-14-kubernetes-source-alpha.md",
@@ -15641,7 +15641,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2019-12-16",
-          "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
+          "description": "Enrich your events with EC2 metadata",
           "id": "2019-12-16-ec2-metadata",
           "importance": "high",
           "path": "website/highlights/2019-12-16-ec2-metadata.md",
@@ -18790,7 +18790,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2020-01-03",
-          "description": "The `tcp` and `udp` sources no longer exist and have been merged into a new\n`socket` type.",
+          "description": "We've simplified our socket based sources into a single `socket` source",
           "id": "2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source",
           "importance": "low",
           "path": "website/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source.md",
@@ -18806,7 +18806,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-01-03",
-          "description": "The `tcp` sink has been renamed to `socket`, upgrading is easy!",
+          "description": "This renames the existing `tcp` sink to `socket`",
           "id": "2020-01-03-move-existing-tcp-sink-into-socket-sink",
           "importance": "low",
           "path": "website/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink.md",
@@ -18821,7 +18821,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-01-12",
-          "description": "Request based sinks have had their request fields nested under the table\n`request` and no longer use fixed retry intervals, instead using a fibonacci\nsequence for backing off retry attempts.",
+          "description": "<fill-in>",
           "id": "2020-01-12-request-options-refactored",
           "importance": "low",
           "path": "website/highlights/2020-01-12-request-options-refactored.md",
@@ -18837,7 +18837,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-01-12",
-          "description": "The `kafka` sink field `bootstrap_servers` has been changed from an array to a\nstring, expecting a comma separated list of bootstrap servers similar to the\n`kafka` source:",
+          "description": "This change achieve consistency with our `kafka` source and other Kafka clients",
           "id": "2020-01-12-use-comma-delim-server-list-instead-of-an-array",
           "importance": "low",
           "path": "website/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array.md",
@@ -18852,7 +18852,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-01-14",
-          "description": "The `splunk_hec` source now emits events with a `message` key instead of a\n`line` key. This can be renamed via the global `log_schema`\noptions.",
+          "description": "This change ensures the `splunk_hec` source conforms to Vector's schema",
           "id": "2020-01-14-rename-line-field-to-message",
           "importance": "low",
           "path": "website/highlights/2020-01-14-rename-line-field-to-message.md",
@@ -18867,7 +18867,7 @@ module.exports = {
         {
           "author_github": "https://github.com/MOZGIII",
           "date": "2020-01-20",
-          "description": "There is no longer a distinction within Vector between explicit and implicit\nevent fields. All fields are now implicit and therefore the `splunk_hec` sink\nwill _not_ index any fields by default.",
+          "description": "This gives you full control over which fields are indexed",
           "id": "2020-01-20-splunk-hec-specify-indexed-fields",
           "importance": "low",
           "path": "website/highlights/2020-01-20-splunk-hec-specify-indexed-fields.md",
@@ -18882,7 +18882,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2020-01-07",
-          "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
+          "description": "Scrape prometheus metrics with Vector",
           "id": "2020-01-07-prometheus-source",
           "importance": "high",
           "path": "website/highlights/2020-01-07-prometheus-source.md",
@@ -23456,7 +23456,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-02-05",
-          "description": "The `endpoint` and `region` options have been dropped in the `elasticsearch`\nsink in favor of using the `host` option. If you\nare one of the rare users that set these options please set the `host` option\nto the full domain of your AWS elasticsearch cluster.",
+          "description": "We've dropped redundant AWS options that may break backward compatibility",
           "id": "2020-02-05-drop-aws-options",
           "importance": "low",
           "path": "website/highlights/2020-02-05-drop-aws-options.md",
@@ -23472,7 +23472,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-02-24",
-          "description": "We are currently working to improve and optimize our `log` data\nmodel. Initial versions of this data model were\nrepresented as a flat map for key access optimizations. This proved over time\nto not be as helpful as we had hoped. As a result we are working to move our\ndata model to be as close to JSON as possible. This means:",
+          "description": "We're bringing our log data model closer to JSON",
           "id": "2020-02-24-log-data-model-changes",
           "importance": "low",
           "path": "website/highlights/2020-02-24-log-data-model-changes.md",
@@ -23487,7 +23487,7 @@ module.exports = {
         {
           "author_github": "https://github.com/MOZGIII",
           "date": "2020-02-05",
-          "description": "Anyone that was worked with Docker logs knows how frustrating this problem\ncan be. Docker, by default, splits log messages that exceed 16kb. While 16kb\nseems like a lot, it can easily be exceeded if you're logging rich structured\nevents. This can be a very difficult and frustrating problem to solve with\nother tools (we speak from experience). In this release Vector solves this\nautomatically with a new `auto_partial_merge` option in the `docker` source.",
+          "description": "Docker splits long messages by default, and now Vector merges them back for you",
           "id": "2020-02-05-merge-partial-docker-events",
           "importance": "high",
           "path": "website/highlights/2020-02-05-merge-partial-docker-events.md",
@@ -23503,7 +23503,7 @@ module.exports = {
         {
           "author_github": "https://github.com/MOZGIII",
           "date": "2020-02-21",
-          "description": "One of the biggest frustrations we've heard from users in this space is the\ninability to merge lines together. Such a simple task can be incredibly\ncomplex and hard. Fear not! We plan to add first-class support for solving\nthis problem.",
+          "description": "Merge multiple lines together based on rules",
           "id": "2020-02-21-file-source-multiline-support",
           "importance": "medium",
           "path": "website/highlights/2020-02-21-file-source-multiline-support.md",
@@ -23518,7 +23518,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2020-02-05",
-          "description": "import Vic from '@site/src/components/Vic';",
+          "description": "The official Vector mascot",
           "id": "2020-02-05-vic-the-vector-mascot",
           "importance": "low",
           "path": "website/highlights/2020-02-05-vic-the-vector-mascot.md",
@@ -23532,7 +23532,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2020-02-07",
-          "description": "Vector is now able to execute a topology spread across multiple config files,\nwhich allows you to break large pipelines down into bite size, easier managed,\nchunks. Running them is as simple as:",
+          "description": "A better way to manage complex Vector configurations",
           "id": "2020-02-07-multi-config-files",
           "importance": "low",
           "path": "website/highlights/2020-02-07-multi-config-files.md",
@@ -23546,7 +23546,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-02-11",
-          "description": "Anyone that dealth with Syslog knows that the format specification is a \"goal\".\nIt's very common for formats to deviate slightly. To account for this we've\nupdated our Syslog parsing to follow the RFC 3164,\nRFC 5424, and other common formats. With these changes\nVector is very likely to parse a Syslog format, or anything like it. And, as\nalways, if Vector's `syslog` source fails to parse your\nformat you can always use the `socket` source and the\n`regex_parser` transform to roll your own\ncollection parsing pipeline.",
+          "description": "Best effort parsing support for Syslog",
           "id": "2020-02-11-improved-syslog-parsing",
           "importance": "low",
           "path": "website/highlights/2020-02-11-improved-syslog-parsing.md",
@@ -23561,7 +23561,7 @@ module.exports = {
         {
           "author_github": "https://github.com/hoverbear",
           "date": "2020-02-14",
-          "description": "Vector does not require a rigid schema for it's `log`\nevents. You are welcome to use any field names you like,\nsuch as the `timestamp`, `message`, and `host`. Until recently, the\ndefault names of these fields were not easily customizable. You either had to\nset these names within the source itself, or rename these fields\nusing the `rename_fields` transform. While this\nworks, it's combersome and is not obvious to anyone reading your Vector\nconfiguration file. Enter Vector's new global log\nschema. These new options allow you to change\nthe default names for the `message_key`, and more:",
+          "description": "Set defaults for Vector's common log key names",
           "id": "2020-02-14-global-log-schema",
           "importance": "low",
           "path": "website/highlights/2020-02-14-global-log-schema.md",
@@ -23575,7 +23575,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-02-17",
-          "description": "Vector offers a templating syntax that you can use to build\ndynamic values in your Vector configuration files. This\nhas now been added to the `add_fields` transform,\nenabling the ability to create fields from other fields values.",
+          "description": "Use Vector's templating syntax to add new fields",
           "id": "2020-02-17-add-fields-transform-templating",
           "importance": "low",
           "path": "website/highlights/2020-02-17-add-fields-transform-templating.md",
@@ -23590,7 +23590,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2020-02-20",
-          "description": "We all love a good sink. Now you can enjoy our latest offerings:",
+          "description": "7 new sinks have been added to Vector",
           "id": "2020-02-20-new-sinks",
           "importance": "medium",
           "path": "website/highlights/2020-02-20-new-sinks.md",
@@ -23604,7 +23604,7 @@ module.exports = {
         {
           "author_github": "https://github.com/hoverbear",
           "date": "2020-02-24",
-          "description": "Vector has a long overdue `rename_fields` transform.\nThis does exactly what it says, rename fields :).",
+          "description": "An easier way to rename fields",
           "id": "2020-02-24-rename-fields-transform",
           "importance": "low",
           "path": "website/highlights/2020-02-24-rename-fields-transform.md",
@@ -23619,7 +23619,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2020-02-24",
-          "description": "The new `swimlanes` transform makes it much easier\nto configure conditional branches of transforms and sinks. For example, you can\neasily create if/else pipelines.",
+          "description": "Split log streams with ease",
           "id": "2020-02-24-swimlanes-transform",
           "importance": "medium",
           "path": "website/highlights/2020-02-24-swimlanes-transform.md",
@@ -23671,7 +23671,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-03-03",
-          "description": "In addition to our security policy, we've added\na new privacy policy. It's our pledge that Vector\nwill _never_ implement any tactics, grey-area or not, to unknowingly collect\ndata.",
+          "description": "Our commitment to privacy",
           "id": "2020-03-03-privacy-policy",
           "importance": "low",
           "path": "website/highlights/2020-03-03-privacy-policy.md",
@@ -25624,12 +25624,6 @@ module.exports = {
       "keybase": "https://keybase.io/binarylogic",
       "name": "Ben",
       "twitter": "https://twitter.com/binarylogic"
-    },
-    {
-      "avatar": "https://github.com/timber-bradybot.png",
-      "github": "https://github.com/timber-bradybot",
-      "id": "brady",
-      "name": "Brady"
     },
     {
       "avatar": "https://github.com/bruceg.png",

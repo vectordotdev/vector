@@ -40,6 +40,7 @@
   --ifm-color-emphasis-25: var(--ifm-color-gray-25);
   --ifm-color-emphasis-40: var(--ifm-color-gray-40);
   --ifm-color-emphasis-50: var(--ifm-color-gray-50);
+  --ifm-color-emphasis-50-solid: #f2f3f5;
   --ifm-color-emphasis-75: var(--ifm-color-gray-75);
   --ifm-color-pink: #f44af5;
   --ifm-color-pink-rgb: 244, 74 ,245;
@@ -79,9 +80,10 @@
   --ifm-navbar-link-color: var(--ifm-heading-color);
   --ifm-navbar-logo-width: 155px;
   --ifm-panel-background-color: var(--ifm-background-color);
-  --ifm-panel-background-rgb: 255, 255, 255;
-  --ifm-panel-background-solid: #FFFFFF;
-  --ifm-panel-background-active: rgba( var(--ifm-color-primary-rgb), 0.2 );
+  --ifm-panel-background-color-rgb: 255, 255, 255;
+  --ifm-panel-background-color-solid: #FFFFFF;
+  --ifm-panel-background-color-active: rgba( var(--ifm-color-primary-rgb), 0.2 );
+  --ifm-panel-background-color-active-solid: #cbf9fe;
   --ifm-panel-border-color: var(--ifm-hr-border-color);
   --ifm-panel-border-color-active: var(--ifm-color-primary);
   --ifm-panel-box-shadow: 0 0px 10px 0px var(--ifm-color-emphasis-50);
@@ -172,6 +174,18 @@ article header h1 {
   font-size: 2em;
 }
 
+
+/**
+ * background
+ */
+
+.background--highlight {
+  animation: gradientBG 5s ease-in infinite;
+  background-image: var(--ifm-highlight-gradient);
+  background-size: 150% 150%;
+  color: var(--ifm-background-color);
+}
+
 /**
  * badge
  */
@@ -244,44 +258,6 @@ article header h1 {
 
 a.badge:hover {
   color: var(--ifm-badge-color);
-}
-
-/**
- * align-text-edges
- */
-
-.align-text-edges {
-  --bleed-padding: calc( var(--ifm-spacing-horizontal) * 1.5 );
-  --bleed-margin: calc( var(--bleed-padding) * -1 );
-  padding: 0 var(--bleed-padding);
-}
-
-.align-text-edges > .alert,
-.align-text-edges > blockquote,
-.align-text-edges > .code-explanation,
-.align-text-edges > .code-header {
-  margin-left: var(--bleed-margin);
-  margin-right: var(--bleed-margin);
-  padding-left: var(--bleed-padding);
-  padding-right: var(--bleed-padding);
-}
-
-.align-text-edges > div[class^="mdxCodeBlock_"],
-.align-text-edges > div > div > .tabs--block {
-  margin-left: var(--bleed-margin);
-  margin-right: var(--bleed-margin);
-}
-
-.align-text-edges > div[class^="mdxCodeBlock_"] code {
-  padding-left: var(--bleed-padding);
-  padding-right: var(--bleed-padding);
-}
-
-@media (max-width: 480px) {
-  .align-text-edges {
-    --bleed-padding: var(--ifm-spacing-horizontal);
-    --bleed-margin: calc( var(--bleed-padding) * -1 );
-  }
 }
 
 /**
@@ -518,7 +494,7 @@ table.comparison tr td.bar.vector .bar {
 }
 
 .component-icons > .icon {
-  background-color: rgba(var(--ifm-panel-background-rgb), 0.75) !important;
+  background-color: rgba(var(--ifm-panel-background-color-rgb), 0.75) !important;
   border-radius: 2rem !important;
   color: var(--ifm-heading-color);
   flex: 1 1;
@@ -568,15 +544,15 @@ ul.connected-list > li {
 }
 
 ul.connected-list > li.header {
-  background: var(--ifm-background-color);
-  border-bottom: 1px solid var(--ifm-hr-border-color);
+  background: var(--ifm-panel-background-color-active-solid);
+  border: 1px solid var(--ifm-panel-border-color-active);
+  border-radius: var(--ifm-global-radius);
   list-style: none;
   font-weight: bold;
-  margin-left: var(--ifm-list-item-padding-left);
+  margin-top: calc( var(--ifm-spacing-vertical) * 3 );
   margin-bottom: var(--ifm-spacing-vertical);
-  padding-top: calc( var(--ifm-spacing-vertical) / 1.5 );
-  padding-bottom: calc( var(--ifm-spacing-vertical) / 1.5 );
-  padding-left: 0;
+  margin-left: var(--ifm-list-item-padding-left);
+  padding: calc( var(--ifm-spacing-vertical) / 1.5 );
   text-transform: uppercase;
 }
 
@@ -1010,6 +986,14 @@ header h1 {
 }
 
 /**
+ * header
+ */
+
+.header--flush {
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+
+/**
  * hero
  *
  * Large hero component typically used on marketing pages.
@@ -1311,7 +1295,7 @@ input[type="text"] {
 input.input--text:focus,
 input[type="email"]:focus,
 input[type="text"]:focus {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-color-active);
   border-color: var(--ifm-color-primary);
   box-shadow: var(--ifm-panel-box-shadow-active);
   color: var(--ifm-color-primary);
@@ -1540,7 +1524,7 @@ ol li.list--li--pink {
 }
 
 .menu.menu--responsive .menu__button {
-  background: var(--ifm-panel-background-solid);
+  background: var(--ifm-panel-background-color-solid);
   border-color: var(--ifm-color-content-secondary);
   bottom: 1em;
   right: 1.5em;
@@ -1717,7 +1701,7 @@ ol li.list--li--pink {
 
 .panel {
   --panel-hover-color: var(--ifm-color-primary);
-  --panel-hover-background-color: var(--ifm-panel-background-active);
+  --panel-hover-background-color: var(--ifm-panel-background-color-active);
   background-color: var(--ifm-panel-background-color);
   border: 0.1em solid var(--ifm-panel-border-color);
   border-radius: 0.7em;
@@ -1728,34 +1712,76 @@ ol li.list--li--pink {
   padding: 2em;
 }
 
-.panel .panel--icon {
-  font-size: 4em;
-  line-height: 1;
-  margin: 0 0 var(--ifm-spacing-vertical) 0;
-}
-
-.panel .panel--title {
-  font-size: 1.2em;
-  font-weight: 600;
-}
-
-.panel .panel--description {
-  font-size: 0.95em;
-  opacity: 0.5;
-}
-
 /* .panel--blend */
 
 .panel.panel--blend {
   background-color: var(--ifm-background-color);
 }
 
+/* .panel--button */
+
+.panel.panel--button {
+  text-align: center;
+}
+
+.panel.panel--button .panel--icon {
+  font-size: 4em;
+  line-height: 1;
+  margin: 0 0 var(--ifm-spacing-vertical) 0;
+}
+
+.panel.panel--button .panel--title {
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.panel.panel--button .panel--description {
+  font-size: 0.95em;
+  opacity: 0.5;
+}
+
+.panel.panel--button--inline {
+  display: flex;
+}
+
+.panel.panel--button--inline .panel--icon {
+  margin: 0;
+}
+
+.panel.panel--button--inline > div:first-child {
+  flex: 0 1 33%;
+  padding-right: var(--ifm-spacing-horizontal);
+  text-align: right;
+}
+
+.panel.panel--button--inline > div:last-child {
+  flex: 1 1;
+  padding-top: 0.25em;
+  text-align: left;
+}
+
 /* .panel--danger */
 
 .panel.panel--danger {
-  --ifm-panel-background-active: rgba( var(--ifm-color-danger-rgb), 0.2 );
+  --ifm-panel-background-color-active: rgba( var(--ifm-color-danger-rgb), 0.2 );
   --ifm-panel-color-active: var(--ifm-color-danger);
   border-left: 6px solid var(--ifm-panel-color-active);
+}
+
+/* .panel--highlight */
+
+.panel.panel--highlight {
+  animation: gradientBG 5s ease-in infinite;
+  background-clip: text;
+  background: none;
+  background-image: var(--ifm-highlight-gradient);
+  background-size: 150% 150%;
+  border: 0px none;
+  color: var(--ifm-background-color);
+}
+
+.panel.panel--highlight:hover {
+  color: var(--ifm-background-color);
 }
 
 /* .panel--l */
@@ -1832,7 +1858,7 @@ a.panel > article > .avatar .avatar__subtitle {
 
 .link.panel:hover,
 a.panel:hover {
-  background-color: var(--ifm-panel-background-active) !important;
+  background-color: var(--ifm-panel-background-color-active) !important;
   border-color: var(--ifm-panel-color-active);
   box-shadow: var(--ifm-panel-box-shadow-active);
   color: var(--ifm-panel-color-active);
@@ -1841,7 +1867,7 @@ a.panel:hover {
 
 .link.panel:hover .badge,
 a.panel:hover .badge {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-color-active);
   border-color: transparent;
 }
 
@@ -1896,13 +1922,13 @@ a.panel:hover h3 {
 }
 
 .react-select-container:hover .react-select__control {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-color-active);
   border-color: var(--ifm-panel-border-color-active);
   box-shadow: var(--ifm-panel-box-shadow-active);
 }
 
 .react-select-container .react-select__menu {
-  background: var(--ifm-panel-background-solid);
+  background: var(--ifm-panel-background-color-solid);
   border-radius: var(--ifm-global-radius);
   color: var(--ifm-color-content);
 }
@@ -1913,13 +1939,13 @@ a.panel:hover h3 {
 }
 
 .react-select-container .react-select__option--is-selected {
-  background: var(--ifm-panel-background-active) !important;
+  background: var(--ifm-panel-background-color-active) !important;
   color: var(--ifm-color-primary) !important;
   font-weight: bold;
 }
 
 .react-select-container .react-select__option--is-focused {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-color-active);
   color: var(--ifm-color-content);
 }
 
@@ -2397,6 +2423,7 @@ html[data-theme="dark"] {
   --ifm-color-emphasis-25: var(--ifm-color-gray-975);
   --ifm-color-emphasis-40: var(--ifm-color-gray-960);
   --ifm-color-emphasis-50: var(--ifm-color-gray-950);
+  --ifm-color-emphasis-50-solid: var(--ifm-color-gray-950);
   --ifm-color-emphasis-75: var(--ifm-color-gray-925);
   --ifm-color-gray-25: rgba(224, 235, 247, calc( 1 - 0.025 ));
   --ifm-color-gray-40: rgba(224, 235, 247, calc( 1 - 0.04 ));
@@ -2423,9 +2450,10 @@ html[data-theme="dark"] {
   --ifm-link-color: var(--ifm-color-primary);
   --ifm-navbar-search-input-icon: url('data:image/svg+xml;utf8,<svg fill="rgb(224, 235, 247)" alt="Search" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" height="16px" width="16px"><path d="M6.02945,10.20327a4.17382,4.17382,0,1,1,4.17382-4.17382A4.15609,4.15609,0,0,1,6.02945,10.20327Zm9.69195,4.2199L10.8989,9.59979A5.88021,5.88021,0,0,0,12.058,6.02856,6.00467,6.00467,0,1,0,9.59979,10.8989l4.82338,4.82338a.89729.89729,0,0,0,1.29912,0,.89749.89749,0,0,0-.00087-1.29909Z" /></svg>');
   --ifm-panel-background-color: var(--ifm-color-emphasis-50);
-  --ifm-panel-background-rgb: 37, 37, 50;
-  --ifm-panel-background-solid: #252532;
-  --ifm-panel-background-solid-light: #323242;
+  --ifm-panel-background-color-rgb: 37, 37, 50;
+  --ifm-panel-background-color-solid: #252532;
+  --ifm-panel-background-color-solid-light: #323242;
+  --ifm-panel-background-color-active-solid: #0a4152;
   --ifm-panel-box-shadow: none;
   --ifm-panel-box-shadow-active: 0 0px 10px 0px rgba( var(--ifm-color-primary-rgb), 0.5 );
 }
@@ -2488,7 +2516,7 @@ html[data-theme='dark'] .button.button--secondary {
 }
 
 html[data-theme='dark'] .button.button--secondary:hover {
-  --ifm-button-background-color: var(--ifm-panel-background-active);
+  --ifm-button-background-color: var(--ifm-panel-background-color-active);
   --ifm-button-border-color: var(--ifm-panel-border-color-active);
   --ifm-button-color: var(--ifm-panel-color-active);
   box-shadow: var(--ifm-panel-box-shadow-active);

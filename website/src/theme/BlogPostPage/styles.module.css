@@ -18,11 +18,6 @@
   }
 }
 
-.mailingListTitle {
-  font-size: 1.5em;
-  font-weight: 600;
-}
-
 html[data-theme='dark'] .headerBackground {
   filter: invert(1);
 }

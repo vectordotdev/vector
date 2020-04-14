@@ -31,7 +31,7 @@
  */
 
 .accordion-item--collapsed:hover {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-color-active);
   border-color: var(--ifm-color-primary);
   box-shadow: var(--ifm-panel-box-shadow-active);
   color: var(--ifm-color-primary);

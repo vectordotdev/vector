@@ -46,6 +46,7 @@ function HighlightItem({authorGithub, dateString, description, headingDepth, per
     <Link to={permalink} className={classnames('panel', `panel--${style}`, 'domain-bg', 'domain-bg--hover', `domain-bg--${domain}`)}>
       <article>
         <HeadingTag>{title}</HeadingTag>
+        <div className="subtitle">{description}</div>
         <Avatar
           github={authorGithub}
           size="sm"
