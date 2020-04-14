@@ -389,6 +389,7 @@ mod tests {
         let (trigger_shutdown, tripwire) = Tripwire::new();
         let (trigger, shutdown_done) = Tripwire::new();
         let shutdown = ShutdownSignal::new(tripwire, trigger);
+
         (trigger_shutdown, shutdown, shutdown_done)
     }
 
