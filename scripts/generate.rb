@@ -303,10 +303,19 @@ metadata.releases_list.each do |release|
     <%= release_header(release) %>
 
     <%- if release.highlights.any? -%>
-    <%= release_highlights(release, heading_depth: 2) %>
+    ## Highlights
+
+    Highlights are noteworthy changes in this release. For a complete list of
+    changes please refer to the [changelog](#changelog).
+
+    <%= release_highlights(release, heading_depth: 3) %>
 
     <%- end -%>
     ## Changelog
+
+    The changelog represents _all_ changes in this release. Vector follows the
+    [Conventional Commits spec][urls.conventional_commits]. The Vector specific
+    scopes can be found [in the Vector repo][urls.vector_semantic_yml].
 
     <Changelog version={<%= release.version.to_json %>} />
 

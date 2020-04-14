@@ -20,16 +20,16 @@ function normalizeItems(items) {
       const {author_github: authorGithub, description, pr_numbers: prNumbers, release, title} = frontMatter;
       const {date: dateString, permalink, tags} = metadata;
 
-      return {
-        authorGithub: authorGithub,
-        dateString: dateString,
-        description: description,
-        permalink: permalink,
-        prNumbers: prNumbers,
-        release: release,
-        tags: tags,
-        title: title
-      }
+      let map = {};
+      map['authorGithub'] = authorGithub;
+      map['dateString'] = dateString;
+      map['description'] = description;
+      map['permalink'] = permalink;
+      map['prNumbers'] = prNumbers;
+      map['release'] = release;
+      map['tags'] = tags;
+      map['title'] = title;
+      return map
     } else {
       return item;
     }
@@ -59,21 +59,24 @@ function Header({groupBy, group}) {
 }
 
 function HighlightItems({clean, groupBy, items, timeline}) {
+  let defaultedGroupBy = groupBy || 'release';
   let normalizedItems = normalizeItems(items);
-  let groupedItems = _.groupBy(items, groupBy);
-  let groupKeys = timeline ? Object.keys(groupedItems) : Object.keys(groupedItems).sort();
+  let groupedItems = _.groupBy(normalizedItems, defaultedGroupBy);
+  let groupKeys = timeline !== false ? Object.keys(groupedItems) : Object.keys(groupedItems).sort();
 
   return (
     <ul className={classnames('connected-list', {'connected-list--clean': clean === true, 'connected-list--timeline': timeline !== false})}>
       {groupKeys.map((group, idx) => {
-        let items = groupedItems[group];
+        let groupItems = groupedItems[group];
 
         return (
           <>
-            <Header groupBy={groupBy} group={group} />
-            {items.map((highlight, idx) => <li>
-              <HighlightItem key={idx} {...highlight} />
-            </li>)}
+            <Header groupBy={defaultedGroupBy} group={group} />
+            {groupItems.map((highlight, idx) => {
+              return <li key={idx}>
+                <HighlightItem {...highlight} />
+              </li>
+            })}
           </>
         );
       })}

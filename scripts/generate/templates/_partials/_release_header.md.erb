@@ -6,6 +6,7 @@ description: <%= "#{release.title} - #{release.codename} - Release Notes".to_jso
 version: <%= release.version.to_json %>
 ---
 
+<%- if release.highlights.any? || release.commits.size > 25 -%>
 ## What's Included?
 
 <div className="list--semi-bold">
@@ -24,3 +25,5 @@ version: <%= release.version.to_json %>
 <%- end -%>
 
 </div>
+
+<%- end -%>

@@ -181,6 +181,9 @@ function ReleasePage(props) {
           {warnings.length > 0 && <Alert icon={false} fill={true} type="danger" className="list--warnings margin-bottom--lg">
             <ul>{warnings}</ul>
           </Alert>}
+          {warnings.length == 0 && <Alert fill={true} icon="check-circle" type="primary" className="margin-bottom--lg">
+            This release can be cleanly upgraded. There no breaking changes or special upgrade actions.
+          </Alert>}
           <section className="markdown">
             <MDXProvider components={MDXComponents}><ReleaseContents /></MDXProvider>
           </section>
