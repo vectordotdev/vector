@@ -186,7 +186,9 @@ impl Stream for Reader {
     type Error = ();
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.delete_acked();
+        if self.should_delete() {
+            self.delete_acked();
+        }
 
         // If there's no value at read_offset, we return NotReady and rely on Writer
         // using write_notifier to wake this task up after the next write.
@@ -231,39 +233,41 @@ impl Drop for Reader {
 }
 
 impl Reader {
-    fn delete_acked(&mut self) {
+    fn should_delete(&self) -> bool {
         let num_to_delete = self.ack_counter.load(Ordering::Relaxed);
         let blocked_writers = self.blocked_write_task_count.load(Ordering::Relaxed);
 
-        if num_to_delete > 10_000 || blocked_writers > 0 {
-            let num_to_delete = self.ack_counter.swap(0, Ordering::Relaxed);
+        num_to_delete > 10_000 || blocked_writers > 0
+    }
 
-            let new_offset = self.delete_offset + num_to_delete;
-            assert!(
-                new_offset <= self.read_offset,
-                "Tried to ack beyond read offset"
-            );
+    fn delete_acked(&mut self) {
+        let num_to_delete = self.ack_counter.swap(0, Ordering::Relaxed);
 
-            let mut delete_batch = Writebatch::new();
+        let new_offset = self.delete_offset + num_to_delete;
+        assert!(
+            new_offset <= self.read_offset,
+            "Tried to ack beyond read offset"
+        );
 
-            for i in self.delete_offset..new_offset {
-                delete_batch.delete(Key(i));
-            }
+        let mut delete_batch = Writebatch::new();
 
-            self.db.write(WriteOptions::new(), &delete_batch).unwrap();
-
-            self.delete_offset = new_offset;
-
-            self.db.compact(&Key(0), &Key(self.delete_offset));
-
-            let size_deleted = self.unacked_sizes.drain(..num_to_delete).sum();
-            self.current_size.fetch_sub(size_deleted, Ordering::Relaxed);
-
-            for task in self.blocked_write_tasks.lock().unwrap().drain(..) {
-                task.notify();
-            }
-            self.blocked_write_task_count.swap(0, Ordering::Relaxed);
+        for i in self.delete_offset..new_offset {
+            delete_batch.delete(Key(i));
         }
+
+        self.db.write(WriteOptions::new(), &delete_batch).unwrap();
+
+        self.delete_offset = new_offset;
+
+        self.db.compact(&Key(0), &Key(self.delete_offset));
+
+        let size_deleted = self.unacked_sizes.drain(..num_to_delete).sum();
+        self.current_size.fetch_sub(size_deleted, Ordering::Relaxed);
+
+        for task in self.blocked_write_tasks.lock().unwrap().drain(..) {
+            task.notify();
+        }
+        self.blocked_write_task_count.swap(0, Ordering::Relaxed);
     }
 }
 
