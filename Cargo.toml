@@ -10,7 +10,6 @@ readme = "README.md"
 publish = false
 
 [profile.bench]
-[profile.bench]
 debug = false
 opt-level = 3
 lto = true
