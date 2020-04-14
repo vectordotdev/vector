@@ -74,7 +74,7 @@ jobs:
         key: vector-test-harness-packaged-deb-${{ steps.pr-info.outputs.head_sha }}
     - name: Make deb
       if: steps.deb-cache.outputs.cache-hit != 'true'
-      run: PASS_FEATURES=default-musl PASS_RUST_LTO=lto ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive package-deb
+      run: PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive package-deb
 
     - name: Invoke test harness
       uses: docker://timberiodev/vector-test-harness:latest

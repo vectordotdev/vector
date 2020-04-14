@@ -409,3 +409,7 @@ disable-resolv-conf = []
 [[bench]]
 name = "bench"
 harness = false
+
+[profile.release]
+lto = true
+codegen-units = 1
