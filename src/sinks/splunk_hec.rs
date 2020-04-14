@@ -526,7 +526,7 @@ mod integration_tests {
         assert_eq!(message, entry["message"].as_str().unwrap());
         let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
         assert_eq!("hello", asdf);
-        let sourcetype = entry["sourcetype"].as_array().unwrap()[0].as_str().unwrap();
+        let sourcetype = entry["sourcetype"].as_str().unwrap();
         assert_eq!("file", sourcetype);
     }
 
