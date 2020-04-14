@@ -2,7 +2,10 @@
 //       that is to be tested is present.
 #![cfg(feature = "kubernetes-integration-tests")]
 
-use crate::test_util::{random_string, trace_init, wait_for};
+use crate::{
+    event,
+    test_util::{random_string, trace_init, wait_for},
+};
 use k8s_openapi::api::apps::v1::{DaemonSetSpec, DaemonSetStatus};
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 use kube::{
@@ -526,6 +529,12 @@ fn kube_one_log() {
     wait_for(|| {
         for line in logs(&kube, &vector) {
             if line["message"].as_str().unwrap() == message {
+                assert_eq!(
+                    line[event::log_schema().source_type_key().as_ref()]
+                        .as_str()
+                        .unwrap(),
+                    "kubernetes"
+                );
                 // DONE
                 return true;
             } else {

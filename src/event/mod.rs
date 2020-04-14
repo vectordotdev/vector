@@ -140,6 +140,15 @@ impl LogEvent {
         self.fields.insert(key.into(), value.into());
     }
 
+    pub fn try_insert<V>(&mut self, key: &Atom, value: V)
+    where
+        V: Into<Value>,
+    {
+        if !self.contains(key) {
+            self.insert(key.clone(), value);
+        }
+    }
+
     pub fn remove(&mut self, key: &Atom) -> Option<Value> {
         util::log::remove(&mut self.fields, &key, false)
     }
