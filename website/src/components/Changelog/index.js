@@ -40,7 +40,6 @@ function Commit({commit, setSearchTerm}) {
 
 function Commits({commits, groupBy, setSearchTerm}) {
   if (groupBy) {
-    console.log(groupBy)
     const groupedCommits = _(commits).sortBy(commit => commit.scope.name).groupBy(groupBy).value();
     const groupKeys = sortCommitTypes(Object.keys(groupedCommits));
 

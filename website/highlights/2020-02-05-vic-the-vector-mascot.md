@@ -15,7 +15,6 @@ developing a mascot was at the top of the list. [Meet Vic][pages.vic], the
 Vector mascot. He has an [illustrious][pages.vic] backstory that you should
 check out.
 
-<img src="/img/vic.svg" className={styles.vicLarge} width="100%" height="auto" />
-
+<Vic style="cool" text="Vic approved" />
 
 [pages.vic]: /vic/
