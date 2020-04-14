@@ -836,9 +836,9 @@ mod integration_tests {
 
         let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
-        let timestamp = chrono::Utc::now();
+        let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
+        let (mut input_lines, events) = random_lines_with_stream(100, 11);
 
         // add a historical timestamp to all but the first event, to simulate
         // out-of-order timestamps.
@@ -846,9 +846,11 @@ mod integration_tests {
         let pump = sink.send_all(events.map(move |mut event| {
             if doit {
                 let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
-                let rfc3339 = timestamp.to_rfc3339();
 
-                event.as_mut_log().insert("timestamp", rfc3339);
+                event.as_mut_log().insert(
+                    event::log_schema().timestamp_key(),
+                    Value::Timestamp(timestamp),
+                );
             }
             doit = true;
 
@@ -874,6 +876,9 @@ mod integration_tests {
             .map(|e| e.message.unwrap())
             .collect::<Vec<_>>();
 
+        // readjust input_lines in the same way we have readjusted timestamps.
+        let first = input_lines.remove(0);
+        input_lines.push(first);
         assert_eq!(output_lines, input_lines);
     }
 

@@ -167,7 +167,7 @@ impl Client {
         mut log_events: Vec<InputLogEvent>,
     ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
         // Sort by timestamp
-        // log_events.sort_by_key(|e| e.timestamp);
+        log_events.sort_by_key(|e| e.timestamp);
 
         let request = PutLogEventsRequest {
             log_events,
