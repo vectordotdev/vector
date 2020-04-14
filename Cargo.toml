@@ -10,7 +10,11 @@ readme = "README.md"
 publish = false
 
 [profile.bench]
-debug = true
+[profile.bench]
+debug = false
+opt-level = 3
+lto = true
+codegen-units = 1
 
 [package.metadata.deb]
 maintainer-scripts = "distribution/debian/scripts/"
