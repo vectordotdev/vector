@@ -7,7 +7,7 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [1006, 1493, 1494, 1495]
 release: "0.7.0"
 importance: "low"
-tags: ["type: upgrade guide", "domain: buffers", "domain: config", "domain: sinks"]
+tags: ["type: breaking change", "domain: buffers", "domain: config", "domain: sinks"]
 ---
 
 Request based sinks have had their request fields nested under the table

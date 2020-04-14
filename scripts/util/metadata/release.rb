@@ -9,16 +9,14 @@ class Release
     :description,
     :date,
     :highlights,
-    :last_date,
     :last_version,
     :permalink,
     :version
 
-  def initialize(release_hash, last_version, last_date, all_highlights)
+  def initialize(release_hash, last_version, all_highlights)
     @codename = release_hash["codename"] || ""
     @description = release_hash["description"] || ""
     @date = release_hash.fetch("date").to_date
-    @last_date = last_date
     @last_version = last_version
     @version = Version.new(release_hash.fetch("version"))
     @permalink = "#{RELEASES_BASE_PATH}/#{@version}/"
@@ -41,8 +39,8 @@ class Release
 
     @commits.each do |commit|
       if commit.breaking_change?
-        if !@highlights.any? { |h| h.type?("upgrade guide") && h.pr_numbers.include?(commit.pr_number) }
-          tags = ["type: upgrade guide"]
+        if !@highlights.any? { |h| h.type?("breaking change") && h.pr_numbers.include?(commit.pr_number) }
+          tags = ["type: breaking change"]
 
           if commit.component_type
             tags << "domain: #{commit.component_type.pluralize}"
@@ -54,11 +52,11 @@ class Release
 
           raise ArgumentError.new(
             <<~EOF
-            Release #{@version} contains breaking commits without an upgrade guide!
+            Release #{@version} contains breaking commits without an breaking change!
 
               * Commiit #{commit.sha_short} - #{commit.description}
 
-            Please add the following upgrade guide at:
+            Please add the following breaking change at:
 
               website/highlights/#{commit.date.to_date.to_s}-#{commit.description.parameterize}.md
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-13"
+last_modified_on: "2020-04-14"
 title: Install Vector via Window Installer
 sidebar_label: MSI
 description: Install Vector through the Windows Installer

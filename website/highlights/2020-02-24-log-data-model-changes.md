@@ -7,7 +7,7 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [1836, 1898]
 release: "0.8.0"
 importance: "low"
-tags: ["type: upgrade guide", "domain: buffers", "event type: log"]
+tags: ["type: breaking change", "domain: buffers", "event type: log"]
 ---
 
 We are currently working to improve and optimize our [`log` data
@@ -17,7 +17,7 @@ to not be as helpful as we had hoped. As a result we are working to move our
 data model to be as close to JSON as possible. This means:
 
 1. `null` values are now supported in Vector's data model.
-2. Nestef fields are represented in an actual nested representation.
+2. Nested fields are represented in an actual nested representation.
 
 Both of these changes bring Vector's internal data model closer to JSON.
 

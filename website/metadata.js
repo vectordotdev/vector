@@ -2511,7 +2511,7 @@ module.exports = {
       "path": "website/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks.md",
       "permalink": "/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks/",
       "tags": [
-        "type: upgrade guide",
+        "type: breaking change",
         "domain: sinks",
         "sink: console",
         "sink: file"
@@ -2572,7 +2572,7 @@ module.exports = {
       "path": "website/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics.md",
       "permalink": "/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics/",
       "tags": [
-        "type: upgrade guide",
+        "type: breaking change",
         "domain: sinks",
         "sink: datadog_metrics"
       ],
@@ -2631,7 +2631,7 @@ module.exports = {
       "path": "website/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source.md",
       "permalink": "/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source/",
       "tags": [
-        "type: upgrade guide",
+        "type: breaking change",
         "domain: sources",
         "source: tcp",
         "source: udp"
@@ -2647,7 +2647,7 @@ module.exports = {
       "path": "website/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink.md",
       "permalink": "/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink/",
       "tags": [
-        "type: upgrade guide",
+        "type: breaking change",
         "domain: sinks",
         "sink: tcp"
       ],
@@ -2677,7 +2677,7 @@ module.exports = {
       "path": "website/highlights/2020-01-12-request-options-refactored.md",
       "permalink": "/highlights/2020-01-12-request-options-refactored/",
       "tags": [
-        "type: upgrade guide",
+        "type: breaking change",
         "domain: buffers",
         "domain: config",
         "domain: sinks"
@@ -2693,7 +2693,7 @@ module.exports = {
       "path": "website/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array.md",
       "permalink": "/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array/",
       "tags": [
-        "type: upgrade guide",
+        "type: breaking change",
         "domain: sinks",
         "sink: kafka"
       ],
@@ -2708,7 +2708,7 @@ module.exports = {
       "path": "website/highlights/2020-01-14-rename-line-field-to-message.md",
       "permalink": "/highlights/2020-01-14-rename-line-field-to-message/",
       "tags": [
-        "type: upgrade guide",
+        "type: breaking change",
         "domain: sources",
         "source: splunk_hec"
       ],
@@ -2723,7 +2723,7 @@ module.exports = {
       "path": "website/highlights/2020-01-20-splunk-hec-specify-indexed-fields.md",
       "permalink": "/highlights/2020-01-20-splunk-hec-specify-indexed-fields/",
       "tags": [
-        "type: upgrade guide",
+        "type: breaking change",
         "domain: sinks",
         "sink: splunk_hec"
       ],
@@ -2738,7 +2738,7 @@ module.exports = {
       "path": "website/highlights/2020-02-05-drop-aws-options.md",
       "permalink": "/highlights/2020-02-05-drop-aws-options/",
       "tags": [
-        "type: upgrade guide",
+        "type: breaking change",
         "provider: aws",
         "domain: sinks",
         "sink: elasticsearch"
@@ -2764,7 +2764,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2020-02-05",
-      "description": "Among the many important things that we must accomplish on our road to 1.0,\ndeveloping a mascot was at the top of the list. Meet Vic, the\nVector mascot. He has an illustrious backstory that you should\ncheck out.",
+      "description": "import Vic from '@site/src/components/Vic';",
       "id": "2020-02-05-vic-the-vector-mascot",
       "importance": "low",
       "path": "website/highlights/2020-02-05-vic-the-vector-mascot.md",
@@ -2871,7 +2871,7 @@ module.exports = {
       "path": "website/highlights/2020-02-24-log-data-model-changes.md",
       "permalink": "/highlights/2020-02-24-log-data-model-changes/",
       "tags": [
-        "type: upgrade guide",
+        "type: breaking change",
         "domain: buffers",
         "event type: log"
       ],
@@ -2927,7 +2927,7 @@ module.exports = {
       "date": "2020-02-28",
       "description": "We've implemented a feature flag system that lets you build custom versions\nof Vector with selected components. This is handy if:",
       "id": "2020-02-28-custom-vector-builds",
-      "importance": "low",
+      "importance": "medium",
       "path": "website/highlights/2020-02-28-custom-vector-builds.md",
       "permalink": "/highlights/2020-02-28-custom-vector-builds/",
       "tags": [
@@ -15542,12 +15542,27 @@ module.exports = {
           "path": "website/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks.md",
           "permalink": "/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks/",
           "tags": [
-            "type: upgrade guide",
+            "type: breaking change",
             "domain: sinks",
             "sink: console",
             "sink: file"
           ],
           "title": "Require `encoding` option for console and file sinks"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2019-12-04",
+          "description": "The `datadog` sink has been renamed to `datadog_metrics` to make way for the\nupcoming `datadog_logs` sink.",
+          "id": "2019-12-04-rename-datadog-sink-to-datadog_metrics",
+          "importance": "low",
+          "path": "website/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics.md",
+          "permalink": "/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics/",
+          "tags": [
+            "type: breaking change",
+            "domain: sinks",
+            "sink: datadog_metrics"
+          ],
+          "title": "The `datadog` sink has been renamed to `datadog_metrics`"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -15593,21 +15608,6 @@ module.exports = {
             "domain: config"
           ],
           "title": "Unit Testing Your Vector Config Files"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "date": "2019-12-04",
-          "description": "The `datadog` sink has been renamed to `datadog_metrics` to make way for the\nupcoming `datadog_logs` sink.",
-          "id": "2019-12-04-rename-datadog-sink-to-datadog_metrics",
-          "importance": "low",
-          "path": "website/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics.md",
-          "permalink": "/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics/",
-          "tags": [
-            "type: upgrade guide",
-            "domain: sinks",
-            "sink: datadog_metrics"
-          ],
-          "title": "The `datadog` sink has been renamed to `datadog_metrics`"
         },
         {
           "author_github": "https://github.com/Jeffail",
@@ -18796,7 +18796,7 @@ module.exports = {
           "path": "website/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source.md",
           "permalink": "/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source/",
           "tags": [
-            "type: upgrade guide",
+            "type: breaking change",
             "domain: sources",
             "source: tcp",
             "source: udp"
@@ -18812,26 +18812,11 @@ module.exports = {
           "path": "website/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink.md",
           "permalink": "/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink/",
           "tags": [
-            "type: upgrade guide",
+            "type: breaking change",
             "domain: sinks",
             "sink: tcp"
           ],
           "title": "Rename existing `tcp` sink to `socket` sink"
-        },
-        {
-          "author_github": "https://github.com/Jeffail",
-          "date": "2020-01-07",
-          "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
-          "id": "2020-01-07-prometheus-source",
-          "importance": "high",
-          "path": "website/highlights/2020-01-07-prometheus-source.md",
-          "permalink": "/highlights/2020-01-07-prometheus-source/",
-          "tags": [
-            "type: new feature",
-            "domain: sources",
-            "source: prometheus"
-          ],
-          "title": "New Prometheus Source"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -18842,7 +18827,7 @@ module.exports = {
           "path": "website/highlights/2020-01-12-request-options-refactored.md",
           "permalink": "/highlights/2020-01-12-request-options-refactored/",
           "tags": [
-            "type: upgrade guide",
+            "type: breaking change",
             "domain: buffers",
             "domain: config",
             "domain: sinks"
@@ -18858,7 +18843,7 @@ module.exports = {
           "path": "website/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array.md",
           "permalink": "/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array/",
           "tags": [
-            "type: upgrade guide",
+            "type: breaking change",
             "domain: sinks",
             "sink: kafka"
           ],
@@ -18873,7 +18858,7 @@ module.exports = {
           "path": "website/highlights/2020-01-14-rename-line-field-to-message.md",
           "permalink": "/highlights/2020-01-14-rename-line-field-to-message/",
           "tags": [
-            "type: upgrade guide",
+            "type: breaking change",
             "domain: sources",
             "source: splunk_hec"
           ],
@@ -18888,11 +18873,26 @@ module.exports = {
           "path": "website/highlights/2020-01-20-splunk-hec-specify-indexed-fields.md",
           "permalink": "/highlights/2020-01-20-splunk-hec-specify-indexed-fields/",
           "tags": [
-            "type: upgrade guide",
+            "type: breaking change",
             "domain: sinks",
             "sink: splunk_hec"
           ],
           "title": "The `splunk_hec` sink does not index fields by default"
+        },
+        {
+          "author_github": "https://github.com/Jeffail",
+          "date": "2020-01-07",
+          "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
+          "id": "2020-01-07-prometheus-source",
+          "importance": "high",
+          "path": "website/highlights/2020-01-07-prometheus-source.md",
+          "permalink": "/highlights/2020-01-07-prometheus-source/",
+          "tags": [
+            "type: new feature",
+            "domain: sources",
+            "source: prometheus"
+          ],
+          "title": "New Prometheus Source"
         }
       ],
       "insertions_count": 24373,
@@ -23462,12 +23462,27 @@ module.exports = {
           "path": "website/highlights/2020-02-05-drop-aws-options.md",
           "permalink": "/highlights/2020-02-05-drop-aws-options/",
           "tags": [
-            "type: upgrade guide",
+            "type: breaking change",
             "provider: aws",
             "domain: sinks",
             "sink: elasticsearch"
           ],
           "title": "AWS specific options have been dropped in the Elasticsearch sink"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-24",
+          "description": "We are currently working to improve and optimize our `log` data\nmodel. Initial versions of this data model were\nrepresented as a flat map for key access optimizations. This proved over time\nto not be as helpful as we had hoped. As a result we are working to move our\ndata model to be as close to JSON as possible. This means:",
+          "id": "2020-02-24-log-data-model-changes",
+          "importance": "low",
+          "path": "website/highlights/2020-02-24-log-data-model-changes.md",
+          "permalink": "/highlights/2020-02-24-log-data-model-changes/",
+          "tags": [
+            "type: breaking change",
+            "domain: buffers",
+            "event type: log"
+          ],
+          "title": "Log Data Model Improvements"
         },
         {
           "author_github": "https://github.com/MOZGIII",
@@ -23486,9 +23501,24 @@ module.exports = {
           "title": "Automatically merge partial Docker events"
         },
         {
+          "author_github": "https://github.com/MOZGIII",
+          "date": "2020-02-21",
+          "description": "One of the biggest frustrations we've heard from users in this space is the\ninability to merge lines together. Such a simple task can be incredibly\ncomplex and hard. Fear not! We plan to add first-class support for solving\nthis problem.",
+          "id": "2020-02-21-file-source-multiline-support",
+          "importance": "medium",
+          "path": "website/highlights/2020-02-21-file-source-multiline-support.md",
+          "permalink": "/highlights/2020-02-21-file-source-multiline-support/",
+          "tags": [
+            "type: enhancement",
+            "domain: sources",
+            "source: file"
+          ],
+          "title": "Improved Multiline Support In The File Source"
+        },
+        {
           "author_github": "https://github.com/Jeffail",
           "date": "2020-02-05",
-          "description": "Among the many important things that we must accomplish on our road to 1.0,\ndeveloping a mascot was at the top of the list. Meet Vic, the\nVector mascot. He has an illustrious backstory that you should\ncheck out.",
+          "description": "import Vic from '@site/src/components/Vic';",
           "id": "2020-02-05-vic-the-vector-mascot",
           "importance": "low",
           "path": "website/highlights/2020-02-05-vic-the-vector-mascot.md",
@@ -23570,36 +23600,6 @@ module.exports = {
             "domain: sinks"
           ],
           "title": "Lots of New Sinks!"
-        },
-        {
-          "author_github": "https://github.com/MOZGIII",
-          "date": "2020-02-21",
-          "description": "One of the biggest frustrations we've heard from users in this space is the\ninability to merge lines together. Such a simple task can be incredibly\ncomplex and hard. Fear not! We plan to add first-class support for solving\nthis problem.",
-          "id": "2020-02-21-file-source-multiline-support",
-          "importance": "medium",
-          "path": "website/highlights/2020-02-21-file-source-multiline-support.md",
-          "permalink": "/highlights/2020-02-21-file-source-multiline-support/",
-          "tags": [
-            "type: enhancement",
-            "domain: sources",
-            "source: file"
-          ],
-          "title": "Improved Multiline Support In The File Source"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "date": "2020-02-24",
-          "description": "We are currently working to improve and optimize our `log` data\nmodel. Initial versions of this data model were\nrepresented as a flat map for key access optimizations. This proved over time\nto not be as helpful as we had hoped. As a result we are working to move our\ndata model to be as close to JSON as possible. This means:",
-          "id": "2020-02-24-log-data-model-changes",
-          "importance": "low",
-          "path": "website/highlights/2020-02-24-log-data-model-changes.md",
-          "permalink": "/highlights/2020-02-24-log-data-model-changes/",
-          "tags": [
-            "type: upgrade guide",
-            "domain: buffers",
-            "event type: log"
-          ],
-          "title": "Log Data Model Improvements"
         },
         {
           "author_github": "https://github.com/hoverbear",

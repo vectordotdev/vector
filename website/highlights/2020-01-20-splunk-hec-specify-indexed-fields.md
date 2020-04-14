@@ -7,7 +7,7 @@ author_github: "https://github.com/MOZGIII"
 pr_numbers: [1537]
 release: "0.7.0"
 importance: "low"
-tags: ["type: upgrade guide","domain: sinks","sink: splunk_hec"]
+tags: ["type: breaking change","domain: sinks","sink: splunk_hec"]
 ---
 
 There is no longer a distinction within Vector between explicit and implicit

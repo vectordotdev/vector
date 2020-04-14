@@ -7,7 +7,7 @@ author_github: https://github.com/Jeffail
 pr_numbers: [1485]
 release: "0.7.0"
 importance: "low"
-tags: ["type: upgrade guide","domain: sources","source: tcp", "source: udp"]
+tags: ["type: breaking change","domain: sources","source: tcp", "source: udp"]
 ---
 
 The `tcp` and `udp` sources no longer exist and have been merged into a new

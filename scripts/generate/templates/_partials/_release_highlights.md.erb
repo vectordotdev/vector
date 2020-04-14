@@ -1,23 +1,8 @@
-<%- highlights = release.highlights.select { |h| !h.importance?("low") } -%>
-<%- upgrade_guides = highlights.select { |h| h.upgrade_guide? } -%>
-<%- highlights = highlights.select { |h| !h.upgrade_guide? } -%>
-<%- if upgrade_guides.any? -%>
-<%= "#" * heading_depth %> Breaking Changes
-
 <%= highlights(
-  upgrade_guides,
-  heading_depth: heading_depth + 1,
-  style: "danger"
-) %>
-
-<%- end -%>
-<%- if highlights.any? -%>
-<%= "#" * heading_depth %> Highlights
-
-<%= highlights(
-  highlights,
+  release.highlights,
   author: false,
-  heading_depth: heading_depth + 1
+  clean: true,
+  group_by: "type",
+  heading_depth: heading_depth,
+  timeline: false
 ) %>
-
-<%- end -%>

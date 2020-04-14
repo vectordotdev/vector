@@ -7,7 +7,7 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [1033]
 release: "0.6.0"
 importance: "low"
-tags: ["type: upgrade guide", "domain: sinks", "sink: console", "sink: file"]
+tags: ["type: breaking change", "domain: sinks", "sink: console", "sink: file"]
 ---
 
 The dynamic `encoding` concept in Vector was confusing users, so we've made

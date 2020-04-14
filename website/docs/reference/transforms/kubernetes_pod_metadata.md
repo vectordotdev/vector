@@ -31,7 +31,7 @@ accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--warnings">
 
 * [Kubernetes][urls.kubernetes] version `>= 1.12` is required.
 * [Kubernetes RBAC][urls.kubernetes_rbac] must be enabled. See the ["Kubernetes RBAC" section][docs.transforms.kubernetes_pod_metadata#kubernetes-rbac] for more info.

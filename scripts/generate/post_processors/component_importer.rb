@@ -17,7 +17,7 @@ module PostProcessors
       'Diagram' => "import Diagram from '@site/src/components/Diagram';",
       'Fields' => "import Fields from '@site/src/components/Fields';",
       'Field' => "import Field from '@site/src/components/Field';",
-      'HighlightItem' => "import HighlightItem from '@theme/HighlightItem';",
+      'HighlightItems' => "import HighlightItems from '@theme/HighlightItems';",
       'InstallationCommand' => "import InstallationCommand from '@site/src/components/InstallationCommand';",
       'Jump' => "import Jump from '@site/src/components/Jump';",
       'ServiceDiagram' => "import ServiceDiagram from '@site/src/components/ServiceDiagram';",

@@ -580,12 +580,9 @@ ul.connected-list > li.header {
   text-transform: uppercase;
 }
 
-ul.connected-list > li.header > .panel {
-  border-left: 0;
-  border-radius: 0;
-  border-right: 0;
-  padding-left: 0;
-  padding-right: 0;
+ul.connected-list > li.header > h3 {
+  margin: 0;
+  text-transform: none;
 }
 
 ul.connected-list > li.header.sticky {
@@ -677,6 +674,27 @@ ul.connected-list.connected-list--blend > li h4 {
   font-weight: normal;
 }
 
+/* connected-list--clean */
+ul.connected-list.connected-list--clean {
+  border-left: 0px none;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+ul.connected-list.connected-list--clean > li {
+  list-style: none;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+ul.connected-list.connected-list--clean > li > h2 .hash-link,
+ul.connected-list.connected-list--clean > li > h3 .hash-link,
+ul.connected-list.connected-list--clean > li > h4 .hash-link,
+ul.connected-list.connected-list--clean > li > h5 .hash-link,
+ul.connected-list.connected-list--clean > li > h6 .hash-link {
+  margin-left: -1.1em !important;
+}
+
 /* connected-list--compact */
 
 ul.connected-list.connected-list--compact > li:not(.header) {
@@ -711,7 +729,7 @@ ul.connected-list.connected-list--timeline > li > a.panel > article {
   position: relative;
 }
 
-@media (min-width: 976px) {
+@media (min-width: 997px) {
   ul.connected-list.connected-list--timeline > li > a.panel span.time {
     --left: calc( ( var(--ifm-spacing-horizontal) * -2 ) - var(--time-width) - var(--ifm-list-item-padding-left) - var(--ifm-list-padding-left));
     color: var(--ifm-color-content);
@@ -744,101 +762,6 @@ ul.connected-list.connected-list--timeline > li > a.panel > article {
 
 ul.connected-list.connected-list--hover > li:hover {
   background-color: var(--ifm-panel-background-color);
-}
-
-/* connected-list--center */
-
-ul.connected-list.connected-list--center {
-
-}
-
-ul.connected-list.connected-list--center > li {
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-ul.connected-list.connected-list--center > li.evenr:not(.node) {
-  text-align: right;
-}
-
-ul.connected-list.connected-list--center > li.evenr:not(.node) > .panel {
-  --shift-size: calc( var(--ifm-list-item-padding-left) + var(--ifm-list-padding-left) + var(--ifm-list-item-padding-left) + var(--ifm-list-padding-left) );
-  margin-left: calc( -100% - var(--shift-size) );
-  margin-right: calc( 100% + var(--shift-size) );
-}
-
-ul.connected-list.connected-list--center > li.node {
-  --size: 5em;
-  background: var(--ifm-heading-color);
-  border-radius: var(--size);
-  color: var(--ifm-background-color);
-  font-size: 0.6em;
-  font-weight: bold;
-  height: var(--size);
-  line-height: var(--size);
-  list-style: none;
-  margin-top: calc( var(--ifm-spacing-vertical) * 2 );
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
-  margin-left: calc( var(--ifm-list-padding-left) * -1 - 4px - ( var(--size) / 2 ));
-  padding: 0;
-  white-space: nowrap;
-  width: var(--size);
-  text-align: center;
-  text-transform: uppercase;
-}
-
-ul.connected-list.connected-list--center > li.node:first-child {
-  margin-top: 0;
-}
-
-ul.connected-list.connected-list--center > li.node.sticky {
-  position: sticky;
-  top: 5px;
-}
-
-@media (max-width: 996px) {
-  ul.connected-list.connected-list--center {
-    border-left: none;
-    margin-left: 0;
-    padding-left: 0;
-  }
-
-  ul.connected-list.connected-list--center li {
-    list-style: none;
-    padding-left: 0;
-  }
-
-  ul.connected-list.connected-list--center > li:nth-child(even):not(.node) > .panel {
-    --shift-size: 0;
-    text-align: left;
-  }
-
-  ul.connected-list.connected-list--center > li.node {
-    background-color: var(--ifm-background-color);
-    border: 1px solid var(--ifm-panel-border-color);
-    border-left: 0px none;
-    border-right: 0px none;
-    border-radius: 0;
-    box-shadow: var(--ifm-panel-box-shadow);
-    color: var(--ifm-heading-color);
-    display: block;
-    font-size: 1em;
-    height: auto;
-    line-height: 0;
-    list-style: disc;
-    margin-left: calc( var(--ifm-spacing-horizontal) * -1 );
-    margin-right: calc( var(--ifm-spacing-horizontal) * -1 );
-    margin-bottom: var(--ifm-spacing-vertical);
-    padding: calc( var(--ifm-spacing-vertical) * 1.5 ) calc( var(--ifm-spacing-horizontal) * 2 );
-    padding-left: var(--ifm-list-item-padding-left);
-    text-align: left;
-    text-transform: uppercase;
-    width: auto;
-  }
-
-  ul.connected-list.connected-list--center > li.node.sticky {
-    top: 0;
-  }
 }
 
 /**
@@ -1451,19 +1374,20 @@ ul.list--warnings > li {
  * list
  */
 
-ol.list--flush {
+ol.list--flush,
+ul.list--flush {
   padding-left: 0;
 }
 
-ol.list--lg {
+.list--lg {
   font-size: 1.2em;
 }
 
-ol.list--primary {
+.list--primary {
   color: var(--ifm-color-primary);
 }
 
-ol.list--semi-bold {
+.list--semi-bold {
   font-weight: 500;
 }
 

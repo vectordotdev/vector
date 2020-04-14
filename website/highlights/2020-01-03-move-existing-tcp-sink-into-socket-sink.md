@@ -7,7 +7,7 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [1404]
 release: "0.7.0"
 importance: "low"
-tags: ["type: upgrade guide", "domain: sinks", "sink: tcp"]
+tags: ["type: breaking change", "domain: sinks", "sink: tcp"]
 ---
 
 The `tcp` sink has been renamed to `socket`, upgrading is easy!

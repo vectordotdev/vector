@@ -1,5 +1,6 @@
 import React from 'react';
 
+import Alert from '@site/src/components/Alert';
 import DownloadDiagram from '@site/src/components/DownloadDiagram';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
@@ -14,11 +15,6 @@ import dateFormat from 'dateformat';
 import pluralize from 'pluralize';
 import styles from './styles.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
-import useTOCHighlight from '@theme/hooks/useTOCHighlight';
-
-const LINK_CLASS_NAME = 'contents__link';
-const ACTIVE_LINK_CLASS_NAME = 'contents__link--active';
-const TOP_OFFSET = 100;
 
 /* eslint-disable jsx-a11y/control-has-associated-label */
 function Headings({headings, isChild}) {
@@ -108,8 +104,6 @@ function Badges() {
 }
 
 function Subtitle({subtitle}) {
-
-
   if (subtitle) {
     return (
       <>
@@ -142,20 +136,28 @@ function ReleasePage(props) {
 
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
-  const {metadata: {releases}} = siteConfig.customFields;
-  const release = releases[version];
+  const {metadata: {latest_release: latestRelease, releases}} = siteConfig.customFields;
 
-  const highlightCount = release.highlights.filter(highlight => highlight.importance != "low").length;
-  const breakingChangeCount = release.commits.filter(commit => commit.breaking_change).length;
-  const newFeatureCount = release.commits.filter(commit => commit.type == "feat").length;
-  const enhancementCount = release.commits.filter(commit => commit.type == "enhancement").length;
-  const fixCount = release.commits.filter(commit => commit.type == "fix").length;
+  //
+  // Vars
+  //
+
+  const release = releases[version];
+  const latest = latestRelease.version != release.version;
+  const breaking = release.commits.some(commit => commit.breaking_change);
+  let warnings = [];
+
+  if (latest) {
+    warnings.push(<li>This is an outdated version. Outdated versions maybe contain bugs. It is recommended to use the <Link to={latestRelease.permalink}>latest version ({latestRelease.version})</Link>.</li>);
+  }
+
+  if (breaking) {
+    warnings.push(<li>This release contains <a href="#breaking-changes">breaking changes</a>. Please review and follow the <a href="#breaking-change-highlights">upgrade guides</a>.</li>)
+  }
 
   //
   // Render
   //
-
-  useTOCHighlight(LINK_CLASS_NAME, ACTIVE_LINK_CLASS_NAME, TOP_OFFSET);
 
   return (
     <Layout title={title} description={description}>
@@ -172,23 +174,13 @@ function ReleasePage(props) {
               <i className="feather icon-download"></i> download
             </Link>
           </div>
-          <div class="hero--toc">
-            <ul>
-              {breakingChangeCount > 0 && <li>
-                <a href="#breaking-changes">
-                  <i className="feather icon-alert-triangle"></i> {pluralize('breaking change', breakingChangeCount, true)}
-                </a>
-              </li>}
-              {highlightCount > 0 && <li><a href="#highlights">{pluralize('highlight', highlightCount, true)}</a></li>}
-              {newFeatureCount > 0 && <li><a href="#feat">{pluralize('new feature', newFeatureCount, true)}</a></li>}
-              {enhancementCount > 0 && <li><a href="#enhancement">{pluralize('enhancement', enhancementCount, true)}</a></li>}
-              {fixCount > 0 && <li><a href="#fix">{pluralize('bug fix', fixCount, true)}</a></li>}
-            </ul>
-          </div>
         </div>
       </header>
       <main className={classnames('container', 'container--xs')}>
         <div class={styles.article}>
+          {warnings.length > 0 && <Alert icon={false} fill={true} type="danger" className="list--warnings margin-bottom--lg">
+            <ul>{warnings}</ul>
+          </Alert>}
           <section className="markdown">
             <MDXProvider components={MDXComponents}><ReleaseContents /></MDXProvider>
           </section>
@@ -215,9 +207,6 @@ function ReleasePage(props) {
                 </a>
               </div>
             </div>
-          </section>
-          <section>
-            <Vic size="l" style="cool" text="see you on the other side" />
           </section>
         </div>
         {(metadata.nextItem || metadata.prevItem) && (

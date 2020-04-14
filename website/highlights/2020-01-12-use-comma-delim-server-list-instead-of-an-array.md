@@ -7,7 +7,7 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [1502]
 release: "0.7.0"
 importance: "low"
-tags: ["type: upgrade guide","domain: sinks","sink: kafka"]
+tags: ["type: breaking change","domain: sinks","sink: kafka"]
 ---
 
 The `kafka` sink field `bootstrap_servers` has been changed from an array to a

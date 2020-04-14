@@ -35,7 +35,7 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--warnings">
 
 * [Kafka][urls.kafka] version `>= 0.8` is required.
 

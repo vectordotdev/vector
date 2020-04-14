@@ -7,7 +7,7 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [1457]
 release: "0.7.0"
 importance: "low"
-tags: ["type: upgrade guide","domain: sources","source: splunk_hec"]
+tags: ["type: breaking change","domain: sources","source: splunk_hec"]
 ---
 
 The `splunk_hec` source now emits events with a `message` key instead of a

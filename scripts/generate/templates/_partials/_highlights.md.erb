@@ -1,16 +1,7 @@
-<ul class="connected-list connected-list--timeline">
-<%- highlights.reverse.each do |highlight| -%>
-<li>
-<HighlightItem
-  authorGithub={<%= (author ? highlight.author_github : nil).to_json %>}
-  dateString={<%= highlight.date.to_json %>}
+<HighlightItems
+  clean={<%= clean.to_json %>}
+  groupBy={<%= group_by.to_json %>}
   headingDepth={<%= heading_depth.to_json %>}
-  permalink={<%= highlight.permalink.to_json %>}
-  prNumbers={<%= highlight.pr_numbers.to_json %>}
+  items={<%= highlight_maps.to_json %>}
   size={<%= size.to_json %>}
-  style={<%= style.to_json %>}
-  tags={<%= highlight.tags.to_json %>}
-  title={<%= highlight.title.to_json %>} />
-</li>
-<%- end -%>
-</ul>
+  timeline={<%= timeline.to_json %>} />

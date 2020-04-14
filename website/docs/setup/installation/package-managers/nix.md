@@ -89,7 +89,7 @@ The following diagram demonstrates how it works.
     <ConfigExample
       format="toml"
       path={"/etc/vector/vector.toml"}
-      sourceName={"journald"}
+      sourceName={"file"}
       sinkName={null} />
 
 3.  ### Start Vector

@@ -39,6 +39,10 @@ class Highlight
     date <=> other.date
   end
 
+  def breaking_change?
+    type?("breaking change")
+  end
+
   def eql?(other)
     self.<=>(other) == 0
   end
@@ -87,9 +91,5 @@ class Highlight
       tags: tags,
       title: title
     }
-  end
-
-  def upgrade_guide?
-    type?("upgrade guide")
   end
 end

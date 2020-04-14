@@ -191,10 +191,8 @@ class Metadata
           sort.
           last
 
-      last_date = last_version && hash.fetch("releases").fetch(last_version.to_s).fetch("date").to_date
-
       release_hash["version"] = version_string
-      release = Release.new(release_hash, last_version, last_date, @highlights)
+      release = Release.new(release_hash, last_version, @highlights)
       @releases.send("#{version_string}=", release)
     end
 

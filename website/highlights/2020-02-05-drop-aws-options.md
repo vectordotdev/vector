@@ -7,7 +7,7 @@ author_github: https://github.com/binarylogic
 pr_numbers: [1703]
 release: "0.8.0"
 importance: "low"
-tags: ["type: upgrade guide", "provider: aws", "domain: sinks", "sink: elasticsearch"]
+tags: ["type: breaking change", "provider: aws", "domain: sinks", "sink: elasticsearch"]
 ---
 
 The `endpoint` and `region` options have been dropped in the [`elasticsearch`

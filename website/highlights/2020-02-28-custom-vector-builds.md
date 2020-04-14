@@ -6,7 +6,7 @@ description: "Build Vector with select components"
 author_github: https://github.com/binarylogic
 pr_numbers: [1924]
 release: "nightly"
-importance: "low"
+importance: "medium"
 tags: ["type: new feature", "domain: sources", "source: vector"]
 ---
 

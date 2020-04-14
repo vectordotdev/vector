@@ -3,7 +3,7 @@ import classnames from 'classnames';
 
 import './styles.css';
 
-function Alert({children, classNames, fill, icon, type}) {
+function Alert({children, className, fill, icon, type}) {
   let typeIcon = null;
 
   switch (type) {
@@ -24,7 +24,7 @@ function Alert({children, classNames, fill, icon, type}) {
   }
 
   return (
-    <div className={classnames(classNames, 'alert', `alert--${type}`, {'alert--fill': fill, 'alert--icon': icon !== false})} role="alert">
+    <div className={classnames(className, 'alert', `alert--${type}`, {'alert--fill': fill, 'alert--icon': icon !== false})} role="alert">
       {icon !== false && <i className={classnames('feather', `icon-${icon || typeIcon}`)}></i>}
       {children}
     </div>

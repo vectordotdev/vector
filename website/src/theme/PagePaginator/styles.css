@@ -17,7 +17,11 @@
   color: var(--ifm-panel-color-active);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 540px) {
+  .pagination-nav {
+    display: block;
+  }
+
   .pagination-nav .pagination-nav__item {
     max-width: none;
   }

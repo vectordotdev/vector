@@ -7,7 +7,7 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [1314]
 release: "0.6.0"
 importance: "low"
-tags: ["type: upgrade guide", "domain: sinks", "sink: datadog_metrics"]
+tags: ["type: breaking change", "domain: sinks", "sink: datadog_metrics"]
 ---
 
 The `datadog` sink has been renamed to `datadog_metrics` to make way for the
