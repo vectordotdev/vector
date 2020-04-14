@@ -64,6 +64,7 @@ pub struct Writer {
     offset: Arc<AtomicUsize>,
     write_notifier: Arc<AtomicTask>,
     blocked_write_tasks: Arc<Mutex<Vec<Task>>>,
+    blocked_write_task_count: Arc<AtomicUsize>,
     writebatch: Writebatch<Key>,
     batch_size: usize,
     max_size: usize,
@@ -80,6 +81,7 @@ impl Clone for Writer {
             offset: Arc::clone(&self.offset),
             write_notifier: Arc::clone(&self.write_notifier),
             blocked_write_tasks: Arc::clone(&self.blocked_write_tasks),
+            blocked_write_task_count: Arc::clone(&self.blocked_write_task_count),
             writebatch: Writebatch::new(),
             batch_size: 0,
             max_size: self.max_size,
@@ -107,6 +109,8 @@ impl Sink for Writer {
                 .lock()
                 .unwrap()
                 .push(task::current());
+            self.blocked_write_task_count
+                .fetch_add(1, Ordering::Relaxed);
 
             self.current_size.fetch_sub(event_size, Ordering::Relaxed);
 
@@ -168,6 +172,7 @@ pub struct Reader {
     delete_offset: usize,
     write_notifier: Arc<AtomicTask>,
     blocked_write_tasks: Arc<Mutex<Vec<Task>>>,
+    blocked_write_task_count: Arc<AtomicUsize>,
     current_size: Arc<AtomicUsize>,
     ack_counter: Arc<AtomicUsize>,
     unacked_sizes: VecDeque<usize>,
@@ -227,9 +232,12 @@ impl Drop for Reader {
 
 impl Reader {
     fn delete_acked(&mut self) {
-        let num_to_delete = self.ack_counter.swap(0, Ordering::Relaxed);
+        let num_to_delete = self.ack_counter.load(Ordering::Relaxed);
+        let blocked_writers = self.blocked_write_task_count.load(Ordering::Relaxed);
 
-        if num_to_delete > 0 {
+        if num_to_delete > 10_000 || blocked_writers > 0 {
+            let num_to_delete = self.ack_counter.swap(0, Ordering::Relaxed);
+
             let new_offset = self.delete_offset + num_to_delete;
             assert!(
                 new_offset <= self.read_offset,
@@ -250,10 +258,11 @@ impl Reader {
 
             let size_deleted = self.unacked_sizes.drain(..num_to_delete).sum();
             self.current_size.fetch_sub(size_deleted, Ordering::Relaxed);
-        }
 
-        for task in self.blocked_write_tasks.lock().unwrap().drain(..) {
-            task.notify();
+            for task in self.blocked_write_tasks.lock().unwrap().drain(..) {
+                task.notify();
+            }
+            self.blocked_write_task_count.swap(0, Ordering::Relaxed);
         }
     }
 }
@@ -312,6 +321,7 @@ pub fn open(
     let write_notifier = Arc::new(AtomicTask::new());
 
     let blocked_write_tasks = Arc::new(Mutex::new(Vec::new()));
+    let blocked_write_task_count = Arc::new(AtomicUsize::new(0));
 
     let ack_counter = Arc::new(AtomicUsize::new(0));
     let acker = super::Acker::Disk(Arc::clone(&ack_counter), Arc::clone(&write_notifier));
@@ -320,6 +330,7 @@ pub fn open(
         db: Arc::clone(&db),
         write_notifier: Arc::clone(&write_notifier),
         blocked_write_tasks: Arc::clone(&blocked_write_tasks),
+        blocked_write_task_count: Arc::clone(&blocked_write_task_count),
         offset: Arc::new(AtomicUsize::new(tail)),
         writebatch: Writebatch::new(),
         batch_size: 0,
@@ -330,6 +341,7 @@ pub fn open(
         db: Arc::clone(&db),
         write_notifier: Arc::clone(&write_notifier),
         blocked_write_tasks,
+        blocked_write_task_count,
         read_offset: head,
         delete_offset: head,
         current_size,
