@@ -3148,7 +3148,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-04-07",
-      "description": "The next iteration of our Lua transform",
+      "description": "The next iteration of our Lua transform.",
       "id": "2020-04-07-lua-transform-version-2",
       "importance": "high",
       "path": "website/highlights/2020-04-07-lua-transform-version-2.md",

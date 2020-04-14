@@ -92,7 +92,7 @@ sudo dpkg -i vector-amd64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"file"}
+  sourceName={"journald"}
   sinkName={null} />
 
 </li>
@@ -138,7 +138,7 @@ sudo dpkg -i vector-arm64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"file"}
+  sourceName={"journald"}
   sinkName={null} />
 
 </li>
@@ -184,7 +184,7 @@ sudo dpkg -i vector-armhf.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"file"}
+  sourceName={"journald"}
   sinkName={null} />
 
 </li>

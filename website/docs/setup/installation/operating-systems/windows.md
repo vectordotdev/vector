@@ -152,7 +152,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"journald"}
+  sourceName={"file"}
   sinkName={null} />
 
 </li>
@@ -163,12 +163,14 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 ```bash
 docker run \
   -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+  -v /var/log \
   timberio/vector:latest-alpine
 ```
 
 <CodeExplanation>
 
 * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+* The `-v /var/log` flag ensures that Vector has access to your app's logging directory, adjust as necessary.
 * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>

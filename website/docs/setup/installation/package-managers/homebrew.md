@@ -76,7 +76,7 @@ brew tap timberio/brew && brew install vector
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"journald"}
+  sourceName={"file"}
   sinkName={null} />
 
 </li>

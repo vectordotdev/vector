@@ -219,7 +219,7 @@ class Templates
   def fetch_strategies(strategy_references)
     strategy_references.collect do |reference|
       name = reference.is_a?(Hash) ? reference.name : reference
-      strategy = metadata.installation.strategies.send(name)
+      strategy = metadata.installation.strategies.send(name).clone
       if reference.respond_to?(:source)
         strategy[:source] = reference.source
       end
