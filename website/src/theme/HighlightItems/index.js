@@ -37,18 +37,18 @@ function normalizeItems(items) {
 }
 
 function Header({groupBy, group}) {
+  const slugger = new GithubSlugger();
+
   switch(groupBy) {
     case 'release':
       return (
         <li className="header sticky">
-          <Link to={`/releases/${group}/download/`}>{group}</Link>
+          <h3><Link to={`/releases/${group}/download/`}>{humanizeString(group)}</Link></h3>
         </li>
       );
       break;
 
     case 'type':
-      const slugger = new GithubSlugger();
-
       return (
         <li className="header sticky">
           <AnchoredH3 id={slugger.slug(`${group}-highlights`)}>{pluralize(humanizeString(group))}</AnchoredH3>
@@ -65,18 +65,20 @@ function HighlightItems({clean, groupBy, items, timeline}) {
   let groupKeys = timeline !== false ? Object.keys(groupedItems) : Object.keys(groupedItems).sort();
 
   return (
-    <ul className={classnames('connected-list', {'connected-list--clean': clean === true, 'connected-list--timeline': timeline !== false})}>
+    <ul className={classnames('connected-list', 'connected-list--clean', {'connected-list--timeline': timeline !== false})}>
       {groupKeys.map((group, idx) => {
         let groupItems = groupedItems[group];
 
         return (
           <>
             <Header groupBy={defaultedGroupBy} group={group} />
-            {groupItems.map((highlight, idx) => {
-              return <li key={idx}>
-                <HighlightItem {...highlight} />
-              </li>
-            })}
+            <ul className="connected-list">
+              {groupItems.map((highlight, idx) => {
+                return <li key={idx}>
+                  <HighlightItem {...highlight} />
+                </li>
+              })}
+            </ul>
           </>
         );
       })}

@@ -44,7 +44,7 @@ function Commits({commits, groupBy, setSearchTerm}) {
     const groupKeys = sortCommitTypes(Object.keys(groupedCommits));
 
     return(
-      <ul className="connected-list">
+      <ul className="connected-list connected-list--clean">
         {groupKeys.map((groupKey, catIdx) => (
           <li key={catIdx}>
             <AnchoredH3 id={groupKey}>{pluralize(commitTypeName(groupKey), groupedCommits[groupKey].length, true)}</AnchoredH3>

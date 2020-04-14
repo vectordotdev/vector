@@ -275,7 +275,7 @@ class Templates
     render("#{partials_path}/_full_config_spec.toml", binding).strip.gsub(/ *$/, '')
   end
 
-  def highlights(highlights, author: true, clean: false, group_by: "type", heading_depth: 3, size: nil, style: nil, timeline: true)
+  def highlights(highlights, author: true, group_by: "type", heading_depth: 3, size: nil, style: nil, timeline: true)
     case group_by
     when "type"
       highlights.sort_by!(&:type)

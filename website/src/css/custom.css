@@ -544,9 +544,7 @@ ul.connected-list > li {
 }
 
 ul.connected-list > li.header {
-  background: var(--ifm-panel-background-color-active-solid);
-  border: 1px solid var(--ifm-panel-border-color-active);
-  border-radius: var(--ifm-global-radius);
+  background: var(--ifm-background-color);
   list-style: none;
   font-weight: bold;
   margin-top: calc( var(--ifm-spacing-vertical) * 3 );
