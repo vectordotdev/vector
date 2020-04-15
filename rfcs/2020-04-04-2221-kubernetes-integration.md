@@ -182,7 +182,7 @@ flood-kind DoS.
 
 We can still offer support for Kubernetes 1.13 and earlier, but it will be
 limiting our high-efficient filtering capabilities significantly. It will
-also increase the maintenance costs and code complexity.
+also increase maintenance costs and code complexity.
 
 On the other hand, Kubernetes pre-1.14 versions are quite rare these days.
 At the time of writing, the latest Kubernetes version is 1.18, and, according
@@ -209,8 +209,8 @@ With raw YAML files, they have to be usable out of the box, but we shouldn't
 expect users to use them as-is. People would often maintain their own "forks" of
 those, tailored to their use case. We shouldn't overcomplicate our recommended
 configuration, but we shouldn't oversimplify it either. It has to be
-production-ready. But it also has to be portable, in a sense that it should work
-without tweaking with as much cluster setups as possible.
+production-ready. But it also has to be portable, in the sense that it should
+work without tweaking with as much cluster setups as possible.
 We should support both `kubectl create` and `kubectl apply` flows.
 `kubectl apply` is generally more limiting than `kubectl create`.
 
@@ -285,7 +285,7 @@ Everything we need to do to achieve this is outlined at the
 
 We can use a tool like [ChartMuseum] to manage our repo. Alternatively, we can
 use a bare HTTP server, like AWS S3 or Github Pages. A tool like like
-[ChartMuseum] has a benefit of doing some things for us. It can use S3
+[ChartMuseum] has the benefit of doing some things for us. It can use S3
 for storage, and offers a convenient [helm plugin][helm_push] to release charts,
 so the release process should be very simple.
 
@@ -314,13 +314,13 @@ level for those use cases to be possible.
 It is possible to implement a sidecar deployment via implementing an operator
 to automatically inject Vector `Container` into `Pod`s (via admission
 controller), but that doesn't make a lot of sense for us to work on, since
-[`DaemonSet`][daemonset] works for most of use cases already.
+[`DaemonSet`][daemonset] works for most of the use cases already.
 
 ### Deployment configuration
 
-It is important that provide a well-thought deployment configuration for
+It is important that provide a well-thought deployment configuration for the
 Vector as part of our Kubernetes integration. We want to ensure good user
-experience, and it includes installation, configuration and upgrading.
+experience, and it includes installation, configuration, and upgrading.
 
 We have to make sure that Vector, being itself an app, runs well in Kubernetes,
 and sanely makes use of all the control and monitoring interfaces that
@@ -450,18 +450,18 @@ render `kubernetes_pod_metadata` useless, as there would be no use case for
 it that wouldn't be covered by `kubernetes` source.
 
 What parts of metadata we inject into events should be configurable, but we can
-and want to offer a sane default here.
+and want to offer sane defaults here.
 
 ### Origin filtering
 
-We can do a highly efficient filtering based on the log file path, and a more
+We can do highly efficient filtering based on the log file path, and a more
 comprehensive filtering via metadata from the k8s API, that is, unfortunately,
 has a bit move overhead.
 
 The best user experience is via k8s API, because then we can support filtering
 by labels/annotations, which is a standard way of doing things with k8s.
 
-#### Filtering based on path
+#### Filtering based on the log file path
 
 We already do that in our current implementation.
 
@@ -485,15 +485,15 @@ Filtering bu Kubernetes metadata is way more advanced and flexible from the user
 perspective.
 
 The idea of doing filtering like that is when Vector picks up a new log file to
-process at `kubernetes` source, it has to be able to somehow make a decision on
-whether to consume the logs from that file, or to ignore it, based on the state
-at the k8s API and Vector configuration.
+process at `kubernetes` source, it has to be able to somehow decide on whether
+to consume the logs from that file, or to ignore it, based on the state at the
+k8s API and the Vector configuration.
 
-This means that there has to be way of making the data from the k8s API related
-to the log file available for Vector.
+This means that there has to be a way to make the data from the k8s API related
+to the log file available to Vector.
 
 Based on the k8s API structure, it looks like we should aim for obtaining the
-`Pod` object, since it contains the essential information about the containers
+`Pod` object, since it contains essential information about the containers
 that produced the log file. Also, is is the `Pod` objects that `kubelet` relies
 on to manage the workloads on the node, so this makes `Pod` objects the best
 option for our case, i.e. better than fetching `Deployment` objects.
@@ -516,8 +516,8 @@ One important thing to note is metadata for the given pod can change over time,
 and the implementation has to take that into account, and update the filtering
 state accordingly.
 
-We also can't overload the k8s API with requests. General rule of thumb is we
-shouldn't do requests much more often that k8s itself generates events.
+We also can't overload the k8s API with requests. The general rule of thumb is
+we shouldn't do requests much more often that k8s itself generates events.
 
 Each approach has very different properties. It is hard to estimate which ones
 are a better fit.
@@ -537,7 +537,7 @@ avoid hitting the k8s API too often.
 
 This is an alternative approach to the previous implementation.
 
-Current implementation allows doing this, but is has a certain downsides -
+The current implementation allows doing this, but is has certain downsides -
 the main problem is we're paying the price of reading the log files that are
 filtered out completely.
 
