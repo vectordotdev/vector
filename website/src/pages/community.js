@@ -98,7 +98,7 @@ function Community() {
               Vector's high-level governance model is designed around the requirements and best practices of the CNCF / Linux Foundation Core Infrastructure Initiative best practice targeting a silver badge status.
             </p>
             <ol>
-              <li><a href="https://bestpractices.coreinfrastructure.org/en" target="_blank">CNCF CII Best Practices</a></li>
+              <li><a href="https://bestpractices.coreinfrastructure.org/en" target="_blank">CNCF CII best practices</a></li>
               <li><a href="https://www.linuxfoundation.org/" target="_blank">Linux Foundation</a></li>
             </ol>
 
@@ -108,7 +108,7 @@ function Community() {
               Vector's project / product management model is designed around the linux kernel development practices and processes.
             </p>
             <ol>
-              <li><a href="https://bestpractices.coreinfrastructure.org/en/projects/34" target="_blank">CNCF CII Best Practices</a></li>
+              <li><a href="https://bestpractices.coreinfrastructure.org/en/projects/34" target="_blank">Linux Kernel CII best practices</a></li>
               <li><a href="https://www.kernel.org/" target="_blank">Linux Foundation</a></li>
             </ol>
 
@@ -119,7 +119,7 @@ function Community() {
             </p>
             <ol>
               <li><a href="https://www.rust-lang.org/" target="_blank">Rust Language Organization</a></li>
-              <li><a href="https://www.rust-lang.org/community" target="_blank">Rust Community Standards</a></li>
+              <li><a href="https://www.rust-lang.org/community" target="_blank">Rust community standards</a></li>
             </ol>
           </div>
         </section>

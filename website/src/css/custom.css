@@ -554,6 +554,10 @@ ul.connected-list > li.header {
   text-transform: uppercase;
 }
 
+ul.connected-list > li.header:first-child {
+  margin-top: 0;
+}
+
 ul.connected-list > li.header > h3 {
   margin: 0;
   text-transform: none;
