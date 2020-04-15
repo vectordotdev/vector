@@ -309,6 +309,10 @@ class Templates
   end
 
   def interface_installation_tutorial(interface, sink: nil, source: nil, heading_depth: 3)
+    if !sink && !source
+      raise ArgumentError.new("You must supply at lease a source or sink")
+    end
+
     render("#{partials_path}/interface_installation_tutorial/_#{interface.name}.md", binding).strip
   end
 

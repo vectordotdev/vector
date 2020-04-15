@@ -55,6 +55,10 @@ function Header({groupBy, group}) {
         </li>
       );
       break;
+
+    default:
+      throw Error(`unknown group: ${groupBy}`);
+      break;
   }
 }
 

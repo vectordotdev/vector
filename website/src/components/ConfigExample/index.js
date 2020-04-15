@@ -86,7 +86,7 @@ function ConfigExample({compatiableSinks, format, path, sourceName, sinkName}) {
       </>
     );
   } else {
-
+    throw Error('ConfigExample must specify a source or a sink');
   }
 }
 
