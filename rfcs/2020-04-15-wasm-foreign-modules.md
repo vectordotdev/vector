@@ -1,4 +1,4 @@
-# RFC <issue#> - <YYYY-MM-DD> - WASM Foreign Module Support
+# RFC #2341 - 2020-04-15 - WASM Foreign Module Support
 
 Introduce Vector's foreign module support, a way for users to add custom functionality to Vector. This RFC introduces
 WASM modules specifically, but we envision the possibility of other implementations (these will be a different RFC).
