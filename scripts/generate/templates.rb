@@ -2,9 +2,9 @@ require "erb"
 
 require "active_support/core_ext/string/output_safety"
 
-require_relative "templates/config_example"
-require_relative "templates/config_schema"
 require_relative "templates/config_spec"
+require_relative "templates/integration_guide"
+require_relative "templates/interface_start"
 
 # Renders templates in the templates sub-dir
 #
@@ -43,7 +43,7 @@ class Templates
 
     links =
       components.select(&:common?)[0..limit].collect do |component|
-        "[#{component.name}][docs.#{type.to_s.pluralize}.#{component.name}]"
+        "[#{component.name}][#{component_short_link(component)}]"
       end
 
     num_leftover = components.size - links.size
@@ -55,7 +55,49 @@ class Templates
     links.join(", ")
   end
 
-  def component_config_example(component)
+  def component_config_example(component, advanced: true)
+    groups = []
+
+    if component.option_groups.empty?
+      groups << AccessibleHash.new({
+        label: "Common",
+        group_name: nil,
+        option_filter: lambda do |option|
+          !advanced || option.common?
+        end
+      })
+
+      if advanced
+        groups << AccessibleHash.new({
+          label: "Advanced",
+          group_name: nil,
+          option_filter: lambda do |option|
+            true
+          end
+        })
+      end
+    else
+      component.option_groups.each do |group_name|
+        groups << AccessibleHash.new({
+          label: group_name,
+          group_name: group_name,
+          option_filter: lambda do |option|
+            option.group?(group_name) && (!advanced || option.common?)
+          end
+        })
+
+        if advanced
+          groups << AccessibleHash.new({
+            label: "#{group_name} (adv)",
+            group_name: group_name,
+            option_filter: lambda do |option|
+              option.group?(group_name)
+            end
+          })
+        end
+      end
+    end
+
     render("#{partials_path}/_component_config_example.md", binding).strip
   end
 
@@ -63,18 +105,16 @@ class Templates
     render("#{partials_path}/_component_default.md.erb", binding).strip
   end
 
-  def component_description(component)
-    send("#{component.type}_description", component)
+  def component_examples(component)
+    render("#{partials_path}/_component_examples.md", binding).strip
+  end
+
+  def component_fields(component, heading_depth: 2)
+    render("#{partials_path}/_component_fields.md", binding)
   end
 
   def component_header(component)
     render("#{partials_path}/_component_header.md", binding).strip
-  end
-
-  def component_output(component, output, breakout_top_keys: false, heading_depth: 1)
-    examples = output.examples
-    fields = output.fields ? output.fields.to_h.values.sort : []
-    render("#{partials_path}/_component_output.md", binding).strip
   end
 
   def component_requirements(component)
@@ -85,6 +125,14 @@ class Templates
     render("#{partials_path}/_component_sections.md", binding).strip
   end
 
+  def component_short_description(component)
+    send("#{component.type}_short_description", component)
+  end
+
+  def component_short_link(component)
+    "docs.#{component.type.to_s.pluralize}.#{component.name}"
+  end
+
   def components_table(components)
     if !components.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
@@ -93,26 +141,17 @@ class Templates
     render("#{partials_path}/_components_table.md", binding).strip
   end
 
-  def config_example(options, array: false, skip_path: false, common: false, path: nil, titles: true)
-    if !options.is_a?(Array)
-      raise ArgumentError.new("Options must be an Array")
-    end
-
-    options = options.sort_by(&:config_file_sort_token)
-    example = ConfigExample.new(options)
-    render("#{partials_path}/_config_example.toml", binding).strip
+  def component_warnings(component)
+    warnings(component.warnings)
   end
 
-  def config_schema(options, opts = {})
+  def config_example(options, array: false, group: nil, key_path: [], table_path: [], &block)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
     end
 
-    opts[:titles] = true unless opts.key?(:titles)
-
-    options = options.sort_by(&:config_file_sort_token)
-    schema = ConfigSchema.new(options)
-    render("#{partials_path}/_config_schema.toml", binding).strip
+    example = ConfigWriters::ExampleWriter.new(options, array: array, group: group, key_path: key_path, table_path: table_path, &block)
+    example.to_toml
   end
 
   def config_spec(options, opts = {})
@@ -122,7 +161,6 @@ class Templates
 
     opts[:titles] = true unless opts.key?(:titles)
 
-    options = options.sort_by(&:config_file_sort_token)
     spec = ConfigSpec.new(options)
     content = render("#{partials_path}/_config_spec.toml", binding).strip
 
@@ -133,8 +171,16 @@ class Templates
     end
   end
 
+  def deployment_strategy(strategy, describe: true, platform: nil, sink: nil, source: nil)
+    render("#{partials_path}/deployment_strategies/_#{strategy.name}.md", binding).strip
+  end
+
   def docker_docs
     render("#{partials_path}/_docker_docs.md")
+  end
+
+  def downloads_urls(downloads)
+    render("#{partials_path}/_downloads_urls.md", binding)
   end
 
   def encoding_description(encoding)
@@ -164,7 +210,28 @@ class Templates
     end
   end
 
-  def fields(fields, filters: true, heading_depth: 1, level: 1, path: nil)
+  def fetch_interfaces(interface_names)
+    interface_names.collect do |name|
+      metadata.installation.interfaces.send(name)
+    end
+  end
+
+  def fetch_strategies(strategy_references)
+    strategy_references.collect do |reference|
+      name = reference.is_a?(Hash) ? reference.name : reference
+      strategy = metadata.installation.strategies.send(name).clone
+      if reference.respond_to?(:source)
+        strategy[:source] = reference.source
+      end
+      strategy
+    end
+  end
+
+  def fetch_strategy(strategy_reference)
+    fetch_strategies([strategy_reference]).first
+  end
+
+  def fields(fields, filters: true, heading_depth: 3, path: nil)
     if !fields.is_a?(Array)
       raise ArgumentError.new("Fields must be an Array")
     end
@@ -172,7 +239,7 @@ class Templates
     render("#{partials_path}/_fields.md", binding).strip
   end
 
-  def fields_example(fields)
+  def fields_example(fields, event_type, root_key: nil)
     if !fields.is_a?(Array)
       raise ArgumentError.new("Fields must be an Array")
     end
@@ -180,7 +247,7 @@ class Templates
     render("#{partials_path}/_fields_example.md", binding).strip
   end
 
-  def fields_hash(fields)
+  def fields_hash(fields, root_key: nil)
     hash = {}
 
     fields.each do |field|
@@ -197,11 +264,94 @@ class Templates
       end
     end
 
-    hash
+    if root_key
+      {root_key => hash}
+    else
+      hash
+    end
   end
 
   def full_config_spec
     render("#{partials_path}/_full_config_spec.toml", binding).strip.gsub(/ *$/, '')
+  end
+
+  def highlights(highlights, author: true, group_by: "type", heading_depth: 3, size: nil, style: nil, timeline: true)
+    case group_by
+    when "type"
+      highlights.sort_by!(&:type)
+    when "version"
+      highlights.sort_by!(&:date)
+    else
+      raise ArgumentError.new("Invalid group_by value: #{group_by.inspect}")
+    end
+
+    highlight_maps =
+      highlights.collect do |highlight|
+        {
+          authorGithub: author ? highlight.author_github : nil,
+          dateString: "#{highlight.date}T00:00:00",
+          description: highlight.description,
+          permalink: highlight.permalink,
+          prNumbers: highlight.pr_numbers,
+          release: highlight.release,
+          style: highlight.breaking_change? ? "danger" : nil,
+          tags: highlight.tags,
+          title: highlight.title,
+          type: highlight.type
+        }
+      end
+
+    render("#{partials_path}/_highlights.md", binding).strip
+  end
+
+  def installation_tutorial(interfaces, strategies, platform: nil, heading_depth: 3, show_deployment_strategy: true)
+    render("#{partials_path}/_installation_tutorial.md", binding).strip
+  end
+
+  def interface_installation_tutorial(interface, sink: nil, source: nil, heading_depth: 3)
+    if !sink && !source
+      raise ArgumentError.new("You must supply at lease a source or sink")
+    end
+
+    render("#{partials_path}/interface_installation_tutorial/_#{interface.name}.md", binding).strip
+  end
+
+  def interface_logs(interface)
+    render("#{partials_path}/interface_logs/_#{interface.name}.md", binding).strip
+  end
+
+  def interface_reload(interface)
+    render("#{partials_path}/interface_reload/_#{interface.name}.md", binding).strip
+  end
+
+  def interface_start(interface, requirements: nil)
+    interface_start =
+      case interface.name
+      when "docker-cli"
+        InterfaceStart::DockerCLI.new(interface, requirements)
+      end
+
+    render("#{partials_path}/interface_start/_#{interface.name}.md", binding).strip
+  end
+
+  def interface_stop(interface)
+    render("#{partials_path}/interface_stop/_#{interface.name}.md", binding).strip
+  end
+
+  def interfaces_logs(interfaces, size: nil)
+    render("#{partials_path}/_interfaces_logs.md", binding).strip
+  end
+
+  def interfaces_reload(interfaces, requirements: nil, size: nil)
+    render("#{partials_path}/_interfaces_reload.md", binding).strip
+  end
+
+  def interfaces_start(interfaces, requirements: nil, size: nil)
+    render("#{partials_path}/_interfaces_start.md", binding).strip
+  end
+
+  def interfaces_stop(interfaces, size: nil)
+    render("#{partials_path}/_interfaces_stop.md", binding).strip
   end
 
   def manual_installation_next_steps(type)
@@ -222,7 +372,8 @@ class Templates
     end
 
     if option.relevant_when
-      description << " Only relevant when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}."
+      word = option.required? ? "required" : "relevant"
+      description << " Only #{word} when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}."
     end
 
     description
@@ -291,7 +442,8 @@ class Templates
     end
 
     if relevant_when && option.relevant_when
-      tag = "relevant when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}"
+      word = option.required? ? "required" : "relevant"
+      tag = "#{word} when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}"
       tags << tag
     end
 
@@ -303,11 +455,15 @@ class Templates
   end
 
   def outputs_link(component)
-    if component.output.to_h.any?
-      "[outputs #{event_types(component.output_types).to_sentence} events](#output)"
-    else
-      "outputs #{event_type_links(component.output_types).to_sentence} events"
+    "outputs #{event_type_links(component.output_types).to_sentence} events"
+  end
+
+  def permissions(permissions, heading_depth: nil)
+    if !permissions.is_a?(Array)
+      raise ArgumentError.new("Permissions must be an Array")
     end
+
+    render("#{partials_path}/_permissions.md", binding).strip
   end
 
   def partial?(template_path)
@@ -325,8 +481,52 @@ class Templates
     end
   end
 
+  def integration_guide(platform: nil, source: nil, sink: nil)
+    if platform && source
+      raise ArgumentError.new("You cannot pass both a platform and a source")
+    end
+
+    interfaces = []
+    strategy = nil
+
+    if platform
+      interfaces = fetch_interfaces(platform.interfaces)
+      strategy = fetch_strategy(platform.strategies.first)
+      source = metadata.sources.send(strategy.source)
+    elsif source
+      interfaces = [metadata.installation.interfaces.send("vector-cli")]
+      strategy = fetch_strategy(source.strategies.first)
+    elsif sink
+      interfaces = metadata.installation.interfaces_list
+      strategy = metadata.installation.strategies_list.first
+    end
+
+    guide =
+      IntegrationGuide.new(
+        interfaces,
+        strategy,
+        platform: platform,
+        source: source,
+        sink: sink
+      )
+
+    render("#{partials_path}/_integration_guide.md", binding).strip
+  end
+
   def pluralize(count, word)
     count != 1 ? "#{count} #{word.pluralize}" : "#{count} #{word}"
+  end
+
+  def release_breaking_changes(release, heading_depth: 3)
+    render("#{partials_path}/_release_breaking_changes.md", binding).strip
+  end
+
+  def release_header(release)
+    render("#{partials_path}/_release_header.md", binding).strip
+  end
+
+  def release_highlights(release, heading_depth: 3)
+    render("#{partials_path}/_release_highlights.md", binding).strip
   end
 
   def release_summary(release)
@@ -393,16 +593,20 @@ class Templates
     content
   end
 
-  def sink_description(sink)
+  def sink_short_description(sink)
     strip <<~EOF
     #{write_verb_link(sink)} #{event_type_links(sink.input_types).to_sentence} events to #{sink.write_to_description}.
     EOF
   end
 
-  def source_description(source)
+  def source_short_description(source)
     strip <<~EOF
     Ingests data through #{source.through_description} and #{outputs_link(source)}.
     EOF
+  end
+
+  def strategies(strategies)
+    render("#{partials_path}/_strategies.md", binding).strip
   end
 
   def subpages(link_name = nil)
@@ -422,7 +626,8 @@ class Templates
         path = DOCS_BASE_PATH + f.gsub(DOCS_ROOT, '').split(".").first
         name = File.basename(f).split(".").first.gsub("-", " ").humanize
 
-        front_matter = FrontMatterParser::Parser.parse_file(f).front_matter
+        loader = FrontMatterParser::Loader::Yaml.new(whitelist_classes: [Date])
+        front_matter = FrontMatterParser::Parser.parse_file(f, loader: loader).front_matter
         sidebar_label = front_matter.fetch("sidebar_label", "hidden")
         if sidebar_label != "hidden"
           name = sidebar_label
@@ -430,14 +635,19 @@ class Templates
 
         "<Jump to=\"#{path}/\">#{name}</Jump>"
       end.
-      join("\n")
+      join("\n").
+      strip
   end
 
   def tags(tags)
     tags.collect { |tag| "`#{tag}`" }.join(" ")
   end
 
-  def transform_description(transform)
+  def topologies
+    render("#{partials_path}/_topologies.md", binding).strip
+  end
+
+  def transform_short_description(transform)
     if transform.input_types == transform.output_types
       strip <<~EOF
       Accepts and #{outputs_link(transform)} allowing you to #{transform.allow_you_to_description}.
@@ -451,6 +661,10 @@ class Templates
 
   def vector_summary
     render("#{partials_path}/_vector_summary.md", binding).strip
+  end
+
+  def warnings(warnings)
+    render("#{partials_path}/_warnings.md", binding).strip
   end
 
   def write_verb_link(sink)

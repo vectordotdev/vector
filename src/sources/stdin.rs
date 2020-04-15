@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
@@ -38,6 +39,7 @@ impl SourceConfig for StdinConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         Ok(stdin_source(
@@ -104,6 +106,11 @@ where
 fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event {
     let mut event = Event::from(line);
 
+    // Add source type
+    event
+        .as_mut_log()
+        .insert(event::log_schema().source_type_key(), "stdin");
+
     if let Some(hostname) = &hostname {
         event.as_mut_log().insert(host_key, hostname.clone());
     }
@@ -118,7 +125,7 @@ mod tests {
     use futures01::sync::mpsc;
     use futures01::Async::*;
     use std::io::Cursor;
-    use tokio::runtime::current_thread::Runtime;
+    use tokio01::runtime::current_thread::Runtime;
 
     #[test]
     fn stdin_create_event() {
@@ -134,6 +141,7 @@ mod tests {
             log[&event::log_schema().message_key()],
             "hello world".into()
         );
+        assert_eq!(log[event::log_schema().source_type_key()], "stdin".into());
     }
 
     #[test]

@@ -5,10 +5,10 @@ sidebar_label: hidden
 hide_pagination: true
 ---
 
+import Jump from '@site/src/components/Jump';
+
 This section will cover the basic concepts of Vector and provide a foundation
 for the rest of the documentation.
-
-import Jump from '@site/src/components/Jump';
 
 <Jump to="/docs/about/concepts/">Concepts</Jump>
 <Jump to="/docs/about/data-model/">Data model</Jump>

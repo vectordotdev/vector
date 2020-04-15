@@ -1,12 +1,14 @@
 use crate::{
     event,
     event::{Event, LogEvent, Value},
+    shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use chrono::TimeZone;
 use futures01::{future, sync::mpsc, Future, Sink};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
@@ -59,6 +61,7 @@ impl SourceConfig for JournaldConfig {
         &self,
         name: &str,
         globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
@@ -173,6 +176,9 @@ fn create_event(record: Record) -> Event {
             }
         }
     }
+    // Add source type
+    log.try_insert(event::log_schema().source_type_key(), "journald");
+
     log.into()
 }
 
@@ -271,13 +277,9 @@ where
                     }
                 };
 
-                let mut record = match serde_json::from_str::<Record>(&text) {
+                let mut record = match decode_record(&text) {
                     Ok(record) => record,
                     Err(error) => {
-                        // journalctl will output non-ASCII messages
-                        // using an array of integers. We don't
-                        // parse them into valid records yet but
-                        // instead just skip them.
                         error!(message = "Invalid record from journald, discarding", %error, %text);
                         continue;
                     }
@@ -323,6 +325,35 @@ where
             }
         }
     }
+}
+
+fn decode_record(text: &str) -> Result<Record, JsonError> {
+    let mut record = serde_json::from_str::<JsonValue>(&text)?;
+    // journalctl will output non-ASCII messages using an array
+    // of integers. Look for those messages and re-parse them.
+    record.get_mut("MESSAGE").and_then(|message| {
+        message
+            .as_array()
+            .and_then(decode_array)
+            .map(|decoded| *message = decoded)
+    });
+    serde_json::from_value(record)
+}
+
+fn decode_array(array: &Vec<JsonValue>) -> Option<JsonValue> {
+    // From the array of values, turn all the numbers into bytes, and
+    // then the bytes into a string, but return None if any value in the
+    // array was not a valid byte.
+    array
+        .into_iter()
+        .map(|item| {
+            item.as_u64().and_then(|num| match num {
+                num if num <= u8::max_value() as u64 => Some(num as u8),
+                _ => None,
+            })
+        })
+        .collect::<Option<Vec<u8>>>()
+        .map(|array| String::from_utf8_lossy(&array).into())
 }
 
 const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
@@ -418,10 +449,11 @@ mod tests {
     use std::time::Duration;
     use stream_cancel::Tripwire;
     use tempfile::tempdir;
-    use tokio::util::FutureExt;
+    use tokio01::util::FutureExt;
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002"}
+{"_SYSTEMD_UNIT":"badunit.service","MESSAGE":[194,191,72,101,108,108,111,63],"__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140003"}
 "#;
 
     struct FakeJournal {
@@ -488,36 +520,42 @@ mod tests {
     }
 
     #[test]
-    fn journald_source_works() {
+    fn reads_journal() {
         let received = run_journal(&[], None);
-        assert_eq!(received.len(), 2);
+        assert_eq!(received.len(), 3);
         assert_eq!(
-            received[0].as_log()[&event::log_schema().message_key()],
+            message(&received[0]),
             Value::Bytes("System Initialization".into())
         );
         assert_eq!(
-            received[1].as_log()[&event::log_schema().message_key()],
-            Value::Bytes("unit message".into())
+            received[0].as_log()[event::log_schema().source_type_key()],
+            "journald".into()
         );
+        assert_eq!(message(&received[1]), Value::Bytes("unit message".into()));
     }
 
     #[test]
-    fn journald_source_filters_units() {
+    fn filters_units() {
         let received = run_journal(&["unit.service"], None);
         assert_eq!(received.len(), 1);
-        assert_eq!(
-            received[0].as_log()[&event::log_schema().message_key()],
-            Value::Bytes("unit message".into())
-        );
+        assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
     }
 
     #[test]
-    fn journald_source_handles_checkpoint() {
+    fn handles_checkpoint() {
         let received = run_journal(&[], Some("1"));
+        assert_eq!(received.len(), 2);
+        assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
+    }
+
+    #[test]
+    fn parses_array_messages() {
+        let received = run_journal(&["badunit.service"], None);
         assert_eq!(received.len(), 1);
-        assert_eq!(
-            received[0].as_log()[&event::log_schema().message_key()],
-            Value::Bytes("unit message".into())
-        );
+        assert_eq!(message(&received[0]), Value::Bytes("¿Hello?".into()));
+    }
+
+    fn message(event: &Event) -> Value {
+        event.as_log()[&event::log_schema().message_key()].clone()
     }
 }

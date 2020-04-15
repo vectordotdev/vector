@@ -1,8 +1,14 @@
 ---
+last_modified_on: "2020-04-06"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 It's possible to define unit tests within a Vector configuration file that cover
 a network of transforms within the topology. The intention of these tests is to
@@ -25,8 +31,6 @@ vector test /etc/vector/*.toml
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
@@ -36,509 +40,97 @@ import Tabs from '@theme/Tabs';
   ]
 }>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" />
-
-```toml
-[transforms.bar]
+```toml title="vector.toml"
+[transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
 [[tests]]
-  # REQUIRED - General
-  name = "foo test" # example
-  no_outputs_from = ["foo"] # example
+  # General
+  name = "foo test" # required
 
-  # REQUIRED - Inputs
+  # Inputs
   [[tests.inputs]]
-    # REQUIRED - General
-    type = "raw" # example, enum
-    insert_at = "foo" # example
+    insert_at = "foo" # required
+    type = "raw" # required
+    value = "some message contents" # required, required when type = "raw"
 
-    # OPTIONAL - General
-    value = "some message contents" # example, no default, relevant when type = "raw"
-
-    # OPTIONAL - Log fields
-    [tests.inputs.log_fields]
-      message = "some message contents" # example
-      host = "myhost" # example
-
-    # OPTIONAL - Metric
-    [tests.inputs.metric]
-      # REQUIRED - General
-      type = "counter" # example, enum
-      name = "duration_total" # example
-      timestamp = "2019-11-01T21:15:47.443232Z" # example
-      val = 10.2 # example
-
-      # OPTIONAL - General
-      direction = "plus" # example, no default, enum
-      sample_rate = 1 # example, no default
-
-      # OPTIONAL - Tags
-      [tests.inputs.metric.tags]
-        host = "foohost" # example
-        region = "us-east-1" # example
-
-  # REQUIRED - Outputs
+  # Outputs
   [[tests.outputs]]
-    # REQUIRED - General
-    extract_from = "foo" # example
+    # Conditions
+    conditions.type = "check_fields" # optional, default
+    conditions."message.eq" = "this is the content to match against" # example
+    conditions."message.contains" = "foo" # example
+    conditions."environment.ends_with" = "-staging" # example
+    conditions."message.regex" = " (any|of|these|five|words) " # example
+    conditions."environment.starts_with" = "staging-" # example
 
-    # OPTIONAL - Conditions
-    [[tests.outputs.conditions]]
-      # REQUIRED
-      type = "check_fields" # example
-
-      # OPTIONAL
-      "message.eq" = "this is the content to match against"
-      "host.exists" = true
-      "method.neq" = "POST"
+    # General
+    extract_from = "foo" # required
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
-[transforms.bar]
+```toml title="vector.toml"
+[transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
 [[tests]]
-  # REQUIRED - General
-  name = "foo test" # example
-  no_outputs_from = ["foo"] # example
+  # General
+  name = "foo test" # required
+  no_outputs_from = ["foo"] # required
 
-  # REQUIRED - Inputs
+  # Inputs
   [[tests.inputs]]
-    # REQUIRED - General
-    type = "raw" # example, enum
-    insert_at = "foo" # example
+    # General
+    insert_at = "foo" # required
+    type = "raw" # required
+    value = "some message contents" # required, required when type = "raw"
 
-    # OPTIONAL - General
-    value = "some message contents" # example, no default, relevant when type = "raw"
+    # Log fields
+    log_fields.message = "some message contents" # example
+    log_fields.host = "myhost" # example
 
-    # OPTIONAL - Log fields
-    [tests.inputs.log_fields]
-      message = "some message contents" # example
-      host = "myhost" # example
+    # Metric
+    # General
+    metric.direction = "plus" # optional, no default
+    metric.name = "duration_total" # required
+    metric.sample_rate = 1 # optional, no default
+    metric.timestamp = "2019-11-01T21:15:47.443232Z" # required
+    metric.type = "counter" # required
+    metric.val = 10.2 # required
 
-    # OPTIONAL - Metric
-    [tests.inputs.metric]
-      # REQUIRED - General
-      type = "counter" # example, enum
-      name = "duration_total" # example
-      timestamp = "2019-11-01T21:15:47.443232Z" # example
-      val = 10.2 # example
+    # Tags
+    metric.tags.host = "foohost" # example
+    metric.tags.region = "us-east-1" # example
 
-      # OPTIONAL - General
-      direction = "plus" # example, no default, enum
-      sample_rate = 1 # example, no default
-
-      # OPTIONAL - Tags
-      [tests.inputs.metric.tags]
-        host = "foohost" # example
-        region = "us-east-1" # example
-
-  # REQUIRED - Outputs
+  # Outputs
   [[tests.outputs]]
-    # REQUIRED - General
-    extract_from = "foo" # example
+    # Conditions
+    conditions.type = "check_fields" # optional, default
+    conditions."message.eq" = "this is the content to match against" # example
+    conditions."host.exists" = true # example
+    conditions."method.neq" = "POST" # example
+    conditions."message.contains" = "foo" # example
+    conditions."environment.ends_with" = "-staging" # example
+    conditions."message.regex" = " (any|of|these|five|words) " # example
+    conditions."environment.starts_with" = "staging-" # example
 
-    # OPTIONAL - Conditions
-    [[tests.outputs.conditions]]
-      # REQUIRED
-      type = "check_fields" # example
-
-      # OPTIONAL
-      "message.eq" = "this is the content to match against"
-      "host.exists" = true
-      "method.neq" = "POST"
+    # General
+    extract_from = "foo" # required
 ```
 
 </TabItem>
 
 </Tabs>
 
-For more information about unit tests check out [this guide][docs.setup.guides.unit-testing].
-
-## Options
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
+For more information about unit tests check out [this guide][guides.advanced.unit-testing].
 
 <Fields filters={true}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"inputs"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"[table]"}
-  unit={null}
-  >
-
-### inputs
-
-A table that defines a unit test input event.
-
-<Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["foo"]}
-  groups={[]}
-  name={"insert_at"}
-  path={"inputs"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### insert_at
-
-The name of a transform, the input event will be delivered to this transform in order to begin the test.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"log_fields"}
-  path={"inputs"}
-  relevantWhen={{"type":"log"}}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-#### log_fields
-
-Specifies the log fields when the input type is 'log'.
-
-<Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"message":"some message contents"},{"host":"myhost"}]}
-  groups={[]}
-  name={"`[field-name]`"}
-  path={"inputs.log_fields"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"*"}
-  unit={null}
-  >
-
-##### `[field-name]`
-
-A key/value pair representing a field to be added to the input event.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"metric"}
-  path={"inputs"}
-  relevantWhen={{"type":"metric"}}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-#### metric
-
-Specifies the metric type when the input type is 'metric'.
-
-<Fields filters={false}>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={{"plus":"Increase the gauge","minus":"Decrease the gauge"}}
-  examples={["plus","minus"]}
-  groups={[]}
-  name={"direction"}
-  path={"inputs.metric"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### direction
-
-The direction to increase or decrease the gauge value.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["duration_total"]}
-  groups={[]}
-  name={"name"}
-  path={"inputs.metric"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### name
-
-The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[1]}
-  groups={[]}
-  name={"sample_rate"}
-  path={"inputs.metric"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"float"}
-  unit={null}
-  >
-
-##### sample_rate
-
-The bucket/distribution the metric is a part of.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"tags"}
-  path={"inputs.metric"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-##### tags
-
-Key/value pairs representing [metric tags][docs.data-model.metric#tags].
-
-<Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"host":"foohost"},{"region":"us-east-1"}]}
-  groups={[]}
-  name={"`[tag-name]`"}
-  path={"inputs.metric.tags"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-###### `[tag-name]`
-
-Key/value pairs representing [metric tags][docs.data-model.metric#tags].
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["2019-11-01T21:15:47.443232Z"]}
-  groups={[]}
-  name={"timestamp"}
-  path={"inputs.metric"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### timestamp
-
-Time metric was created/ingested.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"counter":"A [counter metric type][docs.data-model.metric#counter].","gauge":"A [gauge metric type][docs.data-model.metric#gauge].","histogram":"A [distribution metric type][docs.data-model.metric#distribution].","set":"A [set metric type][docs.data-model.metric#set]."}}
-  examples={["counter"]}
-  groups={[]}
-  name={"type"}
-  path={"inputs.metric"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### type
-
-The metric type.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[10.2]}
-  groups={[]}
-  name={"val"}
-  path={"inputs.metric"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"float"}
-  unit={null}
-  >
-
-##### val
-
-Amount to increment/decrement or gauge.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"raw":"Creates a log event where the message contents are specified in the field 'value'.","log":"Creates a log event where log fields are specified in the table 'log_fields'.","metric":"Creates a metric event, where its type and fields are specified in the table 'metric'."}}
-  examples={["raw","log","metric"]}
-  groups={[]}
-  name={"type"}
-  path={"inputs"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### type
-
-The event type.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["some message contents"]}
-  groups={[]}
-  name={"value"}
-  path={"inputs"}
-  relevantWhen={{"type":"raw"}}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### value
-
-Specifies the log message field contents when the input type is 'raw'.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -552,6 +144,7 @@ Specifies the log message field contents when the input type is 'raw'.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### name
@@ -559,11 +152,11 @@ Specifies the log message field contents when the input type is 'raw'.
 A unique identifier for this test.
 
 
+
+
 </Field>
-
-
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[["foo"]]}
@@ -575,6 +168,7 @@ A unique identifier for this test.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### no_outputs_from
@@ -582,9 +176,379 @@ A unique identifier for this test.
 A list of transforms that must NOT output events in order for the test to pass.
 
 
+
+
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"inputs"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"[table]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### inputs
+
+A table that defines a unit test input event.
 
 
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["foo"]}
+  groups={[]}
+  name={"insert_at"}
+  path={"inputs"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### insert_at
+
+The name of a transform, the input event will be delivered to this transform in
+order to begin the test.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"raw":"Creates a log event where the message contents are specified in the field 'value'.","log":"Creates a log event where log fields are specified in the table 'log_fields'.","metric":"Creates a metric event, where its type and fields are specified in the table 'metric'."}}
+  examples={["raw","log","metric"]}
+  groups={[]}
+  name={"type"}
+  path={"inputs"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The event type.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["some message contents"]}
+  groups={[]}
+  name={"value"}
+  path={"inputs"}
+  relevantWhen={{"type":"raw"}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### value
+
+Specifies the log message field contents when the input type is 'raw'.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"log_fields"}
+  path={"inputs"}
+  relevantWhen={{"type":"log"}}
+  required={true}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### log_fields
+
+Specifies the log fields when the input type is 'log'.
+
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message":"some message contents"},{"host":"myhost"}]}
+  groups={[]}
+  name={"`[field-name]`"}
+  path={"inputs.log_fields"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"*"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[field-name]`
+
+A key/value pair representing a field to be added to the input event.
+
+
+
+
+</Field>
+</Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"metric"}
+  path={"inputs"}
+  relevantWhen={{"type":"metric"}}
+  required={true}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### metric
+
+Specifies the metric type when the input type is 'metric'.
+
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={{"plus":"Increase the gauge","minus":"Decrease the gauge"}}
+  examples={["plus","minus"]}
+  groups={[]}
+  name={"direction"}
+  path={"inputs.metric"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### direction
+
+The direction to increase or decrease the gauge value.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["duration_total"]}
+  groups={[]}
+  name={"name"}
+  path={"inputs.metric"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### name
+
+The name of the metric. Defaults to `<field>_total` for `counter` and `<field>`
+for `gauge`.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[1]}
+  groups={[]}
+  name={"sample_rate"}
+  path={"inputs.metric"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"float"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### sample_rate
+
+The bucket/distribution the metric is a part of.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["2019-11-01T21:15:47.443232Z"]}
+  groups={[]}
+  name={"timestamp"}
+  path={"inputs.metric"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### timestamp
+
+Time metric was created/ingested.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"counter":"A [counter metric type][docs.data-model.metric#counter].","gauge":"A [gauge metric type][docs.data-model.metric#gauge].","histogram":"A [distribution metric type][docs.data-model.metric#distribution].","set":"A [set metric type][docs.data-model.metric#set]."}}
+  examples={["counter","gauge","histogram","set"]}
+  groups={[]}
+  name={"type"}
+  path={"inputs.metric"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### type
+
+The metric type.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[10.2]}
+  groups={[]}
+  name={"val"}
+  path={"inputs.metric"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"float"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### val
+
+Amount to increment/decrement or gauge.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"tags"}
+  path={"inputs.metric"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### tags
+
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].
+
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"host":"foohost"},{"region":"us-east-1"}]}
+  groups={[]}
+  name={"`[tag-name]`"}
+  path={"inputs.metric.tags"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+###### `[tag-name]`
+
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].
+
+
+
+
+</Field>
+</Fields>
+
+</Field>
+</Fields>
+
+</Field>
+</Fields>
+
+</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -598,15 +562,16 @@ A list of transforms that must NOT output events in order for the test to pass.
   templateable={false}
   type={"[table]"}
   unit={null}
+  warnings={[]}
   >
 
 ### outputs
 
 A table that defines a unit test expected output.
 
+
+
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -620,97 +585,34 @@ A table that defines a unit test expected output.
   templateable={false}
   type={"[table]"}
   unit={null}
+  warnings={[]}
   >
 
 #### conditions
 
-A table that defines a collection of conditions to check against the output of a transform. A test is considered to have passed when each condition has resolved true for one or more events extracted from the target transform.An expected output without conditions instead prints the input and output of a target without checking its values.
+A table that defines a collection of conditions to check against the output of
+a transform. A test is considered to have passed when each condition has
+resolved true for one or more events extracted from the target transform.An
+expected output without conditions instead prints the input and output of a
+target without checking its values.
+
+
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"message.eq":"this is the content to match against"}]}
-  groups={[]}
-  name={"`<field_name>`.eq"}
-  path={"outputs.conditions"}
-  relevantWhen={{"type":"check_fields"}}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### `<field_name>`.eq
-
-Check whether a fields contents exactly matches the value specified.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"host.exists":true}]}
-  groups={[]}
-  name={"`<field_name>`.exists"}
-  path={"outputs.conditions"}
-  relevantWhen={{"type":"check_fields"}}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-##### `<field_name>`.exists
-
-Check whether a field exists or does not exist, depending on the provided valuebeing `true` or `false` respectively.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"method.neq":"POST"}]}
-  groups={[]}
-  name={"`<field_name>`.neq"}
-  path={"outputs.conditions"}
-  relevantWhen={{"type":"check_fields"}}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### `<field_name>`.neq
-
-Check whether a fields contents does not match the value specified.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
+  defaultValue={"check_fields"}
+  enumValues={{"check_fields":"Allows you to check individual fields against a list of conditions.","is_log":"Returns true if the event is a log.","is_metric":"Returns true if the event is a metric."}}
   examples={["check_fields","is_log","is_metric"]}
   groups={[]}
   name={"type"}
   path={"outputs.conditions"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### type
@@ -718,14 +620,185 @@ Check whether a fields contents does not match the value specified.
 The type of the condition to execute.
 
 
+
+
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.eq":"this is the content to match against"}]}
+  groups={[]}
+  name={"`[field-name]`.eq"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[field-name]`.eq
+
+Check whether a fields contents exactly matches the value specified.
 
 
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"host.exists":true}]}
+  groups={[]}
+  name={"`[field-name]`.exists"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[field-name]`.exists
+
+Check whether a field exists or does not exist, depending on the provided value
+being `true` or `false` respectively.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"method.neq":"POST"}]}
+  groups={[]}
+  name={"`[field-name]`.neq"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[field-name]`.neq
+
+Check whether a fields contents does not match the value specified.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.contains":"foo"}]}
+  groups={[]}
+  name={"`[field_name]`.contains"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[field_name]`.contains
+
+Checks whether a string field contains a string argument.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"environment.ends_with":"-staging"}]}
+  groups={[]}
+  name={"`[field_name]`.ends_with"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[field_name]`.ends_with
+
+Checks whether a string field ends with a string argument.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.regex":" (any|of|these|five|words) "}]}
+  groups={[]}
+  name={"`[field_name]`.regex"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[field_name]`.regex
+
+Checks whether a string field matches a [regular expression][urls.regex].
+Vector uses the [documented Rust Regex syntax][urls.rust_regex_syntax]. Note
+that this condition is considerably more expensive than a regular string match
+(such as `starts_with` or `contains`) so the use of those conditions are
+preferred where possible.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"environment.starts_with":"staging-"}]}
+  groups={[]}
+  name={"`[field_name]`.starts_with"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[field_name]`.starts_with
+
+Checks whether a string field starts with a string argument.
+
+
+
+
+</Field>
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -739,21 +812,21 @@ The type of the condition to execute.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### extract_from
 
-The name of a transform, at the end of the test events extracted from this transform will be checked against a table of conditions.
+The name of a transform, at the end of the test events extracted from this
+transform will be checked against a table of conditions.
+
+
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 
@@ -762,4 +835,6 @@ The name of a transform, at the end of the test events extracted from this trans
 [docs.data-model.metric#gauge]: /docs/about/data-model/metric/#gauge
 [docs.data-model.metric#set]: /docs/about/data-model/metric/#set
 [docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
-[docs.setup.guides.unit-testing]: /docs/setup/guides/unit-testing/
+[guides.advanced.unit-testing]: /guides/advanced/unit-testing/
+[urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
+[urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax

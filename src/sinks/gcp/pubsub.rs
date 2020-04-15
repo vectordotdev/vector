@@ -3,10 +3,8 @@ use crate::{
     event::Event,
     sinks::{
         util::{
-            encoding::{
-                skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration,
-            },
-            http::{https_client, BatchedHttpSink, HttpSink},
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, RouterSink, UriParseError,
@@ -14,12 +12,13 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::Future;
+use futures01::{Future, Sink};
 use http::Uri;
 use hyper::{Body, Method, Request};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
+use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -40,7 +39,10 @@ pub struct PubsubConfig {
     pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     pub tls: Option<TlsOptions>,
@@ -75,7 +77,8 @@ impl SinkConfig for PubsubConfig {
             batch_settings,
             Some(tls_settings),
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal gcp pubsub sink error: {}", e));
 
         Ok((Box::new(sink), healthcheck))
     }
@@ -128,16 +131,15 @@ impl PubsubSink {
             creds.apply(&mut request);
         }
 
-        let client = https_client(cx.resolver(), tls.clone())?;
+        let mut client = HttpClient::new(cx.resolver(), tls.clone())?;
         let creds = self.creds.clone();
-        let healthcheck =
-            client
-                .request(request)
-                .map_err(Into::into)
-                .and_then(healthcheck_response(
-                    creds,
-                    HealthcheckError::TopicNotFound.into(),
-                ));
+        let healthcheck = client
+            .call(request)
+            .map_err(Into::into)
+            .and_then(healthcheck_response(
+                creds,
+                HealthcheckError::TopicNotFound.into(),
+            ));
         Ok(Box::new(healthcheck))
     }
 

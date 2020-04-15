@@ -1,8 +1,13 @@
 ---
+last_modified_on: "2020-04-11"
 title: Log Event
 description: A detailed guide on Vector's internal log data model.
 ---
 
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Jump from '@site/src/components/Jump';
 import SVG from 'react-inlinesvg';
 
 <SVG src="/img/data-model-log.svg" />
@@ -75,8 +80,6 @@ import TabItem from '@theme/TabItem';
 
 ## Schema
 
-import Alert from '@site/src/components/Alert';
-
 <Alert type="info">
 
 The following fields are the _default_ schema. All of these field names can be
@@ -85,13 +88,7 @@ changed via the
 
 </Alert>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -105,16 +102,20 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
 
-Represents the originating host of the log. This is automatically set within select [sources][docs.sources] if the key does not exist. Change this field name via the [global `host_key` option][docs.reference.global-options#host_key] or the source-level `host_key` option for relevant sources. See [Changing The Default Schema](#changing-the-default-schema) for more info.
+Represents the originating host of the log. This is automatically set within
+select [sources][docs.sources] if the key does not exist. Change this field
+name via the [global `host_key` option][docs.reference.global-options#host_key]
+or the source-level `host_key` option for relevant sources.
+
+ See [Changing The Default Schema](#changing-the-default-schema) for more info.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -128,17 +129,46 @@ Represents the originating host of the log. This is automatically set within sel
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### message
 
-Represents the log message. Change this field name via the [global `message_key` option][docs.reference.global-options#message_key] or the source-level `message_key` option for relevant sources.
+Represents the log message. Change this field name via the [global
+`message_key` option][docs.reference.global-options#message_key] or the
+source-level `message_key` option for relevant sources.
+
  See [Changing The Default Schema](#changing-the-default-schema) for more info.
 
 
 </Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["file","socket","http","kubernetes"]}
+  groups={[]}
+  name={"source_type"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### source_type
+
+The official `type` of [Vector's source component][docs.sources] from which the
+log originates. Change this field name via the [global `source_type_key`
+option][docs.reference.global-options#source_type_key] or the source-level
+`source_type_key` option for relevant sources.
 
 
+
+
+</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -152,17 +182,20 @@ Represents the log message. Change this field name via the [global `message_key`
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### timestamp
 
-A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. Change this field name via the [global `timestamp_key` option][docs.reference.global-options#message_key] or the source-level `timestamp_key` option for relevant sources.
+A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. Change this
+field name via the [global `timestamp_key`
+option][docs.reference.global-options#message_key] or the source-level
+`timestamp_key` option for relevant sources.
+
  See [Changing The Default Schema](#changing-the-default-schema) and [Timestamp Coercion](#timestamp-coercion) for more info.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -176,24 +209,23 @@ A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. Change this fie
   templateable={false}
   type={"*"}
   unit={null}
+  warnings={[]}
   >
 
 ### `[custom-key]`
 
-In addition to the defined fields, a log event can have any number of additional fields. This includes nested fields.
+In addition to the defined fields, a log event can have any number of
+additional fields. This includes nested fields.
+
 
 
 
 </Field>
-
-
 </Fields>
 
 ## Components
 
-import Jump from '@site/src/components/Jump';
-
-<Jump to="/components/?log=true">View all log compatible components</Jump>
+<Jump to="/components/?event-types[]=log">View all log compatible components</Jump>
 
 ## How It Works
 
@@ -224,18 +256,18 @@ Some components, such as [`rename_fields` transform][docs.reference.transforms.r
 accept name of a field as an option. In order to specify a nested field to them, use the
 dot notation which can be described by an example:
 
-```
+```text
 parent_field.child_field
 ```
 
 The dot notation also supports accessing array fields using by placing the index between
 `[` and `]` after the array field name, for example
 
-```
+```text
 array[0]
 ```
 
-The indexes start from 0, missing value are auto-filled by [null values](#null-values).
+The indexes start from 0, missing values are auto-filled by [null values](#null-values).
 
 <Alert type="warning">
 
@@ -295,6 +327,7 @@ Array fields are sequences of values of any type.
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.reference.global-options#message_key]: /docs/reference/global-options/#message_key
+[docs.reference.global-options#source_type_key]: /docs/reference/global-options/#source_type_key
 [docs.reference.transforms.rename_fields]: /docs/reference/transforms/rename_fields/
 [docs.sources]: /docs/reference/sources/
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/

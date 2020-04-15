@@ -2,11 +2,12 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
+    serde::to_string,
     sinks::util::{
-        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto, BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
-        SinkExt, TowerRequestConfig,
+        rusoto, BatchBytesConfig, Buffer, PartitionBatchSink, PartitionBuffer,
+        PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -45,7 +46,10 @@ pub struct S3SinkConfig {
     options: S3Options,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     pub compression: Compression,
     #[serde(default)]
@@ -105,8 +109,8 @@ enum S3StorageClass {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: Some(25),
-        rate_limit_num: Some(25),
+        in_flight_limit: Some(50),
+        rate_limit_num: Some(250),
         ..Default::default()
     };
 }
@@ -205,9 +209,11 @@ impl S3Sink {
             .settings(request, S3RetryLogic)
             .service(s3);
 
-        let sink = crate::sinks::util::BatchServiceSink::new(svc, cx.acker())
-            .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
-            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
+        let buffer = PartitionBuffer::new(Buffer::new(compression));
+
+        let sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
+            .sink_map_err(|error| error!("Sink failed to flush: {}", error));
 
         Ok(Box::new(sink))
     }
@@ -301,11 +307,6 @@ impl Service<Request> for S3Sink {
             })
             .instrument(info_span!("request"))
     }
-}
-
-fn to_string(value: impl Serialize) -> String {
-    let value = serde_json::to_value(&value).unwrap();
-    value.as_str().unwrap().into()
 }
 
 fn build_request(

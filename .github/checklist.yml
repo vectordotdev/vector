@@ -1,0 +1,8 @@
+paths:
+  ".meta/releases/**":
+    - "Did you review all commits to ensure they are categorized correctly and user friendly?"
+    - "Have you run all test harness benchmarks to compare results? (ex: `/test`)"
+  "Cargo.lock":
+    - "Has at least one other team member approved the dependency changes?"
+  "rfcs/**":
+    - "Have at least 3 team members approved this RFC?"

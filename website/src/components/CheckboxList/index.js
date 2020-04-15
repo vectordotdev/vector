@@ -2,9 +2,7 @@ import React from 'react';
 
 import humanizeString from 'humanize-string';
 
-import './styles.css';
-
-function CheckboxList({humanize, icon, values, currentState, setState}) {
+function CheckboxList({currentState, humanize, icon, name, setState, values}) {
   if (values.size == 0)
     return null;
 
@@ -18,7 +16,8 @@ function CheckboxList({humanize, icon, values, currentState, setState}) {
         return (
           <label key={idx}>
             <input
-              type="checkbox"
+              checked={currentState.has(value)}
+              name={name}
               onChange={(event) => {
                 let newValues = new Set(currentState);
 
@@ -29,7 +28,7 @@ function CheckboxList({humanize, icon, values, currentState, setState}) {
 
                 setState(newValues);
               }}
-              checked={currentState.has(value)} />
+              type="checkbox" />
             {label && <>{icon ? <i className={`feather icon-${icon}`}></i> : ''} {label}</>}
           </label>
         );

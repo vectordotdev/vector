@@ -1,16 +1,17 @@
 use futures01::future::{ExecuteError, Executor, Future};
 use std::io;
 use std::pin::Pin;
-use tokio::runtime::Builder;
+use tokio::task::JoinHandle;
+use tokio_compat::runtime::{Builder, Runtime as TokioRuntime, TaskExecutor as TokioTaskExecutor};
 
 pub struct Runtime {
-    rt: tokio::runtime::Runtime,
+    rt: TokioRuntime,
 }
 
 impl Runtime {
     pub fn new() -> io::Result<Self> {
         Ok(Runtime {
-            rt: tokio::runtime::Runtime::new()?,
+            rt: TokioRuntime::new()?,
         })
     }
 
@@ -30,6 +31,22 @@ impl Runtime {
     {
         self.rt.spawn(future);
         self
+    }
+
+    pub fn spawn_std<F>(&mut self, future: F) -> &mut Self
+    where
+        F: std::future::Future<Output = ()> + Send + 'static,
+    {
+        self.rt.spawn_std(future);
+        self
+    }
+
+    pub fn spawn_handle<F>(&mut self, future: F) -> JoinHandle<F::Output>
+    where
+        F: std::future::Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        self.rt.spawn_handle_std(future)
     }
 
     pub fn executor(&self) -> TaskExecutor {
@@ -70,7 +87,7 @@ impl Runtime {
 
 #[derive(Clone, Debug)]
 pub struct TaskExecutor {
-    inner: tokio::runtime::TaskExecutor,
+    inner: TokioTaskExecutor,
 }
 
 impl TaskExecutor {
@@ -91,6 +108,15 @@ where
 {
     fn execute(&self, future: F) -> Result<(), ExecuteError<F>> {
         self.inner.execute(future)
+    }
+}
+
+impl tokio01::executor::Executor for TaskExecutor {
+    fn spawn(
+        &mut self,
+        fut: Box<dyn Future<Item = (), Error = ()> + Send + 'static>,
+    ) -> Result<(), tokio01::executor::SpawnError> {
+        Ok(self.inner.spawn(fut))
     }
 }
 

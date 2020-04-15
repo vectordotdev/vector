@@ -8,13 +8,12 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "json_parser") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "json_parser") %>
 
 [transforms.json_parser.options.drop_field]
 type = "bool"
 common = true
 default = true
-required = true
 description = """\
 If the specified `field` should be dropped (removed) after parsing. If \
 parsing fails, the field will not be removed, irrespective of this setting.\
@@ -34,7 +33,8 @@ event will be kept and passed through.\
 type = "string"
 common = true
 default = "message"
-required = true
+examples = ["message", "parent.child", "array[0]"]
+field_path_notation = true
 description = """\
 The log field to decode as JSON. Must be a `string` value type.\
 """
@@ -49,7 +49,8 @@ as the target, it will only be overwritten if this is set to `true`.\
 
 [transforms.json_parser.options.target_field]
 type = "string"
-examples = ["target"]
+examples = ["root_field", "parent.child"]
+field_path_notation = true
 description = """\
 If this setting is present, the parsed JSON will be inserted into the \
 log as a sub-object with this name. \
@@ -57,12 +58,12 @@ If a field with the same name already exists, the parser will fail and \
 produce an error.\
 """
 
-[[transforms.json_parser.output.log.examples]]
+[[transforms.json_parser.examples]]
 label = "Simple"
 body = """\
 Given the following log event:
 
-```
+```javascript
 {
   "message": "{"key": "value"}"
 }
@@ -89,13 +90,13 @@ By default, Vector drops fields after parsing them via the `drop_field`
 option.\
 """
 
-[[transforms.json_parser.output.log.examples]]
+[[transforms.json_parser.examples]]
 label = "Wrapped"
 body = """\
 It is possible to chain `json_parser` transforms to effectively "unwrap"
 nested JSON documents. For example, give this log event:
 
-```
+```javascript
 {
   "message": "{"parent": "{\"child\": \"value2\"}"}"
 }

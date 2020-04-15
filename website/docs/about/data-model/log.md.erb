@@ -73,11 +73,11 @@ changed via the
 
 </Alert>
 
-<%= fields(metadata.log_fields_list, heading_depth: 3) %>
+<%= fields(metadata.data_model.log.schema_list, heading_depth: 3) %>
 
 ## Components
 
-<Jump to="[[[pages.components]]]?log=true">View all log compatible components</Jump>
+<Jump to="[[[pages.components]]]?event-types[]=log">View all log compatible components</Jump>
 
 ## How It Works
 
@@ -108,18 +108,18 @@ Some components, such as [`rename_fields` transform][docs.reference.transforms.r
 accept name of a field as an option. In order to specify a nested field to them, use the
 dot notation which can be described by an example:
 
-```
+```text
 parent_field.child_field
 ```
 
 The dot notation also supports accessing array fields using by placing the index between
 `[` and `]` after the array field name, for example
 
-```
+```text
 array[0]
 ```
 
-The indexes start from 0, missing value are auto-filled by [null values](#null-values).
+The indexes start from 0, missing values are auto-filled by [null values](#null-values).
 
 <Alert type="warning">
 

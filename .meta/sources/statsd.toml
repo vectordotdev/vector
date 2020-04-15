@@ -1,14 +1,21 @@
 [sources.statsd]
 title = "Statsd"
-beta = true
+noun = "Statsd"
+beta = false
 common = false
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_statsd.toml") %>
+features = [
+  "Accept metrics data over the Statsd UDP protocol.",
+  "Automatically parse metrics into a lossless interoperable data model.",
+]
 function_category = "receive"
 output_types = ["metric"]
-requirements = {}
-through_description = "the StatsD UDP protocol"
+requirements.network_port = "8126"
+strategies = ["service"]
+through_description = "the [StatsD UDP protocol][urls.statsd_udp_protocol]"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "statsd") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "statsd") %>
 
 [sources.statsd.options.address]
 type = "string"
@@ -17,18 +24,18 @@ required = true
 examples = ["127.0.0.1:8126"]
 description = "UDP socket address to bind to."
 
-[[sources.statsd.output.metric.examples]]
+[[sources.statsd.examples]]
 label = "Counter"
 body = """\
 Given the following input:
 
-```text
+```text title="Example input"
 login.invocations:1|c
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example metric event"
 {
   "name": "login.invocations",
   "kind": "incremental",
@@ -41,18 +48,18 @@ A metric event will be output with the following structure:
 ```\
 """
 
-[[sources.statsd.output.metric.examples]]
+[[sources.statsd.examples]]
 label = "Gauge"
 body = """\
 Given the following input:
 
-```text
+```text title="Example input"
 gas_tank:0.50|g
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example metric event"
 {
   "name": "gas_tank",
   "kind": "absolute",
@@ -65,18 +72,18 @@ A metric event will be output with the following structure:
 ```\
 """
 
-[[sources.statsd.output.metric.examples]]
+[[sources.statsd.examples]]
 label = "Set"
 body = """\
 Given the following input:
 
-```text
+```text title="Example input"
 unique_users:foo|s
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example metric event"
 {
   "name": "unique_users",
   "kind": "incremental",
@@ -89,18 +96,18 @@ A metric event will be output with the following structure:
 ```\
 """
 
-[[sources.statsd.output.metric.examples]]
+[[sources.statsd.examples]]
 label = "Timer"
 body = """\
 Given the following input:
 
-```text
+```text title="Example input"
 login.time:22|ms|@0.1
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example metric event"
 {
   "name": "login.time",
   "kind": "incremental",

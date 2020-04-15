@@ -6,13 +6,13 @@ hide_pagination: true
 ---
 
 Sources are responsible for ingesting [events][docs.data-model] into
-Vector, they can both receive and pull in data. If you're deploying Vector in
-an [agent role][docs.roles.agent], you'll want to user local data sources
-like the [`file`][docs.sources.file] or [`stdin`][docs.sources.stdin] sources.
-If you're deploying Vector in a [service role][docs.roles.service], you'll want
-to use sources that receive data over the network, like the
-[`vector`][docs.sources.vector], [`socket`][docs.sources.socket], and
-[`syslog`][docs.sources.syslog] sources.
+Vector, they can both receive and pull in data. If you're deploying Vector as
+a [daemon][docs.strategies#daemon] or [sidecar][docs.strategies#sidecar], you'll
+want to user local data sources like the [`file`][docs.sources.file] or
+[`stdin`][docs.sources.stdin] sources. If you're deploying Vector as a
+[service][docs.strategies#service], you'll want to use sources that receive data
+over the network, like the [`vector`][docs.sources.vector],
+[`socket`][docs.sources.socket], and [`syslog`][docs.sources.syslog] sources.
 
 ---
 

@@ -1,7 +1,7 @@
 #encoding: utf-8
 
 module PostProcessors
-  # Adds section references to option descriptions.
+  # Adds section references for specific terms.
   #
   # When documenting options we'll list them in a table with their name, type,
   # and description. Below we'll expand on behavior in a "How It Works" section.
@@ -12,10 +12,10 @@ module PostProcessors
     class << self
       def reference!(content)
         content.scan(/\[\[references:(.*)\]\]/).collect do |matches|
-          option = matches.first
+          term = matches.first
           how_it_works = content.split("\n## How It Works").last.split("\n## ").first
 
-          sections_with_references = how_it_works.split("`#{option}`")[0..-2]
+          sections_with_references = how_it_works.split("#{term}")[0..-2]
           titles =
             sections_with_references.collect do |section|
               match = section.scan(/\n### (.*)\n/).last
@@ -28,9 +28,9 @@ module PostProcessors
 
           if titles.any?
             links = titles.collect { |title| "[#{title}](##{title.slugify})" }
-            content.sub!("[[references:#{option}]]", " See #{links.to_sentence} for more info.")
+            content.sub!("[[references:#{term}]]", " See #{links.to_sentence} for more info.")
           else
-            content.sub!("[[references:#{option}]]", "")
+            content.sub!("[[references:#{term}]]", "")
           end
         end
 

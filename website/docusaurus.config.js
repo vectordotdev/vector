@@ -1,6 +1,8 @@
+const path = require('path');
+
 module.exports = {
   title: 'Vector',
-  tagline: 'A High-Performance, Logs, Metrics, & Events Router',
+  tagline: 'A lightweight and ultra-fast tool for building observability pipelines',
   url: 'https://vector.dev',
   baseUrl: '/',
   favicon: 'img/favicon.ico',
@@ -18,11 +20,12 @@ module.exports = {
       },
       links: [
         {to: 'components/', label: 'Components', position: 'left'},
+        {to: 'guides/', label: 'Guides', position: 'left'},
         {to: 'docs/', label: 'Docs', position: 'left'},
         {to: 'blog/', label: 'Blog', position: 'left'},
-        {to: 'community/', label: 'Community', position: 'left'},
-        {href: 'https://chat.vector.dev', label: 'Chat', position: 'right'},
+        {to: 'highlights/', label: 'Highlights', position: 'right'},
         {to: 'releases/', label: 'Download', position: 'right'},
+        {to: 'community/', label: 'Community', position: 'right'},
         {href: 'https://github.com/timberio/vector', label: "GitHub", position: 'right'},
       ],
     },
@@ -131,30 +134,42 @@ module.exports = {
       algoliaOptions: {}, // Optional, if provided by Algolia
     },
   },
-  presets: [
+  presets: [],
+  plugins: [
     [
-      '@docusaurus/preset-classic',
+      '@docusaurus/plugin-content-docs',
       {
-        blog: {
-          feedOptions: {
-            type: 'all',
-            copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
-          },
-        },
-        docs: {
-          editUrl: 'https://github.com/timberio/vector/edit/master/website/',
-          sidebarPath: require.resolve('./sidebars.js'),
-        },
-        theme: {
-          customCss: require.resolve('./src/css/custom.css'),
-        },
-      },
+        editUrl: 'https://github.com/timberio/vector/edit/master/website/',
+        sidebarPath: require.resolve('./sidebars.js')
+      }
     ],
+    [
+      '@docusaurus/plugin-content-blog',
+      {
+        feedOptions: {
+          type: 'all',
+          copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
+        }
+      }
+    ],
+    path.resolve(__dirname, './plugins/guides'),
+    path.resolve(__dirname, './plugins/highlights'),
+    ['@docusaurus/plugin-content-pages', {}],
+    path.resolve(__dirname, './plugins/releases'),
+    [path.resolve(__dirname, './plugins/sitemap'), {}]
   ],
   scripts: [],
   stylesheets: [
     'https://fonts.googleapis.com/css?family=Ubuntu|Roboto|Source+Code+Pro',
-    'https://at-ui.github.io/feather-font/css/iconfont.css',
-    ''
+    'https://at-ui.github.io/feather-font/css/iconfont.css'
   ],
+  themes: [
+    [
+      '@docusaurus/theme-classic',
+      {
+        customCss: require.resolve('./src/css/custom.css')
+      }
+    ],
+    '@docusaurus/theme-search-algolia'
+  ]
 };

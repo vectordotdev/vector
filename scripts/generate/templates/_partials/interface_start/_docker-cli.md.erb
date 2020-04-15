@@ -1,0 +1,12 @@
+```bash
+docker run \
+<%= interface_start.start_command_lines.join(" \\\n").indent(2) %>
+```
+
+<%- if interface_start.start_command_explanations.any? -%>
+<CodeExplanation>
+
+* <%= interface_start.start_command_explanations.join("\n* ") %>
+
+</CodeExplanation>
+<%- end -%>

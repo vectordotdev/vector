@@ -1,0 +1,33 @@
+<Steps headingDepth={<%= heading_depth.to_json %>}>
+<ol>
+<li>
+
+### Add the Timber tap and install `vector`
+
+```bash
+brew tap timberio/brew && brew install vector
+```
+
+[Looking for a specific version?][docs.package_managers.homebrew]
+
+</li>
+<li>
+
+### Configure Vector
+
+<ConfigExample
+  format="toml"
+  path={<%= interface.config_path.to_json %>}
+  sourceName={<%= (source && source.name).to_json %>}
+  sinkName={<%= (sink && sink.name).to_json %>} />
+
+</li>
+<li>
+
+### Start Vector
+
+<%= interface_start(interface, requirements: (source && source.requirements)) %>
+
+</li>
+</ol>
+</Steps>

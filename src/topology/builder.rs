@@ -1,17 +1,16 @@
 use super::{
-    config::{SinkContext, TransformContext},
+    config::{DataType, SinkContext, TransformContext},
     fanout::{self, Fanout},
     task::Task,
 };
-use crate::{buffers, dns::Resolver, runtime};
+use crate::{buffers, dns::Resolver, event::Event, runtime, shutdown::SourceShutdownCoordinator};
 use futures01::{
     future::{lazy, Either},
     sync::mpsc,
     Future, Stream,
 };
 use std::{collections::HashMap, time::Duration};
-use stream_cancel::{Trigger, Tripwire};
-use tokio::util::FutureExt;
+use tokio01::util::FutureExt;
 
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
@@ -19,7 +18,7 @@ pub struct Pieces {
     pub tasks: HashMap<String, Task>,
     pub source_tasks: HashMap<String, Task>,
     pub healthchecks: HashMap<String, Task>,
-    pub shutdown_triggers: HashMap<String, Trigger>,
+    pub shutdown_coordinator: SourceShutdownCoordinator,
 }
 
 pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
@@ -97,7 +96,7 @@ pub fn build_pieces(
     let mut tasks = HashMap::new();
     let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
-    let mut shutdown_triggers = HashMap::new();
+    let mut shutdown_coordinator = SourceShutdownCoordinator::new();
 
     let mut errors = vec![];
     let mut warnings = vec![];
@@ -118,7 +117,9 @@ pub fn build_pieces(
 
         let typetag = source.source_type();
 
-        let server = match source.build(&name, &config.global, tx) {
+        let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
+
+        let server = match source.build(&name, &config.global, shutdown_signal, tx) {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", name, error));
                 continue;
@@ -126,19 +127,24 @@ pub fn build_pieces(
             Ok(server) => server,
         };
 
-        let (trigger, tripwire) = Tripwire::new();
-
         let (output, control) = Fanout::new();
         let pump = rx.forward(output).map(|_| ());
         let pump = Task::new(&name, &typetag, pump);
 
-        let server = server.select(tripwire.clone()).map(|_| ()).map_err(|_| ());
+        // The force_shutdown_tripwire is a Future that when it resolves means that this source
+        // has failed to shut down gracefully within its allotted time window and instead should be
+        // forcibly shut down.  We accomplish this by select()-ing on the server Task with the
+        // force_shutdown_tripwire.  That means that if the force_shutdown_tripwire resolves while
+        // the server Task is still running the Task will simply be dropped on the floor.
+        let server = server
+            .select(force_shutdown_tripwire)
+            .map(|_| ())
+            .map_err(|_| ());
         let server = Task::new(&name, &typetag, server);
 
         outputs.insert(name.clone(), control);
         tasks.insert(name.clone(), pump);
         source_tasks.insert(name.clone(), server);
-        shutdown_triggers.insert(name.clone(), trigger);
     }
 
     // Build transforms
@@ -152,6 +158,7 @@ pub fn build_pieces(
             exec: exec.clone(),
         };
 
+        let input_type = transform.inner.input_type();
         let transform = match transform.inner.build(cx) {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
@@ -166,7 +173,7 @@ pub fn build_pieces(
         let (output, control) = Fanout::new();
 
         let transform = transform
-            .transform_stream(input_rx)
+            .transform_stream(filter_event_type(input_rx, input_type))
             .forward(output)
             .map(|_| ());
         let task = Task::new(&name, &typetag, transform);
@@ -182,6 +189,7 @@ pub fn build_pieces(
         let enable_healthcheck = sink.healthcheck;
 
         let typetag = sink.inner.sink_type();
+        let input_type = sink.inner.input_type();
 
         let buffer = sink.buffer.build(&config.global.data_dir, &name);
         let (tx, rx, acker) = match buffer {
@@ -195,6 +203,7 @@ pub fn build_pieces(
         let cx = SinkContext {
             resolver: resolver.clone(),
             acker,
+            exec: exec.clone(),
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx) {
@@ -205,7 +214,7 @@ pub fn build_pieces(
             Ok((sink, healthcheck)) => (sink, healthcheck),
         };
 
-        let sink = rx.forward(sink).map(|_| ());
+        let sink = filter_event_type(rx, input_type).forward(sink).map(|_| ());
         let task = Task::new(&name, &typetag, sink);
 
         let healthcheck_task = if enable_healthcheck {
@@ -245,7 +254,7 @@ pub fn build_pieces(
             tasks,
             source_tasks,
             healthchecks,
-            shutdown_triggers,
+            shutdown_coordinator,
         };
 
         Ok((pieces, warnings))
@@ -260,4 +269,24 @@ fn capitalize(s: &str) -> String {
         r.make_ascii_uppercase();
     }
     s
+}
+
+fn filter_event_type<S>(
+    stream: S,
+    data_type: DataType,
+) -> Box<dyn Stream<Item = Event, Error = ()> + Send>
+where
+    S: Stream<Item = Event, Error = ()> + Send + 'static,
+{
+    match data_type {
+        DataType::Any => Box::new(stream), // it's possible to not call any comparing function if any type is supported
+        DataType::Log => Box::new(stream.filter(|event| match event {
+            Event::Log(_) => true,
+            _ => false,
+        })),
+        DataType::Metric => Box::new(stream.filter(|event| match event {
+            Event::Metric(_) => true,
+            _ => false,
+        })),
+    }
 }

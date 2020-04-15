@@ -4,6 +4,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event, Metric},
     runtime::TaskExecutor,
+    shutdown::ShutdownSignal,
     sinks, sources, transforms,
 };
 use component::ComponentDescription;
@@ -40,7 +41,10 @@ pub struct GlobalOptions {
     pub data_dir: Option<PathBuf>,
     #[serde(default)]
     pub dns_servers: Vec<String>,
-    #[serde(default)]
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
     pub log_schema: event::LogSchema,
 }
 
@@ -114,7 +118,7 @@ impl GlobalOptions {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum DataType {
     Any,
     Log,
@@ -127,6 +131,7 @@ pub trait SourceConfig: core::fmt::Debug {
         &self,
         name: &str,
         globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<sources::Source>;
 
@@ -163,6 +168,7 @@ pub trait SinkConfig: core::fmt::Debug {
 pub struct SinkContext {
     pub(super) acker: Acker,
     pub(super) resolver: Resolver,
+    pub(super) exec: TaskExecutor,
 }
 
 impl SinkContext {
@@ -170,7 +176,8 @@ impl SinkContext {
     pub fn new_test(exec: TaskExecutor) -> Self {
         Self {
             acker: Acker::Null,
-            resolver: Resolver::new(Vec::new(), exec).unwrap(),
+            resolver: Resolver::new(Vec::new(), exec.clone()).unwrap(),
+            exec,
         }
     }
 
@@ -178,8 +185,16 @@ impl SinkContext {
         self.acker.clone()
     }
 
+    pub fn exec(&self) -> TaskExecutor {
+        self.exec.clone()
+    }
+
     pub fn resolver(&self) -> Resolver {
         self.resolver.clone()
+    }
+
+    pub fn executor(&self) -> &TaskExecutor {
+        &self.exec
     }
 }
 
@@ -562,6 +577,7 @@ mod test {
       host_key = "this"
       message_key = "that"
       timestamp_key = "then"
+      kubernetes_key = "when"
 
       [sources.in]
       type = "file"
@@ -578,6 +594,10 @@ mod test {
         assert_eq!("this", config.global.log_schema.host_key().to_string());
         assert_eq!("that", config.global.log_schema.message_key().to_string());
         assert_eq!("then", config.global.log_schema.timestamp_key().to_string());
+        assert_eq!(
+            "when",
+            config.global.log_schema.kubernetes_key().to_string()
+        );
     }
 
     #[test]

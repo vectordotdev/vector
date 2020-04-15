@@ -1,5 +1,7 @@
 use crate::{
     event::{self, Event},
+    internal_events::FileEventReceived,
+    shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     trace::{current_span, Instrument},
 };
@@ -186,6 +188,7 @@ impl SourceConfig for FileConfig {
         &self,
         name: &str,
         globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can
@@ -277,15 +280,14 @@ pub fn file_source(
 
         let span = current_span();
         let span2 = span.clone();
-        tokio::spawn(
+        tokio01::spawn(
             messages
                 .map(move |(msg, file): (Bytes, String)| {
                     let _enter = span2.enter();
-                    trace!(
-                        message = "Received one event.",
-                        file = file.as_str(),
-                        rate_limit_secs = 10
-                    );
+                    emit!(FileEventReceived {
+                        file: &file,
+                        byte_size: msg.len(),
+                    });
                     create_event(msg, file, &host_key, &hostname, &file_key)
                 })
                 .forward(out.sink_map_err(|e| error!(%e)))
@@ -317,6 +319,11 @@ fn create_event(
 ) -> Event {
     let mut event = Event::from(line);
 
+    // Add source type
+    event
+        .as_mut_log()
+        .insert(event::log_schema().source_type_key(), "file");
+
     if let Some(file_key) = &file_key {
         event.as_mut_log().insert(file_key.clone(), file);
     }
@@ -346,7 +353,7 @@ mod tests {
     };
     use stream_cancel::Tripwire;
     use tempfile::tempdir;
-    use tokio::util::FutureExt;
+    use tokio01::util::FutureExt;
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
@@ -458,6 +465,7 @@ mod tests {
             log[&event::log_schema().message_key()],
             "hello world".into()
         );
+        assert_eq!(log[event::log_schema().source_type_key()], "file".into());
     }
 
     #[test]
@@ -813,9 +821,10 @@ mod tests {
             assert_eq!(
                 received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
-                    event::log_schema().host_key().clone(),
-                    event::log_schema().message_key().clone(),
-                    event::log_schema().timestamp_key().clone()
+                    event::log_schema().host_key().to_string(),
+                    event::log_schema().message_key().to_string(),
+                    event::log_schema().timestamp_key().to_string(),
+                    event::log_schema().source_type_key().to_string()
                 ]
                 .into_iter()
                 .collect::<HashSet<_>>()

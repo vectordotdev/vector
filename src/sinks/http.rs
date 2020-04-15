@@ -3,13 +3,13 @@ use crate::{
     event::{self, Event},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{https_client, Auth, BatchedHttpSink, HttpSink},
+        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
         BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{future, Future};
+use futures01::{future, Future, Sink};
 use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Uri,
@@ -19,6 +19,7 @@ use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -120,7 +121,8 @@ impl SinkConfig for HttpSinkConfig {
             batch,
             Some(tls.clone()),
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal http sink error: {}", e));
 
         let sink = Box::new(sink);
 
@@ -243,10 +245,10 @@ fn healthcheck(
         auth.apply(&mut request);
     }
 
-    let client = https_client(resolver, tls_settings)?;
+    let mut client = HttpClient::new(resolver, tls_settings)?;
 
     let healthcheck = client
-        .request(request)
+        .call(request)
         .map_err(|err| err.into())
         .and_then(|response| {
             use hyper::StatusCode;
@@ -571,7 +573,7 @@ mod tests {
                 let (parts, body) = req.into_parts();
 
                 let tx = tx.clone();
-                tokio::spawn(
+                tokio01::spawn(
                     body.concat2()
                         .map_err(|e| panic!(e))
                         .and_then(|body| tx.send((parts, body)))

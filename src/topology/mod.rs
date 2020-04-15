@@ -1,3 +1,11 @@
+//! Topology contains all topology based types.
+//!
+//! Topology is broken up into two main sections. The first
+//! section contains all the main topology types include `Topology`
+//! and the ability to start, stop and reload a config. The second
+//! part contains config related items including config traits for
+//! each type of component.
+
 pub mod builder;
 pub mod config;
 mod fanout;
@@ -11,6 +19,8 @@ use crate::topology::builder::Pieces;
 
 use crate::buffers;
 use crate::runtime;
+use crate::shutdown::SourceShutdownCoordinator;
+use futures::compat::Future01CompatExt;
 use futures01::{
     future,
     sync::{mpsc, oneshot},
@@ -20,8 +30,7 @@ use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 use std::panic::AssertUnwindSafe;
 use std::time::{Duration, Instant};
-use stream_cancel::Trigger;
-use tokio::timer;
+use tokio01::timer;
 use tracing_futures::Instrument;
 
 #[allow(dead_code)]
@@ -30,7 +39,7 @@ pub struct RunningTopology {
     outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
     tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
-    shutdown_triggers: HashMap<String, Trigger>,
+    shutdown_coordinator: SourceShutdownCoordinator,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
 }
@@ -56,7 +65,7 @@ pub fn start_validated(
         inputs: HashMap::new(),
         outputs: HashMap::new(),
         config: Config::empty(),
-        shutdown_triggers: HashMap::new(),
+        shutdown_coordinator: SourceShutdownCoordinator::new(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
@@ -88,6 +97,14 @@ pub fn validate(config: &Config, exec: runtime::TaskExecutor) -> Option<Pieces> 
 }
 
 impl RunningTopology {
+    /// Sends the shutdown signal to all sources and returns a future that resolves
+    /// once all components (sources, transforms, and sinks) have finished shutting down.
+    /// Transforms and sinks should shut down automatically once their input tasks finish.
+    /// Note that this takes ownership of `self`, so once this function returns everything in the
+    /// RunningTopology instance has been dropped except for the `tasks` map, which gets moved
+    /// into the returned future and is used to poll for when the tasks have completed. One the
+    /// returned future is dropped then everything from this RunningTopology instance is fully
+    /// dropped.
     #[must_use]
     pub fn stop(self) -> impl Future<Item = (), Error = ()> {
         let mut running_tasks = self.tasks;
@@ -150,13 +167,27 @@ impl RunningTopology {
             .map(|_| ())
             .map_err(|_: future::SharedError<()>| ());
 
-        future::select_all::<Vec<Box<dyn Future<Item = (), Error = ()> + Send>>>(vec![
-            Box::new(timeout),
-            Box::new(reporter),
-            Box::new(success),
-        ])
-        .map(|_| ())
-        .map_err(|_| ())
+        let shutdown_complete_future =
+            future::select_all::<Vec<Box<dyn Future<Item = (), Error = ()> + Send>>>(vec![
+                Box::new(timeout),
+                Box::new(reporter),
+                Box::new(success),
+            ])
+            .map(|_| ())
+            .map_err(|_| ());
+
+        // TODO: Once all Sources properly look for the ShutdownSignal, remove this in favor of
+        // using 'deadline' instead.
+        let source_shutdown_deadline = Instant::now() + Duration::from_secs(3);
+
+        // Now kick off the shutdown process by shutting down the sources.
+        let source_shutdown_complete = self
+            .shutdown_coordinator
+            .shutdown_all(source_shutdown_deadline);
+
+        source_shutdown_complete
+            .join(shutdown_complete_future)
+            .map(|_| ())
     }
 
     pub fn reload_config_and_respawn(
@@ -207,7 +238,10 @@ impl RunningTopology {
 
         info!("Running healthchecks.");
         if require_healthy {
-            let success = rt.block_on(healthchecks);
+            let jh = rt.spawn_handle(healthchecks.compat());
+            let success = rt
+                .block_on_std(jh)
+                .expect("Task panicked or runtime shutdown unexpectedly");
 
             if success.is_ok() {
                 info!("All healthchecks passed.");
@@ -227,24 +261,54 @@ impl RunningTopology {
         let (sources_to_remove, sources_to_change, sources_to_add) =
             to_remove_change_add(&self.config.sources, &new_config.sources);
 
-        for name in sources_to_remove {
-            info!("Removing source {:?}", name);
+        // First pass to tell the sources to shut down.
+        let mut source_shutdown_complete_futures = Vec::new();
+        // TODO: Once all Sources properly look for the ShutdownSignal, up this time limit to something
+        // more like 30-60 seconds.
 
-            self.tasks.remove(&name).unwrap().forget();
-
-            self.remove_outputs(&name);
-            self.shutdown_source(&name);
+        // Only log that we are waiting for shutdown if we are actually removing
+        // sources.
+        if !sources_to_remove.is_empty() {
+            info!("Waiting for up to 3 seconds for sources to finish shutting down");
         }
 
-        for name in sources_to_change {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        for name in &sources_to_remove {
+            info!("Removing source {:?}", name);
+
+            self.tasks.remove(name).unwrap().forget();
+
+            self.remove_outputs(name);
+            source_shutdown_complete_futures
+                .push(self.shutdown_coordinator.shutdown_source(name, deadline));
+        }
+        for name in &sources_to_change {
             info!("Rebuilding source {:?}", name);
 
-            self.remove_outputs(&name);
-            self.shutdown_source(&name);
+            self.remove_outputs(name);
+            source_shutdown_complete_futures
+                .push(self.shutdown_coordinator.shutdown_source(name, deadline));
+        }
 
-            self.setup_outputs(&name, &mut new_pieces);
+        // Wait for the shutdowns to complete
 
-            self.spawn_source(&name, &mut new_pieces, rt);
+        // Only log message if there are actual futures to check.
+        if !source_shutdown_complete_futures.is_empty() {
+            info!("Waiting for up to 3 seconds for sources to finish shutting down");
+        }
+
+        rt.block_on(future::join_all(source_shutdown_complete_futures))
+            .unwrap();
+
+        // Second pass now that all sources have shut down for final cleanup and spawning
+        // new versions of sources as needed.
+        for name in &sources_to_remove {
+            self.source_tasks.remove(name).wait().unwrap();
+        }
+        for name in &sources_to_change {
+            self.source_tasks.remove(name).wait().unwrap();
+            self.setup_outputs(name, &mut new_pieces);
+            self.spawn_source(name, &mut new_pieces, rt);
         }
 
         for name in sources_to_add {
@@ -364,9 +428,8 @@ impl RunningTopology {
             previous.forget();
         }
 
-        let shutdown_trigger = new_pieces.shutdown_triggers.remove(name).unwrap();
-        self.shutdown_triggers
-            .insert(name.to_string(), shutdown_trigger);
+        self.shutdown_coordinator
+            .takeover_source(name, &mut new_pieces.shutdown_coordinator);
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
         let source_task = handle_errors(source_task.instrument(span), self.abort_tx.clone());
@@ -374,11 +437,6 @@ impl RunningTopology {
             name.to_string(),
             oneshot::spawn(source_task, &rt.executor()),
         );
-    }
-
-    fn shutdown_source(&mut self, name: &str) {
-        self.shutdown_triggers.remove(name).unwrap().cancel();
-        self.source_tasks.remove(name).wait().unwrap();
     }
 
     fn remove_outputs(&mut self, name: &str) {

@@ -1,0 +1,35 @@
+<%- groups ||= [] -%>
+[<%= namespace %>.batch]
+type = "table"
+category = "Batch"
+common = <%= common.to_toml %>
+groups = <%= groups.to_toml %>
+description = "Configures the sink batching behavior."
+
+<%- if max_events -%>
+[<%= namespace %>.batch.children.max_events]
+type = "int"
+common = true
+default = <%= max_events.to_toml %>
+groups = <%= groups.to_toml %>
+unit = "events"
+description = "The maximum size of a batch, in events, before it is flushed."
+<%- end -%>
+
+<%- if max_size -%>
+[<%= namespace %>.batch.children.max_size]
+type = "int"
+common = true
+default = <%= max_size.to_toml %>
+groups = <%= groups.to_toml %>
+unit = "bytes"
+description = "The maximum size of a batch, in bytes, before it is flushed."
+<%- end -%>
+
+[<%= namespace %>.batch.children.timeout_secs]
+type = "int"
+common = true
+default = <%= timeout_secs.to_toml %>
+groups = <%= groups.to_toml %>
+unit = "seconds"
+description = "The maximum age of a batch before it is flushed."

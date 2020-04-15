@@ -1,4 +1,5 @@
 use super::Transform;
+use crate::serde::Fields;
 use crate::{
     event::{Event, Value},
     template::Template,
@@ -13,7 +14,7 @@ use toml::value::Value as TomlValue;
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AddFieldsConfig {
-    pub fields: IndexMap<String, TomlValue>,
+    pub fields: Fields<TomlValue>,
 }
 
 #[derive(Clone)]
@@ -45,7 +46,13 @@ inventory::submit! {
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(AddFields::new(self.fields.clone())))
+        Ok(Box::new(AddFields::new(
+            self.fields
+                .clone()
+                .all_fields()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -62,7 +69,7 @@ impl TransformConfig for AddFieldsConfig {
 }
 
 impl AddFields {
-    pub fn new(fields: IndexMap<String, TomlValue>) -> Self {
+    pub fn new(fields: IndexMap<Atom, TomlValue>) -> Self {
         let mut new_fields = IndexMap::new();
 
         for (k, v) in fields {
@@ -90,7 +97,13 @@ impl Transform for AddFields {
                 .into(),
                 TemplateOrValue::Value(v) => v,
             };
-            event.as_mut_log().insert(key, value);
+            if let Some(_) = event.as_mut_log().insert(&key, value) {
+                debug!(
+                    message = "Field overwritten",
+                    field = key.as_ref(),
+                    rate_limit_secs = 30,
+                )
+            }
         }
 
         Some(event)

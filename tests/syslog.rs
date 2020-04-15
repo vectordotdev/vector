@@ -9,7 +9,7 @@ use sinks::socket::SocketSinkConfig;
 use sinks::util::{encoding::EncodingConfig, Encoding};
 use std::{collections::HashMap, thread, time::Duration};
 #[cfg(unix)]
-use tokio::codec::{FramedWrite, LinesCodec};
+use tokio01::codec::{FramedWrite, LinesCodec};
 #[cfg(unix)]
 use tokio_uds::UnixStream;
 use vector::test_util::{
@@ -170,7 +170,7 @@ fn test_unix_stream_syslog() {
                 .map(|(_source, sink)| sink)
                 .and_then(|sink| {
                     let socket = sink.into_inner().into_inner();
-                    tokio::io::shutdown(socket)
+                    tokio01::io::shutdown(socket)
                         .map(|_| ())
                         .map_err(|e| panic!("{:}", e))
                 })
@@ -200,6 +200,7 @@ struct SyslogMessageRFC5424 {
     version: u8,
     timestamp: String,
     host: String,
+    source_type: String,
     appname: String,
     procid: usize,
     message: String,
@@ -228,6 +229,7 @@ impl SyslogMessageRFC5424 {
             version: 1,
             timestamp,
             host: "hogwarts".to_owned(),
+            source_type: "syslog".to_owned(),
             appname: "harry".to_owned(),
             procid: thread_rng().gen_range(0, 32768),
             structured_data,

@@ -1,7 +1,8 @@
 use crate::{
     event::proto,
-    sinks::util::tcp::TcpSink,
-    sinks::util::SinkExt,
+    internal_events::VectorEventSent,
+    sinks::util::{tcp::TcpSink, StreamSink},
+    tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
@@ -15,11 +16,12 @@ use snafu::Snafu;
 #[serde(deny_unknown_fields)]
 pub struct VectorSinkConfig {
     pub address: String,
+    pub tls: Option<TlsConfig>,
 }
 
 impl VectorSinkConfig {
     pub fn new(address: String) -> Self {
-        Self { address }
+        Self { address, tls: None }
     }
 }
 
@@ -43,8 +45,10 @@ impl SinkConfig for VectorSinkConfig {
         let host = uri.host().ok_or(BuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(BuildError::MissingPort)?;
 
-        let sink = TcpSink::new(host.clone(), port, cx.resolver(), None)
-            .stream_ack(cx.acker())
+        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
+
+        let sink = TcpSink::new(host.clone(), port, cx.resolver(), tls);
+        let sink = StreamSink::new(sink, cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event)));
         let healthcheck = super::util::tcp::tcp_healthcheck(host, port, cx.resolver());
 
@@ -52,7 +56,7 @@ impl SinkConfig for VectorSinkConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn sink_type(&self) -> &'static str {
@@ -68,11 +72,15 @@ enum HealthcheckError {
 
 fn encode_event(event: Event) -> Option<Bytes> {
     let event = proto::EventWrapper::from(event);
-    let event_len = event.encoded_len() as u32;
+    let event_len = event.encoded_len();
     let full_len = event_len + 4;
 
-    let mut out = BytesMut::with_capacity(full_len as usize);
-    out.put_u32_be(event_len);
+    emit!(VectorEventSent {
+        byte_size: full_len
+    });
+
+    let mut out = BytesMut::with_capacity(full_len);
+    out.put_u32_be(event_len as u32);
     event.encode(&mut out).unwrap();
     Some(out.freeze())
 }

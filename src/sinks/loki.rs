@@ -16,7 +16,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event, Value},
     runtime::FutureExt,
-    sinks::util::http::{https_client, Auth, BatchedHttpSink, HttpSink},
+    sinks::util::http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         BatchBytesConfig, TowerRequestConfig, UriSerde,
@@ -26,7 +26,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use derivative::Derivative;
-use futures::compat::Future01CompatExt;
+use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -89,7 +89,8 @@ impl SinkConfig for LokiConfig {
             batch_settings,
             Some(tls),
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal loki sink error: {}", e));
 
         let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed_compat();
 
@@ -225,11 +226,12 @@ impl HttpSink for LokiConfig {
 async fn healthcheck(config: LokiConfig, resolver: Resolver) -> Result<(), crate::Error> {
     let uri = format!("{}ready", config.endpoint);
 
-    let client = https_client(resolver, TlsSettings::from_options(&None)?)?;
+    let tls = TlsSettings::from_options(&config.tls)?;
+    let mut client = HttpClient::new(resolver, tls)?;
 
     let req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
-    let res = client.request(req).compat().await?;
+    let res = client.send(req).await?;
 
     if res.status() != http::StatusCode::OK {
         return Err(format!("A non-successful status returned: {}", res.status()).into());

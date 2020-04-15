@@ -2,10 +2,10 @@ use crate::{
     buffers::Acker,
     event::metric::{MetricKind, MetricValue},
     event::Event,
-    sinks::util::{BatchBytesConfig, BatchServiceSink, Buffer, SinkExt},
+    sinks::util::{BatchBytesConfig, BatchSink, Buffer},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{future, sink::Sink, Future, Poll};
+use futures01::{future, stream::iter_ok, Future, Poll, Sink};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
@@ -92,9 +92,9 @@ impl StatsdSvc {
 
         let svc = ServiceBuilder::new().service(service);
 
-        let sink = BatchServiceSink::new(svc, acker)
-            .batched_with_min(Buffer::new(false), &batch)
-            .with(move |event| encode_event(event, &namespace));
+        let sink = BatchSink::new(svc, Buffer::new(false), batch, acker)
+            .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
+            .with_flat_map(move |event| iter_ok(encode_event(event, &namespace)));
 
         Ok(Box::new(sink))
     }
@@ -119,7 +119,7 @@ fn encode_tags(tags: &BTreeMap<String, String>) -> String {
     parts.join(",")
 }
 
-fn encode_event(event: Event, namespace: &str) -> Result<Vec<u8>, ()> {
+fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
@@ -187,12 +187,12 @@ fn encode_event(event: Event, namespace: &str) -> Result<Vec<u8>, ()> {
     let mut body: Vec<u8> = message.into_bytes();
     body.push(b'\n');
 
-    Ok(body)
+    Some(body)
 }
 
 impl Service<Vec<u8>> for StatsdSvc {
     type Response = ();
-    type Error = tokio::io::Error;
+    type Error = tokio01::io::Error;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
@@ -220,7 +220,8 @@ mod test {
     };
     use bytes::Bytes;
     use futures01::{stream, stream::Stream, sync::mpsc, Sink};
-    use tokio::{
+    use std::time::{Duration, Instant};
+    use tokio01::{
         self,
         codec::BytesCodec,
         net::{UdpFramed, UdpSocket},
@@ -317,6 +318,8 @@ mod test {
 
     #[test]
     fn test_send_to_statsd() {
+        crate::test_util::trace_init();
+
         let config = StatsdSinkConfig {
             namespace: "vector".into(),
             address: default_address(),
@@ -353,6 +356,14 @@ mod test {
 
         let stream = stream::iter_ok(events.clone().into_iter());
         let sender = sink.send_all(stream);
+        let deadline = Instant::now() + Duration::from_millis(100);
+
+        // Add a delay to the write side to let the read side
+        // poll for read interest. Otherwise, this could cause
+        // a race condition in noisy environments.
+        let sender = tokio01::timer::Delay::new(deadline)
+            .map_err(drop)
+            .and_then(|_| sender);
 
         let (tx, rx) = mpsc::channel(1);
 

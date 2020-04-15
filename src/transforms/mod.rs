@@ -1,6 +1,8 @@
 use crate::Event;
 use snafu::Snafu;
 
+mod util;
+
 #[cfg(feature = "transforms-add_fields")]
 pub mod add_fields;
 #[cfg(feature = "transforms-add_tags")]
@@ -13,8 +15,12 @@ pub mod aws_ec2_metadata;
 pub mod coercer;
 #[cfg(feature = "transforms-concat")]
 pub mod concat;
+#[cfg(feature = "transforms-dedupe")]
+pub mod dedupe;
 #[cfg(feature = "transforms-field_filter")]
 pub mod field_filter;
+#[cfg(feature = "transforms-filter")]
+pub mod filter;
 #[cfg(feature = "transforms-geoip")]
 pub mod geoip;
 #[cfg(feature = "transforms-grok_parser")]
@@ -45,10 +51,12 @@ pub mod sampler;
 pub mod split;
 #[cfg(feature = "transforms-swimlanes")]
 pub mod swimlanes;
+#[cfg(feature = "transforms-tag_cardinality_limit")]
+pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
 
-use futures01::{sync::mpsc::Receiver, Stream};
+use futures01::Stream;
 
 pub trait Transform: Send {
     fn transform(&mut self, event: Event) -> Option<Event>;
@@ -61,7 +69,7 @@ pub trait Transform: Send {
 
     fn transform_stream(
         self: Box<Self>,
-        input_rx: Receiver<Event>,
+        input_rx: Box<dyn Stream<Item = Event, Error = ()> + Send>,
     ) -> Box<dyn Stream<Item = Event, Error = ()> + Send>
     where
         Self: 'static,

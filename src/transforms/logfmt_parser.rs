@@ -74,7 +74,9 @@ impl Transform for Logfmt {
 
                 if let Some(conv) = self.conversions.get(&key) {
                     match conv.convert(val.as_bytes().into()) {
-                        Ok(value) => event.as_mut_log().insert(key, value),
+                        Ok(value) => {
+                            event.as_mut_log().insert(key, value);
+                        }
                         Err(error) => {
                             debug!(
                                 message = "Could not convert types.",
@@ -96,6 +98,7 @@ impl Transform for Logfmt {
             debug!(
                 message = "Field does not exist.",
                 field = self.field.as_ref(),
+                rate_limit_secs = 30
             );
         };
 

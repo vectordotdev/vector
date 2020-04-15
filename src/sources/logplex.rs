@@ -1,24 +1,39 @@
 use crate::{
     event::{self, Event},
-    tls::{MaybeTlsIncoming, TlsConfig, TlsSettings},
+    shutdown::ShutdownSignal,
+    sources::util::{ErrorMessage, HttpSource},
+    tls::TlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::Buf;
 use chrono::{DateTime, Utc};
-use futures01::{sync::mpsc, Future, Sink};
+use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
 use std::{
     io::{BufRead, BufReader},
     net::SocketAddr,
+    str::FromStr,
 };
-use stream_cancel::Tripwire;
-use warp::Filter;
+use warp::filters::body::FullBody;
+use warp::http::{HeaderMap, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogplexConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
+}
+
+#[derive(Clone, Default)]
+struct LogplexSource {}
+
+impl HttpSource for LogplexSource {
+    fn build_event(
+        &self,
+        body: FullBody,
+        header_map: HeaderMap,
+    ) -> Result<Vec<Event>, ErrorMessage> {
+        decode_message(body, header_map)
+    }
 }
 
 #[typetag::serde(name = "logplex")]
@@ -27,54 +42,11 @@ impl SourceConfig for LogplexConfig {
         &self,
         _: &str,
         _: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        let (trigger, tripwire) = Tripwire::new();
-        let trigger = Arc::new(Mutex::new(Some(trigger)));
-
-        let svc = warp::post2()
-            .and(warp::path("events"))
-            .and(warp::header::<usize>("Logplex-Msg-Count"))
-            .and(warp::header::<String>("Logplex-Frame-Id"))
-            .and(warp::header::<String>("Logplex-Drain-Token"))
-            .and(warp::body::concat())
-            .and_then(move |msg_count, frame_id, drain_token, body| {
-                info!(message = "Handling logplex request", %msg_count, %frame_id, %drain_token);
-
-                let events = body_to_events(body);
-
-                if events.len() != msg_count {
-                    if cfg!(test) {
-                        panic!("Parsed event count does not match message count header");
-                    } else {
-                        error!(message = "Parsed event count does not match message count header", event_count = events.len(), %msg_count);
-                    }
-                }
-
-                let out = out.clone();
-                let trigger = trigger.clone();
-                out.send_all(futures01::stream::iter_ok(events))
-                    .map_err(move |_: mpsc::SendError<Event>| {
-                        error!("Failed to forward events, downstream is closed");
-                        // shut down the http server if someone hasn't already
-                        trigger.try_lock().ok().take().map(drop);
-                        warp::reject::custom("shutting down")
-                })
-                .map(|_| warp::reply())
-            });
-
-        let ping = warp::get2().and(warp::path("ping")).map(|| "pong");
-
-        let routes = svc.or(ping);
-
-        info!(message = "building logplex server", addr = %self.address);
-
-        let tls = TlsSettings::from_config(&self.tls, true)?;
-        let incoming = MaybeTlsIncoming::bind(&self.address, tls)?;
-
-        let server = warp::serve(routes).serve_incoming_with_graceful_shutdown(incoming, tripwire);
-
-        Ok(Box::new(server))
+        let source = LogplexSource::default();
+        source.run(self.address, "events", &self.tls, out, shutdown)
     }
 
     fn output_type(&self) -> DataType {
@@ -86,7 +58,55 @@ impl SourceConfig for LogplexConfig {
     }
 }
 
-fn body_to_events(body: impl Buf) -> Vec<Event> {
+fn decode_message(body: FullBody, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
+    // Deal with headers
+    let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
+        Ok(v) => v,
+        Err(e) => return Err(header_error_message("Logplex-Msg-Count", &e.to_string())),
+    };
+    let frame_id = get_header(&header_map, "Logplex-Frame-Id")?;
+    let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
+    info!(message = "Handling logplex request", %msg_count, %frame_id, %drain_token);
+
+    // Deal with body
+    let events = body_to_events(body);
+
+    if events.len() != msg_count {
+        let error_msg = format!(
+            "Parsed event count does not match message count header: {} vs {}",
+            events.len(),
+            msg_count
+        );
+
+        if cfg!(test) {
+            panic!(error_msg);
+        } else {
+            error!(message = error_msg.as_str());
+        }
+        return Err(header_error_message("Logplex-Msg-Count", &error_msg));
+    }
+
+    Ok(events)
+}
+
+fn get_header<'a>(header_map: &'a HeaderMap, name: &str) -> Result<&'a str, ErrorMessage> {
+    if let Some(header_value) = header_map.get(name) {
+        header_value
+            .to_str()
+            .map_err(|e| header_error_message(name, &e.to_string()))
+    } else {
+        Err(header_error_message(name, "Header does not exist"))
+    }
+}
+
+fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
+    ErrorMessage::new(
+        StatusCode::BAD_REQUEST,
+        format!("Invalid request header {:?}: {:?}", name, msg),
+    )
+}
+
+fn body_to_events(body: FullBody) -> Vec<Event> {
     let rdr = BufReader::new(body.reader());
     rdr.lines()
         .filter_map(|res| {
@@ -101,7 +121,7 @@ fn body_to_events(body: impl Buf) -> Vec<Event> {
 fn line_to_event(line: String) -> Event {
     let parts = line.splitn(8, ' ').collect::<Vec<&str>>();
 
-    if parts.len() == 8 {
+    let mut event = if parts.len() == 8 {
         let timestamp = parts[2];
         let hostname = parts[3];
         let app_name = parts[4];
@@ -127,12 +147,20 @@ fn line_to_event(line: String) -> Event {
             fields = parts.len()
         );
         Event::from(line)
-    }
+    };
+
+    // Add source type
+    event
+        .as_mut_log()
+        .try_insert(event::log_schema().source_type_key(), "logplex");
+
+    event
 }
 
 #[cfg(test)]
 mod tests {
     use super::LogplexConfig;
+    use crate::shutdown::ShutdownSignal;
     use crate::{
         event::{self, Event},
         runtime::Runtime,
@@ -151,7 +179,12 @@ mod tests {
         let address = test_util::next_addr();
         rt.spawn(
             LogplexConfig { address, tls: None }
-                .build("default", &GlobalOptions::default(), sender)
+                .build(
+                    "default",
+                    &GlobalOptions::default(),
+                    ShutdownSignal::noop(),
+                    sender,
+                )
                 .unwrap(),
         );
         (recv, address)
@@ -196,6 +229,7 @@ mod tests {
                 .into()
         );
         assert_eq!(log[&event::log_schema().host_key()], "host".into());
+        assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -216,6 +250,7 @@ mod tests {
                 .into()
         );
         assert_eq!(log[&event::log_schema().host_key()], "host".into());
+        assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -229,6 +264,7 @@ mod tests {
             "what am i doing here".into()
         );
         assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+        assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -249,5 +285,6 @@ mod tests {
                 .into()
         );
         assert_eq!(log[&event::log_schema().host_key()], "host".into());
+        assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
     }
 }

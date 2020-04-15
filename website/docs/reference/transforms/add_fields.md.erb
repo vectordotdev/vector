@@ -2,17 +2,21 @@
 
 <%= component_header(component) %>
 
-## Configuration
-
-<%= component_config_example(component) %>
-
 <%- if component.requirements.any? -%>
 ## Requirements
 
 <%= component_requirements(component) %>
 
 <%- end -%>
-## Options
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
+## Configuration
+
+<%= component_config_example(component) %>
 
 <%= fields(component.specific_options_list, heading_depth: 3) %>
 
@@ -22,97 +26,68 @@
 <%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
-<%- if component.output.log -%>
-## Output
+<%= component_fields(component, heading_depth: 2) -%>
+<%- if component.examples.any? -%>
+## Examples
 
-<%= component_output(component, component.output.log, heading_depth: 3) %>
+<%= component_examples(component) %>
+
+<%- end -%>
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
 
 <%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
 
-### Arrays
+### Conflicts
 
-The `add_fields` transform will support [TOML arrays][urls.toml_array]. Keep in
-mind that the values must be simple type (not tables), and each value must the
-same type. You cannot mix types:
-
-```toml
-[transforms.<transform-id>]
-  # ...
-
-  [transforms.<transform-id>.fields]
-    my_array = ["first", "second", "third"]
-```
-
-Results in:
-
-```json
-{
-  "my_array.0": "first",
-  "my_array.1": "second",
-  "my_array.2": "third"
-}
-```
-
-Learn more about how [`log` events][docs.data-model.log] are structured.
-
-### Complex Transforming
-
-The `add_fields` transform is designed for simple key additions. If you need
-more complex transforming then we recommend using a more versatile transform
-like the [`lua` transform][docs.transforms.lua].
-
-### Key Conflicts
+#### Key Conflicts
 
 Keys specified in this transform will replace existing keys.
 
-### Value Templating
+#### Nested Key Conflicts
 
-It is possible to use template values in the field. If an input lacks one of the keys needed for a templated field it
-will drop that field from the output.
+Nested keys are added in a _deep_ fashion. They will not replace any ancestor
+objects. For example, given the following `log` event:
 
-```toml
-[transforms.<transform-id>]
-  # ...
-
-  [transforms.<transform-id>.fields]
-    my_field = "{{timestamp}} {{message}}"
-```
-
-### Nested Fields
-
-The `add_fields` transform will support dotted keys or [TOML
-tables][urls.toml_table]. We recommend the dotted key syntax since it is less
-verbose for this usecase:
-
-```toml
-[transforms.<transform-id>]
-  # ...
-
-  [transforms.<transform-id>.fields]
-    parent.child.grandchild = "my_value"
-```
-
-Results in:
-
-```json
+```javascript
 {
-  "parent.child.grandchild": "my_value"
+  "parent": {
+    "child1": "value1"
+  }
 }
 ```
 
-Learn more about how [`log` events][docs.data-model.log] are structured.
+And the following configuration:
 
-### Removing Fields
+```toml
+[transforms.add_nested_field]
+  type = "add_fields"
+  fields.parent.child2 = "value2"
+```
 
-See the [`remove_fields` transform][docs.transforms.remove_fields].
+Will result in the following log event:
+
+```javascript
+{
+  "parent": {
+    "child1": "value1",
+    "child2": "value2"
+  }
+}
+```
+
+Notice that `parent.child1` field was preserved.
 
 ### Types
 
-All supported [configuration value types][docs.configuration#types] are accepted.
-This includes primitivate types (`string`, `int`, `float`, `boolean`) and
-special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
+All supported [configuration value types][docs.configuration#types] are
+accepted. This includes primitivate types (`string`, `int`, `float`, `boolean`)
+and special types, such as [arrays](#arrays) and
+[nested fields](#nested-fields).
 
 

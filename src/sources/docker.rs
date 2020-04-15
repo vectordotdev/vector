@@ -1,6 +1,8 @@
 use crate::{
     event::merge_state::LogEventMergeState,
-    event::{self, Event, Value},
+    event::{self, Event, LogEvent, Value},
+    shutdown::ShutdownSignal,
+    stream::StreamExt,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::{Bytes, BytesMut};
@@ -104,11 +106,13 @@ impl SourceConfig for DockerConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: Sender<Event>,
     ) -> crate::Result<super::Source> {
         DockerSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
             out,
+            shutdown,
         )
         .map(Box::new)
         .map(|source| source as Box<_>)
@@ -226,6 +230,7 @@ impl DockerSource {
     fn new(
         config: DockerConfig,
         out: Sender<Event>,
+        shutdown: ShutdownSignal,
     ) -> crate::Result<impl Future<Item = (), Error = ()>> {
         // Find out it's own container id, if it's inside a docker container.
         // Since docker doesn't readily provide such information,
@@ -258,7 +263,7 @@ impl DockerSource {
         // t2 -- outside: container stoped
         // t3 -- list_containers
         // In that case, logs between [t1,t2] will be pulled to vector only on next start/unpause of that container.
-        let esb = EventStreamBuilder::new(core, out, main_send);
+        let esb = EventStreamBuilder::new(core, out, main_send, shutdown.clone());
 
         // Construct, capture currently running containers, and do main future(self)
         Ok(DockerSource {
@@ -270,7 +275,8 @@ impl DockerSource {
             exclude_self,
         }
         .running_containers()
-        .and_then(|source| source))
+        // Once this ShutdownSignal resolves it will drop DockerSource and by extension it's ShutdownSignal.
+        .and_then(move |source| source.select(shutdown.map(|_| ())).then(|_| Ok(()))))
     }
 
     /// Future that captures currently running containers, and starts event streams for them.
@@ -489,6 +495,8 @@ struct EventStreamBuilder {
     out: Sender<Event>,
     /// End through which event stream futures send ContainerLogInfo to main future
     main_send: UnboundedSender<ContainerLogInfo>,
+    /// Self and event streams will end on this.
+    shutdown: ShutdownSignal,
 }
 
 impl EventStreamBuilder {
@@ -496,15 +504,17 @@ impl EventStreamBuilder {
         core: DockerSourceCore,
         out: Sender<Event>,
         main_send: UnboundedSender<ContainerLogInfo>,
+        shutdown: ShutdownSignal,
     ) -> Self {
         EventStreamBuilder {
             core: Arc::new(core),
             out,
             main_send,
+            shutdown,
         }
     }
 
-    /// Constructs and runs event stream
+    /// Constructs and runs event stream until shutdown.
     fn start(&self, id: ContainerId) -> ContainerState {
         let metadata_fetch = self
             .core
@@ -523,15 +533,15 @@ impl EventStreamBuilder {
             this.start_event_stream(ContainerLogInfo::new(id, metadata, this.core.now_timestamp))
         });
 
-        tokio::spawn(task);
+        tokio01::spawn(task);
 
         ContainerState::new()
     }
 
-    /// If info is present, restarts event stream
+    /// If info is present, restarts event stream which will run until shutdown.
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
-            tokio::spawn(self.start_event_stream(info));
+            tokio01::spawn(self.start_event_stream(info));
         }
     }
 
@@ -561,7 +571,7 @@ impl EventStreamBuilder {
         let partial_event_marker_field = self.core.config.partial_event_marker_field.clone();
         let auto_partial_merge = self.core.config.auto_partial_merge;
         let mut partial_event_merge_state = None;
-        tokio::prelude::stream::poll_fn(move || {
+        tokio01::prelude::stream::poll_fn(move || {
             // !Hot code: from here
             if let Some(&mut (_, ref mut info)) = state.as_mut() {
                 // Main event loop
@@ -607,7 +617,7 @@ impl EventStreamBuilder {
                     id = field::display(info.id.as_str())
                 );
                 // TODO: I am not sure that it's necessary to drive this future to completition
-                tokio::spawn(
+                tokio01::spawn(
                     main.send(info)
                         .map_err(|e| error!(message="Unable to return ContainerLogInfo to main",%e))
                         .map(|_| ()),
@@ -616,6 +626,7 @@ impl EventStreamBuilder {
 
             Ok(Async::Ready(None))
         })
+        .take_until(self.shutdown.clone())
         .forward(self.out.clone().sink_map_err(|_| ()))
         .map(|_| ())
     }
@@ -797,7 +808,10 @@ impl ContainerLogInfo {
 
         // Prepare the log event.
         let mut log_event = {
-            let mut log_event = Event::new_empty_log().into_log();
+            let mut log_event = LogEvent::new();
+
+            // Source type
+            log_event.insert(event::log_schema().source_type_key(), "docker");
 
             // The log message.
             log_event.insert(
@@ -994,7 +1008,12 @@ mod tests {
         let (sender, recv) = mpsc::channel(100);
         rt.spawn(
             config
-                .build("default", &GlobalOptions::default(), sender)
+                .build(
+                    "default",
+                    &GlobalOptions::default(),
+                    ShutdownSignal::noop(),
+                    sender,
+                )
                 .unwrap(),
         );
         recv
@@ -1221,6 +1240,10 @@ mod tests {
         assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
+        assert_eq!(
+            events[0].as_log()[event::log_schema().source_type_key()],
+            "docker".into()
+        );
     }
 
     #[test]
@@ -1317,6 +1340,10 @@ mod tests {
         assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
+        assert_eq!(
+            events[0].as_log()[event::log_schema().source_type_key()],
+            "docker".into()
+        );
     }
 
     #[test]

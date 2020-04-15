@@ -5,46 +5,46 @@ provide everything you need to start contributing to Vector. The
 following TOC is sorted progressively, starting with the basics and
 expanding into more specifics.
 
-<!-- MarkdownTOC autolink="true" indent="   " -->
+<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-- [Assumptions](#assumptions)
-- [Your First Contribution](#your-first-contribution)
-- [Workflow](#workflow)
-   - [Git Branches](#git-branches)
-   - [Git Commits](#git-commits)
-      - [Style](#style)
-      - [Signing-off](#signing-off)
-   - [Github Pull Requests](#github-pull-requests)
-      - [Title](#title)
-      - [Single Concern](#single-concern)
-      - [Reviews & Approvals](#reviews--approvals)
-      - [Merge Style](#merge-style)
-   - [CI](#ci)
-- [Development](#development)
-   - [Setup](#setup)
-   - [The Basics](#the-basics)
-      - [Directory Structure](#directory-structure)
-      - [Makefile](#makefile)
-      - [Code Style](#code-style)
-      - [Feature flags](#feature-flags)
-      - [Documentation](#documentation)
-      - [Changelog](#changelog)
-   - [Dependencies](#dependencies)
-   - [Guidelines](#guidelines)
-      - [Sink Healthchecks](#sink-healthchecks)
-   - [Testing](#testing)
-      - [Sample Logs](#sample-logs)
-      - [Tips and Tricks](#tips-and-tricks)
-   - [Benchmarking](#benchmarking)
-- [Security](#security)
-- [Legal](#legal)
-   - [DCO](#dco)
-      - [Trivial changes](#trivial-changes)
-   - [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
-- [FAQ](#faq)
-   - [Why a DCO instead of a CLA?](#why-a-dco-instead-of-a-cla)
-   - [If I’m contributing while an employee, do I still need my employer to sign something?](#if-i%E2%80%99m-contributing-while-an-employee-do-i-still-need-my-employer-to-sign-something)
-   - [What if I forgot to sign my commits?](#what-if-i-forgot-to-sign-my-commits)
+1. [Assumptions](#assumptions)
+1. [Your First Contribution](#your-first-contribution)
+1. [Workflow](#workflow)
+   1. [Git Branches](#git-branches)
+   1. [Git Commits](#git-commits)
+      1. [Style](#style)
+      1. [Signing-off](#signing-off)
+   1. [Github Pull Requests](#github-pull-requests)
+      1. [Title](#title)
+      1. [Single Concern](#single-concern)
+      1. [Reviews & Approvals](#reviews--approvals)
+      1. [Merge Style](#merge-style)
+   1. [CI](#ci)
+1. [Development](#development)
+   1. [Setup](#setup)
+   1. [The Basics](#the-basics)
+      1. [Directory Structure](#directory-structure)
+      1. [Makefile](#makefile)
+      1. [Code Style](#code-style)
+      1. [Feature flags](#feature-flags)
+      1. [Documentation](#documentation)
+      1. [Changelog](#changelog)
+   1. [Dependencies](#dependencies)
+   1. [Guidelines](#guidelines)
+      1. [Sink Healthchecks](#sink-healthchecks)
+   1. [Testing](#testing)
+      1. [Sample Logs](#sample-logs)
+      1. [Tips and Tricks](#tips-and-tricks)
+   1. [Benchmarking](#benchmarking)
+1. [Security](#security)
+1. [Legal](#legal)
+   1. [DCO](#dco)
+      1. [Trivial changes](#trivial-changes)
+   1. [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
+1. [FAQ](#faq)
+   1. [Why a DCO instead of a CLA?](#why-a-dco-instead-of-a-cla)
+   1. [If I’m contributing while an employee, do I still need my employer to sign something?](#if-i%E2%80%99m-contributing-while-an-employee-do-i-still-need-my-employer-to-sign-something)
+   1. [What if I forgot to sign my commits?](#what-if-i-forgot-to-sign-my-commits)
 
 <!-- /MarkdownTOC -->
 
@@ -92,7 +92,7 @@ Your commits must include a [DCO](https://developercertificate.org/) signature.
 This is simpler than it sounds; it just means that all of your commits
 must contain:
 
-```
+```text
 Signed-off-by: Joe Smith <joe.smith@email.com>
 ```
 
@@ -126,7 +126,7 @@ A list of allowed sub-categories is defined
 
 The following are all good examples of pull request titles:
 
-```
+```text
 feat(new sink): new `xyz` sink
 feat(tcp source): add foo bar baz feature
 fix(tcp source): fix foo bar baz bug
@@ -313,9 +313,9 @@ doing nothing when there is a data dependency like this.
 With all that in mind, here is a simple checklist to go over when writing a new
 health check:
 
-- [ ] Does this check perform different fallible operations from the sink itself?
-- [ ] Does this check have side effects the user would consider undesirable (e.g. data pollution)?
-- [ ] Are there situations where this check would fail but the sink would operate normally?
+* [ ] Does this check perform different fallible operations from the sink itself?
+* [ ] Does this check have side effects the user would consider undesirable (e.g. data pollution)?
+* [ ] Are there situations where this check would fail but the sink would operate normally?
 
 Not all of the answers need to be a hard "no", but we should think about the
 likelihood that any "yes" would lead to false negatives and balance that against
@@ -357,6 +357,7 @@ times:
    ```sh
    export RUSTFLAGS='-Clinker=clang-9 -Clink-arg=-fuse-ld=lld'
    ```
+
 3. Run in the root directory of Vector's source
 
    ```sh

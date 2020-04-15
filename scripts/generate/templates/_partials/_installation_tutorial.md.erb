@@ -1,0 +1,35 @@
+<Tabs
+  block={true}
+  defaultValue="<%= strategies.first.name.parameterize %>"
+  values={<%= strategies.collect { |strategy| {label: "As a #{strategy.title}", value: strategy.name.parameterize } }.to_json %>}>
+<%- strategies.each do |strategy| -%>
+<TabItem value="<%= strategy.name.parameterize %>">
+
+<%- if show_deployment_strategy -%>
+<%= deployment_strategy(strategy, platform: platform) %>
+
+---
+<%- end -%>
+
+<%- interfaces_style = interfaces.length > 4 ? "select" : "pills" -%>
+<Tabs
+  centered={<%= (interfaces_style == "pills").to_json %>}
+  className={<%= (interfaces_style == "pills" ? "rounded" : nil).to_json %>}
+  defaultValue={<%= interfaces.first.name.parameterize.to_json %>}
+  placeholder="Please choose an installation method..."
+  select={<%= (interfaces_style == "select").to_json %>}
+  size={<%= (interfaces_style == "select" ? "lg" : nil).to_json %>}
+  values={<%= interfaces.collect { |interface| {group: interface.type.humanize.pluralize, label: interface.title, value: interface.name.parameterize } }.to_json %>}>
+<%- interfaces.each do |interface| -%>
+<TabItem value="<%= interface.name.parameterize %>">
+
+<%- source_name = strategy.respond_to?(:source) ? strategy.source : interface.source -%>
+<%- source = metadata.sources.send(source_name) -%>
+<%= interface_installation_tutorial(interface, source: source, heading_depth: heading_depth) %>
+
+</TabItem>
+<%- end -%>
+</Tabs>
+</TabItem>
+<%- end -%>
+</Tabs>

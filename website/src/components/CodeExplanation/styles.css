@@ -1,0 +1,53 @@
+.code-explanation {
+  background: rgba( var(--ifm-color-primary-rgb), 0.15 ) !important;
+  border-bottom-left-radius: var(--ifm-global-radius);
+  border-bottom-right-radius: var(--ifm-global-radius);
+  color: var(--ifm-color-primary);
+  font-size: 0.85em;
+  font-weight: 500;
+  margin-bottom: var(--ifm-spacing-vertical);
+  padding: var(--ifm-pre-padding);
+}
+
+.code-explanation--expanded a {
+  color: var(--ifm-color-primary);
+  text-decoration: underline;
+}
+
+.code-explanation--expanded code {
+  background-color: rgba( var(--ifm-color-primary-rgb), 0.15 );
+  color: var(--ifm-color-primary);
+}
+
+.code-explanation--expanded > ul {
+  list-style: disc;
+  margin-bottom: var(--ifm-pre-padding);
+  padding-left: var(--ifm-pre-padding);
+}
+
+.code-explanation--expanded > .code-explanation--toggle {
+  border-top: 1px dotted var(--ifm-color-primary);
+  padding-top: var(--ifm-pre-padding);
+}
+
+.code-explanation--collapsed {
+  padding-top: calc( var(--ifm-pre-padding) / 2 );
+  padding-bottom: calc( var(--ifm-pre-padding) / 2 );
+}
+
+.code-explanation--toggle {
+  color: var(--ifm-color-primary);
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.code-explanation--toggle:hover {
+  color: var(--ifm-heading-color);
+}
+
+.markdown .code-explanation {
+  margin-top: calc( ( var(--ifm-spacing-vertical) * -1 ) - 7px );
+}
+
+.markdown pre.prism-code + .code-explanation {
+}

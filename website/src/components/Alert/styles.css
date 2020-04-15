@@ -3,13 +3,19 @@
  */
 
 .alert {
-  background: var(--ifm-panel-background) !important;
-  border: 0px none;
-  border-left: 6px solid var(--ifm-alert-background-color);
+  background-color: var(--ifm-panel-background-color) !important;
+  border: 1px solid var(--ifm-panel-background-color) !important;
+  border-left: 6px solid var(--ifm-alert-background-color) !important;
   border-radius: 0;
+  box-shadow: var(--ifm-panel-box-shadow);
   font-size: 95%;
   font-weight: 500;
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
+}
+
+.alert.alert--fill {
+  background: rgba( var(--ifm-color-primary-rgb), 0.15 ) !important;
+  color: var(--ifm-color-primary) !important;
 }
 
 .alert > i.feather {
@@ -49,9 +55,16 @@
   border: 1px solid var(--ifm-color-primary);
   color: var(--ifm-color-primary) !important;
 }
+.alert.alert--fill.alert--success {
+  background: rgba( var(--ifm-color-success-rgb), 0.15 ) !important;
+  border: 1px solid var(--ifm-color-success);
+  color: var(--ifm-color-success) !important;
+}
 .alert.alert--fill.alert--warning {
   background: rgba( var(--ifm-color-warning-rgb), 0.15 ) !important;
-  border: 1px solid var(--ifm-color-warning);
+  border-top: 0px none !important;
+  border-right: 0px none !important;
+  border-bottom: 0px none !important;
   color: var(--ifm-color-warning) !important;
 }
 .alert.alert--fill a {

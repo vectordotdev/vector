@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    internal_events::TcpEventReceived,
     sources::util::{SocketListenAddr, TcpSource},
     tls::TlsConfig,
 };
@@ -53,8 +54,13 @@ impl TcpSource for RawTcpSource {
         BytesDelimitedCodec::new_with_max_length(b'\n', self.config.max_length)
     }
 
-    fn build_event(&self, frame: Bytes, host: Option<Bytes>) -> Option<Event> {
+    fn build_event(&self, frame: Bytes, host: Bytes) -> Option<Event> {
+        let byte_size = frame.len();
         let mut event = Event::from(frame);
+
+        event
+            .as_mut_log()
+            .insert(event::log_schema().source_type_key(), "socket");
 
         let host_key = if let Some(key) = &self.config.host_key {
             key
@@ -62,14 +68,14 @@ impl TcpSource for RawTcpSource {
             &event::log_schema().host_key()
         };
 
-        if let Some(host) = host {
-            event.as_mut_log().insert(host_key.clone(), host);
-        }
+        event.as_mut_log().insert(host_key.clone(), host);
 
         trace!(
             message = "Received one event.",
             event = field::debug(&event)
         );
+        emit!(TcpEventReceived { byte_size });
+
         Some(event)
     }
 }

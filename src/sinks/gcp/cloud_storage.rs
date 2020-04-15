@@ -1,13 +1,14 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::{self, Event},
+    serde::to_string,
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{https_client, HttpsClient},
+            http::{HttpClient, HttpClientFuture},
             retries::{RetryAction, RetryLogic},
             BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
-            SinkExt, TowerRequestConfig,
+            TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
@@ -37,7 +38,7 @@ const BASE_URL: &str = "https://storage.googleapis.com/";
 #[derive(Clone)]
 struct GcsSink {
     bucket: String,
-    client: HttpsClient,
+    client: HttpClient,
     creds: Option<GcpCredentials>,
     base_url: String,
     settings: RequestSettings,
@@ -93,7 +94,7 @@ fn default_config(e: Encoding) -> GcsSinkConfig {
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "kebab-case")]
 enum GcsPredefinedAcl {
     AuthenticatedRead,
     BucketOwnerFullControl,
@@ -170,7 +171,7 @@ inventory::submit! {
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let sink = GcsSink::new(self, &cx)?;
+        let mut sink = GcsSink::new(self, &cx)?;
         let healthcheck = sink.healthcheck()?;
         let service = sink.service(self, &cx)?;
 
@@ -201,7 +202,7 @@ impl GcsSink {
         let creds = config.auth.make_credentials(Scope::DevStorageReadWrite)?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
-        let client = https_client(cx.resolver(), tls)?;
+        let client = HttpClient::new(cx.resolver(), tls)?;
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
         Ok(GcsSink {
@@ -236,14 +237,16 @@ impl GcsSink {
             .settings(request, GcsRetryLogic)
             .service(self);
 
-        let sink = crate::sinks::util::BatchServiceSink::new(svc, cx.acker())
-            .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
+        let buffer = PartitionBuffer::new(Buffer::new(compression));
+
+        let sink = crate::sinks::util::PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+            .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(Box::new(sink))
     }
 
-    fn healthcheck(&self) -> crate::Result<Healthcheck> {
+    fn healthcheck(&mut self) -> crate::Result<Healthcheck> {
         let mut builder = Request::builder();
         builder.method(Method::HEAD);
         builder.uri(self.base_url.parse::<Uri>()?);
@@ -255,7 +258,7 @@ impl GcsSink {
 
         let healthcheck =
             self.client
-                .request(request)
+                .call(request)
                 .map_err(Into::into)
                 .and_then(healthcheck_response(
                     self.creds.clone(),
@@ -272,7 +275,7 @@ impl GcsSink {
 impl Service<RequestWrapper> for GcsSink {
     type Response = hyper::Response<Body>;
     type Error = hyper::Error;
-    type Future = hyper::client::ResponseFuture;
+    type Future = HttpClientFuture;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(().into())
@@ -296,7 +299,7 @@ impl Service<RequestWrapper> for GcsSink {
         settings
             .content_encoding
             .map(|ce| headers.insert("content-encoding", ce));
-        headers.insert("x-goog-acl", settings.acl);
+        settings.acl.map(|acl| headers.insert("x-goog-acl", acl));
         headers.insert("x-goog-storage-class", settings.storage_class);
         for (p, v) in settings.metadata {
             headers.insert(p, v);
@@ -307,13 +310,8 @@ impl Service<RequestWrapper> for GcsSink {
             creds.apply(&mut request);
         }
 
-        self.client.request(request)
+        self.client.call(request)
     }
-}
-
-fn to_string(value: impl Serialize) -> String {
-    let value = serde_json::to_value(value).unwrap();
-    value.as_str().unwrap().into()
 }
 
 #[derive(Clone, Debug)]
@@ -365,7 +363,7 @@ impl RequestWrapper {
 // producing a request.
 #[derive(Clone, Debug)]
 struct RequestSettings {
-    acl: HeaderValue,
+    acl: Option<HeaderValue>,
     content_type: HeaderValue,
     content_encoding: Option<HeaderValue>,
     storage_class: HeaderValue,
@@ -377,8 +375,9 @@ struct RequestSettings {
 
 impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
-        let acl = config.acl.unwrap_or(GcsPredefinedAcl::default());
-        let acl = HeaderValue::from_str(&to_string(acl)).unwrap();
+        let acl = config
+            .acl
+            .map(|acl| HeaderValue::from_str(&to_string(acl)).unwrap());
         let content_type = HeaderValue::from_str(config.encoding.codec.content_type()).unwrap();
         let content_encoding = config
             .compression

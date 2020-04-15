@@ -1,34 +1,33 @@
 [sources.docker]
 title = "Docker"
+noun = "Docker"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_docker.toml") %>
+features = [
+  "Collect Docker container logs.",
+  "Filter which containers you collect them from.",
+  "Automatically merge logs that Docker splits.",
+  "Enrich your logs with useful Docker context.",
+]
 function_category = "collect"
-min_version = "1.24"
 output_types = ["log"]
-requirements.additional = """\
-* The [`json-file`][urls.docker_logging_driver_json_file] (default) or \
-[`journald`][urls.docker_logging_driver_journald] Docker logging driver \
-must be enabled for this source to work. See the \
-[Docker Integration Strategy section](#docker-integration-strategy) \
-for more info.
-"""
-service_name = "Docker API"
-through_description = "the [Docker engine daemon][urls.docker_daemon]"
+requirements.docker_api = ">= 1.24"
+strategies = ["daemon"]
+through_description = "the [Docker][urls.docker] [engine daemon][urls.docker_daemon]"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "docker") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "docker") %>
 
 [sources.docker.env_vars.DOCKER_HOST]
 type = "string"
 default = "unix:///var/run/docker.sock"
 examples = ["unix://path/to/socket", "tcp://host:2375/path"]
-required = true
 description = "The docker host to connect to."
 
 [sources.docker.env_vars.DOCKER_VERIFY_TLS]
 type = "bool"
 default = true
-required = true
 description = """\
 If `true` (the default), Vector will validate the TLS certificate of the \
 remote host. Do NOT set this to `false` unless you understand the risks of \
@@ -82,7 +81,7 @@ incomplete message (i.e. partial events). If set to `""`, no field will be \
 added to partial event. This allows to opt-out of partial event detection.\
 """
 
-[sources.docker.output.log.fields.container_created_at]
+[sources.docker.fields.log.fields.container_created_at]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true
@@ -90,7 +89,7 @@ description = """\
 A UTC timestamp representing when the container was created.\
 """
 
-[sources.docker.output.log.fields.container_id]
+[sources.docker.fields.log.fields.container_id]
 type = "string"
 examples = ["9b6247364a03", "715ebfcee040"]
 required = true
@@ -98,7 +97,7 @@ description = """\
 The Docker container ID that the log was collected from.\
 """
 
-[sources.docker.output.log.fields.container_name]
+[sources.docker.fields.log.fields.container_name]
 type = "string"
 examples = ["evil_ptolemy", "nostalgic_stallman"]
 required = true
@@ -106,7 +105,7 @@ description = """\
 The Docker container name that the log was collected from.\
 """
 
-[sources.docker.output.log.fields.image]
+[sources.docker.fields.log.fields.image]
 type = "string"
 examples = ["ubuntu:latest", "busybox", "timberio/vector:latest-alpine"]
 required = true
@@ -114,7 +113,7 @@ description = """\
 The image name that the container is based on.\
 """
 
-[sources.docker.output.log.fields."`[label-key]`"]
+[sources.docker.fields.log.fields."`[label-key]`"]
 type = "string"
 examples = [
   {"com.example.vendor" = "Timber Inc."},
@@ -127,7 +126,7 @@ description = """\
 with it's exact key/value pair.\
 """
 
-[sources.docker.output.log.fields.message]
+[sources.docker.fields.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
 required = true
@@ -135,18 +134,18 @@ description = """\
 The raw log message, unaltered.\
 """
 
-[sources.docker.output.log.fields.stream]
+[sources.docker.fields.log.fields.stream]
 type = "string"
 required = true
 description = """\
 The [standard stream][urls.standard_streams] that the log was collected from.\
 """
 
-[sources.docker.output.log.fields.stream.enum]
+[sources.docker.fields.log.fields.stream.enum]
 stdout = "The STDOUT stream"
 stderr = "The STDERR stream"
 
-[sources.docker.output.log.fields.timestamp]
+[sources.docker.fields.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true

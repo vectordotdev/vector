@@ -1,11 +1,15 @@
 require "erb"
-require "json_schemer"
+
 require "ostruct"
 require "toml-rb"
 
 require_relative "metadata/batching_sink"
+require_relative "metadata/data_model"
 require_relative "metadata/exposing_sink"
 require_relative "metadata/field"
+require_relative "metadata/guides"
+require_relative "metadata/highlight"
+require_relative "metadata/installation"
 require_relative "metadata/links"
 require_relative "metadata/post"
 require_relative "metadata/release"
@@ -31,76 +35,76 @@ class Metadata
       full_path = path.start_with?("/") ? path : "#{META_ROOT}/#{path}"
       body = File.read(full_path)
       renderer = ERB.new(body, nil, '-')
+
       renderer.result(context)
     end
   end
 
   class << self
-    def load!(meta_dir, docs_root, pages_root)
+    def load!(meta_dir, docs_root, guides_root, pages_root)
       metadata = load_metadata!(meta_dir)
-      json_schema = load_json_schema!(meta_dir)
-      validate_schema!(json_schema, metadata)
-      new(metadata, docs_root, pages_root)
+      errors = metadata.validate_schema
+
+      if errors.any?
+        Printer.error!(
+          <<~EOF
+          The resulting hash from the `/.meta/**/*.toml` files failed
+          validation against the following schema:
+
+              /.meta/schema/meta.json
+
+          The errors include:
+
+              * #{errors[0..50].join("\n*    ")}
+          EOF
+        )
+      end
+
+      new(metadata, docs_root, guides_root, pages_root)
     end
 
     private
-      def load_json_schema!(meta_dir)
-        json_schema = read_json("#{meta_dir}/.schema.json")
-
-        Dir.glob("#{meta_dir}/.schema/**/*.json").each do |file|
-          hash = read_json("#{meta_dir}/.schema.json")
-          json_schema.deep_merge!(hash)
-        end
-
-        json_schema
-      end
-
       def load_metadata!(meta_dir)
         metadata = {}
 
         contents =
           Dir.glob("#{meta_dir}/**/[^_]*.toml").collect do |file|
-            Template.render(file)
+            begin
+              Template.render(file)
+            rescue Exception => e
+              Printer.error!(
+                <<~EOF
+                The follow metadata file failed to load:
+
+                  #{file}
+
+                The error received was:
+
+                  #{e.message}
+                  #{e.backtrace.join("\n  ")}
+                EOF
+              )
+            end
           end
 
         content = contents.join("\n")
         TomlRB.parse(content)
       end
 
-      def posts
-        @posts ||=
-          Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
-            Post.new(path)
-          end.sort_by { |post| [ post.date, post.id ] }
-      end
-
-      def read_json(path)
-        body = File.read(path)
-        JSON.parse(body)
-      end
-
-      def validate_schema!(schema, metadata)
-        schemer = JSONSchemer.schema(schema, ref_resolver: 'net/http')
-        errors = schemer.validate(metadata).to_a
-        limit = 50
+      def validate_schema!(metadata)
+        errors = metadata.validate_schema
 
         if errors.any?
-          error_messages =
-            errors[0..(limit - 1)].collect do |error|
-              "The value at `#{error.fetch("data_pointer")}` failed validation for `#{error.fetch("schema_pointer")}`, reason: `#{error.fetch("type")}`"
-            end
-
-          if errors.size > limit
-            error_messages << "+ #{errors.size} errors"
-          end
-
-          error!(
+          Printer.error!(
             <<~EOF
-            The metadata schema is invalid. This means the the resulting
-            hash from the `/.meta/**/*.toml` files violates the defined
-            schema. Errors include:
+            The resulting hash from the `/.meta/**/*.toml` files failed
+            validation against the following schema:
 
-            * #{error_messages.join("\n* ")}
+                /.meta/schema/meta.json
+
+            The errors include:
+
+                * #{errors[0..50].join("\n*    ")}
             EOF
           )
         end
@@ -108,12 +112,13 @@ class Metadata
   end
 
   attr_reader :blog_posts,
+    :data_model,
     :domains,
     :env_vars,
+    :guides,
+    :highlights,
     :installation,
     :links,
-    :log_fields,
-    :metric_fields,
     :options,
     :tests,
     :posts,
@@ -123,11 +128,11 @@ class Metadata
     :team,
     :transforms
 
-  def initialize(hash, docs_root, pages_root)
-    @installation = OpenStruct.new()
-    @log_fields = hash.fetch("log_fields").to_struct_with_name(Field)
-    @metric_fields = hash.fetch("metric_fields").to_struct_with_name(Field)
-    @options = hash.fetch("options").to_struct_with_name(Field)
+  def initialize(hash, docs_root, guides_root, pages_root)
+    @data_model = DataModel.new(hash.fetch("data_model"))
+    @guides = hash.fetch("guides").to_struct_with_name(constructor: Guides)
+    @installation = Installation.new(hash.fetch("installation"))
+    @options = hash.fetch("options").to_struct_with_name(constructor: Field)
     @releases = OpenStruct.new()
     @sinks = OpenStruct.new()
     @sources = OpenStruct.new()
@@ -138,20 +143,37 @@ class Metadata
 
     @domains = hash.fetch("domains").collect { |h| OpenStruct.new(h) }
 
-    # installation
+    # highlights
 
-    installation_hash = hash.fetch("installation")
-    @installation.containers = installation_hash.fetch("containers").collect { |h| OpenStruct.new(h) }
-    @installation.downloads = installation_hash.fetch("downloads").collect { |h| OpenStruct.new(h) }
-    @installation.operating_systems = installation_hash.fetch("operating_systems").collect { |h| OpenStruct.new(h) }
-    @installation.package_managers = installation_hash.fetch("package_managers").collect { |h| OpenStruct.new(h) }
+    @highlights ||=
+      Dir.
+        glob("#{HIGHLIGHTS_ROOT}/**/*.md").
+        filter do |path|
+          content = File.read(path)
+          content.start_with?("---\n")
+        end.
+        collect do |path|
+          Highlight.new(path)
+        end.
+        sort_by do |highlight|
+          [ highlight.date, highlight.id ]
+        end
 
     # posts
 
     @posts ||=
-      Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
-        Post.new(path)
-      end.sort_by { |post| [ post.date, post.id ] }
+      Dir.
+        glob("#{POSTS_ROOT}/**/*.md").
+        filter do |path|
+          content = File.read(path)
+          content.start_with?("---\n")
+        end.
+        collect do |path|
+          Post.new(path)
+        end.
+        sort_by do |post|
+          [ post.date, post.id ]
+        end
 
     # releases
 
@@ -169,10 +191,8 @@ class Metadata
           sort.
           last
 
-      last_date = last_version && hash.fetch("releases").fetch(last_version.to_s).fetch("date").to_date
-
       release_hash["version"] = version_string
-      release = Release.new(release_hash, last_version, last_date, @posts)
+      release = Release.new(release_hash, last_version, @highlights)
       @releases.send("#{version_string}=", release)
     end
 
@@ -221,11 +241,11 @@ class Metadata
 
     # links
 
-    @links = Links.new(hash.fetch("links"), docs_root, pages_root)
+    @links = Links.new(hash.fetch("links"), docs_root, guides_root, pages_root)
 
     # env vars
 
-    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(Field)
+    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(constructor: Field)
 
     components.each do |component|
       component.env_vars.to_h.each do |key, val|
@@ -245,17 +265,12 @@ class Metadata
     @components ||= sources_list + transforms_list + sinks_list
   end
 
-  def downloads(arch: nil, os: nil, package_manager: nil, type: nil)
-    downloads = installation.downloads
-    downloads = downloads.select { |d| d.arch && d.arch.downcase == arch.to_s.downcase } if arch
-    downloads = downloads.select { |d| d.os && d.os.downcase == os.to_s.downcase } if os
-    downloads = downloads.select { |d| d.package_manager && d.package_manager.downcase == package_manager.to_s.downcase } if package_manager
-    downloads = downloads.select { |d| d.type && d.type.downcase == type.to_s.downcase } if type
-    downloads
-  end
-
   def env_vars_list
     @env_vars_list ||= env_vars.to_h.values.sort
+  end
+
+  def event_types
+    @event_types ||= data_model.types
   end
 
   def latest_patch_releases
@@ -272,14 +287,6 @@ class Metadata
 
   def latest_version
     @latest_version ||= latest_release.version
-  end
-
-  def log_fields_list
-    @log_fields_list ||= log_fields.to_h.values.sort
-  end
-
-  def metric_fields_list
-    @metric_fields_list ||= metric_fields.to_h.values.sort
   end
 
   def newer_releases(release)
@@ -322,10 +329,16 @@ class Metadata
     @post_tags ||= posts.collect(&:tags).flatten.uniq
   end
 
-  def platforms
-    @platforms ||= installation.containers +
-      installation.operating_systems +
-      installation.package_managers
+  def platform_names
+    @platforms ||=
+      begin
+        (
+          installation.operating_systems_list.collect(&:name) +
+          installation.package_managers_list.collect(&:name) +
+          installation.package_managers_list.collect(&:archs).flatten.uniq +
+          installation.platforms_list.collect(&:name)
+        ).sort
+      end
   end
 
   def previous_minor_releases(release)
@@ -358,9 +371,13 @@ class Metadata
 
   def to_h
     {
+      event_types: event_types,
+      guides: guides.deep_to_h,
       installation: installation.deep_to_h,
+      latest_highlight: highlights.last.deep_to_h,
       latest_post: posts.last.deep_to_h,
       latest_release: latest_release.deep_to_h,
+      highlights: highlights.deep_to_h,
       posts: posts.deep_to_h,
       post_tags: post_tags,
       releases: releases.deep_to_h,
