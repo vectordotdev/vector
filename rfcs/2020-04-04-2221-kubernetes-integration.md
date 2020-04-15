@@ -569,6 +569,47 @@ authoritative information, in a sense, than the API server on what pods are
 actually running on the node. However there's currently no interface to the
 `kubelet` we could utilize for that.
 
+##### Practical example of filtering by annotation
+
+Here's an example of an `nginx` deployment.
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+      annotations:
+        vector.dev/exclude: "true"
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.14.2
+          ports:
+            - containerPort: 80
+```
+
+The `vector.dev/exclude: "true"`
+`annotation` at the `PodTemplateSpec` is intended to let Vector know that it
+shouldn't collect logs from the relevant `Pod`s.
+
+Upon picking us a new log file for processing, Vector is intended to read the
+`Pod` object, see the `vector.dev/exclude: "true"` annotation and ignore the
+log file altogether. This should save take much less resources compared to
+reading logs files into events and then filtering them out.
+
+This is also a perfectly valid way of filtering out logs of Vector itself.
+
 #### Filtering based on event fields after annotation
 
 This is an alternative approach to the previous implementation.
