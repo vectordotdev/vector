@@ -667,7 +667,7 @@ spec:
 
 The `/etc/podinfo/annotations` file will look something like this:
 
-```
+```text
 kubernetes.io/config.seen="2020-04-15T13:35:27.290739039Z"
 kubernetes.io/config.source="api"
 vector.dev/config="[sinks.aws_s3]\ntype = \"aws_s3\"\ninputs = [\"kubernetes\"]\nbucket = \"my-bucket\"\ncompression = \"gzip\"\nregion = \"us-east-1\"\nkey_prefix = \"date=%F/\"\n"
