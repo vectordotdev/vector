@@ -673,7 +673,7 @@ kubernetes.io/config.source="api"
 vector.dev/config="[sinks.aws_s3]\ntype = \"aws_s3\"\ninputs = [\"kubernetes\"]\nbucket = \"my-bucket\"\ncompression = \"gzip\"\nregion = \"us-east-1\"\nkey_prefix = \"date=%F/\"\n"
 ```
 
-It's quite trivial to extract the configration.
+It's quite trivial to extract the configuration.
 
 While possible, this is outside of the scope of the initial integration.
 
