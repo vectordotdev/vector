@@ -533,6 +533,32 @@ case.
 Either way, we probably want to keep some form of cache + a circuit breaker to
 avoid hitting the k8s API too often.
 
+##### A note on k8s API server availability and `Pod` objects cache
+
+One downside is we'll probably have to stall the events originated from a
+particular log file until we obtain the data from k8s API and decide whether
+to allow that file or filter it. During disasters, if the API server becomes
+unavailable, we'll end up stalling the events for which we don't have `Pod`
+object data cached. It is a good idea to handle this elegantly, for instance
+if we detect that k8s API is gone, we should pause cache-busting until it comes
+up again - because no changes can ever arrive while k8s API server is down, and
+it makes sense to keep the cache while it's happening.
+
+We're in a good position here, because we have a good understanding of the
+system properties, and can intelligently handle k8s API server being down.
+
+Since we'll be stalling the events while we don't have the `Pod` object, there's
+an edge case where we won't be able to ship the events for a prolonged time.
+This scenario occurs when a new pod is added to the node and then kubernetes API
+server goes down. If `kubelet` picks up the update and starts the containers,
+and they start producing logs, but Vector at the same node doesn't get the
+update - we're going to stall the logs indefinitely. Ideally, we'd want to talk
+to the `kubelet` instead of the API server to get the `Pod` object data - since
+it's local (hence has a much higher chance to be present) and has even more
+authoritative information, in a sense, than the API server on what pods are
+actually running on the node. However there's currently no interface to the
+`kubelet` we could utilize for that.
+
 #### Filtering based on event fields after annotation
 
 This is an alternative approach to the previous implementation.
@@ -633,6 +659,7 @@ See [motivation](#motivation).
 1. How do we implement liveness, readiness and startup probes?
 1. Can we populate file at `terminationMessagePath` with some meaningful
    information when we exit or crash?
+1. Can we allow passing arbitrary fields from the `Pod` object to the event?
 
 ## Plan Of Attack
 
