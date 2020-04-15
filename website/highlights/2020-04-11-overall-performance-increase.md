@@ -3,7 +3,7 @@ last_modified_on: "2020-04-14"
 $schema: "/.meta/.schemas/highlights.json"
 title: "~36% Performance Improvement"
 description: "Significant performance gains for all Vector users"
-author_github: https://github.com/lukesteensen
+author_github: "https://github.com/binarylogic"
 pr_numbers: [2295, 2296]
 release: "nightly"
 importance: "high"

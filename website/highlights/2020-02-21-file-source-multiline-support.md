@@ -3,7 +3,7 @@ last_modified_on: "2020-04-14"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Improved Multiline Support In The File Source"
 description: "Merge multiple lines together based on rules"
-author_github: https://github.com/MOZGIII
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1852]
 release: "0.8.0"
 importance: "medium"

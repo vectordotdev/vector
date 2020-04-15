@@ -3,7 +3,7 @@ last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/highlights.json"
 title: "New Kubernetes Source (alpha)"
 description: "Early adopters have a new Kuberenetes source to chew on"
-author_github: https://github.com/Jeffail
+author_github: "https://github.com/binarylogic"
 pr_numbers: [893]
 release: "0.6.0"
 importance: "low"

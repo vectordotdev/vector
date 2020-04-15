@@ -3,7 +3,7 @@ last_modified_on: "2020-04-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "A La Carte Custom Vector Builds"
 description: "Build Vector with select components"
-author_github: https://github.com/binarylogic
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1924]
 release: "nightly"
 importance: "medium"

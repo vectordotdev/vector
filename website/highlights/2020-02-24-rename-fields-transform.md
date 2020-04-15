@@ -3,7 +3,7 @@ last_modified_on: "2020-04-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "New Rename Fields Transform"
 description: "An easier way to rename fields"
-author_github: https://github.com/hoverbear
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1800]
 release: "0.8.0"
 importance: "low"

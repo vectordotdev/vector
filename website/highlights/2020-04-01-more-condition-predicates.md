@@ -3,7 +3,7 @@ last_modified_on: "2020-04-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "More Condition Predicates"
 description: "More options when filtering and routing events"
-author_github: https://github.com/binarylogic
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1997, 2183, 2198]
 release: "nightly"
 importance: "low"

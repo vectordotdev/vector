@@ -3,7 +3,7 @@ last_modified_on: "2020-04-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "New Dedupe Trasnform"
 description: "Shed duplicate logs"
-author_github: https://github.com/binarylogic
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1848]
 release: "nightly"
 importance: "medium"

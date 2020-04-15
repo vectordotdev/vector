@@ -66,7 +66,7 @@ class Release
             $schema: "/.meta/.schemas/highlights.json"
             title: "#{commit.description}"
             description: "<fill-in>"
-            author_github: "<fill-in>"
+            author_github: "https://github.com/binarylogic"
             importance: "medium"
             pr_numbers: [#{commit.pr_number}]
             release: "#{@version}"

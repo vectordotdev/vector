@@ -3,7 +3,7 @@ last_modified_on: "2020-04-14"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Meet Vic, The Vector Mascot"
 description: "The official Vector mascot"
-author_github: https://github.com/Jeffail
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1710]
 release: "0.8.0"
 importance: "low"

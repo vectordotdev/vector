@@ -3,7 +3,7 @@ last_modified_on: "2020-04-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "New Kubernetes Pod Metdata Transform"
 description: "Easily rnrich your logs with Kubernetes metadata"
-author_github: https://github.com/binarylogic
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1888]
 release: "nightly"
 importance: "high"

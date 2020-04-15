@@ -3,7 +3,7 @@ last_modified_on: "2020-04-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Automatically merge partial Docker events"
 description: "Docker splits long messages by default, and now Vector merges them back for you"
-author_github: "https://github.com/MOZGIII"
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1457]
 release: "0.8.0"
 importance: "high"

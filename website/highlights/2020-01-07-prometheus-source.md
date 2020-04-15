@@ -3,7 +3,7 @@ last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/highlights.json"
 title: "New Prometheus Source"
 description: "Scrape prometheus metrics with Vector"
-author_github: https://github.com/Jeffail
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1264]
 release: "0.7.0"
 importance: "high"

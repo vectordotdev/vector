@@ -2,7 +2,7 @@
 last_modified_on: "2020-04-13"
 title: "New Apache Pulsar Sink"
 description: "Sink logs to the Apache Pulsar service"
-author_github: https://github.com/hoverbear
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1665]
 release: "nightly"
 importance: "low"

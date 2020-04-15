@@ -3,7 +3,7 @@ last_modified_on: "2020-04-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Merge existing `tcp` and `udp` sources into a single `socket` source"
 description: "We've simplified our socket based sources into a single `socket` source"
-author_github: https://github.com/Jeffail
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1485]
 release: "0.7.0"
 importance: "low"

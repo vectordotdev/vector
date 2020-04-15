@@ -3,7 +3,7 @@ last_modified_on: "2020-04-14"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Lua Transform v2"
 description: "The next iteration of our Lua transform."
-author_github: https://github.com/binarylogic
+author_github: "https://github.com/binarylogic"
 pr_numbers: [2126]
 release: "nightly"
 importance: "high"

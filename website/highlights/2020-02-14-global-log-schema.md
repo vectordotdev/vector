@@ -3,7 +3,7 @@ last_modified_on: "2020-04-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Introducing Vector's Global Log Schema"
 description: "Set defaults for Vector's common log key names"
-author_github: https://github.com/hoverbear
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1769, 1795]
 release: "0.8.0"
 importance: "low"

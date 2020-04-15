@@ -3,7 +3,7 @@ last_modified_on: "2020-04-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "New Tag Cardinality Limit Transform"
 description: "Protect downstream metrics storages from high cardinality tags"
-author_github: https://github.com/binarylogic
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1959]
 release: "nightly"
 importance: "medium"
