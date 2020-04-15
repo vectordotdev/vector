@@ -12,6 +12,7 @@ import TabItem from '@theme/TabItem';
 import Tabs from '@theme/Tabs';
 
 import classnames from 'classnames';
+import {fetchNewHighlight} from '@site/src/exports/newHighlight';
 import {fetchNewPost} from '@site/src/exports/newPost';
 import {fetchNewRelease} from '@site/src/exports/newRelease';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
@@ -19,7 +20,9 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import repoUrl from '@site/src/exports/repoUrl';
 import cloudify from '@site/src/exports/cloudify';
 
+import _ from 'lodash';
 import styles from './index.module.css';
+
 import './index.css';
 
 const AnchoredH2 = Heading('h2');
@@ -399,12 +402,27 @@ function InstallationSection() {
   );
 }
 
+function Notice() {
+  const newHighlight = fetchNewHighlight();
+  const newPost = fetchNewPost();
+  const newRelease = fetchNewRelease();
+  const items = [newHighlight, newPost, newRelease];
+  const item = _(items).compact().sortBy('date').value()[0];
+
+  if (item) {
+    return <Link to={item.permalink} className={styles.indexAnnouncement}>
+      <span className="badge badge-primary">new</span>
+      {item.title}
+    </Link>
+  } else {
+    return null;
+  }
+}
+
 function Home() {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
   const {metadata: {latest_release}} = siteConfig.customFields;
-  const newPost = fetchNewPost();
-  const newRelease = fetchNewRelease();
 
   useEffect(() => {
     cloudify();
@@ -414,18 +432,7 @@ function Home() {
     <Layout title={`${siteConfig.title} - ${siteConfig.tagline}`} description={siteConfig.tagline}>
       <header className={classnames('hero', 'hero--full-height', styles.indexHeroBanner)}>
         <div className="container container--fluid">
-          {newRelease && (
-            <Link to={`/releases/${newRelease.version}`} className={styles.indexAnnouncement}>
-              <span className="badge badge-primary">new</span>
-              v{newRelease.version} has been released! View release notes.
-            </Link>
-          )}
-          {!newRelease && newPost && (
-            <Link to={`/blog/${newPost.id}`} className={styles.indexAnnouncement}>
-              <span className="badge badge-primary">new</span>
-              {newPost.title}
-            </Link>
-          )}
+          <Notice />
           <h1>Take Control Of Your Observability Data</h1>
           <p className="hero--subtitle">
             <Link to="/components/">Collect, transform, &amp; route</Link> <i>all</i> observability data with <i>one</i> simple tool.

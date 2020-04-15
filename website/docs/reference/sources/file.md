@@ -34,7 +34,7 @@ ingests data through one or more local files and outputs
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--warnings">
 
 * This component must be provided access to the configured file system.
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-11"
 component_title: "AWS EC2 Metadata"
 description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
@@ -31,7 +31,7 @@ logs with AWS EC2 instance metadata.
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--warnings">
 
 
 * [AWS IMDS v2][urls.aws_ec2_instance_metadata] is required. This is available by default on EC2.
@@ -498,4 +498,4 @@ You can learn more in the
 [docs.transforms.aws_ec2_metadata#aws-imds-v2]: /docs/reference/transforms/aws_ec2_metadata/#aws-imds-v2
 [urls.aws_ec2_instance_metadata]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
 [urls.aws_imds_v1_security_problems]: https://aws.amazon.com/blogs/security/defense-in-depth-open-firewalls-reverse-proxies-ssrf-vulnerabilities-ec2-instance-metadata-service/
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

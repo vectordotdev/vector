@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-11"
 title: Install Vector via RPM
 sidebar_label: RPM
 description: Install Vector through the RPM package manager
@@ -270,5 +270,5 @@ Vector's RPM source files are located in
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [urls.rpm]: https://rpm.org/
 [urls.systemd]: https://systemd.io/
-[urls.vector_releases]: https://vector.dev/releases/latest
+[urls.vector_releases]: https://vector.dev/releases/latest/
 [urls.vector_rpm_source_files]: https://github.com/timberio/vector/tree/master/distribution/rpm

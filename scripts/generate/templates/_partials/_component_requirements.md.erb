@@ -1,6 +1,6 @@
 <%- permissions_list = component.permissions_list -%>
 <%- requirements = component.requirements -%>
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--warnings">
 
 <%- if requirements.aws_imds_v2 %>
 * [AWS IMDS v2][urls.aws_ec2_instance_metadata] is required. This is available by default on EC2.

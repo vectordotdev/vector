@@ -16,7 +16,7 @@
 }
 
 .integrations g.item:hover circle {
-  fill: var(--ifm-panel-background-active);
+  fill: var(--ifm-panel-background-color-active);
   stroke: var(--ifm-panel-border-color-active);
 }
 
@@ -36,7 +36,7 @@
 }
 
 .configuration__diagram svg #config-file-bg {
-  fill: var(--ifm-panel-background);
+  fill: var(--ifm-panel-background-color);
   stroke: var(--ifm-panel-border-color);
 }
 

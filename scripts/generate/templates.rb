@@ -219,7 +219,7 @@ class Templates
   def fetch_strategies(strategy_references)
     strategy_references.collect do |reference|
       name = reference.is_a?(Hash) ? reference.name : reference
-      strategy = metadata.installation.strategies.send(name)
+      strategy = metadata.installation.strategies.send(name).clone
       if reference.respond_to?(:source)
         strategy[:source] = reference.source
       end
@@ -275,11 +275,44 @@ class Templates
     render("#{partials_path}/_full_config_spec.toml", binding).strip.gsub(/ *$/, '')
   end
 
+  def highlights(highlights, author: true, group_by: "type", heading_depth: 3, size: nil, style: nil, timeline: true)
+    case group_by
+    when "type"
+      highlights.sort_by!(&:type)
+    when "version"
+      highlights.sort_by!(&:date)
+    else
+      raise ArgumentError.new("Invalid group_by value: #{group_by.inspect}")
+    end
+
+    highlight_maps =
+      highlights.collect do |highlight|
+        {
+          authorGithub: author ? highlight.author_github : nil,
+          dateString: "#{highlight.date}T00:00:00",
+          description: highlight.description,
+          permalink: highlight.permalink,
+          prNumbers: highlight.pr_numbers,
+          release: highlight.release,
+          style: highlight.breaking_change? ? "danger" : nil,
+          tags: highlight.tags,
+          title: highlight.title,
+          type: highlight.type
+        }
+      end
+
+    render("#{partials_path}/_highlights.md", binding).strip
+  end
+
   def installation_tutorial(interfaces, strategies, platform: nil, heading_depth: 3, show_deployment_strategy: true)
     render("#{partials_path}/_installation_tutorial.md", binding).strip
   end
 
   def interface_installation_tutorial(interface, sink: nil, source: nil, heading_depth: 3)
+    if !sink && !source
+      raise ArgumentError.new("You must supply at lease a source or sink")
+    end
+
     render("#{partials_path}/interface_installation_tutorial/_#{interface.name}.md", binding).strip
   end
 
@@ -482,6 +515,18 @@ class Templates
 
   def pluralize(count, word)
     count != 1 ? "#{count} #{word.pluralize}" : "#{count} #{word}"
+  end
+
+  def release_breaking_changes(release, heading_depth: 3)
+    render("#{partials_path}/_release_breaking_changes.md", binding).strip
+  end
+
+  def release_header(release)
+    render("#{partials_path}/_release_header.md", binding).strip
+  end
+
+  def release_highlights(release, heading_depth: 3)
+    render("#{partials_path}/_release_highlights.md", binding).strip
   end
 
   def release_summary(release)

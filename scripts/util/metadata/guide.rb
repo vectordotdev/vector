@@ -18,7 +18,7 @@ class Guide
     @author_github = front_matter["author_github"]
     @id = path.sub(GUIDES_ROOT, '').sub(/\.md$/, "")
     @path = Pathname.new(path).relative_path_from(ROOT_DIR).to_s
-    @permalink = "#{BLOG_HOST}/#{@id}"
+    @permalink = "#{GUIDES_BASE_PATH}/#{@id}/"
     @title = front_matter.fetch("title")
   end
 

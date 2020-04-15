@@ -1,11 +1,15 @@
+.pagination-nav .pagination-nav__item {
+  max-width: none;
+}
+
 .pagination-nav .pagination-nav__link {
-  background: var(--ifm-panel-background);
+  background-color: var(--ifm-panel-background-color);
   border-color: var(--ifm-panel-border-color);
   box-shadow: var(--ifm-panel-box-shadow);
   transition: border 250ms ease;
 }
 .pagination-nav .pagination-nav__link:hover {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-color-active);
   box-shadow: var(--ifm-panel-box-shadow-active);
   color: var(--ifm-panel-color-active);
 }
@@ -13,7 +17,7 @@
   color: var(--ifm-panel-color-active);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 540px) {
   .pagination-nav {
     display: block;
   }

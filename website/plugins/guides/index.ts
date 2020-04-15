@@ -8,7 +8,6 @@ import {
   GuideTags,
   GuideContent,
   TagsModule,
-  GuidePaginated,
   Guide,
 } from './types';
 import {
@@ -56,9 +55,14 @@ export default function pluginContentGuide(
       return [...globPattern];
     },
 
-    // Fetches guide contents and returns metadata for the necessary routes.
     async loadContent() {
       const {routeBasePath} = options;
+      const {siteConfig: {baseUrl = ''}} = context;
+      const basePageUrl = normalizeUrl([baseUrl, routeBasePath]);
+
+      //
+      // Guides
+      //
 
       guides = await generateGuides(contentPath, context, options);
       if (!guides.length) {
@@ -75,8 +79,7 @@ export default function pluginContentGuide(
           };
         }
 
-        const nextItem =
-          index < guides.length - 1 ? guides[index + 1] : null;
+        const nextItem = index < guides.length - 1 ? guides[index + 1] : null;
         if (nextItem) {
           guide.metadata.nextItem = {
             title: nextItem.metadata.title,
@@ -85,30 +88,10 @@ export default function pluginContentGuide(
         }
       });
 
-      // Guide pagination routes.
-      // Example: `/guides`
-      const totalCount = guides.length;
-      const {
-        siteConfig: {baseUrl = ''},
-      } = context;
-      const basePageUrl = normalizeUrl([baseUrl, routeBasePath]);
-
-      const guideListPaginated: GuidePaginated[] = [];
-
-      guideListPaginated.push({
-        metadata: {
-          permalink: basePageUrl,
-          page: 1,
-          guidesPerPage: 1,
-          totalPages: 1,
-          totalCount,
-          previousPage: basePageUrl,
-          nextPage: basePageUrl,
-        },
-        items: guides.filter(guide => guide.metadata.categories.length <= 2).map(item => item.id),
-      });
-
+      //
       // Guide tags
+      //
+
       const guideTags: GuideTags = {};
       const tagsPath = normalizeUrl([basePageUrl, 'tags']);
       guides.forEach(guide => {
@@ -146,19 +129,16 @@ export default function pluginContentGuide(
         });
       });
 
-      const guideTagsListPath =
-        Object.keys(guideTags).length > 0 ? tagsPath : null;
-
-
+      //
       // Guide categories
+      //
+
       let guideCategories = _.flatMap(guides, (guide => guide.metadata.categories));
       guideCategories = _.uniqBy(guideCategories, ((guideCategory) => guideCategory.permalink));
 
       return {
         guides,
-        guideListPaginated,
         guideTags,
-        guideTagsListPath,
         guideCategories,
       };
     },
@@ -174,6 +154,10 @@ export default function pluginContentGuide(
         return;
       }
 
+      //
+      // Prepare
+      //
+
       const {
         guideListComponent,
         guideComponent,
@@ -187,9 +171,7 @@ export default function pluginContentGuide(
       const {addRoute, createData} = actions;
       const {
         guides,
-        guideListPaginated,
         guideTags,
-        guideTagsListPath,
         guideCategories,
       } = guideContents;
 
@@ -198,45 +180,40 @@ export default function pluginContentGuide(
         guideItemsToMetadata[guide.id] = guide.metadata;
       });
 
-      // Guides list
-      await Promise.all(
-        guideListPaginated.map(async listPage => {
-          const {metadata, items} = listPage;
-          const {permalink} = metadata;
-          const pageMetadataPath = await createData(
-            `${docuHash(permalink)}.json`,
-            JSON.stringify(metadata, null, 2),
-          );
+      const {routeBasePath} = options;
+      const {siteConfig: {baseUrl = ''}} = context;
+      const basePageUrl = normalizeUrl([baseUrl, routeBasePath]);
 
-          addRoute({
-            path: permalink,
-            component: guideListComponent,
-            exact: true,
-            modules: {
-              items: items.map(guideID => {
-                const metadata = guideItemsToMetadata[guideID];
-                // To tell routes.js this is an import and not a nested object to recurse.
-                return {
-                  content: {
-                    __import: true,
-                    path: metadata.source,
-                    query: {
-                      truncated: true,
-                    },
-                  },
-                };
-              }),
-              metadata: aliasedSource(pageMetadataPath),
-            },
-          });
-        }),
-      );
+      //
+      // Guides
+      //
 
-      // Tags
-      if (guideTagsListPath === null) {
-        return;
-      }
+      addRoute({
+        path: basePageUrl,
+        component: guideListComponent,
+        exact: true,
+        modules: {
+          items: guides.filter(guide => guide.metadata.categories.length <= 2).map(guide => {
+            const metadata = guide.metadata;
+            // To tell routes.js this is an import and not a nested object to recurse.
+            return {
+              content: {
+                __import: true,
+                path: metadata.source,
+                query: {
+                  truncated: true,
+                },
+              },
+            };
+          }),
+        },
+      });
 
+      //
+      // Guide tags
+      //
+
+      const tagsPath = normalizeUrl([basePageUrl, 'tags']);
       const tagsModule: TagsModule = {};
 
       await Promise.all(
@@ -244,7 +221,7 @@ export default function pluginContentGuide(
           const {name, items, permalink} = guideTags[tag];
 
           tagsModule[tag] = {
-            allTagsPath: guideTagsListPath,
+            allTagsPath: tagsPath,
             slug: tag,
             name,
             count: items.length,
@@ -279,24 +256,24 @@ export default function pluginContentGuide(
         }),
       );
 
-      // Only create /tags page if there are tags.
-      if (Object.keys(guideTags).length > 0) {
-        const tagsListPath = await createData(
-          `${docuHash(`${guideTagsListPath}-tags`)}.json`,
-          JSON.stringify(tagsModule, null, 2),
-        );
+      const tagsListPath = await createData(
+        `${docuHash(`${tagsPath}-tags`)}.json`,
+        JSON.stringify(tagsModule, null, 2),
+      );
 
-        addRoute({
-          path: guideTagsListPath,
-          component: guideTagListComponent,
-          exact: true,
-          modules: {
-            tags: aliasedSource(tagsListPath),
-          },
-        });
-      }
+      addRoute({
+        path: tagsPath,
+        component: guideTagListComponent,
+        exact: true,
+        modules: {
+          tags: aliasedSource(tagsListPath),
+        },
+      });
 
+      //
       // Guide categories
+      //
+
       if (guideCategories.length > 0) {
         let guidePermalinks = _.uniq(guides.map(guide => guide.metadata.permalink));
 
@@ -338,7 +315,10 @@ export default function pluginContentGuide(
         );
       }
 
-      // Guide pages
+      //
+      // Guides
+      //
+
       await Promise.all(
         guides.map(async guide => {
           const {metadata} = guide;

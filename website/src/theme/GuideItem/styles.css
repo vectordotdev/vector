@@ -16,7 +16,7 @@
 }
 
 .guide-item > article {
-  background-color: var(--ifm-panel-background-solid);
+  background-color: var(--ifm-panel-background-color-solid);
   border-radius: 0.2em;
   height: 100%;
   position: relative;
@@ -123,7 +123,7 @@
 }
 
 .guide-item:hover > article {
-  background-image: linear-gradient(to right, var(--ifm-panel-background-solid), var(--ifm-panel-background-solid-light) );
+  background-image: linear-gradient(to right, var(--ifm-panel-background-color-solid), var(--ifm-panel-background-color-solid-light) );
   color: inherit;
 }
 
