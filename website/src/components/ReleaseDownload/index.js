@@ -148,7 +148,7 @@ function ReleaseDownload({version}) {
             <Tabs
               block={true}
               className="rounded"
-              defaultValue="stable"
+              defaultValue={version == 'nightly' ? 'nightly' : 'stable'}
               values={[
                 { label: `Stable`, value: 'stable', },
                 { label: 'Nightly', value: 'nightly', },
@@ -161,18 +161,27 @@ function ReleaseDownload({version}) {
                 options={releaseOptions}
                 isClearable={false}
                 placeholder="Select a version..."
-                value={releaseOptions.find(option => option.value == release.version)}
+                value={releaseOptions.find(option => release && option.value == release.version)}
                 onChange={(selectedOption) => setVersion(selectedOption ? selectedOption.value : null)} />
-              {release.version != releases[0].version && <Alert fill={true} type="danger">
+              {release && release.version != releases[0].version && <Alert fill={true} type="danger">
                 This is an outdated version. Outdated versions maybe contain bugs. It is recommended to use the latest version. Please proceed with caution.
               </Alert>}
-              <DownloadTable browsePath={release.version} date={release.date} downloads={latestDownloads} releaseNotesPath={`/releases/${release.version}/`} version={release.version} />
+              {release && <DownloadTable
+                browsePath={release.version}
+                date={release.date}
+                downloads={latestDownloads}
+                releaseNotesPath={`/releases/${release.version}/`}
+                version={release.version} />}
             </TabItem>
             <TabItem value="nightly">
               <Alert fill={true} type="warning">
                 Nightly versions contain bleeding edge changes that may contain bugs. Proceed with caution.
               </Alert>
-              <DownloadTable browsePath="nightly/latest" date={nightlyDate} downloads={nightlyDownloads} version="nightly" />
+              <DownloadTable
+                browsePath="nightly/latest"
+                date={nightlyDate}
+                downloads={nightlyDownloads}
+                version="nightly" />
             </TabItem>
             </Tabs>
           </div>

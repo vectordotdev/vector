@@ -269,3 +269,9 @@
   to = "/releases/latest/download/"
   status = 302
   force = true
+
+[[redirects]]
+  from = "/releases/nightly/"
+  to = "/releases/nightly/download/"
+  status = 301
+  force = true

@@ -71,7 +71,7 @@ function navLinkAttributes(label, right) {
         attrs.badgeStyle = 'primary';
       }
 
-      attrs.hideText = true;
+      attrs.hideText = right == true;
       attrs.icon = 'gift';
       return attrs;
 
