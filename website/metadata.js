@@ -3732,6 +3732,7 @@ module.exports = {
     "version": "0.8.2"
   },
   "post_tags": [
+    "type: announcement",
     "type: post",
     "domain: testing"
   ],
@@ -3744,7 +3745,7 @@ module.exports = {
       "path": "website/blog/2019-06-28-introducing-vector.md",
       "permalink": "/blog/introducing-vector/",
       "tags": [
-        "type: post"
+        "type: announcement"
       ],
       "title": "Introducing Vector"
     },
