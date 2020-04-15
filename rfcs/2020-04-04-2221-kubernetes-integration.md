@@ -638,7 +638,19 @@ While possible, this is outside of the scope of the initial integration.
 
 #### Custom CRDs
 
-TODO
+A much more involved feature than the one above would be making `Vector`
+configurable via [`Custom Resource Definition`][k8s_docs_crds].
+
+This feature is not considered for the initial integration with Kubernetes, and
+is not even explored, since it is a way more advanced level of integration that
+we can achieve in the short term in the near future.
+
+This section is here for completeness, and we would probably like to explore
+this in the future.
+
+This includes both adding the support for CRDs to Vector itself, and
+implementing an orchestrating component (such things are usually called
+[operators][k8s_docs_operator] in the k8s context, i.e. `vector-operator`).
 
 ### Changes to Vector release process
 
@@ -794,6 +806,8 @@ See [motivation](#motivation).
 [jsonlines]: http://jsonlines.org/
 [k8s_api_host_path_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#hostpathvolumesource-v1-core
 [k8s_doc_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
+[k8s_docs_crds]: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/
+[k8s_docs_operator]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
 [k8s_log_path_location_docs]: https://kubernetes.io/docs/concepts/cluster-administration/logging/#logging-at-the-node-level
 [k8s_src_build_container_logs_directory]: https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L173
 [k8s_src_parse_funcs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L116
