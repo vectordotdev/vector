@@ -583,7 +583,58 @@ In most scenarios it'd be a significant overhead, and can lead to cycles.
 
 #### Annotations and labels on vector pod via downward API
 
-TODO
+We might want to implement support for configuring Vector via annotations
+and/or labels in addition to the configuration files at the `ConfigMap`s.
+
+This actually should be a pretty easy thing to do with a [downward API]. It
+exposes pod data as files, so all we need is a slightly altered configuration
+loading procedure.
+
+This is how is would look like (very simplified):
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kubernetes-downwardapi-volume-example
+  annotations:
+    vector.dev/config: |
+      [sinks.aws_s3]
+      type = "aws_s3"
+      inputs = ["kubernetes"]
+      bucket = "my-bucket"
+      compression = "gzip"
+      region = "us-east-1"
+      key_prefix = "date=%F/"
+spec:
+  containers:
+    - name: vector
+      image: vector-image
+      command:
+        ["vector", "--k8s-downward-api-config", "/etc/podinfo/annotations"]
+      volumeMounts:
+        - name: podinfo
+          mountPath: /etc/podinfo
+  volumes:
+    - name: podinfo
+      downwardAPI:
+        items:
+          - path: "annotations"
+            fieldRef:
+              fieldPath: metadata.annotations
+```
+
+The `/etc/podinfo/annotations` file will look something like this:
+
+```
+kubernetes.io/config.seen="2020-04-15T13:35:27.290739039Z"
+kubernetes.io/config.source="api"
+vector.dev/config="[sinks.aws_s3]\ntype = \"aws_s3\"\ninputs = [\"kubernetes\"]\nbucket = \"my-bucket\"\ncompression = \"gzip\"\nregion = \"us-east-1\"\nkey_prefix = \"date=%F/\"\n"
+```
+
+It's quite trivial to extract the configration.
+
+While possible, this is outside of the scope of the initial integration.
 
 #### Custom CRDs
 
@@ -710,6 +761,7 @@ See [motivation](#motivation).
 [container_runtimes]: https://kubernetes.io/docs/setup/production-environment/container-runtimes/
 [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
 [daemonset]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
+[downward api]: https://kubernetes.io/docs/tasks/inject-data-application/downward-api-volume-expose-pod-information/#store-pod-fields
 [filebeat k8s integration]: https://www.elastic.co/guide/en/beats/filebeat/master/running-on-kubernetes.html
 [firecracker]: https://github.com/firecracker-microvm/firecracker
 [fluentbit k8s integration]: https://docs.fluentbit.io/manual/installation/kubernetes
