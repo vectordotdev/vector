@@ -697,6 +697,15 @@ implementing an orchestrating component (such things are usually called
 
 TODO
 
+### Testing
+
+TODO
+
+- integration tests are cluster-agnostic
+- at CI we test against `minikube` and against all versions from MSKV till the latest k8s
+- at test harness we run non-ephemeral "real" clusters and test against them (i.e. GCP GKE, AWS EKS, Azure K8s, DO K8s, RedHat OpenShift, Rancher, CoreOS Tekton, etc)
+- we integrate our unit tests into test harness in such a way that we can run them as correctness tests
+
 ## Prior Art
 
 1. [Filebeat k8s integration]
