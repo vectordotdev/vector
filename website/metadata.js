@@ -28,6 +28,15 @@ module.exports = {
           "title": "Managing Complex Configs"
         },
         {
+          "author_github": "https://github.com/hoverbear",
+          "description": null,
+          "id": "/advanced/schemas",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/schemas.md",
+          "series_position": null,
+          "title": "Managing Schemas in Vector"
+        },
+        {
           "author_github": "https://github.com/a-rodin",
           "description": null,
           "id": "/advanced/parsing-csv-logs-with-lua",

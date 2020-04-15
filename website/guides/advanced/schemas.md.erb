@@ -2,7 +2,7 @@
 $schema: "/.meta/.schemas/guides.json"
 title: Managing Schemas in Vector
 description: Learn how to manage log schemas with Vector.
-author_github: https://github.com/a-rodin
+author_github: https://github.com/hoverbear
 tags: ["type: guide", "domain: transforms", "transform: lua"]
 assumptions:
 - You understand the [basic Lua concepts][docs.reference.transforms.lua].
@@ -29,7 +29,7 @@ It may be that your data does not follow this convention. In this case you can m
 incoming data in the `log_schema` section of your `config.toml`.
 
 ```toml
-[log_schema]
+[log_schema] title="config.toml"
 host_key = "instance" # default "host"
 message_key = "info" # default "message"
 timestamp_key = "datetime" # default "timestamp"
@@ -49,7 +49,7 @@ Some services will produce logs with the timestamp field mapped to `@timestamp` 
 
 If your vector pipeline is only consuming data from these sources, you can add the following to your `config.toml`:
 
-```toml
+```toml title="config.toml"
 [log_schema]
   timestamp_key = "@timestamp"
 
@@ -73,7 +73,7 @@ Commonly you'll want to do this near either the source or sink of your pipeline.
 
 A transform of this type looks like this:
 
-```toml
+```toml title="config.toml"
 [transforms.strip_personal_details]
 type = "remove_fields"
 inputs = ["my-source-id"]
@@ -91,11 +91,12 @@ Let's pretend we have a nice well behaved application piping Vector logs like th
 { "id": "user3", "gdpr": true, "email": "eu-user3@timber.io" }
 ```
 
-In our theoretical product, we're expanding into the EU and want to comply with the GDPR. In our case, that means our application can't send EU user emails to our US based kafka.
+In our theoretical product, we're expanding into the EU and want to comply with the GDPR. In our case, that means our
+application can't send EU user data to our US based kafka.
 
 We can build a config that will do the first part of this, but we'll just output to console for ease of this example.
 
-```toml
+```toml title="config.toml"
 data_dir = "./data"
 dns_servers = []
 
@@ -168,7 +169,7 @@ The applications for this include some of the reasons discussed in
 
 Lets take a look at what that might look like:
 
-```toml
+```toml title="config.toml"
 [sinks.output]
   inputs = ["demo"]
   type = "kafka"
@@ -188,7 +189,7 @@ Lets take a look at what that might look like:
 It's fairly common for one part of your pipeline to expect a field to be named differently than another part! Vector can
 slide data around for you with the `rename_fields` transform.
 
-```toml
+```toml title="config.toml"
 [transforms.rename_timestamp]
   type = "rename_fields"
   inputs = ["source0"]
@@ -211,7 +212,7 @@ It's useful for when:
 Let's pretend one of your teammates falsely assumed folks always have first and last names, so we have a `first_name`
 and a `last_name` field coming from a source, and we'd like to output a `name` field to a sink.
 
-```toml
+```toml title="config.toml"
 [transforms.moosh_names]
   type = "add_fields"
   inputs = ["source0"]
@@ -236,7 +237,7 @@ should be a number, or vice versa.
 
 The [`coercer`][transform_coercer] transform is the correct tool for this job!
 
-```toml
+```toml title="config.toml"
 [transforms.correct_source_types]
   type = "coercer"
   inputs = ["source0"]
@@ -254,7 +255,7 @@ To do this we'll use `timestamp| $FORMAT`. To build a `$FORMAT`, we can referenc
 [`strftime`](https://docs.rs/chrono/0.4.10/chrono/format/strftime/index.html) documentation. Let's ship some Canadian
 friendly logs up to the great white north!
 
-```toml
+```toml title="config.toml"
 [transforms.format_timestamp]
   type = "coercer"
   types.timestamp = "timestamp|%Y/%m/%d:%H:%M:%S %z"
@@ -271,7 +272,7 @@ supported. In these cases, you can use the `encoding` option.
 The [`console`](/docs/reference/sinks/console/#encoding) sink supports both `json` and `text` as its
 output format
 
-```toml
+```toml title="config.toml"
 [sinks.print]
   type = "console"
   inputs = ["source0"]
@@ -289,7 +290,7 @@ You can also use a transform like [`json_parser`][transform_json_parser] or
 Instead of writing a custom filter or whitelist, you can reuse existing JSON schemas to validate or coerce data. Using
 the `json_parser` transform, specify an optional schema, and optionally specify coercion/filtering preferences.
 
-```toml
+```toml title="config.toml"
 [transforms.parse]
   inputs = ["application"]
   type = "json_parser"
@@ -300,7 +301,7 @@ the `json_parser` transform, specify an optional schema, and optionally specify 
 
 ### Example: AWS Glue
 
-```toml
+```toml title="config.toml"
 [transforms.parse]
   inputs = ["application"]
   type = "aws_glue"
