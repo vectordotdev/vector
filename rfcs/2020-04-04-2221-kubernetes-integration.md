@@ -349,7 +349,7 @@ we'll be using this by default, but we'll also allow configuring this to provide
 the flexibility users will expect.
 
 An alternative to `hostPath` volumes would be a user-provided
-[persistent volume][k8s_doc_persistent_volumes] of some kind. The only
+[persistent volume][k8s_docs_persistent_volumes] of some kind. The only
 requirement is that it has to have a `ReadWriteMany` access mode.
 
 #### Vector config files
@@ -858,9 +858,9 @@ See [motivation](#motivation).
 [jsonlines]: http://jsonlines.org/
 [k8s_api_config_map_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#configmapvolumesource-v1-core
 [k8s_api_host_path_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#hostpathvolumesource-v1-core
-[k8s_doc_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 [k8s_docs_crds]: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/
 [k8s_docs_operator]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
+[k8s_docs_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 [k8s_log_path_location_docs]: https://kubernetes.io/docs/concepts/cluster-administration/logging/#logging-at-the-node-level
 [k8s_src_build_container_logs_directory]: https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L173
 [k8s_src_parse_funcs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L116
