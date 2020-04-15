@@ -199,9 +199,9 @@ For example, behind the scenes of a `get` call, the Guest must allocate some mem
 Due to the current semantics of the `vector::Event` type, passing data between WASM modules and the Vector host involves
 serialization to JSON. We're investigating ways to speed this up.
 
- * It may be possible to add a `repr(C)` flag to Event.
- * It may be worthwhile to explore an `Event` refactor.
- * Other serialization options may be much faster but less compatible.
+* It may be possible to add a `repr(C)` flag to Event.
+* It may be worthwhile to explore an `Event` refactor.
+* Other serialization options may be much faster but less compatible.
 
 
 ### Initialization
@@ -448,13 +448,13 @@ Since this is a broad reaching feature with a number of green sky ideas, we shou
 We should support modules so broadly?
 
 * As sinks? For this we should consider how we handle batching, partitioning, etc, more.
-  - **Temporary Conclusion:** Held off on deciding. Some interest.
+  * **Temporary Conclusion:** Held off on deciding. Some interest.
 * As sources? This requires thinking about how we can do event sourcing.
-  - **Temporary Conclusion:** Held off on deciding. Some interest.
+  * **Temporary Conclusion:** Held off on deciding. Some interest.
 * What about the idea of codecs being separate?
-  - **Temporary Conclusion:** Held off on deciding. Some interest.
+  * **Temporary Conclusion:** Held off on deciding. Some interest.
 * This RFC makes some provisions for a future Event refactor, is it possible that this might happen?
-  - **Temporary Conclusion:** Held off on deciding. Some interest.
+  * **Temporary Conclusion:** Held off on deciding. Some interest.
 
 
 ### Consider supporting a blessed compiler
@@ -486,7 +486,7 @@ We should also consider if we want to change how we handle codecs, since it is l
 include wanting to add codec support to already existing sources.
 
 **Temporary Conclusion:** We will adopt hostcalls for the time being to allow for a minimal POC. We would like to
-investigate these choices later, and we will make a decision before stabilizing WASM modules.
+investigate these choices lat er, and we will make a decision before stabilizing WASM modules.
 
 
 ### Consider Packaging Approach
@@ -525,14 +525,14 @@ Platform support:
 * [ ] Linux (ARMv7) (Likely never)
 * [ ] Linux (Aarch64) (Probably coming, ARM contributing)
 * [ ] Mac (x86_64)
-  + https://github.com/bytecodealliance/lucet/pull/437
+  * https://github.com/bytecodealliance/lucet/pull/437
 * [ ] Windows (x86_64)
-  + https://github.com/bytecodealliance/wasmtime/pull/1216
-  + https://github.com/bytecodealliance/lucet/issues/442
-  + https://github.com/bytecodealliance/lucet/pull/437
+  * https://github.com/bytecodealliance/wasmtime/pull/1216
+  * https://github.com/bytecodealliance/lucet/issues/442
+  * https://github.com/bytecodealliance/lucet/pull/437
 * [ ] FreeBSD (x86_64)
-  + https://github.com/bytecodealliance/lucet/pull/419
-  + https://github.com/bytecodealliance/lucet/pull/437
+  * https://github.com/bytecodealliance/lucet/pull/419
+  * https://github.com/bytecodealliance/lucet/pull/437
 
 **Temporary Conclusion:** The Lucet team desires to support other platforms in the near future. Since the lion's share
 of Vector usage is on X86_64 Linux, and this platform is already supported, we decided to adopt Lucet for now. We could
@@ -543,17 +543,17 @@ consider adopting `wasmtime` in the future if lucet does not eventually reach it
 
 Incremental steps that execute this change.
 
-- v0.1: (Done) This draft forms the groundwork for this RFC, and demos a POC of how a theoretical user could use this
+* v0.1: (Done) This draft forms the groundwork for this RFC, and demos a POC of how a theoretical user could use this
   for a protobuf decoding transform, and permitting the first `wasm` transform test to pass.
-- v0.2: The POC of the initial transform has it's v1
-- v0.3: We have benchmarks of the initial transform POC.
-- v0.4: Compile artifact caching is implemented, so Vector doesn't unnecessarily recompile wasm modules.
-- v0.5: Guest API expanded to support majority of Event API.
-- v0.6: We talk to a couple known users who would be interested in this feature and let them test it out.
-- v0.7: This RFC is amended to include Sinks and Sources information.
-- v0.8: This RFC is amended to include information about possible codec changes.
-- v0.9: Source and Sink implementation POCs made.
-- v0.10: Final APIs specced and tested. Source, Sink, Transform POCs are in tree and running as tests/benches.
-- v1.0: This RFC is complete and we announce with the above guide.
+* v0.2: The POC of the initial transform has it's v1
+* v0.3: We have benchmarks of the initial transform POC.
+* v0.4: Compile artifact caching is implemented, so Vector doesn't unnecessarily recompile wasm modules.
+* v0.5: Guest API expanded to support majority of Event API.
+* v0.6: We talk to a couple known users who would be interested in this feature and let them test it out.
+* v0.7: This RFC is amended to include Sinks and Sources information.
+* v0.8: This RFC is amended to include information about possible codec changes.
+* v0.9: Source and Sink implementation POCs made.
+* v0.10: Final APIs specced and tested. Source, Sink, Transform POCs are in tree and running as tests/benches.
+* v1.0: This RFC is complete and we announce with the above guide.
 
 Note: This can be filled out during the review process.
