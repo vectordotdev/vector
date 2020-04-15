@@ -30,20 +30,6 @@ field name via the \
 the source-level `timestamp_key` option for relevant sources.
 """
 
-[data_model.log.schema.source]
-type = "string"
-examples = ["/var/log/myapp/logfile.log", "197.23.0.8", "/api/v1/pods/some-name"]
-required = true
-description = """\
-The source from which the log originated. This is a specific source that is \
-chosen and set by each [Vector source][docs.sources]. For example, this the \
-[`file` source][docs.sources.file] sets this to the file name, and the \
-[`docker` source][docs.sources.docker] sets this to the container name. Change \
-this field name via the \
-[global `source_key` option][docs.reference.global-options#source_key] or the \
-source-level `source_key` option for relevant sources.
-"""
-
 [data_model.log.schema.source_type]
 type = "string"
 examples = ["file", "socket", "http", "kubernetes"]
