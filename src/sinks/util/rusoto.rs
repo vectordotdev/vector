@@ -69,7 +69,7 @@ impl AwsCredentialsProvider {
             // is 10 seconds.
             chain.set_timeout(Duration::from_secs(8));
 
-            let creds = AutoRefreshingProvider::new(chain)?;
+            let creds = AutoRefreshingProvider::new(chain).context(InvalidAWSCredentials)?;
 
             Ok(Self::Default(creds))
         }
