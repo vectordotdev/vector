@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-11"
 title: Install Vector via DPKG
 sidebar_label: DPKG
 description: Install Vector through the DKG package manager
@@ -314,4 +314,4 @@ Vector's DPKG source files are located in
 [urls.dpkg]: https://wiki.debian.org/dpkg
 [urls.systemd]: https://systemd.io/
 [urls.vector_debian_source_files]: https://github.com/timberio/vector/tree/master/distribution/debian
-[urls.vector_releases]: https://vector.dev/releases/latest
+[urls.vector_releases]: https://vector.dev/releases/latest/

@@ -25,7 +25,7 @@ function Contact() {
           <div className="container">
             <div className="row">
               <div className="col">
-                <a href="mailto:hi@timber.io" className="panel panel--link text--center">
+                <a href="mailto:hi@timber.io" className="panel text--center">
                   <div className="panel--icon">
                     <i className="feather icon-mail"></i>
                   </div>
@@ -34,7 +34,7 @@ function Contact() {
                 </a>
               </div>
               <div className="col">
-                <a href="https://twitter.com/vectordotdev" target="_blank" className="panel panel--link text--center">
+                <a href="https://twitter.com/vectordotdev" target="_blank" className="panel text--center">
                   <div className="panel--icon">
                     <i className="feather icon-twitter"></i>
                   </div>
@@ -45,7 +45,7 @@ function Contact() {
                 </a>
               </div>
               <div className="col">
-                <a href="https://chat.vector.dev" target="_blank" className="panel panel--link text--center">
+                <a href="https://chat.vector.dev" target="_blank" className="panel text--center">
                   <div className="panel--icon">
                     <i className="feather icon-message-circle"></i>
                   </div>

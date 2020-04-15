@@ -58,6 +58,10 @@ impl TcpSource for RawTcpSource {
         let byte_size = frame.len();
         let mut event = Event::from(frame);
 
+        event
+            .as_mut_log()
+            .insert(event::log_schema().source_type_key(), "socket");
+
         let host_key = if let Some(key) = &self.config.host_key {
             key
         } else {

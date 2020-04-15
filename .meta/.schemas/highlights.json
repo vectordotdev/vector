@@ -1,0 +1,73 @@
+{
+  "$id": "https://raw.githubusercontent.com/timberio/vector/master/.meta/schemas/highlights.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Vector Highlights Front Matter Schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "author_github",
+    "description",
+    "importance",
+    "last_modified_on",
+    "pr_numbers",
+    "tags",
+    "title"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The path to this schema.",
+      "enum": ["/.meta/.schemas/highlights.json"]
+    },
+    "author_github": {
+      "type": "string",
+      "description": "Github URL of the author."
+    },
+    "description": {
+      "type": "string",
+      "description": "Short single-line description"
+    },
+    "draft": {
+      "type": "boolean",
+      "description": "Draft mode ensure this guide is not included in releases."
+    },
+    "hide_pagination": {
+      "type": "boolean",
+      "description": "Hides the pagination nav"
+    },
+    "importance": {
+      "type": "string",
+      "description": "The importance level of this highlight. low = only listed on /highlights, m & l = listed in release announcements",
+      "enum": ["low", "medium", "high"]
+    },
+    "last_modified_on": {
+      "type": "string",
+      "description": "When the guide was last modified."
+    },
+    "pr_numbers": {
+      "type": "array",
+      "description": "List of pull request numbers relevant to this highlight.",
+      "items": {
+        "type": "int"
+      }
+    },
+    "release": {
+      "type": "string",
+      "description": "The release/version number this highlight is included in.",
+      "enum": ["nightly","0.4.0","0.5.0","0.6.0","0.7.0","0.7.1","0.7.2","0.8.0","0.8.1","0.8.2"]
+    },
+    "tags": {
+      "type": "array",
+      "description": "Array of tags",
+      "items": {
+        "type": "string",
+        "enum": ["sink: tcp","source: tcp","source: udp","type: announcement","type: enhancement","type: new feature","type: performance","type: breaking change","domain: buffers","domain: cli","domain: config","domain: dependencies","domain: networking","domain: observability","domain: operations","domain: platforms","domain: security","domain: sinks","domain: sources","domain: tests","domain: topology","domain: transforms","domain: ux","domain: website","event type: log","event type: metric","platform: arm64","platform: armv7","platform: amazon-linux","platform: centos","platform: debian","platform: docker","platform: dpkg","platform: homebrew","platform: macos","platform: msi","platform: nix","platform: nixos","platform: raspbian","platform: rhel","platform: rpm","platform: ubuntu","platform: windows","platform: x86_64","provider: aws","provider: confluent","provider: heroku","provider: splunk","provider: yandex","provider: datadog","provider: elastic","provider: gcp","provider: honeycomb","provider: humio","provider: influxdata","provider: logdna","provider: grafana","provider: new relic","provider: papertrail","provider: sematext","source: docker","source: file","source: http","source: journald","source: kafka","source: logplex","source: prometheus","source: socket","source: splunk_hec","source: statsd","source: stdin","source: syslog","source: vector","source: kubernetes","transform: add_fields","transform: add_tags","transform: ansi_stripper","transform: aws_ec2_metadata","transform: coercer","transform: concat","transform: dedupe","transform: filter","transform: geoip","transform: grok_parser","transform: json_parser","transform: kubernetes_pod_metadata","transform: log_to_metric","transform: logfmt_parser","transform: lua","transform: merge","transform: regex_parser","transform: remove_fields","transform: remove_tags","transform: rename_fields","transform: sampler","transform: split","transform: swimlanes","transform: tag_cardinality_limit","transform: tokenizer","sink: aws_cloudwatch_logs","sink: aws_cloudwatch_metrics","sink: aws_kinesis_firehose","sink: aws_kinesis_streams","sink: aws_s3","sink: blackhole","sink: clickhouse","sink: console","sink: datadog_logs","sink: datadog_metrics","sink: elasticsearch","sink: file","sink: gcp_cloud_storage","sink: gcp_pubsub","sink: gcp_stackdriver_logs","sink: honeycomb","sink: http","sink: humio_logs","sink: influxdb_metrics","sink: kafka","sink: logdna","sink: loki","sink: new_relic_logs","sink: papertrail","sink: prometheus","sink: pulsar","sink: sematext_logs","sink: socket","sink: splunk_hec","sink: statsd","sink: vector"]
+      }
+    },
+    "title": {
+      "type": "string",
+      "description": "Title of the guide."
+    }
+  }
+}

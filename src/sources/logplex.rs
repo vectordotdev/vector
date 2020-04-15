@@ -121,7 +121,7 @@ fn body_to_events(body: FullBody) -> Vec<Event> {
 fn line_to_event(line: String) -> Event {
     let parts = line.splitn(8, ' ').collect::<Vec<&str>>();
 
-    if parts.len() == 8 {
+    let mut event = if parts.len() == 8 {
         let timestamp = parts[2];
         let hostname = parts[3];
         let app_name = parts[4];
@@ -147,7 +147,14 @@ fn line_to_event(line: String) -> Event {
             fields = parts.len()
         );
         Event::from(line)
-    }
+    };
+
+    // Add source type
+    event
+        .as_mut_log()
+        .try_insert(event::log_schema().source_type_key(), "logplex");
+
+    event
 }
 
 #[cfg(test)]
@@ -222,6 +229,7 @@ mod tests {
                 .into()
         );
         assert_eq!(log[&event::log_schema().host_key()], "host".into());
+        assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -242,6 +250,7 @@ mod tests {
                 .into()
         );
         assert_eq!(log[&event::log_schema().host_key()], "host".into());
+        assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -255,6 +264,7 @@ mod tests {
             "what am i doing here".into()
         );
         assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+        assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -275,5 +285,6 @@ mod tests {
                 .into()
         );
         assert_eq!(log[&event::log_schema().host_key()], "host".into());
+        assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
     }
 }

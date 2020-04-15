@@ -6,6 +6,14 @@ pub fn insert(fields: &mut BTreeMap<String, Value>, path: &str, value: Value) ->
     map_insert(fields, PathIter::new(path).peekable(), value)
 }
 
+pub fn insert_path(
+    fields: &mut BTreeMap<String, Value>,
+    path: Vec<PathComponent>,
+    value: Value,
+) -> Option<Value> {
+    map_insert(fields, path.into_iter().peekable(), value)
+}
+
 fn map_insert<I>(
     fields: &mut BTreeMap<String, Value>,
     mut path_iter: Peekable<I>,

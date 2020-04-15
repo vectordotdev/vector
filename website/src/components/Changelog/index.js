@@ -1,15 +1,22 @@
 import React, {useState} from 'react';
 
 import CheckboxList from '@site/src/components/CheckboxList';
+import Empty from '@site/src/components/Empty';
 import Heading from '@theme/Heading';
 import Link from '@docusaurus/Link';
+import RadioList from '@site/src/components/RadioList';
+import Select from 'react-select';
 
 import _ from 'lodash';
+import classnames from 'classnames';
 import {commitTypeName, sortCommitTypes} from '@site/src/exports/commits';
 import pluralize from 'pluralize';
+import styles from './styles.module.css';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 const AnchoredH3 = Heading('h3');
 const AnchoredH4 = Heading('h4');
+const DEFAULT_TYPES = ['enhancement', 'feat', 'fix', 'perf'];
 
 function Commit({commit, setSearchTerm}) {
   return (
@@ -37,11 +44,11 @@ function Commits({commits, groupBy, setSearchTerm}) {
     const groupKeys = sortCommitTypes(Object.keys(groupedCommits));
 
     return(
-      <ul className="connected-list">
+      <ul className="connected-list connected-list--clean">
         {groupKeys.map((groupKey, catIdx) => (
           <li key={catIdx}>
             <AnchoredH3 id={groupKey}>{pluralize(commitTypeName(groupKey), groupedCommits[groupKey].length, true)}</AnchoredH3>
-            <ul className="connected-list connected-list--compact connected-list--hover">
+            <ul className="connected-list connected-list--compact connected-list--blend connected-list--hover">
               {groupedCommits[groupKey].map((commit, commitIdx) => (
                 <Commit key={commitIdx} commit={commit} setSearchTerm={setSearchTerm} />
               ))}
@@ -59,14 +66,47 @@ function Commits({commits, groupBy, setSearchTerm}) {
   }
 }
 
-function Changelog(props) {
-  const {commits} = props;
+function Changelog({version}) {
+  const context = useDocusaurusContext();
+  const {siteConfig = {}} = context;
+  const {metadata: {releases}} = siteConfig.customFields;
+  const commits = _.flatMap(releases, (release => (
+    release.commits.map(commit => {
+      commit.version = release.version;
+      return commit
+    })
+  )));
+
+  //
+  // State
+  //
 
   const [groupBy, setGroupBy] = useState('type');
-  const [onlyTypes, setOnlyTypes] = useState(new Set(['enhancement', 'feat', 'fix', 'perf']));
+  const [onlyTypes, setOnlyTypes] = useState(new Set(DEFAULT_TYPES));
   const [searchTerm, setSearchTerm] = useState(null);
+  const [onlyversion, setVersion] = useState(version);
 
-  let filteredCommits = commits.slice(0);
+  //
+  // Base commits
+  //
+
+  let baseCommits = commits.slice(0);
+
+  if (onlyversion) {
+    baseCommits = baseCommits.filter(commit => (
+      commit.version == onlyversion
+    ));
+  }
+
+  //
+  // Filtered commits
+  //
+
+  let filteredCommits = baseCommits;
+
+  if (onlyTypes.size > 0) {
+    filteredCommits = filteredCommits.filter(commit => onlyTypes.has(commit.type) );
+  }
 
   if (searchTerm) {
     filteredCommits = filteredCommits.filter(commit => (
@@ -74,12 +114,10 @@ function Changelog(props) {
     ));
   }
 
-  if (onlyTypes.size > 0) {
-    filteredCommits = filteredCommits.filter(commit => onlyTypes.has(commit.type) );
-
-    if (onlyTypes.has("breaking change")) {
-      filteredCommits = filteredCommits.filter(commit => commit.breaking_change );
-    }
+  if (onlyversion) {
+    filteredCommits = filteredCommits.filter(commit => (
+      commit.version == onlyversion
+    ));
   }
 
   //
@@ -88,7 +126,7 @@ function Changelog(props) {
 
   const types = new Set(
     _(commits).
-      map(commit => commit.group).
+      map(commit => commit.type).
       uniq().
       compact().
       sort().
@@ -100,20 +138,21 @@ function Changelog(props) {
 
   return (
     <div>
-      {commits.length > 1 ?
-        (<div className="filters">
+      {baseCommits.length > 5 ?
+        (<div className="filters filters--narrow">
           <div className="search">
             <span className="search--result-count">{filteredCommits.length} items</span>
             <input
               type="text"
               onChange={(event) => setSearchTerm(event.currentTarget.value)}
-              placeholder="🔍 Search..."
-              className="input--text"
+              placeholder="🔍 Search by type, component name, or title..."
+              className="input--text input--lg"
               value={searchTerm || ''} />
           </div>
           <div className="filter">
             <div className="filter--choices">
               <CheckboxList
+                name="type"
                 values={types}
                 currentState={onlyTypes}
                 setState={setOnlyTypes} />
@@ -122,11 +161,12 @@ function Changelog(props) {
         </div>) :
         null}
       {filteredCommits.length > 0 ?
-        <Commits commits={filteredCommits} groupBy={groupBy} setSearchTerm={setSearchTerm} types={types} /> :
-        <div className="empty">
-          <div className="icon">☹</div>
-          <div>No commits found</div>
-        </div>}
+        <Commits
+          commits={filteredCommits}
+          groupBy={groupBy}
+          setSearchTerm={setSearchTerm}
+          types={types} /> :
+        <Empty text="no commits found" />}
     </div>
   );
 }

@@ -63,7 +63,7 @@
   }
 
   .guide-list .mailing-list {
-    background: var(--ifm-panel-background);
+    background-color: var(--ifm-panel-background-color);
     border: 1px solid var(--ifm-panel-border-color);
     border-radius: var(--ifm-global-radius);
     box-shadow: var(--ifm-panel-box-shadow);

@@ -4,45 +4,82 @@ require_relative "../../util/version"
 class Release
   include Comparable
 
-  attr_reader :commits,
-    :subtitle,
+  attr_reader :codename,
+    :commits,
     :description,
     :date,
-    :last_date,
-    :last_version,
-    :posts,
     :highlights,
-    :upgrade_guides,
+    :last_version,
+    :permalink,
     :version
 
-  def initialize(release_hash, last_version, last_date, all_posts)
-    @last_date = last_date
-    @last_version = last_version
-    @date = release_hash.fetch("date").to_date
-    @subtitle = release_hash["subtitle"] || ""
+  def initialize(release_hash, last_version, all_highlights)
+    @codename = release_hash["codename"] || ""
     @description = release_hash["description"] || ""
-
-    @posts =
-      all_posts.select do |p|
-        last_date && p.date > last_date && p.date <= @date && p.type?("announcement")
-      end
-
-    @highlights =
-      (release_hash["highlights"] || []).collect do |highlight_hash|
-        OpenStruct.new(highlight_hash)
-      end
-
-    @upgrade_guides =
-      (release_hash["upgrade_guides"] || []).collect do |guide_hash|
-        OpenStruct.new(guide_hash)
-      end
-
+    @date = release_hash.fetch("date").to_date
+    @last_version = last_version
     @version = Version.new(release_hash.fetch("version"))
+    @permalink = "#{RELEASES_BASE_PATH}/#{@version}/"
+
+    # commits
 
     @commits =
       release_hash.fetch("commits").collect do |commit_hash|
         Commit.new(commit_hash)
       end
+
+    # highlights
+
+    @highlights =
+      all_highlights.select do |h|
+        h.release == version.to_s
+      end
+
+    # requirements
+
+    @commits.each do |commit|
+      if commit.breaking_change?
+        if !@highlights.any? { |h| h.type?("breaking change") && h.pr_numbers.include?(commit.pr_number) }
+          tags = ["type: breaking change"]
+
+          if commit.component_type
+            tags << "domain: #{commit.component_type.pluralize}"
+          end
+
+          if commit.component_type && commit.component_name
+            tags << "#{commit.component_type}: #{commit.component_name}"
+          end
+
+          raise ArgumentError.new(
+            <<~EOF
+            Release #{@version} contains breaking commits without an breaking change!
+
+              * Commiit #{commit.sha_short} - #{commit.description}
+
+            Please add the following breaking change at:
+
+              website/highlights/#{commit.date.to_date.to_s}-#{commit.description.parameterize}.md
+
+            With the following content:
+
+            ---
+            $schema: "/.meta/.schemas/highlights.json"
+            title: "#{commit.description}"
+            description: "<fill-in>"
+            author_github: "<fill-in>"
+            importance: "medium"
+            pr_numbers: [#{commit.pr_number}]
+            release: "#{@version}"
+            tags: #{tags.to_json}
+            ---
+
+            <fill-in>
+
+            EOF
+          )
+        end
+      end
+    end
   end
 
   def <=>(other)
@@ -129,21 +166,25 @@ class Release
     type == "pre"
   end
 
+  def title
+    @title ||= "Vector v#{version}"
+  end
+
   def to_h
     {
+      codename: codename,
       commits: commits.deep_to_h,
-      subtitle: subtitle,
       description: description,
       compare_url: compare_url,
       deletions_count: deletions_count,
       date: date,
       insertions_count: insertions_count,
       last_version: last_version,
-      posts: posts.deep_to_h,
+      permalink: permalink,
       highlights: highlights.deep_to_h,
+      title: title,
       type: type,
       type_url: type_url,
-      upgrade_guides: upgrade_guides.deep_to_h,
       version: version,
     }
   end

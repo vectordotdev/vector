@@ -9,7 +9,7 @@
 # ------------------------------------------------------------------------------
 # Website: https://vector.dev
 # Docs: https://vector.dev/docs/
-# Community: https://vector.dev/community
+# Community: https://vector.dev/community/
 # ------------------------------------------------------------------------------
 # The file contains a full specification for the `vector.toml` configuration
 # file. It follows the TOML format and includes all options, types, and

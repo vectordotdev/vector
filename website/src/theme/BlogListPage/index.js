@@ -2,9 +2,9 @@ import React from 'react';
 
 import BlogPostItem from '@theme/BlogPostItem';
 import BlogListPaginator from '@theme/BlogListPaginator';
+import CTA from '@site/src/components/CTA';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
-import MailingListForm from '@site/src/components/MailingListForm';
 
 import {enrichTags} from '@site/src/exports/tags';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
@@ -33,23 +33,12 @@ function BlogListPage(props) {
           <h1>The Vector Blog</h1>
           <p>Thoughts on monitoring and observability from the <Link to="/community/#team">Vector & Timber.io team</Link>.</p>
 
-          <h3>Types</h3>
+          <div className="margin-vert--lg">
+            <CTA github={false} size="s" inline={true} style="highlight" />
+          </div>
 
-          <ul className="filters unstyled">
-            {typeTags.map((tag, idx) => (
-              <li key={idx}><Link to={tag.permalink + '/'} className="badge badge--rounded badge--pink">{tag.value}</Link></li>
-            ))}
-          </ul>
-
-          <h3>Domains</h3>
-
-          <ul className="filters unstyled">
-            {domainTags.map((tag, idx) => (
-              <li key={idx}><Link to={tag.permalink + '/'} className="badge badge--rounded badge--blue">{tag.value}</Link></li>
-            ))}
-          </ul>
-
-          <MailingListForm block={true} buttonClass="highlight" />
+          <p className="margin-vert--sm">Looking for product updates &amp; announcements?</p>
+          <p><Link to="/highlights/"><i className="feather icon-gift"></i> Check out the highlights section</Link></p>
         </div>
         <div className="blog-list--items">
           {items.map(({content: BlogPostContent}) => (

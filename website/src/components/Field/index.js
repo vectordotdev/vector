@@ -123,8 +123,6 @@ function Values({values}) {
 
   values.forEach(value => elements.push(<Value value={value} />));
 
-  console.log(elements)
-
   return elements;
 }
 
@@ -196,7 +194,7 @@ function Field({children, common, defaultValue, enumValues, examples, groups, na
   }
 
   return (
-    <li className={classnames('field', 'section', (required ? 'field-required' : ''), (collapse ? 'field-collapsed' : ''))} required={required}>
+    <li className={classnames({'field-required': required, 'field-collapsed': collapse})} required={required}>
       <div className="badges">
         {groups && groups.map((group, idx) => <span key={idx} className="badge badge--secondary">{group}</span>)}
         {templateable && <span className="badge badge--primary with-info-icon" title="This option is dynamic and accepts the Vector template syntax">templateable</span>}

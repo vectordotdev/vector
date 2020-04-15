@@ -314,7 +314,6 @@ jobs:
           name: Build archive and .deb package
           no_output_timeout: 30m
           environment:
-            PASS_RUST_LTO: "lto"
             PASS_FEATURES: "default-musl"
           command: |
             ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive package-deb
@@ -332,7 +331,6 @@ jobs:
           name: Build archive and .deb package
           no_output_timeout: 30m
           environment:
-            PASS_RUST_LTO: "lto"
             PASS_FEATURES: "default-musl"
             DOCKER_PRIVILEGED: "true"
           command: |
@@ -351,7 +349,6 @@ jobs:
           name: Build archive and .deb package
           no_output_timeout: 30m
           environment:
-            PASS_RUST_LTO: "lto"
             PASS_FEATURES: "default-musl"
             DOCKER_PRIVILEGED: "true"
           command: |

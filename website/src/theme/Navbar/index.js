@@ -8,6 +8,7 @@ import SVG from 'react-inlinesvg';
 import Toggle from '@theme/Toggle';
 
 import classnames from 'classnames';
+import {fetchNewHighlight} from '@site/src/exports/newHighlight';
 import {fetchNewPost} from '@site/src/exports/newPost';
 import {fetchNewRelease} from '@site/src/exports/newRelease';
 import useBaseUrl from '@docusaurus/useBaseUrl';
@@ -62,6 +63,18 @@ function navLinkAttributes(label, right) {
       attrs.icon = 'github';
       return attrs;
 
+    case 'highlights':
+      const newHighlight = fetchNewHighlight();
+
+      if (newHighlight) {
+        attrs.badge = 'new';
+        attrs.badgeStyle = 'primary';
+      }
+
+      attrs.hideText = right == true;
+      attrs.icon = 'gift';
+      return attrs;
+
     default:
       return attrs;
   };
@@ -73,7 +86,13 @@ function NavLink({href, hideIcon, label, onClick, position, right, to}) {
 
   return (
     <Link
-      className={classnames("navbar__item navbar__link", attributes.className)}
+      className={classnames(
+        "navbar__item navbar__link",
+        attributes.className,
+        {
+          'navbar__item__icon_only': attributes.hideText
+        }
+      )}
       title={attributes.hideText ? label : null}
       onClick={onClick}
       {...(href

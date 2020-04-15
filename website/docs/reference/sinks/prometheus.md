@@ -34,7 +34,7 @@ The Vector `prometheus` sink
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--warnings">
 
 * [Prometheus][urls.prometheus] version `>= 1.0` is required.
 
