@@ -668,6 +668,7 @@ TODO
    deployment strategies and topologies. There are likely some very useful
    and interesting tactics in their approach though.
 1. [Influx Helm charts]
+1. [Awesome Operators List] - an "awesome list" of operators.
 
 ## Sales Pitch
 
@@ -767,6 +768,7 @@ See [motivation](#motivation).
 [anchor_file_locations]: #file-locations
 [anchor_helm_vs_raw_yaml_files]: #helm-vs-raw-yaml-files
 [anchor_minimal_supported_kubernetes_version]: #minimal-supported-kubernetes-version
+[awesome operators list]: https://github.com/operator-framework/awesome-operators
 [bonzai logging operator]: https://github.com/banzaicloud/logging-operator
 [chartmuseum]: https://chartmuseum.com/
 [configmap_updates]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
