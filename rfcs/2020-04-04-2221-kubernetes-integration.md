@@ -804,6 +804,9 @@ See [motivation](#motivation).
     - [ ] Merge split logs. See [pr#2134].
 - [ ] Audit and improve the `kubernetes_pod_matadata` transform.
   - [ ] Use the `log_schema.kubernetes_key` setting. See [issue#1867].
+- [ ] Add a way to load optional config files (i.e. load config file if it
+      exists, and ignore it if it doesn't). Required to elegantly load multiple
+      files so that we can split the configuration.
 - [ ] Ensure our config reload strategy is solid.
   - [ ] Don't exit when there are configuration errors. See [issue#1816].
   - [ ] Test this. See [issue#2224].
