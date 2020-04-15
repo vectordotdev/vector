@@ -107,7 +107,7 @@ openssl = "0.10.26"
 openssl-probe = "0.1.2"
 string_cache = "0.7.3"
 flate2 = "1.0.6"
-structopt = "0.2.16"
+structopt = "0.3.13"
 indexmap = {version = "1.0.2", features = ["serde-1"]}
 http = "0.1.14"
 http02 = { package = "http", version = "0.2" }
