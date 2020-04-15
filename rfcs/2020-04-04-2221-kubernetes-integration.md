@@ -374,8 +374,8 @@ Vector supports multiple configuration files, and we can rely on that to ship
 a config file with the common configuration part in of our YAML / Helm suite,
 and let users keep their custom config part in a separate file.
 
-We will then mount two `ConfigMap`s into a container, and start Vector in
-multiple configuration files mode
+We will then [mount][k8s_api_config_map_volume_source] two `ConfigMap`s into a
+container, and start Vector in multiple configuration files mode
 (`vector --config .../common.toml --config .../custom.toml`).
 
 #### Vector config file reloads
@@ -856,6 +856,7 @@ See [motivation](#motivation).
 [issue#2225]: https://github.com/timberio/vector/issues/2225
 [json file logging driver]: https://docs.docker.com/config/containers/logging/json-file/
 [jsonlines]: http://jsonlines.org/
+[k8s_api_config_map_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#configmapvolumesource-v1-core
 [k8s_api_host_path_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#hostpathvolumesource-v1-core
 [k8s_doc_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 [k8s_docs_crds]: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/
