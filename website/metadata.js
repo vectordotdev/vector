@@ -65,6 +65,15 @@ module.exports = {
       "description": "Take Vector from zero to production in under 10 minutes.",
       "guides": [
         {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/getting-started/deploying",
+          "last_modified_on": null,
+          "path": "website/guides/getting-started/deploying.md",
+          "series_position": null,
+          "title": "Deploying Vector"
+        },
+        {
           "author_github": "https://github.com/Jeffail",
           "description": null,
           "id": "/getting-started/your-first-pipeline",
