@@ -452,6 +452,16 @@ it that wouldn't be covered by `kubernetes` source.
 What parts of metadata we inject into events should be configurable, but we can
 and want to offer sane defaults here.
 
+Technically, the approach implemented at `kubernetes_pod_metadata` already is
+pretty good.
+
+One small detail is that we probably want to allow adding arbitrary fields from
+the `Pod` object record to the event, instead of a predefined set of fields.
+The rationale is we can never imagine all the use cases people could have
+in the k8s environment, so we probably should be as flexible as possible.
+There doesn't seem to be any technical barriers preventing us from offering
+this.
+
 ### Origin filtering
 
 We can do highly efficient filtering based on the log file path, and a more
