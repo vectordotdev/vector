@@ -1,16 +1,20 @@
 ---
+last_modified_on: "2020-04-11"
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22
-min_version: null
-service_name: "Regex Parser"
 sidebar_label: "regex_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/regex_parser.rs
 status: "prod-ready"
 title: "Regex Parser Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `regex_parser` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to parse a
@@ -26,18 +30,20 @@ log field's value with a [Regular Expression][urls.regex].
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "regex_parser" # required
   inputs = ["my-source-id"] # required
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
   drop_field = true # optional, default
   field = "message" # optional, default
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
 
   # Types
   types.status = "int" # example
@@ -48,13 +54,33 @@ import CodeHeader from '@site/src/components/CodeHeader';
   types.parent.child = "int" # example
 ```
 
-import Fields from '@site/src/components/Fields';
+</TabItem>
+<TabItem value="advanced">
 
-import Field from '@site/src/components/Field';
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "regex_parser" # required
+  inputs = ["my-source-id"] # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
+  overwrite_target = true # optional, default
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
+  target_field = "root_field" # optional, no default
+
+  # Types
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -68,6 +94,7 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_field
@@ -78,8 +105,6 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -93,6 +118,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### field
@@ -103,8 +129,31 @@ The log field to parse.
 
 
 </Field>
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"overwrite_target"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### overwrite_target
+
+If [`target_field`](#target_field) is set and the log contains a field of the same name as the
+target, it will only be overwritten if this is set to `true`.
 
 
+
+
+</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -118,6 +167,7 @@ The log field to parse.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### regex
@@ -128,8 +178,32 @@ The Regular Expression to apply. Do not include the leading or trailing `/`.
 
 
 </Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["root_field","parent.child"]}
+  groups={[]}
+  name={"target_field"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### target_field
+
+If this setting is present, the parsed fields will be inserted into the log as
+a sub-object with this name. If a field with the same name already exists, the
+parser will fail and produce an error.
+
+ See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
+</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -143,6 +217,7 @@ The Regular Expression to apply. Do not include the leading or trailing `/`.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### types
@@ -153,8 +228,6 @@ coerce log fields into their proper types.
  See [Regex Syntax](#regex-syntax) for more info.
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -168,6 +241,7 @@ coerce log fields into their proper types.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`
@@ -180,20 +254,16 @@ supported for the `timestamp` type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
-## Output
+## Examples
 
 Given the following log line:
 
-```json
+```json title="log event"
 {
   "message": "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
 }
@@ -201,7 +271,7 @@ Given the following log line:
 
 And the following configuration:
 
-```toml
+```toml title="vector.toml"
 [transforms.<transform-id>]
   type = "regex_parser"
   field = "message"
@@ -216,7 +286,7 @@ And the following configuration:
 
 A [`log` event][docs.data-model.log] will be output with the following structure:
 
-```javascript
+```javascript title="log event"
 {
   // ... existing fields
   "bytes_in": 5667,
@@ -233,7 +303,6 @@ Things to note about the output:
 
 1. The `message` field was overwritten.
 2. The `bytes_in`, `timestamp`, `status`, and `bytes_out` fields were coerced.
-
 
 ## How It Works
 
@@ -265,13 +334,11 @@ specified [`field`](#field).
 
 ### Field Notation Syntax
 
-The [`field`](#field) options
-support [Vector's field notiation syntax][docs.reference.field-path-notation],
+The [`field`](#field) and [`target_field`](#target_field) options
+support [Vector's field notation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_regex_parser_transform_id]
   # ...
   field = "message"
@@ -339,15 +406,62 @@ More info can be found in the [Regex grouping and flags
 documentation][urls.regex_grouping_and_flags].
 
 
+
+
+
+
+### Value Coercion
+
+Values can be coerced upon extraction via the [`types.*`](#types) options. This functions
+exactly like the [`coercer` transform][docs.transforms.coercer] except that its
+coupled within this transform for convenience.
+
+#### Timestamps
+
+You can coerce values into timestamps via the `timestamp` type:
+
+```toml title="vector.toml"
+# ...
+types.first_timestamp = "timestamp" # best effort parsing
+types.second_timestamp = "timestamp|%Y-%m-%dT%H:%M:%S%z" # ISO8601
+# ...
+```
+
+As noted above, if you do not specify a specific `strftime` format, Vector
+will make a best effort attempt to parse the timestamp against the following
+common formats:
+
+| Format               | Description                                  |
+|:---------------------|:---------------------------------------------|
+| **Without Timezone** |                                              |
+| `%F %T`              | YYYY-MM-DD HH:MM:SS                          |
+| `%v %T`              | DD-Mmm-YYYY HH:MM:SS                         |
+| `FT%T`               | ISO 8601 / RFC 3339 without TZ               |
+| `m/%d/%Y:%T`         | US common date format                        |
+| `a, %d %b %Y %T`     | RFC 822/2822 without TZ                      |
+| `a %d %b %T %Y`      | `date` command output without TZ             |
+| `A %d %B %T %Y`      | `date` command output without TZ, long names |
+| `a %b %e %T %Y`      | ctime format                                 |
+| **With Timezone**    |                                              |
+| `%+`                 | ISO 8601 / RFC 3339                          |
+| `%a %d %b %T %Z %Y`  | `date` command output                        |
+| `%a %d %b %T %z %Y`  | `date` command output, numeric TZ            |
+| `%a %d %b %T %#z %Y` | `date` command output, numeric TZ            |
+| **UTC Formats**      |                                              |
+| `%s`                 | UNIX timestamp                               |
+| `%FT%TZ`             | ISO 8601 / RFC 3339 UTC                      |
+
+
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
+[docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [pages.index#performance]: /#performance
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
-[urls.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags
+[urls.regex_grouping_and_flags]: https://docs.rs/regex/1.3.6/regex/#grouping-and-flags
 [urls.regex_parsing_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance
 [urls.regex_tester]: https://rustexp.lpil.uk/
-[urls.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
+[urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

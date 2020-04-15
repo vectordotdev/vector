@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64px" height="64px" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 64 (93537) - https://sketch.com -->
+    <title>Icon</title>
+    <desc>Created with Sketch.</desc>
+    <g id="Icon" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="splunk_hec" transform="translate(5.000000, 3.000000)" fill="#000000" fill-rule="nonzero">
+            <polygon id="Path" points="0 58 0 47.41217 37.3570609 28.9667049 0 10.8541906 0 0 48.2112515 24.1722158 48.2112515 34.0275545"></polygon>
+        </g>
+    </g>
+</svg>

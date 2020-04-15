@@ -17,6 +17,9 @@ pub mod metric;
 mod util;
 
 pub use metric::Metric;
+pub(crate) use util::log::PathComponent;
+#[cfg(feature = "transforms-grok_parser")]
+pub(crate) use util::log::PathIter;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -30,6 +33,8 @@ lazy_static! {
         message_key: Atom::from("message"),
         timestamp_key: Atom::from("timestamp"),
         host_key: Atom::from("host"),
+        kubernetes_key: Atom::from("kubernetes"),
+        source_type_key: Atom::from("source_type"),
     };
 }
 
@@ -41,7 +46,7 @@ pub enum Event {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct LogEvent {
-    fields: BTreeMap<Atom, Value>,
+    fields: BTreeMap<String, Value>,
 }
 
 impl Event {
@@ -103,24 +108,12 @@ impl LogEvent {
         util::log::get(&self.fields, key)
     }
 
-    pub fn get_flat(&self, key: &Atom) -> Option<&Value> {
-        self.fields.get(key)
-    }
-
     pub fn get_mut(&mut self, key: &Atom) -> Option<&mut Value> {
         util::log::get_mut(&mut self.fields, key)
     }
 
-    pub fn get_flat_mut(&mut self, key: &Atom) -> Option<&mut Value> {
-        self.fields.get_mut(key)
-    }
-
     pub fn contains(&self, key: &Atom) -> bool {
         util::log::contains(&self.fields, key)
-    }
-
-    pub fn contains_flat(&self, key: &Atom) -> bool {
-        self.fields.contains_key(key)
     }
 
     pub fn insert<K, V>(&mut self, key: K, value: V) -> Option<Value>
@@ -131,12 +124,28 @@ impl LogEvent {
         util::log::insert(&mut self.fields, key.as_ref(), value.into())
     }
 
+    pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
+    where
+        V: Into<Value>,
+    {
+        util::log::insert_path(&mut self.fields, key, value.into())
+    }
+
     pub fn insert_flat<K, V>(&mut self, key: K, value: V)
     where
-        K: Into<Atom>,
+        K: Into<String>,
         V: Into<Value>,
     {
         self.fields.insert(key.into(), value.into());
+    }
+
+    pub fn try_insert<V>(&mut self, key: &Atom, value: V)
+    where
+        V: Into<Value>,
+    {
+        if !self.contains(key) {
+            self.insert(key.clone(), value);
+        }
     }
 
     pub fn remove(&mut self, key: &Atom) -> Option<Value> {
@@ -147,19 +156,11 @@ impl LogEvent {
         util::log::remove(&mut self.fields, &key, prune)
     }
 
-    pub fn remove_flat(&mut self, key: &Atom) -> Option<Value> {
-        self.fields.remove(key)
-    }
-
-    pub fn keys<'a>(&'a self) -> impl Iterator<Item = Atom> + 'a {
+    pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
         util::log::keys(&self.fields)
     }
 
-    pub fn keys_flat<'a>(&'a self) -> impl Iterator<Item = &'a Atom> {
-        self.fields.keys()
-    }
-
-    pub fn all_fields<'a>(&'a self) -> impl Iterator<Item = (Atom, &'a Value)> + Serialize {
+    pub fn all_fields<'a>(&'a self) -> impl Iterator<Item = (String, &'a Value)> + Serialize {
         util::log::all_fields(&self.fields)
     }
 
@@ -195,8 +196,8 @@ impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
 
 /// Converts event into an iterator over top-level key/value pairs.
 impl IntoIterator for LogEvent {
-    type Item = (Atom, Value);
-    type IntoIter = std::collections::btree_map::IntoIter<Atom, Value>;
+    type Item = (String, Value);
+    type IntoIter = std::collections::btree_map::IntoIter<String, Value>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.fields.into_iter()
@@ -228,6 +229,11 @@ pub struct LogSchema {
     #[serde(default = "LogSchema::default_host_key")]
     #[getset(get = "pub", set = "pub(crate)")]
     host_key: Atom,
+    #[getset(get = "pub", set = "pub(crate)")]
+    kubernetes_key: Atom,
+    #[serde(default = "LogSchema::default_source_type_key")]
+    #[getset(get = "pub", set = "pub(crate)")]
+    source_type_key: Atom,
 }
 
 impl Default for LogSchema {
@@ -236,6 +242,8 @@ impl Default for LogSchema {
             message_key: Atom::from("message"),
             timestamp_key: Atom::from("timestamp"),
             host_key: Atom::from("host"),
+            kubernetes_key: Atom::from("kubernetes"),
+            source_type_key: Atom::from("source_type"),
         }
     }
 }
@@ -250,6 +258,9 @@ impl LogSchema {
     fn default_host_key() -> Atom {
         Atom::from("host")
     }
+    fn default_source_type_key() -> Atom {
+        Atom::from("source_type")
+    }
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -259,7 +270,7 @@ pub enum Value {
     Float(f64),
     Boolean(bool),
     Timestamp(DateTime<Utc>),
-    Map(BTreeMap<Atom, Value>),
+    Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
     Null,
 }
@@ -307,6 +318,12 @@ impl From<String> for Value {
     }
 }
 
+impl From<&String> for Value {
+    fn from(string: &String) -> Self {
+        string.as_str().into()
+    }
+}
+
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
         Value::Bytes(s.into())
@@ -331,8 +348,8 @@ impl From<f64> for Value {
     }
 }
 
-impl From<BTreeMap<Atom, Value>> for Value {
-    fn from(value: BTreeMap<Atom, Value>) -> Self {
+impl From<BTreeMap<String, Value>> for Value {
+    fn from(value: BTreeMap<String, Value>) -> Self {
         Value::Map(value)
     }
 }
@@ -439,11 +456,11 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
 }
 
 fn decode_map(fields: BTreeMap<String, proto::Value>) -> Option<Value> {
-    let mut accum: BTreeMap<Atom, Value> = BTreeMap::new();
+    let mut accum: BTreeMap<String, Value> = BTreeMap::new();
     for (key, value) in fields {
         match decode_value(value) {
             Some(value) => {
-                accum.insert(Atom::from(key), value);
+                accum.insert(key, value);
             }
             None => return None,
         }
@@ -490,7 +507,7 @@ impl From<proto::EventWrapper> for Event {
                 let fields = proto
                     .fields
                     .into_iter()
-                    .filter_map(|(k, v)| decode_value(v).map(|value| (Atom::from(k), value)))
+                    .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
                     .collect::<BTreeMap<_, _>>();
 
                 Event::Log(LogEvent { fields })
@@ -569,11 +586,11 @@ fn encode_value(value: Value) -> proto::Value {
     }
 }
 
-fn encode_map(fields: BTreeMap<Atom, Value>) -> proto::ValueMap {
+fn encode_map(fields: BTreeMap<String, Value>) -> proto::ValueMap {
     proto::ValueMap {
         fields: fields
             .into_iter()
-            .map(|(key, value)| (key.to_string(), encode_value(value)))
+            .map(|(key, value)| (key, encode_value(value)))
             .collect(),
     }
 }
@@ -786,11 +803,11 @@ mod test {
             all,
             vec![
                 (
-                    Atom::from("Ke$ha"),
+                    String::from("Ke$ha"),
                     "It's going down, I'm yelling timber".to_string()
                 ),
                 (
-                    Atom::from("Pitbull"),
+                    String::from("Pitbull"),
                     "The bigger they are, the harder they fall".to_string()
                 ),
             ]
@@ -811,9 +828,9 @@ mod test {
         assert_eq!(
             collected,
             vec![
-                (Atom::from("YRjhxXcg"), &Value::from("nw8iM5Jr")),
-                (Atom::from("lZDfzKIL"), &Value::from("tOVrjveM")),
-                (Atom::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
+                (String::from("YRjhxXcg"), &Value::from("nw8iM5Jr")),
+                (String::from("lZDfzKIL"), &Value::from("tOVrjveM")),
+                (String::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
             ]
         );
     }

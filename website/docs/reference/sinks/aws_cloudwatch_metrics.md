@@ -1,13 +1,12 @@
 ---
+last_modified_on: "2020-04-12"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
 event_types: ["metric"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_metrics%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "AWS Cloudwatch Metrics"
 sidebar_label: "aws_cloudwatch_metrics|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_cloudwatch_metrics.rs
 status: "beta"
@@ -15,9 +14,14 @@ title: "AWS Cloudwatch Metrics Sink"
 unsupported_operating_systems: []
 ---
 
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `aws_cloudwatch_metrics` sink
 [streams](#streaming) [`metric`][docs.data-model.metric] events to [Amazon Web
-Service's CloudWatch Metrics service][urls.aws_cw_metrics] via the
+Service's CloudWatch Metrics service][urls.aws_cloudwatch_metrics] via the
 [`PutMetricData` API
 endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).
 
@@ -31,45 +35,34 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "aws_cloudwatch_metrics" # required
   inputs = ["my-source-id"] # required
+  healthcheck = true # optional, default
   namespace = "service" # required
   region = "us-east-1" # required, required when endpoint = ""
-  healthcheck = true # optional, default
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "aws_cloudwatch_metrics" # required
   inputs = ["my-source-id"] # required
-  endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
+  healthcheck = true # optional, default
   namespace = "service" # required
   region = "us-east-1" # required, required when endpoint = ""
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
-  healthcheck = true # optional, default
 
   # Batch
   batch.max_events = 20 # optional, default, events
@@ -79,38 +72,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["arn:aws:iam::123456789098:role/my_role"]}
-  groups={[]}
-  name={"assume_role"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### assume_role
-
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
- See [AWS Authentication](#aws-authentication) for more info.
-
-
-</Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -124,6 +86,7 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -133,8 +96,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={20}
@@ -148,6 +109,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"events"}
+  warnings={[]}
   >
 
 #### max_events
@@ -158,8 +120,6 @@ The maximum size of a batch, in events, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -173,6 +133,7 @@ The maximum size of a batch, in events, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -183,13 +144,33 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+
+ See [AWS Authentication](#aws-authentication) for more info.
 
 
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -199,10 +180,11 @@ The maximum age of a batch before it is flushed.
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### endpoint
@@ -214,8 +196,6 @@ this option will make [`region`](#region) moot.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -229,6 +209,7 @@ this option will make [`region`](#region) moot.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -239,8 +220,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -254,6 +233,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### namespace
@@ -266,8 +246,6 @@ that will isolate different metrics from each other.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -281,6 +259,7 @@ that will isolate different metrics from each other.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### region
@@ -292,15 +271,11 @@ provided it will override this value since the endpoint includes the region.
 
 
 </Field>
-
-
 </Fields>
 
 ## Env Vars
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -314,6 +289,7 @@ provided it will override this value since the endpoint includes the region.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_ACCESS_KEY_ID
@@ -325,8 +301,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -340,6 +314,7 @@ Used for AWS authentication when communicating with AWS services. See relevant
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_SECRET_ACCESS_KEY
@@ -351,9 +326,8 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 </Fields>
+
 
 ## How It Works
 
@@ -445,11 +419,11 @@ event-by-event basis. It does not batch data.
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
-[pages.aws_components]: /components?providers%5B%5D=aws/
+[pages.aws_components]: /components/?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+[urls.aws_cloudwatch_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
-[urls.aws_cw_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
 [urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html

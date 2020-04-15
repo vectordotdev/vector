@@ -1,19 +1,24 @@
 ---
+last_modified_on: "2020-04-07"
 delivery_guarantee: "best_effort"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_stackdriver_logs%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "GCP Stackdriver Logs"
 sidebar_label: "gcp_stackdriver_logs|[\"log\"]"
-source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/stackdriver_logs.rs
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/gcp/stackdriver_logs.rs
 status: "beta"
 title: "GCP Stackdriver Logs Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `gcp_stackdriver_logs` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Google
@@ -30,22 +35,13 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "gcp_stackdriver_logs" # required
   inputs = ["my-source-id"] # required
@@ -56,29 +52,27 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "gcp_stackdriver_logs" # required
   inputs = ["my-source-id"] # required
-  credentials_path = "/path/to/credentials.json" # required
-  log_id = "vector-logs" # required
-  project_id = "vector-123456" # required
   billing_account_id = "012345-6789AB-CDEF01" # optional, no default
+  credentials_path = "/path/to/credentials.json" # required
   folder_id = "My Folder" # optional, no default
   healthcheck = true # optional, default
+  log_id = "vector-logs" # required
   organization_id = "622418129737" # optional, no default
+  project_id = "vector-123456" # required
 
   # Batch
   batch.max_size = 5242880 # optional, default, bytes
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -112,13 +106,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -132,6 +120,7 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -141,8 +130,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={5242880}
@@ -156,6 +143,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -166,8 +154,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -181,6 +167,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -191,41 +178,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["012345-6789AB-CDEF01"]}
-  groups={[]}
-  name={"billing_account_id"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### billing_account_id
-
-The billing account ID to which to publish logs.
-
-Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folder_id), [`organization_id`](#organization_id), or
-`project_id` must be set.
-
-
-
-
-</Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -239,6 +194,7 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### buffer
@@ -248,58 +204,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={500}
-  enumValues={null}
-  examples={[500]}
-  groups={[]}
-  name={"max_events"}
-  path={"buffer"}
-  relevantWhen={{"type":"memory"}}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"events"}
-  >
-
-#### max_events
-
-The maximum number of [events][docs.data-model] allowed in the buffer.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[104900000]}
-  groups={[]}
-  name={"max_size"}
-  path={"buffer"}
-  relevantWhen={{"type":"disk"}}
-  required={true}
-  templateable={false}
-  type={"int"}
-  unit={"bytes"}
-  >
-
-#### max_size
-
-The maximum size of the buffer on the disk.
-
- See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-
-
 <Field
   common={true}
   defaultValue={"memory"}
@@ -313,6 +217,7 @@ The maximum size of the buffer on the disk.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -323,8 +228,54 @@ The buffer's type and storage mechanism.
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={500}
+  enumValues={null}
+  examples={[500]}
+  groups={[]}
+  name={"max_events"}
+  path={"buffer"}
+  relevantWhen={{"type":"memory"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  warnings={[]}
+  >
+
+#### max_events
+
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[104900000]}
+  groups={[]}
+  name={"max_size"}
+  path={"buffer"}
+  relevantWhen={{"type":"disk"}}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+#### max_size
+
+The maximum size of the buffer on the disk.
+
+ See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
 <Field
   common={false}
   defaultValue={"block"}
@@ -338,6 +289,7 @@ The buffer's type and storage mechanism.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### when_full
@@ -348,41 +300,9 @@ The behavior when the buffer becomes full.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/path/to/credentials.json"]}
-  groups={[]}
-  name={"credentials_path"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### credentials_path
-
-The filename for a Google Cloud service account credentials JSON file used to
-authenticate access to the Stackdriver Logging API. If this is unset, Vector
-checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
-filename.
-
- See [GCP Authentication](#gcp-authentication) for more info.
-
-
-</Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -396,6 +316,7 @@ filename.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### encoding
@@ -405,8 +326,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -420,6 +339,7 @@ Configures the encoding specific sink behavior.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### except_fields
@@ -430,8 +350,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -445,6 +363,7 @@ Prevent the sink from encoding the specified labels.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### only_fields
@@ -455,8 +374,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -470,6 +387,7 @@ Limit the sink to only encoding the specified labels.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_format
@@ -480,13 +398,63 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["012345-6789AB-CDEF01"]}
+  groups={[]}
+  name={"billing_account_id"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### billing_account_id
+
+The billing account ID to which to publish logs.
+
+Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folder_id), [`organization_id`](#organization_id), or
+`project_id` must be set.
 
 
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/credentials.json"]}
+  groups={[]}
+  name={"credentials_path"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### credentials_path
+
+The filename for a Google Cloud service account credentials JSON file used to
+authenticate access to the Stackdriver Logging API. If this is unset, Vector
+checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
+filename.
+
+
+
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -500,6 +468,7 @@ How to format event timestamps.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### folder_id
@@ -515,8 +484,6 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -530,6 +497,7 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -540,8 +508,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -555,6 +521,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### log_id
@@ -566,8 +533,6 @@ log stream.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -581,6 +546,7 @@ log stream.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### organization_id
@@ -595,8 +561,6 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -610,6 +574,7 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### project_id
@@ -624,8 +589,6 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -639,6 +602,7 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### request
@@ -648,8 +612,6 @@ Configures the sink request behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -663,6 +625,7 @@ Configures the sink request behavior.
   templateable={false}
   type={"int"}
   unit={"requests"}
+  warnings={[]}
   >
 
 #### in_flight_limit
@@ -673,8 +636,6 @@ The maximum number of in-flight requests allowed at any given time.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -688,6 +649,7 @@ The maximum number of in-flight requests allowed at any given time.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### rate_limit_duration_secs
@@ -698,8 +660,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1000}
@@ -713,6 +673,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### rate_limit_num
@@ -724,8 +685,6 @@ time window.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={-1}
@@ -739,6 +698,7 @@ time window.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### retry_attempts
@@ -749,8 +709,6 @@ The maximum number of retries to make for failed requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1}
@@ -764,6 +722,7 @@ The maximum number of retries to make for failed requests.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_initial_backoff_secs
@@ -776,8 +735,6 @@ to select future backoffs.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10}
@@ -791,6 +748,7 @@ to select future backoffs.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_max_duration_secs
@@ -801,8 +759,6 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={60}
@@ -816,6 +772,7 @@ The maximum amount of time, in seconds, to wait between retries.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -829,13 +786,9 @@ duplicate data downstream.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -849,6 +802,7 @@ duplicate data downstream.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### resource
@@ -858,8 +812,6 @@ Options for describing the logging resource.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -873,6 +825,7 @@ Options for describing the logging resource.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -887,8 +840,6 @@ documentation][urls.gcp_resources] for more details.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -902,6 +853,7 @@ documentation][urls.gcp_resources] for more details.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[label]`
@@ -916,13 +868,9 @@ For example, Compute Engine VM instances use the labels `projectId`,
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -936,6 +884,7 @@ For example, Compute Engine VM instances use the labels `projectId`,
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tls
@@ -945,8 +894,6 @@ Configures the TLS options for connections from this sink.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -960,6 +907,7 @@ Configures the TLS options for connections from this sink.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### ca_path
@@ -971,8 +919,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -986,6 +932,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### crt_path
@@ -998,8 +945,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1013,6 +958,7 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_pass
@@ -1024,8 +970,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -1039,6 +983,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_path
@@ -1050,8 +995,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -1065,20 +1008,18 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be loaded and checked for validity, but the handshake will not attempt to verify the certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
-host. Do NOT set this to `false` unless you understand the risks of not
-verifying the remote certificate.
+host.
 
 
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -1092,6 +1033,7 @@ verifying the remote certificate.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### verify_hostname
@@ -1104,20 +1046,14 @@ you understand the risks of not verifying the remote hostname.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Env Vars
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -1131,6 +1067,7 @@ you understand the risks of not verifying the remote hostname.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### GOOGLE_APPLICATION_CREDENTIALS
@@ -1138,19 +1075,15 @@ you understand the risks of not verifying the remote hostname.
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Stackdriver Logging API.
 
- See [GCP Authentication](#gcp-authentication) for more info.
+
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 
@@ -1175,20 +1108,6 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
-
-### GCP Authentication
-
-GCP offers a [variety of authentication methods][urls.gcp_authentication] and
-Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
-and will find credentials in the following order:
-
-1. If the [`credentials_path`](#credentials_path) option is set.
-2. If the `api_key` option is set.
-3. Finally, if the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
-
-If credentials are not found the [healtcheck](#healthchecks) will fail and an
-error will be [logged][docs.monitoring#logs].
-
 
 ### Health Checks
 
@@ -1223,7 +1142,7 @@ any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][urls.new_gcp_stackdriver_logs_sink_issue].
+with the Vector team by [opening an issue][urls.new_gcp_stackdriver_logs_sink_issue].
 
 ### Retry Policy
 
@@ -1232,17 +1151,21 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
 
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
+options.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
-[docs.monitoring#logs]: /docs/administration/monitoring/#logs
-[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
-[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcp_folders]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
 [urls.gcp_projects]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
 [urls.gcp_resources]: https://cloud.google.com/monitoring/api/resources
 [urls.gcp_stackdriver_logging]: https://cloud.google.com/logging/docs/reference/v2/rest/
 [urls.gcp_stackdriver_logging_rest]: https://cloud.google.com/logging/
 [urls.new_gcp_stackdriver_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_stackdriver_logs
+[urls.openssl]: https://www.openssl.org/

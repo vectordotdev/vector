@@ -1,19 +1,24 @@
 ---
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` sink exposes `metric` events to Prometheus metrics service."
 event_types: ["metric"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22
-min_version: "1.0"
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Prometheus"
 sidebar_label: "prometheus|[\"metric\"]"
-source_url: https://github.com/timberio/vector/blob/master/src/sources/prometheus/
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/prometheus.rs
 status: "beta"
 title: "Prometheus Sink"
 unsupported_operating_systems: []
 ---
+
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `prometheus` sink
 [exposes](#exposing--scraping) [`metric`][docs.data-model.metric] events to
@@ -29,33 +34,21 @@ The Vector `prometheus` sink
 
 ## Requirements
 
-import Alert from '@site/src/components/Alert';
+<Alert icon={false} type="danger" className="list--warnings">
 
-<Alert icon={false} type="danger" classNames="list--warnings">
-
-* Prometheus version >= 1.0 is required.
-
+* [Prometheus][urls.prometheus] version `>= 1.0` is required.
 
 </Alert>
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "prometheus" # required
   inputs = ["my-source-id"] # required
@@ -66,28 +59,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "prometheus" # required
   inputs = ["my-source-id"] # required
   address = "0.0.0.0:9598" # required
-  namespace = "service" # required
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # optional, default, seconds
   flush_period_secs = 60 # optional, default, seconds
+  namespace = "service" # required
 ```
 
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -101,6 +86,7 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### address
@@ -111,8 +97,6 @@ The address to expose for scraping.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]}
@@ -126,6 +110,7 @@ The address to expose for scraping.
   templateable={false}
   type={"[float]"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 ### buckets
@@ -137,8 +122,6 @@ Default buckets to use for aggregating
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={60}
@@ -152,6 +135,7 @@ Default buckets to use for aggregating
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 ### flush_period_secs
@@ -162,8 +146,6 @@ Time interval between [set][docs.data-model.metric#set] values are reset.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -177,6 +159,7 @@ Time interval between [set][docs.data-model.metric#set] values are reset.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### namespace
@@ -188,26 +171,22 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 
 
 </Field>
-
-
 </Fields>
 
-## Output
 
-The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service.
-For example:
-
+## Examples
 
 <Tabs
   block={true}
   defaultValue="histograms"
+  select={false}
   values={[{"label":"Histograms","value":"histograms"},{"label":"Counters","value":"counters"},{"label":"Gauges","value":"gauges"}]}>
 
 <TabItem value="histograms">
 
 Given the following histogram metric events:
 
-```json
+```json title="Example histogram metrics"
 [
   {
     "name": "response_time_s",
@@ -232,7 +211,7 @@ Given the following histogram metric events:
 
 This sink will output the following:
 
-```text
+```text title="Example sink output"
 # HELP response_time_s response_time_s
 # TYPE response_time_s histogram
 response_time_s_bucket{le="0.005"} 0
@@ -257,7 +236,7 @@ response_time_s_count 2
 
 Given the following counter metric events:
 
-```json
+```json title="Example counter metrics"
 [
   {
     "name": "logins",
@@ -279,7 +258,7 @@ Given the following counter metric events:
 
 This sink will output the following:
 
-```text
+```text title="Example sink output"
 # HELP logins logins
 # TYPE logins counter
 logins 4
@@ -291,7 +270,7 @@ logins 4
 
 Given the following gauge metric events:
 
-```json
+```json title="Example gauge metrics"
 [
   {
     "name": "memory_rss",
@@ -314,7 +293,7 @@ Given the following gauge metric events:
 
 This sink will output the following:
 
-```text
+```text title="Example sink output"
 # HELP memory_rss memory_rss
 # TYPE memory_rss gauge
 memory_rss 225

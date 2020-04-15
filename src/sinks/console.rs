@@ -1,7 +1,9 @@
-use super::util::encoding::{EncodingConfig, EncodingConfiguration};
-use super::util::SinkExt;
 use crate::{
     event::{self, Event},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        StreamSink,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use async_trait::async_trait;
@@ -57,7 +59,7 @@ impl SinkConfig for ConsoleSinkConfig {
 
         let sink = WriterSink { output, encoding };
         let sink = streaming_sink::compat::adapt_to_topology(&mut cx, sink);
-        let sink = sink.stream_ack(cx.acker());
+        let sink = StreamSink::new(sink, cx.acker());
 
         Ok((Box::new(sink), Box::new(future::ok(()))))
     }
@@ -171,7 +173,7 @@ mod test {
             value: MetricValue::Counter { value: 100.0 },
         });
         assert_eq!(
-            r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"kind":"incremental","value":{"type":"counter","value":100.0}}"#,
+            r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"kind":"incremental","counter":{"value":100.0}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }
@@ -188,7 +190,7 @@ mod test {
             },
         });
         assert_eq!(
-            r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"set","values":["bob"]}}"#,
+            r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","set":{"values":["bob"]}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }
@@ -206,7 +208,7 @@ mod test {
             },
         });
         assert_eq!(
-            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"distribution","values":[10.0],"sample_rates":[1]}}"#,
+            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1]}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }

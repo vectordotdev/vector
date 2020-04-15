@@ -3,262 +3,3641 @@ module.exports = {
     "log",
     "metric"
   ],
+  "guides": {
+    "advanced": {
+      "children": {
+      },
+      "description": "Go beyond the basics, become a Vector pro, and extract the full potential of Vector.",
+      "guides": [
+        {
+          "author_github": "https://github.com/a-rodin",
+          "description": null,
+          "id": "/advanced/custom-aggregations-with-lua",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/custom-aggregations-with-lua.md",
+          "series_position": null,
+          "title": "Custom Aggregations with Lua"
+        },
+        {
+          "author_github": "https://github.com/Jeffail",
+          "description": null,
+          "id": "/advanced/managing-complex-configs",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/managing-complex-configs.md",
+          "series_position": null,
+          "title": "Managing Complex Configs"
+        },
+        {
+          "author_github": "https://github.com/a-rodin",
+          "description": null,
+          "id": "/advanced/parsing-csv-logs-with-lua",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/parsing-csv-logs-with-lua.md",
+          "series_position": null,
+          "title": "Parsing CSV logs with Lua"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/advanced/troubleshooting",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/troubleshooting.md",
+          "series_position": null,
+          "title": "Troubleshooting"
+        },
+        {
+          "author_github": "https://github.com/Jeffail",
+          "description": null,
+          "id": "/advanced/unit-testing",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/unit-testing.md",
+          "series_position": null,
+          "title": "Unit Testing Your Configs"
+        }
+      ],
+      "name": "advanced",
+      "series": false,
+      "title": "Advanced"
+    },
+    "getting-started": {
+      "children": {
+      },
+      "description": "Take Vector from zero to production in under 10 minutes.",
+      "guides": [
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/getting-started/deploying",
+          "last_modified_on": null,
+          "path": "website/guides/getting-started/deploying.md",
+          "series_position": null,
+          "title": "Deploying Vector"
+        },
+        {
+          "author_github": "https://github.com/Jeffail",
+          "description": null,
+          "id": "/getting-started/your-first-pipeline",
+          "last_modified_on": null,
+          "path": "website/guides/getting-started/your-first-pipeline.md",
+          "series_position": null,
+          "title": "Hello World. Your First Vector Pipeline."
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/getting-started/monitoring",
+          "last_modified_on": null,
+          "path": "website/guides/getting-started/monitoring.md",
+          "series_position": null,
+          "title": "Monitoring Vector"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/getting-started/next-steps",
+          "last_modified_on": null,
+          "path": "website/guides/getting-started/next-steps.md",
+          "series_position": null,
+          "title": "Next Steps"
+        },
+        {
+          "author_github": "https://github.com/Jeffail",
+          "description": null,
+          "id": "/getting-started/structuring",
+          "last_modified_on": null,
+          "path": "website/guides/getting-started/structuring.md",
+          "series_position": null,
+          "title": "Structuring Your Log Data"
+        }
+      ],
+      "name": "getting-started",
+      "series": true,
+      "title": "Getting Started"
+    },
+    "integrate": {
+      "children": {
+      },
+      "description": "Targeted guides for integrating platforms, data sources, and data destinations.",
+      "guides": [
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker.md",
+          "series_position": null,
+          "title": "Collect logs from Docker and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http.md",
+          "series_position": null,
+          "title": "Collect logs from HTTP and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald.md",
+          "series_position": null,
+          "title": "Collect logs from Journald and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka.md",
+          "series_position": null,
+          "title": "Collect logs from Kafka and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin.md",
+          "series_position": null,
+          "title": "Collect logs from STDIN and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec.md",
+          "series_position": null,
+          "title": "Collect logs from Splunk HEC and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog.md",
+          "series_position": null,
+          "title": "Collect logs from Syslog and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket.md",
+          "series_position": null,
+          "title": "Collect logs from a TCP, UDP, or UDS socket and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file.md",
+          "series_position": null,
+          "title": "Collect logs from a file and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/prometheus",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/prometheus.md",
+          "series_position": null,
+          "title": "Collect metrics from Prometheus and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/statsd",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/statsd.md",
+          "series_position": null,
+          "title": "Collect metrics from Statsd and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Docker to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Docker to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Docker to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Docker to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Docker to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Docker to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Docker to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Docker to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Docker to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Docker to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Docker to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Docker to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Docker to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Docker to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Docker to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/loki.md",
+          "series_position": null,
+          "title": "Send logs from Docker to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Docker to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Docker to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Docker to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Docker to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/socket.md",
+          "series_position": null,
+          "title": "Send logs from Docker to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/file.md",
+          "series_position": null,
+          "title": "Send logs from Docker to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/http.md",
+          "series_position": null,
+          "title": "Send logs from Docker to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/kafka.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/logdna.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/loki.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/socket.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/file.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/http.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/vector.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to another Vector instance"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Journald to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Journald to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Journald to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Journald to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Journald to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Journald to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/loki.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Journald to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/socket.md",
+          "series_position": null,
+          "title": "Send logs from Journald to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/file.md",
+          "series_position": null,
+          "title": "Send logs from Journald to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/http.md",
+          "series_position": null,
+          "title": "Send logs from Journald to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/journald/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/vector.md",
+          "series_position": null,
+          "title": "Send logs from Journald to another Vector instance"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/loki.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/socket.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/file.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/http.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/vector.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to another Vector instance"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/kafka.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/logdna.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/loki.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/socket.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/file.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/http.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/stdin/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/vector.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to another Vector instance"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/loki.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/socket.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/file.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/http.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/vector.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to another Vector instance"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/loki.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/socket.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/file.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/http.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/syslog/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/vector.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to another Vector instance"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/kafka.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/logdna.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/loki.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/socket.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/file.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/http.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/vector.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to another Vector instance"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from a file to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from a file to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from a file to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from a file to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from a file to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from a file to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from a file to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from a file to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from a file to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from a file to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from a file to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from a file to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from a file to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/kafka.md",
+          "series_position": null,
+          "title": "Send logs from a file to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/logdna.md",
+          "series_position": null,
+          "title": "Send logs from a file to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/loki.md",
+          "series_position": null,
+          "title": "Send logs from a file to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from a file to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from a file to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from a file to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from a file to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/socket.md",
+          "series_position": null,
+          "title": "Send logs from a file to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/file.md",
+          "series_position": null,
+          "title": "Send logs from a file to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/http.md",
+          "series_position": null,
+          "title": "Send logs from a file to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/file/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/vector.md",
+          "series_position": null,
+          "title": "Send logs from a file to another Vector instance"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/pulsar.md",
+          "series_position": null,
+          "title": "Send logs to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/kafka.md",
+          "series_position": null,
+          "title": "Send logs to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/logdna.md",
+          "series_position": null,
+          "title": "Send logs to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/loki.md",
+          "series_position": null,
+          "title": "Send logs to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/papertrail.md",
+          "series_position": null,
+          "title": "Send logs to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/socket.md",
+          "series_position": null,
+          "title": "Send logs to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/file.md",
+          "series_position": null,
+          "title": "Send logs to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/http.md",
+          "series_position": null,
+          "title": "Send logs to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/prometheus/aws_cloudwatch_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/prometheus/aws_cloudwatch_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Prometheus to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/prometheus/datadog_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/prometheus/datadog_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Prometheus to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/prometheus/influxdb_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/prometheus/influxdb_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Prometheus to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/prometheus/prometheus",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/prometheus/prometheus.md",
+          "series_position": null,
+          "title": "Send metrics from Prometheus to Prometheus"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/prometheus/statsd",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/prometheus/statsd.md",
+          "series_position": null,
+          "title": "Send metrics from Prometheus to Statsd"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/statsd/aws_cloudwatch_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/statsd/aws_cloudwatch_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Statsd to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/statsd/datadog_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/statsd/datadog_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Statsd to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/statsd/influxdb_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/statsd/influxdb_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Statsd to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/statsd/prometheus",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/statsd/prometheus.md",
+          "series_position": null,
+          "title": "Send metrics from Statsd to Prometheus"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/statsd/statsd",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/statsd/statsd.md",
+          "series_position": null,
+          "title": "Send metrics from Statsd to Statsd"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/aws_cloudwatch_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/aws_cloudwatch_metrics.md",
+          "series_position": null,
+          "title": "Send metrics to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/datadog_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/datadog_metrics.md",
+          "series_position": null,
+          "title": "Send metrics to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/influxdb_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/influxdb_metrics.md",
+          "series_position": null,
+          "title": "Send metrics to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/prometheus",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/prometheus.md",
+          "series_position": null,
+          "title": "Send metrics to Prometheus"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/statsd",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/statsd.md",
+          "series_position": null,
+          "title": "Send metrics to Statsd"
+        }
+      ],
+      "name": "integrate",
+      "series": false,
+      "title": "Integrate"
+    }
+  },
+  "highlights": [
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2019-10-21",
+      "description": "The `encoding` option is now required for these sinks",
+      "id": "2019-10-21-require-encoding-option-for-console-and-file-sinks",
+      "importance": "low",
+      "path": "website/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks.md",
+      "permalink": "/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks/",
+      "tags": [
+        "type: breaking change",
+        "domain: sinks",
+        "sink: console",
+        "sink: file"
+      ],
+      "title": "Require `encoding` option for console and file sinks"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2019-11-19",
+      "description": "These architectures are widely used in embeded devices & servers",
+      "id": "2019-11-19-arm-support-on-linux",
+      "importance": "high",
+      "path": "website/highlights/2019-11-19-arm-support-on-linux.md",
+      "permalink": "/highlights/2019-11-19-arm-support-on-linux/",
+      "tags": [
+        "type: new feature",
+        "domain: platforms",
+        "platform: arm64",
+        "platform: armv7"
+      ],
+      "title": "ARMv7 & ARM64 Support on Linux"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2019-11-21",
+      "description": "Bringing the performance and reliability of Vector to Windows",
+      "id": "2019-11-21-windows-support",
+      "importance": "high",
+      "path": "website/highlights/2019-11-21-windows-support.md",
+      "permalink": "/highlights/2019-11-21-windows-support/",
+      "tags": [
+        "type: new feature",
+        "domain: platforms",
+        "platform: windows"
+      ],
+      "title": "Windows Support Is Here!"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2019-11-25",
+      "description": "Treating your Vector configuration files as code",
+      "id": "2019-11-25-unit-testing-vector-config-files",
+      "importance": "medium",
+      "path": "website/highlights/2019-11-25-unit-testing-vector-config-files.md",
+      "permalink": "/highlights/2019-11-25-unit-testing-vector-config-files/",
+      "tags": [
+        "type: new feature",
+        "domain: config"
+      ],
+      "title": "Unit Testing Your Vector Config Files"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2019-12-04",
+      "description": "This ensures that naming is consistent for the upcoming `datadog_logs` sink",
+      "id": "2019-12-04-rename-datadog-sink-to-datadog_metrics",
+      "importance": "low",
+      "path": "website/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics.md",
+      "permalink": "/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics/",
+      "tags": [
+        "type: breaking change",
+        "domain: sinks",
+        "sink: datadog_metrics"
+      ],
+      "title": "The `datadog` sink has been renamed to `datadog_metrics`"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2019-12-13",
+      "description": "Point Vector to custom DNS servers",
+      "id": "2019-12-13-custom-dns",
+      "importance": "low",
+      "path": "website/highlights/2019-12-13-custom-dns.md",
+      "permalink": "/highlights/2019-12-13-custom-dns/",
+      "tags": [
+        "type: new feature",
+        "domain: networking"
+      ],
+      "title": "Use Custom DNS Servers"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2019-12-14",
+      "description": "Early adopters have a new Kuberenetes source to chew on",
+      "id": "2019-12-14-kubernetes-source-alpha",
+      "importance": "low",
+      "path": "website/highlights/2019-12-14-kubernetes-source-alpha.md",
+      "permalink": "/highlights/2019-12-14-kubernetes-source-alpha/",
+      "tags": [
+        "type: new feature",
+        "domain: sources",
+        "source: kubernetes"
+      ],
+      "title": "New Kubernetes Source (alpha)"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2019-12-16",
+      "description": "Enrich your events with EC2 metadata",
+      "id": "2019-12-16-ec2-metadata",
+      "importance": "high",
+      "path": "website/highlights/2019-12-16-ec2-metadata.md",
+      "permalink": "/highlights/2019-12-16-ec2-metadata/",
+      "tags": [
+        "type: new feature",
+        "domain: transforms",
+        "transform: aws_ec2_metadata"
+      ],
+      "title": "New AWS EC2 Medata Transform"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-01-03",
+      "description": "We've simplified our socket based sources into a single `socket` source",
+      "id": "2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source",
+      "importance": "low",
+      "path": "website/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source.md",
+      "permalink": "/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source/",
+      "tags": [
+        "type: breaking change",
+        "domain: sources",
+        "source: tcp",
+        "source: udp"
+      ],
+      "title": "Merge existing `tcp` and `udp` sources into a single `socket` source"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-01-03",
+      "description": "This renames the existing `tcp` sink to `socket`",
+      "id": "2020-01-03-move-existing-tcp-sink-into-socket-sink",
+      "importance": "low",
+      "path": "website/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink.md",
+      "permalink": "/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink/",
+      "tags": [
+        "type: breaking change",
+        "domain: sinks",
+        "sink: tcp"
+      ],
+      "title": "Rename existing `tcp` sink to `socket` sink"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-01-07",
+      "description": "Scrape prometheus metrics with Vector",
+      "id": "2020-01-07-prometheus-source",
+      "importance": "high",
+      "path": "website/highlights/2020-01-07-prometheus-source.md",
+      "permalink": "/highlights/2020-01-07-prometheus-source/",
+      "tags": [
+        "type: new feature",
+        "domain: sources",
+        "source: prometheus"
+      ],
+      "title": "New Prometheus Source"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-01-12",
+      "description": "<fill-in>",
+      "id": "2020-01-12-request-options-refactored",
+      "importance": "low",
+      "path": "website/highlights/2020-01-12-request-options-refactored.md",
+      "permalink": "/highlights/2020-01-12-request-options-refactored/",
+      "tags": [
+        "type: breaking change",
+        "domain: buffers",
+        "domain: config",
+        "domain: sinks"
+      ],
+      "title": "Sink options have been refactored"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-01-12",
+      "description": "This change achieve consistency with our `kafka` source and other Kafka clients",
+      "id": "2020-01-12-use-comma-delim-server-list-instead-of-an-array",
+      "importance": "low",
+      "path": "website/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array.md",
+      "permalink": "/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array/",
+      "tags": [
+        "type: breaking change",
+        "domain: sinks",
+        "sink: kafka"
+      ],
+      "title": "Use comma delim server list in `kafka` sink"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-01-14",
+      "description": "This change ensures the `splunk_hec` source conforms to Vector's schema",
+      "id": "2020-01-14-rename-line-field-to-message",
+      "importance": "low",
+      "path": "website/highlights/2020-01-14-rename-line-field-to-message.md",
+      "permalink": "/highlights/2020-01-14-rename-line-field-to-message/",
+      "tags": [
+        "type: breaking change",
+        "domain: sources",
+        "source: splunk_hec"
+      ],
+      "title": "Rename `line` field to `message` in `splunk_hec` source"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-01-20",
+      "description": "This gives you full control over which fields are indexed",
+      "id": "2020-01-20-splunk-hec-specify-indexed-fields",
+      "importance": "low",
+      "path": "website/highlights/2020-01-20-splunk-hec-specify-indexed-fields.md",
+      "permalink": "/highlights/2020-01-20-splunk-hec-specify-indexed-fields/",
+      "tags": [
+        "type: breaking change",
+        "domain: sinks",
+        "sink: splunk_hec"
+      ],
+      "title": "The `splunk_hec` sink does not index fields by default"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-05",
+      "description": "We've dropped redundant AWS options that may break backward compatibility",
+      "id": "2020-02-05-drop-aws-options",
+      "importance": "low",
+      "path": "website/highlights/2020-02-05-drop-aws-options.md",
+      "permalink": "/highlights/2020-02-05-drop-aws-options/",
+      "tags": [
+        "type: breaking change",
+        "provider: aws",
+        "domain: sinks",
+        "sink: elasticsearch"
+      ],
+      "title": "AWS specific options have been dropped in the Elasticsearch sink"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-05",
+      "description": "Docker splits long messages by default, and now Vector merges them back for you",
+      "id": "2020-02-05-merge-partial-docker-events",
+      "importance": "high",
+      "path": "website/highlights/2020-02-05-merge-partial-docker-events.md",
+      "permalink": "/highlights/2020-02-05-merge-partial-docker-events/",
+      "tags": [
+        "type: enhancement",
+        "domain: sources",
+        "source: docker",
+        "platform: docker"
+      ],
+      "title": "Automatically merge partial Docker events"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-05",
+      "description": "The official Vector mascot",
+      "id": "2020-02-05-vic-the-vector-mascot",
+      "importance": "low",
+      "path": "website/highlights/2020-02-05-vic-the-vector-mascot.md",
+      "permalink": "/highlights/2020-02-05-vic-the-vector-mascot/",
+      "tags": [
+        "type: new feature",
+        "domain: website"
+      ],
+      "title": "Meet Vic, The Vector Mascot"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-07",
+      "description": "A better way to manage complex Vector configurations",
+      "id": "2020-02-07-multi-config-files",
+      "importance": "low",
+      "path": "website/highlights/2020-02-07-multi-config-files.md",
+      "permalink": "/highlights/2020-02-07-multi-config-files/",
+      "tags": [
+        "type: new feature",
+        "domain: config"
+      ],
+      "title": "Support For Multiple Config Files"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-11",
+      "description": "Best effort parsing support for Syslog",
+      "id": "2020-02-11-improved-syslog-parsing",
+      "importance": "low",
+      "path": "website/highlights/2020-02-11-improved-syslog-parsing.md",
+      "permalink": "/highlights/2020-02-11-improved-syslog-parsing/",
+      "tags": [
+        "type: new feature",
+        "domain: sources",
+        "source: syslog"
+      ],
+      "title": "Improved Syslog Parsing"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-14",
+      "description": "Set defaults for Vector's common log key names",
+      "id": "2020-02-14-global-log-schema",
+      "importance": "low",
+      "path": "website/highlights/2020-02-14-global-log-schema.md",
+      "permalink": "/highlights/2020-02-14-global-log-schema/",
+      "tags": [
+        "type: new feature",
+        "domain: config"
+      ],
+      "title": "Introducing Vector's Global Log Schema"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-17",
+      "description": "Use Vector's templating syntax to add new fields",
+      "id": "2020-02-17-add-fields-transform-templating",
+      "importance": "low",
+      "path": "website/highlights/2020-02-17-add-fields-transform-templating.md",
+      "permalink": "/highlights/2020-02-17-add-fields-transform-templating/",
+      "tags": [
+        "type: new feature",
+        "domain: transforms",
+        "transform: add_fields"
+      ],
+      "title": "The Add Fields Transform Supports Templating"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-20",
+      "description": "7 new sinks have been added to Vector",
+      "id": "2020-02-20-new-sinks",
+      "importance": "medium",
+      "path": "website/highlights/2020-02-20-new-sinks.md",
+      "permalink": "/highlights/2020-02-20-new-sinks/",
+      "tags": [
+        "type: new feature",
+        "domain: sinks"
+      ],
+      "title": "Lots of New Sinks!"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-21",
+      "description": "Merge multiple lines together based on rules",
+      "id": "2020-02-21-file-source-multiline-support",
+      "importance": "medium",
+      "path": "website/highlights/2020-02-21-file-source-multiline-support.md",
+      "permalink": "/highlights/2020-02-21-file-source-multiline-support/",
+      "tags": [
+        "type: enhancement",
+        "domain: sources",
+        "source: file"
+      ],
+      "title": "Improved Multiline Support In The File Source"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-24",
+      "description": "We're bringing our log data model closer to JSON",
+      "id": "2020-02-24-log-data-model-changes",
+      "importance": "low",
+      "path": "website/highlights/2020-02-24-log-data-model-changes.md",
+      "permalink": "/highlights/2020-02-24-log-data-model-changes/",
+      "tags": [
+        "type: breaking change",
+        "domain: buffers",
+        "event type: log"
+      ],
+      "title": "Log Data Model Improvements"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-24",
+      "description": "An easier way to rename fields",
+      "id": "2020-02-24-rename-fields-transform",
+      "importance": "low",
+      "path": "website/highlights/2020-02-24-rename-fields-transform.md",
+      "permalink": "/highlights/2020-02-24-rename-fields-transform/",
+      "tags": [
+        "type: new feature",
+        "domain: transforms",
+        "transform: rename_fields"
+      ],
+      "title": "New Rename Fields Transform"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-24",
+      "description": "Split log streams with ease",
+      "id": "2020-02-24-swimlanes-transform",
+      "importance": "medium",
+      "path": "website/highlights/2020-02-24-swimlanes-transform.md",
+      "permalink": "/highlights/2020-02-24-swimlanes-transform/",
+      "tags": [
+        "type: new feature",
+        "domain: transforms",
+        "transform: swimlanes"
+      ],
+      "title": "New Swimlanes Transform"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-27",
+      "description": "Bringing Vector to NixOS",
+      "id": "2020-02-27-nixos-support",
+      "importance": "low",
+      "path": "website/highlights/2020-02-27-nixos-support.md",
+      "permalink": "/highlights/2020-02-27-nixos-support/",
+      "tags": [
+        "type: new feature",
+        "domain: platforms",
+        "platform: nixos"
+      ],
+      "title": "NixOS Support"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-02-28",
+      "description": "Build Vector with select components",
+      "id": "2020-02-28-custom-vector-builds",
+      "importance": "medium",
+      "path": "website/highlights/2020-02-28-custom-vector-builds.md",
+      "permalink": "/highlights/2020-02-28-custom-vector-builds/",
+      "tags": [
+        "type: new feature",
+        "domain: sources",
+        "source: vector"
+      ],
+      "title": "A La Carte Custom Vector Builds"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-03-03",
+      "description": "Our commitment to privacy",
+      "id": "2020-03-03-privacy-policy",
+      "importance": "low",
+      "path": "website/highlights/2020-03-03-privacy-policy.md",
+      "permalink": "/highlights/2020-03-03-privacy-policy/",
+      "tags": [
+        "type: announcement"
+      ],
+      "title": "We've Added A Privacy Policy"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-03-04",
+      "description": "More control over which fields are included when encoding",
+      "id": "2020-03-04-encoding-whitelist-blacklist",
+      "importance": "low",
+      "path": "website/highlights/2020-03-04-encoding-whitelist-blacklist.md",
+      "permalink": "/highlights/2020-03-04-encoding-whitelist-blacklist/",
+      "tags": [
+        "type: new feature",
+        "domain: sinks"
+      ],
+      "title": "Whitelist & Blacklist Fields When Encoding"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-03-09",
+      "description": "Improve throughput by compressing data before writing it to Kafka",
+      "id": "2020-03-09-kafka-sink-compression",
+      "importance": "low",
+      "path": "website/highlights/2020-03-09-kafka-sink-compression.md",
+      "permalink": "/highlights/2020-03-09-kafka-sink-compression/",
+      "tags": [
+        "type: new feature",
+        "domain: sinks",
+        "sink: kafka"
+      ],
+      "title": "Compression Now Available In The Kafka Sink"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-03-10",
+      "description": "Shed duplicate logs",
+      "id": "2020-03-10-dedupe-transform",
+      "importance": "medium",
+      "path": "website/highlights/2020-03-10-dedupe-transform.md",
+      "permalink": "/highlights/2020-03-10-dedupe-transform/",
+      "tags": [
+        "type: new feature",
+        "domain: sources",
+        "source: vector"
+      ],
+      "title": "New Dedupe Trasnform"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-03-11",
+      "description": "Protect downstream metrics storages from high cardinality tags",
+      "id": "2020-03-11-tag-cardinality-limit-transform",
+      "importance": "medium",
+      "path": "website/highlights/2020-03-11-tag-cardinality-limit-transform.md",
+      "permalink": "/highlights/2020-03-11-tag-cardinality-limit-transform/",
+      "tags": [
+        "type: new feature",
+        "domain: transforms",
+        "transform: tag_cardinality_limit"
+      ],
+      "title": "New Tag Cardinality Limit Transform"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-03-11",
+      "description": "Securely forward data between Vector instances",
+      "id": "2020-03-11-vector-sink-tls",
+      "importance": "low",
+      "path": "website/highlights/2020-03-11-vector-sink-tls.md",
+      "permalink": "/highlights/2020-03-11-vector-sink-tls/",
+      "tags": [
+        "type: new feature",
+        "domain: sources",
+        "source: vector"
+      ],
+      "title": "The Vector Source & Sink Support TLS"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-03-12",
+      "description": "Sink logs to the Papertrail logging service",
+      "id": "2020-03-12-papertrail-sink",
+      "importance": "low",
+      "path": "website/highlights/2020-03-12-papertrail-sink.md",
+      "permalink": "/highlights/2020-03-12-papertrail-sink/",
+      "tags": [
+        "type: new feature",
+        "domain: sinks",
+        "sink: papertrail"
+      ],
+      "title": "New Papertrail Sink"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-03-14",
+      "description": "Sink logs to the Honeycomb logging service",
+      "id": "2020-03-14-honeycomb-sink",
+      "importance": "low",
+      "path": "website/highlights/2020-03-14-honeycomb-sink.md",
+      "permalink": "/highlights/2020-03-14-honeycomb-sink/",
+      "tags": [
+        "type: new feature",
+        "domain: sinks",
+        "sink: honeycomb"
+      ],
+      "title": "New Honeycomb Sink"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-03-19",
+      "description": "Sink logs to the Apache Pulsar service",
+      "id": "2020-03-19-apache-pulsar-sink",
+      "importance": "low",
+      "path": "website/highlights/2020-03-19-apache-pulsar-sink.md",
+      "permalink": "/highlights/2020-03-19-apache-pulsar-sink/",
+      "tags": [
+        "type: new feature",
+        "domain: sinks",
+        "sink: pulsar"
+      ],
+      "title": "New Apache Pulsar Sink"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-03-23",
+      "description": "Sink logs to the Datadog logging service",
+      "id": "2020-03-23-datadog-logs-sink",
+      "importance": "low",
+      "path": "website/highlights/2020-03-23-datadog-logs-sink.md",
+      "permalink": "/highlights/2020-03-23-datadog-logs-sink/",
+      "tags": [
+        "type: new feature",
+        "domain: sinks",
+        "sink: datadog_logs"
+      ],
+      "title": "New Datadog Logs Sink"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-03-31",
+      "description": "Filter and route your logs based on defined conditions",
+      "id": "2020-03-31-filter-transform",
+      "importance": "medium",
+      "path": "website/highlights/2020-03-31-filter-transform.md",
+      "permalink": "/highlights/2020-03-31-filter-transform/",
+      "tags": [
+        "type: new feature",
+        "domain: transforms",
+        "transform: filter"
+      ],
+      "title": "New Filter Transform"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-03-31",
+      "description": "High quality guides and education for Vector",
+      "id": "2020-03-31-guides-section",
+      "importance": "high",
+      "path": "website/highlights/2020-03-31-guides-section.md",
+      "permalink": "/highlights/2020-03-31-guides-section/",
+      "tags": [
+        "type: new feature",
+        "domain: website"
+      ],
+      "title": "A New Guides Section"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-04-01",
+      "description": "Easily rnrich your logs with Kubernetes metadata",
+      "id": "2020-04-01-kubernetes-pod-metadata-transform",
+      "importance": "high",
+      "path": "website/highlights/2020-04-01-kubernetes-pod-metadata-transform.md",
+      "permalink": "/highlights/2020-04-01-kubernetes-pod-metadata-transform/",
+      "tags": [
+        "type: new feature",
+        "domain: sources",
+        "source: vector"
+      ],
+      "title": "New Kubernetes Pod Metdata Transform"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-04-01",
+      "description": "More options when filtering and routing events",
+      "id": "2020-04-01-more-condition-predicates",
+      "importance": "low",
+      "path": "website/highlights/2020-04-01-more-condition-predicates.md",
+      "permalink": "/highlights/2020-04-01-more-condition-predicates/",
+      "tags": [
+        "type: enhancement",
+        "domain: config",
+        "domain: transforms",
+        "transform: filter",
+        "transform: swimlanes"
+      ],
+      "title": "More Condition Predicates"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-04-07",
+      "description": "The next iteration of our Lua transform.",
+      "id": "2020-04-07-lua-transform-version-2",
+      "importance": "high",
+      "path": "website/highlights/2020-04-07-lua-transform-version-2.md",
+      "permalink": "/highlights/2020-04-07-lua-transform-version-2/",
+      "tags": [
+        "type: new feature",
+        "domain: sources",
+        "source: vector"
+      ],
+      "title": "Lua Transform v2"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-04-07",
+      "description": "It's not possible to forward metrics between Vector instances",
+      "id": "2020-04-07-vector-to-vector-metrics",
+      "importance": "low",
+      "path": "website/highlights/2020-04-07-vector-to-vector-metrics.md",
+      "permalink": "/highlights/2020-04-07-vector-to-vector-metrics/",
+      "tags": [
+        "type: new feature",
+        "domain: sources",
+        "source: vector"
+      ],
+      "title": "The Vector Source Now Accepts Metrics"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-04-11",
+      "description": "Significant performance gains for all Vector users",
+      "id": "2020-04-11-overall-performance-increase",
+      "importance": "high",
+      "path": "website/highlights/2020-04-11-overall-performance-increase.md",
+      "permalink": "/highlights/2020-04-11-overall-performance-increase/",
+      "tags": [
+        "type: performance"
+      ],
+      "title": "~36% Performance Improvement"
+    }
+  ],
   "installation": {
-    "containers": [
-      {
+    "downloads": {
+      "x86_64-unknown-linux-musl-tar-gz": {
+        "package_manager": null,
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "x86_64",
+        "file_name": "vector-x86_64-unknown-linux-musl.tar.gz",
+        "file_type": "tar.gz",
+        "os": "Linux",
+        "title": "Linux (x86_64)",
+        "type": "archive",
+        "name": "x86_64-unknown-linux-musl-tar-gz"
+      },
+      "aarch64-unknown-linux-musl-tar-gz": {
+        "package_manager": null,
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "ARM64",
+        "file_name": "vector-aarch64-unknown-linux-musl.tar.gz",
+        "file_type": "tar.gz",
+        "os": "Linux",
+        "title": "Linux (ARM64)",
+        "type": "archive",
+        "name": "aarch64-unknown-linux-musl-tar-gz"
+      },
+      "armv7-unknown-linux-musleabihf-tar-gz": {
+        "package_manager": null,
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "ARMv7",
+        "file_name": "vector-armv7-unknown-linux-musleabihf.tar.gz",
+        "file_type": "tar.gz",
+        "os": "Linux",
+        "title": "Linux (ARMv7)",
+        "type": "archive",
+        "name": "armv7-unknown-linux-musleabihf-tar-gz"
+      },
+      "x86_64-apple-darwin-tar-gz": {
+        "package_manager": null,
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "x86_64",
+        "file_name": "vector-x86_64-apple-darwin.tar.gz",
+        "file_type": "tar.gz",
+        "os": "MacOS",
+        "title": "MacOS (x86_64)",
+        "type": "archive",
+        "name": "x86_64-apple-darwin-tar-gz"
+      },
+      "x86_64-pc-windows-msvc-zip": {
+        "package_manager": null,
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "x86_64",
+        "file_name": "vector-x86_64-pc-windows-msvc.zip",
+        "file_type": "zip",
+        "os": "Windows",
+        "title": "Windows (x86_64, 7+)",
+        "type": "archive",
+        "name": "x86_64-pc-windows-msvc-zip"
+      },
+      "x64-msi": {
+        "package_manager": "msi",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "x86_64",
+        "file_name": "vector-x64.msi",
+        "file_type": "msi",
+        "os": "Windows",
+        "title": "Windows (x86_64, 7+)",
+        "type": "package",
+        "name": "x64-msi"
+      },
+      "amd64-deb": {
+        "package_manager": "dpkg",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "x86_64",
+        "file_name": "vector-amd64.deb",
+        "file_type": "deb",
+        "os": "Linux",
+        "title": "Deb (x86_64)",
+        "type": "package",
+        "name": "amd64-deb"
+      },
+      "arm64-deb": {
+        "package_manager": "dpkg",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "ARM64",
+        "file_name": "vector-arm64.deb",
+        "file_type": "deb",
+        "os": "Linux",
+        "title": "Deb (ARM64)",
+        "type": "package",
+        "name": "arm64-deb"
+      },
+      "armhf-deb": {
+        "package_manager": "dpkg",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "ARMv7",
+        "file_name": "vector-armhf.deb",
+        "file_type": "deb",
+        "os": "Linux",
+        "title": "Deb (ARMv7)",
+        "type": "package",
+        "name": "armhf-deb"
+      },
+      "x86_64-rpm": {
+        "package_manager": "rpm",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "x86_64",
+        "file_name": "vector-x86_64.rpm",
+        "file_type": "rpm",
+        "os": "Linux",
+        "title": "RPM (x86_64)",
+        "type": "package",
+        "name": "x86_64-rpm"
+      },
+      "aarch64-rpm": {
+        "package_manager": "rpm",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "ARM64",
+        "file_name": "vector-aarch64.rpm",
+        "file_type": "rpm",
+        "os": "Linux",
+        "title": "RPM (ARM64)",
+        "type": "package",
+        "name": "aarch64-rpm"
+      },
+      "armv7hl-rpm": {
+        "package_manager": "rpm",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "ARMv7",
+        "file_name": "vector-armv7hl.rpm",
+        "file_type": "rpm",
+        "os": "Linux",
+        "title": "RPM (ARMv7)",
+        "type": "package",
+        "name": "armv7hl-rpm"
+      }
+    },
+    "operating_systems": {
+      "amazon-linux": {
+        "title": "Amazon Linux",
+        "interfaces": [
+          "rpm",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
+        "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          }
+        ],
+        "name": "amazon-linux"
+      },
+      "centos": {
+        "title": "CentOS",
+        "interfaces": [
+          "rpm",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
+        "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          }
+        ],
+        "name": "centos"
+      },
+      "debian": {
+        "title": "Debian",
+        "interfaces": [
+          "dpkg",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
+        "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          }
+        ],
+        "name": "debian"
+      },
+      "macos": {
+        "title": "MacOS",
+        "interfaces": [
+          "homebrew",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
+        "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "file"
+          }
+        ],
+        "name": "macos"
+      },
+      "nixos": {
+        "title": "NixOS",
+        "interfaces": [
+          "nix",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
+        "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          }
+        ],
+        "name": "nixos"
+      },
+      "raspbian": {
+        "title": "Raspbian",
+        "interfaces": [
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
+        "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          }
+        ],
+        "name": "raspbian"
+      },
+      "rhel": {
+        "title": "RHEL",
+        "interfaces": [
+          "rpm",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
+        "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          }
+        ],
+        "name": "rhel"
+      },
+      "ubuntu": {
+        "title": "Ubuntu",
+        "interfaces": [
+          "dpkg",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
+        "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          }
+        ],
+        "name": "ubuntu"
+      },
+      "windows": {
+        "title": "Windows",
+        "interfaces": [
+          "msi",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
+        "os": "Windows",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "file"
+          }
+        ],
+        "name": "windows"
+      }
+    },
+    "package_managers": {
+      "dpkg": {
+        "title": "DPKG",
         "archs": [
           "x86_64",
           "ARM64",
           "ARMv7"
         ],
-        "id": "docker",
-        "name": "Docker",
+        "interfaces": [
+          "dpkg"
+        ],
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          }
+        ],
+        "name": "dpkg"
+      },
+      "homebrew": {
+        "title": "Homebrew",
+        "archs": [
+          "x86_64"
+        ],
+        "interfaces": [
+          "homebrew"
+        ],
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "file"
+          }
+        ],
+        "name": "homebrew"
+      },
+      "msi": {
+        "title": "MSI",
+        "interfaces": [
+          "msi"
+        ],
+        "archs": [
+          "x86_64"
+        ],
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "file"
+          }
+        ],
+        "name": "msi"
+      },
+      "nix": {
+        "title": "Nix",
+        "interfaces": [
+          "nix"
+        ],
+        "archs": [
+          "x86_64"
+        ],
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          }
+        ],
+        "name": "nix"
+      },
+      "rpm": {
+        "title": "RPM",
+        "interfaces": [
+          "rpm"
+        ],
+        "archs": [
+          "x86_64"
+        ],
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          }
+        ],
+        "name": "rpm"
+      }
+    },
+    "platforms": {
+      "docker": {
+        "archs": [
+          "x86_64",
+          "ARM64",
+          "ARMv7"
+        ],
+        "description": "[Docker][urls.docker] is an open platform for developing, shipping, and running\napplications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.",
+        "interfaces": [
+          "docker-cli",
+          "docker-compose"
+        ],
+        "logo_path": "/img/logos/docker.svg",
+        "name": "docker",
         "oss": [
           "Linux",
           "MacOS"
-        ]
+        ],
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "docker"
+          },
+          {
+            "name": "sidecar",
+            "source": "file"
+          },
+          {
+            "name": "service",
+            "source": "vector"
+          }
+        ],
+        "title": "Docker"
       }
+    }
+  },
+  "latest_highlight": {
+    "author_github": "https://github.com/binarylogic",
+    "date": "2020-04-11",
+    "description": "Significant performance gains for all Vector users",
+    "id": "2020-04-11-overall-performance-increase",
+    "importance": "high",
+    "path": "website/highlights/2020-04-11-overall-performance-increase.md",
+    "permalink": "/highlights/2020-04-11-overall-performance-increase/",
+    "tags": [
+      "type: performance"
     ],
-    "downloads": [
-      {
-        "arch": "x86_64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-x86_64-unknown-linux-musl.tar.gz",
-        "file_type": "tar.gz",
-        "name": "Linux (x86_64)",
-        "os": "Linux",
-        "type": "archive"
-      },
-      {
-        "arch": "ARM64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-aarch64-unknown-linux-musl.tar.gz",
-        "file_type": "tar.gz",
-        "name": "Linux (ARM64)",
-        "os": "Linux",
-        "type": "archive"
-      },
-      {
-        "arch": "ARMv7",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-armv7-unknown-linux-musleabihf.tar.gz",
-        "file_type": "tar.gz",
-        "name": "Linux (ARMv7)",
-        "os": "Linux",
-        "type": "archive"
-      },
-      {
-        "arch": "x86_64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-x86_64-apple-darwin.tar.gz",
-        "file_type": "tar.gz",
-        "name": "MacOS (x86_64)",
-        "os": "MacOS",
-        "type": "archive"
-      },
-      {
-        "arch": "x86_64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-x86_64-pc-windows-msvc.zip",
-        "file_type": "zip",
-        "name": "Windows (x86_64, 7+)",
-        "os": "Windows",
-        "type": "archive"
-      },
-      {
-        "arch": "x86_64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-x64.msi",
-        "file_type": "msi",
-        "name": "Windows (x86_64, 7+)",
-        "os": "Windows",
-        "package_manager": "MSI",
-        "type": "package"
-      },
-      {
-        "arch": "x86_64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-amd64.deb",
-        "file_type": "deb",
-        "name": "Deb (x86_64)",
-        "os": "Linux",
-        "package_manager": "DPKG",
-        "type": "package"
-      },
-      {
-        "arch": "ARM64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-arm64.deb",
-        "file_type": "deb",
-        "name": "Deb (ARM64)",
-        "os": "Linux",
-        "package_manager": "DPKG",
-        "type": "package"
-      },
-      {
-        "arch": "ARMv7",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-armhf.deb",
-        "file_type": "deb",
-        "name": "Deb (ARMv7)",
-        "os": "Linux",
-        "package_manager": "DPKG",
-        "type": "package"
-      },
-      {
-        "arch": "x86_64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-x86_64.rpm",
-        "file_type": "rpm",
-        "name": "RPM (x86_64)",
-        "os": "Linux",
-        "package_manager": "RPM",
-        "type": "package"
-      },
-      {
-        "arch": "ARM64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-aarch64.rpm",
-        "file_type": "rpm",
-        "name": "RPM (ARM64)",
-        "os": "Linux",
-        "package_manager": "RPM",
-        "type": "package"
-      },
-      {
-        "arch": "ARMv7",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-armv7hl.rpm",
-        "file_type": "rpm",
-        "name": "RPM (ARMv7)",
-        "os": "Linux",
-        "package_manager": "RPM",
-        "type": "package"
-      }
-    ],
-    "operating_systems": [
-      {
-        "id": "amazon-linux",
-        "name": "Amazon Linux",
-        "os": "Linux",
-        "package_manager": "RPM"
-      },
-      {
-        "id": "centos",
-        "name": "CentOS",
-        "os": "Linux",
-        "package_manager": "RPM"
-      },
-      {
-        "id": "debian",
-        "name": "Debian",
-        "os": "Linux",
-        "package_manager": "DPKG"
-      },
-      {
-        "id": "macos",
-        "name": "MacOS",
-        "os": "Linux",
-        "package_manager": "Homebrew"
-      },
-      {
-        "id": "nixos",
-        "name": "NixOS",
-        "os": "Linux",
-        "package_manager": "nix"
-      },
-      {
-        "id": "raspbian",
-        "name": "Raspbian",
-        "os": "Linux",
-        "package_manager": "DPKG"
-      },
-      {
-        "id": "rhel",
-        "name": "RHEL",
-        "os": "Linux",
-        "package_manager": "RPM"
-      },
-      {
-        "id": "ubuntu",
-        "name": "Ubuntu",
-        "os": "Linux",
-        "package_manager": "DPKG"
-      },
-      {
-        "id": "windows",
-        "name": "Windows",
-        "os": "Windows"
-      }
-    ],
-    "package_managers": [
-      {
-        "archs": [
-          "x86_64",
-          "ARM64",
-          "ARMv7"
-        ],
-        "id": "dpkg",
-        "name": "DPKG"
-      },
-      {
-        "archs": [
-          "x86_64"
-        ],
-        "id": "homebrew",
-        "name": "Homebrew"
-      },
-      {
-        "archs": [
-          "x86_64"
-        ],
-        "id": "nix",
-        "name": "Nix"
-      },
-      {
-        "archs": [
-          "x86_64"
-        ],
-        "id": "rpm",
-        "name": "RPM"
-      },
-      {
-        "archs": [
-          "x86_64"
-        ],
-        "id": "msi",
-        "name": "MSI"
-      }
-    ]
+    "title": "~36% Performance Improvement"
   },
   "latest_post": {
-    "author_github": "https://github.com/Jeffail",
-    "date": "2020-01-07",
-    "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
-    "id": "prometheus-source",
-    "path": "website/blog/2020-01-07-prometheus-source.md",
-    "permalink": "https://vector.dev/blog/prometheus-source",
+    "author_github": "https://github.com/lukesteensen",
+    "date": "2020-04-09",
+    "description": "When we set out to build Vector, we knew that reliability and performance were\ntwo of our top priorities. We also knew that even the best of intentions would\nnot be enough to make certain those qualities were realized and reflected in our\nusers' production deployments. Since then, we've been continuously evolving and\nexpanding our approach to achieving that level of quality.",
+    "id": "how-we-test-vector",
+    "path": "website/blog/2020-04-09-how-we-test-vector.md",
+    "permalink": "/blog/how-we-test-vector/",
     "tags": [
-      "type: announcement",
-      "event type: metrics",
-      "domain: sources",
-      "source: prometheus"
+      "type: post",
+      "domain: testing"
     ],
-    "title": "Prometheus Source"
+    "title": "How We Test Vector"
   },
   "latest_release": {
+    "codename": "",
     "commits": [
       {
         "author": "Ashley Jeffs",
@@ -267,7 +3646,6 @@ module.exports = {
         "deletions_count": 1,
         "description": "Enable file sink in generate subcmd",
         "files_count": 1,
-        "group": "fix",
         "insertions_count": 5,
         "message": "fix(cli): Enable file sink in generate subcmd (#1989)",
         "pr_number": 1989,
@@ -287,7 +3665,6 @@ module.exports = {
         "deletions_count": 8,
         "description": "Explicitly call GC in `lua` transform",
         "files_count": 1,
-        "group": "fix",
         "insertions_count": 25,
         "message": "fix(lua transform): Explicitly call GC in `lua` transform (#1990)",
         "pr_number": 1990,
@@ -307,7 +3684,6 @@ module.exports = {
         "deletions_count": 7,
         "description": "Fix broken links",
         "files_count": 5,
-        "group": "docs",
         "insertions_count": 9,
         "message": "docs: Fix broken links",
         "pr_number": null,
@@ -327,7 +3703,6 @@ module.exports = {
         "deletions_count": 1,
         "description": "Use new Homebrew installer in CI",
         "files_count": 1,
-        "group": "chore",
         "insertions_count": 1,
         "message": "chore(testing): Use new Homebrew installer in CI",
         "pr_number": null,
@@ -350,30 +3725,16 @@ module.exports = {
     ],
     "insertions_count": 31,
     "last_version": "0.8.1",
-    "posts": [
-
-    ],
-    "subtitle": "",
+    "permalink": "/releases/0.8.2/",
+    "title": "Vector v0.8.2",
     "type": "initial dev",
     "type_url": "https://semver.org/#spec-item-4",
-    "upgrade_guides": [
-
-    ],
     "version": "0.8.2"
   },
   "post_tags": [
     "type: announcement",
-    "domain: platforms",
-    "platform: arm",
-    "platform: windows",
-    "domain: config",
-    "domain: networking",
-    "platform: kubernetes",
-    "domain: transforms",
-    "transform: ec2_metadata",
-    "event type: metrics",
-    "domain: sources",
-    "source: prometheus"
+    "type: post",
+    "domain: testing"
   ],
   "posts": [
     {
@@ -382,112 +3743,29 @@ module.exports = {
       "description": "Today we're very excited to open source the Vector project! Vector is a tool for building flexible and robust pipelines for your logs and metrics data. We're still in the early stages, but our goal with Vector is to dramatically simplify your observability infrastructure while making it easy to get more value from your data.",
       "id": "introducing-vector",
       "path": "website/blog/2019-06-28-introducing-vector.md",
-      "permalink": "https://vector.dev/blog/introducing-vector",
+      "permalink": "/blog/introducing-vector/",
       "tags": [
         "type: announcement"
       ],
       "title": "Introducing Vector"
     },
     {
-      "author_github": "https://github.com/binarylogic",
-      "date": "2019-11-19",
-      "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
-      "id": "arm-support-on-linux",
-      "path": "website/blog/2019-11-19-arm-support-on-linux.md",
-      "permalink": "https://vector.dev/blog/arm-support-on-linux",
+      "author_github": "https://github.com/lukesteensen",
+      "date": "2020-04-09",
+      "description": "When we set out to build Vector, we knew that reliability and performance were\ntwo of our top priorities. We also knew that even the best of intentions would\nnot be enough to make certain those qualities were realized and reflected in our\nusers' production deployments. Since then, we've been continuously evolving and\nexpanding our approach to achieving that level of quality.",
+      "id": "how-we-test-vector",
+      "path": "website/blog/2020-04-09-how-we-test-vector.md",
+      "permalink": "/blog/how-we-test-vector/",
       "tags": [
-        "type: announcement",
-        "domain: platforms",
-        "platform: arm"
+        "type: post",
+        "domain: testing"
       ],
-      "title": "ARMv7 & ARM64 Support on Linux"
-    },
-    {
-      "author_github": "https://github.com/binarylogic",
-      "date": "2019-11-21",
-      "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
-      "id": "windows-support",
-      "path": "website/blog/2019-11-21-windows-support.md",
-      "permalink": "https://vector.dev/blog/windows-support",
-      "tags": [
-        "type: announcement",
-        "domain: platforms",
-        "platform: windows"
-      ],
-      "title": "Windows Support Is Here!"
-    },
-    {
-      "author_github": "https://github.com/Jeffail",
-      "date": "2019-11-25",
-      "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
-      "id": "unit-testing-vector-config-files",
-      "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
-      "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
-      "tags": [
-        "type: announcement",
-        "domain: config"
-      ],
-      "title": "Unit Testing Your Vector Config Files"
-    },
-    {
-      "author_github": "https://github.com/Jeffail",
-      "date": "2019-12-13",
-      "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
-      "id": "custom-dns",
-      "path": "website/blog/2019-12-13-custom-dns.md",
-      "permalink": "https://vector.dev/blog/custom-dns",
-      "tags": [
-        "type: announcement",
-        "domain: networking"
-      ],
-      "title": "Use Custom DNS Servers"
-    },
-    {
-      "author_github": "https://github.com/Jeffail",
-      "date": "2019-12-14",
-      "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
-      "id": "kubernetes-source-alpha",
-      "path": "website/blog/2019-12-14-kubernetes-source-alpha.md",
-      "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
-      "tags": [
-        "type: announcement",
-        "domain: platforms",
-        "platform: kubernetes"
-      ],
-      "title": "Alpha Kubernetes Source"
-    },
-    {
-      "author_github": "https://github.com/Jeffail",
-      "date": "2019-12-16",
-      "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
-      "id": "ec2-metadata",
-      "path": "website/blog/2019-12-16-ec2-metadata.md",
-      "permalink": "https://vector.dev/blog/ec2-metadata",
-      "tags": [
-        "type: announcement",
-        "domain: transforms",
-        "transform: ec2_metadata"
-      ],
-      "title": "EC2 Metadata Enrichments"
-    },
-    {
-      "author_github": "https://github.com/Jeffail",
-      "date": "2020-01-07",
-      "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
-      "id": "prometheus-source",
-      "path": "website/blog/2020-01-07-prometheus-source.md",
-      "permalink": "https://vector.dev/blog/prometheus-source",
-      "tags": [
-        "type: announcement",
-        "event type: metrics",
-        "domain: sources",
-        "source: prometheus"
-      ],
-      "title": "Prometheus Source"
+      "title": "How We Test Vector"
     }
   ],
   "releases": {
     "0.4.0": {
+      "codename": "Hello World Again",
       "commits": [
         {
           "author": "Lucio Franco",
@@ -496,7 +3774,6 @@ module.exports = {
           "deletions_count": 270,
           "description": "Add initial rework of rate limited logs",
           "files_count": 5,
-          "group": "perf",
           "insertions_count": 300,
           "message": "perf(observability): Add initial rework of rate limited logs (#778)",
           "pr_number": 778,
@@ -516,7 +3793,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Increase docker-release timeout",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(operations): Increase docker-release timeout (#858)",
           "pr_number": 858,
@@ -536,7 +3812,6 @@ module.exports = {
           "deletions_count": 347,
           "description": "New `add_tags` transform",
           "files_count": 35,
-          "group": "feat",
           "insertions_count": 1352,
           "message": "feat(new transform): New `add_tags` transform (#785)",
           "pr_number": 785,
@@ -556,7 +3831,6 @@ module.exports = {
           "deletions_count": 347,
           "description": "New `remove_tags` transform",
           "files_count": 35,
-          "group": "feat",
           "insertions_count": 1352,
           "message": "feat(new transform): New `remove_tags` transform (#785)",
           "pr_number": 785,
@@ -576,7 +3850,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "New `file` sink",
           "files_count": 22,
-          "group": "feat",
           "insertions_count": 1355,
           "message": "feat(new sink): New `file` sink (#688)",
           "pr_number": 688,
@@ -596,7 +3869,6 @@ module.exports = {
           "deletions_count": 261,
           "description": "update stream-based diagram",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 206,
           "message": "docs: update stream-based diagram",
           "pr_number": null,
@@ -616,7 +3888,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "update roadmap link",
           "files_count": 8,
-          "group": "docs",
           "insertions_count": 13,
           "message": "docs: update roadmap link",
           "pr_number": null,
@@ -636,7 +3907,6 @@ module.exports = {
           "deletions_count": 70,
           "description": "favor older files and allow configuring greedier reads",
           "files_count": 9,
-          "group": "enhancement",
           "insertions_count": 393,
           "message": "enhancement(file source): favor older files and allow configuring greedier reads (#810)",
           "pr_number": 810,
@@ -656,7 +3926,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "clarify sampler transform rate documentation",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 16,
           "message": "docs: clarify sampler transform rate documentation",
           "pr_number": null,
@@ -676,7 +3945,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "gitbook straight doesnt escape |, so we will have to live with \\|",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 6,
           "message": "docs: gitbook straight doesnt escape |, so we will have to live with \\|",
           "pr_number": null,
@@ -696,7 +3964,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "use &#124; for the pipe character...gitbook",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 6,
           "message": "docs: use &#124; for the pipe character...gitbook",
           "pr_number": null,
@@ -716,7 +3983,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "add SUMMARY.md.erb template",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 90,
           "message": "docs: add SUMMARY.md.erb template",
           "pr_number": null,
@@ -736,7 +4002,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "use literals when escaping |",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 6,
           "message": "docs: use literals when escaping |",
           "pr_number": null,
@@ -756,7 +4021,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "gitbook doesnt like double escaped | characters",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 6,
           "message": "docs: gitbook doesnt like double escaped | characters",
           "pr_number": null,
@@ -776,7 +4040,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "fix file source table escaping",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 9,
           "message": "docs: fix file source table escaping",
           "pr_number": null,
@@ -796,7 +4059,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "kafka souce it an at_least_once delivery guarantee",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 5,
           "message": "docs: kafka souce it an at_least_once delivery guarantee",
           "pr_number": null,
@@ -816,7 +4078,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "add note about kafka topic pattern matching, ref https://github.com/timberio/vector/issues/819",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 16,
           "message": "docs: add note about kafka topic pattern matching, ref https://github.com/timberio/vector/issues/819",
           "pr_number": null,
@@ -836,7 +4097,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "fix path detection",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: fix path detection",
           "pr_number": null,
@@ -856,7 +4116,6 @@ module.exports = {
           "deletions_count": 26,
           "description": "fix sink links",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 26,
           "message": "docs: fix sink links",
           "pr_number": null,
@@ -876,7 +4135,6 @@ module.exports = {
           "deletions_count": 35,
           "description": "generate SUMMARY.md to ensure new components show up in the side bar",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 69,
           "message": "docs: generate SUMMARY.md to ensure new components show up in the side bar",
           "pr_number": null,
@@ -896,7 +4154,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "add kafka source to summary.md",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 11,
           "message": "docs: add kafka source to summary.md",
           "pr_number": null,
@@ -916,7 +4173,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add bundler to requirements",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 7,
           "message": "docs: Add bundler to requirements (#845)",
           "pr_number": 845,
@@ -936,7 +4192,6 @@ module.exports = {
           "deletions_count": 77,
           "description": "Add checkpointing support",
           "files_count": 8,
-          "group": "enhancement",
           "insertions_count": 342,
           "message": "enhancement(journald source): Add checkpointing support (#816)",
           "pr_number": 816,
@@ -956,7 +4211,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Make the headers and query tables optional.",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 11,
           "message": "fix(elasticsearch sink): Make the headers and query tables optional. (#831)",
           "pr_number": 831,
@@ -976,7 +4230,6 @@ module.exports = {
           "deletions_count": 17,
           "description": "Fix docker nightly builds",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 11,
           "message": "fix(operations): Fix docker nightly builds (#830)",
           "pr_number": 830,
@@ -996,7 +4249,6 @@ module.exports = {
           "deletions_count": 16,
           "description": "allow aggregating multiple lines into one event",
           "files_count": 5,
-          "group": "enhancement",
           "insertions_count": 285,
           "message": "enhancement(file source): allow aggregating multiple lines into one event (#809)",
           "pr_number": 809,
@@ -1016,7 +4268,6 @@ module.exports = {
           "deletions_count": 830,
           "description": "Topology test refactoring",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 677,
           "message": "chore(testing): Topology test refactoring (#748)",
           "pr_number": 748,
@@ -1036,7 +4287,6 @@ module.exports = {
           "deletions_count": 28,
           "description": "Add support for unverified HTTPS",
           "files_count": 6,
-          "group": "enhancement",
           "insertions_count": 124,
           "message": "enhancement(http sink): Add support for unverified HTTPS (#815)",
           "pr_number": 815,
@@ -1056,7 +4306,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add missing clickhouse integration test feature",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(testing): Add missing clickhouse integration test feature (#818)",
           "pr_number": 818,
@@ -1076,7 +4325,6 @@ module.exports = {
           "deletions_count": 53,
           "description": "Update to `tokio-udp` v0.1.5",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 21,
           "message": "chore(udp source): Update to `tokio-udp` v0.1.5 (#817)",
           "pr_number": 817,
@@ -1096,7 +4344,6 @@ module.exports = {
           "deletions_count": 50,
           "description": "Use new UdpFramed",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 55,
           "message": "chore(udp source): Use new UdpFramed (#808)",
           "pr_number": 808,
@@ -1116,7 +4363,6 @@ module.exports = {
           "deletions_count": 121,
           "description": "make fingerprinting strategy configurable",
           "files_count": 7,
-          "group": "enhancement",
           "insertions_count": 330,
           "message": "enhancement(file source): make fingerprinting strategy configurable (#780)",
           "pr_number": 780,
@@ -1136,7 +4382,6 @@ module.exports = {
           "deletions_count": 41,
           "description": "fix tcp sink docs formatting issues",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 33,
           "message": "docs: fix tcp sink docs formatting issues",
           "pr_number": null,
@@ -1156,7 +4401,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Initial `journald` source implementation",
           "files_count": 20,
-          "group": "feat",
           "insertions_count": 1366,
           "message": "feat(new source): Initial `journald` source implementation (#702)",
           "pr_number": 702,
@@ -1176,7 +4420,6 @@ module.exports = {
           "deletions_count": 19,
           "description": "Add support for TLS",
           "files_count": 10,
-          "group": "enhancement",
           "insertions_count": 460,
           "message": "enhancement(tcp sink): Add support for TLS (#765)",
           "pr_number": 765,
@@ -1196,7 +4439,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "add test for tokenizer handling multiple spaces",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(testing): add test for tokenizer handling multiple spaces",
           "pr_number": null,
@@ -1216,7 +4458,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "add build steps as part of overall testing",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 6,
           "message": "chore(testing): add build steps as part of overall testing (#788)",
           "pr_number": 788,
@@ -1236,7 +4477,6 @@ module.exports = {
           "deletions_count": 13,
           "description": "`encoding = \"text\"` overrides",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 48,
           "message": "fix(aws_cloudwatch_logs sink): `encoding = \"text\"` overrides (#803)",
           "pr_number": 803,
@@ -1256,7 +4496,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "Docker build image tweaks",
           "files_count": 7,
-          "group": "chore",
           "insertions_count": 28,
           "message": "chore(operations): Docker build image tweaks (#802)",
           "pr_number": 802,
@@ -1276,7 +4515,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add new `kafka` source",
           "files_count": 16,
-          "group": "feat",
           "insertions_count": 786,
           "message": "feat(new source): Add new `kafka` source (#774)",
           "pr_number": 774,
@@ -1296,7 +4534,6 @@ module.exports = {
           "deletions_count": 64,
           "description": "Use GNU ld instead of LLVM lld for x86_64-unknown-linux-musl",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 26,
           "message": "fix(operations): Use GNU ld instead of LLVM lld for x86_64-unknown-linux-musl (#794)",
           "pr_number": 794,
@@ -1316,7 +4553,6 @@ module.exports = {
           "deletions_count": 174,
           "description": "update github label links to use new lowercase format",
           "files_count": 32,
-          "group": "docs",
           "insertions_count": 174,
           "message": "docs: update github label links to use new lowercase format",
           "pr_number": null,
@@ -1336,7 +4572,6 @@ module.exports = {
           "deletions_count": 56,
           "description": "remove sinks guidelines from docs and put them in contributing.md",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 0,
           "message": "docs: remove sinks guidelines from docs and put them in contributing.md",
           "pr_number": null,
@@ -1356,7 +4591,6 @@ module.exports = {
           "deletions_count": 307,
           "description": "merge DEVELOPING.md into CONTRIBUTING.md",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 286,
           "message": "docs: merge DEVELOPING.md into CONTRIBUTING.md",
           "pr_number": null,
@@ -1376,7 +4610,6 @@ module.exports = {
           "deletions_count": 48,
           "description": "Add tags support to log_to_metric transform",
           "files_count": 6,
-          "group": "enhancement",
           "insertions_count": 127,
           "message": "enhancement(lua transform): Add tags support to log_to_metric transform (#786)",
           "pr_number": 786,
@@ -1396,7 +4629,6 @@ module.exports = {
           "deletions_count": 12,
           "description": "fix relative linking on root docs pages, ref: https://github.com/timberio/vector/pull/793",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 16,
           "message": "docs: fix relative linking on root docs pages, ref: https://github.com/timberio/vector/pull/793",
           "pr_number": null,
@@ -1416,7 +4648,6 @@ module.exports = {
           "deletions_count": 33,
           "description": "update data model docs with relevant changes",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 73,
           "message": "docs: update data model docs with relevant changes",
           "pr_number": null,
@@ -1436,7 +4667,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Restore rust-toolchain after building",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Restore rust-toolchain after building (#792)",
           "pr_number": 792,
@@ -1456,7 +4686,6 @@ module.exports = {
           "deletions_count": 15,
           "description": "fix source output types",
           "files_count": 7,
-          "group": "docs",
           "insertions_count": 20,
           "message": "docs: fix source output types",
           "pr_number": null,
@@ -1476,7 +4705,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "update add companies link",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 5,
           "message": "docs: update add companies link",
           "pr_number": null,
@@ -1496,7 +4724,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "add companies list",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 38,
           "message": "docs: add companies list (#789)",
           "pr_number": 789,
@@ -1516,7 +4743,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "add log/metrics correlation feature",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 10,
           "message": "docs: add log/metrics correlation feature",
           "pr_number": null,
@@ -1536,7 +4762,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "add namespace config",
           "files_count": 7,
-          "group": "enhancement",
           "insertions_count": 67,
           "message": "enhancement(prometheus sink): add namespace config (#782)",
           "pr_number": 782,
@@ -1556,7 +4781,6 @@ module.exports = {
           "deletions_count": 17,
           "description": "update cloudwatch examples",
           "files_count": 7,
-          "group": "docs",
           "insertions_count": 22,
           "message": "docs: update cloudwatch examples",
           "pr_number": null,
@@ -1576,7 +4800,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "fix authentication list, attempt 2",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: fix authentication list, attempt 2",
           "pr_number": null,
@@ -1596,7 +4819,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "fix authentication list",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 20,
           "message": "docs: fix authentication list",
           "pr_number": null,
@@ -1616,7 +4838,6 @@ module.exports = {
           "deletions_count": 32,
           "description": "fix partitioning language",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 11,
           "message": "docs: fix partitioning language",
           "pr_number": null,
@@ -1636,7 +4857,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Only notify on failed/fixed master builds",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(operations): Only notify on failed/fixed master builds (#779)",
           "pr_number": 779,
@@ -1656,7 +4876,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "fix UDP docs typo",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 6,
           "message": "docs: fix UDP docs typo",
           "pr_number": null,
@@ -1676,7 +4895,6 @@ module.exports = {
           "deletions_count": 33,
           "description": "fix errors in udp source docs",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 24,
           "message": "docs: fix errors in udp source docs",
           "pr_number": null,
@@ -1696,7 +4914,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "fix from archive installation typos",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 7,
           "message": "docs: fix from archive installation typos",
           "pr_number": null,
@@ -1716,7 +4933,6 @@ module.exports = {
           "deletions_count": 108,
           "description": "keep nightly builds",
           "files_count": 10,
-          "group": "chore",
           "insertions_count": 154,
           "message": "chore: keep nightly builds (#772)",
           "pr_number": 772,
@@ -1736,7 +4952,6 @@ module.exports = {
           "deletions_count": 57,
           "description": "add labels support",
           "files_count": 2,
-          "group": "enhancement",
           "insertions_count": 131,
           "message": "enhancement(prometheus sink): add labels support (#773)",
           "pr_number": 773,
@@ -1756,7 +4971,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "add udp source",
           "files_count": 12,
-          "group": "docs",
           "insertions_count": 485,
           "message": "docs: add udp source",
           "pr_number": null,
@@ -1776,7 +4990,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "add clickhouse sink documentation",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 478,
           "message": "docs: add clickhouse sink documentation",
           "pr_number": null,
@@ -1796,7 +5009,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Add support for custom query parameters",
           "files_count": 6,
-          "group": "enhancement",
           "insertions_count": 64,
           "message": "enhancement(elasticsearch sink): Add support for custom query parameters (#766)",
           "pr_number": 766,
@@ -1816,7 +5028,6 @@ module.exports = {
           "deletions_count": 42,
           "description": "Error type for types conversion",
           "files_count": 7,
-          "group": "chore",
           "insertions_count": 101,
           "message": "chore: Error type for types conversion (#735)",
           "pr_number": 735,
@@ -1836,7 +5047,6 @@ module.exports = {
           "deletions_count": 29,
           "description": "Initial `clickhouse` sink implementation",
           "files_count": 18,
-          "group": "feat",
           "insertions_count": 698,
           "message": "feat(new sink): Initial `clickhouse` sink implementation (#693)",
           "pr_number": 693,
@@ -1856,7 +5066,6 @@ module.exports = {
           "deletions_count": 68,
           "description": "Add rust-toolchain file and bump to 1.37",
           "files_count": 27,
-          "group": "chore",
           "insertions_count": 55,
           "message": "chore: Add rust-toolchain file and bump to 1.37 (#761)",
           "pr_number": 761,
@@ -1876,7 +5085,6 @@ module.exports = {
           "deletions_count": 33,
           "description": "add tags into metrics model",
           "files_count": 8,
-          "group": "enhancement",
           "insertions_count": 243,
           "message": "enhancement(metric data model): add tags into metrics model (#754)",
           "pr_number": 754,
@@ -1896,7 +5104,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Add guidance for writing healthchecks",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 116,
           "message": "docs: Add guidance for writing healthchecks (#755)",
           "pr_number": 755,
@@ -1916,7 +5123,6 @@ module.exports = {
           "deletions_count": 27,
           "description": "Add dynamic group creation",
           "files_count": 8,
-          "group": "enhancement",
           "insertions_count": 236,
           "message": "enhancement(aws_cloudwatch_logs sink): Add dynamic group creation (#759)",
           "pr_number": 759,
@@ -1936,7 +5142,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Initial `aws_cloudwatch_metrics` sink implementation ",
           "files_count": 9,
-          "group": "feat",
           "insertions_count": 588,
           "message": "feat(new sink): Initial `aws_cloudwatch_metrics` sink implementation  (#707)",
           "pr_number": 707,
@@ -1956,7 +5161,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "fix docs generator file ext",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore(docs): fix docs generator file ext",
           "pr_number": null,
@@ -1976,7 +5180,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add support for additional headers to the Elasticsearch sink",
           "files_count": 5,
-          "group": "enhancement",
           "insertions_count": 62,
           "message": "enhancement(elasticsearch sink): Add support for additional headers to the Elasticsearch sink (#758)",
           "pr_number": 758,
@@ -1996,7 +5199,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Update Metric::Set usage",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 5,
           "message": "fix(prometheus sink): Update Metric::Set usage (#756)",
           "pr_number": 756,
@@ -2016,7 +5218,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Initial `udp` source implementation",
           "files_count": 3,
-          "group": "feat",
           "insertions_count": 230,
           "message": "feat(new source): Initial `udp` source implementation (#738)",
           "pr_number": 738,
@@ -2036,7 +5237,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Support sets",
           "files_count": 2,
-          "group": "enhancement",
           "insertions_count": 178,
           "message": "enhancement(prometheus sink): Support sets (#733)",
           "pr_number": 733,
@@ -2056,7 +5256,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "reload with unparseable config",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 14,
           "message": "fix(config): reload with unparseable config (#752)",
           "pr_number": 752,
@@ -2076,7 +5275,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Add HTTP Basic authorization",
           "files_count": 7,
-          "group": "enhancement",
           "insertions_count": 105,
           "message": "enhancement(elasticsearch sink): Add HTTP Basic authorization (#749)",
           "pr_number": 749,
@@ -2096,7 +5294,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Ignore topology replace source and transform",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore: Ignore topology replace source and transform (#740)",
           "pr_number": 740,
@@ -2116,7 +5313,6 @@ module.exports = {
           "deletions_count": 28,
           "description": "fix typo",
           "files_count": 28,
-          "group": "docs",
           "insertions_count": 28,
           "message": "docs: fix typo",
           "pr_number": null,
@@ -2136,7 +5332,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Hot fix (cargo-fmt)",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore: Hot fix (cargo-fmt)",
           "pr_number": null,
@@ -2156,7 +5351,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Validation of sinks and sources for non-emptiness.",
           "files_count": 2,
-          "group": "enhancement",
           "insertions_count": 14,
           "message": "enhancement(config): Validation of sinks and sources for non-emptiness. (#739)",
           "pr_number": 739,
@@ -2176,7 +5370,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "fix typos",
           "files_count": 8,
-          "group": "docs",
           "insertions_count": 8,
           "message": "docs: fix typos",
           "pr_number": null,
@@ -2196,7 +5389,6 @@ module.exports = {
           "deletions_count": 134,
           "description": "Fix typo in vector image",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 1,
           "message": "docs: Fix typo in vector image (#744)",
           "pr_number": 744,
@@ -2216,7 +5408,6 @@ module.exports = {
           "deletions_count": 29,
           "description": "Fix typos",
           "files_count": 16,
-          "group": "docs",
           "insertions_count": 30,
           "message": "docs: Fix typos (#743)",
           "pr_number": 743,
@@ -2236,7 +5427,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Improve x86_64-unknown-linux-musl build",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(operations): Improve x86_64-unknown-linux-musl build (#722)",
           "pr_number": 722,
@@ -2256,7 +5446,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "It is now possible to reload a with a non-overlap…",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 63,
           "message": "fix(topology): It is now possible to reload a with a non-overlap… (#681)",
           "pr_number": 681,
@@ -2276,7 +5465,6 @@ module.exports = {
           "deletions_count": 125,
           "description": "Add sink healthcheck disable",
           "files_count": 22,
-          "group": "enhancement",
           "insertions_count": 531,
           "message": "enhancement(topology): Add sink healthcheck disable (#731)",
           "pr_number": 731,
@@ -2296,7 +5484,6 @@ module.exports = {
           "deletions_count": 27,
           "description": "update sink flow diagrams",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 25,
           "message": "docs: update sink flow diagrams",
           "pr_number": null,
@@ -2316,7 +5503,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "fix release-s3 error",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore: fix release-s3 error",
           "pr_number": null,
@@ -2336,7 +5522,6 @@ module.exports = {
           "deletions_count": 195,
           "description": "add timestamps into metrics",
           "files_count": 11,
-          "group": "enhancement",
           "insertions_count": 335,
           "message": "enhancement(metric data model): add timestamps into metrics (#726)",
           "pr_number": 726,
@@ -2356,7 +5541,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "don't serialize MapValue::Null as a string",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 30,
           "message": "fix(log data model): don't serialize MapValue::Null as a string (#725)",
           "pr_number": 725,
@@ -2376,7 +5560,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "RUSTSEC-2019-0011 by updating crossbeam-epoch",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 20,
           "message": "fix(security): RUSTSEC-2019-0011 by updating crossbeam-epoch (#723)",
           "pr_number": 723,
@@ -2396,7 +5579,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "remove filter on nightly builds",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore(operations): remove filter on nightly builds",
           "pr_number": null,
@@ -2416,7 +5598,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "add prometheus histograms test",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 39,
           "message": "chore(testing): add prometheus histograms test (#719)",
           "pr_number": 719,
@@ -2436,7 +5617,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Use a locked down version of localstack",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(testing): Use a locked down version of localstack (#720)",
           "pr_number": 720,
@@ -2456,7 +5636,6 @@ module.exports = {
           "deletions_count": 23,
           "description": "use double for storing metric values",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 18,
           "message": "chore(metric data model): use double for storing metric values (#717)",
           "pr_number": 717,
@@ -2476,7 +5655,6 @@ module.exports = {
           "deletions_count": 47,
           "description": "use shorter component ids",
           "files_count": 30,
-          "group": "docs",
           "insertions_count": 47,
           "message": "docs: use shorter component ids",
           "pr_number": null,
@@ -2496,7 +5674,6 @@ module.exports = {
           "deletions_count": 596,
           "description": "Support histograms",
           "files_count": 18,
-          "group": "enhancement",
           "insertions_count": 742,
           "message": "enhancement(prometheus sink): Support histograms (#675)",
           "pr_number": 675,
@@ -2516,7 +5693,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "all new * as a commit title category",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 12,
           "message": "chore: all new * as a commit title category",
           "pr_number": null,
@@ -2536,7 +5712,6 @@ module.exports = {
           "deletions_count": 18,
           "description": "fix duplicate section references",
           "files_count": 13,
-          "group": "docs",
           "insertions_count": 145,
           "message": "docs: fix duplicate section references",
           "pr_number": null,
@@ -2556,7 +5731,6 @@ module.exports = {
           "deletions_count": 189,
           "description": "aws_s3_sink encoding is not required",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 184,
           "message": "docs: aws_s3_sink encoding is not required",
           "pr_number": null,
@@ -2576,7 +5750,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "add valid scopes",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 63,
           "message": "docs: add valid scopes",
           "pr_number": null,
@@ -2596,7 +5769,6 @@ module.exports = {
           "deletions_count": 40,
           "description": "fix typo",
           "files_count": 11,
-          "group": "docs",
           "insertions_count": 40,
           "message": "docs: fix typo",
           "pr_number": null,
@@ -2616,7 +5788,6 @@ module.exports = {
           "deletions_count": 96,
           "description": "remove false default values that communicate dynamic behavior",
           "files_count": 16,
-          "group": "docs",
           "insertions_count": 136,
           "message": "docs: remove false default values that communicate dynamic behavior",
           "pr_number": null,
@@ -2636,7 +5807,6 @@ module.exports = {
           "deletions_count": 248,
           "description": "fix html escaping issues",
           "files_count": 33,
-          "group": "docs",
           "insertions_count": 248,
           "message": "docs: fix html escaping issues",
           "pr_number": null,
@@ -2656,7 +5826,6 @@ module.exports = {
           "deletions_count": 281,
           "description": "add html escaping",
           "files_count": 37,
-          "group": "docs",
           "insertions_count": 326,
           "message": "docs: add html escaping",
           "pr_number": null,
@@ -2676,7 +5845,6 @@ module.exports = {
           "deletions_count": 50,
           "description": "fall back to global data_dir option (#644)",
           "files_count": 14,
-          "group": "enhancement",
           "insertions_count": 191,
           "message": "enhancement(file source): fall back to global data_dir option (#644) (#673)",
           "pr_number": 673,
@@ -2696,7 +5864,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "fix lua drop event example",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: fix lua drop event example",
           "pr_number": null,
@@ -2716,7 +5883,6 @@ module.exports = {
           "deletions_count": 59,
           "description": "fix alternative suggestions",
           "files_count": 32,
-          "group": "docs",
           "insertions_count": 70,
           "message": "docs: fix alternative suggestions",
           "pr_number": null,
@@ -2736,7 +5902,6 @@ module.exports = {
           "deletions_count": 58,
           "description": "update log_to_metric docs to reflect all metric types",
           "files_count": 7,
-          "group": "docs",
           "insertions_count": 284,
           "message": "docs: update log_to_metric docs to reflect all metric types",
           "pr_number": null,
@@ -2756,7 +5921,6 @@ module.exports = {
           "deletions_count": 230,
           "description": "update enum language",
           "files_count": 37,
-          "group": "docs",
           "insertions_count": 239,
           "message": "docs: update enum language",
           "pr_number": null,
@@ -2776,7 +5940,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "add summary for Vector config syntax",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 6,
           "message": "docs: add summary for Vector config syntax",
           "pr_number": null,
@@ -2796,7 +5959,6 @@ module.exports = {
           "deletions_count": 16,
           "description": "fix template syntax broken link",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 16,
           "message": "docs: fix template syntax broken link",
           "pr_number": null,
@@ -2816,7 +5978,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "fix doc typo",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 5,
           "message": "docs: fix doc typo",
           "pr_number": null,
@@ -2836,7 +5997,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "remote strftime comment in s3 key_prefix description",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 5,
           "message": "docs: remote strftime comment in s3 key_prefix description",
           "pr_number": null,
@@ -2856,7 +6016,6 @@ module.exports = {
           "deletions_count": 137,
           "description": "add documentation on Vectors template syntax",
           "files_count": 43,
-          "group": "docs",
           "insertions_count": 2601,
           "message": "docs: add documentation on Vectors template syntax",
           "pr_number": null,
@@ -2876,7 +6035,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "fix build syntax error",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore(operations): fix build syntax error",
           "pr_number": null,
@@ -2896,7 +6054,6 @@ module.exports = {
           "deletions_count": 71,
           "description": "fix nightly builds, release to docker and s3",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 128,
           "message": "chore(operations): fix nightly builds, release to docker and s3",
           "pr_number": null,
@@ -2916,7 +6073,6 @@ module.exports = {
           "deletions_count": 19,
           "description": "cleanup docker language",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 28,
           "message": "docs: cleanup docker language",
           "pr_number": null,
@@ -2936,7 +6092,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "update installer script to use musl statically linked archive",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(chore): update installer script to use musl statically linked archive",
           "pr_number": null,
@@ -2956,7 +6111,6 @@ module.exports = {
           "deletions_count": 31,
           "description": "update chat to chat/forum since it servers both purposes now",
           "files_count": 30,
-          "group": "docs",
           "insertions_count": 31,
           "message": "docs: update chat to chat/forum since it servers both purposes now",
           "pr_number": null,
@@ -2976,7 +6130,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "add data model diagram",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 216,
           "message": "docs: add data model diagram",
           "pr_number": null,
@@ -2996,7 +6149,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "fix docker html entity escaping",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 12,
           "message": "docs: fix docker html entity escaping",
           "pr_number": null,
@@ -3016,7 +6168,6 @@ module.exports = {
           "deletions_count": 32,
           "description": "update vector docker images to reflect their base image",
           "files_count": 7,
-          "group": "chore",
           "insertions_count": 34,
           "message": "chore(operations): update vector docker images to reflect their base image (#705)",
           "pr_number": 705,
@@ -3036,7 +6187,6 @@ module.exports = {
           "deletions_count": 151,
           "description": "use templates for ES index and S3 key prefix",
           "files_count": 4,
-          "group": "enhancement",
           "insertions_count": 275,
           "message": "enhancement(elasticsearch sink): use templates for ES index and S3 key prefix (#686)",
           "pr_number": 686,
@@ -3056,7 +6206,6 @@ module.exports = {
           "deletions_count": 40,
           "description": "unflatten event before outputting",
           "files_count": 17,
-          "group": "fix",
           "insertions_count": 552,
           "message": "fix(log data model): unflatten event before outputting (#678)",
           "pr_number": 678,
@@ -3076,7 +6225,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "recommend alpine docker image",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: recommend alpine docker image",
           "pr_number": null,
@@ -3096,7 +6244,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "attempt to fix data model type links",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 3,
           "message": "docs: attempt to fix data model type links",
           "pr_number": null,
@@ -3116,7 +6263,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "singularize log event types",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: singularize log event types",
           "pr_number": null,
@@ -3136,7 +6282,6 @@ module.exports = {
           "deletions_count": 32,
           "description": "expand on log event types",
           "files_count": 21,
-          "group": "docs",
           "insertions_count": 66,
           "message": "docs: expand on log event types",
           "pr_number": null,
@@ -3156,7 +6301,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "fix subnav item names for log and event",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: fix subnav item names for log and event",
           "pr_number": null,
@@ -3176,7 +6320,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "fix path typo in subnav",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: fix path typo in subnav",
           "pr_number": null,
@@ -3196,7 +6339,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "rename log and metric subnav items because Gitbook...",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: rename log and metric subnav items because Gitbook...",
           "pr_number": null,
@@ -3216,7 +6358,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "rename log and metric event titles because gitbook...",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: rename log and metric event titles because gitbook...",
           "pr_number": null,
@@ -3236,7 +6377,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "add log and metrics subnav items for the data model section",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: add log and metrics subnav items for the data model section",
           "pr_number": null,
@@ -3256,7 +6396,6 @@ module.exports = {
           "deletions_count": 522,
           "description": "Add configurable partition keys",
           "files_count": 54,
-          "group": "enhancement",
           "insertions_count": 1075,
           "message": "enhancement(aws_kinesis_streams sink): Add configurable partition keys (#692)",
           "pr_number": 692,
@@ -3276,7 +6415,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "cleanup musl archive language",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 5,
           "message": "docs: cleanup musl archive language",
           "pr_number": null,
@@ -3296,7 +6434,6 @@ module.exports = {
           "deletions_count": 37,
           "description": "release nightly instead of on each commit",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 47,
           "message": "chore(operations): release nightly instead of on each commit (#703)",
           "pr_number": 703,
@@ -3316,7 +6453,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "remove musl warnings since it includes all features now",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 3,
           "message": "docs: remove musl warnings since it includes all features now",
           "pr_number": null,
@@ -3336,7 +6472,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "fix broken links",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: fix broken links",
           "pr_number": null,
@@ -3356,7 +6491,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "fix docker.md parsing error",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 1,
           "message": "docs: fix docker.md parsing error",
           "pr_number": null,
@@ -3376,7 +6510,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Add rate limit notice when it starts",
           "files_count": 3,
-          "group": "enhancement",
           "insertions_count": 40,
           "message": "enhancement(observability): Add rate limit notice when it starts (#696)",
           "pr_number": 696,
@@ -3396,7 +6529,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "make binary stripping an option during the release process, fixes an issue stripping armv7 binaries",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 6,
           "message": "chore(operations): make binary stripping an option during the release process, fixes an issue stripping armv7 binaries",
           "pr_number": null,
@@ -3416,7 +6548,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "add TARGET env var to musl build archive step",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(operations): add TARGET env var to musl build archive step",
           "pr_number": null,
@@ -3436,7 +6567,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Remove extra debug flags",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore: Remove extra debug flags",
           "pr_number": null,
@@ -3456,7 +6586,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Fix build-archive script to support multiple features",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 23,
           "message": "chore(operations): Fix build-archive script to support multiple features",
           "pr_number": null,
@@ -3476,7 +6605,6 @@ module.exports = {
           "deletions_count": 19,
           "description": "Disable armv7 musleabihf build",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 19,
           "message": "chore(operations): Disable armv7 musleabihf build (#698)",
           "pr_number": 698,
@@ -3496,7 +6624,6 @@ module.exports = {
           "deletions_count": 20,
           "description": "Build for x86_64-unknown-linux-musl with all features and optimized binary size",
           "files_count": 3,
-          "group": "enhancement",
           "insertions_count": 365,
           "message": "enhancement(operations): Build for x86_64-unknown-linux-musl with all features and optimized binary size (#689)",
           "pr_number": 689,
@@ -3516,7 +6643,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "remove Slack since we no longer use Slack",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore: remove Slack since we no longer use Slack",
           "pr_number": null,
@@ -3536,7 +6662,6 @@ module.exports = {
           "deletions_count": 82,
           "description": "update documentation to reflect new help resources",
           "files_count": 37,
-          "group": "docs",
           "insertions_count": 208,
           "message": "docs: update documentation to reflect new help resources",
           "pr_number": null,
@@ -3556,7 +6681,6 @@ module.exports = {
           "deletions_count": 20,
           "description": "Retry requests on timeouts",
           "files_count": 5,
-          "group": "fix",
           "insertions_count": 146,
           "message": "fix(networking): Retry requests on timeouts (#691)",
           "pr_number": 691,
@@ -3576,7 +6700,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Default `doc_type` to `_doc` and make it op…",
           "files_count": 2,
-          "group": "enhancement",
           "insertions_count": 6,
           "message": "enhancement(elasticsearch sink): Default `doc_type` to `_doc` and make it op… (#695)",
           "pr_number": 695,
@@ -3596,7 +6719,6 @@ module.exports = {
           "deletions_count": 97,
           "description": "remove forum references, we recommend filing a help issue or joining our Slack channel instead",
           "files_count": 34,
-          "group": "chore",
           "insertions_count": 33,
           "message": "chore: remove forum references, we recommend filing a help issue or joining our Slack channel instead",
           "pr_number": null,
@@ -3616,7 +6738,6 @@ module.exports = {
           "deletions_count": 355,
           "description": "Add retry ability to cloudwatch",
           "files_count": 24,
-          "group": "enhancement",
           "insertions_count": 605,
           "message": "enhancement(aws_cloudwatch_logs sink): Add retry ability to cloudwatch (#663)",
           "pr_number": 663,
@@ -3636,7 +6757,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "replace some references to \"sink\" with `component.type`",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: replace some references to \"sink\" with `component.type` (#685)",
           "pr_number": 685,
@@ -3656,7 +6776,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Update nom from 0.5.0-beta2 to 0.5",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 21,
           "message": "chore: Update nom from 0.5.0-beta2 to 0.5 (#679)",
           "pr_number": 679,
@@ -3676,7 +6795,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "minor fixes in getting-started page",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: minor fixes in getting-started page (#682)",
           "pr_number": 682,
@@ -3696,7 +6814,6 @@ module.exports = {
           "deletions_count": 58,
           "description": "use templates for metric names in log_to_metric",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 141,
           "message": "enhancement(log_to_metric transform): use templates for metric names in log_to_metric (#668)",
           "pr_number": 668,
@@ -3716,7 +6833,6 @@ module.exports = {
           "deletions_count": 20,
           "description": "add coercer transform",
           "files_count": 17,
-          "group": "feat",
           "insertions_count": 689,
           "message": "feat(new transform): add coercer transform (#666)",
           "pr_number": 666,
@@ -3736,7 +6852,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Use multi-stage builds for vector-slim Docker image",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 11,
           "message": "chore(operations): Use multi-stage builds for vector-slim Docker image (#672)",
           "pr_number": 672,
@@ -3756,7 +6871,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "fix broken build process",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore(operations): fix broken build process",
           "pr_number": null,
@@ -3776,7 +6890,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "fix spelling in READMEs",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: fix spelling in READMEs (#671)",
           "pr_number": 671,
@@ -3796,7 +6909,6 @@ module.exports = {
           "deletions_count": 27,
           "description": "build x86_64-unknown-linux-musl with all features",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 54,
           "message": "chore(operations): build x86_64-unknown-linux-musl with all features (#669)",
           "pr_number": 669,
@@ -3816,7 +6928,6 @@ module.exports = {
           "deletions_count": 24,
           "description": "update batch_timeuot unit to seconds across all docs",
           "files_count": 9,
-          "group": "docs",
           "insertions_count": 28,
           "message": "docs: update batch_timeuot unit to seconds across all docs",
           "pr_number": null,
@@ -3836,7 +6947,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "add support for armv7 releases, both gnueabihf and musleabihf",
           "files_count": 6,
-          "group": "chore",
           "insertions_count": 84,
           "message": "chore(operations): add support for armv7 releases, both gnueabihf and musleabihf (#662)",
           "pr_number": 662,
@@ -3856,7 +6966,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "switch batch_timeout from bytes to seconds",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 1,
           "message": "docs: switch batch_timeout from bytes to seconds",
           "pr_number": null,
@@ -3876,7 +6985,6 @@ module.exports = {
           "deletions_count": 12,
           "description": "Use correct units in example batch timeouts",
           "files_count": 12,
-          "group": "docs",
           "insertions_count": 12,
           "message": "docs: Use correct units in example batch timeouts (#664)",
           "pr_number": 664,
@@ -3896,7 +7004,6 @@ module.exports = {
           "deletions_count": 64,
           "description": "reusable templating system for event values",
           "files_count": 3,
-          "group": "enhancement",
           "insertions_count": 162,
           "message": "enhancement(config): reusable templating system for event values (#656)",
           "pr_number": 656,
@@ -3916,7 +7023,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "add timberio/vector-alpine docker image",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 86,
           "message": "chore(operations): add timberio/vector-alpine docker image (#659)",
           "pr_number": 659,
@@ -3936,7 +7042,6 @@ module.exports = {
           "deletions_count": 36,
           "description": "remove labels support from log_to_metric",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 20,
           "message": "chore(operations): remove labels support from log_to_metric (#657)",
           "pr_number": 657,
@@ -3956,7 +7061,6 @@ module.exports = {
           "deletions_count": 68,
           "description": "push Histogram and Set metrics from logs",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 155,
           "message": "enhancement(log_to_metric transform): push Histogram and Set metrics from logs (#650)",
           "pr_number": 650,
@@ -3976,7 +7080,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "retry HttpDispatch errors for s3 and kinesis",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 2,
           "message": "fix(aws_s3 sink): retry HttpDispatch errors for s3 and kinesis (#651)",
           "pr_number": 651,
@@ -3996,7 +7099,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "rename call when releasing to latest and edge channels in s3",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(operations): rename call when releasing to latest and edge channels in s3",
           "pr_number": null,
@@ -4016,7 +7118,6 @@ module.exports = {
           "deletions_count": 41,
           "description": "add support for x86_64-unknown-linux-musl releases",
           "files_count": 10,
-          "group": "chore",
           "insertions_count": 51,
           "message": "chore(operations): add support for x86_64-unknown-linux-musl releases (#654)",
           "pr_number": 654,
@@ -4036,7 +7137,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Update smallvec to `v0.6.10`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 6,
           "message": "chore(tech debt): Update smallvec to `v0.6.10` (#652)",
           "pr_number": 652,
@@ -4056,7 +7156,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Add `jemallocator` feature flag",
           "files_count": 2,
-          "group": "enhancement",
           "insertions_count": 3,
           "message": "enhancement(operations): Add `jemallocator` feature flag (#653)",
           "pr_number": 653,
@@ -4076,7 +7175,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "add test around min file size for fingerprinting",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 41,
           "message": "chore: add test around min file size for fingerprinting",
           "pr_number": null,
@@ -4096,7 +7194,6 @@ module.exports = {
           "deletions_count": 318,
           "description": "accept both logs and metrics",
           "files_count": 31,
-          "group": "enhancement",
           "insertions_count": 600,
           "message": "enhancement(console sink): accept both logs and metrics (#631)",
           "pr_number": 631,
@@ -4116,7 +7213,6 @@ module.exports = {
           "deletions_count": 81,
           "description": "Refactor metrics sampling, rename Timer to Histogram",
           "files_count": 6,
-          "group": "chore",
           "insertions_count": 96,
           "message": "chore(metric data model): Refactor metrics sampling, rename Timer to Histogram (#648)",
           "pr_number": 648,
@@ -4136,7 +7232,6 @@ module.exports = {
           "deletions_count": 78,
           "description": "add type coercion",
           "files_count": 12,
-          "group": "enhancement",
           "insertions_count": 322,
           "message": "enhancement(grok_parser transform): add type coercion (#632)",
           "pr_number": 632,
@@ -4156,7 +7251,6 @@ module.exports = {
           "deletions_count": 36,
           "description": "test thread usage to ensure tests pass on all machines",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 40,
           "message": "chore(testing): test thread usage to ensure tests pass on all machines (#646)",
           "pr_number": 646,
@@ -4176,7 +7270,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "add convetional commits to contributing",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 12,
           "message": "docs: add convetional commits to contributing",
           "pr_number": null,
@@ -4196,7 +7289,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "add AWS env vars",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 9,
           "message": "docs: add AWS env vars",
           "pr_number": null,
@@ -4216,7 +7308,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "add exit codes",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 17,
           "message": "docs: add exit codes",
           "pr_number": null,
@@ -4236,7 +7327,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Add validating page for administration docs",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 49,
           "message": "docs: Add validating page for administration docs",
           "pr_number": null,
@@ -4256,7 +7346,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Add docs about file checkpointing",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 31,
           "message": "docs: Add docs about file checkpointing",
           "pr_number": null,
@@ -4276,7 +7365,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Add reference to glob_minimum_cooldown option",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 5,
           "message": "docs: Add reference to glob_minimum_cooldown option",
           "pr_number": null,
@@ -4296,7 +7384,6 @@ module.exports = {
           "deletions_count": 13,
           "description": "Fix Github labels query param",
           "files_count": 14,
-          "group": "docs",
           "insertions_count": 17,
           "message": "docs: Fix Github labels query param",
           "pr_number": null,
@@ -4316,7 +7403,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Fix sampler rate example",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 5,
           "message": "docs: Fix sampler rate example",
           "pr_number": null,
@@ -4336,7 +7422,6 @@ module.exports = {
           "deletions_count": 85,
           "description": "Add component context section",
           "files_count": 22,
-          "group": "docs",
           "insertions_count": 135,
           "message": "docs: Add component context section",
           "pr_number": null,
@@ -4356,7 +7441,6 @@ module.exports = {
           "deletions_count": 31,
           "description": "Add fingerprint options for file source to docs",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 95,
           "message": "docs: Add fingerprint options for file source to docs",
           "pr_number": null,
@@ -4376,7 +7460,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add sampler transform to summary.md",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 1,
           "message": "docs: Add sampler transform to summary.md",
           "pr_number": null,
@@ -4396,7 +7479,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add glob_minimum_cooldown option to file source docs",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 29,
           "message": "docs: Add glob_minimum_cooldown option to file source docs",
           "pr_number": null,
@@ -4416,7 +7498,6 @@ module.exports = {
           "deletions_count": 67,
           "description": "Use one consistent env var syntax",
           "files_count": 31,
-          "group": "docs",
           "insertions_count": 67,
           "message": "docs: Use one consistent env var syntax",
           "pr_number": null,
@@ -4436,7 +7517,6 @@ module.exports = {
           "deletions_count": 156,
           "description": "Improve configuration validation and make it more strict",
           "files_count": 17,
-          "group": "enhancement",
           "insertions_count": 236,
           "message": "enhancement(config): Improve configuration validation and make it more strict (#552)",
           "pr_number": 552,
@@ -4456,7 +7536,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add semtantic.yml to only check PR titles",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore: Add semtantic.yml to only check PR titles",
           "pr_number": null,
@@ -4476,7 +7555,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Use the proper type in the blackhole example",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 1,
           "message": "docs: Use the proper type in the blackhole example",
           "pr_number": null,
@@ -4496,7 +7574,6 @@ module.exports = {
           "deletions_count": 215,
           "description": "Add doc sections for all sink egress methods",
           "files_count": 19,
-          "group": "docs",
           "insertions_count": 259,
           "message": "docs: Add doc sections for all sink egress methods",
           "pr_number": null,
@@ -4516,7 +7593,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix argument type",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore: Fix argument type (#639)",
           "pr_number": 639,
@@ -4536,7 +7612,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Batch diagram language",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Batch diagram language",
           "pr_number": null,
@@ -4556,7 +7631,6 @@ module.exports = {
           "deletions_count": 24,
           "description": "Fix authentication formatting",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 12,
           "message": "docs: Fix authentication formatting",
           "pr_number": null,
@@ -4576,7 +7650,6 @@ module.exports = {
           "deletions_count": 108,
           "description": "Fix config example headers for transforms and sources",
           "files_count": 34,
-          "group": "docs",
           "insertions_count": 188,
           "message": "docs: Fix config example headers for transforms and sources",
           "pr_number": null,
@@ -4596,7 +7669,6 @@ module.exports = {
           "deletions_count": 134,
           "description": "Add relevance text to options table",
           "files_count": 19,
-          "group": "docs",
           "insertions_count": 99,
           "message": "docs: Add relevance text to options table",
           "pr_number": null,
@@ -4616,7 +7688,6 @@ module.exports = {
           "deletions_count": 25,
           "description": "Add relevant when... tag for options that depend on other options in docs",
           "files_count": 17,
-          "group": "docs",
           "insertions_count": 40,
           "message": "docs: Add relevant when... tag for options that depend on other options in docs",
           "pr_number": null,
@@ -4636,7 +7707,6 @@ module.exports = {
           "deletions_count": 92,
           "description": "Fix environment variable language in docs",
           "files_count": 28,
-          "group": "docs",
           "insertions_count": 95,
           "message": "docs: Fix environment variable language in docs",
           "pr_number": null,
@@ -4656,7 +7726,6 @@ module.exports = {
           "deletions_count": 18,
           "description": "Update grok_parser language",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 16,
           "message": "docs: Update grok_parser language",
           "pr_number": null,
@@ -4676,7 +7745,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "Add examples to the add_fields docs",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 31,
           "message": "docs: Add examples to the add_fields docs",
           "pr_number": null,
@@ -4696,7 +7764,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Fix section references for fields that include Regex special characters",
           "files_count": 7,
-          "group": "docs",
           "insertions_count": 8,
           "message": "docs: Fix section references for fields that include Regex special characters",
           "pr_number": null,
@@ -4716,7 +7783,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Link to log data model in add fields docs",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 5,
           "message": "docs: Link to log data model in add fields docs",
           "pr_number": null,
@@ -4736,7 +7802,6 @@ module.exports = {
           "deletions_count": 73,
           "description": "Add default envirnoment variables section",
           "files_count": 33,
-          "group": "docs",
           "insertions_count": 317,
           "message": "docs: Add default envirnoment variables section",
           "pr_number": null,
@@ -4756,7 +7821,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix cloudwatch test by dropping sink",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 6,
           "message": "chore: Fix cloudwatch test by dropping sink (#626)",
           "pr_number": 626,
@@ -4776,7 +7840,6 @@ module.exports = {
           "deletions_count": 136,
           "description": "Fix add_fields transform docs",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 64,
           "message": "docs: Fix add_fields transform docs",
           "pr_number": null,
@@ -4796,7 +7859,6 @@ module.exports = {
           "deletions_count": 325,
           "description": "Add File checkpoint feature.",
           "files_count": 6,
-          "group": "enhancement",
           "insertions_count": 539,
           "message": "enhancement(file source): Add File checkpoint feature. (#609)",
           "pr_number": 609,
@@ -4816,7 +7878,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Back out change to dash handling",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore: Back out change to dash handling",
           "pr_number": null,
@@ -4836,7 +7897,6 @@ module.exports = {
           "deletions_count": 211,
           "description": "Add cloudwatch partitioning and refactor partition buffer",
           "files_count": 7,
-          "group": "enhancement",
           "insertions_count": 656,
           "message": "enhancement(aws_cloudwatch_logs sink): Add cloudwatch partitioning and refactor partition buffer (#519)",
           "pr_number": 519,
@@ -4856,7 +7916,6 @@ module.exports = {
           "deletions_count": 37,
           "description": "Add `--color` option and tty check for ansi colors",
           "files_count": 5,
-          "group": "enhancement",
           "insertions_count": 64,
           "message": "enhancement(cli): Add `--color` option and tty check for ansi colors (#623)",
           "pr_number": 623,
@@ -4876,7 +7935,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Log when regex does not match",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 13,
           "message": "enhancement(regex_parser transform): Log when regex does not match (#618)",
           "pr_number": 618,
@@ -4896,7 +7954,6 @@ module.exports = {
           "deletions_count": 25,
           "description": "File tests timeout instead of hang if channel is stuck open.",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 63,
           "message": "chore: File tests timeout instead of hang if channel is stuck open. (#612)",
           "pr_number": 612,
@@ -4916,7 +7973,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Debian 10 verification step",
           "files_count": 6,
-          "group": "chore",
           "insertions_count": 30,
           "message": "chore(operations): Debian 10 verification step (#615)",
           "pr_number": 615,
@@ -4936,7 +7992,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix debian-slim install line in docs",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(operations): Fix debian-slim install line in docs",
           "pr_number": null,
@@ -4956,7 +8011,6 @@ module.exports = {
           "deletions_count": 30,
           "description": "Dont use HTML characters in default value for docs",
           "files_count": 11,
-          "group": "docs",
           "insertions_count": 30,
           "message": "docs: Dont use HTML characters in default value for docs",
           "pr_number": null,
@@ -4976,7 +8030,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Restore docker installation instructions",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 84,
           "message": "docs: Restore docker installation instructions",
           "pr_number": null,
@@ -4996,7 +8049,6 @@ module.exports = {
           "deletions_count": 2658,
           "description": "Add section references to each option within the docs",
           "files_count": 56,
-          "group": "docs",
           "insertions_count": 453,
           "message": "docs: Add section references to each option within the docs",
           "pr_number": null,
@@ -5016,7 +8068,6 @@ module.exports = {
           "deletions_count": 18,
           "description": "Fix lock file",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 9,
           "message": "docs: Fix lock file",
           "pr_number": null,
@@ -5036,7 +8087,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Restore \"send your first event\" guide",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 96,
           "message": "docs: Restore \"send your first event\" guide",
           "pr_number": null,
@@ -5056,7 +8106,6 @@ module.exports = {
           "deletions_count": 248,
           "description": "Fix docs/README.md",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 20,
           "message": "docs: Fix docs/README.md",
           "pr_number": null,
@@ -5076,7 +8125,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Fix log_to_metrics examples",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix log_to_metrics examples",
           "pr_number": null,
@@ -5096,7 +8144,6 @@ module.exports = {
           "deletions_count": 114,
           "description": "Ensure \"How It Works\" sections are alphabetically sorted",
           "files_count": 33,
-          "group": "docs",
           "insertions_count": 247,
           "message": "docs: Ensure \"How It Works\" sections are alphabetically sorted",
           "pr_number": null,
@@ -5116,7 +8163,6 @@ module.exports = {
           "deletions_count": 389,
           "description": "Ensure docs links are relative",
           "files_count": 36,
-          "group": "docs",
           "insertions_count": 618,
           "message": "docs: Ensure docs links are relative",
           "pr_number": null,
@@ -5136,7 +8182,6 @@ module.exports = {
           "deletions_count": 1472,
           "description": "Add log_to_metric documentation",
           "files_count": 54,
-          "group": "docs",
           "insertions_count": 2030,
           "message": "docs: Add log_to_metric documentation",
           "pr_number": null,
@@ -5156,7 +8201,6 @@ module.exports = {
           "deletions_count": 18,
           "description": "Add filename extension option and fix trailing slash",
           "files_count": 3,
-          "group": "enhancement",
           "insertions_count": 70,
           "message": "enhancement(aws_s3 sink): Add filename extension option and fix trailing slash (#596)",
           "pr_number": 596,
@@ -5176,7 +8220,6 @@ module.exports = {
           "deletions_count": 75,
           "description": "Rename tracing crates",
           "files_count": 12,
-          "group": "chore",
           "insertions_count": 94,
           "message": "chore: Rename tracing crates (#608)",
           "pr_number": 608,
@@ -5196,7 +8239,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Fix README",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 81,
           "message": "docs: Fix README (#610)",
           "pr_number": 610,
@@ -5216,7 +8258,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Initial rate limit subscriber",
           "files_count": 6,
-          "group": "enhancement",
           "insertions_count": 378,
           "message": "enhancement(observability): Initial rate limit subscriber (#494)",
           "pr_number": 494,
@@ -5236,7 +8277,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Convert \"-\" into \"nil\"",
           "files_count": 2,
-          "group": "enhancement",
           "insertions_count": 24,
           "message": "enhancement(tokenizer transform): Convert \"-\" into \"nil\" (#580)",
           "pr_number": 580,
@@ -5256,7 +8296,6 @@ module.exports = {
           "deletions_count": 309,
           "description": "Cleanup documentation headers",
           "files_count": 37,
-          "group": "docs",
           "insertions_count": 726,
           "message": "docs: Cleanup documentation headers",
           "pr_number": null,
@@ -5276,7 +8315,6 @@ module.exports = {
           "deletions_count": 7109,
           "description": "Move dynamically generated docs to ERB templates",
           "files_count": 149,
-          "group": "docs",
           "insertions_count": 9434,
           "message": "docs: Move dynamically generated docs to ERB templates (#601)",
           "pr_number": 601,
@@ -5296,7 +8334,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add Ruby and Bundler 2 to development requirements",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: Add Ruby and Bundler 2 to development requirements (#600)",
           "pr_number": 600,
@@ -5316,7 +8353,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "Fix gauge misspelling",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 9,
           "message": "docs: Fix gauge misspelling (#594)",
           "pr_number": 594,
@@ -5336,7 +8372,6 @@ module.exports = {
           "deletions_count": 20,
           "description": "Fix include exclude",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 20,
           "message": "docs: Fix include exclude (#593)",
           "pr_number": 593,
@@ -5356,7 +8391,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Add env var example to add_fields documentation",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 18,
           "message": "docs: Add env var example to add_fields documentation",
           "pr_number": null,
@@ -5376,7 +8410,6 @@ module.exports = {
           "deletions_count": 136,
           "description": "Fix documentation array syntax",
           "files_count": 45,
-          "group": "docs",
           "insertions_count": 136,
           "message": "docs: Fix documentation array syntax",
           "pr_number": null,
@@ -5396,7 +8429,6 @@ module.exports = {
           "deletions_count": 290,
           "description": "Resolve documentation typos and formatting issues",
           "files_count": 61,
-          "group": "docs",
           "insertions_count": 875,
           "message": "docs: Resolve documentation typos and formatting issues",
           "pr_number": null,
@@ -5416,7 +8448,6 @@ module.exports = {
           "deletions_count": 1132,
           "description": "Add check for pending documentation changes",
           "files_count": 83,
-          "group": "docs",
           "insertions_count": 750,
           "message": "docs: Add check for pending documentation changes (#592)",
           "pr_number": 592,
@@ -5436,7 +8467,6 @@ module.exports = {
           "deletions_count": 27,
           "description": "Fix configuration documentation headings",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 27,
           "message": "docs: Fix configuration documentation headings (#591)",
           "pr_number": 591,
@@ -5456,7 +8486,6 @@ module.exports = {
           "deletions_count": 321,
           "description": "Cleanup documentation conventions",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 132,
           "message": "docs: Cleanup documentation conventions (#590)",
           "pr_number": 590,
@@ -5476,7 +8505,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Reduce test threads from 8 to 4",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(testing): Reduce test threads from 8 to 4 (#587)",
           "pr_number": 587,
@@ -5496,7 +8524,6 @@ module.exports = {
           "deletions_count": 194,
           "description": "Rename tokio-trace to tracing",
           "files_count": 30,
-          "group": "chore",
           "insertions_count": 197,
           "message": "chore: Rename tokio-trace to tracing (#578)",
           "pr_number": 578,
@@ -5516,7 +8543,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Add make signoff command in pull request template",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore: Add make signoff command in pull request template",
           "pr_number": null,
@@ -5536,7 +8562,6 @@ module.exports = {
           "deletions_count": 65,
           "description": "Update Makefile and DEVELOPING.md",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 82,
           "message": "docs: Update Makefile and DEVELOPING.md (#570)",
           "pr_number": 570,
@@ -5556,7 +8581,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Use MiB not mib in docs",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 10,
           "message": "docs: Use MiB not mib in docs (#577)",
           "pr_number": 577,
@@ -5576,7 +8600,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Link to License",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 5,
           "message": "docs: Link to License",
           "pr_number": null,
@@ -5596,7 +8619,6 @@ module.exports = {
           "deletions_count": 39,
           "description": "Add DCO and update CONTRIBUTING.md",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 117,
           "message": "docs: Add DCO and update CONTRIBUTING.md (#571)",
           "pr_number": 571,
@@ -5616,7 +8638,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix tests",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(testing): Fix tests",
           "pr_number": null,
@@ -5636,7 +8657,6 @@ module.exports = {
           "deletions_count": 19,
           "description": "Use floats for metrics values",
           "files_count": 4,
-          "group": "enhancement",
           "insertions_count": 19,
           "message": "enhancement(metric data model): Use floats for metrics values (#553)",
           "pr_number": 553,
@@ -5656,7 +8676,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "output multiple metrics from a single log",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 57,
           "message": "enhancement(log_to_metric transform): output multiple metrics from a single log",
           "pr_number": null,
@@ -5676,7 +8695,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "adjust transform trait for multiple output events",
           "files_count": 2,
-          "group": "enhancement",
           "insertions_count": 14,
           "message": "enhancement(topology): adjust transform trait for multiple output events",
           "pr_number": null,
@@ -5696,7 +8714,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Remove makefile from list of languages",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore: Remove makefile from list of languages",
           "pr_number": null,
@@ -5716,7 +8733,6 @@ module.exports = {
           "deletions_count": 15,
           "description": "Use printf in the install.sh script",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 15,
           "message": "chore(operations): Use printf in the install.sh script",
           "pr_number": null,
@@ -5736,7 +8752,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Bump check-stable box size",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Bump check-stable box size (#555)",
           "pr_number": 555,
@@ -5756,7 +8771,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "make sure Cargo.lock gets updated on version bump",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 8,
           "message": "chore: make sure Cargo.lock gets updated on version bump",
           "pr_number": null,
@@ -5776,7 +8790,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Ensure new bumped version uses -dev",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore: Ensure new bumped version uses -dev",
           "pr_number": null,
@@ -5796,7 +8809,6 @@ module.exports = {
           "deletions_count": 14,
           "description": "Start v0.4.0-dev",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 14,
           "message": "chore: Start v0.4.0-dev",
           "pr_number": null,
@@ -5816,7 +8828,6 @@ module.exports = {
           "deletions_count": 123,
           "description": "add all parsed syslog fields to event",
           "files_count": 4,
-          "group": "feat",
           "insertions_count": 322,
           "message": "feat(syslog source): add all parsed syslog fields to event (#836)",
           "pr_number": 836,
@@ -5836,7 +8847,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "log a single warning when ignoring small files",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 33,
           "message": "enhancement(file source): log a single warning when ignoring small files (#863)",
           "pr_number": 863,
@@ -5856,7 +8866,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "add logging when we can't tail file",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 11,
           "message": "chore: add logging when we can't tail file",
           "pr_number": null,
@@ -5876,7 +8885,6 @@ module.exports = {
           "deletions_count": 43,
           "description": "Support AWS authentication",
           "files_count": 8,
-          "group": "feat",
           "insertions_count": 270,
           "message": "feat(elasticsearch sink): Support AWS authentication (#864)",
           "pr_number": 864,
@@ -5896,7 +8904,6 @@ module.exports = {
           "deletions_count": 50,
           "description": "add check_urls make argument",
           "files_count": 8,
-          "group": "docs",
           "insertions_count": 50,
           "message": "docs: add check_urls make argument",
           "pr_number": null,
@@ -5916,7 +8923,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "create component md file if it does not yet exist, closes #849",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 12,
           "message": "docs: create component md file if it does not yet exist, closes #849",
           "pr_number": null,
@@ -5936,7 +8942,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "add split transform",
           "files_count": 17,
-          "group": "feat",
           "insertions_count": 964,
           "message": "feat(new transform): add split transform (#850)",
           "pr_number": 850,
@@ -5956,7 +8961,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "ignore .tmp files",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore: ignore .tmp files",
           "pr_number": null,
@@ -5976,7 +8980,6 @@ module.exports = {
           "deletions_count": 302,
           "description": "Error types",
           "files_count": 51,
-          "group": "chore",
           "insertions_count": 627,
           "message": "chore: Error types (#811)",
           "pr_number": 811,
@@ -5996,7 +8999,6 @@ module.exports = {
           "deletions_count": 2035,
           "description": "Move .metadata.toml to /.meta/*",
           "files_count": 53,
-          "group": "docs",
           "insertions_count": 1873,
           "message": "docs: Move .metadata.toml to /.meta/* (#872)",
           "pr_number": 872,
@@ -6016,7 +9018,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "switch to more modern kafka image",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 10,
           "message": "chore: switch to more modern kafka image (#875)",
           "pr_number": 875,
@@ -6036,7 +9037,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Fix some typos in file-source crate",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 6,
           "message": "chore: Fix some typos in file-source crate (#871)",
           "pr_number": 871,
@@ -6056,7 +9056,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Fix String error return in elasticsearch config parser",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 23,
           "message": "chore: Fix String error return in elasticsearch config parser (#883)",
           "pr_number": 883,
@@ -6076,7 +9075,6 @@ module.exports = {
           "deletions_count": 2042,
           "description": "Simpler, less noisy component options",
           "files_count": 88,
-          "group": "docs",
           "insertions_count": 199,
           "message": "docs: Simpler, less noisy component options (#888)",
           "pr_number": 888,
@@ -6096,7 +9094,6 @@ module.exports = {
           "deletions_count": 94,
           "description": "Introduce crate-level `Result` type",
           "files_count": 41,
-          "group": "chore",
           "insertions_count": 88,
           "message": "chore: Introduce crate-level `Result` type (#884)",
           "pr_number": 884,
@@ -6116,7 +9113,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "add commit types for semantic prs",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 8,
           "message": "chore: add commit types for semantic prs",
           "pr_number": null,
@@ -6136,7 +9132,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Add relese-meta make target for preparing release metadata",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 355,
           "message": "chore: Add relese-meta make target for preparing release metadata (#898)",
           "pr_number": 898,
@@ -6156,7 +9151,6 @@ module.exports = {
           "deletions_count": 297,
           "description": "automatically create missing component templates",
           "files_count": 81,
-          "group": "docs",
           "insertions_count": 342,
           "message": "docs: automatically create missing component templates (#899)",
           "pr_number": 899,
@@ -6176,7 +9170,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "update checker docker image too include activesupport",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 13,
           "message": "chore(operations): update checker docker image too include activesupport",
           "pr_number": null,
@@ -6196,7 +9189,6 @@ module.exports = {
           "deletions_count": 2694,
           "description": "Simplify link system and resolution",
           "files_count": 138,
-          "group": "docs",
           "insertions_count": 2700,
           "message": "docs: Simplify link system and resolution (#901)",
           "pr_number": 901,
@@ -6216,7 +9208,6 @@ module.exports = {
           "deletions_count": 82,
           "description": "Generate CHANGELOG.md",
           "files_count": 20,
-          "group": "chore",
           "insertions_count": 699,
           "message": "chore(operations): Generate CHANGELOG.md (#903)",
           "pr_number": 903,
@@ -6236,7 +9227,6 @@ module.exports = {
           "deletions_count": 27,
           "description": "simplify readme installation links",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 8,
           "message": "docs: simplify readme installation links",
           "pr_number": null,
@@ -6256,7 +9246,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "fix archive name for nightly builds",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore: fix archive name for nightly builds",
           "pr_number": null,
@@ -6276,7 +9265,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "dont upload version triple archives to s3",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): dont upload version triple archives to s3",
           "pr_number": null,
@@ -6296,7 +9284,6 @@ module.exports = {
           "deletions_count": 27,
           "description": "use consistent archive names across all release channels",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 33,
           "message": "chore(operations): use consistent archive names across all release channels",
           "pr_number": null,
@@ -6316,7 +9303,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "cleanup unused variables in release-s3.sh script",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore: cleanup unused variables in release-s3.sh script",
           "pr_number": null,
@@ -6336,7 +9322,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "rename config tag",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 1,
           "message": "fix(add_fields transform): rename config tag (#902)",
           "pr_number": 902,
@@ -6356,7 +9341,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "default config path \"/etc/vector/vector.toml\"",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 7,
           "message": "enhancement(config): default config path \"/etc/vector/vector.toml\" (#900)",
           "pr_number": 900,
@@ -6376,7 +9360,6 @@ module.exports = {
           "deletions_count": 97,
           "description": "Add release-commit make target",
           "files_count": 31,
-          "group": "chore",
           "insertions_count": 387,
           "message": "chore(operations): Add release-commit make target (#911)",
           "pr_number": 911,
@@ -6396,7 +9379,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Remove $VERSION from package-deb",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(testing): Remove $VERSION from package-deb (#910)",
           "pr_number": 910,
@@ -6416,7 +9398,6 @@ module.exports = {
           "deletions_count": 34,
           "description": "Use OpenSSL instead of LibreSSL for x86_64-unknown-linux-musl",
           "files_count": 4,
-          "group": "fix",
           "insertions_count": 6,
           "message": "fix(operations): Use OpenSSL instead of LibreSSL for x86_64-unknown-linux-musl (#904)",
           "pr_number": 904,
@@ -6436,7 +9417,6 @@ module.exports = {
           "deletions_count": 274,
           "description": "Remove ARMv7 support -- for now",
           "files_count": 7,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore(operations): Remove ARMv7 support -- for now (#913)",
           "pr_number": 913,
@@ -6456,7 +9436,6 @@ module.exports = {
           "deletions_count": 63,
           "description": "Add libssl-dev to musl builder",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 63,
           "message": "chore(operations): Add libssl-dev to musl builder (#917)",
           "pr_number": 917,
@@ -6476,7 +9455,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Remove $VERSION when building archives",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(operations): Remove $VERSION when building archives (#918)",
           "pr_number": 918,
@@ -6496,7 +9474,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Use vendored OpenSSL for x86_64-unknown-linux-musl CI build",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Use vendored OpenSSL for x86_64-unknown-linux-musl CI build (#919)",
           "pr_number": 919,
@@ -6516,7 +9493,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "add types to semantic.yml",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 20,
           "message": "docs: add types to semantic.yml",
           "pr_number": null,
@@ -6536,7 +9512,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "verify builds by default",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 32,
           "message": "chore(operations): verify builds by default (#914)",
           "pr_number": 914,
@@ -6556,7 +9531,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "use enhancement not improvement",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 11,
           "message": "docs: use enhancement not improvement",
           "pr_number": null,
@@ -6576,7 +9550,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Prepare v0.4.0 release",
           "files_count": 5,
-          "group": "chore",
           "insertions_count": 671,
           "message": "chore: Prepare v0.4.0 release",
           "pr_number": null,
@@ -6596,7 +9569,6 @@ module.exports = {
           "deletions_count": 69,
           "description": "fix s3 compression and endpoint options",
           "files_count": 7,
-          "group": "docs",
           "insertions_count": 73,
           "message": "docs: fix s3 compression and endpoint options (#921)",
           "pr_number": 921,
@@ -6616,7 +9588,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "update release-github to include release notes",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 106,
           "message": "chore(operations): update release-github to include release notes",
           "pr_number": null,
@@ -6636,7 +9607,6 @@ module.exports = {
           "deletions_count": 116,
           "description": "use common setup.rb script for boiler plate setup",
           "files_count": 6,
-          "group": "chore",
           "insertions_count": 7,
           "message": "chore(operations): use common setup.rb script for boiler plate setup",
           "pr_number": null,
@@ -6659,18 +9629,14 @@ module.exports = {
       ],
       "insertions_count": 27640,
       "last_version": null,
-      "posts": [
-
-      ],
-      "subtitle": "",
+      "permalink": "/releases/0.4.0/",
+      "title": "Vector v0.4.0",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "upgrade_guides": [
-
-      ],
       "version": "0.4.0"
     },
     "0.5.0": {
+      "codename": "Platform Mingling",
       "commits": [
         {
           "author": "Ben Johnson",
@@ -6679,7 +9645,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Update releaser Dockerfile to include Ruby and the necessary gems",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 10,
           "message": "chore(operations): Update releaser Dockerfile to include Ruby and the necessary gems",
           "pr_number": null,
@@ -6699,7 +9664,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add git to musl builder",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Add git to musl builder (#923)",
           "pr_number": 923,
@@ -6719,7 +9683,6 @@ module.exports = {
           "deletions_count": 21,
           "description": "Fix github release notes",
           "files_count": 9,
-          "group": "chore",
           "insertions_count": 51,
           "message": "chore(operations): Fix github release notes",
           "pr_number": null,
@@ -6739,7 +9702,6 @@ module.exports = {
           "deletions_count": 12,
           "description": "Update release download URLs",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 22,
           "message": "docs: Update release download URLs",
           "pr_number": null,
@@ -6759,7 +9721,6 @@ module.exports = {
           "deletions_count": 23,
           "description": "Show information about why a retry needs to happen",
           "files_count": 3,
-          "group": "enhancement",
           "insertions_count": 36,
           "message": "enhancement(observability): Show information about why a retry needs to happen (#835)",
           "pr_number": 835,
@@ -6779,7 +9740,6 @@ module.exports = {
           "deletions_count": 707,
           "description": "Make encoding non-optional",
           "files_count": 23,
-          "group": "chore",
           "insertions_count": 542,
           "message": "chore(config): Make encoding non-optional (#894)",
           "pr_number": 894,
@@ -6799,7 +9759,6 @@ module.exports = {
           "deletions_count": 82,
           "description": "add version to readme",
           "files_count": 10,
-          "group": "docs",
           "insertions_count": 146,
           "message": "docs: add version to readme",
           "pr_number": null,
@@ -6819,7 +9778,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Update installation readme link",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: Update installation readme link",
           "pr_number": null,
@@ -6839,7 +9797,6 @@ module.exports = {
           "deletions_count": 46,
           "description": "Recommend a new version based on pending commits",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 81,
           "message": "chore(operations): Recommend a new version based on pending commits",
           "pr_number": null,
@@ -6859,7 +9816,6 @@ module.exports = {
           "deletions_count": 25,
           "description": "Use proper category in changelog for new components",
           "files_count": 19,
-          "group": "docs",
           "insertions_count": 461,
           "message": "docs: Use proper category in changelog for new components",
           "pr_number": null,
@@ -6879,7 +9835,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Initial `statsd` implementation",
           "files_count": 16,
-          "group": "feat",
           "insertions_count": 776,
           "message": "feat(new sink): Initial `statsd` implementation (#821)",
           "pr_number": 821,
@@ -6899,7 +9854,6 @@ module.exports = {
           "deletions_count": 18,
           "description": "Fix incorrect description of kafka option",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 14,
           "message": "docs: Fix incorrect description of kafka option (#926)",
           "pr_number": 926,
@@ -6919,7 +9873,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Add OpenSSL to x86_64-unknown-linux-musl buil…",
           "files_count": 5,
-          "group": "chore",
           "insertions_count": 53,
           "message": "chore(operations): Add OpenSSL to x86_64-unknown-linux-musl buil… (#927)",
           "pr_number": 927,
@@ -6939,7 +9892,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Add support for TLS (SSL)",
           "files_count": 14,
-          "group": "feat",
           "insertions_count": 409,
           "message": "feat(kafka sink): Add support for TLS (SSL) (#912)",
           "pr_number": 912,
@@ -6959,7 +9911,6 @@ module.exports = {
           "deletions_count": 23,
           "description": "Use PKCS#12 keys instead of JKS",
           "files_count": 6,
-          "group": "feat",
           "insertions_count": 64,
           "message": "feat(kafka sink): Use PKCS#12 keys instead of JKS (#934)",
           "pr_number": 934,
@@ -6979,7 +9930,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix nightly builds link",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix nightly builds link",
           "pr_number": null,
@@ -6999,7 +9949,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Create SECURITY.md",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 7,
           "message": "docs: Create SECURITY.md",
           "pr_number": null,
@@ -7019,7 +9968,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix install script path export",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 9,
           "message": "chore(operations): Fix install script path export (#891)",
           "pr_number": 891,
@@ -7039,7 +9987,6 @@ module.exports = {
           "deletions_count": 50,
           "description": "Simplify changelog TOC",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 15,
           "message": "docs: Simplify changelog TOC",
           "pr_number": null,
@@ -7059,7 +10006,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Update to rust 1.38.0",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore: Update to rust 1.38.0",
           "pr_number": null,
@@ -7079,7 +10025,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Fix fmt errors for 1.38.0",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore: Fix fmt errors for 1.38.0",
           "pr_number": null,
@@ -7099,7 +10044,6 @@ module.exports = {
           "deletions_count": 200,
           "description": "Improve installation docs",
           "files_count": 23,
-          "group": "docs",
           "insertions_count": 419,
           "message": "docs: Improve installation docs (#942)",
           "pr_number": 942,
@@ -7119,7 +10063,6 @@ module.exports = {
           "deletions_count": 54,
           "description": "Link to README.md file in SUMMARY.md",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 59,
           "message": "docs: Link to README.md file in SUMMARY.md",
           "pr_number": null,
@@ -7139,7 +10082,6 @@ module.exports = {
           "deletions_count": 241,
           "description": "Fix broken docs links",
           "files_count": 27,
-          "group": "docs",
           "insertions_count": 63,
           "message": "docs: Fix broken docs links",
           "pr_number": null,
@@ -7159,7 +10101,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Ensure .rpm packages are built in nightly builds",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 21,
           "message": "chore(operations): Ensure .rpm packages are built in nightly builds",
           "pr_number": null,
@@ -7179,7 +10120,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "fix broken tabs on yum and apt pages",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: fix broken tabs on yum and apt pages",
           "pr_number": null,
@@ -7199,7 +10139,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "fix download links for deb and rpm packages",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 218,
           "message": "docs: fix download links for deb and rpm packages",
           "pr_number": null,
@@ -7219,7 +10158,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Update SECURITY.md with better info",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 25,
           "message": "docs: Update SECURITY.md with better info",
           "pr_number": null,
@@ -7239,7 +10177,6 @@ module.exports = {
           "deletions_count": 80,
           "description": "Docker images use binaries",
           "files_count": 5,
-          "group": "chore",
           "insertions_count": 29,
           "message": "chore(operations): Docker images use binaries (#940)",
           "pr_number": 940,
@@ -7259,7 +10196,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Remove setting VERSION for `make generate`",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Remove setting VERSION for `make generate`",
           "pr_number": null,
@@ -7279,7 +10215,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add `fix` as a valid PR type",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore: Add `fix` as a valid PR type",
           "pr_number": null,
@@ -7299,7 +10234,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Clean up debian user creation and unit file",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore(operations): Clean up debian user creation and unit file (#947)",
           "pr_number": 947,
@@ -7319,7 +10253,6 @@ module.exports = {
           "deletions_count": 34,
           "description": "Update tokio versions",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 70,
           "message": "chore(operations): Update tokio versions (#949)",
           "pr_number": 949,
@@ -7339,7 +10272,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Use stable Rust 1.38.0 and update Linux headers for x86_6…",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore: Use stable Rust 1.38.0 and update Linux headers for x86_6… (#945)",
           "pr_number": 945,
@@ -7359,7 +10291,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Tarball URL address for the Linux installation script",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(operations): Tarball URL address for the Linux installation script (#957)",
           "pr_number": 957,
@@ -7379,7 +10310,6 @@ module.exports = {
           "deletions_count": 213,
           "description": "Add support for TLS options",
           "files_count": 14,
-          "group": "feat",
           "insertions_count": 575,
           "message": "feat(elasticsearch sink): Add support for TLS options (#953)",
           "pr_number": 953,
@@ -7399,7 +10329,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Ensure released s3 files are public-read",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 12,
           "message": "chore(operations): Ensure released s3 files are public-read (#959)",
           "pr_number": 959,
@@ -7419,7 +10348,6 @@ module.exports = {
           "deletions_count": 140,
           "description": "Sync and verify install.sh",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 428,
           "message": "chore(operations): Sync and verify install.sh (#958)",
           "pr_number": 958,
@@ -7439,7 +10367,6 @@ module.exports = {
           "deletions_count": 265,
           "description": "Remove APT, YUM, and PackageCloud",
           "files_count": 21,
-          "group": "docs",
           "insertions_count": 61,
           "message": "docs: Remove APT, YUM, and PackageCloud (#961)",
           "pr_number": 961,
@@ -7459,7 +10386,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add SSE and public-read ACL to install.sh",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Add SSE and public-read ACL to install.sh",
           "pr_number": null,
@@ -7479,7 +10405,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Verify installation script on mac",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 15,
           "message": "chore(operations): Verify installation script on mac (#965)",
           "pr_number": 965,
@@ -7499,7 +10424,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Verify that sh.vector.dev works",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 22,
           "message": "chore(operations): Verify that sh.vector.dev works (#964)",
           "pr_number": 964,
@@ -7519,7 +10443,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Create missing .md file for new components",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 7,
           "message": "docs: Create missing .md file for new components",
           "pr_number": null,
@@ -7539,7 +10462,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Verify and check Homebrew install",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 26,
           "message": "chore(operations): Verify and check Homebrew install (#969)",
           "pr_number": 969,
@@ -7559,7 +10481,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Add support for basic auth",
           "files_count": 5,
-          "group": "feat",
           "insertions_count": 100,
           "message": "feat(clickhouse sink): Add support for basic auth (#937)",
           "pr_number": 937,
@@ -7579,7 +10500,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Use sudo when checking internet install",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Use sudo when checking internet install",
           "pr_number": null,
@@ -7599,7 +10519,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Update cloudwatch metrics docs",
           "files_count": 8,
-          "group": "docs",
           "insertions_count": 99,
           "message": "docs: Update cloudwatch metrics docs (#968)",
           "pr_number": 968,
@@ -7619,7 +10538,6 @@ module.exports = {
           "deletions_count": 19,
           "description": "Properly verify that the Vector Systemd service started",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 25,
           "message": "chore(operations): Properly verify that the Vector Systemd service started (#982)",
           "pr_number": 982,
@@ -7639,7 +10557,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Dont auto-update when testing Homebrew install",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Dont auto-update when testing Homebrew install",
           "pr_number": null,
@@ -7659,7 +10576,6 @@ module.exports = {
           "deletions_count": 169,
           "description": "Fix Docker builds",
           "files_count": 20,
-          "group": "chore",
           "insertions_count": 430,
           "message": "chore(operations): Fix Docker builds (#985)",
           "pr_number": 985,
@@ -7679,7 +10595,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix failing verify-install-on-internet check",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Fix failing verify-install-on-internet check",
           "pr_number": null,
@@ -7699,7 +10614,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix vector docker image name reference",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix vector docker image name reference",
           "pr_number": null,
@@ -7719,7 +10633,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "Initial `docker` source implementation",
           "files_count": 23,
-          "group": "feat",
           "insertions_count": 1537,
           "message": "feat(new source): Initial `docker` source implementation (#787)",
           "pr_number": 787,
@@ -7739,7 +10652,6 @@ module.exports = {
           "deletions_count": 540,
           "description": "Unify the different TLS options",
           "files_count": 25,
-          "group": "enhancement",
           "insertions_count": 905,
           "message": "enhancement(security): Unify the different TLS options (#972)",
           "pr_number": 972,
@@ -7759,7 +10671,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Default data_dir to /var/lib/vector",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 8,
           "message": "fix(config): Default data_dir to /var/lib/vector (#995)",
           "pr_number": 995,
@@ -7779,7 +10690,6 @@ module.exports = {
           "deletions_count": 630,
           "description": "Add rate limited debug messages",
           "files_count": 33,
-          "group": "feat",
           "insertions_count": 422,
           "message": "feat(observability): Add rate limited debug messages (#971)",
           "pr_number": 971,
@@ -7799,7 +10709,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix release script bug",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(operations): Fix release script bug",
           "pr_number": null,
@@ -7819,7 +10728,6 @@ module.exports = {
           "deletions_count": 204,
           "description": "Prepare v0.5.0 release",
           "files_count": 10,
-          "group": "chore",
           "insertions_count": 55,
           "message": "chore: Prepare v0.5.0 release",
           "pr_number": null,
@@ -7839,7 +10747,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add 0.5.0 release metadata",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 61,
           "message": "chore: Add 0.5.0 release metadata",
           "pr_number": null,
@@ -7859,7 +10766,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Remove unsupported bash flags",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore: Remove unsupported bash flags",
           "pr_number": null,
@@ -7879,7 +10785,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Add sudo when installing via dpkg or rpm",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 10,
           "message": "chore(operations): Add sudo when installing via dpkg or rpm (#999)",
           "pr_number": 999,
@@ -7899,7 +10804,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add git to musl build image",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Add git to musl build image (#997)",
           "pr_number": 997,
@@ -7919,7 +10823,6 @@ module.exports = {
           "deletions_count": 107,
           "description": "Fix centos verifier",
           "files_count": 15,
-          "group": "chore",
           "insertions_count": 37,
           "message": "chore(operations): Fix centos verifier (#1001)",
           "pr_number": 1001,
@@ -7934,7 +10837,7 @@ module.exports = {
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.4.0...v0.5.0",
-      "date": "2019-10-09",
+      "date": "2019-10-10",
       "deletions_count": 3038,
       "description": "",
       "highlights": [
@@ -7942,18 +10845,14 @@ module.exports = {
       ],
       "insertions_count": 6839,
       "last_version": "0.4.0",
-      "posts": [
-
-      ],
-      "subtitle": "",
+      "permalink": "/releases/0.5.0/",
+      "title": "Vector v0.5.0",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "upgrade_guides": [
-
-      ],
       "version": "0.5.0"
     },
     "0.6.0": {
+      "codename": "The Long Stretch",
       "commits": [
         {
           "author": "Ben Johnson",
@@ -7962,7 +10861,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Push docker images so that `latest` tags are last",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Push docker images so that `latest` tags are last",
           "pr_number": null,
@@ -7982,7 +10880,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Print grease command output",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Print grease command output",
           "pr_number": null,
@@ -8002,7 +10899,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Do not release Github or Homebrew on nightly",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore(operations): Do not release Github or Homebrew on nightly",
           "pr_number": null,
@@ -8022,7 +10918,6 @@ module.exports = {
           "deletions_count": 40,
           "description": "Make global options actually use default",
           "files_count": 6,
-          "group": "fix",
           "insertions_count": 56,
           "message": "fix(cli): Make global options actually use default (#1013)",
           "pr_number": 1013,
@@ -8042,7 +10937,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Add relevant when details to config spec",
           "files_count": 17,
-          "group": "docs",
           "insertions_count": 74,
           "message": "docs: Add relevant when details to config spec (#1016)",
           "pr_number": 1016,
@@ -8062,7 +10956,6 @@ module.exports = {
           "deletions_count": 3683,
           "description": "List out component options as linkable sections",
           "files_count": 95,
-          "group": "docs",
           "insertions_count": 3115,
           "message": "docs: List out component options as linkable sections (#1019)",
           "pr_number": 1019,
@@ -8082,7 +10975,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add ca certificates for docker image",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 2,
           "message": "fix(docker platform): Add ca certificates for docker image (#1014)",
           "pr_number": 1014,
@@ -8102,7 +10994,6 @@ module.exports = {
           "deletions_count": 3593,
           "description": "Further improve options documentation for each component",
           "files_count": 122,
-          "group": "docs",
           "insertions_count": 3957,
           "message": "docs: Further improve options documentation for each component",
           "pr_number": null,
@@ -8122,7 +11013,6 @@ module.exports = {
           "deletions_count": 456,
           "description": "Remove superflous tags in config examples",
           "files_count": 42,
-          "group": "docs",
           "insertions_count": 458,
           "message": "docs: Remove superflous tags in config examples",
           "pr_number": null,
@@ -8142,7 +11032,6 @@ module.exports = {
           "deletions_count": 480,
           "description": "Dont repeat default value in configuration examples",
           "files_count": 45,
-          "group": "docs",
           "insertions_count": 468,
           "message": "docs: Dont repeat default value in configuration examples",
           "pr_number": null,
@@ -8162,7 +11051,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Initial `datadog_metrics` implementation",
           "files_count": 16,
-          "group": "feat",
           "insertions_count": 1085,
           "message": "feat(new sink): Initial `datadog_metrics` implementation (#967)",
           "pr_number": 967,
@@ -8182,7 +11070,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Remove debian cache to reduce image size",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Remove debian cache to reduce image size (#1028)",
           "pr_number": 1028,
@@ -8202,7 +11089,6 @@ module.exports = {
           "deletions_count": 76,
           "description": "Dont label unit in config examples",
           "files_count": 20,
-          "group": "docs",
           "insertions_count": 80,
           "message": "docs: Dont label unit in config examples",
           "pr_number": null,
@@ -8222,7 +11108,6 @@ module.exports = {
           "deletions_count": 334,
           "description": "Add back section references to option descriptions",
           "files_count": 45,
-          "group": "docs",
           "insertions_count": 348,
           "message": "docs: Add back section references to option descriptions",
           "pr_number": null,
@@ -8242,7 +11127,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Ensure log_to_metric tags option shows in example",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 9,
           "message": "docs: Ensure log_to_metric tags option shows in example",
           "pr_number": null,
@@ -8262,7 +11146,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix metrics examples syntax error",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 1,
           "message": "docs: Fix metrics examples syntax error",
           "pr_number": null,
@@ -8282,7 +11165,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix log data model",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix log data model",
           "pr_number": null,
@@ -8302,7 +11184,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Add `commit_interval_ms` option",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 17,
           "message": "enhancement(kafka source): Add `commit_interval_ms` option (#944)",
           "pr_number": 944,
@@ -8322,7 +11203,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Fix typos",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 8,
           "message": "docs: Fix typos",
           "pr_number": null,
@@ -8342,7 +11222,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Put buffering tests behind `leveldb` feature",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(testing): Put buffering tests behind `leveldb` feature (#1046)",
           "pr_number": 1046,
@@ -8362,7 +11241,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Update `tower-limit` to `v0.1.1`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore(operations): Update `tower-limit` to `v0.1.1` (#1018)",
           "pr_number": 1018,
@@ -8382,7 +11260,6 @@ module.exports = {
           "deletions_count": 17,
           "description": "Resolve inability to shutdown Vector when std…",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 39,
           "message": "fix(stdin source): Resolve inability to shutdown Vector when std… (#960)",
           "pr_number": 960,
@@ -8402,7 +11279,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add address and path to the syslog source example config",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 8,
           "message": "docs: Add address and path to the syslog source example config",
           "pr_number": null,
@@ -8422,7 +11298,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Bump version in Cargo.toml before releasing",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 23,
           "message": "chore(operations): Bump version in Cargo.toml before releasing (#1048)",
           "pr_number": 1048,
@@ -8442,7 +11317,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Update leveldb-sys up to 2.0.5",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 3,
           "message": "enhancement(platforms): Update leveldb-sys up to 2.0.5 (#1055)",
           "pr_number": 1055,
@@ -8462,7 +11336,6 @@ module.exports = {
           "deletions_count": 204,
           "description": "Apply some fixes for clippy lints",
           "files_count": 36,
-          "group": "chore",
           "insertions_count": 188,
           "message": "chore: Apply some fixes for clippy lints (#1034)",
           "pr_number": 1034,
@@ -8482,7 +11355,6 @@ module.exports = {
           "deletions_count": 61,
           "description": "Require `encoding` option for console and file sinks",
           "files_count": 17,
-          "group": "breaking change",
           "insertions_count": 116,
           "message": "fix(config)!: Require `encoding` option for console and file sinks (#1033)",
           "pr_number": 1033,
@@ -8502,7 +11374,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Bundle install should print output on error",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(operations): Bundle install should print output on error (#1068)",
           "pr_number": 1068,
@@ -8522,7 +11393,6 @@ module.exports = {
           "deletions_count": 70,
           "description": "Add support for systemd socket activation",
           "files_count": 23,
-          "group": "enhancement",
           "insertions_count": 199,
           "message": "enhancement(networking): Add support for systemd socket activation (#1045)",
           "pr_number": 1045,
@@ -8542,7 +11412,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Add OpenSSL and pkg-config to development requirements",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 9,
           "message": "docs: Add OpenSSL and pkg-config to development requirements (#1066)",
           "pr_number": 1066,
@@ -8562,7 +11431,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Set default `drop_field` to true",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 13,
           "message": "enhancement(regex_parser transform): Set default `drop_field` to true",
           "pr_number": null,
@@ -8582,7 +11450,6 @@ module.exports = {
           "deletions_count": 83,
           "description": "Add `validate` sub command",
           "files_count": 5,
-          "group": "feat",
           "insertions_count": 269,
           "message": "feat(cli): Add `validate` sub command (#1064)",
           "pr_number": 1064,
@@ -8602,7 +11469,6 @@ module.exports = {
           "deletions_count": 136,
           "description": "Metrics buffer & aggregation",
           "files_count": 7,
-          "group": "enhancement",
           "insertions_count": 875,
           "message": "enhancement(metric data model): Metrics buffer & aggregation (#930)",
           "pr_number": 930,
@@ -8622,7 +11488,6 @@ module.exports = {
           "deletions_count": 127,
           "description": "Use rdkafka crate from the upstream Git repository",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 118,
           "message": "chore(operations): Use rdkafka crate from the upstream Git repository (#1063)",
           "pr_number": 1063,
@@ -8642,7 +11507,6 @@ module.exports = {
           "deletions_count": 635,
           "description": "Check config examples",
           "files_count": 37,
-          "group": "chore",
           "insertions_count": 18,
           "message": "chore(config): Check config examples (#1082)",
           "pr_number": 1082,
@@ -8662,7 +11526,6 @@ module.exports = {
           "deletions_count": 12,
           "description": "Fix a couple minor issues with checkpointing",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 17,
           "message": "fix(journald source): Fix a couple minor issues with checkpointing (#1086)",
           "pr_number": 1086,
@@ -8682,7 +11545,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix merge problem in Cargo.lock",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(operations): Fix merge problem in Cargo.lock (#1087)",
           "pr_number": 1087,
@@ -8702,7 +11564,6 @@ module.exports = {
           "deletions_count": 17,
           "description": "Use metric buffer in Datadog sink",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 17,
           "message": "enhancement(datadog_metrics sink): Use metric buffer in Datadog sink (#1080)",
           "pr_number": 1080,
@@ -8722,7 +11583,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Update `ctor` dependency",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 6,
           "message": "chore(operations): Update `ctor` dependency (#1095)",
           "pr_number": 1095,
@@ -8742,7 +11602,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Avoid dependency on platform-specific machine word size",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(operations): Avoid dependency on platform-specific machine word size (#1096)",
           "pr_number": 1096,
@@ -8762,7 +11621,6 @@ module.exports = {
           "deletions_count": 13,
           "description": "Rework option to limit records to current boot in journald source",
           "files_count": 7,
-          "group": "fix",
           "insertions_count": 36,
           "message": "fix(journald source): Rework option to limit records to current boot in journald source (#1105)",
           "pr_number": 1105,
@@ -8782,7 +11640,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Wrap provider call with a tokio runtime",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 11,
           "message": "enhancement(elasticsearch sink): Wrap provider call with a tokio runtime (#1104)",
           "pr_number": 1104,
@@ -8802,7 +11659,6 @@ module.exports = {
           "deletions_count": 77,
           "description": "Update Rusoto to 0.38.0",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 80,
           "message": "chore(operations): Update Rusoto to 0.38.0 (#1112)",
           "pr_number": 1112,
@@ -8822,7 +11678,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Increase sleep interval in the tests for file source",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(file source): Increase sleep interval in the tests for file source (#1113)",
           "pr_number": 1113,
@@ -8842,7 +11697,6 @@ module.exports = {
           "deletions_count": 116,
           "description": "Update Rusoto to 0.41.x",
           "files_count": 5,
-          "group": "chore",
           "insertions_count": 79,
           "message": "chore(operations): Update Rusoto to 0.41.x (#1114)",
           "pr_number": 1114,
@@ -8862,7 +11716,6 @@ module.exports = {
           "deletions_count": 12,
           "description": "Cursor/checkpoint fixes",
           "files_count": 5,
-          "group": "fix",
           "insertions_count": 77,
           "message": "fix(journald source): Cursor/checkpoint fixes (#1106)",
           "pr_number": 1106,
@@ -8882,7 +11735,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Use `rlua` crate from a fork with Pairs implementation",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 16,
           "message": "chore(operations): Use `rlua` crate from a fork with Pairs implementation (#1119)",
           "pr_number": 1119,
@@ -8902,7 +11754,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Allow iteration over fields",
           "files_count": 2,
-          "group": "enhancement",
           "insertions_count": 61,
           "message": "enhancement(lua transform): Allow iteration over fields (#1111)",
           "pr_number": 1111,
@@ -8922,7 +11773,6 @@ module.exports = {
           "deletions_count": 13,
           "description": "Move example of iterating over all fields out of the autogenerated file",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 26,
           "message": "docs(lua transform): Move example of iterating over all fields out of the autogenerated file (#1120)",
           "pr_number": 1120,
@@ -8942,7 +11792,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Flatten out region configuration in elasticsearch sink",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 1,
           "message": "fix(elasticsearch sink): Flatten out region configuration in elasticsearch sink (#1116)",
           "pr_number": 1116,
@@ -8962,7 +11811,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "Improve topology tracing spans",
           "files_count": 47,
-          "group": "fix",
           "insertions_count": 276,
           "message": "fix(observability): Improve topology tracing spans (#1123)",
           "pr_number": 1123,
@@ -8982,7 +11830,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Update grok to version 1.0.1",
           "files_count": 2,
-          "group": "enhancement",
           "insertions_count": 4,
           "message": "enhancement(grok_parser transform): Update grok to version 1.0.1 (#1124)",
           "pr_number": 1124,
@@ -9002,7 +11849,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Limit journald records to the current boot",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 34,
           "message": "fix(journald source): Limit journald records to the current boot (#1122)",
           "pr_number": 1122,
@@ -9022,7 +11868,6 @@ module.exports = {
           "deletions_count": 98,
           "description": "Abstracts runtime into runtime.rs",
           "files_count": 23,
-          "group": "chore",
           "insertions_count": 170,
           "message": "chore(operations): Abstracts runtime into runtime.rs (#1098)",
           "pr_number": 1098,
@@ -9042,7 +11887,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Add Cargo.toml version check to CI",
           "files_count": 5,
-          "group": "chore",
           "insertions_count": 84,
           "message": "chore(operations): Add Cargo.toml version check to CI (#1102)",
           "pr_number": 1102,
@@ -9062,7 +11906,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Handle edge cases in the Cargo.toml version check",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(operations): Handle edge cases in the Cargo.toml version check (#1138)",
           "pr_number": 1138,
@@ -9082,7 +11925,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Bump version in Cargo.toml to 0.6.0",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Bump version in Cargo.toml to 0.6.0 (#1139)",
           "pr_number": 1139,
@@ -9102,7 +11944,6 @@ module.exports = {
           "deletions_count": 28,
           "description": "Automatically create missing directories",
           "files_count": 6,
-          "group": "enhancement",
           "insertions_count": 121,
           "message": "enhancement(file sink): Automatically create missing directories (#1094)",
           "pr_number": 1094,
@@ -9122,7 +11963,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Update lock file for 0.6",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Update lock file for 0.6 (#1140)",
           "pr_number": 1140,
@@ -9142,7 +11982,6 @@ module.exports = {
           "deletions_count": 17,
           "description": "Show Git version and target triple in `vector --version` output",
           "files_count": 5,
-          "group": "enhancement",
           "insertions_count": 40,
           "message": "enhancement(cli): Show Git version and target triple in `vector --version` output (#1044)",
           "pr_number": 1044,
@@ -9162,7 +12001,6 @@ module.exports = {
           "deletions_count": 1380,
           "description": "Update lock file",
           "files_count": 10,
-          "group": "chore",
           "insertions_count": 880,
           "message": "chore: Update lock file (#1133)",
           "pr_number": 1133,
@@ -9182,7 +12020,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Flush and reset any current filter before applying new filter",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 1,
           "message": "fix(journald source): Flush and reset any current filter before applying new filter (#1135)",
           "pr_number": 1135,
@@ -9202,7 +12039,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Ensure internal rate limiting is logged",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 1,
           "message": "enhancement(observability): Ensure internal rate limiting is logged (#1151)",
           "pr_number": 1151,
@@ -9222,7 +12058,6 @@ module.exports = {
           "deletions_count": 40,
           "description": "Use inventory for plugins",
           "files_count": 42,
-          "group": "chore",
           "insertions_count": 280,
           "message": "chore(config): Use inventory for plugins (#1115)",
           "pr_number": 1115,
@@ -9242,7 +12077,6 @@ module.exports = {
           "deletions_count": 17,
           "description": "Fix metrics batch strategy in sinks",
           "files_count": 6,
-          "group": "fix",
           "insertions_count": 7,
           "message": "fix(aws_cloudwatch_metrics sink): Fix metrics batch strategy in sinks (#1141)",
           "pr_number": 1141,
@@ -9262,7 +12096,6 @@ module.exports = {
           "deletions_count": 130,
           "description": "Refactor the batching configuration",
           "files_count": 12,
-          "group": "enhancement",
           "insertions_count": 132,
           "message": "enhancement(config): Refactor the batching configuration (#1154)",
           "pr_number": 1154,
@@ -9282,7 +12115,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add `list` subcommand",
           "files_count": 4,
-          "group": "feat",
           "insertions_count": 98,
           "message": "feat(cli): Add `list` subcommand (#1156)",
           "pr_number": 1156,
@@ -9302,7 +12134,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Stop accidentally requiring region for ES",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 24,
           "message": "fix(elasticsearch sink): Stop accidentally requiring region for ES (#1161)",
           "pr_number": 1161,
@@ -9322,7 +12153,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Bump loofah from 2.2.3 to 2.3.1 in /scripts",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore(operatons): Bump loofah from 2.2.3 to 2.3.1 in /scripts (#1163)",
           "pr_number": 1163,
@@ -9342,7 +12172,6 @@ module.exports = {
           "deletions_count": 17,
           "description": "Use vendored OpenSSL",
           "files_count": 3,
-          "group": "enhancement",
           "insertions_count": 20,
           "message": "enhancement(platforms): Use vendored OpenSSL (#1170)",
           "pr_number": 1170,
@@ -9362,7 +12191,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "upgrade to rust 1.39.0",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): upgrade to rust 1.39.0 (#1159)",
           "pr_number": 1159,
@@ -9382,7 +12210,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add `clean` target to Makefile",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 3,
           "message": "enhancement(operations): Add `clean` target to Makefile (#1171)",
           "pr_number": 1171,
@@ -9402,7 +12229,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Fixes a bug droping parsed field",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 24,
           "message": "fix(json_parser transform): Fixes a bug droping parsed field (#1167)",
           "pr_number": 1167,
@@ -9422,7 +12248,6 @@ module.exports = {
           "deletions_count": 60,
           "description": "`host` is not required when provider is AWS",
           "files_count": 5,
-          "group": "fix",
           "insertions_count": 112,
           "message": "fix(elasticsearch sink): `host` is not required when provider is AWS (#1164)",
           "pr_number": 1164,
@@ -9442,7 +12267,6 @@ module.exports = {
           "deletions_count": 1,
           "description": " Limit the number of CircleCI build jobs to 8",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations):  Limit the number of CircleCI build jobs to 8 (#1176)",
           "pr_number": 1176,
@@ -9462,7 +12286,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix missed `cargo fmt` run on elasticsearch sink",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore: Fix missed `cargo fmt` run on elasticsearch sink (#1175)",
           "pr_number": 1175,
@@ -9482,7 +12305,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Don't drop parsed field",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 20,
           "message": "fix(grok_parser transform): Don't drop parsed field (#1172)",
           "pr_number": 1172,
@@ -9502,7 +12324,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Add support for target field configuration",
           "files_count": 6,
-          "group": "enhancement",
           "insertions_count": 152,
           "message": "enhancement(json_parser transform): Add support for target field configuration (#1165)",
           "pr_number": 1165,
@@ -9522,7 +12343,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Add `generate` subcommand",
           "files_count": 6,
-          "group": "feat",
           "insertions_count": 272,
           "message": "feat(cli): Add `generate` subcommand (#1168)",
           "pr_number": 1168,
@@ -9542,7 +12362,6 @@ module.exports = {
           "deletions_count": 28,
           "description": "Use `strptime` instead of `strftime` in docs where appropriate",
           "files_count": 13,
-          "group": "docs",
           "insertions_count": 28,
           "message": "docs: Use `strptime` instead of `strftime` in docs where appropriate (#1183)",
           "pr_number": 1183,
@@ -9562,7 +12381,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Support default environment variable values",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 11,
           "message": "enhancement(config): Support default environment variable values (#1185)",
           "pr_number": 1185,
@@ -9582,7 +12400,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Update rdkafka to fix rdkafka/cmake feature",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(operations): Update rdkafka to fix rdkafka/cmake feature (#1186)",
           "pr_number": 1186,
@@ -9602,7 +12419,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Use leveldb from fork with improved portability",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore(operations): Use leveldb from fork with improved portability (#1184)",
           "pr_number": 1184,
@@ -9622,7 +12438,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Increase wait timeouts in tests which otherwise fail on slow CPUs",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 8,
           "message": "fix(testing): Increase wait timeouts in tests which otherwise fail on slow CPUs (#1181)",
           "pr_number": 1181,
@@ -9642,7 +12457,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Control which version of leveldb-sys to use with features",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore(operations): Control which version of leveldb-sys to use with features (#1191)",
           "pr_number": 1191,
@@ -9662,7 +12476,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Support `armv7-unknown-linux` (Raspberry Pi, etc) platforms",
           "files_count": 4,
-          "group": "feat",
           "insertions_count": 366,
           "message": "feat(new platform): Support `armv7-unknown-linux` (Raspberry Pi, etc) platforms (#1054)",
           "pr_number": 1054,
@@ -9682,7 +12495,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Support `aarch64-unknown-linux` (ARM64, Raspberry Pi, etc) platforms",
           "files_count": 4,
-          "group": "feat",
           "insertions_count": 347,
           "message": "feat(new platform): Support `aarch64-unknown-linux` (ARM64, Raspberry Pi, etc) platforms (#1193)",
           "pr_number": 1193,
@@ -9702,7 +12514,6 @@ module.exports = {
           "deletions_count": 37,
           "description": "Re-fix journald cursor handling and libsystemd name",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 34,
           "message": "fix(journald source): Re-fix journald cursor handling and libsystemd name (#1202)",
           "pr_number": 1202,
@@ -9722,7 +12533,6 @@ module.exports = {
           "deletions_count": 23643,
           "description": "New website and documentation",
           "files_count": 496,
-          "group": "docs",
           "insertions_count": 39821,
           "message": "docs: New website and documentation (#1207)",
           "pr_number": 1207,
@@ -9742,7 +12552,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Initial `ansi_stripper` transform implementation",
           "files_count": 5,
-          "group": "feat",
           "insertions_count": 158,
           "message": "feat(new transform): Initial `ansi_stripper` transform implementation (#1188)",
           "pr_number": 1188,
@@ -9762,7 +12571,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix README banner",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 146,
           "message": "docs: Fix README banner",
           "pr_number": null,
@@ -9782,7 +12590,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Initial `geoip` transform implementation",
           "files_count": 6,
-          "group": "feat",
           "insertions_count": 286,
           "message": "feat(new transform): Initial `geoip` transform implementation (#1015)",
           "pr_number": 1015,
@@ -9802,7 +12609,6 @@ module.exports = {
           "deletions_count": 307,
           "description": "Small website and documentation improvements",
           "files_count": 28,
-          "group": "docs",
           "insertions_count": 880,
           "message": "docs: Small website and documentation improvements (#1215)",
           "pr_number": 1215,
@@ -9822,7 +12628,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Small changes to website homepage styles",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 9,
           "message": "docs: Small changes to website homepage styles",
           "pr_number": null,
@@ -9842,7 +12647,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Fix some URLs",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 7,
           "message": "docs: Fix some URLs",
           "pr_number": null,
@@ -9862,7 +12666,6 @@ module.exports = {
           "deletions_count": 91,
           "description": "Allow >1 config targets for validate command",
           "files_count": 3,
-          "group": "enhancement",
           "insertions_count": 82,
           "message": "enhancement(cli): Allow >1 config targets for validate command (#1218)",
           "pr_number": 1218,
@@ -9882,7 +12685,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix components link in README",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix components link in README (#1222)",
           "pr_number": 1222,
@@ -9902,7 +12704,6 @@ module.exports = {
           "deletions_count": 4232,
           "description": "Rename components section to reference in docs",
           "files_count": 134,
-          "group": "docs",
           "insertions_count": 740,
           "message": "docs: Rename components section to reference in docs (#1223)",
           "pr_number": 1223,
@@ -9922,7 +12723,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Styling fixes",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 13,
           "message": "docs: Styling fixes",
           "pr_number": null,
@@ -9942,7 +12742,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Fix restoring of `rust-toolchain` file",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(operations): Fix restoring of `rust-toolchain` file (#1224)",
           "pr_number": 1224,
@@ -9962,7 +12761,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Produce archives for `armv7-unknown-linux-musleabihf`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 29,
           "message": "chore(operations): Produce archives for `armv7-unknown-linux-musleabihf` (#1225)",
           "pr_number": 1225,
@@ -9982,7 +12780,6 @@ module.exports = {
           "deletions_count": 72,
           "description": "Support `x86_64-pc-windows-msvc` (Windows 7+) platform",
           "files_count": 15,
-          "group": "feat",
           "insertions_count": 337,
           "message": "feat(new platform): Support `x86_64-pc-windows-msvc` (Windows 7+) platform (#1205)",
           "pr_number": 1205,
@@ -10002,7 +12799,6 @@ module.exports = {
           "deletions_count": 53,
           "description": "Update downloads links",
           "files_count": 11,
-          "group": "docs",
           "insertions_count": 144,
           "message": "docs: Update downloads links",
           "pr_number": null,
@@ -10022,7 +12818,6 @@ module.exports = {
           "deletions_count": 374,
           "description": "Fix `check-generate` check in CI",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 398,
           "message": "chore(operations): Fix `check-generate` check in CI (#1226)",
           "pr_number": 1226,
@@ -10042,7 +12837,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Use bash from Docker containers as a shell in Circle CI",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 13,
           "message": "chore(operations): Use bash from Docker containers as a shell in Circle CI (#1227)",
           "pr_number": 1227,
@@ -10062,7 +12856,6 @@ module.exports = {
           "deletions_count": 12,
           "description": "Fix invocation of check jobs",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 12,
           "message": "chore(operations): Fix invocation of check jobs (#1229)",
           "pr_number": 1229,
@@ -10082,7 +12875,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Verify `zip` archives for `x86_64-pc-windows-msvc` in `wine`",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 17,
           "message": "chore(operations): Verify `zip` archives for `x86_64-pc-windows-msvc` in `wine` (#1228)",
           "pr_number": 1228,
@@ -10102,7 +12894,6 @@ module.exports = {
           "deletions_count": 90,
           "description": "Update to docusaurus alpha.36",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 82,
           "message": "chore(website): Update to docusaurus alpha.36",
           "pr_number": null,
@@ -10122,7 +12913,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Fix curl commands mentioned in #1234",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: Fix curl commands mentioned in #1234",
           "pr_number": null,
@@ -10142,7 +12932,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Run nightly builds at 5pm UTC",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Run nightly builds at 5pm UTC",
           "pr_number": null,
@@ -10162,7 +12951,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Redraw diagram to fix an initial load issue in Chrome",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: Redraw diagram to fix an initial load issue in Chrome",
           "pr_number": null,
@@ -10182,7 +12970,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Rerender diagram to fix Chrome update issue",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 10,
           "message": "docs: Rerender diagram to fix Chrome update issue",
           "pr_number": null,
@@ -10202,7 +12989,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "More Chrome fixes",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore(website): More Chrome fixes",
           "pr_number": null,
@@ -10222,7 +13008,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Fix Chrome sorting issue",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 8,
           "message": "chore(website): Fix Chrome sorting issue",
           "pr_number": null,
@@ -10242,7 +13027,6 @@ module.exports = {
           "deletions_count": 182,
           "description": "Fix readme",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 47,
           "message": "docs: Fix readme",
           "pr_number": null,
@@ -10262,7 +13046,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Fix readme component counts",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 11,
           "message": "docs: Fix readme component counts",
           "pr_number": null,
@@ -10282,7 +13065,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Make `openssl/vendored` feature optional",
           "files_count": 2,
-          "group": "enhancement",
           "insertions_count": 7,
           "message": "enhancement(platforms): Make `openssl/vendored` feature optional (#1239)",
           "pr_number": 1239,
@@ -10302,7 +13084,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Accept metric events, too",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 8,
           "message": "enhancement(blackhole sink): Accept metric events, too (#1237)",
           "pr_number": 1237,
@@ -10322,7 +13103,6 @@ module.exports = {
           "deletions_count": 14,
           "description": "Update `openssl` dependency",
           "files_count": 2,
-          "group": "enhancement",
           "insertions_count": 14,
           "message": "enhancement(platforms): Update `openssl` dependency (#1240)",
           "pr_number": 1240,
@@ -10342,7 +13122,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Don't put *.erb files to configs directory",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 2,
           "message": "fix(platforms): Don't put *.erb files to configs directory (#1241)",
           "pr_number": 1241,
@@ -10362,7 +13141,6 @@ module.exports = {
           "deletions_count": 351,
           "description": "Document installation on Windows",
           "files_count": 37,
-          "group": "docs",
           "insertions_count": 1064,
           "message": "docs: Document installation on Windows (#1235)",
           "pr_number": 1235,
@@ -10382,7 +13160,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add docker to homepage",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 151,
           "message": "docs: Add docker to homepage",
           "pr_number": null,
@@ -10402,7 +13179,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Update docker image",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Update docker image",
           "pr_number": null,
@@ -10422,7 +13198,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix administrating doc",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 31,
           "message": "docs: Fix administrating doc",
           "pr_number": null,
@@ -10442,7 +13217,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add administration to docs sidebar",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Add administration to docs sidebar",
           "pr_number": null,
@@ -10462,7 +13236,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Add C++ toolchain installation step",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 9,
           "message": "docs: Add C++ toolchain installation step",
           "pr_number": null,
@@ -10482,7 +13255,6 @@ module.exports = {
           "deletions_count": 20,
           "description": "Attempt to fix website theme flickering",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 25,
           "message": "chore(website): Attempt to fix website theme flickering",
           "pr_number": null,
@@ -10502,7 +13274,6 @@ module.exports = {
           "deletions_count": 25,
           "description": "Describe build features",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 82,
           "message": "docs: Describe build features (#1243)",
           "pr_number": 1243,
@@ -10522,7 +13293,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Add ARMv7 to installation docs",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 84,
           "message": "docs: Add ARMv7 to installation docs",
           "pr_number": null,
@@ -10542,7 +13312,6 @@ module.exports = {
           "deletions_count": 15,
           "description": "Various installation docs corrections, closes #1234",
           "files_count": 8,
-          "group": "docs",
           "insertions_count": 27,
           "message": "docs: Various installation docs corrections, closes #1234",
           "pr_number": null,
@@ -10562,7 +13331,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Remove Alogia search until it has indexed everything",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(website): Remove Alogia search until it has indexed everything",
           "pr_number": null,
@@ -10582,7 +13350,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Fix passing environment variables inside the CI Docker containers",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 16,
           "message": "chore(operations): Fix passing environment variables inside the CI Docker containers (#1233)",
           "pr_number": 1233,
@@ -10602,7 +13369,6 @@ module.exports = {
           "deletions_count": 141,
           "description": "Add operating system as a compenent attribute and filter",
           "files_count": 59,
-          "group": "chore",
           "insertions_count": 619,
           "message": "chore(website): Add operating system as a compenent attribute and filter (#1244)",
           "pr_number": 1244,
@@ -10622,7 +13388,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix operating system filter",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Fix operating system filter",
           "pr_number": null,
@@ -10642,7 +13407,6 @@ module.exports = {
           "deletions_count": 33,
           "description": "Dont show operating systems for transforms",
           "files_count": 16,
-          "group": "chore",
           "insertions_count": 33,
           "message": "chore(website): Dont show operating systems for transforms",
           "pr_number": null,
@@ -10662,7 +13426,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix broken link on homepage",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 1,
           "message": "docs: Fix broken link on homepage",
           "pr_number": null,
@@ -10682,7 +13445,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add sidebar background and ga id",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(website): Add sidebar background and ga id",
           "pr_number": null,
@@ -10702,7 +13464,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix link",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix link",
           "pr_number": null,
@@ -10722,7 +13483,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix name of `shiplift/unix-socket` feature",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix name of `shiplift/unix-socket` feature (#1251)",
           "pr_number": 1251,
@@ -10742,7 +13502,6 @@ module.exports = {
           "deletions_count": 641,
           "description": "Update dependencies",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 644,
           "message": "chore(website): Update dependencies",
           "pr_number": null,
@@ -10762,7 +13521,6 @@ module.exports = {
           "deletions_count": 13,
           "description": "Fix Github issues links",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 13,
           "message": "docs: Fix Github issues links",
           "pr_number": null,
@@ -10782,7 +13540,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Use the proper font in the configuration digram, ref #1234",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 7,
           "message": "chore(website): Use the proper font in the configuration digram, ref #1234",
           "pr_number": null,
@@ -10802,7 +13559,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Enable Algolia search",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(website): Enable Algolia search",
           "pr_number": null,
@@ -10822,7 +13578,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Remove paginator from main doc content so that it is not included in search results",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 11,
           "message": "chore(website): Remove paginator from main doc content so that it is not included in search results",
           "pr_number": null,
@@ -10842,7 +13597,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "Fix search field styling",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 42,
           "message": "chore(website): Fix search field styling",
           "pr_number": null,
@@ -10862,7 +13616,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Move main links in header to the left",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore(website): Move main links in header to the left",
           "pr_number": null,
@@ -10882,7 +13635,6 @@ module.exports = {
           "deletions_count": 17,
           "description": "Add JSON encoding option",
           "files_count": 6,
-          "group": "enhancement",
           "insertions_count": 102,
           "message": "enhancement(http sink): Add JSON encoding option (#1174)",
           "pr_number": 1174,
@@ -10902,7 +13654,6 @@ module.exports = {
           "deletions_count": 61,
           "description": "Reference exact latest version instead of \"latest\" in download URLs",
           "files_count": 7,
-          "group": "docs",
           "insertions_count": 153,
           "message": "docs: Reference exact latest version instead of \"latest\" in download URLs (#1254)",
           "pr_number": 1254,
@@ -10922,7 +13673,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Fix search bar styling on mobile",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 24,
           "message": "chore(website): Fix search bar styling on mobile",
           "pr_number": null,
@@ -10942,7 +13692,6 @@ module.exports = {
           "deletions_count": 101,
           "description": "Add auto-generated comments to files that are auto-generated, closes #1256",
           "files_count": 114,
-          "group": "docs",
           "insertions_count": 655,
           "message": "docs: Add auto-generated comments to files that are auto-generated, closes #1256",
           "pr_number": null,
@@ -10962,7 +13711,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Sleep to avoid split reads",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 16,
           "message": "fix(file source): Sleep to avoid split reads (#1236)",
           "pr_number": 1236,
@@ -10982,7 +13730,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add CODEOWNERS file",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 71,
           "message": "chore(operations): Add CODEOWNERS file (#1248)",
           "pr_number": 1248,
@@ -11002,7 +13749,6 @@ module.exports = {
           "deletions_count": 79,
           "description": "Add `test` sub-command",
           "files_count": 38,
-          "group": "feat",
           "insertions_count": 2446,
           "message": "feat(cli): Add `test` sub-command (#1220)",
           "pr_number": 1220,
@@ -11022,7 +13768,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Re-generate unit test spec",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 8,
           "message": "docs: Re-generate unit test spec",
           "pr_number": null,
@@ -11042,7 +13787,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Add hash links to all headings",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 20,
           "message": "chore(website): Add hash links to all headings",
           "pr_number": null,
@@ -11057,14 +13801,13 @@ module.exports = {
         },
         {
           "author": "Alexey Suslov",
-          "breaking_change": true,
+          "breaking_change": false,
           "date": "2019-11-26 12:24:33 +0000",
           "deletions_count": 1036,
           "description": "Reorganise metric model",
           "files_count": 16,
-          "group": "breaking change",
           "insertions_count": 1389,
-          "message": "enhancement(metric data model)!: Reorganise metric model (#1217)",
+          "message": "enhancement(metric data model): Reorganise metric model (#1217)",
           "pr_number": 1217,
           "scope": {
             "category": "core",
@@ -11082,7 +13825,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Turn \"executable\" bit off for some of docs files",
           "files_count": 21,
-          "group": "docs",
           "insertions_count": 0,
           "message": "docs: Turn \"executable\" bit off for some of docs files",
           "pr_number": null,
@@ -11102,7 +13844,6 @@ module.exports = {
           "deletions_count": 298,
           "description": "Enrich events with metadata",
           "files_count": 39,
-          "group": "enhancement",
           "insertions_count": 505,
           "message": "enhancement(docker source): Enrich events with metadata (#1149)",
           "pr_number": 1149,
@@ -11122,7 +13863,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Testing documentation touchups",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 718,
           "message": "docs: Testing documentation touchups",
           "pr_number": null,
@@ -11142,7 +13882,6 @@ module.exports = {
           "deletions_count": 177,
           "description": "Fix examples syntax and parsing",
           "files_count": 19,
-          "group": "docs",
           "insertions_count": 198,
           "message": "docs: Fix examples syntax and parsing",
           "pr_number": null,
@@ -11162,7 +13901,6 @@ module.exports = {
           "deletions_count": 12,
           "description": "Clarify guarantees language to be feature specific not component specific",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 12,
           "message": "docs: Clarify guarantees language to be feature specific not component specific",
           "pr_number": null,
@@ -11182,7 +13920,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "Fix docker source config examples",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 8,
           "message": "docs: Fix docker source config examples",
           "pr_number": null,
@@ -11202,7 +13939,6 @@ module.exports = {
           "deletions_count": 43,
           "description": "Fix sorting in make generate",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 35,
           "message": "chore(operations): Fix sorting in make generate",
           "pr_number": null,
@@ -11222,7 +13958,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Add timeouts to crash tests",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 14,
           "message": "chore(testing): Add timeouts to crash tests (#1265)",
           "pr_number": 1265,
@@ -11242,7 +13977,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Run `x86_64-pc-windows-msvc` tests in release mode",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(testing): Run `x86_64-pc-windows-msvc` tests in release mode (#1269)",
           "pr_number": 1269,
@@ -11262,7 +13996,6 @@ module.exports = {
           "deletions_count": 41,
           "description": "Move env vars to reference section",
           "files_count": 11,
-          "group": "docs",
           "insertions_count": 204,
           "message": "docs: Move env vars to reference section",
           "pr_number": null,
@@ -11282,7 +14015,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Custom DNS resolution",
           "files_count": 11,
-          "group": "feat",
           "insertions_count": 733,
           "message": "feat(networking): Custom DNS resolution (#1118)",
           "pr_number": 1118,
@@ -11302,7 +14034,6 @@ module.exports = {
           "deletions_count": 1697,
           "description": "Add env_vars key to all components",
           "files_count": 109,
-          "group": "docs",
           "insertions_count": 3752,
           "message": "docs: Add env_vars key to all components",
           "pr_number": null,
@@ -11322,7 +14053,6 @@ module.exports = {
           "deletions_count": 616,
           "description": "Fix rate_limit and retry option names",
           "files_count": 20,
-          "group": "docs",
           "insertions_count": 625,
           "message": "docs: Fix rate_limit and retry option names (#1270)",
           "pr_number": 1270,
@@ -11342,7 +14072,6 @@ module.exports = {
           "deletions_count": 832,
           "description": "Fix variable field names",
           "files_count": 25,
-          "group": "docs",
           "insertions_count": 79,
           "message": "docs: Fix variable field names",
           "pr_number": null,
@@ -11362,7 +14091,6 @@ module.exports = {
           "deletions_count": 72,
           "description": "Fix variable field names",
           "files_count": 26,
-          "group": "docs",
           "insertions_count": 95,
           "message": "docs: Fix variable field names",
           "pr_number": null,
@@ -11382,7 +14110,6 @@ module.exports = {
           "deletions_count": 2210,
           "description": "Fix config examples category name",
           "files_count": 46,
-          "group": "docs",
           "insertions_count": 894,
           "message": "docs: Fix config examples category name",
           "pr_number": null,
@@ -11402,7 +14129,6 @@ module.exports = {
           "deletions_count": 70,
           "description": "Fix example categories",
           "files_count": 24,
-          "group": "docs",
           "insertions_count": 53,
           "message": "docs: Fix example categories",
           "pr_number": null,
@@ -11422,7 +14148,6 @@ module.exports = {
           "deletions_count": 274,
           "description": "Build .deb packages for all musl targets",
           "files_count": 17,
-          "group": "chore",
           "insertions_count": 500,
           "message": "chore(operations): Build .deb packages for all musl targets (#1247)",
           "pr_number": 1247,
@@ -11442,7 +14167,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Typo",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 1,
           "message": "docs: Typo (#1273)",
           "pr_number": 1273,
@@ -11462,7 +14186,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Remove console.log",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 0,
           "message": "docs: Remove console.log",
           "pr_number": null,
@@ -11482,7 +14205,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add a unit test guide",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 253,
           "message": "docs: Add a unit test guide (#1278)",
           "pr_number": 1278,
@@ -11502,7 +14224,6 @@ module.exports = {
           "deletions_count": 23,
           "description": "Add topology section",
           "files_count": 6,
-          "group": "chore",
           "insertions_count": 90,
           "message": "chore(website): Add topology section",
           "pr_number": null,
@@ -11522,7 +14243,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Default to centralized topology",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore(website): Default to centralized topology",
           "pr_number": null,
@@ -11542,7 +14262,6 @@ module.exports = {
           "deletions_count": 13,
           "description": "Fix rounded tabs",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 33,
           "message": "chore(website): Fix rounded tabs",
           "pr_number": null,
@@ -11562,7 +14281,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Increase CI output timeout",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 8,
           "message": "chore(operations): Increase CI output timeout (#1272)",
           "pr_number": 1272,
@@ -11582,7 +14300,6 @@ module.exports = {
           "deletions_count": 24,
           "description": "Delete unused OpenSSL patch",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore(operations): Delete unused OpenSSL patch (#1282)",
           "pr_number": 1282,
@@ -11602,7 +14319,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Run nightly builds at 12am UTC",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Run nightly builds at 12am UTC",
           "pr_number": null,
@@ -11622,7 +14338,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Set up redirects for x86_64-unknown-linux-gnu archives",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 23,
           "message": "chore(operations): Set up redirects for x86_64-unknown-linux-gnu archives (#1284)",
           "pr_number": 1284,
@@ -11642,7 +14357,6 @@ module.exports = {
           "deletions_count": 122,
           "description": "Build multi-arch Docker images",
           "files_count": 9,
-          "group": "chore",
           "insertions_count": 151,
           "message": "chore(operations): Build multi-arch Docker images (#1279)",
           "pr_number": 1279,
@@ -11662,7 +14376,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Use `sidebar_label` as subpage title if possible",
           "files_count": 5,
-          "group": "chore",
           "insertions_count": 17,
           "message": "chore(website): Use `sidebar_label` as subpage title if possible (#1283)",
           "pr_number": 1283,
@@ -11682,7 +14395,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Simplify platform names in \"downloads\" section",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 8,
           "message": "chore(website): Simplify platform names in \"downloads\" section (#1285)",
           "pr_number": 1285,
@@ -11702,7 +14414,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Run nightly builds at 11am UTC",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(operations): Run nightly builds at 11am UTC",
           "pr_number": null,
@@ -11722,7 +14433,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Remove extra `setup_remote_docker` step from `relase-docker`",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 0,
           "message": "fix(operations): Remove extra `setup_remote_docker` step from `relase-docker` (#1287)",
           "pr_number": 1287,
@@ -11742,7 +14452,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix S3 release verification",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 1,
           "message": "fix(operations): Fix S3 release verification (#1286)",
           "pr_number": 1286,
@@ -11762,7 +14471,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "Upgrade Docker on the step in which it is used",
           "files_count": 3,
-          "group": "fix",
           "insertions_count": 22,
           "message": "fix(operations): Upgrade Docker on the step in which it is used (#1288)",
           "pr_number": 1288,
@@ -11782,7 +14490,6 @@ module.exports = {
           "deletions_count": 618,
           "description": "Cleanup installation docs",
           "files_count": 32,
-          "group": "docs",
           "insertions_count": 783,
           "message": "docs: Cleanup installation docs (#1289)",
           "pr_number": 1289,
@@ -11802,7 +14509,6 @@ module.exports = {
           "deletions_count": 229,
           "description": "Update to docaurus 2.0.0-alpha.37",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 242,
           "message": "chore(website): Update to docaurus 2.0.0-alpha.37",
           "pr_number": null,
@@ -11822,7 +14528,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Group downloads by os",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 62,
           "message": "chore(website): Group downloads by os",
           "pr_number": null,
@@ -11842,7 +14547,6 @@ module.exports = {
           "deletions_count": 25,
           "description": "Rename raspberry-pi to raspbian",
           "files_count": 10,
-          "group": "docs",
           "insertions_count": 44,
           "message": "docs: Rename raspberry-pi to raspbian",
           "pr_number": null,
@@ -11862,7 +14566,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix responsive styling on homepage",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 9,
           "message": "chore(website): Fix responsive styling on homepage",
           "pr_number": null,
@@ -11882,7 +14585,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Fix accessing custom front-matter in docs",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 13,
           "message": "chore(website): Fix accessing custom front-matter in docs",
           "pr_number": null,
@@ -11902,7 +14604,6 @@ module.exports = {
           "deletions_count": 62,
           "description": "Build RPM packages for ARM",
           "files_count": 5,
-          "group": "chore",
           "insertions_count": 220,
           "message": "chore(operations): Build RPM packages for ARM (#1292)",
           "pr_number": 1292,
@@ -11922,7 +14623,6 @@ module.exports = {
           "deletions_count": 338,
           "description": "Refactor the sinks' request_* configuration",
           "files_count": 12,
-          "group": "enhancement",
           "insertions_count": 321,
           "message": "enhancement(config): Refactor the sinks' request_* configuration (#1187)",
           "pr_number": 1187,
@@ -11942,7 +14642,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix Raspbian id capitalization",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix Raspbian id capitalization (#1295)",
           "pr_number": 1295,
@@ -11962,7 +14661,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Run `package-rpm*` jobs explicitly",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 3,
           "message": "fix(operations): Run `package-rpm*` jobs explicitly (#1298)",
           "pr_number": 1298,
@@ -11982,7 +14680,6 @@ module.exports = {
           "deletions_count": 16,
           "description": "Fix section links",
           "files_count": 9,
-          "group": "docs",
           "insertions_count": 24,
           "message": "docs: Fix section links",
           "pr_number": null,
@@ -12002,7 +14699,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix browse downloads link",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Fix browse downloads link",
           "pr_number": null,
@@ -12022,7 +14718,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Add slugify method to mimic Docusaurus hashing logic for links",
           "files_count": 7,
-          "group": "chore",
           "insertions_count": 23,
           "message": "chore(website): Add slugify method to mimic Docusaurus hashing logic for links",
           "pr_number": null,
@@ -12042,7 +14737,6 @@ module.exports = {
           "deletions_count": 20,
           "description": "Fix buffers and batches hash link",
           "files_count": 10,
-          "group": "chore",
           "insertions_count": 20,
           "message": "chore(website): Fix buffers and batches hash link",
           "pr_number": null,
@@ -12062,7 +14756,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Use the Rust regex tester, closes #634",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Use the Rust regex tester, closes #634",
           "pr_number": null,
@@ -12082,7 +14775,6 @@ module.exports = {
           "deletions_count": 16,
           "description": "Fix example regex",
           "files_count": 6,
-          "group": "chore",
           "insertions_count": 16,
           "message": "chore(website): Fix example regex",
           "pr_number": null,
@@ -12102,7 +14794,6 @@ module.exports = {
           "deletions_count": 35,
           "description": "Pass `TaskExecutor` to transform",
           "files_count": 25,
-          "group": "chore",
           "insertions_count": 67,
           "message": "chore(topology): Pass `TaskExecutor` to transform (#1144)",
           "pr_number": 1144,
@@ -12122,7 +14813,6 @@ module.exports = {
           "deletions_count": 223,
           "description": "Add community page with mailing list",
           "files_count": 13,
-          "group": "chore",
           "insertions_count": 271,
           "message": "chore(website): Add community page with mailing list (#1309)",
           "pr_number": 1309,
@@ -12142,7 +14832,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Responsive styling for community page",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 14,
           "message": "chore(wensite): Responsive styling for community page",
           "pr_number": null,
@@ -12162,7 +14851,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Fix slide out main nav menu link labels",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 7,
           "message": "chore(website): Fix slide out main nav menu link labels",
           "pr_number": null,
@@ -12182,7 +14870,6 @@ module.exports = {
           "deletions_count": 14,
           "description": "Re-add components list",
           "files_count": 5,
-          "group": "chore",
           "insertions_count": 207,
           "message": "chore(website): Re-add components list",
           "pr_number": null,
@@ -12202,7 +14889,6 @@ module.exports = {
           "deletions_count": 29,
           "description": "Use ${ENV_VAR} syntax in relavant examples",
           "files_count": 9,
-          "group": "docs",
           "insertions_count": 33,
           "message": "docs: Use ${ENV_VAR} syntax in relavant examples",
           "pr_number": null,
@@ -12222,7 +14908,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "Performance optimisations in metric buffer",
           "files_count": 2,
-          "group": "perf",
           "insertions_count": 165,
           "message": "perf(metric data model): Performance optimisations in metric buffer (#1290)",
           "pr_number": 1290,
@@ -12242,7 +14927,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Fix nav width",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 10,
           "message": "chore(website): Fix nav width",
           "pr_number": null,
@@ -12262,7 +14946,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Update README with new links",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 8,
           "message": "docs: Update README with new links",
           "pr_number": null,
@@ -12282,7 +14965,6 @@ module.exports = {
           "deletions_count": 113,
           "description": "Add `SinkContext` to `SinkConfig`",
           "files_count": 23,
-          "group": "chore",
           "insertions_count": 146,
           "message": "chore(topology): Add `SinkContext` to `SinkConfig` (#1306)",
           "pr_number": 1306,
@@ -12302,7 +14984,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "Initial `new_relic_logs` sink implementation",
           "files_count": 13,
-          "group": "feat",
           "insertions_count": 1166,
           "message": "feat(new sink): Initial `new_relic_logs` sink implementation (#1303)",
           "pr_number": 1303,
@@ -12322,7 +15003,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Fix NR build signature",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 12,
           "message": "chore: Fix NR build signature",
           "pr_number": null,
@@ -12342,7 +15022,6 @@ module.exports = {
           "deletions_count": 182,
           "description": "Add map to ServiceBuilder and s3",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 346,
           "message": "chore: Add map to ServiceBuilder and s3 (#1189)",
           "pr_number": 1189,
@@ -12362,7 +15041,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Rename `datadog` sink to `datadog_metrics`",
           "files_count": 1,
-          "group": "breaking change",
           "insertions_count": 3,
           "message": "fix(datadog_metrics sink)!: Rename `datadog` sink to `datadog_metrics` (#1314)",
           "pr_number": 1314,
@@ -12382,7 +15060,6 @@ module.exports = {
           "deletions_count": 166,
           "description": "Sync with new toggle changes",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(website): Sync with new toggle changes",
           "pr_number": null,
@@ -12402,7 +15079,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Send aggregated distributions to Datadog",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 231,
           "message": "enhancement(datadog_metrics sink): Send aggregated distributions to Datadog (#1263)",
           "pr_number": 1263,
@@ -12422,7 +15098,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Test & validate subcommands without args target default path",
           "files_count": 3,
-          "group": "enhancement",
           "insertions_count": 32,
           "message": "enhancement(cli): Test & validate subcommands without args target default path (#1313)",
           "pr_number": 1313,
@@ -12442,7 +15117,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix statsd binding to loopback only",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 1,
           "message": "fix(statsd sink): Fix statsd binding to loopback only (#1316)",
           "pr_number": 1316,
@@ -12462,7 +15136,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Fix multiple sources test",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(testing): Fix multiple sources test (#1322)",
           "pr_number": 1322,
@@ -12482,7 +15155,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Document `drop_field`",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 42,
           "message": "docs(json_parser transform): Document `drop_field` (#1323)",
           "pr_number": 1323,
@@ -12502,7 +15174,6 @@ module.exports = {
           "deletions_count": 207,
           "description": "Update to docusaurus 2.0.0-alpha.39",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 198,
           "message": "chore(website): Update to docusaurus 2.0.0-alpha.39",
           "pr_number": null,
@@ -12522,7 +15193,6 @@ module.exports = {
           "deletions_count": 29,
           "description": "Add \"default-{musl,msvc}\" features",
           "files_count": 7,
-          "group": "chore",
           "insertions_count": 93,
           "message": "chore(operations): Add \"default-{musl,msvc}\" features (#1331)",
           "pr_number": 1331,
@@ -12542,7 +15212,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix validating environment title",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 1,
           "message": "docs: Fix validating environment title",
           "pr_number": null,
@@ -12562,7 +15231,6 @@ module.exports = {
           "deletions_count": 87,
           "description": "Use LLVM-9 from the distribution repository",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 31,
           "message": "chore(operations): Use LLVM-9 from the distribution repository (#1333)",
           "pr_number": 1333,
@@ -12582,7 +15250,6 @@ module.exports = {
           "deletions_count": 44,
           "description": "Initial `splunk_hec` source implementation",
           "files_count": 7,
-          "group": "feat",
           "insertions_count": 1142,
           "message": "feat(new source): Initial `splunk_hec` source implementation",
           "pr_number": null,
@@ -12602,7 +15269,6 @@ module.exports = {
           "deletions_count": 63,
           "description": "Use LLVM from an archive instead of Git",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 33,
           "message": "chore(operations): Use LLVM from an archive instead of Git (#1334)",
           "pr_number": 1334,
@@ -12622,7 +15288,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Update `shiplift 0.6`",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 7,
           "message": "chore(docker source): Update `shiplift 0.6` (#1335)",
           "pr_number": 1335,
@@ -12642,7 +15307,6 @@ module.exports = {
           "deletions_count": 54,
           "description": "Rewrite getting started guide.",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 76,
           "message": "docs: Rewrite getting started guide. (#1332)",
           "pr_number": 1332,
@@ -12662,7 +15326,6 @@ module.exports = {
           "deletions_count": 18,
           "description": "Update contribution guide for docs",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 53,
           "message": "docs: Update contribution guide for docs",
           "pr_number": null,
@@ -12682,7 +15345,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add missing rate limited log",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 1,
           "message": "fix(grok_parser transform): Add missing rate limited log (#1336)",
           "pr_number": 1336,
@@ -12702,7 +15364,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Edit getting started guide",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Edit getting started guide",
           "pr_number": null,
@@ -12722,7 +15383,6 @@ module.exports = {
           "deletions_count": 39,
           "description": "Fix unit test spec rendering",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 43,
           "message": "docs: Fix unit test spec rendering",
           "pr_number": null,
@@ -12742,7 +15402,6 @@ module.exports = {
           "deletions_count": 44,
           "description": "Build `msi` package for Vector",
           "files_count": 23,
-          "group": "chore",
           "insertions_count": 780,
           "message": "chore(operations): Build `msi` package for Vector (#1345)",
           "pr_number": 1345,
@@ -12762,7 +15421,6 @@ module.exports = {
           "deletions_count": 16,
           "description": "Remove sleeps from topology tests",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 1,
           "message": "fix(testing): Remove sleeps from topology tests (#1346)",
           "pr_number": 1346,
@@ -12782,7 +15440,6 @@ module.exports = {
           "deletions_count": 21,
           "description": "Detect and read gzipped files",
           "files_count": 7,
-          "group": "feat",
           "insertions_count": 127,
           "message": "feat(file source): Detect and read gzipped files (#1344)",
           "pr_number": 1344,
@@ -12802,7 +15459,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Put `etc` directory only to Linux archives",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 11,
           "message": "fix(operations): Put `etc` directory only to Linux archives (#1352)",
           "pr_number": 1352,
@@ -12822,7 +15478,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Allow passing features to `make build`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Allow passing features to `make build` (#1356)",
           "pr_number": 1356,
@@ -12842,7 +15497,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Compress release archives with `gzip -9`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Compress release archives with `gzip -9` (#1294)",
           "pr_number": 1294,
@@ -12862,7 +15516,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add notices for OpenSSL to the license for binary distributions",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 22,
           "message": "chore(operations): Add notices for OpenSSL to the license for binary distributions (#1351)",
           "pr_number": 1351,
@@ -12877,81 +15530,141 @@ module.exports = {
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.5.0...v0.6.0",
-      "date": "2019-12-09",
+      "date": "2019-12-12",
       "deletions_count": 9213,
       "description": "",
       "highlights": [
-
-      ],
-      "insertions_count": 22141,
-      "last_version": "0.5.0",
-      "posts": [
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2019-10-21",
+          "description": "The `encoding` option is now required for these sinks",
+          "id": "2019-10-21-require-encoding-option-for-console-and-file-sinks",
+          "importance": "low",
+          "path": "website/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks.md",
+          "permalink": "/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks/",
+          "tags": [
+            "type: breaking change",
+            "domain: sinks",
+            "sink: console",
+            "sink: file"
+          ],
+          "title": "Require `encoding` option for console and file sinks"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2019-12-04",
+          "description": "This ensures that naming is consistent for the upcoming `datadog_logs` sink",
+          "id": "2019-12-04-rename-datadog-sink-to-datadog_metrics",
+          "importance": "low",
+          "path": "website/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics.md",
+          "permalink": "/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics/",
+          "tags": [
+            "type: breaking change",
+            "domain: sinks",
+            "sink: datadog_metrics"
+          ],
+          "title": "The `datadog` sink has been renamed to `datadog_metrics`"
+        },
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-11-19",
-          "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
-          "id": "arm-support-on-linux",
-          "path": "website/blog/2019-11-19-arm-support-on-linux.md",
-          "permalink": "https://vector.dev/blog/arm-support-on-linux",
+          "description": "These architectures are widely used in embeded devices & servers",
+          "id": "2019-11-19-arm-support-on-linux",
+          "importance": "high",
+          "path": "website/highlights/2019-11-19-arm-support-on-linux.md",
+          "permalink": "/highlights/2019-11-19-arm-support-on-linux/",
           "tags": [
-            "type: announcement",
+            "type: new feature",
             "domain: platforms",
-            "platform: arm"
+            "platform: arm64",
+            "platform: armv7"
           ],
           "title": "ARMv7 & ARM64 Support on Linux"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-11-21",
-          "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
-          "id": "windows-support",
-          "path": "website/blog/2019-11-21-windows-support.md",
-          "permalink": "https://vector.dev/blog/windows-support",
+          "description": "Bringing the performance and reliability of Vector to Windows",
+          "id": "2019-11-21-windows-support",
+          "importance": "high",
+          "path": "website/highlights/2019-11-21-windows-support.md",
+          "permalink": "/highlights/2019-11-21-windows-support/",
           "tags": [
-            "type: announcement",
+            "type: new feature",
             "domain: platforms",
             "platform: windows"
           ],
           "title": "Windows Support Is Here!"
         },
         {
-          "author_github": "https://github.com/Jeffail",
+          "author_github": "https://github.com/binarylogic",
           "date": "2019-11-25",
-          "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
-          "id": "unit-testing-vector-config-files",
-          "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
-          "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
+          "description": "Treating your Vector configuration files as code",
+          "id": "2019-11-25-unit-testing-vector-config-files",
+          "importance": "medium",
+          "path": "website/highlights/2019-11-25-unit-testing-vector-config-files.md",
+          "permalink": "/highlights/2019-11-25-unit-testing-vector-config-files/",
           "tags": [
-            "type: announcement",
+            "type: new feature",
             "domain: config"
           ],
           "title": "Unit Testing Your Vector Config Files"
-        }
-      ],
-      "subtitle": "",
-      "type": "initial dev",
-      "type_url": "https://semver.org/#spec-item-4",
-      "upgrade_guides": [
-        {
-          "body": "<p>\nThe `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n</p>\n\n<pre>\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n</pre>\n",
-          "commits": [
-
-          ],
-          "id": "encoding-guide",
-          "title": "The `file` and `console` sinks now require `encoding`"
         },
         {
-          "body": "<p>\nThe `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n</p>\n\n<pre>\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n</pre>\n",
-          "commits": [
-
+          "author_github": "https://github.com/binarylogic",
+          "date": "2019-12-13",
+          "description": "Point Vector to custom DNS servers",
+          "id": "2019-12-13-custom-dns",
+          "importance": "low",
+          "path": "website/highlights/2019-12-13-custom-dns.md",
+          "permalink": "/highlights/2019-12-13-custom-dns/",
+          "tags": [
+            "type: new feature",
+            "domain: networking"
           ],
-          "id": "datadog-guide",
-          "title": "The `datadog` sink has been renamed to `datadog_metrics`"
+          "title": "Use Custom DNS Servers"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2019-12-14",
+          "description": "Early adopters have a new Kuberenetes source to chew on",
+          "id": "2019-12-14-kubernetes-source-alpha",
+          "importance": "low",
+          "path": "website/highlights/2019-12-14-kubernetes-source-alpha.md",
+          "permalink": "/highlights/2019-12-14-kubernetes-source-alpha/",
+          "tags": [
+            "type: new feature",
+            "domain: sources",
+            "source: kubernetes"
+          ],
+          "title": "New Kubernetes Source (alpha)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2019-12-16",
+          "description": "Enrich your events with EC2 metadata",
+          "id": "2019-12-16-ec2-metadata",
+          "importance": "high",
+          "path": "website/highlights/2019-12-16-ec2-metadata.md",
+          "permalink": "/highlights/2019-12-16-ec2-metadata/",
+          "tags": [
+            "type: new feature",
+            "domain: transforms",
+            "transform: aws_ec2_metadata"
+          ],
+          "title": "New AWS EC2 Medata Transform"
         }
       ],
+      "insertions_count": 22141,
+      "last_version": "0.5.0",
+      "permalink": "/releases/0.6.0/",
+      "title": "Vector v0.6.0",
+      "type": "initial dev",
+      "type_url": "https://semver.org/#spec-item-4",
       "version": "0.6.0"
     },
     "0.7.0": {
+      "codename": "The Great Omelet",
       "commits": [
         {
           "author": "Bruce Guenter",
@@ -12960,7 +15673,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix handling of locally-installed bundles",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix handling of locally-installed bundles (#1354)",
           "pr_number": 1354,
@@ -12980,7 +15692,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Rename Alex to Alexander",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore: Rename Alex to Alexander",
           "pr_number": null,
@@ -13000,7 +15711,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Fix broken footer links",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 9,
           "message": "chore(website): Fix broken footer links",
           "pr_number": null,
@@ -13020,7 +15730,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Redirect legacy /mailing_list path",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 8,
           "message": "chore(website): Redirect legacy /mailing_list path",
           "pr_number": null,
@@ -13040,7 +15749,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Fix release-github",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(operations): Fix release-github",
           "pr_number": null,
@@ -13060,7 +15768,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Fix release-github",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 7,
           "message": "chore(operations): Fix release-github",
           "pr_number": null,
@@ -13080,7 +15787,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "Add output fields to `geoip` transform docs",
           "files_count": 18,
-          "group": "docs",
           "insertions_count": 235,
           "message": "docs: Add output fields to `geoip` transform docs",
           "pr_number": null,
@@ -13100,7 +15806,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Fix `release-github` job",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 5,
           "message": "fix(operations): Fix `release-github` job (#1359)",
           "pr_number": 1359,
@@ -13120,7 +15825,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix typo",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 1,
           "message": "docs: Fix typo (#1360)",
           "pr_number": 1360,
@@ -13140,7 +15844,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "Document Docker build",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 186,
           "message": "docs: Document Docker build (#1358)",
           "pr_number": 1358,
@@ -13160,7 +15863,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "Fix blog responsive styling issues",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 13,
           "message": "chore(website): Fix blog responsive styling issues",
           "pr_number": null,
@@ -13180,7 +15882,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix link typo in footer",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Fix link typo in footer",
           "pr_number": null,
@@ -13200,7 +15901,6 @@ module.exports = {
           "deletions_count": 17,
           "description": "Inital `kubernetes` source implementation ",
           "files_count": 11,
-          "group": "feat",
           "insertions_count": 1199,
           "message": "feat(new source): Inital `kubernetes` source implementation  (#893)",
           "pr_number": 893,
@@ -13220,7 +15920,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Bump version to 0.7.0",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore: Bump version to 0.7.0 (#1364)",
           "pr_number": 1364,
@@ -13240,7 +15939,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix config file location",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix config file location (#1367)",
           "pr_number": 1367,
@@ -13260,7 +15958,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Fix value types link",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 3,
           "message": "docs: Fix value types link",
           "pr_number": null,
@@ -13280,7 +15977,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "make truncation utf8-aware",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 13,
           "message": "fix(regex_parser transform): make truncation utf8-aware (#1361)",
           "pr_number": 1361,
@@ -13300,7 +15996,6 @@ module.exports = {
           "deletions_count": 31,
           "description": "Fix bool default values in spec",
           "files_count": 10,
-          "group": "docs",
           "insertions_count": 33,
           "message": "docs: Fix bool default values in spec",
           "pr_number": null,
@@ -13320,7 +16015,6 @@ module.exports = {
           "deletions_count": 32,
           "description": "Improve blog markup",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 59,
           "message": "chore(website): Improve blog markup",
           "pr_number": null,
@@ -13340,7 +16034,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "updated version in Cargo.lock",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore: updated version in Cargo.lock",
           "pr_number": null,
@@ -13360,7 +16053,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Remove columnar formats section in aws_s3 sink",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 0,
           "message": "docs: Remove columnar formats section in aws_s3 sink",
           "pr_number": null,
@@ -13380,7 +16072,6 @@ module.exports = {
           "deletions_count": 41,
           "description": "Fix release description",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 55,
           "message": "chore(website): Fix release description",
           "pr_number": null,
@@ -13400,7 +16091,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Downcase release description",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore(website): Downcase release description",
           "pr_number": null,
@@ -13420,7 +16110,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add opengraph image",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore(website): Add opengraph image",
           "pr_number": null,
@@ -13440,7 +16129,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix open-graph image name",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Fix open-graph image name",
           "pr_number": null,
@@ -13460,7 +16148,6 @@ module.exports = {
           "deletions_count": 54,
           "description": "Fix performance comparison link",
           "files_count": 21,
-          "group": "fix",
           "insertions_count": 55,
           "message": "fix(website): Fix performance comparison link (#1369)",
           "pr_number": 1369,
@@ -13480,7 +16167,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "Update readme with new release links",
           "files_count": 15,
-          "group": "chore",
           "insertions_count": 122,
           "message": "chore(website): Update readme with new release links",
           "pr_number": null,
@@ -13500,7 +16186,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Add new post to readme",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 42,
           "message": "docs: Add new post to readme",
           "pr_number": null,
@@ -13520,7 +16205,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Center new post announcement",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 18,
           "message": "chore(website): Center new post announcement",
           "pr_number": null,
@@ -13540,7 +16224,6 @@ module.exports = {
           "deletions_count": 24,
           "description": "Update concepts doc",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 50,
           "message": "docs: Update concepts doc",
           "pr_number": null,
@@ -13560,7 +16243,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Initial `concat` transform implementation",
           "files_count": 12,
-          "group": "feat",
           "insertions_count": 598,
           "message": "feat(new transform): Initial `concat` transform implementation (#1271)",
           "pr_number": 1271,
@@ -13580,7 +16262,6 @@ module.exports = {
           "deletions_count": 764,
           "description": "Add example output",
           "files_count": 90,
-          "group": "docs",
           "insertions_count": 605,
           "message": "docs(concat transform): Add example output",
           "pr_number": null,
@@ -13600,7 +16281,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Formalize output data structure",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 10,
           "message": "docs: Formalize output data structure",
           "pr_number": null,
@@ -13620,7 +16300,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Re-order guides",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 13,
           "message": "chore(website): Re-order guides",
           "pr_number": null,
@@ -13640,7 +16319,6 @@ module.exports = {
           "deletions_count": 565,
           "description": "Update links to end with a / to avoid redirects",
           "files_count": 88,
-          "group": "chore",
           "insertions_count": 558,
           "message": "chore(website): Update links to end with a / to avoid redirects",
           "pr_number": null,
@@ -13660,7 +16338,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Initial `aws_ec2_metadata` transform implementation",
           "files_count": 15,
-          "group": "feat",
           "insertions_count": 1333,
           "message": "feat(new transform): Initial `aws_ec2_metadata` transform implementation (#1325)",
           "pr_number": 1325,
@@ -13680,7 +16357,6 @@ module.exports = {
           "deletions_count": 17,
           "description": "remove accidentally committed vector.toml",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore: remove accidentally committed vector.toml",
           "pr_number": null,
@@ -13700,7 +16376,6 @@ module.exports = {
           "deletions_count": 477,
           "description": "Fix builds by updating website dependencies",
           "files_count": 10,
-          "group": "chore",
           "insertions_count": 287,
           "message": "chore(website): Fix builds by updating website dependencies (#1379)",
           "pr_number": 1379,
@@ -13720,7 +16395,6 @@ module.exports = {
           "deletions_count": 77,
           "description": "Fix broken links",
           "files_count": 58,
-          "group": "chore",
           "insertions_count": 52,
           "message": "chore(website): Fix broken links",
           "pr_number": null,
@@ -13740,7 +16414,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Remove uncessary #! link in sidebar",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Remove uncessary #! link in sidebar",
           "pr_number": null,
@@ -13760,7 +16433,6 @@ module.exports = {
           "deletions_count": 368,
           "description": "Fix website redirect and meta descriptions",
           "files_count": 94,
-          "group": "chore",
           "insertions_count": 307,
           "message": "chore(website): Fix website redirect and meta descriptions",
           "pr_number": null,
@@ -13780,7 +16452,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Add more meta descriptions to pages that were missing it",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 7,
           "message": "chore(website): Add more meta descriptions to pages that were missing it",
           "pr_number": null,
@@ -13800,7 +16471,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Fix config path for MSI package",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 6,
           "message": "docs: Fix config path for MSI package (#1378)",
           "pr_number": 1378,
@@ -13820,7 +16490,6 @@ module.exports = {
           "deletions_count": 441,
           "description": "Update metric docs according to new data model",
           "files_count": 17,
-          "group": "docs",
           "insertions_count": 774,
           "message": "docs: Update metric docs according to new data model (#1268)",
           "pr_number": 1268,
@@ -13840,7 +16509,6 @@ module.exports = {
           "deletions_count": 24,
           "description": "Update data model pages",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 47,
           "message": "docs: Update data model pages",
           "pr_number": null,
@@ -13860,7 +16528,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Update statsd docs",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 12,
           "message": "docs: Update statsd docs (#1381)",
           "pr_number": 1381,
@@ -13880,7 +16547,6 @@ module.exports = {
           "deletions_count": 80,
           "description": "Remove unneeded remove clones",
           "files_count": 21,
-          "group": "chore",
           "insertions_count": 75,
           "message": "chore: Remove unneeded remove clones (#1375)",
           "pr_number": 1375,
@@ -13900,7 +16566,6 @@ module.exports = {
           "deletions_count": 32,
           "description": "Edit guarantees page",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 58,
           "message": "docs: Edit guarantees page",
           "pr_number": null,
@@ -13920,7 +16585,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix spelling mistake",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix spelling mistake",
           "pr_number": null,
@@ -13940,7 +16604,6 @@ module.exports = {
           "deletions_count": 123,
           "description": "Add custom DNS option",
           "files_count": 8,
-          "group": "feat",
           "insertions_count": 157,
           "message": "feat(networking): Add custom DNS option (#1362)",
           "pr_number": 1362,
@@ -13960,7 +16623,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add keywords script",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 99,
           "message": "chore(website): Add keywords script",
           "pr_number": null,
@@ -13980,7 +16642,6 @@ module.exports = {
           "deletions_count": 180,
           "description": "Fix option linking format",
           "files_count": 39,
-          "group": "docs",
           "insertions_count": 215,
           "message": "docs: Fix option linking format",
           "pr_number": null,
@@ -14000,7 +16661,6 @@ module.exports = {
           "deletions_count": 129,
           "description": "Reorganize metrics data model",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 245,
           "message": "docs: Reorganize metrics data model",
           "pr_number": null,
@@ -14020,7 +16680,6 @@ module.exports = {
           "deletions_count": 42,
           "description": "Fix more unecessary redirect links",
           "files_count": 14,
-          "group": "chore",
           "insertions_count": 42,
           "message": "chore(website): Fix more unecessary redirect links",
           "pr_number": null,
@@ -14040,7 +16699,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Update Vector announcement post to use h2s",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore(website): Update Vector announcement post to use h2s",
           "pr_number": null,
@@ -14060,7 +16718,6 @@ module.exports = {
           "deletions_count": 28,
           "description": "Drop use of docs.vector.dev",
           "files_count": 13,
-          "group": "docs",
           "insertions_count": 23,
           "message": "docs: Drop use of docs.vector.dev",
           "pr_number": null,
@@ -14080,7 +16737,6 @@ module.exports = {
           "deletions_count": 41,
           "description": "Fix configuration example",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 85,
           "message": "docs: Fix configuration example",
           "pr_number": null,
@@ -14100,7 +16756,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Handle interruptions on Windows",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 9,
           "message": "enhancement(cli): Handle interruptions on Windows (#1219)",
           "pr_number": 1219,
@@ -14120,7 +16775,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix more links that redirect",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(website): Fix more links that redirect",
           "pr_number": null,
@@ -14140,7 +16794,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Link link and metric tags to their respective data model pages",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 6,
           "message": "docs: Link link and metric tags to their respective data model pages",
           "pr_number": null,
@@ -14160,7 +16813,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Initial `gcp_pubsub` sink implementation",
           "files_count": 18,
-          "group": "feat",
           "insertions_count": 1542,
           "message": "feat(new sink): Initial `gcp_pubsub` sink implementation (#1308)",
           "pr_number": 1308,
@@ -14180,7 +16832,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Make the pass_list field optional",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 1,
           "message": "docs: Make the pass_list field optional (#1384)",
           "pr_number": 1384,
@@ -14200,7 +16851,6 @@ module.exports = {
           "deletions_count": 41,
           "description": "Add aliases for latest major and minor versions",
           "files_count": 14,
-          "group": "chore",
           "insertions_count": 54,
           "message": "chore(operations): Add aliases for latest major and minor versions (#1386)",
           "pr_number": 1386,
@@ -14220,7 +16870,6 @@ module.exports = {
           "deletions_count": 203,
           "description": "Improve page titles",
           "files_count": 110,
-          "group": "chore",
           "insertions_count": 349,
           "message": "chore(website): Improve page titles",
           "pr_number": null,
@@ -14240,7 +16889,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Fix GCP pubsub title",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 7,
           "message": "docs: Fix GCP pubsub title",
           "pr_number": null,
@@ -14260,7 +16908,6 @@ module.exports = {
           "deletions_count": 491,
           "description": "Add Google service provider to new gcp_pubsub sink",
           "files_count": 12,
-          "group": "docs",
           "insertions_count": 10,
           "message": "docs: Add Google service provider to new gcp_pubsub sink",
           "pr_number": null,
@@ -14280,7 +16927,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Stop testing with ext host",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 9,
           "message": "fix(splunk_hec sink): Stop testing with ext host",
           "pr_number": null,
@@ -14300,7 +16946,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Use Bundler 2.0.x for the checker and releaser images",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 2,
           "message": "fix(operations): Use Bundler 2.0.x for the checker and releaser images (#1392)",
           "pr_number": 1392,
@@ -14320,7 +16965,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Upgrade to rustc 1.40.0",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 9,
           "message": "chore: Upgrade to rustc 1.40.0 (#1395)",
           "pr_number": 1395,
@@ -14340,7 +16984,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Add custom dns for `vector` and `tcp` sinks",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 38,
           "message": "chore(networking): Add custom dns for `vector` and `tcp` sinks (#1400)",
           "pr_number": 1400,
@@ -14360,7 +17003,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix https rusoto connections",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(networking): Fix https rusoto connections (#1396)",
           "pr_number": 1396,
@@ -14380,7 +17022,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Update components meta tags to be more descriptive;",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Update components meta tags to be more descriptive;",
           "pr_number": null,
@@ -14400,7 +17041,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Add \"How It works\" to `gcp_pubsub` docs",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 85,
           "message": "docs: Add \"How It works\" to `gcp_pubsub` docs",
           "pr_number": null,
@@ -14420,7 +17060,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Initial `aws_kinesis_firehose` sink",
           "files_count": 17,
-          "group": "feat",
           "insertions_count": 1280,
           "message": "feat(new sink): Initial `aws_kinesis_firehose` sink (#1388)",
           "pr_number": 1388,
@@ -14440,7 +17079,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Add getting started button to about page",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 12,
           "message": "docs: Add getting started button to about page",
           "pr_number": null,
@@ -14460,7 +17098,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Fix field names in regex example",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 5,
           "message": "docs: Fix field names in regex example (#1405)",
           "pr_number": 1405,
@@ -14480,7 +17117,6 @@ module.exports = {
           "deletions_count": 48,
           "description": "Update healtchecks to use resolver",
           "files_count": 5,
-          "group": "chore",
           "insertions_count": 80,
           "message": "chore(networking): Update healtchecks to use resolver (#1403)",
           "pr_number": 1403,
@@ -14500,7 +17136,6 @@ module.exports = {
           "deletions_count": 47,
           "description": "Update keywords",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 48,
           "message": "chore(website): Update keywords",
           "pr_number": null,
@@ -14520,7 +17155,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix `splunk_channel` option description, closes #1410",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix `splunk_channel` option description, closes #1410",
           "pr_number": null,
@@ -14540,7 +17174,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Vertically center hero on homepage",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 8,
           "message": "chore(website): Vertically center hero on homepage",
           "pr_number": null,
@@ -14560,7 +17193,6 @@ module.exports = {
           "deletions_count": 96,
           "description": "Further improve page descriptions",
           "files_count": 36,
-          "group": "docs",
           "insertions_count": 54,
           "message": "docs: Further improve page descriptions",
           "pr_number": null,
@@ -14580,7 +17212,6 @@ module.exports = {
           "deletions_count": 14,
           "description": "Fix `rustup` for `x86_64-pc-windows-msvc` in CI",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 13,
           "message": "fix(operations): Fix `rustup` for `x86_64-pc-windows-msvc` in CI (#1414)",
           "pr_number": 1414,
@@ -14600,7 +17231,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Add netlify.toml for redirects",
           "files_count": 7,
-          "group": "chore",
           "insertions_count": 27,
           "message": "chore(website): Add netlify.toml for redirects",
           "pr_number": null,
@@ -14620,7 +17250,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Fix duplicate description keys",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore(website): Fix duplicate description keys",
           "pr_number": null,
@@ -14640,7 +17269,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "/mailing_list redirect rule should end with a slash",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): /mailing_list redirect rule should end with a slash",
           "pr_number": null,
@@ -14660,7 +17288,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add scripts/signoff-git-hook.sh",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 28,
           "message": "chore: Add scripts/signoff-git-hook.sh (#1420)",
           "pr_number": 1420,
@@ -14680,7 +17307,6 @@ module.exports = {
           "deletions_count": 12,
           "description": "Add note about Syslog3164 not being supported",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 26,
           "message": "docs: Add note about Syslog3164 not being supported",
           "pr_number": null,
@@ -14700,7 +17326,6 @@ module.exports = {
           "deletions_count": 38,
           "description": "Add contact and press sections",
           "files_count": 21,
-          "group": "chore",
           "insertions_count": 460,
           "message": "chore(website): Add contact and press sections",
           "pr_number": null,
@@ -14720,7 +17345,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add Vector icon",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 29,
           "message": "chore(website): Add Vector icon",
           "pr_number": null,
@@ -14740,7 +17364,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix typo",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Fix typo",
           "pr_number": null,
@@ -14760,7 +17383,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix mailinglist form styling",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 7,
           "message": "chore(website): Fix mailinglist form styling",
           "pr_number": null,
@@ -14780,7 +17402,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Send min for distributions",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 8,
           "message": "enhancement(datadog_metrics sink): Send min for distributions (#1422)",
           "pr_number": 1422,
@@ -14800,7 +17421,6 @@ module.exports = {
           "deletions_count": 410,
           "description": "Accept Into<...> values at LogEvent::insert",
           "files_count": 37,
-          "group": "chore",
           "insertions_count": 242,
           "message": "chore(log data model): Accept Into<...> values at LogEvent::insert (#1419)",
           "pr_number": 1419,
@@ -14820,7 +17440,6 @@ module.exports = {
           "deletions_count": 508,
           "description": "Update to docusaurus 2.0.0-alpha.40",
           "files_count": 13,
-          "group": "chore",
           "insertions_count": 641,
           "message": "chore(website): Update to docusaurus 2.0.0-alpha.40",
           "pr_number": null,
@@ -14840,7 +17459,6 @@ module.exports = {
           "deletions_count": 15,
           "description": "Remove duplicated line from the installation docs ",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Remove duplicated line from the installation docs  (#1438)",
           "pr_number": 1438,
@@ -14860,7 +17478,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Add #vectordev hashtag",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore(website): Add #vectordev hashtag",
           "pr_number": null,
@@ -14880,7 +17497,6 @@ module.exports = {
           "deletions_count": 545,
           "description": "Check for EOLs and trailing spaces in CI",
           "files_count": 69,
-          "group": "chore",
           "insertions_count": 617,
           "message": "chore(operations): Check for EOLs and trailing spaces in CI (#1425)",
           "pr_number": 1425,
@@ -14900,7 +17516,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add .editorconfig",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 14,
           "message": "chore: Add .editorconfig (#1421)",
           "pr_number": 1421,
@@ -14920,7 +17535,6 @@ module.exports = {
           "deletions_count": 480,
           "description": "Ensure that all files are checked by `check-style.sh`",
           "files_count": 266,
-          "group": "fix",
           "insertions_count": 486,
           "message": "fix(operations): Ensure that all files are checked by `check-style.sh` (#1441)",
           "pr_number": 1441,
@@ -14940,7 +17554,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix scrolling issue when mobile slide out nav closes",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 27,
           "message": "chore(website): Fix scrolling issue when mobile slide out nav closes",
           "pr_number": null,
@@ -14960,7 +17573,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Fix broken release notes links, closes #1452",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 7,
           "message": "chore(website): Fix broken release notes links, closes #1452",
           "pr_number": null,
@@ -14980,7 +17592,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix badge spacing on changelog",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore(website): Fix badge spacing on changelog",
           "pr_number": null,
@@ -15000,7 +17611,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Allow containers to be flush",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 6,
           "message": "chore(website): Allow containers to be flush",
           "pr_number": null,
@@ -15020,7 +17630,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix `make check-fmt`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore: Fix `make check-fmt`",
           "pr_number": null,
@@ -15040,7 +17649,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Don't ack with zero items",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 29,
           "message": "fix(buffers): Don't ack with zero items (#1465)",
           "pr_number": 1465,
@@ -15060,7 +17668,6 @@ module.exports = {
           "deletions_count": 103,
           "description": "Update Vector description",
           "files_count": 12,
-          "group": "chore",
           "insertions_count": 94,
           "message": "chore(website): Update Vector description",
           "pr_number": null,
@@ -15080,7 +17687,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Call out event",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Call out event",
           "pr_number": null,
@@ -15100,7 +17706,6 @@ module.exports = {
           "deletions_count": 178,
           "description": "Ensure all wildcard examples are shown",
           "files_count": 64,
-          "group": "docs",
           "insertions_count": 255,
           "message": "docs: Ensure all wildcard examples are shown",
           "pr_number": null,
@@ -15120,7 +17725,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix links in `CONTRIBUTING.md`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore: Fix links in `CONTRIBUTING.md` (#1475)",
           "pr_number": 1475,
@@ -15140,7 +17744,6 @@ module.exports = {
           "deletions_count": 107,
           "description": "Parse additional metadata",
           "files_count": 3,
-          "group": "enhancement",
           "insertions_count": 234,
           "message": "enhancement(kubernetes source): Parse additional metadata (#1249)",
           "pr_number": 1249,
@@ -15160,7 +17763,6 @@ module.exports = {
           "deletions_count": 263,
           "description": "Move existing 'tcp' sink into 'socket' sink.",
           "files_count": 21,
-          "group": "breaking change",
           "insertions_count": 915,
           "message": "feat(new sink)!: Move existing 'tcp' sink into 'socket' sink. (#1404)",
           "pr_number": 1404,
@@ -15180,7 +17782,6 @@ module.exports = {
           "deletions_count": 731,
           "description": "Merge existing 'tcp' and 'udp' sources into a single 'socket' source",
           "files_count": 27,
-          "group": "breaking change",
           "insertions_count": 1013,
           "message": "feat(new source)!: Merge existing 'tcp' and 'udp' sources into a single 'socket' source (#1485)",
           "pr_number": 1485,
@@ -15200,7 +17801,6 @@ module.exports = {
           "deletions_count": 14,
           "description": "Provide timestamp",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 32,
           "message": "enhancement(splunk_hec source): Provide timestamp (#1458)",
           "pr_number": 1458,
@@ -15220,7 +17820,6 @@ module.exports = {
           "deletions_count": 53,
           "description": "Add retry logic to `kubernetes source` tests",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 83,
           "message": "chore(testing): Add retry logic to `kubernetes source` tests (#1413)",
           "pr_number": 1413,
@@ -15240,7 +17839,6 @@ module.exports = {
           "deletions_count": 13,
           "description": "Re-enable buffering reclaim test",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 18,
           "message": "fix(buffers): Re-enable buffering reclaim test (#1474)",
           "pr_number": 1474,
@@ -15260,7 +17858,6 @@ module.exports = {
           "deletions_count": 1095,
           "description": "Cleanup `tcp` and `udp` references in favor of the new `socket` source and sink",
           "files_count": 13,
-          "group": "docs",
           "insertions_count": 27,
           "message": "docs: Cleanup `tcp` and `udp` references in favor of the new `socket` source and sink",
           "pr_number": null,
@@ -15280,7 +17877,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Redirect TCP/UDP components to the new Socket components",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 18,
           "message": "docs: Redirect TCP/UDP components to the new Socket components",
           "pr_number": null,
@@ -15300,7 +17896,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Backoff reads to inactive files",
           "files_count": 3,
-          "group": "perf",
           "insertions_count": 41,
           "message": "perf(file source): Backoff reads to inactive files (#1476)",
           "pr_number": 1476,
@@ -15320,7 +17915,6 @@ module.exports = {
           "deletions_count": 409,
           "description": "Initial `prometheus` source implementation",
           "files_count": 32,
-          "group": "feat",
           "insertions_count": 2363,
           "message": "feat(new source): Initial `prometheus` source implementation (#1264)",
           "pr_number": 1264,
@@ -15340,7 +17934,6 @@ module.exports = {
           "deletions_count": 23,
           "description": "Update benches and minor cleanup",
           "files_count": 7,
-          "group": "chore",
           "insertions_count": 77,
           "message": "chore(testing): Update benches and minor cleanup (#1487)",
           "pr_number": 1487,
@@ -15360,7 +17953,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add compiling docs for Windows",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 116,
           "message": "docs: Add compiling docs for Windows (#1486)",
           "pr_number": 1486,
@@ -15380,7 +17972,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Verify building of the Nix package",
           "files_count": 6,
-          "group": "chore",
           "insertions_count": 100,
           "message": "chore(operations): Verify building of the Nix package (#1432)",
           "pr_number": 1432,
@@ -15400,7 +17991,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix newline style",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 1,
           "message": "fix(operations): Fix newline style",
           "pr_number": null,
@@ -15420,7 +18010,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Document `endpoint` parameter for `aws_s3` sink",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 55,
           "message": "docs: Document `endpoint` parameter for `aws_s3` sink (#1497)",
           "pr_number": 1497,
@@ -15440,7 +18029,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Add `node_modules` to `.gitignore`",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore: Add `node_modules` to `.gitignore`",
           "pr_number": null,
@@ -15460,7 +18048,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Don't list unused architectures for Raspbian",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: Don't list unused architectures for Raspbian",
           "pr_number": null,
@@ -15480,7 +18067,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Ignore recliam test",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(testing): Ignore recliam test (#1508)",
           "pr_number": 1508,
@@ -15500,7 +18086,6 @@ module.exports = {
           "deletions_count": 39,
           "description": "Update messaging to follow messaging framework",
           "files_count": 6,
-          "group": "chore",
           "insertions_count": 29,
           "message": "chore(website): Update messaging to follow messaging framework",
           "pr_number": null,
@@ -15520,7 +18105,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Simplify tag line",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Simplify tag line",
           "pr_number": null,
@@ -15540,7 +18124,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Less words in the tag line",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Less words in the tag line",
           "pr_number": null,
@@ -15560,7 +18143,6 @@ module.exports = {
           "deletions_count": 40,
           "description": "Add additional container filters",
           "files_count": 5,
-          "group": "enhancement",
           "insertions_count": 217,
           "message": "enhancement(docker source): Add additional container filters (#1324)",
           "pr_number": 1324,
@@ -15580,7 +18162,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Merge fix",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore(docker source): Merge fix (#1512)",
           "pr_number": 1512,
@@ -15600,7 +18181,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Update metric.md: fix typo",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 1,
           "message": "docs: Update metric.md: fix typo (#1511)",
           "pr_number": 1511,
@@ -15620,7 +18200,6 @@ module.exports = {
           "deletions_count": 19,
           "description": "Use comma delim server list instead of an array",
           "files_count": 4,
-          "group": "breaking change",
           "insertions_count": 16,
           "message": "chore(kafka sink)!: Use comma delim server list instead of an array (#1502)",
           "pr_number": 1502,
@@ -15640,7 +18219,6 @@ module.exports = {
           "deletions_count": 318,
           "description": "Rename `buffer.num_items` to `buffer.max_events`",
           "files_count": 17,
-          "group": "breaking change",
           "insertions_count": 318,
           "message": "chore(config)!: Rename `buffer.num_items` to `buffer.max_events` (#1495)",
           "pr_number": 1495,
@@ -15660,7 +18238,6 @@ module.exports = {
           "deletions_count": 213,
           "description": "Rename `basic_auth` to `auth` and unflatten",
           "files_count": 28,
-          "group": "breaking change",
           "insertions_count": 417,
           "message": "chore(config)!: Rename `basic_auth` to `auth` and unflatten (#1494)",
           "pr_number": 1494,
@@ -15680,7 +18257,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix metrics data model typo",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix metrics data model typo",
           "pr_number": null,
@@ -15700,7 +18276,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Use shiplift's since for filtering logs",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 1,
           "message": "enhancement(docker source): Use shiplift's since for filtering logs (#1513)",
           "pr_number": 1513,
@@ -15720,7 +18295,6 @@ module.exports = {
           "deletions_count": 3319,
           "description": "Nest `batch_*` and `request_*` sink config options",
           "files_count": 132,
-          "group": "breaking change",
           "insertions_count": 4106,
           "message": "chore(config)!: Nest `batch_*` and `request_*` sink config options (#1493)",
           "pr_number": 1493,
@@ -15740,7 +18314,6 @@ module.exports = {
           "deletions_count": 19,
           "description": "Update homepage language",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 22,
           "message": "chore(website): Update homepage language",
           "pr_number": null,
@@ -15760,7 +18333,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix generate failure for metrics typo",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Fix generate failure for metrics typo",
           "pr_number": null,
@@ -15780,7 +18352,6 @@ module.exports = {
           "deletions_count": 54,
           "description": "Run `test-stable` tests using `x86_64-unknown-linux-musl` target",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 21,
           "message": "chore(operations): Run `test-stable` tests using `x86_64-unknown-linux-musl` target (#1505)",
           "pr_number": 1505,
@@ -15800,7 +18371,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix tests for NixOS",
           "files_count": 2,
-          "group": "fix",
           "insertions_count": 2,
           "message": "fix(operations): Fix tests for NixOS (#1522)",
           "pr_number": 1522,
@@ -15820,7 +18390,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Clairfy `start_at_beginning`",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 7,
           "message": "docs(file source): Clairfy `start_at_beginning` (#1523)",
           "pr_number": 1523,
@@ -15840,7 +18409,6 @@ module.exports = {
           "deletions_count": 104,
           "description": "Use fibonacci instead of fixed backoff",
           "files_count": 27,
-          "group": "breaking change",
           "insertions_count": 573,
           "message": "enhancement(networking)!: Use fibonacci instead of fixed backoff (#1006)",
           "pr_number": 1006,
@@ -15860,7 +18428,6 @@ module.exports = {
           "deletions_count": 1421,
           "description": "Set `type` and `inputs` as required fields",
           "files_count": 51,
-          "group": "docs",
           "insertions_count": 690,
           "message": "docs: Set `type` and `inputs` as required fields",
           "pr_number": null,
@@ -15880,7 +18447,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Rename `line` field to `message`",
           "files_count": 2,
-          "group": "breaking change",
           "insertions_count": 33,
           "message": "enhancement(splunk_hec source)!: Rename `line` field to `message` (#1457)",
           "pr_number": 1457,
@@ -15900,7 +18466,6 @@ module.exports = {
           "deletions_count": 101,
           "description": "Add unix domain socket support to the 'socket` source",
           "files_count": 8,
-          "group": "feat",
           "insertions_count": 335,
           "message": "feat(socket source): Add unix domain socket support to the 'socket` source (#1489)",
           "pr_number": 1489,
@@ -15920,7 +18485,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Deprecate `LogEvent::into_value` in favor of `LogEvent::remove`",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(log data model): Deprecate `LogEvent::into_value` in favor of `LogEvent::remove` (#1528)",
           "pr_number": 1528,
@@ -15940,7 +18504,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Use `.iter()` instead of `.into_iter()` for arrays",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore(testing): Use `.iter()` instead of `.into_iter()` for arrays (#1529)",
           "pr_number": 1529,
@@ -15955,14 +18518,13 @@ module.exports = {
         },
         {
           "author": "Alexander Rodin",
-          "breaking_change": true,
+          "breaking_change": false,
           "date": "2020-01-17 14:32:43 +0000",
           "deletions_count": 574,
           "description": "Remove distinction between explicit and implicit fields",
           "files_count": 49,
-          "group": "breaking change",
           "insertions_count": 426,
-          "message": "chore(log data model)!: Remove distinction between explicit and implicit fields (#1530)",
+          "message": "chore(log data model): Remove distinction between explicit and implicit fields (#1530)",
           "pr_number": 1530,
           "scope": {
             "category": "core",
@@ -15975,14 +18537,13 @@ module.exports = {
         },
         {
           "author": "Bruce Guenter",
-          "breaking_change": true,
+          "breaking_change": false,
           "date": "2020-01-17 14:59:29 +0000",
           "deletions_count": 453,
           "description": "Switch from libsystemd to piping journalctl",
           "files_count": 8,
-          "group": "breaking change",
           "insertions_count": 200,
-          "message": "feat(journald source)!: Switch from libsystemd to piping journalctl (#1526)",
+          "message": "feat(journald source): Switch from libsystemd to piping journalctl (#1526)",
           "pr_number": 1526,
           "scope": {
             "category": "source",
@@ -16000,7 +18561,6 @@ module.exports = {
           "deletions_count": 258,
           "description": "Homepage language cleanup",
           "files_count": 9,
-          "group": "chore",
           "insertions_count": 103,
           "message": "chore(website): Homepage language cleanup",
           "pr_number": null,
@@ -16020,7 +18580,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Customize toggle button",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 189,
           "message": "chore(website): Customize toggle button",
           "pr_number": null,
@@ -16040,7 +18599,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add free language",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Add free language",
           "pr_number": null,
@@ -16060,7 +18618,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Add modern language",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore(website): Add modern language",
           "pr_number": null,
@@ -16080,7 +18637,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "Add a new option for specifying indexed fields to `splunk_hec` sink",
           "files_count": 5,
-          "group": "breaking change",
           "insertions_count": 87,
           "message": "enhancement(splunk_hec sink)!: Add a new option for specifying indexed fields to `splunk_hec` sink (#1537)",
           "pr_number": 1537,
@@ -16100,7 +18656,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Remove trailing spaces to fix `check-fmt`",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 1,
           "message": "fix(operations): Remove trailing spaces to fix `check-fmt`",
           "pr_number": null,
@@ -16120,7 +18675,6 @@ module.exports = {
           "deletions_count": 21,
           "description": "Cleanup \"free\" language",
           "files_count": 7,
-          "group": "chore",
           "insertions_count": 31,
           "message": "chore(website): Cleanup \"free\" language",
           "pr_number": null,
@@ -16140,7 +18694,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Initial `logfmt_parser` transform impl",
           "files_count": 12,
-          "group": "feat",
           "insertions_count": 510,
           "message": "feat(new transform): Initial `logfmt_parser` transform impl (#1541)",
           "pr_number": 1541,
@@ -16160,7 +18713,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "add assume_role",
           "files_count": 7,
-          "group": "enhancement",
           "insertions_count": 93,
           "message": "enhancement(aws_cloudwatch_logs sink): add assume_role (#1554)",
           "pr_number": 1554,
@@ -16180,7 +18732,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Initial `logplex` source implementation",
           "files_count": 11,
-          "group": "feat",
           "insertions_count": 408,
           "message": "feat(new source): Initial `logplex` source implementation (#1540)",
           "pr_number": 1540,
@@ -16200,7 +18751,6 @@ module.exports = {
           "deletions_count": 20,
           "description": "Remove build and verify steps for non-releases",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 46,
           "message": "chore(operations): Remove build and verify steps for non-releases (#1558)",
           "pr_number": 1558,
@@ -16220,7 +18770,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add PR length guidelines to contrib",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 7,
           "message": "chore(docs): Add PR length guidelines to contrib (#1539)",
           "pr_number": 1539,
@@ -16239,124 +18788,124 @@ module.exports = {
       "deletions_count": 11774,
       "description": "You can't make an omelet without cracking some eggs. We have our eyes set on version 1 and a backlog of breaking changes we wanted to merge before we reach it. Version 0.7.0 is our attempt to cluster as many breaking changes as we can into a single release.",
       "highlights": [
-
-      ],
-      "insertions_count": 24373,
-      "last_version": "0.6.0",
-      "posts": [
         {
-          "author_github": "https://github.com/Jeffail",
-          "date": "2019-12-13",
-          "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
-          "id": "custom-dns",
-          "path": "website/blog/2019-12-13-custom-dns.md",
-          "permalink": "https://vector.dev/blog/custom-dns",
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-01-03",
+          "description": "We've simplified our socket based sources into a single `socket` source",
+          "id": "2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source",
+          "importance": "low",
+          "path": "website/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source.md",
+          "permalink": "/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source/",
           "tags": [
-            "type: announcement",
-            "domain: networking"
+            "type: breaking change",
+            "domain: sources",
+            "source: tcp",
+            "source: udp"
           ],
-          "title": "Use Custom DNS Servers"
+          "title": "Merge existing `tcp` and `udp` sources into a single `socket` source"
         },
         {
-          "author_github": "https://github.com/Jeffail",
-          "date": "2019-12-14",
-          "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
-          "id": "kubernetes-source-alpha",
-          "path": "website/blog/2019-12-14-kubernetes-source-alpha.md",
-          "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-01-03",
+          "description": "This renames the existing `tcp` sink to `socket`",
+          "id": "2020-01-03-move-existing-tcp-sink-into-socket-sink",
+          "importance": "low",
+          "path": "website/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink.md",
+          "permalink": "/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink/",
           "tags": [
-            "type: announcement",
-            "domain: platforms",
-            "platform: kubernetes"
+            "type: breaking change",
+            "domain: sinks",
+            "sink: tcp"
           ],
-          "title": "Alpha Kubernetes Source"
+          "title": "Rename existing `tcp` sink to `socket` sink"
         },
         {
-          "author_github": "https://github.com/Jeffail",
-          "date": "2019-12-16",
-          "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
-          "id": "ec2-metadata",
-          "path": "website/blog/2019-12-16-ec2-metadata.md",
-          "permalink": "https://vector.dev/blog/ec2-metadata",
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-01-12",
+          "description": "<fill-in>",
+          "id": "2020-01-12-request-options-refactored",
+          "importance": "low",
+          "path": "website/highlights/2020-01-12-request-options-refactored.md",
+          "permalink": "/highlights/2020-01-12-request-options-refactored/",
           "tags": [
-            "type: announcement",
-            "domain: transforms",
-            "transform: ec2_metadata"
+            "type: breaking change",
+            "domain: buffers",
+            "domain: config",
+            "domain: sinks"
           ],
-          "title": "EC2 Metadata Enrichments"
+          "title": "Sink options have been refactored"
         },
         {
-          "author_github": "https://github.com/Jeffail",
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-01-12",
+          "description": "This change achieve consistency with our `kafka` source and other Kafka clients",
+          "id": "2020-01-12-use-comma-delim-server-list-instead-of-an-array",
+          "importance": "low",
+          "path": "website/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array.md",
+          "permalink": "/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array/",
+          "tags": [
+            "type: breaking change",
+            "domain: sinks",
+            "sink: kafka"
+          ],
+          "title": "Use comma delim server list in `kafka` sink"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-01-14",
+          "description": "This change ensures the `splunk_hec` source conforms to Vector's schema",
+          "id": "2020-01-14-rename-line-field-to-message",
+          "importance": "low",
+          "path": "website/highlights/2020-01-14-rename-line-field-to-message.md",
+          "permalink": "/highlights/2020-01-14-rename-line-field-to-message/",
+          "tags": [
+            "type: breaking change",
+            "domain: sources",
+            "source: splunk_hec"
+          ],
+          "title": "Rename `line` field to `message` in `splunk_hec` source"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-01-20",
+          "description": "This gives you full control over which fields are indexed",
+          "id": "2020-01-20-splunk-hec-specify-indexed-fields",
+          "importance": "low",
+          "path": "website/highlights/2020-01-20-splunk-hec-specify-indexed-fields.md",
+          "permalink": "/highlights/2020-01-20-splunk-hec-specify-indexed-fields/",
+          "tags": [
+            "type: breaking change",
+            "domain: sinks",
+            "sink: splunk_hec"
+          ],
+          "title": "The `splunk_hec` sink does not index fields by default"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
           "date": "2020-01-07",
-          "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
-          "id": "prometheus-source",
-          "path": "website/blog/2020-01-07-prometheus-source.md",
-          "permalink": "https://vector.dev/blog/prometheus-source",
+          "description": "Scrape prometheus metrics with Vector",
+          "id": "2020-01-07-prometheus-source",
+          "importance": "high",
+          "path": "website/highlights/2020-01-07-prometheus-source.md",
+          "permalink": "/highlights/2020-01-07-prometheus-source/",
           "tags": [
-            "type: announcement",
-            "event type: metrics",
+            "type: new feature",
             "domain: sources",
             "source: prometheus"
           ],
-          "title": "Prometheus Source"
+          "title": "New Prometheus Source"
         }
       ],
-      "subtitle": "The Great Omelet",
+      "insertions_count": 24373,
+      "last_version": "0.6.0",
+      "permalink": "/releases/0.7.0/",
+      "title": "Vector v0.7.0",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "upgrade_guides": [
-        {
-          "body": "<p>\nThe `tcp` and `udp` sources no longer exist and have been merged into a new\n`socket` type. Likewise, the `tcp` sink has been merged into the `socket` sink.\n\nMigration is straight forward, simply change the `type` to `socket` and add the\nfield `mode` to match the socket type (`tcp` or `udp`):\n</p>\n\n<pre>\n [sources.my_tcp_source]\n-  type = \"tcp\"\n+  type = \"socket\"\n   address = \"0.0.0.0:9000\"\n+  mode = \"tcp\"\n\n [sources.my_tcp_sink]\n-  type = \"tcp\"\n+  type = \"socket\"\n   address = \"92.12.333.224:5000\"\n+  mode = \"tcp\"\n</pre>\n",
-          "commits": [
-
-          ],
-          "id": "tcp-udp-to-socket-guide",
-          "title": "The `tcp` and `udp` sources & sinks have been merged into `socket`"
-        },
-        {
-          "body": "<p>\nRequest based sinks have had their request fields nested under the table\n`request` and no longer use fixed retry intervals, instead using a fibonacci\nsequence for backing off retry attempts.\n</p>\n\n<p>\nBatching fields are now nested under the table `batch`, with the field `size`\nreplaced with either `max_events` or `max_size` in order to clarify its purpose\n(capping discrete events or bytes respectively).\n</p>\n\n<p>\nFinally, authentication fields have been moved from the table `basic_auth` into\na general purpose `auth` table complemented with a `strategy` field.\n</p>\n\n<p>\nThese changes effect the following sinks:\n</p>\n\n<ul>\n  <li> `aws_cloudwatch_logs` </li>\n  <li> `aws_kinesis_firehose` </li>\n  <li> `aws_kinesis_streams` </li>\n  <li> `aws_s3` </li>\n  <li> `clickhouse` </li>\n  <li> `datadog_metrics` </li>\n  <li> `elasticsearch` </li>\n  <li> `gcp_pubsub` </li>\n  <li> `http` </li>\n  <li> `new_relic_logs` </li>\n  <li> `splunk_hec` </li>\n</ul>\n\n<p>\nIn order to migrate all fields prefixed with `request_` must be placed within a\n`request` table with the prefix removed.\n\nThe config field `retry_backoff_secs` must also be replaced with two new fields\n`retry_initial_backoff_secs` and `retry_max_duration_secs`.\n\nFields prefixed with `batch_` must be placed within a `batch` table with the\nprefix removed. Instances of `batch_size` should be renamed `max_size` or\n`max_events` (refer to the relevant sink docs for the correct variant).\n\nFinally, the table `basic_auth` should renamed `auth` with a field `strategy`\nadded:\n</p>\n\n<pre>\n [sinks.my_sink_id]\n   type = \"http\"\n   inputs = [\"my-source-id\"]\n   uri = \"https://10.22.212.22:9000/endpoint\"\n\n-  batch_size = 1049000\n+  [sinks.my_sink_id.batch]\n+    max_size = 1049000\n\n-  [sinks.my_sink_id.basic_auth]\n+  [sinks.my_sink_id.auth]\n+    strategy = \"basic\"\n     user = \"${USERNAME_ENV_VAR}\"\n     password = \"${PASSWORD_ENV_VAR}\"\n\n-  request_in_flight_limit = 5\n-  request_retry_backoff_secs = 1\n+  [sinks.my_sink_id.request]\n+    in_flight_limit = 5\n+    retry_initial_backoff_secs = 1\n+    retry_max_duration_secs = 10\n</pre>\n",
-          "commits": [
-
-          ],
-          "id": "request-changed-guide",
-          "title": "Request, batching and auth fields refactored for sink components"
-        },
-        {
-          "body": "<p>\nThe buffer field `num_items` has been renamed to `max_events` in order to clarify\nits purpose.\n\nMigration involves simply changing all occurrences of `buffer.num_items` to\n`buffer.max_events`:\n</p>\n\n<pre>\n [sinks.my_sink_id]\n   type = \"aws_s3\"\n   inputs = [\"my-source-id\"]\n   bucket = \"my-bucket\"\n\n   [sinks.my_sink_id.buffer]\n     type = \"memory\"\n-    num_items = 500\n+    max_events = 500\n</pre>\n",
-          "commits": [
-
-          ],
-          "id": "buffer-num-items-changed",
-          "title": "The buffer field `num_items` has been renamed to `max_events`"
-        },
-        {
-          "body": "<p>\nThe `kafka` sink field `bootstrap_servers` has been changed from an array to a\nstring, expecting a comma separated list of bootstrap servers similar to the\n`kafka` source:\n</p>\n\n<pre>\n [sinks.my_sink_id]\n   type = \"kafka\"\n   inputs = [\"my-source-id\"]\n-  bootstrap_servers = [\"10.14.22.123:9092\", \"10.14.23.332:9092\"]\n+  bootstrap_servers = \"10.14.22.123:9092,10.14.23.332:9092\"\n</pre>\n",
-          "commits": [
-
-          ],
-          "id": "kafka-sink-comma-list",
-          "title": "The `kafka` sink now takes a comma separated list of bootstrap servers"
-        },
-        {
-          "body": "<p>\nThe `journald` source originally used libsystemd in order to consume logs from\nJournald. Since this was causing issues for some distributions of Vector it has\nnow been changed to pipe logs from journalctl.\n</p>\n<p>\nTherefore, when using a `journald` source users must now ensure that the\n`journalctl` binary is available. The field `local_only` has also been removed\nas it is no longer applicable.\n</p>\n",
-          "commits": [
-
-          ],
-          "id": "journald-source-switch",
-          "title": "The `journald` source now pipes from journalctl"
-        },
-        {
-          "body": "<p>\nThere is no longer a distinction within Vector between explicit and implicit\nevent fields. All fields are now implicit and therefore the `splunk_hec` sink\nwill <i>not</i> index any fields by default.\n</p>\n<p>\nIn order to mark desired fields as indexed you can use the optional configuration\noption `indexed_fields`:\n</p>\n<pre>\n [sinks.my_sink_id]\n   type = \"splunk_hec\"\n   inputs = [\"my-source-id\"]\n+  indexed_fields = [\"foo\", \"bar\"]\n</pre>\n",
-          "commits": [
-
-          ],
-          "id": "splunk-hec-sink-explicit",
-          "title": "The `splunk_hec` sink does not index any fields by default"
-        }
-      ],
       "version": "0.7.0"
     },
     "0.7.1": {
+      "codename": "",
       "commits": [
         {
           "author": "Alexander Rodin",
@@ -16365,7 +18914,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Make sorting of blog posts stable",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Make sorting of blog posts stable (#1566)",
           "pr_number": 1566,
@@ -16385,7 +18933,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add AWS API key for Windows tests in CI",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(operations): Add AWS API key for Windows tests in CI (#1565)",
           "pr_number": 1565,
@@ -16405,7 +18952,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Pass `CIRCLE_SHA1` environment variable to `release-github` job",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Pass `CIRCLE_SHA1` environment variable to `release-github` job (#1567)",
           "pr_number": 1567,
@@ -16425,7 +18971,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix crash when `in_flight_limit` is set to `1`",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 31,
           "message": "fix(aws_s3 sink): Fix crash when `in_flight_limit` is set to `1` (#1569)",
           "pr_number": 1569,
@@ -16445,7 +18990,6 @@ module.exports = {
           "deletions_count": 118,
           "description": "Fix error when socket addresses do not use `IPV4` or `IPV6` addresses",
           "files_count": 9,
-          "group": "fix",
           "insertions_count": 117,
           "message": "fix(socket sink): Fix error when socket addresses do not use `IPV4` or `IPV6` addresses (#1575)",
           "pr_number": 1575,
@@ -16465,7 +19009,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "Fix `aws_kinesis_firehose` sink healthcheck",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 13,
           "message": "fix(aws_kinesis_firehose sink): Fix `aws_kinesis_firehose` sink healthcheck (#1573)",
           "pr_number": 1573,
@@ -16485,7 +19028,6 @@ module.exports = {
           "deletions_count": 53,
           "description": "Escape special characters in options descriptions",
           "files_count": 26,
-          "group": "chore",
           "insertions_count": 53,
           "message": "chore(website): Escape special characters in options descriptions (#1580)",
           "pr_number": 1580,
@@ -16505,7 +19047,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Create `vector` user when installing RPM package",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 11,
           "message": "fix(rpm platform): Create `vector` user when installing RPM package (#1583)",
           "pr_number": 1583,
@@ -16525,7 +19066,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Support bug fixing releases",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 18,
           "message": "chore(operations): Support bug fixing releases (#1587)",
           "pr_number": 1587,
@@ -16545,7 +19085,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add all generated files to the release commit",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Add all generated files to the release commit (#1588)",
           "pr_number": 1588,
@@ -16565,7 +19104,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Do not require `systemd` as an RPM dependency",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 0,
           "message": "fix(rpm platform): Do not require `systemd` as an RPM dependency (#1590)",
           "pr_number": 1590,
@@ -16585,7 +19123,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add `release-push` target to the Makefile",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 30,
           "message": "chore(operations): Add `release-push` target to the Makefile (#1589)",
           "pr_number": 1589,
@@ -16600,7 +19137,7 @@ module.exports = {
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.7.0...v0.7.1",
-      "date": "2020-01-23",
+      "date": "2020-01-24",
       "deletions_count": 206,
       "description": "",
       "highlights": [
@@ -16608,18 +19145,14 @@ module.exports = {
       ],
       "insertions_count": 281,
       "last_version": "0.7.0",
-      "posts": [
-
-      ],
-      "subtitle": "",
+      "permalink": "/releases/0.7.1/",
+      "title": "Vector v0.7.1",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "upgrade_guides": [
-
-      ],
       "version": "0.7.1"
     },
     "0.7.2": {
+      "codename": "",
       "commits": [
         {
           "author": "Ashley Jeffs",
@@ -16628,7 +19161,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix typo",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix typo",
           "pr_number": null,
@@ -16648,7 +19180,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Wrap failing test in feature flag",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(testing): Wrap failing test in feature flag (#1595)",
           "pr_number": 1595,
@@ -16668,7 +19199,6 @@ module.exports = {
           "deletions_count": 59,
           "description": "Ensure that own logs are always ignored",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 53,
           "message": "fix(docker source): Ensure that own logs are always ignored (#1525)",
           "pr_number": 1525,
@@ -16688,7 +19218,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix `release-github` CI job",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore(operations): Fix `release-github` CI job (#1600)",
           "pr_number": 1600,
@@ -16708,7 +19237,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Fix `release-homebrew` CI job",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(operations): Fix `release-homebrew` CI job (#1601)",
           "pr_number": 1601,
@@ -16728,7 +19256,6 @@ module.exports = {
           "deletions_count": 65,
           "description": "Fix socket address documentation",
           "files_count": 31,
-          "group": "docs",
           "insertions_count": 76,
           "message": "docs: Fix socket address documentation (#1607)",
           "pr_number": 1607,
@@ -16748,7 +19275,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix group creation in the RPM package",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 1,
           "message": "fix(platforms): Fix group creation in the RPM package (#1654)",
           "pr_number": 1654,
@@ -16768,7 +19294,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Bump version in `Cargo.toml` and `Cargo.lock`",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(operations): Bump version in `Cargo.toml` and `Cargo.lock`",
           "pr_number": null,
@@ -16788,7 +19313,6 @@ module.exports = {
           "deletions_count": 39,
           "description": "Disable kuberenetes tests in CI temporarily",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 35,
           "message": "chore(testing): Disable kuberenetes tests in CI temporarily (#1629)",
           "pr_number": 1629,
@@ -16808,7 +19332,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix creation of the tag in `make release`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Fix creation of the tag in `make release`",
           "pr_number": null,
@@ -16828,7 +19351,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Use all tags in `make release`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Use all tags in `make release`",
           "pr_number": null,
@@ -16848,7 +19370,6 @@ module.exports = {
           "deletions_count": 73,
           "description": "Improve 0.7.1 release notes",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 73,
           "message": "docs: Improve 0.7.1 release notes",
           "pr_number": null,
@@ -16871,18 +19392,14 @@ module.exports = {
       ],
       "insertions_count": 104,
       "last_version": "0.7.1",
-      "posts": [
-
-      ],
-      "subtitle": "",
+      "permalink": "/releases/0.7.2/",
+      "title": "Vector v0.7.2",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "upgrade_guides": [
-
-      ],
       "version": "0.7.2"
     },
     "0.8.0": {
+      "codename": "A Wholesome Platter Of Features",
       "commits": [
         {
           "author": "Alexander Rodin",
@@ -16891,7 +19408,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Make sorting of blog posts stable",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Make sorting of blog posts stable (#1566)",
           "pr_number": 1566,
@@ -16911,7 +19427,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add AWS API key for Windows tests in CI",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(operations): Add AWS API key for Windows tests in CI (#1565)",
           "pr_number": 1565,
@@ -16931,7 +19446,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Pass `CIRCLE_SHA1` environment variable to `release-github` job",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Pass `CIRCLE_SHA1` environment variable to `release-github` job (#1567)",
           "pr_number": 1567,
@@ -16951,7 +19465,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix a bug with `retry_limit` is set to 1",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 31,
           "message": "fix(aws_s3 sink): Fix a bug with `retry_limit` is set to 1 (#1569)",
           "pr_number": 1569,
@@ -16971,7 +19484,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Enable more logging by default",
           "files_count": 3,
-          "group": "enhancement",
           "insertions_count": 8,
           "message": "enhancement(aws_cloudwatch_logs sink): Enable more logging by default (#1564)",
           "pr_number": 1564,
@@ -16991,7 +19503,6 @@ module.exports = {
           "deletions_count": 96,
           "description": "Allow building on Windows Stable Rust",
           "files_count": 9,
-          "group": "chore",
           "insertions_count": 180,
           "message": "chore(operations): Allow building on Windows Stable Rust (#1560)",
           "pr_number": 1560,
@@ -17011,7 +19522,6 @@ module.exports = {
           "deletions_count": 118,
           "description": "Allow for non-IP address host names",
           "files_count": 9,
-          "group": "fix",
           "insertions_count": 117,
           "message": "fix(socket sink): Allow for non-IP address host names (#1575)",
           "pr_number": 1575,
@@ -17031,7 +19541,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "Use `describe_delivery_stream` AWS API method for healthcheck",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 13,
           "message": "fix(aws_kinesis_firehose sink): Use `describe_delivery_stream` AWS API method for healthcheck (#1573)",
           "pr_number": 1573,
@@ -17051,7 +19560,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Bump version to 0.8.0 to fix `make check-version`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore: Bump version to 0.8.0 to fix `make check-version`",
           "pr_number": null,
@@ -17071,7 +19579,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Update `Cargo.lock`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Update `Cargo.lock`",
           "pr_number": null,
@@ -17091,7 +19598,6 @@ module.exports = {
           "deletions_count": 53,
           "description": "Escape special characters in options descriptions",
           "files_count": 26,
-          "group": "chore",
           "insertions_count": 53,
           "message": "chore(website): Escape special characters in options descriptions (#1580)",
           "pr_number": 1580,
@@ -17111,7 +19617,6 @@ module.exports = {
           "deletions_count": 38,
           "description": "Check that all blog articles are signed in CI",
           "files_count": 27,
-          "group": "chore",
           "insertions_count": 130,
           "message": "chore(website): Check that all blog articles are signed in CI (#1459)",
           "pr_number": 1459,
@@ -17131,7 +19636,6 @@ module.exports = {
           "deletions_count": 20,
           "description": "Fix broken s3 link",
           "files_count": 9,
-          "group": "chore",
           "insertions_count": 454,
           "message": "chore(website): Fix broken s3 link",
           "pr_number": null,
@@ -17151,7 +19655,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Fix socket sink docs",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 6,
           "message": "docs(socket sink): Fix socket sink docs (#1585)",
           "pr_number": 1585,
@@ -17171,7 +19674,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Create `vector` user when installing RPM package",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 11,
           "message": "fix(rpm platform): Create `vector` user when installing RPM package (#1583)",
           "pr_number": 1583,
@@ -17191,7 +19693,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix avatar on blog list page",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Fix avatar on blog list page",
           "pr_number": null,
@@ -17211,7 +19712,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Redo blog sigs",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore(website): Redo blog sigs",
           "pr_number": null,
@@ -17231,7 +19731,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Support bug fixing releases",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 18,
           "message": "chore(operations): Support bug fixing releases (#1587)",
           "pr_number": 1587,
@@ -17251,7 +19750,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add all generated files to the release commit",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Add all generated files to the release commit (#1588)",
           "pr_number": 1588,
@@ -17271,7 +19769,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Do not require `systemd` as an RPM dependency",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore(operations): Do not require `systemd` as an RPM dependency (#1590)",
           "pr_number": 1590,
@@ -17291,7 +19788,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add `release-push` target to the Makefile",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 30,
           "message": "chore(operations): Add `release-push` target to the Makefile (#1589)",
           "pr_number": 1589,
@@ -17311,7 +19807,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix typo",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix typo",
           "pr_number": null,
@@ -17331,7 +19826,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Wrap failing test in feature flag",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(testing): Wrap failing test in feature flag (#1595)",
           "pr_number": 1595,
@@ -17351,7 +19845,6 @@ module.exports = {
           "deletions_count": 59,
           "description": "Always check containers for self",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 53,
           "message": "fix(docker source): Always check containers for self (#1525)",
           "pr_number": 1525,
@@ -17371,7 +19864,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix `release-github` CI job",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore(operations): Fix `release-github` CI job (#1600)",
           "pr_number": 1600,
@@ -17391,7 +19883,6 @@ module.exports = {
           "deletions_count": 56,
           "description": "Run `make generate`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore: Run `make generate`",
           "pr_number": null,
@@ -17411,7 +19902,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Fix `release-homebrew` CI job",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 5,
           "message": "chore(operations): Fix `release-homebrew` CI job (#1601)",
           "pr_number": 1601,
@@ -17431,7 +19921,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add Netlify _redirects file",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore(website): Add Netlify _redirects file",
           "pr_number": null,
@@ -17451,7 +19940,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Force netlify redirects",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 14,
           "message": "chore(website): Force netlify redirects",
           "pr_number": null,
@@ -17471,7 +19959,6 @@ module.exports = {
           "deletions_count": 65,
           "description": "Fix socket address documentation",
           "files_count": 31,
-          "group": "docs",
           "insertions_count": 76,
           "message": "docs(socket source): Fix socket address documentation (#1607)",
           "pr_number": 1607,
@@ -17491,7 +19978,6 @@ module.exports = {
           "deletions_count": 27,
           "description": "Remove unused guides attribute",
           "files_count": 27,
-          "group": "docs",
           "insertions_count": 0,
           "message": "docs: Remove unused guides attribute",
           "pr_number": null,
@@ -17511,7 +19997,6 @@ module.exports = {
           "deletions_count": 200,
           "description": "Fix service provider filters in components section",
           "files_count": 41,
-          "group": "chore",
           "insertions_count": 995,
           "message": "chore(website): Fix service provider filters in components section",
           "pr_number": null,
@@ -17531,7 +20016,6 @@ module.exports = {
           "deletions_count": 350,
           "description": "Cleanup authentication options",
           "files_count": 24,
-          "group": "docs",
           "insertions_count": 315,
           "message": "docs: Cleanup authentication options",
           "pr_number": null,
@@ -17551,7 +20035,6 @@ module.exports = {
           "deletions_count": 204,
           "description": "Make region for AWS services a required option",
           "files_count": 9,
-          "group": "docs",
           "insertions_count": 212,
           "message": "docs: Make region for AWS services a required option",
           "pr_number": null,
@@ -17571,7 +20054,6 @@ module.exports = {
           "deletions_count": 24,
           "description": "The region option is only requried for AWS exclusive sinks",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 28,
           "message": "docs: The region option is only requried for AWS exclusive sinks",
           "pr_number": null,
@@ -17591,7 +20073,6 @@ module.exports = {
           "deletions_count": 236,
           "description": "Nest source building steps under platform tabs",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 274,
           "message": "docs: Nest source building steps under platform tabs",
           "pr_number": null,
@@ -17611,7 +20092,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add all vector.dev redirects to netlify.toml",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 46,
           "message": "docs: Add all vector.dev redirects to netlify.toml",
           "pr_number": null,
@@ -17631,7 +20111,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Fix journald supported operating systems",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: Fix journald supported operating systems",
           "pr_number": null,
@@ -17651,7 +20130,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add \"requirements\" section for relevant components",
           "files_count": 56,
-          "group": "docs",
           "insertions_count": 550,
           "message": "docs: Add \"requirements\" section for relevant components",
           "pr_number": null,
@@ -17671,7 +20149,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Add address example to logplex source",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 7,
           "message": "docs: Add address example to logplex source",
           "pr_number": null,
@@ -17691,7 +20168,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Fix format errors",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 3,
           "message": "chore: Fix format errors",
           "pr_number": null,
@@ -17711,7 +20187,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Setup Netlify proxy for test-results subdomain",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 9,
           "message": "chore(website): Setup Netlify proxy for test-results subdomain",
           "pr_number": null,
@@ -17731,7 +20206,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Setup Netlify proxy for sh subdomain",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 6,
           "message": "chore(website): Setup Netlify proxy for sh subdomain",
           "pr_number": null,
@@ -17751,7 +20225,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Add checkpointing and communication strategy to journald source docs",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 48,
           "message": "docs: Add checkpointing and communication strategy to journald source docs (#1611)",
           "pr_number": 1611,
@@ -17771,7 +20244,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Document adding the Vector user to a group which can use `journalctl`",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 33,
           "message": "docs: Document adding the Vector user to a group which can use `journalctl` (#1584)",
           "pr_number": 1584,
@@ -17791,7 +20263,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix the journalctl start date to work across all timezones",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 1,
           "message": "fix(journald source): Fix the journalctl start date to work across all timezones (#1627)",
           "pr_number": 1627,
@@ -17811,7 +20282,6 @@ module.exports = {
           "deletions_count": 120,
           "description": "Initial `gcp_stackdriver_logging` sink implementation",
           "files_count": 23,
-          "group": "feat",
           "insertions_count": 2095,
           "message": "feat(new sink): Initial `gcp_stackdriver_logging` sink implementation (#1555)",
           "pr_number": 1555,
@@ -17831,7 +20301,6 @@ module.exports = {
           "deletions_count": 39,
           "description": "Disable kuberenetes tests in CI temporarily",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 35,
           "message": "chore(testing): Disable kuberenetes tests in CI temporarily (#1629)",
           "pr_number": 1629,
@@ -17851,7 +20320,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "Event::extend use FromIter",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 18,
           "message": "chore(event): Event::extend use FromIter (#1631)",
           "pr_number": 1631,
@@ -17871,7 +20339,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Introduce `JsonArrayBuffer` buffer",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 89,
           "message": "chore(buffers): Introduce `JsonArrayBuffer` buffer (#1633)",
           "pr_number": 1633,
@@ -17891,7 +20358,6 @@ module.exports = {
           "deletions_count": 31,
           "description": "Cleanup generate and check Dockerfiles",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 15,
           "message": "chore(operations): Cleanup generate and check Dockerfiles (#1623)",
           "pr_number": 1623,
@@ -17911,7 +20377,6 @@ module.exports = {
           "deletions_count": 25,
           "description": "Add new `drop_unspecified` option to drop unspecified fields",
           "files_count": 5,
-          "group": "enhancement",
           "insertions_count": 165,
           "message": "enhancement(coercer transform): Add new `drop_unspecified` option to drop unspecified fields (#1636)",
           "pr_number": 1636,
@@ -17931,7 +20396,6 @@ module.exports = {
           "deletions_count": 94,
           "description": "upgrade http and prost-build deps",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 27,
           "message": "chore(security): upgrade http and prost-build deps (#1638)",
           "pr_number": 1638,
@@ -17951,7 +20415,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "add cargo-deny check for advisories",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 20,
           "message": "chore(security): add cargo-deny check for advisories (#1640)",
           "pr_number": 1640,
@@ -17971,7 +20434,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Upgrade to rustc `1.41.0`",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore: Upgrade to rustc `1.41.0` (#1646)",
           "pr_number": 1646,
@@ -17991,7 +20453,6 @@ module.exports = {
           "deletions_count": 25,
           "description": "Add run.sh to run commands through Docker based on the `USE_DOCKER` env var",
           "files_count": 5,
-          "group": "chore",
           "insertions_count": 68,
           "message": "chore(operations): Add run.sh to run commands through Docker based on the `USE_DOCKER` env var (#1637)",
           "pr_number": 1637,
@@ -18011,7 +20472,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Initial `sematext` sink implementation",
           "files_count": 14,
-          "group": "chore",
           "insertions_count": 1079,
           "message": "chore(new sink): Initial `sematext` sink implementation (#1562)",
           "pr_number": 1562,
@@ -18031,7 +20491,6 @@ module.exports = {
           "deletions_count": 655,
           "description": "Upgrade all dependencies",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 810,
           "message": "chore: Upgrade all dependencies (#1648)",
           "pr_number": 1648,
@@ -18051,7 +20510,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add Ana 🎉",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 12,
           "message": "chore(website): Add Ana 🎉 (#1649)",
           "pr_number": 1649,
@@ -18071,7 +20529,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix group creation in the RPM package",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 1,
           "message": "fix(rpm platform): Fix group creation in the RPM package (#1654)",
           "pr_number": 1654,
@@ -18091,7 +20548,6 @@ module.exports = {
           "deletions_count": 1931,
           "description": "Update to new lockfile format",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1921,
           "message": "chore: Update to new lockfile format (#1655)",
           "pr_number": 1655,
@@ -18111,7 +20567,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Fix EU endpoint and docs",
           "files_count": 4,
-          "group": "fix",
           "insertions_count": 4,
           "message": "fix(sematext sink): Fix EU endpoint and docs (#1657)",
           "pr_number": 1657,
@@ -18131,7 +20586,6 @@ module.exports = {
           "deletions_count": 132,
           "description": "Refactor internal http sink to use new helper API",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 327,
           "message": "chore(http sink): Refactor internal http sink to use new helper API (#1641)",
           "pr_number": 1641,
@@ -18151,7 +20605,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "Add ability to verify RPM artifacts locally",
           "files_count": 7,
-          "group": "chore",
           "insertions_count": 170,
           "message": "chore(testing): Add ability to verify RPM artifacts locally (#1647)",
           "pr_number": 1647,
@@ -18171,7 +20624,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "Update Twitter handle to vectordotdev",
           "files_count": 6,
-          "group": "chore",
           "insertions_count": 9,
           "message": "chore(website): Update Twitter handle to vectordotdev (#1664)",
           "pr_number": 1664,
@@ -18191,7 +20643,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix creation of the tag in `make release`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Fix creation of the tag in `make release`",
           "pr_number": null,
@@ -18211,7 +20662,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Use all tags in `make release`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Use all tags in `make release`",
           "pr_number": null,
@@ -18231,7 +20681,6 @@ module.exports = {
           "deletions_count": 73,
           "description": "Improve 0.7.1 release notes",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 73,
           "message": "docs: Improve 0.7.1 release notes",
           "pr_number": null,
@@ -18251,7 +20700,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Update README header links",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 11,
           "message": "docs: Update README header links",
           "pr_number": null,
@@ -18271,7 +20719,6 @@ module.exports = {
           "deletions_count": 37,
           "description": "Fix nix verifier step (and nightly builds)",
           "files_count": 7,
-          "group": "chore",
           "insertions_count": 16,
           "message": "chore(operations): Fix nix verifier step (and nightly builds) (#1669)",
           "pr_number": 1669,
@@ -18291,7 +20738,6 @@ module.exports = {
           "deletions_count": 89,
           "description": "flesh out security policy",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 443,
           "message": "chore(security): flesh out security policy (#1642)",
           "pr_number": 1642,
@@ -18311,7 +20757,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fox SECURITY.md vulnerability link",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fox SECURITY.md vulnerability link",
           "pr_number": null,
@@ -18331,7 +20776,6 @@ module.exports = {
           "deletions_count": 35,
           "description": "Fix SECURITY.md TOC links",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 35,
           "message": "docs: Fix SECURITY.md TOC links",
           "pr_number": null,
@@ -18351,7 +20795,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Colourize help",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 10,
           "message": "enhancement(cli): Colourize help (#1660)",
           "pr_number": 1660,
@@ -18371,7 +20814,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add team member social profiles",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 11,
           "message": "docs: Add team member social profiles",
           "pr_number": null,
@@ -18391,7 +20833,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix COPY path for armv7 Docker image",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Fix COPY path for armv7 Docker image (#1671)",
           "pr_number": 1671,
@@ -18411,7 +20852,6 @@ module.exports = {
           "deletions_count": 12,
           "description": "Add assume_role docs",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 42,
           "message": "docs: Add assume_role docs",
           "pr_number": null,
@@ -18431,7 +20871,6 @@ module.exports = {
           "deletions_count": 148,
           "description": "Fix broken links",
           "files_count": 54,
-          "group": "docs",
           "insertions_count": 144,
           "message": "docs: Fix broken links",
           "pr_number": null,
@@ -18451,7 +20890,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Clarify SECURITY.md requirements on 2fa and commit signing",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 3,
           "message": "docs: Clarify SECURITY.md requirements on 2fa and commit signing",
           "pr_number": null,
@@ -18471,7 +20909,6 @@ module.exports = {
           "deletions_count": 27,
           "description": "fix typos",
           "files_count": 15,
-          "group": "docs",
           "insertions_count": 27,
           "message": "docs: fix typos (#1577)",
           "pr_number": 1577,
@@ -18491,7 +20928,6 @@ module.exports = {
           "deletions_count": 50,
           "description": "Add unix domain socket support to the `socket` sink",
           "files_count": 9,
-          "group": "feat",
           "insertions_count": 379,
           "message": "feat(socket sink): Add unix domain socket support to the `socket` sink (#1561)",
           "pr_number": 1561,
@@ -18511,7 +20947,6 @@ module.exports = {
           "deletions_count": 36,
           "description": "Add .github/labels.yml for syncing labels",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 547,
           "message": "chore(operations): Add .github/labels.yml for syncing labels (#1677)",
           "pr_number": 1677,
@@ -18531,7 +20966,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix labels.yml path in label-syncer workflow",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operation): Fix labels.yml path in label-syncer workflow",
           "pr_number": null,
@@ -18551,7 +20985,6 @@ module.exports = {
           "deletions_count": 14,
           "description": "Cleanup unused labels",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 9,
           "message": "chore(operations): Cleanup unused labels",
           "pr_number": null,
@@ -18571,7 +21004,6 @@ module.exports = {
           "deletions_count": 111,
           "description": "Define a JSON schema for the .meta/**/*.toml files",
           "files_count": 55,
-          "group": "chore",
           "insertions_count": 733,
           "message": "chore(operations): Define a JSON schema for the .meta/**/*.toml files (#1678)",
           "pr_number": 1678,
@@ -18591,7 +21023,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Upgrade `tracing-subscriber 0.2.0-alpha.5`",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 29,
           "message": "chore: Upgrade `tracing-subscriber 0.2.0-alpha.5` (#1681)",
           "pr_number": 1681,
@@ -18611,7 +21042,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix the SECURITY.md link at CONTRIBUTING.md",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore: Fix the SECURITY.md link at CONTRIBUTING.md (#1682)",
           "pr_number": 1682,
@@ -18631,7 +21061,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Fix `aws_s3` sink examples",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 6,
           "message": "docs: Fix `aws_s3` sink examples (#1683)",
           "pr_number": 1683,
@@ -18651,7 +21080,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "Remove background checks on security page",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore: Remove background checks on security page",
           "pr_number": null,
@@ -18671,7 +21099,6 @@ module.exports = {
           "deletions_count": 13,
           "description": "Fixup versions in tracing-metrics",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 4,
           "message": "chore(operations): Fixup versions in tracing-metrics (#1690)",
           "pr_number": 1690,
@@ -18691,7 +21118,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Add several S3 object-level options (`grant_full_control`, `server_side_encryption`, and more)",
           "files_count": 6,
-          "group": "enhancement",
           "insertions_count": 638,
           "message": "enhancement(aws_s3 sink): Add several S3 object-level options (`grant_full_control`, `server_side_encryption`, and more) (#1689)",
           "pr_number": 1689,
@@ -18711,7 +21137,6 @@ module.exports = {
           "deletions_count": 20,
           "description": "Use `rust-toolchain` file when building CI Docker images",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 10,
           "message": "chore(operations): Use `rust-toolchain` file when building CI Docker images (#1691)",
           "pr_number": 1691,
@@ -18731,7 +21156,6 @@ module.exports = {
           "deletions_count": 38,
           "description": "New `merge` transform",
           "files_count": 23,
-          "group": "feat",
           "insertions_count": 1539,
           "message": "feat(new transform): New `merge` transform (#1504)",
           "pr_number": 1504,
@@ -18751,7 +21175,6 @@ module.exports = {
           "deletions_count": 38,
           "description": "Add `auto_partial_merge` to automatically merge partial events",
           "files_count": 23,
-          "group": "enhancement",
           "insertions_count": 1539,
           "message": "enhancement(docker source): Add `auto_partial_merge` to automatically merge partial events (#1504)",
           "pr_number": 1504,
@@ -18771,7 +21194,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Fix auto_partial_merge option name",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 5,
           "message": "docs(docker source): Fix auto_partial_merge option name",
           "pr_number": null,
@@ -18791,7 +21213,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Warn log for non retryable requests",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 1,
           "message": "enhancement(observability): Warn log for non retryable requests (#1706)",
           "pr_number": 1706,
@@ -18811,7 +21232,6 @@ module.exports = {
           "deletions_count": 52,
           "description": "Rename cloud and add host",
           "files_count": 5,
-          "group": "chore",
           "insertions_count": 126,
           "message": "chore(sematext sink): Rename cloud and add host (#1704)",
           "pr_number": 1704,
@@ -18831,7 +21251,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Upgrade to `tracing-subscriber 0.2.0`",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 6,
           "message": "chore: Upgrade to `tracing-subscriber 0.2.0` (#1707)",
           "pr_number": 1707,
@@ -18851,7 +21270,6 @@ module.exports = {
           "deletions_count": 12,
           "description": "Fixup security language",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 9,
           "message": "docs: Fixup security language (#1711)",
           "pr_number": 1711,
@@ -18871,7 +21289,6 @@ module.exports = {
           "deletions_count": 81,
           "description": "Allow partials in /.meta/*.toml files",
           "files_count": 17,
-          "group": "chore",
           "insertions_count": 105,
           "message": "chore(website): Allow partials in /.meta/*.toml files (#1715)",
           "pr_number": 1715,
@@ -18891,7 +21308,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Initial `logdna` sink implementation",
           "files_count": 16,
-          "group": "feat",
           "insertions_count": 1389,
           "message": "feat(new sink): Initial `logdna` sink implementation (#1668)",
           "pr_number": 1668,
@@ -18911,7 +21327,6 @@ module.exports = {
           "deletions_count": 384,
           "description": "Drop aws endpoint and region options",
           "files_count": 21,
-          "group": "breaking change",
           "insertions_count": 137,
           "message": "chore(elasticsearch sink)!: Drop aws endpoint and region options (#1703)",
           "pr_number": 1703,
@@ -18931,7 +21346,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Add ENV_VAR api key examples first",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 10,
           "message": "docs: Add ENV_VAR api key examples first",
           "pr_number": null,
@@ -18951,7 +21365,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix LogDNA casing",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix LogDNA casing",
           "pr_number": null,
@@ -18971,7 +21384,6 @@ module.exports = {
           "deletions_count": 27,
           "description": "Add proper non retry messages",
           "files_count": 3,
-          "group": "enhancement",
           "insertions_count": 76,
           "message": "enhancement(observability): Add proper non retry messages (#1712)",
           "pr_number": 1712,
@@ -18991,7 +21403,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add a (super secret) vic page",
           "files_count": 12,
-          "group": "docs",
           "insertions_count": 738,
           "message": "docs: Add a (super secret) vic page (#1710)",
           "pr_number": 1710,
@@ -19011,7 +21422,6 @@ module.exports = {
           "deletions_count": 20,
           "description": "make host calculation more explicit",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 13,
           "message": "chore(sematext sink): make host calculation more explicit (#1720)",
           "pr_number": 1720,
@@ -19031,7 +21441,6 @@ module.exports = {
           "deletions_count": 43,
           "description": "Add providers to labels and semantic PR scopes",
           "files_count": 8,
-          "group": "chore",
           "insertions_count": 153,
           "message": "chore: Add providers to labels and semantic PR scopes",
           "pr_number": null,
@@ -19051,7 +21460,6 @@ module.exports = {
           "deletions_count": 172,
           "description": "Allow running all tests locally",
           "files_count": 15,
-          "group": "chore",
           "insertions_count": 636,
           "message": "chore(operations): Allow running all tests locally (#1701)",
           "pr_number": 1701,
@@ -19071,7 +21479,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Clarify topology warnings",
           "files_count": 3,
-          "group": "enhancement",
           "insertions_count": 4,
           "message": "enhancement(config): Clarify topology warnings (#1726)",
           "pr_number": 1726,
@@ -19091,7 +21498,6 @@ module.exports = {
           "deletions_count": 77,
           "description": "Restore `rust-toolchain` file in the project root",
           "files_count": 9,
-          "group": "chore",
           "insertions_count": 79,
           "message": "chore(operations): Restore `rust-toolchain` file in the project root (#1729)",
           "pr_number": 1729,
@@ -19111,7 +21517,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix `test-stable` CI job",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Fix `test-stable` CI job (#1730)",
           "pr_number": 1730,
@@ -19131,7 +21536,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Replace Alexey with Luke",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 6,
           "message": "chore: Replace Alexey with Luke (#1723)",
           "pr_number": 1723,
@@ -19151,7 +21555,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Set `beta` to true",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs(merge transform): Set `beta` to true",
           "pr_number": null,
@@ -19171,7 +21574,6 @@ module.exports = {
           "deletions_count": 15,
           "description": "Require `beta` attribute for all components",
           "files_count": 34,
-          "group": "docs",
           "insertions_count": 45,
           "message": "docs: Require `beta` attribute for all components",
           "pr_number": null,
@@ -19191,7 +21593,6 @@ module.exports = {
           "deletions_count": 40,
           "description": "Support multiple configuration files.",
           "files_count": 5,
-          "group": "feat",
           "insertions_count": 208,
           "message": "feat(cli): Support multiple configuration files. (#1725)",
           "pr_number": 1725,
@@ -19211,7 +21612,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Improve `docker-run.sh` script",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 18,
           "message": "chore(operations): Improve `docker-run.sh` script (#1733)",
           "pr_number": 1733,
@@ -19231,7 +21631,6 @@ module.exports = {
           "deletions_count": 21,
           "description": "Add support for running containers under Podman",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 28,
           "message": "chore(operations): Add support for running containers under Podman (#1736)",
           "pr_number": 1736,
@@ -19251,7 +21650,6 @@ module.exports = {
           "deletions_count": 77,
           "description": "Improve cyclic deps error message",
           "files_count": 4,
-          "group": "enhancement",
           "insertions_count": 98,
           "message": "enhancement(topology): Improve cyclic deps error message (#1728)",
           "pr_number": 1728,
@@ -19271,7 +21669,6 @@ module.exports = {
           "deletions_count": 82,
           "description": "Add support for `assume_role` to all AWS sinks",
           "files_count": 13,
-          "group": "enhancement",
           "insertions_count": 330,
           "message": "enhancement(aws provider): Add support for `assume_role` to all AWS sinks (#1722)",
           "pr_number": 1722,
@@ -19291,7 +21688,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Disable failing CI check",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore(operations): Disable failing CI check",
           "pr_number": null,
@@ -19311,7 +21707,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix loading of private keys in separate files for sinks",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 44,
           "message": "chore(operations): Fix loading of private keys in separate files for sinks (#1749)",
           "pr_number": 1749,
@@ -19331,7 +21726,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Use the \"minimal\" profile when installing with rustup",
           "files_count": 5,
-          "group": "chore",
           "insertions_count": 7,
           "message": "chore(operations): Use the \"minimal\" profile when installing with rustup (#1747)",
           "pr_number": 1747,
@@ -19351,7 +21745,6 @@ module.exports = {
           "deletions_count": 3018,
           "description": "Move \"magic\" component fields up to the /.meta directory",
           "files_count": 181,
-          "group": "docs",
           "insertions_count": 2766,
           "message": "docs: Move \"magic\" component fields up to the /.meta directory (#1758)",
           "pr_number": 1758,
@@ -19371,7 +21764,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix `verify-nixos` CI check",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 8,
           "message": "chore(operations): Fix `verify-nixos` CI check (#1760)",
           "pr_number": 1760,
@@ -19391,7 +21783,6 @@ module.exports = {
           "deletions_count": 21,
           "description": "Fix nested field documentation",
           "files_count": 10,
-          "group": "chore",
           "insertions_count": 193,
           "message": "chore(website): Fix nested field documentation (#1765)",
           "pr_number": 1765,
@@ -19411,7 +21802,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Initial `humio_logs` sink implementation",
           "files_count": 12,
-          "group": "feat",
           "insertions_count": 1022,
           "message": "feat(new sink): Initial `humio_logs` sink implementation (#1716)",
           "pr_number": 1716,
@@ -19431,7 +21821,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Fix encoding docs",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 7,
           "message": "docs(splunk_hec sink): Fix encoding docs (#1768)",
           "pr_number": 1768,
@@ -19451,7 +21840,6 @@ module.exports = {
           "deletions_count": 58,
           "description": "Remove encoding option",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(humio_logs sink): Remove encoding option (#1767)",
           "pr_number": 1767,
@@ -19471,7 +21859,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Option to reload config on file change",
           "files_count": 7,
-          "group": "feat",
           "insertions_count": 260,
           "message": "feat(config): Option to reload config on file change (#1330)",
           "pr_number": 1330,
@@ -19491,7 +21878,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Fix typo",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Fix typo",
           "pr_number": null,
@@ -19511,7 +21897,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Fix example `host` values for `splunk_hec` sink",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 5,
           "message": "docs: Fix example `host` values for `splunk_hec` sink",
           "pr_number": null,
@@ -19531,7 +21916,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Support conditionally rebuilding the docker images",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 16,
           "message": "chore(operations): Support conditionally rebuilding the docker images (#1744)",
           "pr_number": 1744,
@@ -19551,7 +21935,6 @@ module.exports = {
           "deletions_count": 32,
           "description": "Fix unit tests reference",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 646,
           "message": "docs: Fix unit tests reference (#1777)",
           "pr_number": 1777,
@@ -19571,7 +21954,6 @@ module.exports = {
           "deletions_count": 143,
           "description": "Improve best effort support for Syslog formats (5424, 3164, nginx style, etc)",
           "files_count": 8,
-          "group": "enhancement",
           "insertions_count": 200,
           "message": "enhancement(syslog source): Improve best effort support for Syslog formats (5424, 3164, nginx style, etc) (#1757)",
           "pr_number": 1757,
@@ -19591,7 +21973,6 @@ module.exports = {
           "deletions_count": 23,
           "description": "Improve `vector generate` syntax and formatting",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 195,
           "message": "enhancement(cli): Improve `vector generate` syntax and formatting (#1773)",
           "pr_number": 1773,
@@ -19611,7 +21992,6 @@ module.exports = {
           "deletions_count": 183,
           "description": "Test sub command improvements",
           "files_count": 11,
-          "group": "enhancement",
           "insertions_count": 329,
           "message": "enhancement(cli): Test sub command improvements (#1739)",
           "pr_number": 1739,
@@ -19631,7 +22011,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Add units to default value examples",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 11,
           "message": "chore(website): Add units to default value examples",
           "pr_number": null,
@@ -19651,7 +22030,6 @@ module.exports = {
           "deletions_count": 27,
           "description": "Simplify docker example values",
           "files_count": 6,
-          "group": "docs",
           "insertions_count": 29,
           "message": "docs: Simplify docker example values",
           "pr_number": null,
@@ -19671,7 +22049,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Clarify generate error messages with type",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 12,
           "message": "chore: Clarify generate error messages with type (#1780)",
           "pr_number": 1780,
@@ -19691,7 +22068,6 @@ module.exports = {
           "deletions_count": 223,
           "description": "Global default log schemas",
           "files_count": 49,
-          "group": "feat",
           "insertions_count": 715,
           "message": "feat(config): Global default log schemas (#1769)",
           "pr_number": 1769,
@@ -19711,7 +22087,6 @@ module.exports = {
           "deletions_count": 132,
           "description": "Add new global `log_schema` throughout the docs",
           "files_count": 24,
-          "group": "docs",
           "insertions_count": 445,
           "message": "docs: Add new global `log_schema` throughout the docs (#1795)",
           "pr_number": 1795,
@@ -19731,7 +22106,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Reduce homepage animation refresh rate",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(website): Reduce homepage animation refresh rate",
           "pr_number": null,
@@ -19751,7 +22125,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add behavior tests for `add_fields` and `remove_fields` transforms",
           "files_count": 6,
-          "group": "chore",
           "insertions_count": 144,
           "message": "chore(testing): Add behavior tests for `add_fields` and `remove_fields` transforms (#1781)",
           "pr_number": 1781,
@@ -19771,7 +22144,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Stop homepage animation after a timeout",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 24,
           "message": "chore(website): Stop homepage animation after a timeout",
           "pr_number": null,
@@ -19791,7 +22163,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Support schema settings in unit tests",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 8,
           "message": "chore(cli): Support schema settings in unit tests (#1793)",
           "pr_number": 1793,
@@ -19811,7 +22182,6 @@ module.exports = {
           "deletions_count": 6,
           "description": "Disable failing CI check",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 0,
           "message": "chore(operations): Disable failing CI check",
           "pr_number": null,
@@ -19831,7 +22201,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "Add templating as a domain",
           "files_count": 4,
-          "group": "chore",
           "insertions_count": 29,
           "message": "chore: Add templating as a domain",
           "pr_number": null,
@@ -19851,7 +22220,6 @@ module.exports = {
           "deletions_count": 31,
           "description": "Correct lints and tests",
           "files_count": 9,
-          "group": "chore",
           "insertions_count": 57,
           "message": "chore(windows platform): Correct lints and tests (#1789)",
           "pr_number": 1789,
@@ -19871,7 +22239,6 @@ module.exports = {
           "deletions_count": 333,
           "description": "Update README and add templating reference",
           "files_count": 35,
-          "group": "docs",
           "insertions_count": 601,
           "message": "docs: Update README and add templating reference (#1805)",
           "pr_number": 1805,
@@ -19891,7 +22258,6 @@ module.exports = {
           "deletions_count": 24,
           "description": "Fix generate check",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 24,
           "message": "chore: Fix generate check",
           "pr_number": null,
@@ -19911,7 +22277,6 @@ module.exports = {
           "deletions_count": 10,
           "description": "Update README language",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 8,
           "message": "docs: Update README language",
           "pr_number": null,
@@ -19931,7 +22296,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Short README bullet point",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 2,
           "message": "docs: Short README bullet point",
           "pr_number": null,
@@ -19951,7 +22315,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Fix typo in `concat` transform example",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: Fix typo in `concat` transform example",
           "pr_number": null,
@@ -19971,7 +22334,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Clarify description of `ansi_stripper` transform",
           "files_count": 4,
-          "group": "docs",
           "insertions_count": 8,
           "message": "docs: Clarify description of `ansi_stripper` transform (#1809)",
           "pr_number": 1809,
@@ -19991,7 +22353,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add more behavior tests for transforms",
           "files_count": 9,
-          "group": "chore",
           "insertions_count": 320,
           "message": "chore(testing): Add more behavior tests for transforms (#1811)",
           "pr_number": 1811,
@@ -20011,7 +22372,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add field order test at src/event/discriminant.rs",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 18,
           "message": "chore: Add field order test at src/event/discriminant.rs (#1822)",
           "pr_number": 1822,
@@ -20031,7 +22391,6 @@ module.exports = {
           "deletions_count": 2779,
           "description": "Update to docusaurus 2.0.0-alpha.41",
           "files_count": 13,
-          "group": "chore",
           "insertions_count": 1599,
           "message": "chore(website): Update to docusaurus 2.0.0-alpha.41 (#1831)",
           "pr_number": 1831,
@@ -20051,7 +22410,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Support advanced `librdkafka` options",
           "files_count": 4,
-          "group": "enhancement",
           "insertions_count": 207,
           "message": "enhancement(kafka source): Support advanced `librdkafka` options (#1830)",
           "pr_number": 1830,
@@ -20071,7 +22429,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Support advanced `librdkafka` options",
           "files_count": 4,
-          "group": "enhancement",
           "insertions_count": 185,
           "message": "enhancement(kafka sink): Support advanced `librdkafka` options (#1829)",
           "pr_number": 1829,
@@ -20091,7 +22448,6 @@ module.exports = {
           "deletions_count": 9,
           "description": "Support templating for dynamic values",
           "files_count": 5,
-          "group": "enhancement",
           "insertions_count": 147,
           "message": "enhancement(add_fields transform): Support templating for dynamic values (#1799)",
           "pr_number": 1799,
@@ -20111,7 +22467,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Initial `loki` sink",
           "files_count": 19,
-          "group": "feat",
           "insertions_count": 2106,
           "message": "feat(new sink): Initial `loki` sink (#1783)",
           "pr_number": 1783,
@@ -20131,7 +22486,6 @@ module.exports = {
           "deletions_count": 314,
           "description": "Add more `include_container_names`, `include_pod_uids`, and `include_namespaces` filters",
           "files_count": 7,
-          "group": "feat",
           "insertions_count": 1091,
           "message": "feat(kubernetes source): Add more `include_container_names`, `include_pod_uids`, and `include_namespaces` filters (#1501)",
           "pr_number": 1501,
@@ -20151,7 +22505,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Ensure zero output event tests fail",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 115,
           "message": "chore: Ensure zero output event tests fail (#1814)",
           "pr_number": 1814,
@@ -20171,7 +22524,6 @@ module.exports = {
           "deletions_count": 108,
           "description": "Update to docusaurus 2.0.0-alpha.43",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 102,
           "message": "chore(website): Update to docusaurus 2.0.0-alpha.43",
           "pr_number": null,
@@ -20191,7 +22543,6 @@ module.exports = {
           "deletions_count": 3,
           "description": "Initial `influxdb_metrics` sink implementation",
           "files_count": 16,
-          "group": "feat",
           "insertions_count": 2554,
           "message": "feat(new sink): Initial `influxdb_metrics` sink implementation (#1759)",
           "pr_number": 1759,
@@ -20211,7 +22562,6 @@ module.exports = {
           "deletions_count": 16,
           "description": "Make token optional",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 54,
           "message": "chore: Make token optional (#1837)",
           "pr_number": 1837,
@@ -20231,7 +22581,6 @@ module.exports = {
           "deletions_count": 378,
           "description": "Add support for option groups and versions ",
           "files_count": 82,
-          "group": "docs",
           "insertions_count": 1155,
           "message": "docs: Add support for option groups and versions  (#1859)",
           "pr_number": 1859,
@@ -20251,7 +22600,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Fix influxdb_metrics common options groups",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 25,
           "message": "docs: Fix influxdb_metrics common options groups",
           "pr_number": null,
@@ -20271,7 +22619,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "only drop source field if JSON parse succeeds",
           "files_count": 4,
-          "group": "fix",
           "insertions_count": 33,
           "message": "fix(json_parser transform): only drop source field if JSON parse succeeds (#1863)",
           "pr_number": 1863,
@@ -20291,7 +22638,6 @@ module.exports = {
           "deletions_count": 111,
           "description": "Update logging driver support",
           "files_count": 120,
-          "group": "docs",
           "insertions_count": 342,
           "message": "docs(docker source): Update logging driver support (#1741)",
           "pr_number": 1741,
@@ -20311,7 +22657,6 @@ module.exports = {
           "deletions_count": 87,
           "description": "Add transform context",
           "files_count": 26,
-          "group": "chore",
           "insertions_count": 120,
           "message": "chore(transforms): Add transform context (#1855)",
           "pr_number": 1855,
@@ -20331,7 +22676,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Inital Kubernetes `WatchClient`",
           "files_count": 7,
-          "group": "chore",
           "insertions_count": 490,
           "message": "chore(transforms): Inital Kubernetes `WatchClient` (#1746)",
           "pr_number": 1746,
@@ -20351,7 +22695,6 @@ module.exports = {
           "deletions_count": 19,
           "description": "Support `Array` and `Map` kinds in `Value`",
           "files_count": 3,
-          "group": "breaking change",
           "insertions_count": 123,
           "message": "enhancement(log data model)!: Support `Array` and `Map` kinds in `Value` (#1836)",
           "pr_number": 1836,
@@ -20371,7 +22714,6 @@ module.exports = {
           "deletions_count": 171,
           "description": "Add min_version to relevant components",
           "files_count": 77,
-          "group": "docs",
           "insertions_count": 341,
           "message": "docs: Add min_version to relevant components",
           "pr_number": null,
@@ -20391,7 +22733,6 @@ module.exports = {
           "deletions_count": 39,
           "description": "Run `make generate`",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 39,
           "message": "chore: Run `make generate`",
           "pr_number": null,
@@ -20411,7 +22752,6 @@ module.exports = {
           "deletions_count": 100,
           "description": "Initial `gcp_cloud_storage` sink implementation",
           "files_count": 26,
-          "group": "feat",
           "insertions_count": 2483,
           "message": "feat(new sink): Initial `gcp_cloud_storage` sink implementation (#1794)",
           "pr_number": 1794,
@@ -20431,7 +22771,6 @@ module.exports = {
           "deletions_count": 217,
           "description": "Add docker info",
           "files_count": 177,
-          "group": "docs",
           "insertions_count": 325,
           "message": "docs(aws_ec2_metadata transform): Add docker info (#1862)",
           "pr_number": 1862,
@@ -20451,7 +22790,6 @@ module.exports = {
           "deletions_count": 16,
           "description": "Advance to `prod-ready` status",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 18,
           "message": "docs(cloudwatch_logs sink): Advance to `prod-ready` status (#1875)",
           "pr_number": 1875,
@@ -20471,7 +22809,6 @@ module.exports = {
           "deletions_count": 214,
           "description": "Re-run `make generate` to fix GCS docs",
           "files_count": 61,
-          "group": "chore",
           "insertions_count": 14,
           "message": "chore(docs): Re-run `make generate` to fix GCS docs (#1877)",
           "pr_number": 1877,
@@ -20491,7 +22828,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Set `min_version` to `1.1.54378`",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 13,
           "message": "docs(clickhouse sink): Set `min_version` to `1.1.54378` (#1879)",
           "pr_number": 1879,
@@ -20511,7 +22847,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Add feature `disable-resolv-conf` to make Vector tests pass on NixOS",
           "files_count": 3,
-          "group": "chore",
           "insertions_count": 9,
           "message": "chore(testing): Add feature `disable-resolv-conf` to make Vector tests pass on NixOS (#1874)",
           "pr_number": 1874,
@@ -20531,7 +22866,6 @@ module.exports = {
           "deletions_count": 14,
           "description": "Clarify `split` transform behavior",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 18,
           "message": "docs: Clarify `split` transform behavior",
           "pr_number": null,
@@ -20551,7 +22885,6 @@ module.exports = {
           "deletions_count": 45,
           "description": "Fix example",
           "files_count": 3,
-          "group": "docs",
           "insertions_count": 59,
           "message": "docs(split transform): Fix example",
           "pr_number": null,
@@ -20571,7 +22904,6 @@ module.exports = {
           "deletions_count": 5,
           "description": "Refer to docker API",
           "files_count": 64,
-          "group": "docs",
           "insertions_count": 77,
           "message": "docs(docker source): Refer to docker API (#1885)",
           "pr_number": 1885,
@@ -20591,7 +22923,6 @@ module.exports = {
           "deletions_count": 135,
           "description": "Allow multiple unit test inputs",
           "files_count": 5,
-          "group": "enhancement",
           "insertions_count": 376,
           "message": "enhancement(config): Allow multiple unit test inputs (#1824)",
           "pr_number": 1824,
@@ -20611,7 +22942,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add `no_outputs_from` field to unit tests",
           "files_count": 4,
-          "group": "enhancement",
           "insertions_count": 182,
           "message": "enhancement(config): Add `no_outputs_from` field to unit tests (#1817)",
           "pr_number": 1817,
@@ -20631,7 +22961,6 @@ module.exports = {
           "deletions_count": 121,
           "description": "Use `BTreeMap` instead of `HashMap` for logs and metrics",
           "files_count": 23,
-          "group": "chore",
           "insertions_count": 158,
           "message": "chore(log data model): Use `BTreeMap` instead of `HashMap` for logs and metrics (#1838)",
           "pr_number": 1838,
@@ -20651,7 +22980,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add description and bio to press page",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 26,
           "message": "chore: Add description and bio to press page (#1884)",
           "pr_number": 1884,
@@ -20671,7 +22999,6 @@ module.exports = {
           "deletions_count": 13,
           "description": "Respect Lua types when converting back to events (#857)",
           "files_count": 3,
-          "group": "fix",
           "insertions_count": 78,
           "message": "fix(lua transform): Respect Lua types when converting back to events (#857) (#1886)",
           "pr_number": 1886,
@@ -20691,7 +23018,6 @@ module.exports = {
           "deletions_count": 11,
           "description": "Fixup benches",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 6,
           "message": "docs: Fixup benches (#1883)",
           "pr_number": 1883,
@@ -20711,7 +23037,6 @@ module.exports = {
           "deletions_count": 42,
           "description": "Rename to `sematext_logs`",
           "files_count": 10,
-          "group": "chore",
           "insertions_count": 42,
           "message": "chore(sematext_logs sink): Rename to `sematext_logs` (#1871)",
           "pr_number": 1871,
@@ -20731,7 +23056,6 @@ module.exports = {
           "deletions_count": 103,
           "description": "Better multi-line support",
           "files_count": 6,
-          "group": "enhancement",
           "insertions_count": 915,
           "message": "enhancement(file source): Better multi-line support (#1852)",
           "pr_number": 1852,
@@ -20751,7 +23075,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "File doc fix",
           "files_count": 1,
-          "group": "docs",
           "insertions_count": 5,
           "message": "docs: File doc fix (#1896)",
           "pr_number": 1896,
@@ -20771,7 +23094,6 @@ module.exports = {
           "deletions_count": 122,
           "description": "Add support for TLS",
           "files_count": 44,
-          "group": "enhancement",
           "insertions_count": 341,
           "message": "enhancement(kafka source): Add support for TLS (#1893)",
           "pr_number": 1893,
@@ -20791,7 +23113,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Support null values in log events",
           "files_count": 8,
-          "group": "breaking change",
           "insertions_count": 45,
           "message": "enhancement(log data model)!: Support null values in log events (#1898)",
           "pr_number": 1898,
@@ -20811,7 +23132,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Change `timestamp_key` back to `message_key`",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 2,
           "message": "chore(kubernetes source): Change `timestamp_key` back to `message_key` (#1887)",
           "pr_number": 1887,
@@ -20831,7 +23151,6 @@ module.exports = {
           "deletions_count": 201,
           "description": "Initial `rename_fields` transform implementation",
           "files_count": 13,
-          "group": "feat",
           "insertions_count": 520,
           "message": "feat(new transform): Initial `rename_fields` transform implementation (#1800)",
           "pr_number": 1800,
@@ -20851,7 +23170,6 @@ module.exports = {
           "deletions_count": 198,
           "description": "Add multiline examples",
           "files_count": 20,
-          "group": "docs",
           "insertions_count": 406,
           "message": "docs(file source): Add multiline examples (#1899)",
           "pr_number": 1899,
@@ -20871,7 +23189,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Reduce RAM usage when running `make test`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(testing): Reduce RAM usage when running `make test` (#1901)",
           "pr_number": 1901,
@@ -20891,7 +23208,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Make note that prod-ready means a stable API",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 4,
           "message": "docs: Make note that prod-ready means a stable API",
           "pr_number": null,
@@ -20911,7 +23227,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Add `timestamp_format` field",
           "files_count": 4,
-          "group": "enhancement",
           "insertions_count": 185,
           "message": "enhancement(clickhouse sink): Add `timestamp_format` field (#1634)",
           "pr_number": 1634,
@@ -20931,7 +23246,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Nest request fields",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 59,
           "message": "chore(clickhouse sink): Nest request fields",
           "pr_number": null,
@@ -20951,7 +23265,6 @@ module.exports = {
           "deletions_count": 179,
           "description": "Add `swimlanes` transform",
           "files_count": 21,
-          "group": "feat",
           "insertions_count": 1003,
           "message": "feat(new transform): Add `swimlanes` transform (#1785)",
           "pr_number": 1785,
@@ -20971,7 +23284,6 @@ module.exports = {
           "deletions_count": 90,
           "description": "Fix swimlanes documentation",
           "files_count": 5,
-          "group": "chore",
           "insertions_count": 87,
           "message": "chore: Fix swimlanes documentation",
           "pr_number": null,
@@ -20991,7 +23303,6 @@ module.exports = {
           "deletions_count": 2,
           "description": "Use checksum fingerprinting",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 2,
           "message": "fix(kubernetes source): Use checksum fingerprinting (#1912)",
           "pr_number": 1912,
@@ -21011,7 +23322,6 @@ module.exports = {
           "deletions_count": 4,
           "description": "Fix `make check-code`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore: Fix `make check-code`",
           "pr_number": null,
@@ -21031,7 +23341,6 @@ module.exports = {
           "deletions_count": 9442,
           "description": "Prepare v0.8.0 release",
           "files_count": 16,
-          "group": "chore",
           "insertions_count": 16467,
           "message": "chore: Prepare v0.8.0 release",
           "pr_number": null,
@@ -21051,7 +23360,6 @@ module.exports = {
           "deletions_count": 19,
           "description": "Relax the requirements for `no_outputs_from` unit test targets",
           "files_count": 2,
-          "group": "chore",
           "insertions_count": 8,
           "message": "chore: Relax the requirements for `no_outputs_from` unit test targets (#1921)",
           "pr_number": 1921,
@@ -21071,7 +23379,6 @@ module.exports = {
           "deletions_count": 22,
           "description": "Clean up swimlanes examples",
           "files_count": 2,
-          "group": "docs",
           "insertions_count": 32,
           "message": "docs: Clean up swimlanes examples",
           "pr_number": null,
@@ -21091,7 +23398,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Enable `rdkafka` by default",
           "files_count": 1,
-          "group": "enhancement",
           "insertions_count": 1,
           "message": "enhancement(observability): Enable `rdkafka` by default (#1918)",
           "pr_number": 1918,
@@ -21111,7 +23417,6 @@ module.exports = {
           "deletions_count": 0,
           "description": "Fix build with `--no-default-features`",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(operations): Fix build with `--no-default-features` (#1920)",
           "pr_number": 1920,
@@ -21131,7 +23436,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Allow kubernetes tests to compile",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(testing): Allow kubernetes tests to compile (#1911)",
           "pr_number": 1911,
@@ -21146,55 +23450,199 @@ module.exports = {
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.7.2...v0.8.0",
-      "date": "2020-02-20",
+      "date": "2020-02-25",
       "deletions_count": 20387,
-      "description": "The features for this release have been pouring in. Clearly the\nVector team need better hobbies.",
+      "description": "",
       "highlights": [
         {
-          "body": "<p>\nAnyone that was worked with Docker logs knows how frustrating this problem\ncan be. Docker, by default, splits log messages that exceed 16kb. While 16kb\nseems like a lot, it can easily be exceeded if you're logging rich structured\nevents. This can be a very difficult and frustrating problem to solve with\nother tools (we speak from experience). In this release Vector solves this\nautomatically with a new `auto_partial_merge` option in the `docker` source.\n</p>\n<p>\nWe love assimilation and look forward to a future where our individualistic\nhuman personalities can also be merged into a societal hive mind.\n</p>\n",
-          "id": "merge-docker-events",
-          "title": "Automatically Merge Split Docker Events!"
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-05",
+          "description": "We've dropped redundant AWS options that may break backward compatibility",
+          "id": "2020-02-05-drop-aws-options",
+          "importance": "low",
+          "path": "website/highlights/2020-02-05-drop-aws-options.md",
+          "permalink": "/highlights/2020-02-05-drop-aws-options/",
+          "tags": [
+            "type: breaking change",
+            "provider: aws",
+            "domain: sinks",
+            "sink: elasticsearch"
+          ],
+          "title": "AWS specific options have been dropped in the Elasticsearch sink"
         },
         {
-          "body": "<p>\nThe new <a href=\"/docs/reference/transforms/swimlanes/\"><code>swimlanes</code>\ntransform</a> makes it much easier to configure conditional branches of\ntransforms and sinks. For example, you can easily create\n<a href=\"/docs/reference/transforms/swimlanes/#output\">if/else pipelines</a>.\n</p>\n<p>\nRemember to occasionally let your branches mingle so that they don't completely\nlose touch.\n</p>\n",
-          "id": "improved-control-flow",
-          "title": "Improved Control Flow With Swimlanes"
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-24",
+          "description": "We're bringing our log data model closer to JSON",
+          "id": "2020-02-24-log-data-model-changes",
+          "importance": "low",
+          "path": "website/highlights/2020-02-24-log-data-model-changes.md",
+          "permalink": "/highlights/2020-02-24-log-data-model-changes/",
+          "tags": [
+            "type: breaking change",
+            "domain: buffers",
+            "event type: log"
+          ],
+          "title": "Log Data Model Improvements"
         },
         {
-          "body": "<p>\nUnit testing your configuration files has been supported by Vector for a while\nnow. Based on feedback we've received and some healthy dog-fooding we've\nexpanded their functionality and made a lot of improvements to how they work.\n</p>\n<p>\nIf you aren't yet using unit tests in your configs we strongly recommend you try\nit out. You can find out more in <a href=\"/docs/setup/guides/unit-testing/\">this guide</a>.\n</p>\n",
-          "id": "unit-test-improvements",
-          "title": "Config Unit Test Improvements"
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-05",
+          "description": "Docker splits long messages by default, and now Vector merges them back for you",
+          "id": "2020-02-05-merge-partial-docker-events",
+          "importance": "high",
+          "path": "website/highlights/2020-02-05-merge-partial-docker-events.md",
+          "permalink": "/highlights/2020-02-05-merge-partial-docker-events/",
+          "tags": [
+            "type: enhancement",
+            "domain: sources",
+            "source: docker",
+            "platform: docker"
+          ],
+          "title": "Automatically merge partial Docker events"
         },
         {
-          "body": "<p>\nNot everyone enjoys Marmite, we get it, some people have\n<span style=\"text-decoration: line-through;\">wrong</span> different tastes.\nSimilarly, not everyone is going to want to follow our default field schema\n(`host`, `message`, `timestamp`). Rather than making you work around this with\ntransforms we've added some handy global options to set these universally:\n</p>\n<pre>\n# OPTIONAL - Log schema\n[log_schema]\n  host_key = \"host\" # default\n  message_key = \"message\" # default\n  timestamp_key = \"timestamp\" # default\n</pre>\n",
-          "id": "custom-schemas",
-          "title": "Custom Field Schemas"
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-21",
+          "description": "Merge multiple lines together based on rules",
+          "id": "2020-02-21-file-source-multiline-support",
+          "importance": "medium",
+          "path": "website/highlights/2020-02-21-file-source-multiline-support.md",
+          "permalink": "/highlights/2020-02-21-file-source-multiline-support/",
+          "tags": [
+            "type: enhancement",
+            "domain: sources",
+            "source: file"
+          ],
+          "title": "Improved Multiline Support In The File Source"
         },
         {
-          "body": "<p>\nVector is now able to execute a topology spread across multiple config files,\nwhich allows you to break large pipelines down into bite size, easier managed,\nchunks. Running them is as simple as:\n</p>\n<pre>\nvector -c ./configs/first.toml -c ./configs/second.toml -c ./more/*.toml\n</pre>\n<p>\nSubscribe to our newsletter and you'll be notified when we learn how to do this\nwith human emotions.\n</p>\n",
-          "id": "multi-config-files",
-          "title": "Support for Multiple Config Files"
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-05",
+          "description": "The official Vector mascot",
+          "id": "2020-02-05-vic-the-vector-mascot",
+          "importance": "low",
+          "path": "website/highlights/2020-02-05-vic-the-vector-mascot.md",
+          "permalink": "/highlights/2020-02-05-vic-the-vector-mascot/",
+          "tags": [
+            "type: new feature",
+            "domain: website"
+          ],
+          "title": "Meet Vic, The Vector Mascot"
         },
         {
-          "body": "<p>\nWe all love a good sink. Now you can enjoy our latest offerings:\n<a href=\"/docs/reference/sinks/gcp_stackdriver_logging\"><code>gcp_stackdriver_logging</code></a>,\n<a href=\"/docs/reference/sinks/gcp_cloud_storage\"><code>gcp_cloud_storage</code></a>,\n<a href=\"/docs/reference/sinks/logdna\"><code>logdna</code></a>,\n<a href=\"/docs/reference/sinks/humio_logs\"><code>humio_logs</code></a>,\n<a href=\"/docs/reference/sinks/loki\"><code>loki</code></a> and\n<a href=\"/docs/reference/sinks/influxdb_metrics\"><code>influxdb_metrics</code></a>.\n</p>\n",
-          "id": "lots-of-new-sinks",
-          "title": "Lots of New Sinks"
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-07",
+          "description": "A better way to manage complex Vector configurations",
+          "id": "2020-02-07-multi-config-files",
+          "importance": "low",
+          "path": "website/highlights/2020-02-07-multi-config-files.md",
+          "permalink": "/highlights/2020-02-07-multi-config-files/",
+          "tags": [
+            "type: new feature",
+            "domain: config"
+          ],
+          "title": "Support For Multiple Config Files"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-11",
+          "description": "Best effort parsing support for Syslog",
+          "id": "2020-02-11-improved-syslog-parsing",
+          "importance": "low",
+          "path": "website/highlights/2020-02-11-improved-syslog-parsing.md",
+          "permalink": "/highlights/2020-02-11-improved-syslog-parsing/",
+          "tags": [
+            "type: new feature",
+            "domain: sources",
+            "source: syslog"
+          ],
+          "title": "Improved Syslog Parsing"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-14",
+          "description": "Set defaults for Vector's common log key names",
+          "id": "2020-02-14-global-log-schema",
+          "importance": "low",
+          "path": "website/highlights/2020-02-14-global-log-schema.md",
+          "permalink": "/highlights/2020-02-14-global-log-schema/",
+          "tags": [
+            "type: new feature",
+            "domain: config"
+          ],
+          "title": "Introducing Vector's Global Log Schema"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-17",
+          "description": "Use Vector's templating syntax to add new fields",
+          "id": "2020-02-17-add-fields-transform-templating",
+          "importance": "low",
+          "path": "website/highlights/2020-02-17-add-fields-transform-templating.md",
+          "permalink": "/highlights/2020-02-17-add-fields-transform-templating/",
+          "tags": [
+            "type: new feature",
+            "domain: transforms",
+            "transform: add_fields"
+          ],
+          "title": "The Add Fields Transform Supports Templating"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-20",
+          "description": "7 new sinks have been added to Vector",
+          "id": "2020-02-20-new-sinks",
+          "importance": "medium",
+          "path": "website/highlights/2020-02-20-new-sinks.md",
+          "permalink": "/highlights/2020-02-20-new-sinks/",
+          "tags": [
+            "type: new feature",
+            "domain: sinks"
+          ],
+          "title": "Lots of New Sinks!"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-24",
+          "description": "An easier way to rename fields",
+          "id": "2020-02-24-rename-fields-transform",
+          "importance": "low",
+          "path": "website/highlights/2020-02-24-rename-fields-transform.md",
+          "permalink": "/highlights/2020-02-24-rename-fields-transform/",
+          "tags": [
+            "type: new feature",
+            "domain: transforms",
+            "transform: rename_fields"
+          ],
+          "title": "New Rename Fields Transform"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-24",
+          "description": "Split log streams with ease",
+          "id": "2020-02-24-swimlanes-transform",
+          "importance": "medium",
+          "path": "website/highlights/2020-02-24-swimlanes-transform.md",
+          "permalink": "/highlights/2020-02-24-swimlanes-transform/",
+          "tags": [
+            "type: new feature",
+            "domain: transforms",
+            "transform: swimlanes"
+          ],
+          "title": "New Swimlanes Transform"
         }
       ],
       "insertions_count": 53951,
       "last_version": "0.7.2",
-      "posts": [
-
-      ],
-      "subtitle": "A wholesome platter of features",
+      "permalink": "/releases/0.8.0/",
+      "title": "Vector v0.8.0",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "upgrade_guides": [
-
-      ],
       "version": "0.8.0"
     },
     "0.8.1": {
+      "codename": "",
       "commits": [
         {
           "author": "Lucio Franco",
@@ -21203,7 +23651,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Correct typetag",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 1,
           "message": "fix(humio_logs sink): Correct typetag (#1972)",
           "pr_number": 1972,
@@ -21222,22 +23669,30 @@ module.exports = {
       "deletions_count": 1,
       "description": "",
       "highlights": [
-
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-03-03",
+          "description": "Our commitment to privacy",
+          "id": "2020-03-03-privacy-policy",
+          "importance": "low",
+          "path": "website/highlights/2020-03-03-privacy-policy.md",
+          "permalink": "/highlights/2020-03-03-privacy-policy/",
+          "tags": [
+            "type: announcement"
+          ],
+          "title": "We've Added A Privacy Policy"
+        }
       ],
       "insertions_count": 1,
       "last_version": "0.8.0",
-      "posts": [
-
-      ],
-      "subtitle": "",
+      "permalink": "/releases/0.8.1/",
+      "title": "Vector v0.8.1",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "upgrade_guides": [
-
-      ],
       "version": "0.8.1"
     },
     "0.8.2": {
+      "codename": "",
       "commits": [
         {
           "author": "Ashley Jeffs",
@@ -21246,7 +23701,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Enable file sink in generate subcmd",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 5,
           "message": "fix(cli): Enable file sink in generate subcmd (#1989)",
           "pr_number": 1989,
@@ -21266,7 +23720,6 @@ module.exports = {
           "deletions_count": 8,
           "description": "Explicitly call GC in `lua` transform",
           "files_count": 1,
-          "group": "fix",
           "insertions_count": 25,
           "message": "fix(lua transform): Explicitly call GC in `lua` transform (#1990)",
           "pr_number": 1990,
@@ -21286,7 +23739,6 @@ module.exports = {
           "deletions_count": 7,
           "description": "Fix broken links",
           "files_count": 5,
-          "group": "docs",
           "insertions_count": 9,
           "message": "docs: Fix broken links",
           "pr_number": null,
@@ -21306,7 +23758,6 @@ module.exports = {
           "deletions_count": 1,
           "description": "Use new Homebrew installer in CI",
           "files_count": 1,
-          "group": "chore",
           "insertions_count": 1,
           "message": "chore(testing): Use new Homebrew installer in CI",
           "pr_number": null,
@@ -21329,29 +23780,39 @@ module.exports = {
       ],
       "insertions_count": 31,
       "last_version": "0.8.1",
-      "posts": [
-
-      ],
-      "subtitle": "",
+      "permalink": "/releases/0.8.2/",
+      "title": "Vector v0.8.2",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "upgrade_guides": [
-
-      ],
       "version": "0.8.2"
     }
   },
   "sinks": {
     "aws_cloudwatch_logs": {
       "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"aws_cloudwatch_logs\" # required\n  inputs = [\"in\"] # required\n  group_name = \"group-name\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"{{ host }}\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).",
+      "description": "Amazon CloudWatch is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in form of logs and metrics from a single platform.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to AWS Cloudwatch.",
+        "Dynamically partition logs across CloudWatch groups and streams.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "aws_cloudwatch_logs_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/aws_cloudwatch.svg",
       "name": "aws_cloudwatch_logs",
+      "noun": "AWS Cloudwatch Logs",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21360,22 +23821,39 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
+      "short_description": "Batches log events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint.",
       "status": "prod-ready",
+      "title": "AWS Cloudwatch Logs",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint"
     },
     "aws_cloudwatch_metrics": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"aws_cloudwatch_metrics\" # required\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\""
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Streams metric events to [Amazon Web Service's CloudWatch Metrics service][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).",
+      "description": "Amazon CloudWatch is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in form of logs and metrics from a single platform.",
       "event_types": [
         "metric"
+      ],
+      "features": [
+        "Send metrics to AWS Cloudwatch.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Automatically aggregate metrics at the edge for improved performance."
       ],
       "function_category": "transmit",
       "id": "aws_cloudwatch_metrics_sink",
+      "input_types": [
+        "metric"
+      ],
+      "logo_path": "/img/logos/aws_cloudwatch.svg",
       "name": "aws_cloudwatch_metrics",
+      "noun": "AWS Cloudwatch Metrics",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21384,22 +23862,39 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
+      "short_description": "Streams metric events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint.",
       "status": "beta",
+      "title": "AWS Cloudwatch Metrics",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint"
     },
     "aws_kinesis_firehose": {
-      "beta": true,
+      "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"aws_kinesis_firehose\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"my-stream\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [Amazon Web Service's Kinesis Data Firehose][urls.aws_kinesis_data_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html).",
+      "description": "Amazon Kinesis Data Firehose is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to AWS Kinesis Firehose.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "aws_kinesis_firehose_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/aws_kinesis_firehose.svg",
       "name": "aws_kinesis_firehose",
+      "noun": "AWS Kinesis Firehose",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21408,22 +23903,39 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
-      "status": "beta",
+      "short_description": "Batches log events to Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint.",
+      "status": "prod-ready",
+      "title": "AWS Kinesis Firehose",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint"
     },
     "aws_kinesis_streams": {
-      "beta": true,
+      "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"aws_kinesis_streams\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"my-stream\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).",
+      "description": "Amazon Kinesis Data Streams is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to AWS Kinesis Data Streams.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "aws_kinesis_streams_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/aws_kinesis_streams.svg",
       "name": "aws_kinesis_streams",
+      "noun": "AWS Kinesis Data Streams",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21432,22 +23944,41 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
-      "status": "beta",
+      "short_description": "Batches log events to Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint.",
+      "status": "prod-ready",
+      "title": "AWS Kinesis Data Streams",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint"
     },
     "aws_s3": {
-      "beta": true,
+      "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"aws_s3\" # required\n  inputs = [\"in\"] # required\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [Amazon Web Service's S3 service][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).",
+      "description": "Amazon Simple Storage Service (Amazon S3) is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to AWS S3.",
+        "Dynamically partition logs across different key prefixes.",
+        "Compress and batch data to reduce storage cost and imrpove throughput.",
+        "Optionally adjust ACL and encryption settings.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "aws_s3_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/aws_s3.svg",
       "name": "aws_s3",
+      "noun": "AWS S3",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21456,23 +23987,39 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
-      "status": "beta",
+      "short_description": "Batches log events to Amazon Web Service's S3 service via the `PutObject` API endpoint.",
+      "status": "prod-ready",
+      "title": "AWS S3",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Amazon Web Service's S3 service via the `PutObject` API endpoint"
     },
     "blackhole": {
       "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"blackhole\" # required\n  inputs = [\"in\"] # required\n  print_amount = 1000 # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes.",
+      "description": null,
       "event_types": [
         "log",
         "metric"
+      ],
+      "features": [
+        "Test log throughput.",
+        "Print log totals on an interval."
       ],
       "function_category": "test",
       "id": "blackhole_sink",
+      "input_types": [
+        "log",
+        "metric"
+      ],
+      "logo_path": null,
       "name": "blackhole",
+      "noun": "blackhole",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21481,47 +24028,81 @@ module.exports = {
       "service_providers": [
 
       ],
+      "short_description": "Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes.",
       "status": "prod-ready",
+      "title": "Blackhole",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "a blackhole that simply discards data, designed for testing and benchmarking purposes"
     },
     "clickhouse": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"clickhouse\" # required\n  inputs = [\"in\"] # required\n  host = \"http://localhost:8123\" # required\n  table = \"mytable\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Batches log events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to ClickHouse.",
+        "Compress and batch data to maximize throughput.",
+        "Encode timestamps to ClickHouse supported formats.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "clickhouse_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/clickhouse.svg",
       "name": "clickhouse",
+      "noun": "Clickhouse",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
       "service_providers": [
-
+        "Yandex"
       ],
+      "short_description": "Batches log events to Clickhouse via the `HTTP` Interface.",
       "status": "beta",
+      "title": "Clickhouse",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Clickhouse via the `HTTP` Interface"
     },
     "console": {
       "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"console\" # required\n  inputs = [\"in\"] # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Streams log and metric events to [standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`.",
+      "description": null,
       "event_types": [
         "log",
         "metric"
       ],
+      "features": [
+        "Print logs to STDOUT or STDERR.",
+        "Encode logs to JSON or text."
+      ],
       "function_category": "test",
       "id": "console_sink",
+      "input_types": [
+        "log",
+        "metric"
+      ],
+      "logo_path": null,
       "name": "console",
+      "noun": "the console",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21530,22 +24111,40 @@ module.exports = {
       "service_providers": [
 
       ],
+      "short_description": "Streams log and metric events to standard output streams, such as STDOUT and STDERR.",
       "status": "prod-ready",
+      "title": "Console",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "standard output streams, such as STDOUT and STDERR"
     },
     "datadog_logs": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"datadog_logs\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${DATADOG_API_KEY_ENV_VAR}\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Streams log events to [Datadog's][urls.datadog] logs via the [TCP endpoint][urls.datadog_logs_endpoints].",
+      "description": "Datadog is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to DataDog.",
+        "Automatically map common fields to Datadog's reserved fields.",
+        "Compress and batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "datadog_logs_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/datadog.svg",
       "name": "datadog_logs",
+      "noun": "Datadog Logs",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21554,22 +24153,39 @@ module.exports = {
       "service_providers": [
         "Datadog"
       ],
+      "short_description": "Streams log events to Datadog's logs via the TCP endpoint.",
       "status": "beta",
+      "title": "Datadog Logs",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Datadog's logs via the TCP endpoint"
     },
     "datadog_metrics": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"datadog_metrics\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${DATADOG_API_KEY}\" # required\n  namespace = \"service\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Batches metric events to [Datadog's][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).",
+      "description": "Datadog is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform.",
       "event_types": [
         "metric"
       ],
+      "features": [
+        "Send metrics to Datadog.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Automatically aggregate metrics at the edge for improved performance."
+      ],
       "function_category": "transmit",
       "id": "datadog_metrics_sink",
+      "input_types": [
+        "metric"
+      ],
+      "logo_path": "/img/logos/datadog.svg",
       "name": "datadog_metrics",
+      "noun": "Datadog Metrics",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21578,22 +24194,40 @@ module.exports = {
       "service_providers": [
         "Datadog"
       ],
+      "short_description": "Batches metric events to Datadog's metrics service using HTTP API.",
       "status": "beta",
+      "title": "Datadog Metrics",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Datadog's metrics service using HTTP API"
     },
     "elasticsearch": {
-      "beta": true,
+      "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"elasticsearch\" # required\n  inputs = [\"in\"] # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Batches log events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).",
+      "description": "Elasticsearch is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch.",
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to Elasticsearch (AWS, Elastic Cloud, self-hosted, etc).",
+        "Batch data to maximize throughput.",
+        "Dynamically partition logs across indexes.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "elasticsearch_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/elasticsearch.svg",
       "name": "elasticsearch",
+      "noun": "Elasticsearch",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21603,22 +24237,37 @@ module.exports = {
         "AWS",
         "Elastic"
       ],
-      "status": "beta",
+      "short_description": "Batches log events to Elasticsearch via the `_bulk` API endpoint.",
+      "status": "prod-ready",
+      "title": "Elasticsearch",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Elasticsearch via the `_bulk` API endpoint"
     },
     "file": {
       "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"file\" # required\n  inputs = [\"in\"] # required\n  path = \"vector-%Y-%m-%d.log\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Streams log events to a file.",
+      "description": null,
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Write logs to files.",
+        "Dynamically partition logs across multiple files."
       ],
       "function_category": "transmit",
       "id": "file_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/file.svg",
       "name": "file",
+      "noun": "a file",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21627,118 +24276,211 @@ module.exports = {
       "service_providers": [
 
       ],
+      "short_description": "Streams log events to a file.",
       "status": "prod-ready",
+      "title": "File",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "a file"
     },
     "gcp_cloud_storage": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"gcp_cloud_storage\" # required\n  inputs = [\"in\"] # required\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  credentials_path = \"/path/to/credentials.json\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [Google Cloud Platform's Cloud Storage service](https://cloud.google.com/storage) via the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).",
+      "description": "Google Cloud Storage is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. This makes it a prime candidate for log data.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to GCP Cloud Storage.",
+        "Leverage any of GCP's IAM strategies.",
+        "Confifgure object sizes to reduce request cost.",
+        "Dynamically partition logs across different key prefixes.",
+        "Optionally compress data to reduce storage cost.",
+        "Control object-level ACL.",
+        "Choose different storage classes for cost control.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "gcp_cloud_storage_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/gcp_cloud_storage.svg",
       "name": "gcp_cloud_storage",
+      "noun": "GCP Cloud Storage (GCS)",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
       "service_providers": [
-        "Google"
+        "GCP"
       ],
+      "short_description": "Batches log events to Google Cloud Platform's Cloud Storage service via the XML Interface.",
       "status": "beta",
+      "title": "GCP Cloud Storage (GCS)",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Google Cloud Platform's Cloud Storage service via the XML Interface"
     },
     "gcp_pubsub": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"gcp_pubsub\" # required\n  inputs = [\"in\"] # required\n  project = \"vector-123456\" # required\n  topic = \"this-is-a-topic\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Batches log events to [Google Cloud Platform's Pubsub service][urls.gcp_pubsub] via the [REST Interface][urls.gcp_pubsub_rest].",
+      "description": "GCP Pub/Sub is a fully-managed real-time messaging service that allows you to send and receive messages between independent applications on the Google Cloud Platform.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to GCP PubSub.",
+        "Leverage any of GCP's IAM strategies.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "gcp_pubsub_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/gcp_pubsub.svg",
       "name": "gcp_pubsub",
+      "noun": "GCP PubSub",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
       "service_providers": [
-        "Google"
+        "GCP"
       ],
+      "short_description": "Batches log events to Google Cloud Platform's Pubsub service via the REST Interface.",
       "status": "beta",
+      "title": "GCP PubSub",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Google Cloud Platform's Pubsub service via the REST Interface"
     },
     "gcp_stackdriver_logs": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"gcp_stackdriver_logs\" # required\n  inputs = [\"in\"] # required\n  credentials_path = \"/path/to/credentials.json\" # required\n  log_id = \"vector-logs\" # required\n  project_id = \"vector-123456\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Batches log events to [Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest].",
+      "description": "Stackdriver is Google Cloud's embedded observability suite designed to monitor, troubleshoot, and improve cloud infrastructure, software, and application performance. Stackdriver enables you to efficiently build and run workloads, keeping applications performant and available.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to GCP Stackdriver.",
+        "Leverage any of GCP's IAM strategies.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "gcp_stackdriver_logs_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/gcp_stackdriver.svg",
       "name": "gcp_stackdriver_logs",
+      "noun": "GCP Stackdriver Logs",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
       "service_providers": [
-        "Google"
+        "GCP"
       ],
+      "short_description": "Batches log events to Google Cloud Platform's Stackdriver Logging service via the REST Interface.",
       "status": "beta",
+      "title": "GCP Stackdriver Logs",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Google Cloud Platform's Stackdriver Logging service via the REST Interface"
     },
     "honeycomb": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"honeycomb\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${HONEYCOMB_API_KEY}\" # required\n  dataset = \"my-honeycomb-dataset\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [Honeycomb][urls.honeycomb] via the [batch events API][urls.honeycomb_batch].",
+      "description": "Honeycomb provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send structured logs to the Honeycomb observability service.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "honeycomb_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/honeycomb.svg",
       "name": "honeycomb",
+      "noun": "Honeycomb",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
       "service_providers": [
-
+        "Honeycomb"
       ],
+      "short_description": "Batches log events to Honeycomb via the batch events API.",
       "status": "beta",
+      "title": "Honeycomb",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Honeycomb via the batch events API"
     },
     "http": {
       "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"http\" # required\n  inputs = [\"in\"] # required\n  uri = \"https://10.22.212.22:9000/endpoint\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to a generic HTTP endpoint.",
+      "description": null,
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs over the HTTP protocol.",
+        "Batch and compress data to maximize throughput.",
+        "Optionally set custom headers.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "http_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/http.svg",
       "name": "http",
+      "noun": "an HTTP endpoint",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21747,46 +24489,80 @@ module.exports = {
       "service_providers": [
 
       ],
+      "short_description": "Batches log events to a generic HTTP endpoint.",
       "status": "prod-ready",
+      "title": "HTTP",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "a generic HTTP endpoint"
     },
     "humio_logs": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"humio_logs\" # required\n  inputs = [\"in\"] # required\n  token = \"${HUMIO_TOKEN}\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [Humio][urls.humio] via the [HEC API][urls.humio_hec].",
+      "description": "Humio is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data.",
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to the Humio logging service.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "humio_logs_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/humio.svg",
       "name": "humio_logs",
+      "noun": "Humio",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
       "service_providers": [
-
+        "Humio"
       ],
+      "short_description": "Batches log events to Humio via the HEC API.",
       "status": "beta",
+      "title": "Humio Logs",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Humio via the HEC API"
     },
     "influxdb_metrics": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"influxdb_metrics\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"http://localhost:8086/\" # required\n  namespace = \"service\" # required\n  bucket = \"vector-bucket\" # required\n  database = \"vector-database\" # required\n\n  # Auth\n  org = \"my-org\" # required\n  token = \"${INFLUXDB_TOKEN}\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Batches metric events to [InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API.",
+      "description": "InfluxDB is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics.",
       "event_types": [
         "metric"
       ],
+      "features": [
+        "Send metrics to InfluxDB v1 or v2.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Automatically aggregate metrics at the edge for improved performance."
+      ],
       "function_category": "transmit",
       "id": "influxdb_metrics_sink",
+      "input_types": [
+        "metric"
+      ],
+      "logo_path": "/img/logos/influxdb.svg",
       "name": "influxdb_metrics",
+      "noun": "InfluxDB",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21795,22 +24571,40 @@ module.exports = {
       "service_providers": [
         "InfluxData"
       ],
+      "short_description": "Batches metric events to InfluxDB using v1 or v2 HTTP API.",
       "status": "beta",
+      "title": "InfluxDB Metrics",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "InfluxDB using v1 or v2 HTTP API"
     },
     "kafka": {
       "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"kafka\" # required\n  inputs = [\"in\"] # required\n  bootstrap_servers = \"10.14.22.123:9092,10.14.23.332:9092\" # required\n  key_field = \"user_id\" # required\n  topic = \"topic-1234\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Streams log events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].",
+      "description": "Apache Kafka is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.",
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to Kafka.",
+        "Leverage any of AWS' IAM strategies.",
+        "Optionally compress data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "kafka_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/kafka.svg",
       "name": "kafka",
+      "noun": "Kafka",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21820,70 +24614,122 @@ module.exports = {
         "AWS",
         "Confluent"
       ],
+      "short_description": "Streams log events to Apache Kafka via the Kafka protocol.",
       "status": "prod-ready",
+      "title": "Kafka",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Apache Kafka via the Kafka protocol"
     },
     "logdna": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"logdna\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${LOGDNA_API_KEY}\" # required\n  hostname = \"${HOSTNAME}\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Batches log events to [LogDna][urls.logdna]'s HTTP Ingestion API.",
+      "description": "LogDNA is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to the LogDNA logging service.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "logdna_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/logdna.svg",
       "name": "logdna",
+      "noun": "LogDNA",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
       "service_providers": [
-
+        "LogDNA"
       ],
+      "short_description": "Batches log events to LogDna's HTTP Ingestion API.",
       "status": "beta",
+      "title": "LogDNA",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "LogDna's HTTP Ingestion API"
     },
     "loki": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"loki\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"http://localhost:3100\" # required\n\n  # Labels\n  labels.key = \"value\" # example\n  labels.key = \"{{ event_field }}\" # example"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Batches log events to [Loki][urls.loki].",
+      "description": "Loki is a horizontally-scalable, highly-available, multi-tenant log aggregation system inspired by Prometheus. It is designed to be very cost effective and easy to operate. It does not index the contents of the logs, but rather a set of labels for each log stream.",
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send structured logs to the Loki logging service.",
+        "Batch data to maximize throughput.",
+        "Set custom labels to be added to all log data.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "loki_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/loki.svg",
       "name": "loki",
+      "noun": "Loki",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
       "service_providers": [
-
+        "Grafana"
       ],
+      "short_description": "Batches log events to Loki.",
       "status": "beta",
+      "title": "Loki",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Loki"
     },
     "new_relic_logs": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"new_relic_logs\" # required\n  inputs = [\"in\"] # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [New Relic's log service][urls.new_relic] via their [log API][urls.new_relic_log_api].",
+      "description": "New Relic is a San Francisco, California-based technology company which develops cloud-based software to help website and application owners track the performances of their services.",
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to the New Relic logging service.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "new_relic_logs_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/new_relic.svg",
       "name": "new_relic_logs",
+      "noun": "New Relic",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21892,46 +24738,78 @@ module.exports = {
       "service_providers": [
         "New Relic"
       ],
+      "short_description": "Batches log events to New Relic's log service via their log API.",
       "status": "beta",
+      "title": "New Relic Logs",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "New Relic's log service via their log API"
     },
     "papertrail": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"papertrail\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"logs.papertrailapp.com:12345\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Streams log events to [Papertrail](https://www.papertrail.com/) via [Syslog](https://help.papertrailapp.com/kb/how-it-works/http-api/#submitting-log-messages).",
+      "description": "Papertrail is a web-based log aggregation application used by developers and IT team to search and view logs in real time.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to the Papertrail logging service.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "papertrail_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/papertrail.svg",
       "name": "papertrail",
+      "noun": "Papertrail",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
       "service_providers": [
-
+        "Papertrail"
       ],
+      "short_description": "Streams log events to Papertrail via Syslog.",
       "status": "beta",
+      "title": "Papertrail",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Papertrail via Syslog"
     },
     "prometheus": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"prometheus\" # required\n  inputs = [\"in\"] # required\n  address = \"0.0.0.0:9598\" # required\n  namespace = \"service\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Exposes metric events to [Prometheus][urls.prometheus] metrics service.",
+      "description": "Prometheus is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points.",
       "event_types": [
         "metric"
       ],
+      "features": [
+        "Expose an endpoint that Prometheus can scrape for metrics data.",
+        "Automatically aggregate metrics at the edge for improved performance."
+      ],
       "function_category": "transmit",
       "id": "prometheus_sink",
+      "input_types": [
+        "metric"
+      ],
+      "logo_path": "/img/logos/prometheus.svg",
       "name": "prometheus",
+      "noun": "Prometheus",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21940,22 +24818,38 @@ module.exports = {
       "service_providers": [
 
       ],
+      "short_description": "Exposes metric events to Prometheus metrics service.",
       "status": "beta",
+      "title": "Prometheus",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Prometheus metrics service"
     },
     "pulsar": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"pulsar\" # required\n  inputs = [\"in\"] # required\n  address = \"127.0.0.1:6650\" # required\n  topic = \"topic-1234\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Streams log events to [Apache Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].",
+      "description": "Pulsar is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to Apache Pulsar.",
+        "Stream data in a real-time fashion.",
+        "Automatically retry failed requests, with backoff."
       ],
       "function_category": "transmit",
       "id": "pulsar_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/pulsar.svg",
       "name": "pulsar",
+      "noun": "Apache Pulsar",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -21964,46 +24858,78 @@ module.exports = {
       "service_providers": [
 
       ],
+      "short_description": "Streams log events to Apache Pulsar via the Pulsar protocol.",
       "status": "beta",
+      "title": "Apache Pulsar",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Apache Pulsar via the Pulsar protocol"
     },
     "sematext_logs": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"sematext_logs\" # required\n  inputs = [\"in\"] # required\n  token = \"${SEMATEXT_TOKEN}\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Batches log events to [Sematext][urls.sematext] via the [Elasticsearch API][urls.sematext_es].",
+      "description": "Sematext is a hosted monitoring platform based on Elasticsearch. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to the Sematext monitoring service.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "sematext_logs_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/sematext.svg",
       "name": "sematext_logs",
+      "noun": "Sematext",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
       "service_providers": [
-
+        "Sematext"
       ],
+      "short_description": "Batches log events to Sematext via the Elasticsearch API.",
       "status": "beta",
+      "title": "Sematext Logs",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Sematext via the Elasticsearch API"
     },
     "socket": {
       "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"socket\" # required\n  inputs = [\"in\"] # required\n  address = \"92.12.333.224:5000\" # required, required when mode = \"tcp\" or mode = \"udp\"\n  mode = \"tcp\" # required\n  path = \"/path/to/socket\" # required, required when mode = \"unix\"\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Streams log events to a socket, such as a TCP, UDP, or Unix domain socket.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+        "Stream logs over a TCP, UDP, or Unix socket.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "socket_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/socket.svg",
       "name": "socket",
+      "noun": "a TCP, UDP, or UDS socket",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -22012,22 +24938,40 @@ module.exports = {
       "service_providers": [
 
       ],
+      "short_description": "Streams log events to a socket, such as a TCP, UDP, or UDS socket.",
       "status": "prod-ready",
+      "title": "Socket",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "a socket, such as a TCP, UDP, or UDS socket"
     },
     "splunk_hec": {
       "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"splunk_hec\" # required\n  inputs = [\"in\"] # required\n  host = \"http://my-splunk-host.com\" # required\n  token = \"${SPLUNK_HEC_TOKEN}\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to a [Splunk's HTTP Event Collector][urls.splunk_hec].",
+      "description": "The Splunk HTTP Event Collector (HEC) is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.",
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to a Splunk HTTP event collector.",
+        "Customize which fields should be added to the Splunk index.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "splunk_hec_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/splunk_hec.svg",
       "name": "splunk_hec",
+      "noun": "a Splunk HEC",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -22036,22 +24980,37 @@ module.exports = {
       "service_providers": [
         "Splunk"
       ],
+      "short_description": "Batches log events to a Splunk's HTTP Event Collector.",
       "status": "prod-ready",
+      "title": "Splunk HEC",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "a Splunk's HTTP Event Collector"
     },
     "statsd": {
-      "beta": true,
+      "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"statsd\" # required\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Streams metric events to [StatsD][urls.statsd] metrics service.",
+      "description": "StatsD is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by Etsy in Node.",
       "event_types": [
         "metric"
       ],
+      "features": [
+        "Stream metrics over a StatsD UDP protocol.",
+        "Automatically aggregate metrics at the edge for improved performance."
+      ],
       "function_category": "transmit",
       "id": "statsd_sink",
+      "input_types": [
+        "metric"
+      ],
+      "logo_path": "/img/logos/statsd.svg",
       "name": "statsd",
+      "noun": "Statsd",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -22060,22 +25019,38 @@ module.exports = {
       "service_providers": [
 
       ],
-      "status": "beta",
+      "short_description": "Streams metric events to StatsD metrics service.",
+      "status": "prod-ready",
+      "title": "Statsd",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "StatsD metrics service"
     },
     "vector": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  type = \"vector\" # required\n  inputs = [\"in\"] # required\n  address = \"92.12.333.224:5000\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Streams log events to another downstream [`vector` source][docs.sources.vector].",
+      "description": null,
       "event_types": [
-        "log"
+        "log",
+        "metric"
+      ],
+      "features": [
+        "Send data to another downstream Vector instance."
       ],
       "function_category": "transmit",
       "id": "vector_sink",
+      "input_types": [
+        "log",
+        "metric"
+      ],
+      "logo_path": "/img/logos/vector.svg",
       "name": "vector",
+      "noun": "another Vector instance",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -22084,33 +25059,53 @@ module.exports = {
       "service_providers": [
 
       ],
+      "short_description": "Streams log and metric events to another downstream `vector` source.",
       "status": "beta",
+      "title": "Vector",
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "another downstream `vector` source"
     }
   },
   "sources": {
     "docker": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"docker\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the [Docker engine daemon][urls.docker_daemon] and outputs log events.",
+      "description": "Docker is an open platform for developing, shipping, and running\napplications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.",
       "event_types": [
         "log"
       ],
+      "features": [
+        "Collect Docker container logs.",
+        "Filter which containers you collect them from.",
+        "Automatically merge logs that Docker splits.",
+        "Enrich your logs with useful Docker context."
+      ],
       "function_category": "collect",
       "id": "docker_source",
+      "logo_path": "/img/logos/docker.svg",
       "name": "docker",
+      "noun": "Docker",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Ingests data through the Docker engine daemon and outputs log events.",
       "status": "beta",
+      "through_description": "the Docker engine daemon",
+      "title": "Docker",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22118,23 +25113,41 @@ module.exports = {
     },
     "file": {
       "beta": false,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"file\" # required\n  include = [\"/var/log/nginx/*.log\"] # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through one or more local files and outputs log events.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+        "Tail one or more files.",
+        "Automatically discover new files with glob patterns.",
+        "Merge multi-line logs into one event.",
+        "Checkpoint your position to ensure data is not lost between restarts.",
+        "Enrich your logs with useful file and host-level context."
+      ],
       "function_category": "collect",
       "id": "file_source",
+      "logo_path": "/img/logos/file.svg",
       "name": "file",
+      "noun": "a file",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Ingests data through one or more local files and outputs log events.",
       "status": "prod-ready",
+      "through_description": "one or more local files",
+      "title": "File",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22142,23 +25155,39 @@ module.exports = {
     },
     "http": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"http\" # required\n  address = \"0.0.0.0:80\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the HTTP protocol and outputs log events.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+        "Accept log data over HTTP.",
+        "Decode JSON, NDJSON, and text.",
+        "Enrich your logs with select HTTP headers."
+      ],
       "function_category": "receive",
       "id": "http_source",
+      "logo_path": "/img/logos/http.svg",
       "name": "http",
+      "noun": "HTTP",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Ingests data through the HTTP protocol and outputs log events.",
       "status": "beta",
+      "through_description": "the HTTP protocol",
+      "title": "HTTP",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22166,21 +25195,38 @@ module.exports = {
     },
     "journald": {
       "beta": true,
-      "delivery_guarantee": "best_effort",
-      "description": "Ingests data through log records from journald and outputs log events.",
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"journald\" # required"
+      },
+      "delivery_guarantee": "at_least_once",
+      "description": "Journald is a utility for accessing log data across a variety of system services. It was introduce with Systemd to help system administrator collect, access, and route log data.",
       "event_types": [
         "log"
       ],
+      "features": [
+        "Collect Journald/Systemd logs.",
+        "Filter which Systemd units you collect them from.",
+        "Checkpoint your position to ensure data is not lost between restarts.",
+        "Enrich your logs with useful Systemd context."
+      ],
       "function_category": "collect",
       "id": "journald_source",
+      "logo_path": "/img/logos/journald.svg",
       "name": "journald",
+      "noun": "Journald",
       "operating_systems": [
         "Linux"
+      ],
+      "output_types": [
+        "log"
       ],
       "service_providers": [
 
       ],
+      "short_description": "Ingests data through Systemd's Journald utility and outputs log events.",
       "status": "beta",
+      "through_description": "Systemd's Journald utility",
+      "title": "Journald",
       "type": "source",
       "unsupported_operating_systems": [
         "MacOS",
@@ -22189,23 +25235,40 @@ module.exports = {
     },
     "kafka": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"kafka\" # required\n  bootstrap_servers = \"10.14.22.123:9092,10.14.23.332:9092\" # required\n  group_id = \"consumer-group-name\" # required\n  topics = [\"^(prefix1|prefix2)-.+\", \"topic-1\", \"topic-2\"] # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Ingests data through Kafka 0.9 or later and outputs log events.",
+      "description": "Apache Kafka is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.",
       "event_types": [
         "log"
       ],
+      "features": [
+        "Consume one or more Kafka topics.",
+        "Checkpoint your position to ensure data is not lost between restarts.",
+        "Enrich your logs with useful Kafka context."
+      ],
       "function_category": "collect",
       "id": "kafka_source",
+      "logo_path": "/img/logos/kafka.svg",
       "name": "kafka",
+      "noun": "Kafka",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
-      "service_providers": [
-
+      "output_types": [
+        "log"
       ],
+      "service_providers": [
+        "AWS",
+        "Confluent"
+      ],
+      "short_description": "Ingests data through Kafka and outputs log events.",
       "status": "beta",
+      "through_description": "Kafka",
+      "title": "Kafka",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22213,23 +25276,38 @@ module.exports = {
     },
     "logplex": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"logplex\" # required\n  address = \"0.0.0.0:80\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Ingests data through the [Heroku Logplex HTTP Drain protocol][urls.logplex_protocol] and outputs log events.",
+      "description": "Heroku’s Logplex router is responsible for collating and distributing the log entries generated by Heroku apps and other components of the Heroku platform. It makes these entries available through the Logplex public API and the Heroku command-line tool.",
       "event_types": [
         "log"
       ],
+      "features": [
+        "Accept Heroku Logplex data over HTTP.",
+        "Automatically parse incoming data into structured events."
+      ],
       "function_category": "receive",
       "id": "logplex_source",
+      "logo_path": "/img/logos/logplex.svg",
       "name": "logplex",
+      "noun": "Heroku Logplex",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
-      "service_providers": [
-
+      "output_types": [
+        "log"
       ],
+      "service_providers": [
+        "Heroku"
+      ],
+      "short_description": "Ingests data through the Heroku Logplex HTTP Drain protocol and outputs log events.",
       "status": "beta",
+      "through_description": "the Heroku Logplex HTTP Drain protocol",
+      "title": "Heroku Logplex",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22237,23 +25315,39 @@ module.exports = {
     },
     "prometheus": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"prometheus\" # required\n  hosts = [\"http://localhost:9090\"] # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the Prometheus text exposition format and outputs metric events.",
+      "description": "Prometheus is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points.",
       "event_types": [
         "metric"
       ],
+      "features": [
+        "Scrape one or more Prometheus endpoints.",
+        "Ingest all Prometheus metric types.",
+        "Automatically parse metrics into a lossless interoperable data model."
+      ],
       "function_category": "receive",
       "id": "prometheus_source",
+      "logo_path": "/img/logos/prometheus.svg",
       "name": "prometheus",
+      "noun": "Prometheus",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
+      "output_types": [
+        "metric"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Ingests data through the Prometheus text exposition format and outputs metric events.",
       "status": "beta",
+      "through_description": "the Prometheus text exposition format",
+      "title": "Prometheus",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22261,23 +25355,38 @@ module.exports = {
     },
     "socket": {
       "beta": false,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"socket\" # required\n  address = \"0.0.0.0:9000\" # required, required when mode = \"tcp\" or mode = \"udp\"\n  mode = \"tcp\" # required\n  path = \"/path/to/socket\" # required, required when mode = \"unix\""
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through a socket, such as a TCP, UDP, or Unix socket and outputs log events.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+        "Accept log data over a TCP, UDP, or UDS socket.",
+        "Automatically enrich logs with host-level context."
+      ],
       "function_category": "receive",
       "id": "socket_source",
+      "logo_path": "/img/logos/socket.svg",
       "name": "socket",
+      "noun": "a TCP, UDP, or UDS socket",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs log events.",
       "status": "prod-ready",
+      "through_description": "a socket, such as a TCP, UDP, or UDS socket",
+      "title": "Socket",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22285,47 +25394,78 @@ module.exports = {
     },
     "splunk_hec": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"splunk_hec\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Ingests data through the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol] and outputs log events.",
+      "description": "The Splunk HTTP Event Collector (HEC) is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.",
       "event_types": [
         "log"
       ],
+      "features": [
+        "Accept log data just like the Splunk HTTP event collector.",
+        "Automatically parse incoming data into structured events.",
+        "Optionally require authentication on all requests."
+      ],
       "function_category": "receive",
       "id": "splunk_hec_source",
+      "logo_path": "/img/logos/splunk_hec.svg",
       "name": "splunk_hec",
+      "noun": "Splunk HEC",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
-      "service_providers": [
-
+      "output_types": [
+        "log"
       ],
+      "service_providers": [
+        "Splunk"
+      ],
+      "short_description": "Ingests data through the Splunk HTTP Event Collector protocol and outputs log events.",
       "status": "beta",
+      "through_description": "the Splunk HTTP Event Collector protocol",
+      "title": "Splunk HEC",
       "type": "source",
       "unsupported_operating_systems": [
 
       ]
     },
     "statsd": {
-      "beta": true,
+      "beta": false,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"statsd\" # required\n  address = \"127.0.0.1:8126\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the StatsD UDP protocol and outputs metric events.",
+      "description": "StatsD is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by Etsy in Node.",
       "event_types": [
         "metric"
       ],
+      "features": [
+        "Accept metrics data over the Statsd UDP protocol.",
+        "Automatically parse metrics into a lossless interoperable data model."
+      ],
       "function_category": "receive",
       "id": "statsd_source",
+      "logo_path": "/img/logos/statsd.svg",
       "name": "statsd",
+      "noun": "Statsd",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
+      "output_types": [
+        "metric"
+      ],
       "service_providers": [
 
       ],
-      "status": "beta",
+      "short_description": "Ingests data through the StatsD UDP protocol and outputs metric events.",
+      "status": "prod-ready",
+      "through_description": "the StatsD UDP protocol",
+      "title": "Statsd",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22333,23 +25473,38 @@ module.exports = {
     },
     "stdin": {
       "beta": false,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"stdin\" # required"
+      },
       "delivery_guarantee": "at_least_once",
-      "description": "Ingests data through standard input (STDIN) and outputs log events.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+        "Accept new line delimited log data through STDIN.",
+        "Automatically enrich logs with host-level context."
+      ],
       "function_category": "receive",
       "id": "stdin_source",
+      "logo_path": "/img/logos/stdin.svg",
       "name": "stdin",
+      "noun": "STDIN",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Ingests data through standard input (STDIN) and outputs log events.",
       "status": "prod-ready",
+      "through_description": "standard input (STDIN)",
+      "title": "STDIN",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22357,23 +25512,38 @@ module.exports = {
     },
     "syslog": {
       "beta": false,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"syslog\" # required\n  address = \"0.0.0.0:514\" # required, required when mode = \"tcp\" or mode = \"udp\"\n  mode = \"tcp\" # required\n  path = \"/path/to/socket\" # required, required when mode = \"unix\""
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the Syslog protocol and outputs log events.",
+      "description": "Syslog stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is primarily used to collect various device logs from several different machines in a central location for monitoring and review.",
       "event_types": [
         "log"
       ],
+      "features": [
+        "Accept log data over the Syslog protocol via TCP, UDP, or Unix sockets.",
+        "Automatically parse Syslog 3164 and 5424 formats."
+      ],
       "function_category": "receive",
       "id": "syslog_source",
+      "logo_path": "/img/logos/syslog.svg",
       "name": "syslog",
+      "noun": "Syslog",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Ingests data through the Syslog protocol and outputs log events.",
       "status": "prod-ready",
+      "through_description": "the Syslog protocol",
+      "title": "Syslog",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22381,24 +25551,39 @@ module.exports = {
     },
     "vector": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"vector\" # required\n  address = \"0.0.0.0:9000\" # required"
+      },
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events.",
+      "description": null,
       "event_types": [
         "log",
         "metric"
       ],
+      "features": [
+        "Accept data from another upstream Vector instance."
+      ],
       "function_category": "receive",
       "id": "vector_source",
+      "logo_path": "/img/logos/vector.svg",
       "name": "vector",
+      "noun": "Vector",
       "operating_systems": [
         "Linux",
         "MacOS",
         "Windows"
       ],
+      "output_types": [
+        "log",
+        "metric"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Ingests data through another upstream `vector` sink and outputs log and metric events.",
       "status": "beta",
+      "through_description": "another upstream `vector` sink",
+      "title": "Vector",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22408,19 +25593,15 @@ module.exports = {
   "team": [
     {
       "avatar": "https://github.com/a-rodin.png",
+      "bio": "Alexander is a Senior Engineer at <a href=\"https://timber.io\">Timber.io</a> and a member of the <a href=\"/community#team\">core Vector team</a>. He created <a href=\"https://alexanderrodin.com/qstardict\">QStarDict</a>, a dictionary application written in C++.",
       "github": "https://github.com/a-rodin",
       "id": "alex",
       "keybase": "https://keybase.io/arodin",
       "name": "Alexander"
     },
     {
-      "avatar": "https://github.com/loony-bean.png",
-      "github": "https://github.com/loony-bean",
-      "id": "alexey",
-      "name": "Alexey"
-    },
-    {
       "avatar": "https://github.com/hoverbear.png",
+      "bio": "Ana is a Senior Engineer at <a href=\"https://timber.io\">Timber.io</a> and member of the <a href=\"/community#team\">core Vector team</a>. She is actively invovled in the Rust community and contributing to project and organizing meetups.",
       "github": "https://github.com/hoverbear",
       "id": "ana",
       "keybase": "https://keybase.io/hoverbear",
@@ -22429,6 +25610,7 @@ module.exports = {
     },
     {
       "avatar": "https://github.com/Jeffail.png",
+      "bio": "Ashley is a Principal Engineer at <a href=\"https://timber.io\">Timber.io</a> and member of the <a href=\"/community#team\">core Vector team</a>. He created <a href=\"https://github.com/Jeffail/benthos\">Benthos stream processor</a>, a popular stream processor written Go.",
       "github": "https://github.com/Jeffail",
       "id": "ashley",
       "keybase": "https://keybase.io/jeffail",
@@ -22437,6 +25619,7 @@ module.exports = {
     },
     {
       "avatar": "https://github.com/binarylogic.png",
+      "bio": "Ben is the CTO/Co-Founder at <a href=\"https://timber.io\">Timber.io</a> and a member of the <a href=\"/community#team\">core Vector team</a>. He is an open-source veteran, creating <a href=\"https://github.com/binarylogic/authlogic\">Authlogic</a> over 15 years ago before helping to launch Vector.",
       "github": "https://github.com/binarylogic",
       "id": "ben",
       "keybase": "https://keybase.io/binarylogic",
@@ -22465,31 +25648,61 @@ module.exports = {
     },
     {
       "avatar": "https://github.com/lukesteensen.png",
+      "bio": "Luke is a Senior Engineer at <a href=\"https://timber.io\">Timber.io</a> and member of the <a href=\"/community#team\">core Vector team</a>. Before Timber Luke was an engineer at Braintree, working on parts of their observability pipeline.",
       "github": "https://github.com/lukesteensen",
       "id": "luke",
       "keybase": "https://keybase.io/lukesteensen",
       "name": "Luke",
       "twitter": "https://twitter.com/lukesteensen"
+    },
+    {
+      "avatar": "https://github.com/MOZGIII.png",
+      "github": "https://github.com/MOZGIII",
+      "id": "mike",
+      "keybase": "https://keybase.io/MOZGIII",
+      "name": "Mike",
+      "twitter": "https://twitter.com/MOZGIII"
+    },
+    {
+      "avatar": "https://github.com/vector-vic.png",
+      "github": "https://github.com/vector-vic",
+      "id": "vic",
+      "name": "Vic"
     }
   ],
   "transforms": {
     "add_fields": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  # General\n  type = \"add_fields\" # required\n  inputs = [\"in\"] # required\n\n  # Fields\n  fields.string_field = \"string value\" # example\n  fields.env_var_field = \"${ENV_VAR}\" # example\n  fields.templated_field = \"{{ my_other_field }}\" # example\n  fields.int_field = 1 # example\n  fields.float_field = 1.2 # example\n  fields.bool_field = true # example\n  fields.timestamp_field = 1979-05-27T00:32:00Z # example\n  fields.parent.child_field = \"child_value\" # example\n  fields.list_field = [\"first\", \"second\", \"third\"] # example"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to add one or more log fields.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "shape",
       "id": "add_fields_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "add_fields",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to add one or more log fields.",
       "status": "prod-ready",
+      "title": "Add Fields",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22497,21 +25710,36 @@ module.exports = {
     },
     "add_tags": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  # General\n  type = \"add_tags\" # required\n  inputs = [\"in\"] # required\n\n  # Tags\n  tags.static_tag = \"my value\" # example\n  tags.env_tag = \"${ENV_VAR}\" # example"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts metric events and allows you to add one or more metric tags.",
+      "description": null,
       "event_types": [
         "metric"
       ],
+      "features": [
+
+      ],
       "function_category": "shape",
       "id": "add_tags_transform",
+      "inpuut_types": [
+        "metric"
+      ],
+      "logo_path": null,
       "name": "add_tags",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "metric"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts metric events and allows you to add one or more metric tags.",
       "status": "prod-ready",
+      "title": "Add Tags",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22519,21 +25747,36 @@ module.exports = {
     },
     "ansi_stripper": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"ansi_stripper\" # required\n  inputs = [\"in\"] # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to strips ANSI escape sequences from the specified field.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "sanitize",
       "id": "ansi_stripper_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "ansi_stripper",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to strips ANSI escape sequences from the specified field.",
       "status": "prod-ready",
+      "title": "ANSI Stripper",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22541,21 +25784,36 @@ module.exports = {
     },
     "aws_ec2_metadata": {
       "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"aws_ec2_metadata\" # required\n  inputs = [\"in\"] # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to enrich logs with AWS EC2 instance metadata.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "enrich",
       "id": "aws_ec2_metadata_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "aws_ec2_metadata",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to enrich logs with AWS EC2 instance metadata.",
       "status": "beta",
+      "title": "AWS EC2 Metadata",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22563,21 +25821,36 @@ module.exports = {
     },
     "coercer": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"coercer\" # required\n  inputs = [\"in\"] # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to coerce log fields into fixed types.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "parse",
       "id": "coercer_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "coercer",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to coerce log fields into fixed types.",
       "status": "prod-ready",
+      "title": "Coercer",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22585,21 +25858,36 @@ module.exports = {
     },
     "concat": {
       "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"concat\" # required\n  inputs = [\"in\"] # required\n  items = [\"first[..3]\", \"second[-5..]\", \"third[3..6]\"] # required\n  target = \"root_field_name\" # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to concat (substrings) of other fields to a new one.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "shape",
       "id": "concat_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "concat",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to concat (substrings) of other fields to a new one.",
       "status": "beta",
+      "title": "Concat",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22607,43 +25895,76 @@ module.exports = {
     },
     "dedupe": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  # General\n  type = \"dedupe\" # required\n  inputs = [\"in\"] # required\n\n  # Fields"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to prevent duplicate Events from being outputted by using an LRU cache.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "filter",
       "id": "dedupe_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "dedupe",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to prevent duplicate Events from being outputted by using an LRU cache.",
       "status": "prod-ready",
+      "title": "Dedupe events",
       "type": "transform",
       "unsupported_operating_systems": [
 
       ]
     },
-    "field_filter": {
+    "filter": {
       "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  # General\n  type = \"filter\" # required\n  inputs = [\"in\"] # required\n\n  # Condition"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to filter events by a log field's value.",
+      "description": null,
       "event_types": [
-        "log"
+        "log",
+        "metric"
+      ],
+      "features": [
+
       ],
       "function_category": "filter",
-      "id": "field_filter_transform",
-      "name": "field_filter",
+      "id": "filter_transform",
+      "inpuut_types": [
+        "log",
+        "metric"
+      ],
+      "logo_path": null,
+      "name": "filter",
       "operating_systems": [
 
+      ],
+      "output_types": [
+        "log",
+        "metric"
       ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log and metric events and allows you to select events based on a set of logical conditions.",
       "status": "beta",
+      "title": "Filter",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22651,21 +25972,36 @@ module.exports = {
     },
     "geoip": {
       "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"geoip\" # required\n  inputs = [\"in\"] # required\n  database = \"/path/to/GeoLite2-City.mmdb\" # required\n  source = \"ip_address\" # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "enrich",
       "id": "geoip_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "geoip",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.",
       "status": "beta",
+      "title": "GeoIP",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22673,21 +26009,36 @@ module.exports = {
     },
     "grok_parser": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"grok_parser\" # required\n  inputs = [\"in\"] # required\n  pattern = \"%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}\" # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to parse a log field value with [Grok][urls.grok].",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "parse",
       "id": "grok_parser_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "grok_parser",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to parse a log field value with Grok.",
       "status": "prod-ready",
+      "title": "Grok Parser",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22695,21 +26046,73 @@ module.exports = {
     },
     "json_parser": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"json_parser\" # required\n  inputs = [\"in\"] # required\n  drop_invalid = true # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to parse a log field value as JSON.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "parse",
       "id": "json_parser_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "json_parser",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to parse a log field value as JSON.",
       "status": "prod-ready",
+      "title": "JSON Parser",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "kubernetes_pod_metadata": {
+      "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"kubernetes_pod_metadata\" # required\n  inputs = [\"in\"] # required"
+      },
+      "delivery_guarantee": null,
+      "description": null,
+      "event_types": [
+        "log"
+      ],
+      "features": [
+
+      ],
+      "function_category": "enrich",
+      "id": "kubernetes_pod_metadata_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
+      "name": "kubernetes_pod_metadata",
+      "operating_systems": [
+
+      ],
+      "output_types": [
+        "log"
+      ],
+      "service_providers": [
+
+      ],
+      "short_description": "Accepts log events and allows you to enrich Kubernetes logs with Pod metadata.",
+      "status": "beta",
+      "title": "Kubernetes Pod Metadata",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22717,22 +26120,37 @@ module.exports = {
     },
     "log_to_metric": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  # General\n  type = \"log_to_metric\" # required\n  inputs = [\"in\"] # required\n\n  # Metrics\n  metrics.field = \"duration\" # required\n  metrics.name = \"duration_total\" # required\n  metrics.type = \"counter\" # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to convert logs into one or more metrics.",
+      "description": null,
       "event_types": [
         "log",
         "metric"
       ],
+      "features": [
+
+      ],
       "function_category": "convert",
       "id": "log_to_metric_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "log_to_metric",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "metric"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to convert logs into one or more metrics.",
       "status": "prod-ready",
+      "title": "Log to Metric",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22740,21 +26158,36 @@ module.exports = {
     },
     "logfmt_parser": {
       "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"logfmt_parser\" # required\n  inputs = [\"in\"] # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to extract data from a logfmt-formatted log field.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "parse",
       "id": "logfmt_parser_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "logfmt_parser",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to parse a log field's value in the logfmt format.",
       "status": "beta",
+      "title": "Logfmt Parser",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22762,21 +26195,39 @@ module.exports = {
     },
     "lua": {
       "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  # General\n  type = \"lua\" # required\n  inputs = [\"in\"] # required\n  version = \"2\" # required\n\n  # Hooks\n  hooks.process = \"\"\"\n  function (event, emit)\n    event.log.field = \"value\" -- set value of a field\n    event.log.another_field = nil -- remove field\n    event.log.first, event.log.second = nil, event.log.first -- rename field\n\n    -- Very important! Emit the processed event.\n    emit(event)\n  end\n  \"\"\""
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to transform events with a full embedded [Lua][urls.lua] engine.",
+      "description": null,
       "event_types": [
-        "log"
+        "log",
+        "metric"
+      ],
+      "features": [
+
       ],
       "function_category": "program",
       "id": "lua_transform",
+      "inpuut_types": [
+        "log",
+        "metric"
+      ],
+      "logo_path": null,
       "name": "lua",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log",
+        "metric"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log and metric events and allows you to transform events with a full embedded Lua engine.",
       "status": "beta",
+      "title": "Lua",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22784,21 +26235,36 @@ module.exports = {
     },
     "merge": {
       "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"merge\" # required\n  inputs = [\"in\"] # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to merge partial log events into a single event.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "aggregate",
       "id": "merge_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "merge",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to merge partial log events into a single event.",
       "status": "beta",
+      "title": "Merge",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22806,21 +26272,36 @@ module.exports = {
     },
     "regex_parser": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"regex_parser\" # required\n  inputs = [\"in\"] # required\n  regex = \"^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$\" # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to parse a log field's value with a [Regular Expression][urls.regex].",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "parse",
       "id": "regex_parser_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "regex_parser",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to parse a log field's value with a Regular Expression.",
       "status": "prod-ready",
+      "title": "Regex Parser",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22828,21 +26309,36 @@ module.exports = {
     },
     "remove_fields": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"remove_fields\" # required\n  inputs = [\"in\"] # required\n  fields = [\"field1\", \"field2\", \"parent.child\"] # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to remove one or more log fields.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "shape",
       "id": "remove_fields_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "remove_fields",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to remove one or more log fields.",
       "status": "prod-ready",
+      "title": "Remove Fields",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22850,21 +26346,36 @@ module.exports = {
     },
     "remove_tags": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"remove_tags\" # required\n  inputs = [\"in\"] # required\n  tags = [\"tag1\", \"tag2\"] # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts metric events and allows you to remove one or more metric tags.",
+      "description": null,
       "event_types": [
         "metric"
       ],
+      "features": [
+
+      ],
       "function_category": "shape",
       "id": "remove_tags_transform",
+      "inpuut_types": [
+        "metric"
+      ],
+      "logo_path": null,
       "name": "remove_tags",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "metric"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts metric events and allows you to remove one or more metric tags.",
       "status": "prod-ready",
+      "title": "Remove Tags",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22872,21 +26383,36 @@ module.exports = {
     },
     "rename_fields": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  # General\n  type = \"rename_fields\" # required\n  inputs = [\"in\"] # required\n\n  # Fields\n  fields.old_field_name = \"new_field_name\" # example\n  fields.parent.old_child_name = \"parent.new_child_name\" # example"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to rename one or more log fields.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "shape",
       "id": "rename_fields_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "rename_fields",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to rename one or more log fields.",
       "status": "prod-ready",
+      "title": "Rename Fields",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22894,21 +26420,36 @@ module.exports = {
     },
     "sampler": {
       "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"sampler\" # required\n  inputs = [\"in\"] # required\n  rate = 10 # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to sample events with a configurable rate.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "filter",
       "id": "sampler_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "sampler",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to sample events with a configurable rate.",
       "status": "beta",
+      "title": "Sampler",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22916,21 +26457,36 @@ module.exports = {
     },
     "split": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"split\" # required\n  inputs = [\"in\"] # required\n  field_names = [\"timestamp\", \"level\", \"message\", \"parent.child\"] # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "parse",
       "id": "split_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "split",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names.",
       "status": "prod-ready",
+      "title": "Split",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22938,21 +26494,36 @@ module.exports = {
     },
     "swimlanes": {
       "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  # General\n  type = \"swimlanes\" # required\n  inputs = [\"in\"] # required\n\n  # Lanes\n  [transforms.out.lanes.`[swimlane-id]`]"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to route events across parallel streams using logical filters.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "route",
       "id": "swimlanes_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "swimlanes",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to route events across parallel streams using logical filters.",
       "status": "beta",
+      "title": "Swimlanes",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22960,21 +26531,36 @@ module.exports = {
     },
     "tag_cardinality_limit": {
       "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"tag_cardinality_limit\" # required\n  inputs = [\"in\"] # required\n  mode = \"exact\" # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.",
+      "description": null,
       "event_types": [
         "metric"
       ],
+      "features": [
+
+      ],
       "function_category": "filter",
       "id": "tag_cardinality_limit_transform",
+      "inpuut_types": [
+        "metric"
+      ],
+      "logo_path": null,
       "name": "tag_cardinality_limit",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "metric"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.",
       "status": "beta",
+      "title": "Tag Cardinality Limit",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22982,21 +26568,36 @@ module.exports = {
     },
     "tokenizer": {
       "beta": false,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"tokenizer\" # required\n  inputs = [\"in\"] # required\n  field_names = [\"timestamp\", \"level\", \"message\", \"parent.child\"] # required"
+      },
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.",
+      "description": null,
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "parse",
       "id": "tokenizer_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
       "name": "tokenizer",
       "operating_systems": [
 
       ],
+      "output_types": [
+        "log"
+      ],
       "service_providers": [
 
       ],
+      "short_description": "Accepts log events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.",
       "status": "prod-ready",
+      "title": "Tokenizer",
       "type": "transform",
       "unsupported_operating_systems": [
 

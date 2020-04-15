@@ -1,6 +1,11 @@
-use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, SinkExt};
 use crate::{
     dns::Resolver,
+    emit,
+    internal_events::{
+        TcpConnectionDisconnected, TcpConnectionEstablished, TcpConnectionFailed, TcpEventSent,
+        TcpFlushError,
+    },
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink},
     sinks::{Healthcheck, RouterSink},
     tls::{MaybeTlsConnector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
     topology::config::SinkContext,
@@ -11,6 +16,7 @@ use futures01::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::io::{ErrorKind, Read};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use tokio01::{
@@ -19,7 +25,6 @@ use tokio01::{
     timer::Delay,
 };
 use tokio_retry::strategy::ExponentialBackoff;
-use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -142,21 +147,19 @@ impl TcpSink {
                 },
                 TcpSinkState::Connecting(ref mut connect_future) => match connect_future.poll() {
                     Ok(Async::Ready(stream)) => {
-                        debug!(message = "connected");
+                        emit!(TcpConnectionEstablished {
+                            peer_addr: stream.peer_addr().ok(),
+                        });
                         self.backoff = Self::fresh_backoff();
                         TcpSinkState::Connected(FramedWrite::new(stream, BytesCodec::new()))
                     }
-                    Ok(Async::NotReady) => {
-                        return Ok(Async::NotReady);
-                    }
+                    Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Err(error) => {
-                        error!(message = "unable to connect.", %error);
+                        emit!(TcpConnectionFailed { error });
                         TcpSinkState::Backoff(self.next_delay())
                     }
                 },
-                TcpSinkState::Connected(ref mut connection) => {
-                    return Ok(Async::Ready(connection));
-                }
+                TcpSinkState::Connected(ref mut connection) => return Ok(Async::Ready(connection)),
             };
         }
     }
@@ -172,17 +175,27 @@ impl Sink for TcpSink {
 
         match self.poll_connection() {
             Ok(Async::Ready(connection)) => {
-                debug!(
-                    message = "sending event.",
-                    bytes = &field::display(line.len())
-                );
-                match connection.start_send(line) {
-                    Err(error) => {
-                        error!(message = "connection disconnected.", %error);
+                let mut dummy = [0; 0];
+                // Test if the remote has issued a disconnect
+                match connection.get_mut().read(&mut dummy) {
+                    Err(error) if error.kind() != ErrorKind::WouldBlock => {
+                        emit!(TcpConnectionDisconnected { error });
                         self.state = TcpSinkState::Disconnected;
-                        Ok(AsyncSink::Ready)
+                        Ok(AsyncSink::NotReady(line))
                     }
-                    Ok(ok) => Ok(ok),
+                    _ => {
+                        emit!(TcpEventSent {
+                            byte_size: line.len()
+                        });
+                        match connection.start_send(line) {
+                            Err(error) => {
+                                error!(message = "connection disconnected.", %error);
+                                self.state = TcpSinkState::Disconnected;
+                                Ok(AsyncSink::Ready)
+                            }
+                            Ok(ok) => Ok(ok),
+                        }
+                    }
                 }
             }
             Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),
@@ -204,7 +217,7 @@ impl Sink for TcpSink {
 
         match connection.poll_complete() {
             Err(error) => {
-                error!(message = "unable to flush connection.", %error);
+                emit!(TcpFlushError { error });
                 self.state = TcpSinkState::Disconnected;
                 Ok(Async::Ready(()))
             }
@@ -220,11 +233,9 @@ pub fn raw_tcp(
     encoding: EncodingConfig<Encoding>,
     tls: MaybeTlsSettings,
 ) -> RouterSink {
-    Box::new(
-        TcpSink::new(host, port, cx.resolver(), tls)
-            .stream_ack(cx.acker())
-            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
-    )
+    let tcp = TcpSink::new(host, port, cx.resolver(), tls);
+    let sink = StreamSink::new(tcp, cx.acker());
+    Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))))
 }
 
 #[derive(Debug, Snafu)]

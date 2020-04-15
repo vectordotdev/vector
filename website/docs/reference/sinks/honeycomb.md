@@ -1,19 +1,24 @@
 ---
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "Honeycomb"
 description: "The Vector `honeycomb` sink batches `log` events to Honeycomb via the batch events API."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+honeycomb%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Honeycomb"
 sidebar_label: "honeycomb|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/honeycomb.rs
 status: "beta"
 title: "Honeycomb Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `honeycomb` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to
@@ -29,26 +34,17 @@ The Vector `honeycomb` sink
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "honeycomb" # required
   inputs = ["my-source-id"] # required
-  api_key = "${MY_API_KEY}" # required
+  api_key = "${HONEYCOMB_API_KEY}" # required
   dataset = "my-honeycomb-dataset" # required
   healthcheck = true # optional, default
 ```
@@ -56,14 +52,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "honeycomb" # required
   inputs = ["my-source-id"] # required
-  api_key = "${MY_API_KEY}" # required
+  api_key = "${HONEYCOMB_API_KEY}" # required
   dataset = "my-honeycomb-dataset" # required
   healthcheck = true # optional, default
 
@@ -72,9 +66,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Request
@@ -90,38 +84,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${MY_API_KEY}","some-api-key"]}
-  groups={[]}
-  name={"api_key"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### api_key
-
-The team key that will be used to authenticate against Honeycomb.
-
-
-
-
-</Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -135,6 +98,7 @@ The team key that will be used to authenticate against Honeycomb.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -144,8 +108,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={5242880}
@@ -159,6 +121,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -169,8 +132,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -184,6 +145,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -194,13 +156,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -214,6 +172,7 @@ The maximum age of a batch before it is flushed.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### buffer
@@ -223,58 +182,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={500}
-  enumValues={null}
-  examples={[500]}
-  groups={[]}
-  name={"max_events"}
-  path={"buffer"}
-  relevantWhen={{"type":"memory"}}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"events"}
-  >
-
-#### max_events
-
-The maximum number of [events][docs.data-model] allowed in the buffer.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[104900000]}
-  groups={[]}
-  name={"max_size"}
-  path={"buffer"}
-  relevantWhen={{"type":"disk"}}
-  required={true}
-  templateable={false}
-  type={"int"}
-  unit={"bytes"}
-  >
-
-#### max_size
-
-The maximum size of the buffer on the disk.
-
- See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-
-
 <Field
   common={true}
   defaultValue={"memory"}
@@ -288,6 +195,7 @@ The maximum size of the buffer on the disk.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -298,8 +206,54 @@ The buffer's type and storage mechanism.
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={500}
+  enumValues={null}
+  examples={[500]}
+  groups={[]}
+  name={"max_events"}
+  path={"buffer"}
+  relevantWhen={{"type":"memory"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  warnings={[]}
+  >
+
+#### max_events
+
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[104900000]}
+  groups={[]}
+  name={"max_size"}
+  path={"buffer"}
+  relevantWhen={{"type":"disk"}}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+#### max_size
+
+The maximum size of the buffer on the disk.
+
+ See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
 <Field
   common={false}
   defaultValue={"block"}
@@ -313,6 +267,7 @@ The buffer's type and storage mechanism.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### when_full
@@ -323,13 +278,33 @@ The behavior when the buffer becomes full.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${HONEYCOMB_API_KEY}","some-api-key"]}
+  groups={[]}
+  name={"api_key"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### api_key
+
+The team key that will be used to authenticate against Honeycomb.
 
 
+
+
+</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -343,6 +318,7 @@ The behavior when the buffer becomes full.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### dataset
@@ -353,8 +329,6 @@ The dataset that Vector will send logs to.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -368,6 +342,7 @@ The dataset that Vector will send logs to.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -378,8 +353,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -393,6 +366,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### request
@@ -402,8 +376,6 @@ Configures the sink request behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -417,6 +389,7 @@ Configures the sink request behavior.
   templateable={false}
   type={"int"}
   unit={"requests"}
+  warnings={[]}
   >
 
 #### in_flight_limit
@@ -427,8 +400,6 @@ The maximum number of in-flight requests allowed at any given time.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -442,6 +413,7 @@ The maximum number of in-flight requests allowed at any given time.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### rate_limit_duration_secs
@@ -452,8 +424,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -467,6 +437,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### rate_limit_num
@@ -478,8 +449,6 @@ time window.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={-1}
@@ -493,6 +462,7 @@ time window.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### retry_attempts
@@ -503,8 +473,6 @@ The maximum number of retries to make for failed requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1}
@@ -518,6 +486,7 @@ The maximum number of retries to make for failed requests.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_initial_backoff_secs
@@ -530,8 +499,6 @@ to select future backoffs.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10}
@@ -545,6 +512,7 @@ to select future backoffs.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_max_duration_secs
@@ -555,8 +523,6 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={60}
@@ -570,6 +536,7 @@ The maximum amount of time, in seconds, to wait between retries.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -583,20 +550,14 @@ duplicate data downstream.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 
@@ -662,7 +623,7 @@ any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][urls.new_honeycomb_sink_issue].
+with the Vector team by [opening an issue][urls.new_honeycomb_sink_issue].
 
 ### Retry Policy
 

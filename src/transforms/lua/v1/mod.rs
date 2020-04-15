@@ -1,5 +1,6 @@
 use crate::{
     event::{Event, Value},
+    internal_events::{LuaEventProcessed, LuaGcTriggered, LuaScriptError},
     topology::config::{DataType, TransformContext},
     transforms::Transform,
 };
@@ -111,11 +112,18 @@ impl Lua {
                 .get::<_, Option<LuaEvent>>("event")
                 .map(|option| option.map(|lua_event| lua_event.inner))
         });
+
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {
+            emit!(LuaGcTriggered {
+                used_memory: self.lua.used_memory()
+            });
             self.lua.gc_collect()?;
             self.invocations_after_gc = 0;
         }
+
+        emit!(LuaEventProcessed);
+
         result
     }
 }
@@ -124,8 +132,8 @@ impl Transform for Lua {
     fn transform(&mut self, event: Event) -> Option<Event> {
         match self.process(event) {
             Ok(event) => event,
-            Err(err) => {
-                error!(message = "Error in lua script; discarding event.", error = %format_error(&err), rate_limit_secs = 30);
+            Err(error) => {
+                emit!(LuaScriptError { error });
                 None
             }
         }
@@ -205,7 +213,7 @@ impl rlua::UserData for LuaEvent {
     }
 }
 
-fn format_error(error: &rlua::Error) -> String {
+pub fn format_error(error: &rlua::Error) -> String {
     match error {
         rlua::Error::CallbackError { traceback, cause } => format_error(&cause) + "\n" + traceback,
         err => err.to_string(),

@@ -1,10 +1,3 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
 import React, {useState} from 'react';
 
 import Link from '@docusaurus/Link';
@@ -15,8 +8,10 @@ import isInternalUrl from '@docusaurus/utils';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import useLockBodyScroll from '@theme/hooks/useLockBodyScroll';
+import useLogo from '@theme/hooks/useLogo';
 
 import styles from './styles.module.css';
+import './styles.css';
 
 const MOBILE_TOGGLE_SIZE = 24;
 
@@ -157,9 +152,10 @@ function mutateSidebarCollapsingState(item, path) {
 function DocSidebar(props) {
   const [showResponsiveSidebar, setShowResponsiveSidebar] = useState(false);
   const {
-    siteConfig: {themeConfig: {navbar: {title, logo = {}} = {}}} = {},
+    siteConfig: {themeConfig: {navbar: {title} = {}}} = {},
+    isClient,
   } = useDocusaurusContext();
-  const logoUrl = useBaseUrl(logo.src);
+  const {logoLink, logoLinkProps, logoImageUrl, logoAlt} = useLogo();
 
 
   const {
@@ -190,11 +186,13 @@ function DocSidebar(props) {
   }
 
   return (
-    <div className={styles.sidebar}>
-      <div className={classnames(styles.sidebarLogo, 'sidebar__logo')}>
-        {logo != null && <SVG src={logoUrl} alt={logo.alt} />}
+    <div className={classnames('docs-sidebar', styles.sidebar)}>
+      <Link className={styles.sidebarLogo} to={logoLink} {...logoLinkProps}>
+        {logoImageUrl != null && (
+          <SVG key={isClient} src={logoImageUrl} alt={logoAlt} />
+        )}
         {title != null && <strong>{title}</strong>}
-      </div>
+      </Link>
       <div
         className={classnames('menu', 'menu--responsive', styles.menu, {
           'menu--show': showResponsiveSidebar,

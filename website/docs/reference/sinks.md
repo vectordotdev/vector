@@ -5,14 +5,14 @@ sidebar_label: hidden
 hide_pagination: true
 ---
 
+import VectorComponents from '@site/src/components/VectorComponents';
+
 Vector sinks fan-out [log][docs.data-model.log] and
 [metric][docs.data-model.metric] [events][docs.data-model] data to a
 variety of downstream destinations. They are responsible for reliably sending,
 or outputting, this data.
 
 ---
-
-import VectorComponents from '@site/src/components/VectorComponents';
 
 <VectorComponents titles={false} sources={false} transforms={false} />
 

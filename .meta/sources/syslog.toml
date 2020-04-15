@@ -1,19 +1,26 @@
 [sources.syslog]
 title = "Syslog"
+noun = "Syslog"
 beta = false
 common = true
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_syslog.toml") %>
+features = [
+  "Accept log data over the Syslog protocol via TCP, UDP, or Unix sockets.",
+  "Automatically parse Syslog 3164 and 5424 formats.",
+]
 function_category = "receive"
 output_types = ["log"]
-requirements = {}
-through_description = "the Syslog protocol"
+requirements.network_port = "514"
+strategies = ["service"]
+through_description = "the [Syslog protocol][urls.syslog_5424]"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "syslog") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "syslog") %>
 
 [sources.syslog.options.address]
 type = "string"
 common = true
-examples = ["0.0.0.0:9000", "systemd", "systemd#2"]
+examples = ["0.0.0.0:514", "systemd", "systemd#2"]
 relevant_when = {mode = ["tcp", "udp"]}
 required = true
 description = """\
@@ -60,9 +67,9 @@ description = """\
 The unix socket path. *This should be absolute path.*
 """
 
-<%= render("_partials/_tls_acceptor_options.toml", namespace: "sources.syslog.options", relevant: "") %>
+<%= render("_partials/fields/_tls_acceptor_options.toml", namespace: "sources.syslog.options", relevant: "") %>
 
-[sources.syslog.output.log.fields.appname]
+[sources.syslog.fields.log.fields.appname]
 type = "string"
 examples = ["app-name"]
 description = """\
@@ -70,7 +77,7 @@ The appname extracted from the Syslog formatted line. If a appname is not \
 found, then the key will not be added.\
 """
 
-[sources.syslog.output.log.fields.host]
+[sources.syslog.fields.log.fields.host]
 type = "string"
 examples = ["my.host.com"]
 required = true
@@ -80,7 +87,7 @@ Vector will use the upstream hostname. In the case where `mode` = `"unix"` the \
 socket path will be used. This key can be renamed via the `host_key` option.\
 """
 
-[sources.syslog.output.log.fields.facility]
+[sources.syslog.fields.log.fields.facility]
 type = "string"
 examples = ["1"]
 description = """\
@@ -88,7 +95,7 @@ The facility extracted from the Syslog line. If a facility is not found, then \
 the key will not be added.\
 """
 
-[sources.syslog.output.log.fields.message]
+[sources.syslog.fields.log.fields.message]
 type = "string"
 examples = ["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]
 required = true
@@ -96,7 +103,7 @@ description = """\
 The raw message, unaltered.
 """
 
-[sources.syslog.output.log.fields.msgid]
+[sources.syslog.fields.log.fields.msgid]
 type = "string"
 examples = ["ID47"]
 description = """\
@@ -104,7 +111,7 @@ The msgid extracted from the Syslog line. If a msgid is not found, then the \
 key will not be added.\
 """
 
-[sources.syslog.output.log.fields.procid]
+[sources.syslog.fields.log.fields.procid]
 type = "string"
 examples = ["8710"]
 description = """\
@@ -112,7 +119,7 @@ The procid extracted from the Syslog line. If a procid is not found, then the \
 key will not be added.\
 """
 
-[sources.syslog.output.log.fields.severity]
+[sources.syslog.fields.log.fields.severity]
 type = "string"
 examples = ["notice"]
 description = """\
@@ -120,7 +127,7 @@ The severity extracted from the Syslog line. If a severity is not found, then \
 the key will not be added.\
 """
 
-[sources.syslog.output.log.fields.timestamp]
+[sources.syslog.fields.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true
@@ -129,7 +136,7 @@ The timestamp extracted from the incoming line. If a timestamp is not found, \
 then Vector will use the current time.\
 """
 
-[sources.syslog.output.log.fields.version]
+[sources.syslog.fields.log.fields.version]
 type = "int"
 examples = [1]
 description = """\
@@ -137,7 +144,7 @@ The version extracted from the Syslog line. If a version is not found, then \
 the key will not be added.\
 """
 
-[sources.syslog.output.log.fields."`[field-name]`"]
+[sources.syslog.fields.log.fields."`[field-name]`"]
 type = "*"
 examples = [
   {custom_field1 = "custom value 1"},
@@ -147,7 +154,7 @@ In addition to the defined fields, any Syslog 5424 structured fields are \
 parsed and inserted as root level fields.
 """
 
-[[sources.syslog.output.log.examples]]
+[[sources.syslog.examples]]
 label = "RFC5424"
 body = """\
 Given the following [Syslog 5424][urls.syslog_5424] log line:

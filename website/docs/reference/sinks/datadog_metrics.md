@@ -1,19 +1,23 @@
 ---
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Datadog Metrics"
 description: "The Vector `datadog_metrics` sink batches `metric` events to Datadog's metrics service using HTTP API."
 event_types: ["metric"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+datadog_metrics%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Datadog Metrics"
 sidebar_label: "datadog_metrics|[\"metric\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sinks/datadog_metrics.rs
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/datadog/metrics.rs
 status: "beta"
 title: "Datadog Metrics Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `datadog_metrics` sink
 [batches](#buffers--batches) [`metric`][docs.data-model.metric] events to
@@ -30,45 +34,33 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "datadog_metrics" # required
   inputs = ["my-source-id"] # required
-  api_key = "${DATADOG_API_KEY_ENV_VAR}" # required
-  namespace = "service" # required
+  api_key = "${DATADOG_API_KEY}" # required
   healthcheck = true # optional, default
-  host = "https://api.datadoghq.com" # optional, default
+  namespace = "service" # required
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "datadog_metrics" # required
   inputs = ["my-source-id"] # required
-  api_key = "${DATADOG_API_KEY_ENV_VAR}" # required
-  namespace = "service" # required
+  api_key = "${DATADOG_API_KEY}" # required
   healthcheck = true # optional, default
   host = "https://api.datadoghq.com" # optional, default
+  namespace = "service" # required
 
   # Batch
   batch.max_events = 20 # optional, default, events
@@ -87,38 +79,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${DATADOG_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
-  groups={[]}
-  name={"api_key"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### api_key
-
-Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
-
-
-
-
-</Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -132,6 +93,7 @@ Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -141,8 +103,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={20}
@@ -156,6 +116,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"events"}
+  warnings={[]}
   >
 
 #### max_events
@@ -166,8 +127,6 @@ The maximum size of a batch, in events, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -181,6 +140,7 @@ The maximum size of a batch, in events, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -191,13 +151,33 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${DATADOG_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  groups={[]}
+  name={"api_key"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### api_key
+
+Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
 
 
+
+
+</Field>
 <Field
   common={true}
   defaultValue={true}
@@ -211,6 +191,7 @@ The maximum age of a batch before it is flushed.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -221,10 +202,8 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
-  common={true}
+  common={false}
   defaultValue={"https://api.datadoghq.com"}
   enumValues={null}
   examples={["https://api.datadoghq.com","https://api.datadoghq.eu"]}
@@ -236,6 +215,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -246,8 +226,6 @@ Datadog endpoint to send metrics to.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -261,6 +239,7 @@ Datadog endpoint to send metrics to.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### namespace
@@ -271,8 +250,6 @@ A prefix that will be added to all metric names.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -286,6 +263,7 @@ A prefix that will be added to all metric names.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### request
@@ -295,8 +273,6 @@ Configures the sink request behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -310,6 +286,7 @@ Configures the sink request behavior.
   templateable={false}
   type={"int"}
   unit={"requests"}
+  warnings={[]}
   >
 
 #### in_flight_limit
@@ -320,8 +297,6 @@ The maximum number of in-flight requests allowed at any given time.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -335,6 +310,7 @@ The maximum number of in-flight requests allowed at any given time.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### rate_limit_duration_secs
@@ -345,8 +321,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -360,6 +334,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### rate_limit_num
@@ -371,8 +346,6 @@ time window.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={-1}
@@ -386,6 +359,7 @@ time window.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### retry_attempts
@@ -396,8 +370,6 @@ The maximum number of retries to make for failed requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1}
@@ -411,6 +383,7 @@ The maximum number of retries to make for failed requests.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_initial_backoff_secs
@@ -423,8 +396,6 @@ to select future backoffs.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10}
@@ -438,6 +409,7 @@ to select future backoffs.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_max_duration_secs
@@ -448,8 +420,6 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={60}
@@ -463,6 +433,7 @@ The maximum amount of time, in seconds, to wait between retries.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -476,14 +447,11 @@ duplicate data downstream.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
+
 
 ## How It Works
 
@@ -549,7 +517,7 @@ any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][urls.new_datadog_metrics_sink_issue].
+with the Vector team by [opening an issue][urls.new_datadog_metrics_sink_issue].
 
 ### Retry Policy
 

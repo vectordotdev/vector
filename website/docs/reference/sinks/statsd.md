@@ -1,19 +1,23 @@
 ---
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` sink streams `metric` events to StatsD metrics service."
 event_types: ["metric"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+statsd%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Statsd"
 sidebar_label: "statsd|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/statsd.rs
-status: "beta"
+status: "prod-ready"
 title: "Statsd Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `statsd` sink
 [streams](#streaming) [`metric`][docs.data-model.metric] events to
@@ -29,26 +33,37 @@ The Vector `statsd` sink
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "statsd" # required
   inputs = ["my-source-id"] # required
-  namespace = "service" # required
   address = "127.0.0.1:8125" # optional, default
   healthcheck = true # optional, default
+  namespace = "service" # required
 ```
 
-import Fields from '@site/src/components/Fields';
+</TabItem>
+<TabItem value="advanced">
 
-import Field from '@site/src/components/Field';
+```toml title="vector.toml"
+[sinks.my_sink_id]
+  type = "statsd" # required
+  inputs = ["my-source-id"] # required
+  address = "127.0.0.1:8125" # optional, default
+  healthcheck = true # optional, default
+  namespace = "service" # required
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={"127.0.0.1:8125"}
@@ -62,6 +77,7 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### address
@@ -72,8 +88,6 @@ The UDP socket address to send stats to.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -87,6 +101,7 @@ The UDP socket address to send stats to.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -97,8 +112,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -112,6 +125,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### namespace
@@ -122,15 +136,10 @@ A prefix that will be added to all metric names.
 
 
 </Field>
-
-
 </Fields>
 
-## Output
 
-The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] events to [StatsD][urls.statsd] metrics service.
-For example:
-
+## Examples
 
 ```text
 gorets:1|c

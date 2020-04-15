@@ -1,16 +1,20 @@
 ---
+last_modified_on: "2020-04-11"
 component_title: "Sampler"
 description: "The Vector `sampler` transform accepts and outputs `log` events allowing you to sample events with a configurable rate."
 event_types: ["log"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+sampler%22
-min_version: null
-service_name: "Sampler"
 sidebar_label: "sampler|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/sampler.rs
 status: "beta"
 title: "Sampler Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `sampler` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to sample
@@ -26,53 +30,36 @@ events with a configurable rate.
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "sampler" # required
   inputs = ["my-source-id"] # required
-  rate = 10 # required
   pass_list = ["[error]", "field2"] # optional, no default
+  rate = 10 # required
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "sampler" # required
   inputs = ["my-source-id"] # required
-  rate = 10 # required
   key_field = "message" # optional, no default
   pass_list = ["[error]", "field2"] # optional, no default
+  rate = 10 # required
 ```
 
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -86,6 +73,7 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### key_field
@@ -98,8 +86,6 @@ option][docs.reference.global-options#message_key].
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -113,6 +99,7 @@ option][docs.reference.global-options#message_key].
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### pass_list
@@ -125,8 +112,6 @@ _not_ be sampled.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -140,6 +125,7 @@ _not_ be sampled.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### rate
@@ -152,8 +138,6 @@ be dropped.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
@@ -178,4 +162,4 @@ You can learn more in the
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.global-options#message_key]: /docs/reference/global-options/#message_key
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

@@ -1,7 +1,10 @@
 ---
+last_modified_on: "2020-04-01"
 title: Updating
 description: How to update Vector to a newer version.
 ---
+
+import Jump from '@site/src/components/Jump';
 
 Updating Vector depends largely on your [installation][docs.installation]
 method. Each installation guide provides it's own "Updating" section:
@@ -16,19 +19,13 @@ method. Each installation guide provides it's own "Updating" section:
 
 ## Installation Method
 
-### Containers
-
-import Jump from '@site/src/components/Jump';
-
-<Jump to="/docs/setup/installation/containers/docker/#updating">Docker</Jump>
-
 ### Package managers
 
 <Jump to="/docs/setup/installation/package-managers/dpkg/#updating">DPKG</Jump>
 <Jump to="/docs/setup/installation/package-managers/homebrew/#updating">Homebrew</Jump>
+<Jump to="/docs/setup/installation/package-managers/msi/#updating">MSI</Jump>
 <Jump to="/docs/setup/installation/package-managers/nix/#updating">Nix</Jump>
 <Jump to="/docs/setup/installation/package-managers/rpm/#updating">RPM</Jump>
-<Jump to="/docs/setup/installation/package-managers/msi/#updating">MSI</Jump>
 
 ### Manual
 

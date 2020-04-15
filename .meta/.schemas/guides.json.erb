@@ -1,0 +1,77 @@
+{
+  "$id": "https://raw.githubusercontent.com/timberio/vector/master/.meta/schemas/guides.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Vector Guides Front Matter Schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "author_github",
+    "description",
+    "last_modified_on",
+    "tags",
+    "title"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The path to this schema.",
+      "enum": ["/.meta/.schemas/guides.json"]
+    },
+    "author_github": {
+      "type": "string",
+      "description": "Github URL of the author."
+    },
+    "cover_label": {
+      "type": "string",
+      "description": "Optional label for the cover of the guide"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the guide."
+    },
+    "draft": {
+      "type": "boolean",
+      "description": "Draft mode ensure this guide is not included in releases."
+    },
+    "hide_pagination": {
+      "type": "boolean",
+      "description": "Hides the pagination nav"
+    },
+    "last_modified_on": {
+      "type": "string",
+      "description": "When the guide was last modified."
+    },
+    "series_position": {
+      "type": "number",
+      "description": "If this guide is part of a series, this should specify the position in that series.",
+      "minimum": 1
+    },
+    "tags": {
+      "type": "array",
+      "description": "Array of tags",
+      "items": {
+        "type": "string",
+        "enum": <%= (
+          ["type: guide", "type: post", "type: tutorial"] +
+          metadata.domains.collect { |d| "domain: #{d.name}" } +
+          metadata.platform_names.collect { |p| "platform: #{p.downcase}" } +
+          metadata.sources_list.collect { |s| "source: #{s.name}" } +
+          metadata.transforms_list.collect { |t| "transform: #{t.name}" } +
+          metadata.sinks_list.collect { |s| "sink: #{s.name}" }
+        ) .to_json %>
+      }
+    },
+    "title": {
+      "type": "string",
+      "description": "Title of the guide."
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "Array of assumptions",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -9,10 +9,15 @@
 
 cd "$(dirname "$0")/../website/blog"
 
-for i in *.md; do
-  if [ -f $i.sig ]; then
-    continue
-  fi
+if [[ -n "$ARTICLE" ]]; then
+  rm "${ARTICLE}.md.sig"
+  gpg --detach-sign "${ARTICLE}.md"
+else
+  for i in *.md; do
+    if [ -f $i.sig ]; then
+      continue
+    fi
 
-  gpg --detach-sign $i
-done
+    gpg --detach-sign $i
+  done
+fi

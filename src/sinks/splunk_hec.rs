@@ -10,7 +10,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures01::Future;
+use futures01::{Future, Sink};
 use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -91,7 +91,8 @@ impl SinkConfig for HecSinkConfig {
             batch,
             tls_settings,
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal splunk_hec sink error: {}", e));
 
         Ok((Box::new(sink), healthcheck))
     }

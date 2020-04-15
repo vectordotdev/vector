@@ -1,0 +1,47 @@
+<%- downloads = metadata.installation.select_downloads(package_manager: :msi) -%>
+<Steps headingDepth={<%= heading_depth.to_json %>}>
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="<%= downloads.first.arch.parameterize %>"
+  values={<%= downloads.collect { |download| {label: download.arch, value: download.arch.parameterize} }.to_json %>}>
+
+<%- downloads.each do |download| -%>
+<TabItem value="<%= download.arch.parameterize %>">
+
+1.  ### Download the Vector `.msi` file
+
+    ```bat
+    powershell Invoke-WebRequest [[[urls.vector_downloads.<%= metadata.latest_version.minor_x %>/<%= download.file_name %>]]] -OutFile <%= download.file_name %>
+    ```
+
+    [Looking for a specific version?][docs.package_managers.msi#versions]
+
+2.  ### Install the Vector `.msi` package using `msiexec` command
+
+    ```bat
+    msiexec /i <%= download.file_name %> /quiet
+    ```
+
+3.  ### Navigate to the Vector directory
+
+    ```bat
+    cd "C:\Program Files\Vector"
+    ```
+
+4.  ### Configure Vector
+
+    <ConfigExample
+      format="toml"
+      path={<%= interface.config_path.to_toml %>}
+      sourceName={<%= (source && source.name).to_json %>}
+      sinkName={<%= (sink && sink.name).to_json %>} />
+
+5.  ### Start Vector
+
+<%= interface_start(interface, requirements: (source && source.requirements)).indent(4) %>
+
+</TabItem>
+<%- end -%>
+</Tabs>
+</Steps>

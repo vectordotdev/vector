@@ -1,16 +1,20 @@
 ---
+last_modified_on: "2020-04-11"
 component_title: "ANSI Stripper"
 description: "The Vector `ansi_stripper` transform accepts and outputs `log` events allowing you to strips ANSI escape sequences from the specified field."
 event_types: ["log"]
 function_category: "sanitize"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+ansi_stripper%22
-min_version: null
-service_name: "ANSI Stripper"
 sidebar_label: "ansi_stripper|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/ansi_stripper.rs
 status: "prod-ready"
 title: "ANSI Stripper Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `ansi_stripper` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to strips
@@ -26,24 +30,33 @@ ANSI escape sequences from the specified field.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "ansi_stripper" # required
   inputs = ["my-source-id"] # required
   field = "message" # optional, default
 ```
 
-import Fields from '@site/src/components/Fields';
+</TabItem>
+<TabItem value="advanced">
 
-import Field from '@site/src/components/Field';
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  type = "ansi_stripper" # required
+  inputs = ["my-source-id"] # required
+  field = "message" # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -57,6 +70,7 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### field
@@ -67,8 +81,6 @@ The target field to strip ANSI escape sequences from.
 
 
 </Field>
-
-
 </Fields>
 
 
@@ -93,12 +105,10 @@ You can learn more in the
 ### Field Notation Syntax
 
 The [`field`](#field) options
-support [Vector's field notiation syntax][docs.reference.field-path-notation],
+support [Vector's field notation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_ansi_stripper_transform_id]
   # ...
   field = "message"
@@ -114,4 +124,4 @@ You can learn more about Vector's field notation in the
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

@@ -1,13 +1,13 @@
 import React from 'react';
 
 import Avatar from '@site/src/components/Avatar';
-import BlogPostTags from '@site/src/components/BlogPostTags';
+import CTA from '@site/src/components/CTA';
 import Layout from '@theme/Layout';
 import BlogPostItem from '@theme/BlogPostItem';
 import BlogPostPaginator from '@theme/BlogPostPaginator';
-import MailingListForm from '@site/src/components/MailingListForm';
 import MDXComponents from '@theme/MDXComponents';
 import {MDXProvider} from '@mdx-js/react';
+import Tags from '@site/src/components/Tags';
 
 import classnames from 'classnames';
 import dateFormat from 'dateformat';
@@ -23,7 +23,7 @@ function BlogPostPage(props) {
   const {date: dateString, tags} = metadata;
   const readingStats = readingTime(BlogPostContents.toString());
   const date = new Date(Date.parse(dateString));
-  const domainTag = enrichTags(tags).find(tag => tag.category == 'domain');
+  const domainTag = enrichTags(tags, 'blog').find(tag => tag.category == 'domain');
   const domain = domainTag ? domainTag.value : null;
   const newPost = fetchNewPost();
 
@@ -36,28 +36,32 @@ function BlogPostPage(props) {
       <article className={styles.blogPost}>
         <header className={classnames('hero', 'domain-bg', `domain-bg--${domain}`, styles.header)}>
           <div className={classnames('container', styles.headerContainer)}>
-            <Avatar github={author_github} size="lg" nameSuffix={<> / <time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" subTitle={false} vertical={true} />
+            <div class="hero--avatar">
+              <Avatar
+                github={author_github}
+                size="lg"
+                nameSuffix={<> / <time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>}
+                rel="author"
+                subTitle={false}
+                vertical={true} />
+            </div>
             <h1>{title}</h1>
-            <div className={styles.headerTags}>
-              <BlogPostTags tags={tags} />
+            <div className="hero--subtitle">{metadata.description}</div>
+            <div className="hero--tags">
+              <Tags colorProfile="blog" tags={tags} />
             </div>
           </div>
         </header>
-        <div className="container container--narrow container--bleed margin-vert--xl">
-          <section className="markdown">
+        <div className="container container--xs margin-vert--xl">
+          <section className="markdown dropcap">
             <MDXProvider components={MDXComponents}><BlogPostContents /></MDXProvider>
           </section>
-          <section className={classnames('panel', 'bleed', styles.mailingList)} style={{textAlign: 'center'}}>
-            <div className={styles.mailingListTitle}>
-              <i className="feather icon-mail"></i> Vector In Your Inbox!
-            </div>
-            <p>
-              One email on the 1st of the month. No spam, ever.
-            </p>
-            <MailingListForm center={true} description={false} size="lg" />
+          <section>
+            <h2>Like What You See?</h2>
+            <CTA />
           </section>
           {(metadata.nextItem || metadata.prevItem) && (
-            <div className="bleed margin-vert--xl">
+            <div className="margin-vert--xl">
               <BlogPostPaginator
                 nextItem={metadata.nextItem}
                 prevItem={metadata.prevItem}

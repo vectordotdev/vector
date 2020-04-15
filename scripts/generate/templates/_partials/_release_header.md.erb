@@ -1,0 +1,29 @@
+---
+title: <%= "#{release.title} Release Notes".to_json %>
+codename: <%= release.codename.to_json %>
+date: <%= release.date.to_json %>
+description: <%= "#{release.title} - #{release.codename} - Release Notes".to_json %>
+version: <%= release.version.to_json %>
+---
+
+<%- if release.highlights.any? || release.commits.size > 25 -%>
+## What's Included?
+
+<div className="list--semi-bold">
+
+<%- if release.highlights.any? -%>
+* **[Highlights](#highlights)**
+<%- grouped_highlights = release.highlights.group_by(&:type) -%>
+<%- grouped_highlights.keys.sort.each do |type| -%>
+  * [<%= pluralize(grouped_highlights.fetch(type).size, type.humanize) %>](#<%= type.parameterize %>-highlights)
+<%- end -%>
+<%- end -%>
+* **[Changelog](#changelog)**
+<%- grouped_commits = release.commits.filter { |c| !c.chore? && !c.doc_update? }.group_by(&:type) -%>
+<%- grouped_commits.keys.sort.each do |type| -%>
+  * [<%= pluralize(grouped_commits.fetch(type).size, type.humanize) %>](#<%= type.parameterize %>)
+<%- end -%>
+
+</div>
+
+<%- end -%>

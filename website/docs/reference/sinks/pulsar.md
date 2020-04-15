@@ -1,19 +1,23 @@
 ---
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "Apache Pulsar"
 description: "The Vector `pulsar` sink streams `log` events to Apache Pulsar via the Pulsar protocol."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+pulsar%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Apache Pulsar"
 sidebar_label: "pulsar|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/pulsar.rs
 status: "beta"
 title: "Apache Pulsar Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `pulsar` sink
 [streams](#streaming) [`log`][docs.data-model.log] events to [Apache
@@ -29,25 +33,19 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
+  type = "pulsar" # required
+  inputs = ["my-source-id"] # required
   address = "127.0.0.1:6650" # required
+  healthcheck = true # optional, default
   topic = "topic-1234" # required
 
   # Encoding
@@ -57,17 +55,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
+  type = "pulsar" # required
+  inputs = ["my-source-id"] # required
   address = "127.0.0.1:6650" # required
+  healthcheck = true # optional, default
   topic = "topic-1234" # required
 
   # Auth
-  auth.name = "${NAME_ENV_VAR}" # optional, no default
-  auth.token = "${TOKEN_ENV_VAR}" # optional, no default
+  auth.name = "${PULSAR_NAME}" # optional, no default
+  auth.token = "${PULSAR_TOKEN}" # optional, no default
 
   # Encoding
   encoding.codec = "json" # required
@@ -79,38 +78,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["127.0.0.1:6650"]}
-  groups={[]}
-  name={"address"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### address
-
-A host and port pair that the pulsar client should connect to.
-
-
-
-
-</Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -124,6 +92,7 @@ A host and port pair that the pulsar client should connect to.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### auth
@@ -133,13 +102,11 @@ Options for the authentication strategy.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["${NAME_ENV_VAR}","name123"]}
+  examples={["${PULSAR_NAME}","name123"]}
   groups={[]}
   name={"name"}
   path={"auth"}
@@ -148,6 +115,7 @@ Options for the authentication strategy.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### name
@@ -158,13 +126,11 @@ The basic authentication name.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["${TOKEN_ENV_VAR}","123456789"]}
+  examples={["${PULSAR_TOKEN}","123456789"]}
   groups={[]}
   name={"token"}
   path={"auth"}
@@ -173,6 +139,7 @@ The basic authentication name.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### token
@@ -183,13 +150,9 @@ The basic authentication password.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -203,6 +166,7 @@ The basic authentication password.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### encoding
@@ -212,8 +176,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -227,6 +189,7 @@ Configures the encoding specific sink behavior.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### codec
@@ -237,8 +200,6 @@ The encoding codec used to serialize the events before outputting.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -252,6 +213,7 @@ The encoding codec used to serialize the events before outputting.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### except_fields
@@ -262,8 +224,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -277,6 +237,7 @@ Prevent the sink from encoding the specified labels.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### only_fields
@@ -287,8 +248,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -302,6 +261,7 @@ Limit the sink to only encoding the specified labels.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_format
@@ -312,13 +272,57 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["127.0.0.1:6650"]}
+  groups={[]}
+  name={"address"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### address
+
+A host and port pair that the pulsar client should connect to.
 
 
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"healthcheck"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### healthcheck
+
+Enables/disables the sink healthcheck upon start.
+
+ See [Health Checks](#health-checks) for more info.
+
+
+</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -332,6 +336,7 @@ How to format event timestamps.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### topic
@@ -342,8 +347,6 @@ The Pulsar topic name to write events to.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

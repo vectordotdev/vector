@@ -164,8 +164,11 @@ impl Client {
     pub fn put_logs(
         &self,
         sequence_token: Option<String>,
-        log_events: Vec<InputLogEvent>,
+        mut log_events: Vec<InputLogEvent>,
     ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
+        // Sort by timestamp
+        log_events.sort_by_key(|e| e.timestamp);
+
         let request = PutLogEventsRequest {
             log_events,
             sequence_token,

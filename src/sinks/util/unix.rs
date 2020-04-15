@@ -1,6 +1,9 @@
-use crate::sinks::util::SinkExt;
 use crate::{
-    sinks::util::{encode_event, encoding::EncodingConfig, Encoding},
+    internal_events::{
+        UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketError,
+        UnixSocketEventSent,
+    },
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
     sinks::{Healthcheck, RouterSink},
     topology::config::SinkContext,
 };
@@ -33,12 +36,11 @@ impl UnixSinkConfig {
 
     pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let encoding = self.encoding.clone();
+        let unix = UnixSink::new(self.path.clone());
+        let sink = StreamSink::new(unix, cx.acker());
 
-        let sink = Box::new(
-            UnixSink::new(self.path.clone())
-                .stream_ack(cx.acker())
-                .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
-        );
+        let sink =
+            Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))));
         let healthcheck = unix_healthcheck(self.path.clone());
 
         Ok((sink, healthcheck))
@@ -108,19 +110,15 @@ impl UnixSink {
                     Ok(Async::NotReady) => {
                         return Ok(Async::NotReady);
                     }
-                    Err(err) => {
-                        error!(
-                            "Error connecting to {}: {}",
-                            self.path.to_str().unwrap(),
-                            err
-                        );
+                    Err(error) => {
+                        emit!(UnixSocketConnectionFailure {
+                            error,
+                            path: &self.path
+                        });
                         UnixSinkState::Backoff(self.next_delay())
                     }
                     Ok(Async::Ready(stream)) => {
-                        debug!(
-                            message = "connected",
-                            path = &field::display(self.path.to_str().unwrap())
-                        );
+                        emit!(UnixSocketConnectionEstablished { path: &self.path });
                         self.backoff = Self::fresh_backoff();
                         let out = FramedWrite::new(stream, BytesCodec::new());
                         UnixSinkState::Open(out)
@@ -150,20 +148,25 @@ impl Sink for UnixSink {
     type SinkError = ();
 
     fn start_send(&mut self, line: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
+        let byte_size = line.len();
         match self.poll_connection() {
             Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),
             Err(_) => {
                 unreachable!(); // poll_ready() should never return an error
             }
             Ok(Async::Ready(connection)) => match connection.start_send(line) {
-                Err(err) => {
-                    let path = self.path.to_str().unwrap();
-                    debug!(message = "disconnected.", path = &field::display(path));
-                    error!("Error in connection {}: {}", path, err);
+                Err(error) => {
+                    emit!(UnixSocketError {
+                        error,
+                        path: &self.path
+                    });
                     self.state = UnixSinkState::Disconnected;
                     Ok(AsyncSink::Ready)
                 }
-                Ok(res) => Ok(res),
+                Ok(res) => {
+                    emit!(UnixSocketEventSent { byte_size });
+                    Ok(res)
+                }
             },
         }
     }
@@ -178,10 +181,11 @@ impl Sink for UnixSink {
         let connection = try_ready!(self.poll_connection());
 
         match connection.poll_complete() {
-            Err(err) => {
-                let path = self.path.to_str().unwrap();
-                debug!(message = "disconnected.", path = &field::display(&path));
-                error!("Error in connection {}: {}", path, err);
+            Err(error) => {
+                emit!(UnixSocketError {
+                    error,
+                    path: &self.path
+                });
                 self.state = UnixSinkState::Disconnected;
                 Ok(Async::Ready(()))
             }

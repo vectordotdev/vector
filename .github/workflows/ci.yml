@@ -69,7 +69,7 @@ jobs:
         name: builds
     - uses: opsgang/ga-setup-minikube@v0.1.1
       with:
-        minikube-version: 1.9.0
+        minikube-version: 1.9.1
         k8s-version: ${{ matrix.kube }}
     - name: Start local repository
       run: docker run -d -p 5000:5000 --restart=always --name registry registry:2
@@ -87,5 +87,5 @@ jobs:
     - name: Make test binary executable
       run: chmod +x ./builds/vector-test
     - name: Run kubernetes integration tests
-      run: KUBE_TEST_IMAGE=localhost:5000/vector_test:latest ./builds/vector-test --test-threads=1 kubernetes
+      run: KUBE_TEST_IMAGE=localhost:5000/vector_test:latest TEST_LOG=debug ./builds/vector-test --test-threads=1 kubernetes
 

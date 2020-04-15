@@ -1,19 +1,24 @@
 ---
+last_modified_on: "2020-04-07"
 delivery_guarantee: "best_effort"
 component_title: "Vector"
 description: "The Vector `vector` source ingests data through another upstream `vector` sink and outputs `log` and `metric` events."
 event_types: ["log","metric"]
 function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Vector"
 sidebar_label: "vector|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/vector.rs
 status: "beta"
 title: "Vector Source"
 unsupported_operating_systems: []
 ---
+
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `vector` source
 ingests data through another upstream [`vector` sink][docs.sinks.vector] and
@@ -28,24 +33,23 @@ events.
      website/docs/reference/sources/vector.md.erb
 -->
 
-## Configuration
+## Requirements
 
-import Tabs from '@theme/Tabs';
+<Alert icon={false} type="danger" className="list--warnings">
+
+* This component exposes a configured port. You must ensure your network allows access to this port.
+
+</Alert>
+
+## Configuration
 
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "vector" # required
   address = "0.0.0.0:9000" # required
@@ -54,9 +58,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "vector" # required
@@ -75,13 +77,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -95,6 +91,7 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### address
@@ -107,8 +104,6 @@ include a port.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={30}
@@ -122,6 +117,7 @@ include a port.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 ### shutdown_timeout_secs
@@ -132,8 +128,6 @@ The timeout before a connection is forcefully closed during shutdown.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -147,6 +141,7 @@ The timeout before a connection is forcefully closed during shutdown.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tls
@@ -156,8 +151,6 @@ Configures the TLS options for connections from this source.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -171,6 +164,7 @@ Configures the TLS options for connections from this source.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### ca_path
@@ -182,8 +176,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -197,6 +189,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### crt_path
@@ -209,8 +202,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -224,6 +215,7 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### enabled
@@ -235,8 +227,6 @@ is also required.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -250,6 +240,7 @@ is also required.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_pass
@@ -261,8 +252,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -276,6 +265,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_path
@@ -287,8 +277,6 @@ PEM format (PKCS#8).
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -302,32 +290,23 @@ PEM format (PKCS#8).
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` will cause OpenSSL to not request a certificate from the client","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
 
 If `true`, Vector will require a TLS certificate from the connecting host and
 terminate the connection if it is not valid. If `false` (the default), Vector
-will ignore the presence of a client certificate.
+will not request a certificate from the client.
 
 
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
-
-## Output
-
-The `vector` source is a pass-through source and is intended to accept data
-from an upstream [`vector` sink][docs.sinks.vector]. Datta is not changed or
-augmented.
 
 ## How It Works
 
@@ -353,8 +332,17 @@ Currently, Vector does not perform any application level message acknowledgement
 Upstream Vector instances forward data to downstream Vector instances via the TCP protocol.
 
 
+
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
+options.
+
+
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.sinks.vector]: /docs/reference/sinks/vector/
 [urls.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
+[urls.openssl]: https://www.openssl.org/

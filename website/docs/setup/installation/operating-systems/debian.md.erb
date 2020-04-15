@@ -1,0 +1,15 @@
+---
+title: Install Vector On Debian
+sidebar_label: Debian
+description: Install Vector on the Debian operating system
+---
+
+<%- operating_system = metadata.installation.operating_systems.debian -%>
+<%- interfaces = fetch_interfaces(operating_system.interfaces) -%>
+<%- strategies = fetch_strategies(operating_system.strategies) -%>
+
+This document will cover installing Vector on Debian.
+
+## Install
+
+<%= installation_tutorial(interfaces, strategies, heading_depth: 3) %>

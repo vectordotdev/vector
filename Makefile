@@ -4,6 +4,14 @@ _latest_version := $(shell scripts/version.sh true)
 _version := $(shell scripts/version.sh)
 export USE_CONTAINER ?= docker
 
+# Begin OS detection
+ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
+    export OPERATING_SYSTEM := Windows
+    export DEFAULT_FEATURES = default-msvc
+else
+    export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
+    export DEFAULT_FEATURES = default
+endif
 
 help:
 	@echo "                                      __   __  __"
@@ -69,21 +77,22 @@ release-push: ## Push new Vector version
 	@scripts/release-push.sh
 
 run: ## Starts Vector in development mode
-	@cargo run
+	@cargo run --no-default-features --features ${DEFAULT_FEATURES}
 
 signoff: ## Signsoff all previous commits since branch creation
 	@scripts/signoff.sh
 
+export ARTICLE ?= true
 sign-blog: ## Sign newly added blog articles using GPG
 	@scripts/sign-blog.sh
 
 test: ## Spins up Docker resources and runs _every_ test
-	@cargo test --all --features docker --no-run
+	@cargo test --no-default-features --features ${DEFAULT_FEATURES} --all --features docker --no-run
 	@docker-compose up -d test-runtime-deps
-	@cargo test --all --features docker -- --test-threads 4
+	@cargo test --no-default-features --features ${DEFAULT_FEATURES} --all --features docker -- --test-threads 4
 
 test-behavior: ## Runs behavioral tests
-	@cargo run -- test tests/behavior/**/*.toml
+	@cargo run --no-default-features --features ${DEFAULT_FEATURES} -- test tests/behavior/**/*.toml
 
 clean: ## Remove build artifacts
 	@cargo clean
@@ -96,13 +105,13 @@ build-archive: ## Build a Vector archive for a given $TARGET and $VERSION
 build-ci-docker-images: ## Build the various Docker images used for CI
 	@scripts/build-ci-docker-images.sh
 
-build-docker: ## Build the Vector docker images, but do not push
+build-docker: ## Build the Vector docker images from artifacts created via `package-deb`, but do not push
 	@scripts/build-docker.sh
 
-package-deb: ## Create a .deb package from artifacts created via `build`
+package-deb: ## Create a .deb package from artifacts created via `build-archive`
 	@scripts/package-deb.sh
 
-package-rpm: ## Create a .rpm package from artifacts created via `build`
+package-rpm: ## Create a .rpm package from artifacts created via `build-archive`
 	@scripts/package-rpm.sh
 
 release-commit: ## Commits release changes

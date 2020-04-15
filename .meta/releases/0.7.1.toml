@@ -1,5 +1,5 @@
 [releases."0.7.1"]
-date = 2020-01-23
+date = 2020-01-24
 commits = [
 {sha = "e5096d0ad09333cdcbf7f7b8fdea71764c61b940", message = "chore(operations): Make sorting of blog posts stable (#1566)", author = "Alexander Rodin", date = 2020-01-22T17:53:08Z, files_count = 1, insertions_count = 1, deletions_count = 1},
 {sha = "ed11b854a21f8f8f4d0b532d2b946ed0d3a91718", message = "chore(operations): Add AWS API key for Windows tests in CI (#1565)", author = "Alexander Rodin", date = 2020-01-22T18:00:10Z, files_count = 1, insertions_count = 5, deletions_count = 1},

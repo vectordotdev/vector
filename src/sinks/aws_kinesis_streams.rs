@@ -6,7 +6,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         rusoto::{self, AwsCredentialsProvider},
-        BatchEventsConfig, SinkExt, TowerRequestConfig,
+        BatchEventsConfig, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -16,8 +16,8 @@ use lazy_static::lazy_static;
 use rand::random;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_kinesis::{
-    Kinesis, KinesisClient, ListStreamsInput, PutRecordsError, PutRecordsInput, PutRecordsOutput,
-    PutRecordsRequestEntry,
+    DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError, PutRecordsInput,
+    PutRecordsOutput, PutRecordsRequestEntry,
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -102,8 +102,8 @@ impl KinesisService {
         let kinesis = KinesisService { client, config };
 
         let sink = request
-            .batch_sink(KinesisRetryLogic, kinesis, cx.acker())
-            .batched_with_min(Vec::new(), &batch)
+            .batch_sink(KinesisRetryLogic, kinesis, Vec::new(), batch, cx.acker())
+            .sink_map_err(|e| error!("Fatal kinesis streams sink error: {}", e))
             .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 
         Ok(sink)
@@ -163,9 +163,9 @@ impl RetryLogic for KinesisRetryLogic {
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
-    #[snafu(display("ListStreams failed: {}", source))]
-    ListStreamsFailed {
-        source: RusotoError<rusoto_kinesis::ListStreamsError>,
+    #[snafu(display("DescribeStream failed: {}", source))]
+    DescribeStreamFailed {
+        source: RusotoError<rusoto_kinesis::DescribeStreamError>,
     },
     #[snafu(display("Stream names do not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
@@ -185,21 +185,18 @@ fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Result<s
     let stream_name = config.stream_name;
 
     let fut = client
-        .list_streams(ListStreamsInput {
-            exclusive_start_stream_name: Some(stream_name.clone()),
+        .describe_stream(DescribeStreamInput {
+            stream_name: stream_name.clone(),
+            exclusive_start_shard_id: None,
             limit: Some(1),
         })
-        .map_err(|source| HealthcheckError::ListStreamsFailed { source }.into())
-        .and_then(move |res| Ok(res.stream_names.into_iter().next()))
+        .map_err(|source| HealthcheckError::DescribeStreamFailed { source }.into())
+        .and_then(move |res| Ok(res.stream_description.stream_name))
         .and_then(move |name| {
-            if let Some(name) = name {
-                if name == stream_name {
-                    Ok(())
-                } else {
-                    Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
-                }
+            if name == stream_name {
+                Ok(())
             } else {
-                Err(HealthcheckError::NoMatchingStreamName { stream_name }.into())
+                Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
             }
         });
 

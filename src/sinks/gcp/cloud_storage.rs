@@ -8,7 +8,7 @@ use crate::{
             http::{HttpClient, HttpClientFuture},
             retries::{RetryAction, RetryLogic},
             BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
-            SinkExt, TowerRequestConfig,
+            TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
@@ -94,7 +94,7 @@ fn default_config(e: Encoding) -> GcsSinkConfig {
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "kebab-case")]
 enum GcsPredefinedAcl {
     AuthenticatedRead,
     BucketOwnerFullControl,
@@ -237,8 +237,10 @@ impl GcsSink {
             .settings(request, GcsRetryLogic)
             .service(self);
 
-        let sink = crate::sinks::util::BatchServiceSink::new(svc, cx.acker())
-            .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
+        let buffer = PartitionBuffer::new(Buffer::new(compression));
+
+        let sink = crate::sinks::util::PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+            .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(Box::new(sink))
@@ -297,7 +299,7 @@ impl Service<RequestWrapper> for GcsSink {
         settings
             .content_encoding
             .map(|ce| headers.insert("content-encoding", ce));
-        headers.insert("x-goog-acl", settings.acl);
+        settings.acl.map(|acl| headers.insert("x-goog-acl", acl));
         headers.insert("x-goog-storage-class", settings.storage_class);
         for (p, v) in settings.metadata {
             headers.insert(p, v);
@@ -361,7 +363,7 @@ impl RequestWrapper {
 // producing a request.
 #[derive(Clone, Debug)]
 struct RequestSettings {
-    acl: HeaderValue,
+    acl: Option<HeaderValue>,
     content_type: HeaderValue,
     content_encoding: Option<HeaderValue>,
     storage_class: HeaderValue,
@@ -373,8 +375,9 @@ struct RequestSettings {
 
 impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
-        let acl = config.acl.unwrap_or(GcsPredefinedAcl::default());
-        let acl = HeaderValue::from_str(&to_string(acl)).unwrap();
+        let acl = config
+            .acl
+            .map(|acl| HeaderValue::from_str(&to_string(acl)).unwrap());
         let content_type = HeaderValue::from_str(config.encoding.codec.content_type()).unwrap();
         let content_encoding = config
             .compression

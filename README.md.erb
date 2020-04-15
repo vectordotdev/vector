@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="<%= metadata.links.fetch("urls.vector_getting_started") %>">Getting Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_docs") %>">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_community") %>">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_twitter") %>">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_download") %>">Download v<%= metadata.latest_version %><a/>
+    <a href="<%= metadata.links.fetch("urls.vector_components") %>">Components<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_guides") %>">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_docs") %>">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_blog") %>">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_community") %>">Community<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_download") %>">Download v<%= metadata.latest_version %><a/>
   </strong>
 </p>
 
@@ -15,7 +15,7 @@
 
 <p align="center">
   <strong>
-    New post! <a href="<%= metadata.new_post.permalink %>"><%= metadata.new_post.title %></a>
+    New post! <a href="<%= HOST %><%= metadata.new_post.permalink %>"><%= metadata.new_post.title %></a>
   </strong>
 </p>
 
@@ -37,10 +37,9 @@
 
 ### Setup
 
-* [**Installation**][docs.installation] - [containers][docs.containers], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
+* [**Installation**][docs.installation] - [operating systems][docs.operating_systems], [package managers][docs.package_managers], [platforms][docs.platforms], [from archives][docs.from-archives], [from source][docs.from-source]
 * [**Configuration**][docs.configuration]
-* [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
-* [**Guides**][docs.guides] - [getting started][docs.guides.getting_started], [unit testing][docs.guides.unit-testing]
+* [**Deployment**][docs.deployment] - [strategies][docs.strategies], [topologies][docs.topologies]
 
 ### Reference
 
@@ -116,6 +115,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 * **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] transforms.
 * **Rich parsing** - [Regex][docs.transforms.regex_parser], [Grok][docs.transforms.grok_parser], and [more][urls.vector_parsing_transforms] allow for rich parsing.
+* **Smart timestamp coercion** - All [parsing transforms][urls.vector_parsing_transforms] implement a [`types` option][docs.transforms.regex_parser#types] that can automatically parse timestamps.
 * **Context enrichment** - [Enrich data with environment context][urls.vector_enriching_transforms].
 * **Metrics derivation** - [Derive logs from metrics][docs.transforms.log_to_metric].
 * **Multi-line merging** - [Merge multi-line logs][docs.sources.file#multiline] into one event, such as stacktraces.
@@ -125,8 +125,8 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Hot reload** - [Reload configuration on the fly][docs.process-management#reloading] without disrupting data flow.
 * **Zero delay start** - [Starts and restarts][docs.administration.process-management] without a delay.
 * **Multi-platform** - [Linux, MacOS, Windows, x86_64, ARM64, and ARMv7][docs.installation].
-* **CI friendly** - [Config linting][docs.administration.validating], [dry runs][docs.administration.validating], and [unit tests][docs.guides.unit-testing] make Vector CI friendly.
-* **Configurable concurrency** - All CPU cores ([service][docs.roles.service]) or just one ([agent][docs.roles.agent]) via the [`--threads` flag][docs.process-management#starting].
+* **CI friendly** - [Config linting][docs.administration.validating], [dry runs][docs.administration.validating], and [unit tests][guides.advanced.unit-testing] make Vector CI friendly.
+* **Configurable concurrency** - All CPU cores ([service][docs.strategies#service]) or just one ([daemon][docs.strategies#daemon]) via the [`--threads` flag][docs.process-management#starting].
 * **Custom DNS** - [Custom DNS][docs.global-options#dns_servers] makes service discovery possible.
 * **Optional static binary** - [Optional MUSL static binaries][pages.releases] mean zero required dependencies.
 * **TLS support** - All relevant Vector components offer TLS options for secure communication.
@@ -144,7 +144,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 ### UX
 
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you make the appropriate tradeoffs with components.
-* **Config unit tests** - [Develop Vector config files like code][docs.guides.unit-testing]. Avoid the frustrating dev style required by other tools.
+* **Config unit tests** - [Develop Vector config files like code][guides.advanced.unit-testing]. Avoid the frustrating dev style required by other tools.
 * **Config linting** - [Quickly lint][docs.administration.validating] Vector config files to spot errors and prevent bad configs in CI.
 * **Thoughtful docs** - [Quality documentation][docs.what-is-vector] that respects your time and reduces communication overhead.
 
@@ -160,13 +160,13 @@ Run the following in your terminal, then follow the on-screen instructions.
 Or use your own [preferred method][docs.installation].
 
 
-## Latest Posts & Announcements
+## Latest Highlights
 
-<%- metadata.posts.reverse[0..4].each do |post| -%>
-* [<%= post.title %>](<%= post.permalink %>)
+<%- metadata.highlights.reverse[0..4].each do |highlight| -%>
+* [<%= highlight.title %>](<%= HOST %><%= highlight.permalink %>)
 <%- end -%>
 
-[view all...][urls.vector_blog]
+[view all...][urls.vector_highlights]
 
 ---
 

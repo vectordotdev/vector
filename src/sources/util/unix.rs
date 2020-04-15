@@ -1,5 +1,4 @@
-use crate::event::Event;
-use crate::sources::Source;
+use crate::{emit, event::Event, internal_events::UnixSocketError, sources::Source};
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use std::path::PathBuf;
@@ -41,6 +40,7 @@ pub fn build_unix_source(
                 let out = out.clone();
                 let peer_addr = socket.peer_addr().ok();
                 let host_key = host_key.clone();
+                let listen_path = path.clone();
 
                 let span = info_span!("connection");
                 let path = if let Some(addr) = peer_addr {
@@ -59,7 +59,12 @@ pub fn build_unix_source(
                     path.map(|p| p.to_string_lossy().into_owned().into());
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
                     .filter_map(move |line| build_event(&host_key, received_from.clone(), &line))
-                    .map_err(|e| error!("error reading line: {:?}", e));
+                    .map_err(move |error| {
+                        emit!(UnixSocketError {
+                            error,
+                            path: &listen_path,
+                        });
+                    });
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
                 tokio01::spawn(handler.instrument(span))

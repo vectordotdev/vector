@@ -8,6 +8,12 @@
 <%= component_requirements(component) %>
 
 <%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
 ## Configuration
 
 <%= component_config_example(component) %>
@@ -20,12 +26,18 @@
 <%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
+
+<%- end -%>
 ## How It Works [[sort]]
 
 ### Decentralized Deployments
 
 Loki currently does not support out-of-order inserts. If Vector is deployed in
-a decentralized setup  then there is the possiblity that logs might get
+a decentralized setup then there is the possibility that logs might get
 rejected due to data races between Vector instances. To avoid this we suggest
 either assigning each Vector instance with a unique label or deploying a
 centralized Vector which will ensure no logs will get sent out-of-order.

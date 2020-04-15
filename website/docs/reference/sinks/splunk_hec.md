@@ -1,19 +1,24 @@
 ---
+last_modified_on: "2020-04-07"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+splunk_hec%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Splunk HEC"
 sidebar_label: "splunk_hec|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/splunk_hec.rs
 status: "prod-ready"
 title: "Splunk HEC Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `splunk_hec` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to a [Splunk's
@@ -29,31 +34,22 @@ HTTP Event Collector][urls.splunk_hec].
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "splunk_hec" # required
   inputs = ["my-source-id"] # required
-  host = "http://my-splunk-host.com" # required
-  token = "${TOKEN_ENV_VAR}" # required
   healthcheck = true # optional, default
+  host = "http://my-splunk-host.com" # required
   host_key = "hostname" # optional, no default
   indexed_fields = ["field1", "field2"] # optional, no default, relevant when encoding = "json"
+  token = "${SPLUNK_HEC_TOKEN}" # required
 
   # Encoding
   encoding.codec = "json" # required
@@ -62,28 +58,26 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "splunk_hec" # required
   inputs = ["my-source-id"] # required
-  host = "http://my-splunk-host.com" # required
-  token = "${TOKEN_ENV_VAR}" # required
   healthcheck = true # optional, default
+  host = "http://my-splunk-host.com" # required
   host_key = "hostname" # optional, no default
   index = "custom_index" # optional, no default
   indexed_fields = ["field1", "field2"] # optional, no default, relevant when encoding = "json"
+  token = "${SPLUNK_HEC_TOKEN}" # required
 
   # Batch
   batch.max_size = 1049000 # optional, default, bytes
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -113,13 +107,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -133,6 +121,7 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -142,8 +131,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={1049000}
@@ -157,6 +144,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -167,8 +155,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -182,6 +168,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -192,13 +179,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -212,6 +195,7 @@ The maximum age of a batch before it is flushed.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### buffer
@@ -221,58 +205,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={500}
-  enumValues={null}
-  examples={[500]}
-  groups={[]}
-  name={"max_events"}
-  path={"buffer"}
-  relevantWhen={{"type":"memory"}}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"events"}
-  >
-
-#### max_events
-
-The maximum number of [events][docs.data-model] allowed in the buffer.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[104900000]}
-  groups={[]}
-  name={"max_size"}
-  path={"buffer"}
-  relevantWhen={{"type":"disk"}}
-  required={true}
-  templateable={false}
-  type={"int"}
-  unit={"bytes"}
-  >
-
-#### max_size
-
-The maximum size of the buffer on the disk.
-
- See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-
-
 <Field
   common={true}
   defaultValue={"memory"}
@@ -286,6 +218,7 @@ The maximum size of the buffer on the disk.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -296,8 +229,54 @@ The buffer's type and storage mechanism.
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={500}
+  enumValues={null}
+  examples={[500]}
+  groups={[]}
+  name={"max_events"}
+  path={"buffer"}
+  relevantWhen={{"type":"memory"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  warnings={[]}
+  >
+
+#### max_events
+
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[104900000]}
+  groups={[]}
+  name={"max_size"}
+  path={"buffer"}
+  relevantWhen={{"type":"disk"}}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+#### max_size
+
+The maximum size of the buffer on the disk.
+
+ See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
 <Field
   common={false}
   defaultValue={"block"}
@@ -311,6 +290,7 @@ The buffer's type and storage mechanism.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### when_full
@@ -321,13 +301,9 @@ The behavior when the buffer becomes full.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -341,6 +317,7 @@ The behavior when the buffer becomes full.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### encoding
@@ -350,8 +327,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -365,6 +340,7 @@ Configures the encoding specific sink behavior.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### codec
@@ -375,8 +351,6 @@ The encoding codec used to serialize the events before outputting.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -390,6 +364,7 @@ The encoding codec used to serialize the events before outputting.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### except_fields
@@ -400,8 +375,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -415,6 +388,7 @@ Prevent the sink from encoding the specified labels.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### only_fields
@@ -425,8 +399,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -440,6 +412,7 @@ Limit the sink to only encoding the specified labels.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_format
@@ -450,13 +423,9 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -470,6 +439,7 @@ How to format event timestamps.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -480,8 +450,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -495,6 +463,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -505,8 +474,6 @@ Your Splunk HEC host.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -520,6 +487,7 @@ Your Splunk HEC host.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host_key
@@ -532,8 +500,6 @@ option][docs.reference.global-options#host_key].
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -547,6 +513,7 @@ option][docs.reference.global-options#host_key].
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### index
@@ -558,8 +525,6 @@ index is used.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -573,6 +538,7 @@ index is used.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### indexed_fields
@@ -583,8 +549,30 @@ Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields].
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${SPLUNK_HEC_TOKEN}","A94A8FE5CCB19BA61C4C08"]}
+  groups={[]}
+  name={"token"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### token
+
+Your Splunk HEC token.
+
+ See [Setup](#setup) for more info.
 
 
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -598,6 +586,7 @@ Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields].
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### request
@@ -607,8 +596,6 @@ Configures the sink request behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={10}
@@ -622,6 +609,7 @@ Configures the sink request behavior.
   templateable={false}
   type={"int"}
   unit={"requests"}
+  warnings={[]}
   >
 
 #### in_flight_limit
@@ -632,8 +620,6 @@ The maximum number of in-flight requests allowed at any given time.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -647,6 +633,7 @@ The maximum number of in-flight requests allowed at any given time.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### rate_limit_duration_secs
@@ -657,8 +644,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={10}
@@ -672,6 +657,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### rate_limit_num
@@ -683,8 +669,6 @@ time window.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={-1}
@@ -698,6 +682,7 @@ time window.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### retry_attempts
@@ -708,8 +693,6 @@ The maximum number of retries to make for failed requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1}
@@ -723,6 +706,7 @@ The maximum number of retries to make for failed requests.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_initial_backoff_secs
@@ -735,8 +719,6 @@ to select future backoffs.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10}
@@ -750,6 +732,7 @@ to select future backoffs.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_max_duration_secs
@@ -760,8 +743,6 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={60}
@@ -775,6 +756,7 @@ The maximum amount of time, in seconds, to wait between retries.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -788,13 +770,9 @@ duplicate data downstream.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -808,6 +786,7 @@ duplicate data downstream.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tls
@@ -817,8 +796,6 @@ Configures the TLS options for connections from this sink.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -832,6 +809,7 @@ Configures the TLS options for connections from this sink.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### ca_path
@@ -843,8 +821,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -858,6 +834,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### crt_path
@@ -870,8 +847,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -885,6 +860,7 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_pass
@@ -896,8 +872,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -911,6 +885,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_path
@@ -922,8 +897,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -937,20 +910,18 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be loaded and checked for validity, but the handshake will not attempt to verify the certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
-host. Do NOT set this to `false` unless you understand the risks of not
-verifying the remote certificate.
+host.
 
 
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -964,6 +935,7 @@ verifying the remote certificate.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### verify_hostname
@@ -976,45 +948,15 @@ you understand the risks of not verifying the remote hostname.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${TOKEN_ENV_VAR}","A94A8FE5CCB19BA61C4C08"]}
-  groups={[]}
-  name={"token"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### token
-
-Your Splunk HEC token.
-
- See [Setup](#setup) for more info.
-
-
-</Field>
-
-
 </Fields>
+
 
 ## How It Works
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 
@@ -1073,7 +1015,7 @@ any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][urls.new_splunk_hec_sink_issue].
+with the Vector team by [opening an issue][urls.new_splunk_hec_sink_issue].
 
 ### Retry Policy
 
@@ -1091,12 +1033,21 @@ your Spunk HTTP Collectory you'll be provided a [`host`](#host) and [`token`](#t
 should supply to the [`host`](#host) and [`token`](#token) options.
 
 
+
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
+options.
+
+
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [urls.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+splunk_hec
+[urls.openssl]: https://www.openssl.org/
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [urls.splunk_hec_indexed_fields]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC
 [urls.splunk_hec_setup]: https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector

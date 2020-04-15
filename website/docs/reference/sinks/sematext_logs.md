@@ -1,19 +1,24 @@
 ---
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Sematext Logs"
 description: "The Vector `sematext_logs` sink batches `log` events to Sematext via the Elasticsearch API."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+sematext_logs%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Sematext Logs"
 sidebar_label: "sematext_logs|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/sematext_logs.rs
 status: "beta"
 title: "Sematext Logs Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `sematext_logs` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to
@@ -29,52 +34,41 @@ The Vector `sematext_logs` sink
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "sematext_logs" # required
   inputs = ["my-source-id"] # required
-  token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
   healthcheck = true # optional, default
+  token = "${SEMATEXT_TOKEN}" # required
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "sematext_logs" # required
   inputs = ["my-source-id"] # required
-  token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
   healthcheck = true # optional, default
   host = "http://127.0.0.1" # optional, no default
   region = "na" # optional, no default
+  token = "${SEMATEXT_TOKEN}" # required
 
   # Batch
   batch.max_size = 10490000 # optional, default, bytes
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -95,13 +89,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -115,6 +103,7 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -124,8 +113,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={10490000}
@@ -139,6 +126,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -149,8 +137,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -164,6 +150,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -174,13 +161,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -194,6 +177,7 @@ The maximum age of a batch before it is flushed.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### buffer
@@ -203,58 +187,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={500}
-  enumValues={null}
-  examples={[500]}
-  groups={[]}
-  name={"max_events"}
-  path={"buffer"}
-  relevantWhen={{"type":"memory"}}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"events"}
-  >
-
-#### max_events
-
-The maximum number of [events][docs.data-model] allowed in the buffer.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[104900000]}
-  groups={[]}
-  name={"max_size"}
-  path={"buffer"}
-  relevantWhen={{"type":"disk"}}
-  required={true}
-  templateable={false}
-  type={"int"}
-  unit={"bytes"}
-  >
-
-#### max_size
-
-The maximum size of the buffer on the disk.
-
- See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-
-
 <Field
   common={true}
   defaultValue={"memory"}
@@ -268,6 +200,7 @@ The maximum size of the buffer on the disk.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -278,8 +211,54 @@ The buffer's type and storage mechanism.
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={500}
+  enumValues={null}
+  examples={[500]}
+  groups={[]}
+  name={"max_events"}
+  path={"buffer"}
+  relevantWhen={{"type":"memory"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  warnings={[]}
+  >
+
+#### max_events
+
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[104900000]}
+  groups={[]}
+  name={"max_size"}
+  path={"buffer"}
+  relevantWhen={{"type":"disk"}}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+#### max_size
+
+The maximum size of the buffer on the disk.
+
+ See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
 <Field
   common={false}
   defaultValue={"block"}
@@ -293,6 +272,7 @@ The buffer's type and storage mechanism.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### when_full
@@ -303,13 +283,9 @@ The behavior when the buffer becomes full.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -323,6 +299,7 @@ The behavior when the buffer becomes full.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### encoding
@@ -332,8 +309,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -347,6 +322,7 @@ Configures the encoding specific sink behavior.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### except_fields
@@ -357,8 +333,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -372,6 +346,7 @@ Prevent the sink from encoding the specified labels.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### only_fields
@@ -382,8 +357,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -397,6 +370,7 @@ Limit the sink to only encoding the specified labels.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_format
@@ -407,13 +381,9 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -427,6 +397,7 @@ How to format event timestamps.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -437,8 +408,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -452,6 +421,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -463,8 +433,6 @@ is not set.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -478,6 +446,7 @@ is not set.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### region
@@ -489,8 +458,30 @@ not set.
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${SEMATEXT_TOKEN}","some-sematext-token"]}
+  groups={[]}
+  name={"token"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### token
+
+The token that will be used to write to Sematext.
 
 
+
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -504,6 +495,7 @@ not set.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### request
@@ -513,8 +505,6 @@ Configures the sink request behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -528,6 +518,7 @@ Configures the sink request behavior.
   templateable={false}
   type={"int"}
   unit={"requests"}
+  warnings={[]}
   >
 
 #### in_flight_limit
@@ -538,8 +529,6 @@ The maximum number of in-flight requests allowed at any given time.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -553,6 +542,7 @@ The maximum number of in-flight requests allowed at any given time.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### rate_limit_duration_secs
@@ -563,8 +553,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -578,6 +566,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### rate_limit_num
@@ -589,8 +578,6 @@ time window.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={-1}
@@ -604,6 +591,7 @@ time window.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### retry_attempts
@@ -614,8 +602,6 @@ The maximum number of retries to make for failed requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1}
@@ -629,6 +615,7 @@ The maximum number of retries to make for failed requests.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_initial_backoff_secs
@@ -641,8 +628,6 @@ to select future backoffs.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10}
@@ -656,6 +641,7 @@ to select future backoffs.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_max_duration_secs
@@ -666,8 +652,6 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={60}
@@ -681,6 +665,7 @@ The maximum amount of time, in seconds, to wait between retries.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -694,45 +679,14 @@ duplicate data downstream.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${SEMATEXT_TOKEN_ENV_VAR}","some-sematext-token"]}
-  groups={[]}
-  name={"token"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### token
-
-The token that will be used to write to Sematext.
-
-
-
-
-</Field>
-
-
 </Fields>
 
 ## How It Works
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 
@@ -798,7 +752,7 @@ any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][urls.new_sematext_logs_sink_issue].
+with the Vector team by [opening an issue][urls.new_sematext_logs_sink_issue].
 
 ### Retry Policy
 

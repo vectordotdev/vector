@@ -1,19 +1,23 @@
 ---
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector `file` sink streams `log` events to a file."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "File"
 sidebar_label: "file|[\"log\"]"
-source_url: https://github.com/timberio/vector/blob/master/src/sinks/file/
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/file
 status: "prod-ready"
 title: "File Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `file` sink
 [streams](#streaming) [`log`][docs.data-model.log] events to a file.
@@ -28,28 +32,19 @@ The Vector `file` sink
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "file" # required
   inputs = ["my-source-id"] # required
-  path = "vector-%Y-%m-%d.log" # required
   healthcheck = true # optional, default
+  path = "vector-%Y-%m-%d.log" # required
 
   # Encoding
   encoding.codec = "ndjson" # required
@@ -58,16 +53,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "file" # required
   inputs = ["my-source-id"] # required
-  path = "vector-%Y-%m-%d.log" # required
   healthcheck = true # optional, default
   idle_timeout_secs = "30" # optional, default
+  path = "vector-%Y-%m-%d.log" # required
 
   # Encoding
   encoding.codec = "ndjson" # required
@@ -79,13 +72,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -99,6 +86,7 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### encoding
@@ -108,8 +96,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -123,6 +109,7 @@ Configures the encoding specific sink behavior.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### codec
@@ -133,8 +120,6 @@ The encoding codec used to serialize the events before outputting.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -148,6 +133,7 @@ The encoding codec used to serialize the events before outputting.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### except_fields
@@ -158,8 +144,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -173,6 +157,7 @@ Prevent the sink from encoding the specified labels.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### only_fields
@@ -183,8 +168,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -198,6 +181,7 @@ Limit the sink to only encoding the specified labels.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_format
@@ -208,13 +192,9 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -228,6 +208,7 @@ How to format event timestamps.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -238,8 +219,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"30"}
@@ -253,6 +232,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### idle_timeout_secs
@@ -264,8 +244,6 @@ events for this timeout, the file will be flushed and closed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -279,6 +257,7 @@ events for this timeout, the file will be flushed and closed.
   templateable={true}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### path
@@ -289,9 +268,8 @@ File name to write events to.
 
 
 </Field>
-
-
 </Fields>
+
 
 ## How It Works
 
@@ -323,9 +301,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sinks.my_file_sink_id]
   # ...
   path = "vector-%Y-%m-%d.log"

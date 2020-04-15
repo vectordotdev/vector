@@ -1,34 +1,53 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
+.container {
+  --ifm-sidebar-width: 225px;
+  display: flex;
+}
+
+.leftCol {
+  flex: 0 0 calc( 100% - var(--ifm-sidebar-width));
+  max-width: calc( 100% - var(--ifm-sidebar-width));
+  padding-right: calc( var(--ifm-spacing-horizontal) * 2 );
+}
+
+.rightCol {
+  border-left: 1px solid var(--ifm-contents-border-color);
+  flex: 0 0 var(--ifm-sidebar-width);
+  max-width: var(--ifm-sidebar-width);
+  padding-left: var(--ifm-spacing-horizontal);
+}
 
 .docTitle {
-  font-size: 3rem;
-  margin-bottom: 3rem;
-}
-
-@media only screen and (max-width: 996px) {
-  .docTitle {
-    font-size: 2rem;
-    margin-bottom: 2rem;
-  }
-}
-
-.docItemContainer {
-  margin: 0 auto;
-  max-width: 45em;
+  font-size: 2em;
+  margin-bottom: 0.3em;
 }
 
 .paginator {
   border-top: 1px solid var(--ifm-hr-border-color);
-  margin: calc( var(--ifm-spacing-vertical) * 2 ) calc( var(--ifm-spacing-horizontal) * 2 ) 0 calc( var(--ifm-spacing-horizontal) * 2 );
+  margin: calc( var(--ifm-spacing-vertical) * 2 ) 0;
   padding-top: calc( var(--ifm-spacing-vertical) * 2 );
 }
 
+.tableOfContents {
+  height: calc( 100vh - var(--ifm-navbar-height) );
+  overflow-y: auto;
+  position: sticky;
+  top: var(--ifm-navbar-height);
+}
+
 @media (max-width: 996px) {
+  .container {
+    display: block;
+  }
+
+  .leftCol {
+    max-width: none;
+    padding-right: 0;
+  }
+
+  .rightCol {
+    display: none;
+  }
+
   .paginator {
     margin-left: 0;
     margin-right: 0;

@@ -46,7 +46,7 @@
 }
 
 .indexAnnouncement:hover {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-color-active);
   text-decoration: none;
 }
 
@@ -58,13 +58,20 @@
   animation: indexHeroInitial 700ms cubic-bezier(0, 1.5, 0.32, 1.5), indexHeroPulsating 2.5s linear infinite;
   animation-delay: 650ms, 1350ms;
   animation-fill-mode: forwards;
-  background-image: radial-gradient(ellipse at center calc( 50% + 125px ), rgba(var(--ifm-color-primary-rgb), 0.25), transparent 20%);
+  background-image: radial-gradient(ellipse at center calc( 50% + 6em ), rgba(var(--ifm-color-primary-rgb), 0.25), transparent 20%);
   background-position: center center;
+  font-size: 1.05em;
+}
+
+@media (min-width: 1330px) {
+  .indexHeroBanner {
+    font-size: 1.15em;
+  }
 }
 
 .indexHeroDiagram {
   margin: calc( var(--ifm-spacing-vertical) * 2 ) 0;
-  max-height: 325px;
+  max-height: 21em;
   height: auto;
   width: 100%;
 }
@@ -151,7 +158,7 @@ html[data-theme="dark"] .hero {
 .components h3 {
   align-items: center;
   display: flex;
-  font-size: 3.5rem;
+  font-size: 3.5em;
   height: 100%;
   justify-content: center;
   position: relative;
@@ -187,7 +194,7 @@ html[data-theme="dark"] .hero {
   }
 
   .components h3 {
-    font-size: 2.5rem;
+    font-size: 2.5em;
   }
 }
 
@@ -209,7 +216,7 @@ html[data-theme="dark"] .hero {
   .components ul {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    grid-gap: 1rem;
+    grid-gap: 1em;
     margin: 0;
     padding: 0;
   }
@@ -219,7 +226,7 @@ html[data-theme="dark"] .hero {
   }
 
   .components ul li a {
-    background: var(--ifm-panel-background);
+    background-color: var(--ifm-panel-background-color);
     border: 1px solid var(--ifm-panel-border-color);
     border-radius: 0.25em;
     box-shadow: var(--ifm-panel-box-shadow);
@@ -235,7 +242,7 @@ html[data-theme="dark"] .hero {
   }
 
   .components ul li a:hover {
-    background: var(--ifm-panel-background-active);
+    background: var(--ifm-panel-background-color-active);
     border-color: var(--ifm-panel-border-color-active);
     box-shadow: var(--ifm-panel-box-shadow-active);
     color: var(--ifm-panel-color-active);

@@ -1,5 +1,6 @@
 [releases."0.4.0"]
 date = 2019-09-24
+codename = "Hello World Again"
 commits = [
 {sha = "1357a3fa6b9acd0dd1d4b9e577969bf0594a5691", message = "perf(observability): Add initial rework of rate limited logs (#778)", author = "Lucio Franco", date = 2019-09-12T12:12:12Z, files_count = 5, insertions_count = 300, deletions_count = 270},
 {sha = "bf81efdddf801232aa44ab76184e1368f1ce4f78", message = "chore(operations): Increase docker-release timeout (#858)", author = "Lucio Franco", date = 2019-09-12T10:38:59Z, files_count = 1, insertions_count = 2, deletions_count = 1},

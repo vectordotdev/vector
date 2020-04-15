@@ -1,16 +1,20 @@
 ---
+last_modified_on: "2020-04-11"
 component_title: "Log to Metric"
 description: "The Vector `log_to_metric` transform accepts `log` events but outputs [`metric`](#metric) events allowing you to convert logs into one or more metrics."
 event_types: ["log","metric"]
 function_category: "convert"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22
-min_version: null
-service_name: "Log to Metric"
 sidebar_label: "log_to_metric|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/log_to_metric.rs
 status: "prod-ready"
 title: "Log to Metric Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `log_to_metric` transform
 accepts [`log`][docs.data-model.log] events but outputs
@@ -27,11 +31,7 @@ or more metrics.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.log_to_metric]
   type = "log_to_metric"
 
@@ -44,13 +44,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     tags.env = "${ENV}" # optional
 ```
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -64,6 +58,7 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"[table]"}
   unit={null}
+  warnings={[]}
   >
 
 ### metrics
@@ -73,8 +68,6 @@ A table of key/value pairs representing the keys to be added to the event.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -88,6 +81,7 @@ A table of key/value pairs representing the keys to be added to the event.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### field
@@ -98,8 +92,6 @@ The log field to use as the metric.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -113,6 +105,7 @@ The log field to use as the metric.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### increment_by_value
@@ -124,8 +117,6 @@ metric will be incremented by 1 regardless of the [`field`](#field) value.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -139,6 +130,7 @@ metric will be incremented by 1 regardless of the [`field`](#field) value.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### name
@@ -150,63 +142,6 @@ for `gauge`.
 
 
 </Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"tags"}
-  path={"metrics"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-#### tags
-
-Key/value pairs representing [metric tags][docs.data-model.metric#tags].
-
-
-
-<Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"host":"${HOSTNAME}"},{"region":"us-east-1"},{"status":"{{status}}"}]}
-  groups={[]}
-  name={"`[tag-name]`"}
-  path={"metrics.tags"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### `[tag-name]`
-
-Key/value pairs representing [metric tags][docs.data-model.metric#tags].
-Environment variables and field interpolation is allowed.
-
-
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -220,6 +155,7 @@ Environment variables and field interpolation is allowed.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -230,38 +166,75 @@ The metric type.
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"tags"}
+  path={"metrics"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### tags
+
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 
 
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"host":"${HOSTNAME}"},{"region":"us-east-1"},{"status":"{{status}}"}]}
+  groups={[]}
+  name={"`[tag-name]`"}
+  path={"metrics.tags"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[tag-name]`
+
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].
+Environment variables and field interpolation is allowed.
+
+
+
+
+</Field>
 </Fields>
 
 </Field>
-
-
 </Fields>
 
-## Output
+</Field>
+</Fields>
 
-import Tabs from '@theme/Tabs';
+## Examples
 
 <Tabs
   block={true}
-  defaultValue="timings"
-  values={[
-    { label: 'Timings', value: 'timings', },
-    { label: 'Counting', value: 'counting', },
-    { label: 'Summing', value: 'summing', },
-    { label: 'Gauges', value: 'gauges', },
-    { label: 'Sets', value: 'sets', },
-  ]
-}>
+  defaultValue="histograms"
+  select={false}
+  values={[{"label":"Histograms","value":"histograms"},{"label":"Counts","value":"counts"},{"label":"Sums","value":"sums"},{"label":"Gauges","value":"gauges"},{"label":"Set","value":"set"}]}>
 
-import TabItem from '@theme/TabItem';
-
-<TabItem value="timings">
+<TabItem value="histograms">
 
 This example demonstrates capturing timings in your logs.
 
-```json
+```json title="log event"
 {
   "host": "10.22.11.222",
   "message": "Sent 200 in 54.2ms",
@@ -272,7 +245,7 @@ This example demonstrates capturing timings in your logs.
 
 You can convert the `time` field into a `distribution` metric:
 
-```toml
+```toml tite="vector.toml"
 [transforms.log_to_metric]
   type = "log_to_metric"
 
@@ -287,7 +260,7 @@ You can convert the `time` field into a `distribution` metric:
 A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
-```javascript
+```javascript title="metric event"
 {
   "name": "time_ms",
   "kind": "incremental",
@@ -295,8 +268,7 @@ structure:
     "status": "200",
     "host": "10.22.11.222"
   }
-  "value": {
-    "type": "distribution",
+  "distribution": {
     "values": [54.2],
     "sample_rates": [1.0]
   }
@@ -304,17 +276,17 @@ structure:
 ```
 
 This metric will then proceed down the pipeline, and depending on the sink,
-will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
+will be aggregated in Vector (such is the case for the [`prometheus` sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 
 </TabItem>
-<TabItem value="counting">
+
+<TabItem value="counts">
 
 This example demonstrates counting HTTP status codes.
 
 Given the following log line:
 
-```json
+```json title="log event"
 {
   "host": "10.22.11.222",
   "message": "Sent 200 in 54.2ms",
@@ -324,7 +296,7 @@ Given the following log line:
 
 You can count the number of responses by status code:
 
-```toml
+```toml title="vector.toml"
 [transforms.log_to_metric]
   type = "log_to_metric"
 
@@ -339,7 +311,7 @@ You can count the number of responses by status code:
 A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
-```javascript
+```javascript title="metric event"
 {
   "name": "response_total",
   "kind": "incremental",
@@ -347,26 +319,25 @@ structure:
     "status": "200",
     "host": "10.22.11.222"
   }
-  "value": {
-    "type": "counter",
+  "counter": {
     "value": 1.0,
   }
 }
 ```
 
 This metric will then proceed down the pipeline, and depending on the sink,
-will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
+will be aggregated in Vector (such is the case for the [`prometheus` sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 
 </TabItem>
-<TabItem value="summing">
+
+<TabItem value="sums">
 
 In this example we'll demonstrate computing a sum. The scenario we've chosen
 is to compute the total of orders placed.
 
 Given the following log line:
 
-```json
+```json title="log event"
 {
   "host": "10.22.11.222",
   "message": "Order placed for $122.20",
@@ -377,7 +348,7 @@ Given the following log line:
 You can reduce this log into a `counter` metric that increases by the
 field's value:
 
-```toml
+```toml title="vector.toml"
 [transforms.log_to_metric]
   type = "log_to_metric"
 
@@ -392,7 +363,7 @@ field's value:
 A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
-```javascript
+```javascript title="metric event"
 {
   "name": "order_total",
   "kind": "incremental",
@@ -400,18 +371,17 @@ structure:
     "status": "200",
     "host": "10.22.11.222"
   }
-  "value": {
-    "type": "counter",
+  "counter": {
     "value": 122.20,
   }
 }
 ```
 
 This metric will then proceed down the pipeline, and depending on the sink,
-will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
+will be aggregated in Vector (such is the case for the [`prometheus` sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 
 </TabItem>
+
 <TabItem value="gauges">
 
 In this example we'll demonstrate creating a gauge that represents the current
@@ -419,7 +389,7 @@ CPU load verages.
 
 Given the following log line:
 
-```json
+```json title="log event"
 {
   "host": "10.22.11.222",
   "message": "CPU activity sample",
@@ -431,7 +401,7 @@ Given the following log line:
 
 You can reduce this logs into multiple `gauge` metrics:
 
-```toml
+```toml title="vector.toml"
 [transforms.log_to_metric]
   type = "log_to_metric"
 
@@ -454,50 +424,51 @@ You can reduce this logs into multiple `gauge` metrics:
 Multiple [`metric` events][docs.data-model.metric] will be output with the following
 structure:
 
-```javascript
-[
-  {
-    "name": "1m_load_avg",
-    "kind": "absolute",
-    "tags": {
-      "host": "10.22.11.222"
-    },
-    "value": {
-      "type": "gauge",
-      "value": 78.2
-    }
+```javascript title="Metric event 1"
+{
+  "name": "1m_load_avg",
+  "kind": "absolute",
+  "tags": {
+    "host": "10.22.11.222"
   },
-  {
-    "name": "5m_load_avg",
-    "kind": "absolute",
-    "tags": {
-      "host": "10.22.11.222"
-    },
-    "value": {
-      "type": "gauge",
-      "value": 56.2
-    }
-  },
-  {
-    "name": "15m_load_avg",
-    "kind": "absolute",
-    "tags": {
-      "host": "10.22.11.222"
-    },
-    "value": {
-      "type": "gauge",
-      "value": 48.7
-    }
+  "gauge": {
+    "value": 78.2
   }
-]
+}
+```
+
+```javascript title="Metric event 2"
+{
+  "name": "5m_load_avg",
+  "kind": "absolute",
+  "tags": {
+    "host": "10.22.11.222"
+  },
+  "gauge": {
+    "value": 56.2
+  }
+}
+```
+
+```javascript title="Metric event 3"
+{
+  "name": "15m_load_avg",
+  "kind": "absolute",
+  "tags": {
+    "host": "10.22.11.222"
+  },
+  "gauge": {
+    "value": 48.7
+  }
+}
 ```
 
 This metric will then proceed down the pipeline, and depending on the sink,
-will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
+will be aggregated in Vector (such is the case for the [`prometheus` sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 
 </TabItem>
-<TabItem value="sets">
+
+<TabItem value="set">
 
 In this example we'll demonstrate how to use sets. Sets are primarly a Statsd
 concept that represent the number of unique values seens for a given metric.
@@ -506,7 +477,7 @@ and the metric store will count the number of unique values seen.
 
 For example, given the following log line:
 
-```json
+```json title="log event"
 {
   "host": "10.22.11.222",
   "message": "Sent 200 in 54.2ms",
@@ -516,7 +487,7 @@ For example, given the following log line:
 
 You can count the number of unique `remote_addr` values by using a set:
 
-```toml
+```toml title="vector.toml"
 [transforms.log_to_metric]
   type = "log_to_metric"
 
@@ -529,23 +500,21 @@ You can count the number of unique `remote_addr` values by using a set:
 A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
-```javascript
+```javascript title="metric event"
 {
   "name": "remote_addr",
   "kind": "incremental",
   "tags": {
     "host": "10.22.11.222"
   },
-  "value": {
-    "type": "set",
+  "set": {
     "values": ["233.221.232.22"]
   }
 }
 ```
 
 This metric will then proceed down the pipeline, and depending on the sink,
-will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
+will be aggregated in Vector (such is the case for the [`prometheus` sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 
 </TabItem>
 </Tabs>
@@ -600,4 +569,4 @@ individual metrics for reduction in the metrics storage itself.
 [docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.sinks.prometheus]: /docs/reference/sinks/prometheus/
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

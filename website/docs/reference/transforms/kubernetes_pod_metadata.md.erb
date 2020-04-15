@@ -1,0 +1,80 @@
+<%- component = metadata.transforms.kubernetes_pod_metadata -%>
+
+<%= component_header(component) %>
+
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
+## Configuration
+
+<%= component_config_example(component) %>
+
+<%= fields(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= fields(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
+<%- if component.permissions_list.any? -%>
+## Permissions
+
+The `<%= component.name %>` <%= component.type %> requires the following
+permissions. If you are running a Kubernetes cluster you should have a basic
+understanding of Kubernetes permissions. Refer to [Kubernetes Authorization
+docs][urls.kubernetes_authorization] for more info.
+
+<%= permissions(component.permissions_list, heading_depth: 3) %>
+
+<%- end -%>
+<%= component_fields(component, heading_depth: 2) -%>
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
+
+<%- end -%>
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Building & Maintaining The Metadata
+
+Vector leverages the [Rust `k8s-openapi` crate][urls.rust_k8s_openapi_crate]
+to communicate with the [Kubernetes API][urls.kubernetes_api] to build and
+maintaing the Pod metadata that this component enriches the log with.
+
+This metadata is held in memory. The loading and maintenance of this data is
+performed asynchronously, in the background, as to not block log processing.
+Upon starting Vector the metadata is loaded and then Vector utilizes the
+[Kubernetes Watch API][urls.kubernetes_watch_api] to stream Pod updates in
+real-time, there is no polling involved.
+
+### Log Data Collection
+
+To collect Kubernetes logs please refer to the `kubernetes` source.
+
+### Kubernetes API Communication Failures
+
+Vector will retry failed Kubernetes API requests indefinitely. Retries will
+exponentially backoff with jitter and across uniform distribution whose upper
+limit you can control via the `max_retry_timeout` option. This ensures that
+Vector does not effectively DDOS your Kubernetes API in the event of failure.
+
+### Nesting Metadata Fields
+
+Fields defined with `fields` option will be nested under the
+[global `kubernetes_key`][docs.reference.global-options#kubernetes_key]. You
+can change the name of this key or use the
+[`rename_fields`][docs.transforms.rename_fields] transform to move it to the
+root of the event.

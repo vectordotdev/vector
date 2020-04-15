@@ -1,23 +1,28 @@
 ---
+last_modified_on: "2020-04-12"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Kinesis Data Streams"
 description: "The Vector `aws_kinesis_streams` sink batches `log` events to Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_kinesis_streams%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "AWS Kinesis Data Streams"
 sidebar_label: "aws_kinesis_streams|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_kinesis_streams.rs
-status: "beta"
+status: "prod-ready"
 title: "AWS Kinesis Data Streams Sink"
 unsupported_operating_systems: []
 ---
 
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `aws_kinesis_streams` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web
-Service's Kinesis Data Stream service][urls.aws_kinesis_data_streams] via the
+Service's Kinesis Data Stream service][urls.aws_kinesis_streams] via the
 [`PutRecords` API
 endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
 
@@ -31,29 +36,20 @@ endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "aws_kinesis_streams" # required
   inputs = ["my-source-id"] # required
+  partition_key_field = "user_id" # optional, no default
   region = "us-east-1" # required, required when endpoint = ""
   stream_name = "my-stream" # required
-  partition_key_field = "user_id" # optional, no default
 
   # Encoding
   encoding.codec = "json" # required
@@ -62,27 +58,25 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "aws_kinesis_streams" # required
   inputs = ["my-source-id"] # required
-  endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
+  partition_key_field = "user_id" # optional, no default
   region = "us-east-1" # required, required when endpoint = ""
   stream_name = "my-stream" # required
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
-  partition_key_field = "user_id" # optional, no default
 
   # Batch
   batch.max_events = 500 # optional, default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -104,38 +98,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["arn:aws:iam::123456789098:role/my_role"]}
-  groups={[]}
-  name={"assume_role"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### assume_role
-
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
- See [AWS Authentication](#aws-authentication) for more info.
-
-
-</Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -149,6 +112,7 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -158,8 +122,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={500}
@@ -173,6 +135,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"events"}
+  warnings={[]}
   >
 
 #### max_events
@@ -183,8 +146,6 @@ The maximum size of a batch, in events, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -198,6 +159,7 @@ The maximum size of a batch, in events, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -208,13 +170,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -228,6 +186,7 @@ The maximum age of a batch before it is flushed.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### buffer
@@ -237,58 +196,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={500}
-  enumValues={null}
-  examples={[500]}
-  groups={[]}
-  name={"max_events"}
-  path={"buffer"}
-  relevantWhen={{"type":"memory"}}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"events"}
-  >
-
-#### max_events
-
-The maximum number of [events][docs.data-model] allowed in the buffer.
-
- See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[104900000]}
-  groups={[]}
-  name={"max_size"}
-  path={"buffer"}
-  relevantWhen={{"type":"disk"}}
-  required={true}
-  templateable={false}
-  type={"int"}
-  unit={"bytes"}
-  >
-
-#### max_size
-
-The maximum size of the buffer on the disk.
-
-
-
-
-</Field>
-
-
 <Field
   common={true}
   defaultValue={"memory"}
@@ -302,6 +209,7 @@ The maximum size of the buffer on the disk.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -312,8 +220,54 @@ The buffer's type and storage mechanism.
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={500}
+  enumValues={null}
+  examples={[500]}
+  groups={[]}
+  name={"max_events"}
+  path={"buffer"}
+  relevantWhen={{"type":"memory"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  warnings={[]}
+  >
+
+#### max_events
+
+The maximum number of [events][docs.data-model] allowed in the buffer.
+
+ See [Buffers & Batches](#buffers--batches) for more info.
 
 
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[104900000]}
+  groups={[]}
+  name={"max_size"}
+  path={"buffer"}
+  relevantWhen={{"type":"disk"}}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+#### max_size
+
+The maximum size of the buffer on the disk.
+
+
+
+
+</Field>
 <Field
   common={false}
   defaultValue={"block"}
@@ -327,6 +281,7 @@ The buffer's type and storage mechanism.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### when_full
@@ -337,13 +292,9 @@ The behavior when the buffer becomes full.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -357,6 +308,7 @@ The behavior when the buffer becomes full.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### encoding
@@ -366,8 +318,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -381,6 +331,7 @@ Configures the encoding specific sink behavior.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### codec
@@ -391,8 +342,6 @@ The encoding codec used to serialize the events before outputting.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -406,6 +355,7 @@ The encoding codec used to serialize the events before outputting.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### except_fields
@@ -416,8 +366,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -431,6 +379,7 @@ Prevent the sink from encoding the specified labels.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### only_fields
@@ -441,8 +390,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -456,6 +403,7 @@ Limit the sink to only encoding the specified labels.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_format
@@ -466,13 +414,33 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+
+ See [AWS Authentication](#aws-authentication) for more info.
 
 
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -482,10 +450,11 @@ How to format event timestamps.
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### endpoint
@@ -497,8 +466,6 @@ this option will make [`region`](#region) moot.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -512,6 +479,7 @@ this option will make [`region`](#region) moot.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### partition_key_field
@@ -522,8 +490,6 @@ The log field used as the Kinesis record's partition key value.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -537,6 +503,7 @@ The log field used as the Kinesis record's partition key value.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### region
@@ -548,218 +515,6 @@ provided it will override this value since the endpoint includes the region.
 
 
 </Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"request"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### request
-
-Configures the sink request behavior.
-
-
-
-<Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={5}
-  enumValues={null}
-  examples={[5]}
-  groups={[]}
-  name={"in_flight_limit"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"requests"}
-  >
-
-#### in_flight_limit
-
-The maximum number of in-flight requests allowed at any given time.
-
- See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={1}
-  enumValues={null}
-  examples={[1]}
-  groups={[]}
-  name={"rate_limit_duration_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-#### rate_limit_duration_secs
-
-The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
- See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={5}
-  enumValues={null}
-  examples={[5]}
-  groups={[]}
-  name={"rate_limit_num"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={null}
-  >
-
-#### rate_limit_num
-
-The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
-time window.
-
- See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={-1}
-  enumValues={null}
-  examples={[-1]}
-  groups={[]}
-  name={"retry_attempts"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={null}
-  >
-
-#### retry_attempts
-
-The maximum number of retries to make for failed requests.
-
- See [Retry Policy](#retry-policy) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={1}
-  enumValues={null}
-  examples={[1]}
-  groups={[]}
-  name={"retry_initial_backoff_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-#### retry_initial_backoff_secs
-
-The amount of time to wait before attempting the first retry for a failed
-request. Once, the first retry has failed the fibonacci sequence will be used
-to select future backoffs.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={10}
-  enumValues={null}
-  examples={[10]}
-  groups={[]}
-  name={"retry_max_duration_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-#### retry_max_duration_secs
-
-The maximum amount of time, in seconds, to wait between retries.
-
-
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={30}
-  enumValues={null}
-  examples={[30]}
-  groups={[]}
-  name={"timeout_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-#### timeout_secs
-
-The maximum time a request can take before being aborted. It is highly
-recommended that you do not lower value below the service's internal timeout,
-as this could create orphaned requests, pile on retries, and result in
-duplicate data downstream.
-
- See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -773,26 +528,223 @@ duplicate data downstream.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### stream_name
 
-The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Logs
-stream.
+The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis
+Logs stream.
 
 
 
 
 </Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"request"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### request
+
+Configures the sink request behavior.
 
 
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={5}
+  enumValues={null}
+  examples={[5]}
+  groups={[]}
+  name={"in_flight_limit"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"requests"}
+  warnings={[]}
+  >
+
+#### in_flight_limit
+
+The maximum number of in-flight requests allowed at any given time.
+
+ See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  groups={[]}
+  name={"rate_limit_duration_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### rate_limit_duration_secs
+
+The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
+
+ See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={5}
+  enumValues={null}
+  examples={[5]}
+  groups={[]}
+  name={"rate_limit_num"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### rate_limit_num
+
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
+time window.
+
+ See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={-1}
+  enumValues={null}
+  examples={[-1]}
+  groups={[]}
+  name={"retry_attempts"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### retry_attempts
+
+The maximum number of retries to make for failed requests.
+
+ See [Retry Policy](#retry-policy) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  groups={[]}
+  name={"retry_initial_backoff_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### retry_initial_backoff_secs
+
+The amount of time to wait before attempting the first retry for a failed
+request. Once, the first retry has failed the fibonacci sequence will be used
+to select future backoffs.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={10}
+  enumValues={null}
+  examples={[10]}
+  groups={[]}
+  name={"retry_max_duration_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### retry_max_duration_secs
+
+The maximum amount of time, in seconds, to wait between retries.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={30}
+  enumValues={null}
+  examples={[30]}
+  groups={[]}
+  name={"timeout_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### timeout_secs
+
+The maximum time a request can take before being aborted. It is highly
+recommended that you do not lower value below the service's internal timeout,
+as this could create orphaned requests, pile on retries, and result in
+duplicate data downstream.
+
+ See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+</Fields>
+
+</Field>
 </Fields>
 
 ## Env Vars
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -806,6 +758,7 @@ stream.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_ACCESS_KEY_ID
@@ -817,8 +770,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -832,6 +783,7 @@ Used for AWS authentication when communicating with AWS services. See relevant
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_SECRET_ACCESS_KEY
@@ -843,18 +795,10 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 </Fields>
 
-## Output
 
-The `aws_kinesis_streams` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
-Batches are flushed via the [`batch_size`](#batch_size) or
-[`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
-batches](#buffers--batches) section.
-For example:
-
+## Examples
 
 ```http
 POST / HTTP/1.1
@@ -910,8 +854,6 @@ optional setting that is helpful for a variety of use cases, such as cross
 account access.
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 
@@ -1010,7 +952,7 @@ any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][urls.new_aws_kinesis_streams_sink_issue].
+with the Vector team by [opening an issue][urls.new_aws_kinesis_streams_sink_issue].
 
 ### Retry Policy
 
@@ -1026,15 +968,15 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [docs.transforms.add_fields]: /docs/reference/transforms/add_fields/
-[pages.aws_components]: /components?providers%5B%5D=aws/
+[pages.aws_components]: /components/?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+[urls.aws_cloudwatch_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
-[urls.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
-[urls.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [urls.aws_kinesis_partition_key]: https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecordsRequestEntry.html#Streams-Type-PutRecordsRequestEntry-PartitionKey
 [urls.aws_kinesis_split_shards]: https://docs.aws.amazon.com/streams/latest/dev/kinesis-using-sdk-java-resharding-split.html
+[urls.aws_kinesis_streams]: https://aws.amazon.com/kinesis/data-streams/
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_kinesis_streams_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_kinesis_streams

@@ -1,19 +1,24 @@
 ---
+last_modified_on: "2020-04-07"
 delivery_guarantee: "at_least_once"
 component_title: "Heroku Logplex"
 description: "The Vector `logplex` source ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events."
 event_types: ["log"]
 function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+logplex%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Heroku Logplex"
 sidebar_label: "logplex|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/logplex.rs
 status: "beta"
 title: "Heroku Logplex Source"
 unsupported_operating_systems: []
 ---
+
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `logplex` source
 ingests data through the [Heroku Logplex HTTP Drain
@@ -28,39 +33,36 @@ events.
      website/docs/reference/sources/logplex.md.erb
 -->
 
-## Configuration
+## Requirements
 
-import Tabs from '@theme/Tabs';
+<Alert icon={false} type="danger" className="list--warnings">
+
+* This component exposes a configured port. You must ensure your network allows access to this port.
+
+</Alert>
+
+## Configuration
 
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "logplex" # required
-  address = "0.0.0.0:8088" # required
+  address = "0.0.0.0:80" # required
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "logplex" # required
-  address = "0.0.0.0:8088" # required
+  address = "0.0.0.0:80" # required
 
   # TLS
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
@@ -74,18 +76,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["0.0.0.0:8088"]}
+  examples={["0.0.0.0:80"]}
   groups={[]}
   name={"address"}
   path={null}
@@ -94,6 +90,7 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### address
@@ -104,8 +101,6 @@ The address to accept connections on. The address _must_ include a port.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -119,6 +114,7 @@ The address to accept connections on. The address _must_ include a port.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tls
@@ -128,8 +124,6 @@ Configures the TLS options for connections from this source.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -143,6 +137,7 @@ Configures the TLS options for connections from this source.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### ca_path
@@ -154,8 +149,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -169,6 +162,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### crt_path
@@ -181,8 +175,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -196,6 +188,7 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### enabled
@@ -207,8 +200,6 @@ is also required.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -222,6 +213,7 @@ is also required.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_pass
@@ -233,8 +225,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -248,6 +238,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_path
@@ -259,8 +250,6 @@ PEM format (PKCS#8).
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -274,25 +263,84 @@ PEM format (PKCS#8).
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` will cause OpenSSL to not request a certificate from the client","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
 
 If `true`, Vector will require a TLS certificate from the connecting host and
 terminate the connection if it is not valid. If `false` (the default), Vector
-will ignore the presence of a client certificate.
+will not request a certificate from the client.
 
 
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
+</Fields>
+
+## Fields
+
+```javascript title="example log event"
+{
+  // ...
+  "message": "This is one line from the plain text HTTP body",
+  "timestamp": "2019-11-01T21:15:47+00:00"
+  // ...
+}
+```
+
+<Fields filters={true}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["This is one line from the plain text HTTP body"]}
+  groups={[]}
+  name={"message"}
+  path={null}
+  relevantWhen={{"encoding":["text"]}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### message
+
+The message field, containing the plain text message.
 
 
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
+  name={"timestamp"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"timestamp"}
+  unit={null}
+  warnings={[]}
+  >
+
+### timestamp
+
+The time the event was ingested. Note this may be overridden by JSON payloads.
+
+
+
+
+</Field>
 </Fields>
 
 ## How It Works
@@ -306,7 +354,14 @@ will be replaced before being evaluated.
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
 
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
+options.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [urls.logplex_protocol]: https://github.com/heroku/logplex/blob/master/doc/README.http_drains.md
+[urls.openssl]: https://www.openssl.org/

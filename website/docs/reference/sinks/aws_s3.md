@@ -1,19 +1,24 @@
 ---
+last_modified_on: "2020-04-12"
 delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "AWS S3"
 sidebar_label: "aws_s3|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
-status: "beta"
+status: "prod-ready"
 title: "AWS S3 Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `aws_s3` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web
@@ -30,33 +35,21 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "aws_s3" # required
   inputs = ["my-source-id"] # required
   bucket = "my-bucket" # required
   compression = "gzip" # required
-  region = "us-east-1" # required, required when endpoint = ""
   healthcheck = true # optional, default
-
-  # Naming
-  key_prefix = "date=%F/" # optional, default
+  region = "us-east-1" # required, required when endpoint = ""
 
   # Batch
   batch.max_size = 10490000 # optional, default, bytes
@@ -68,24 +61,25 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # Encoding
   encoding.codec = "ndjson" # required
+
+  # Naming
+  key_prefix = "date=%F/" # optional, default
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "aws_s3" # required
   inputs = ["my-source-id"] # required
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   bucket = "my-bucket" # required
   compression = "gzip" # required
-  endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
-  region = "us-east-1" # required, required when endpoint = ""
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
+  region = "us-east-1" # required, required when endpoint = ""
 
   # ACL
   acl = "private" # optional, no default
@@ -94,27 +88,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
   grant_read_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
   grant_write_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
 
-  # Encryption
-  server_side_encryption = "AES256" # optional, no default
-  ssekms_key_id = "abcd1234" # optional, no default, relevant when server_side_encryption = "aws:kms"
-
-  # Naming
-  filename_append_uuid = true # optional, default
-  filename_extension = "log" # optional, default
-  filename_time_format = "%s" # optional, default
-  key_prefix = "date=%F/" # optional, default
-
-  # Storage
-  storage_class = "STANDARD" # optional, no default
-
   # Batch
   batch.max_size = 10490000 # optional, default, bytes
   batch.timeout_secs = 300 # optional, default, seconds
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -123,8 +104,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.timestamp_format = "rfc3339" # optional, default
 
+  # Encryption
+  server_side_encryption = "AES256" # optional, no default
+  ssekms_key_id = "abcd1234" # optional, no default, relevant when server_side_encryption = "aws:kms"
+
   # Metadata
   tags.Tag1 = "Value1" # example
+
+  # Naming
+  filename_append_uuid = true # optional, default
+  filename_extension = "log" # optional, default
+  filename_time_format = "%s" # optional, default
+  key_prefix = "date=%F/" # optional, default
 
   # Request
   request.in_flight_limit = 50 # optional, default, requests
@@ -134,18 +125,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 30 # optional, default, seconds
+
+  # Storage
+  storage_class = "STANDARD" # optional, no default
 ```
 
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -159,6 +147,7 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### acl
@@ -170,523 +159,6 @@ ACL][urls.aws_s3_canned_acl].
 
 
 </Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["arn:aws:iam::123456789098:role/my_role"]}
-  groups={[]}
-  name={"assume_role"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### assume_role
-
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
- See [AWS Authentication](#aws-authentication) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"batch"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### batch
-
-Configures the sink batching behavior.
-
-
-
-<Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={10490000}
-  enumValues={null}
-  examples={[10490000]}
-  groups={[]}
-  name={"max_size"}
-  path={"batch"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"bytes"}
-  >
-
-#### max_size
-
-The maximum size of a batch, in bytes, before it is flushed.
-
- See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={300}
-  enumValues={null}
-  examples={[300]}
-  groups={[]}
-  name={"timeout_secs"}
-  path={"batch"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-#### timeout_secs
-
-The maximum age of a batch before it is flushed.
-
- See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["my-bucket"]}
-  groups={[]}
-  name={"bucket"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### bucket
-
-The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
-
-
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"buffer"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### buffer
-
-Configures the sink specific buffer behavior.
-
-
-
-<Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={500}
-  enumValues={null}
-  examples={[500]}
-  groups={[]}
-  name={"max_events"}
-  path={"buffer"}
-  relevantWhen={{"type":"memory"}}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"events"}
-  >
-
-#### max_events
-
-The maximum number of [events][docs.data-model] allowed in the buffer.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[104900000]}
-  groups={[]}
-  name={"max_size"}
-  path={"buffer"}
-  relevantWhen={{"type":"disk"}}
-  required={true}
-  templateable={false}
-  type={"int"}
-  unit={"bytes"}
-  >
-
-#### max_size
-
-The maximum size of the buffer on the disk.
-
- See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"block"}
-  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
-  examples={["block","drop_newest"]}
-  groups={[]}
-  name={"when_full"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### when_full
-
-The behavior when the buffer becomes full.
-
-
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
-  examples={["gzip","none"]}
-  groups={[]}
-  name={"compression"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### compression
-
-The compression mechanism to use.
-
-
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"encoding"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### encoding
-
-Configures the encoding specific sink behavior.
-
-
-
-<Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["ndjson","text"]}
-  groups={[]}
-  name={"codec"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### codec
-
-The encoding codec used to serialize the events before outputting.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["timestamp","message","host"]]}
-  groups={[]}
-  name={"except_fields"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  >
-
-#### except_fields
-
-Prevent the sink from encoding the specified labels.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["timestamp","message","host"]]}
-  groups={[]}
-  name={"only_fields"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  >
-
-#### only_fields
-
-Limit the sink to only encoding the specified labels.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"rfc3339"}
-  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
-  examples={["rfc3339","unix"]}
-  groups={[]}
-  name={"timestamp_format"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### timestamp_format
-
-How to format event timestamps.
-
-
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["127.0.0.0:5000/path/to/service"]}
-  groups={[]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={{"region":""}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### endpoint
-
-Custom endpoint for use with AWS-compatible services. Providing a value for
-this option will make [`region`](#region) moot.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"filename_append_uuid"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-### filename_append_uuid
-
-Whether or not to append a UUID v4 token to the end of the file. This ensures
-there are no name collisions high volume use cases.
-
- See [Object naming](#object-naming) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"log"}
-  enumValues={null}
-  examples={["log"]}
-  groups={[]}
-  name={"filename_extension"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### filename_extension
-
-The filename extension to use in the object name.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"%s"}
-  enumValues={null}
-  examples={["%s"]}
-  groups={[]}
-  name={"filename_time_format"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### filename_time_format
-
-The format of the resulting object file name. [`strftime`
-specifiers][urls.strptime_specifiers] are supported.
-
- See [Object naming](#object-naming) for more info.
-
-
-</Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -700,6 +172,7 @@ specifiers][urls.strptime_specifiers] are supported.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### grant_full_control
@@ -711,8 +184,6 @@ permissions on the created objects.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -726,6 +197,7 @@ permissions on the created objects.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### grant_read
@@ -737,8 +209,6 @@ their metadata.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -752,6 +222,7 @@ their metadata.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### grant_read_acp
@@ -763,8 +234,6 @@ ACL.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -778,6 +247,7 @@ ACL.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### grant_write_acp
@@ -789,296 +259,324 @@ ACL.
 
 
 </Field>
-
-
 <Field
   common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start.
-
- See [Health Checks](#health-checks) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={"date=%F/"}
-  enumValues={null}
-  examples={["date=%F/","date=%F/hour=%H/","year=%Y/month=%m/day=%d/","application_id={{ application_id }}/date=%F/"]}
-  groups={[]}
-  name={"key_prefix"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={true}
-  type={"string"}
-  unit={null}
-  >
-
-### key_prefix
-
-A prefix to apply to all object key names. This should be used to partition
-your objects, and it's important to end this value with a `/` if you want this
-to be the root S3 "folder".
-
- See [Object naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["us-east-1"]}
-  groups={[]}
-  name={"region"}
-  path={null}
-  relevantWhen={{"endpoint":""}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### region
-
-The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is
-provided it will override this value since the endpoint includes the region.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
   groups={[]}
-  name={"request"}
+  name={"batch"}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
-### request
+### batch
 
-Configures the sink request behavior.
+Configures the sink batching behavior.
 
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
-  defaultValue={50}
+  defaultValue={10490000}
   enumValues={null}
-  examples={[50]}
+  examples={[10490000]}
   groups={[]}
-  name={"in_flight_limit"}
-  path={"request"}
+  name={"max_size"}
+  path={"batch"}
   relevantWhen={null}
   required={false}
   templateable={false}
   type={"int"}
-  unit={"requests"}
+  unit={"bytes"}
+  warnings={[]}
   >
 
-#### in_flight_limit
+#### max_size
 
-The maximum number of in-flight requests allowed at any given time.
-
- See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={1}
-  enumValues={null}
-  examples={[1]}
-  groups={[]}
-  name={"rate_limit_duration_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-#### rate_limit_duration_secs
-
-The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
- See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={250}
-  enumValues={null}
-  examples={[250]}
-  groups={[]}
-  name={"rate_limit_num"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={null}
-  >
-
-#### rate_limit_num
-
-The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
-time window.
-
- See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={-1}
-  enumValues={null}
-  examples={[-1]}
-  groups={[]}
-  name={"retry_attempts"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={null}
-  >
-
-#### retry_attempts
-
-The maximum number of retries to make for failed requests.
-
- See [Retry Policy](#retry-policy) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={1}
-  enumValues={null}
-  examples={[1]}
-  groups={[]}
-  name={"retry_initial_backoff_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-#### retry_initial_backoff_secs
-
-The amount of time to wait before attempting the first retry for a failed
-request. Once, the first retry has failed the fibonacci sequence will be used
-to select future backoffs.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={10}
-  enumValues={null}
-  examples={[10]}
-  groups={[]}
-  name={"retry_max_duration_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-#### retry_max_duration_secs
-
-The maximum amount of time, in seconds, to wait between retries.
-
-
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={30}
-  enumValues={null}
-  examples={[30]}
-  groups={[]}
-  name={"timeout_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-#### timeout_secs
-
-The maximum time a request can take before being aborted. It is highly
-recommended that you do not lower value below the service's internal timeout,
-as this could create orphaned requests, pile on retries, and result in
-duplicate data downstream.
+The maximum size of a batch, in bytes, before it is flushed.
 
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={300}
+  enumValues={null}
+  examples={[300]}
+  groups={[]}
+  name={"timeout_secs"}
+  path={"batch"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### timeout_secs
+
+The maximum age of a batch before it is flushed.
+
+ See [Buffers & Batches](#buffers--batches) for more info.
 
 
+</Field>
 </Fields>
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"buffer"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### buffer
+
+Configures the sink specific buffer behavior.
 
 
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={500}
+  enumValues={null}
+  examples={[500]}
+  groups={[]}
+  name={"max_events"}
+  path={"buffer"}
+  relevantWhen={{"type":"memory"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  warnings={[]}
+  >
+
+#### max_events
+
+The maximum number of [events][docs.data-model] allowed in the buffer.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[104900000]}
+  groups={[]}
+  name={"max_size"}
+  path={"buffer"}
+  relevantWhen={{"type":"disk"}}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+#### max_size
+
+The maximum size of the buffer on the disk.
+
+ See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"block"}
+  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
+  examples={["block","drop_newest"]}
+  groups={[]}
+  name={"when_full"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### when_full
+
+The behavior when the buffer becomes full.
+
+
+
+
+</Field>
+</Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"encoding"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### encoding
+
+Configures the encoding specific sink behavior.
+
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["ndjson","text"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### codec
+
+The encoding codec used to serialize the events before outputting.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+
+
+</Field>
+</Fields>
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -1092,6 +590,7 @@ duplicate data downstream.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### server_side_encryption
@@ -1102,8 +601,6 @@ The server-side encryption algorithm used when storing these objects.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1117,6 +614,7 @@ The server-side encryption algorithm used when storing these objects.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### ssekms_key_id
@@ -1130,35 +628,152 @@ Amazon S3 uses the AWS managed CMK in AWS to protect the data.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
-  enumValues={{"STANDARD":"The default storage class. If you don't specify the storage class when you upload an object, Amazon S3 assigns the STANDARD storage class.","REDUCED_REDUNDANCY":"Designed for noncritical, reproducible data that can be stored with less redundancy than the STANDARD storage class. AWS recommends that you not use this storage class. The STANDARD storage class is more cost effective. ","INTELLIGENT_TIERING":"Stores objects in two access tiers: one tier that is optimized for frequent access and another lower-cost tier that is optimized for infrequently accessed data.","STANDARD_IA":"Amazon S3 stores the object data redundantly across multiple geographically separated Availability Zones (similar to the STANDARD storage class).","ONEZONE_IA":"Amazon S3 stores the object data in only one Availability Zone.","GLACIER":"Use for archives where portions of the data might need to be retrieved in minutes.","DEEP_ARCHIVE":"Use for archiving data that rarely needs to be accessed."}}
-  examples={["STANDARD","REDUCED_REDUNDANCY","INTELLIGENT_TIERING","STANDARD_IA","ONEZONE_IA","GLACIER","DEEP_ARCHIVE"]}
+  enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
   groups={[]}
-  name={"storage_class"}
+  name={"assume_role"}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
-### storage_class
+### assume_role
 
-The storage class for the created objects. See [the S3 Storage
-Classes](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html)
-for more details.
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
 
- See [Storage class](#storage-class) for more info.
+ See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["my-bucket"]}
+  groups={[]}
+  name={"bucket"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### bucket
+
+The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
 
 
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
+  examples={["gzip","none"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+The compression mechanism to use.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["127.0.0.0:5000/path/to/service"]}
+  groups={[]}
+  name={"endpoint"}
+  path={null}
+  relevantWhen={{"region":""}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### endpoint
+
+Custom endpoint for use with AWS-compatible services. Providing a value for
+this option will make [`region`](#region) moot.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"healthcheck"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### healthcheck
+
+Enables/disables the sink healthcheck upon start.
+
+ See [Health Checks](#health-checks) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["us-east-1"]}
+  groups={[]}
+  name={"region"}
+  path={null}
+  relevantWhen={{"endpoint":""}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### region
+
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is
+provided it will override this value since the endpoint includes the region.
+
+
+
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -1172,6 +787,7 @@ for more details.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tags
@@ -1181,8 +797,6 @@ The tag-set for the object.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1196,6 +810,7 @@ The tag-set for the object.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[tag-name]`
@@ -1206,20 +821,340 @@ A custom tag to be added to the created objects.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"filename_append_uuid"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### filename_append_uuid
+
+Whether or not to append a UUID v4 token to the end of the file. This ensures
+there are no name collisions high volume use cases.
+
+ See [Object naming](#object-naming) for more info.
 
 
+</Field>
+<Field
+  common={false}
+  defaultValue={"log"}
+  enumValues={null}
+  examples={["log"]}
+  groups={[]}
+  name={"filename_extension"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### filename_extension
+
+The filename extension to use in the object name.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"%s"}
+  enumValues={null}
+  examples={["%s"]}
+  groups={[]}
+  name={"filename_time_format"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### filename_time_format
+
+The format of the resulting object file name. [`strftime`
+specifiers][urls.strptime_specifiers] are supported.
+
+ See [Object naming](#object-naming) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"date=%F/"}
+  enumValues={null}
+  examples={["date=%F/","date=%F/hour=%H/","year=%Y/month=%m/day=%d/","application_id={{ application_id }}/date=%F/"]}
+  groups={[]}
+  name={"key_prefix"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={true}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### key_prefix
+
+A prefix to apply to all object key names. This should be used to partition
+your objects, and it's important to end this value with a `/` if you want this
+to be the root S3 "folder".
+
+ See [Object naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"request"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### request
+
+Configures the sink request behavior.
+
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={50}
+  enumValues={null}
+  examples={[50]}
+  groups={[]}
+  name={"in_flight_limit"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"requests"}
+  warnings={[]}
+  >
+
+#### in_flight_limit
+
+The maximum number of in-flight requests allowed at any given time.
+
+ See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  groups={[]}
+  name={"rate_limit_duration_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### rate_limit_duration_secs
+
+The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
+
+ See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={250}
+  enumValues={null}
+  examples={[250]}
+  groups={[]}
+  name={"rate_limit_num"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### rate_limit_num
+
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
+time window.
+
+ See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={-1}
+  enumValues={null}
+  examples={[-1]}
+  groups={[]}
+  name={"retry_attempts"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### retry_attempts
+
+The maximum number of retries to make for failed requests.
+
+ See [Retry Policy](#retry-policy) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  groups={[]}
+  name={"retry_initial_backoff_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### retry_initial_backoff_secs
+
+The amount of time to wait before attempting the first retry for a failed
+request. Once, the first retry has failed the fibonacci sequence will be used
+to select future backoffs.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={10}
+  enumValues={null}
+  examples={[10]}
+  groups={[]}
+  name={"retry_max_duration_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### retry_max_duration_secs
+
+The maximum amount of time, in seconds, to wait between retries.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={30}
+  enumValues={null}
+  examples={[30]}
+  groups={[]}
+  name={"timeout_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### timeout_secs
+
+The maximum time a request can take before being aborted. It is highly
+recommended that you do not lower value below the service's internal timeout,
+as this could create orphaned requests, pile on retries, and result in
+duplicate data downstream.
+
+ See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+</Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={{"STANDARD":"The default storage class. If you don't specify the storage class when you upload an object, Amazon S3 assigns the STANDARD storage class.","REDUCED_REDUNDANCY":"Designed for noncritical, reproducible data that can be stored with less redundancy than the STANDARD storage class. AWS recommends that you not use this storage class. The STANDARD storage class is more cost effective. ","INTELLIGENT_TIERING":"Stores objects in two access tiers: one tier that is optimized for frequent access and another lower-cost tier that is optimized for infrequently accessed data.","STANDARD_IA":"Amazon S3 stores the object data redundantly across multiple geographically separated Availability Zones (similar to the STANDARD storage class).","ONEZONE_IA":"Amazon S3 stores the object data in only one Availability Zone.","GLACIER":"Use for archives where portions of the data might need to be retrieved in minutes.","DEEP_ARCHIVE":"Use for archiving data that rarely needs to be accessed."}}
+  examples={["STANDARD","REDUCED_REDUNDANCY","INTELLIGENT_TIERING","STANDARD_IA","ONEZONE_IA","GLACIER","DEEP_ARCHIVE"]}
+  groups={[]}
+  name={"storage_class"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### storage_class
+
+The storage class for the created objects. See [the S3 Storage
+Classes](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html)
+for more details.
+
+ See [Storage class](#storage-class) for more info.
+
+
+</Field>
 </Fields>
 
 ## Env Vars
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1233,6 +1168,7 @@ A custom tag to be added to the created objects.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_ACCESS_KEY_ID
@@ -1244,8 +1180,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1259,6 +1193,7 @@ Used for AWS authentication when communicating with AWS services. See relevant
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_SECRET_ACCESS_KEY
@@ -1270,9 +1205,8 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 </Fields>
+
 
 ## How It Works
 
@@ -1302,8 +1236,6 @@ optional setting that is helpful for a variety of use cases, such as cross
 account access.
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-partitioned.svg" />
 
@@ -1440,7 +1372,7 @@ any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][urls.new_aws_s3_sink_issue].
+with the Vector team by [opening an issue][urls.new_aws_s3_sink_issue].
 
 ### Retry Policy
 
@@ -1485,9 +1417,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sinks.my_aws_s3_sink_id]
   # ...
   key_prefix = "date=%F/"
@@ -1507,7 +1437,7 @@ You can learn more about the complete syntax in the
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [docs.reference.templating]: /docs/reference/templating/
-[pages.aws_components]: /components?providers%5B%5D=aws/
+[pages.aws_components]: /components/?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_canonical_user_id]: https://docs.aws.amazon.com/general/latest/gr/acct-identifiers.html#FindingCanonicalId
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html

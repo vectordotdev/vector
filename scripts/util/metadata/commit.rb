@@ -14,7 +14,6 @@ class Commit
     :deletions_count,
     :description,
     :files_count,
-    :group,
     :insertions_count,
     :message,
     :pr_number,
@@ -37,7 +36,6 @@ class Commit
     @pr_number = message_attributes["pr_number"]
     @scope = CommitScope.new(message_attributes["scope"] || "core")
     @type = message_attributes.fetch("type")
-    @group = @breaking_change ? "breaking change" : @type
   end
 
   def breaking_change?
@@ -137,7 +135,6 @@ class Commit
       deletions_count: deletions_count,
       description: description,
       files_count: files_count,
-      group: group,
       insertions_count: insertions_count,
       message: message,
       pr_number: pr_number,

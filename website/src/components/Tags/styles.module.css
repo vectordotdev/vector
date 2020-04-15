@@ -1,0 +1,18 @@
+.tags {
+  overflow: hidden;
+}
+
+.tags a {
+  margin-right: 0.5em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.tagsBlock a {
+  display: block;
+  margin-right: none;
+  margin-bottom: 0.5em;
+}

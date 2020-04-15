@@ -18,9 +18,11 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use futures01::{sync::mpsc, Future, Sink, Stream};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::env::{self, VarError};
+use string_cache::DefaultAtom as Atom;
 
 // ?NOTE
 // Original proposal: https://github.com/kubernetes/kubernetes/blob/release-1.5/docs/proposals/kubelet-cri-logging.md#proposed-solution
@@ -34,6 +36,10 @@ const LOG_DIRECTORY: &str = r"/var/log/pods/";
 
 /// Enviorment variable through which we are receiving uid of this vector's pod.
 const VECTOR_POD_UID_ENV: &str = "VECTOR_POD_UID";
+
+lazy_static! {
+    pub static ref POD_UID: Atom = Atom::from("object_uid");
+}
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -97,6 +103,15 @@ impl SourceConfig for KubernetesConfig {
             .filter_map(move |event| now.filter(event))
             .map(remove_ending_newline)
             .filter_map(move |event| transform_pod_uid.transform(event))
+            .map(|mut event| {
+                // Add source type
+                let key = event::log_schema().source_type_key();
+                // We need to insert here to overwrite files source type.
+                if event.as_log().get(key) == Some(&"file".into()) {
+                    event.as_mut_log().insert(key, "kubernetes");
+                }
+                event
+            })
             .forward(out.sink_map_err(drop))
             .map(drop)
             .join(file_source)
