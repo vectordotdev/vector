@@ -6,6 +6,13 @@ blog = "/blog/"
 guides = "/guides/"
 parse_transforms = "/components/?functions%5B%5D=parse"
 program_transforms = "/components/?functions%5B%5D=program"
+transform_add_fields = "/docs/reference/transforms/add_fields/"
+transform_remove_fields = "/docs/reference/transforms/remove_fields/"
+transform_regex_parser = "/docs/reference/transforms/regex_parser/"
+transform_split = "/docs/reference/transforms/split/"
+transform_coercer = "/docs/reference/transforms/coercer/"
+transform_json_parser = "/docs/reference/transforms/json_parser/"
+transform_grok_parser = "/docs/reference/transforms/grok_parser/"
 
 [links.urls]
 add_company = "https://github.com/timberio/vector/blob/master/.meta/companies.toml"

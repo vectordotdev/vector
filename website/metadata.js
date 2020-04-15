@@ -15552,21 +15552,6 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/binarylogic",
-          "date": "2019-12-04",
-          "description": "This ensures that naming is consistent for the upcoming `datadog_logs` sink",
-          "id": "2019-12-04-rename-datadog-sink-to-datadog_metrics",
-          "importance": "low",
-          "path": "website/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics.md",
-          "permalink": "/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics/",
-          "tags": [
-            "type: breaking change",
-            "domain: sinks",
-            "sink: datadog_metrics"
-          ],
-          "title": "The `datadog` sink has been renamed to `datadog_metrics`"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
           "date": "2019-11-19",
           "description": "These architectures are widely used in embeded devices & servers",
           "id": "2019-11-19-arm-support-on-linux",
@@ -15609,6 +15594,21 @@ module.exports = {
             "domain: config"
           ],
           "title": "Unit Testing Your Vector Config Files"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2019-12-04",
+          "description": "This ensures that naming is consistent for the upcoming `datadog_logs` sink",
+          "id": "2019-12-04-rename-datadog-sink-to-datadog_metrics",
+          "importance": "low",
+          "path": "website/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics.md",
+          "permalink": "/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics/",
+          "tags": [
+            "type: breaking change",
+            "domain: sinks",
+            "sink: datadog_metrics"
+          ],
+          "title": "The `datadog` sink has been renamed to `datadog_metrics`"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -18821,6 +18821,21 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/binarylogic",
+          "date": "2020-01-07",
+          "description": "Scrape prometheus metrics with Vector",
+          "id": "2020-01-07-prometheus-source",
+          "importance": "high",
+          "path": "website/highlights/2020-01-07-prometheus-source.md",
+          "permalink": "/highlights/2020-01-07-prometheus-source/",
+          "tags": [
+            "type: new feature",
+            "domain: sources",
+            "source: prometheus"
+          ],
+          "title": "New Prometheus Source"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
           "date": "2020-01-12",
           "description": "<fill-in>",
           "id": "2020-01-12-request-options-refactored",
@@ -18879,21 +18894,6 @@ module.exports = {
             "sink: splunk_hec"
           ],
           "title": "The `splunk_hec` sink does not index fields by default"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "date": "2020-01-07",
-          "description": "Scrape prometheus metrics with Vector",
-          "id": "2020-01-07-prometheus-source",
-          "importance": "high",
-          "path": "website/highlights/2020-01-07-prometheus-source.md",
-          "permalink": "/highlights/2020-01-07-prometheus-source/",
-          "tags": [
-            "type: new feature",
-            "domain: sources",
-            "source: prometheus"
-          ],
-          "title": "New Prometheus Source"
         }
       ],
       "insertions_count": 24373,
@@ -23472,21 +23472,6 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/binarylogic",
-          "date": "2020-02-24",
-          "description": "We're bringing our log data model closer to JSON",
-          "id": "2020-02-24-log-data-model-changes",
-          "importance": "low",
-          "path": "website/highlights/2020-02-24-log-data-model-changes.md",
-          "permalink": "/highlights/2020-02-24-log-data-model-changes/",
-          "tags": [
-            "type: breaking change",
-            "domain: buffers",
-            "event type: log"
-          ],
-          "title": "Log Data Model Improvements"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
           "date": "2020-02-05",
           "description": "Docker splits long messages by default, and now Vector merges them back for you",
           "id": "2020-02-05-merge-partial-docker-events",
@@ -23500,21 +23485,6 @@ module.exports = {
             "platform: docker"
           ],
           "title": "Automatically merge partial Docker events"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "date": "2020-02-21",
-          "description": "Merge multiple lines together based on rules",
-          "id": "2020-02-21-file-source-multiline-support",
-          "importance": "medium",
-          "path": "website/highlights/2020-02-21-file-source-multiline-support.md",
-          "permalink": "/highlights/2020-02-21-file-source-multiline-support/",
-          "tags": [
-            "type: enhancement",
-            "domain: sources",
-            "source: file"
-          ],
-          "title": "Improved Multiline Support In The File Source"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -23601,6 +23571,36 @@ module.exports = {
             "domain: sinks"
           ],
           "title": "Lots of New Sinks!"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-21",
+          "description": "Merge multiple lines together based on rules",
+          "id": "2020-02-21-file-source-multiline-support",
+          "importance": "medium",
+          "path": "website/highlights/2020-02-21-file-source-multiline-support.md",
+          "permalink": "/highlights/2020-02-21-file-source-multiline-support/",
+          "tags": [
+            "type: enhancement",
+            "domain: sources",
+            "source: file"
+          ],
+          "title": "Improved Multiline Support In The File Source"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-24",
+          "description": "We're bringing our log data model closer to JSON",
+          "id": "2020-02-24-log-data-model-changes",
+          "importance": "low",
+          "path": "website/highlights/2020-02-24-log-data-model-changes.md",
+          "permalink": "/highlights/2020-02-24-log-data-model-changes/",
+          "tags": [
+            "type: breaking change",
+            "domain: buffers",
+            "event type: log"
+          ],
+          "title": "Log Data Model Improvements"
         },
         {
           "author_github": "https://github.com/binarylogic",
