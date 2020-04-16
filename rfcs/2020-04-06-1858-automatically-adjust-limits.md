@@ -153,6 +153,9 @@ reason about the causes of bandwidth limits.
   flapping of the concurrency level without allowing the RTT to grow
   unbounded and overload the sink.
 
+* Some level of (random) jitter may be needed to stagger the increases,
+  to avoid a large number of clients overwhelming a sink.
+
 ## Plan Of Attack
 
 * [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
