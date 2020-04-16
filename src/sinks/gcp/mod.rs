@@ -6,9 +6,11 @@ use hyper::{
     header::{HeaderValue, AUTHORIZATION},
     Request, StatusCode,
 };
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
+use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio01::timer::Interval;
@@ -16,6 +18,9 @@ use tokio01::timer::Interval;
 pub mod cloud_storage;
 pub mod pubsub;
 pub mod stackdriver_logs;
+
+const SERVICE_ACCOUNT_TOKEN_URL: &str =
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
 #[derive(Debug, Snafu)]
 enum GcpError {
@@ -28,7 +33,13 @@ enum GcpError {
     #[snafu(display("Invalid RSA key in GCP credentials"))]
     InvalidRsaKey { source: GOErr },
     #[snafu(display("Failed to get OAuth token"))]
-    GetTokenFailed { source: GOErr },
+    GetToken { source: GOErr },
+    #[snafu(display("Failed to get OAuth token text"))]
+    GetTokenText { source: reqwest::Error },
+    #[snafu(display("Failed to get implicit GCP token"))]
+    GetImplicitToken { source: reqwest::Error },
+    #[snafu(display("Failed to parse OAuth token"))]
+    TokenFromStr { source: GOErr },
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -41,31 +52,49 @@ impl GcpAuthConfig {
     pub fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpCredentials>> {
         let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
         let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
-        match (&creds_path, &self.api_key) {
-            (Some(path), _) => Ok(Some(GcpCredentials::new(path, scope)?)),
-            (None, Some(_)) => Ok(None),
-            (None, None) => Err(GcpError::MissingAuth.into()),
-        }
+        Ok(match (&creds_path, &self.api_key) {
+            (Some(path), _) => Some(GcpCredentials::from_file(path, scope)?),
+            (None, Some(_)) => None,
+            (None, None) => Some(GcpCredentials::new_implicit(scope)?),
+        })
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct GcpCredentials {
-    creds: Credentials,
+    creds: Option<Credentials>,
     scope: Scope,
     token: Arc<RwLock<Token>>,
 }
 
+fn get_token_implicit() -> Result<Token, GcpError> {
+    let client = Client::new();
+    let mut response = client
+        .get(SERVICE_ACCOUNT_TOKEN_URL)
+        .header("Metadata-Flavor", "Google")
+        .send()
+        .context(GetImplicitToken)?;
+    Token::from_str(&response.text().context(GetTokenText)?).context(TokenFromStr)
+}
+
 impl GcpCredentials {
-    pub fn new(path: &str, scope: Scope) -> crate::Result<Self> {
+    fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
         let creds = Credentials::from_file(path).context(InvalidCredentials1)?;
         let jwt = make_jwt(&creds, &scope)?;
-        let token = goauth::get_token_with_creds(&jwt, &creds).context(GetTokenFailed)?;
-        let token = Arc::new(RwLock::new(token));
+        let token = goauth::get_token_with_creds(&jwt, &creds).context(GetToken)?;
         Ok(Self {
-            creds,
+            creds: Some(creds),
             scope,
-            token,
+            token: Arc::new(RwLock::new(token)),
+        })
+    }
+
+    fn new_implicit(scope: Scope) -> crate::Result<Self> {
+        let token = get_token_implicit()?;
+        Ok(Self {
+            creds: None,
+            scope,
+            token: Arc::new(RwLock::new(token)),
         })
     }
 
@@ -78,8 +107,13 @@ impl GcpCredentials {
     }
 
     fn regenerate_token(&self) -> crate::Result<()> {
-        let jwt = make_jwt(&self.creds, &self.scope).unwrap(); // Errors caught above
-        let token = goauth::get_token_with_creds(&jwt, &self.creds)?;
+        let token = match &self.creds {
+            Some(creds) => {
+                let jwt = make_jwt(creds, &self.scope).unwrap(); // Errors caught above
+                goauth::get_token_with_creds(&jwt, creds)?
+            }
+            None => get_token_implicit()?,
+        };
         *self.token.write().unwrap() = token;
         Ok(())
     }

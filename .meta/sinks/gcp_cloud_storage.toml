@@ -53,7 +53,7 @@ write_to_description = "[Google Cloud Platform's Cloud Storage service](https://
   timeout_secs: 60
 ) %>
 
-<%= render("_partials/fields/_gcp.toml", namespace: "sinks.gcp_cloud_storage", access: "Cloud Storage API", required: true) %>
+<%= render("_partials/fields/_gcp.toml", namespace: "sinks.gcp_cloud_storage", access: "Cloud Storage API") %>
 
 [sinks.gcp_cloud_storage.options.bucket]
 type = "string"

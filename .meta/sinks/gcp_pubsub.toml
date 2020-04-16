@@ -47,7 +47,7 @@ write_to_description = "[Google Cloud Platform's Pubsub service][urls.gcp_pubsub
   timeout_secs: 60
 ) %>
 
-<%= render("_partials/fields/_gcp.toml", namespace: "sinks.gcp_pubsub", access: "pubsub project and topic", required: false) %>
+<%= render("_partials/fields/_gcp.toml", namespace: "sinks.gcp_pubsub", access: "pubsub project and topic") %>
 
 [sinks.gcp_pubsub.options.api_key]
 type = "string"

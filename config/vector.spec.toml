@@ -4983,7 +4983,12 @@ require('custom_module')
   # authenticate access to the Cloud Storage API. If this is unset, Vector checks
   # the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
   #
-  # * required
+  # If no filename is named, Vector will attempt to fetch an instance service
+  # account for the compute instance the program is running on. If Vector is not
+  # running on a GCE instance, you must define a credentials file as above.
+  #
+  # * optional
+  # * no default
   # * type: string
   credentials_path = "/path/to/credentials.json"
 
@@ -5327,6 +5332,10 @@ require('custom_module')
   # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
   # filename.
   #
+  # If no filename is named, Vector will attempt to fetch an instance service
+  # account for the compute instance the program is running on. If Vector is not
+  # running on a GCE instance, you must define a credentials file as above.
+  #
   # * optional
   # * no default
   # * type: string
@@ -5599,7 +5608,12 @@ require('custom_module')
   # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
   # filename.
   #
-  # * required
+  # If no filename is named, Vector will attempt to fetch an instance service
+  # account for the compute instance the program is running on. If Vector is not
+  # running on a GCE instance, you must define a credentials file as above.
+  #
+  # * optional
+  # * no default
   # * type: string
   credentials_path = "/path/to/credentials.json"
 
