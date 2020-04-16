@@ -1,7 +1,7 @@
 ---
 last_modified_on: "2020-04-16"
 $schema: "/.meta/.schemas/highlights.json"
-title: "Make ACL optional for the Google Cloud Storage sink"
+title: "ACL is now optional for the Google Cloud Storage sink"
 description: "ACL is not always required when creating objects in GCP Cloud Storage"
 author_github: "https://github.com/binarylogic"
 hide_on_release_notes: false

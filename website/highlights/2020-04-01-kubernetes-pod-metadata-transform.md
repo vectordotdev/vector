@@ -5,7 +5,7 @@ title: "New Kubernetes Pod Metdata Transform"
 description: "Easily rnrich your logs with Kubernetes metadata"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1888]
-release: "nightly"
+release: "0.9.0"
 hide_on_release_notes: false
 tags: ["type: new feature", "domain: sources", "source: vector"]
 ---

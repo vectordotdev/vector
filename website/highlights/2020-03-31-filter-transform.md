@@ -1,41 +1,38 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-16"
 $schema: "/.meta/.schemas/highlights.json"
 title: "New Filter Transform"
 description: "Filter and route your logs based on defined conditions"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [2088]
-release: "nightly"
+release: "0.9.0"
 hide_on_release_notes: false
 tags: ["type: new feature", "domain: transforms", "transform: filter"]
 ---
 
-We love [Prometheus][urls.prometheus], but we also love [options](https://www.mms.com/en-us/shop/single-color)
-and so we've added a [`prometheus` source][docs.sources.prometheus] to let you
-send Prometheus format metrics anywhere you like.
+We recently introduced a concept of conditions, which you can see in our
+[`swimlanes` transform][docs.transforms.swimlanes] as well as our [unit
+tests feature][docs.reference.tests]. This paved the way for a new `filter`
+transform, allowing you to filter events based on a set of conditions. This
+is replaces our old `field_filter` transform since it is much more expressive.
 
-<!--truncate-->
+## Get Started
 
-This was an important feat for Vector because it required us to mature our
-metrics data model and tested our interoperability between metrics sources
-To use it simply add the source config and point it towards the hosts you wish
-to scrape:
+```toml title="vector.toml"
+[transforms.haproxy_errors]
+  # General
+  type = "filter"
+  inputs = ["my-source-id"]
 
-```toml
-[sources.my_source_id]
-  type = "prometheus"
-  hosts = ["http://localhost:9090"]
-  scrape_interval_secs = 1
+  # Conditions
+  condition."level.eq" = "error"
+  condition."service" = "haproxy"
 ```
 
-For more guidance get on the [reference page][docs.sources.prometheus].
-
-## Why?
-
-We believe the most common use cases for this source will be backups and
-migration, if you have an interesting use case we'd [love to hear about it][urls.vector_chat].
+Check out the [docs][docs.transforms.filter] for a fill list of available
+conditions.
 
 
-[docs.sources.prometheus]: /docs/reference/sources/prometheus/
-[urls.prometheus]: https://prometheus.io/
-[urls.vector_chat]: https://chat.vector.dev
+[docs.reference.tests]: /docs/reference/tests/
+[docs.transforms.filter]: /docs/reference/transforms/filter/
+[docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/

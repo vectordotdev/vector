@@ -12,7 +12,6 @@ tags: ["type: new feature", "domain: sources", "source: vector"]
 
 import Alert from '@site/src/components/Alert';
 import Jump from '@site/src/components/Jump';
-import Vic from '@site/src/components/Vic';
 
 This is an exciting one! v2 of our [`lua` transform][docs.transforms.lua] has
 been released. It contains an entirely new API for using Lua within Vector,
@@ -86,7 +85,6 @@ source = """
 ```
 
 <Jump to="/guides/advanced/custom-aggregations-with-lua/" leftIcon="book-open">Learn how this works in the guide</Jump>
-<Vic style="cool" text="Vic approved" className="margin-vert--lg" />
 
 ## Get Started
 

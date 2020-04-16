@@ -5,7 +5,7 @@ title: "NixOS Support"
 description: "Bringing Vector to NixOS"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1946]
-release: "nightly"
+release: "0.9.0"
 hide_on_release_notes: true
 tags: ["type: new feature", "domain: platforms", "platform: nixos"]
 ---

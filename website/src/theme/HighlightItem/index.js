@@ -23,14 +23,38 @@ function prTags(numbers) {
   }));
 }
 
-function HighlightItem({authorGithub, dateString, description, headingDepth, hideAuthor, hideTags, permalink, prNumbers, style, tags, title}) {
+function HighlightItem({authorGithub, colorize, dateString, description, headingDepth, hideAuthor, hideTags, permalink, prNumbers, tags, title}) {
   const date = new Date(Date.parse(dateString));
   const formattedDate = dateFormat(date, "mmm dS, yyyy");
   let enrichedTags = enrichTags(tags, 'highlights');
   enrichedTags = enrichedTags.concat(prTags(prNumbers));
   const domainTag = enrichedTags.find(tag => tag.category == 'domain');
   const domain = domainTag ? domainTag.value : null;
+  const typeTag = enrichedTags.find(tag => tag.category == 'type');
+  const type = typeTag ? typeTag.value : null;
   const HeadingTag = `h${headingDepth || 3}`;
+
+  let style = null;
+
+  if (colorize) {
+    switch(type) {
+      case 'breaking change':
+        style = 'danger';
+        break;
+
+      case 'enhancement':
+        style = 'pink';
+        break;
+
+      case 'new feature':
+        style = 'primary';
+        break;
+
+      case 'performance':
+        style = 'warning';
+        break;
+    }
+  }
 
   const subTitle = <>
     <span className="time">

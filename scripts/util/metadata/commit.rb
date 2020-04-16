@@ -21,6 +21,8 @@ class Commit
     :sha,
     :type
 
+  attr_accessor :highlight_permalink
+
   def initialize(attributes)
     @author = attributes.fetch("author")
     @deletions_count = attributes["deletions_count"] || 0
@@ -105,6 +107,7 @@ class Commit
       deletions_count: deletions_count,
       description: description,
       files_count: files_count,
+      highlight_permalink: highlight_permalink,
       insertions_count: insertions_count,
       message: message,
       pr_number: pr_number,

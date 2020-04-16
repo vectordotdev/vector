@@ -69,7 +69,7 @@ fmt: ## Format code
 	@cargo fmt
 
 release: ## Release a new Vector version
-	@$(MAKE) release-meta
+	@$(MAKE) release-prepare
 	@$(MAKE) generate CHECK_URLS=false
 	@$(MAKE) release-commit
 
@@ -127,8 +127,8 @@ release-github: ## Release to Github
 release-homebrew: ## Release to timberio Homebrew tap
 	@scripts/release-homebrew.sh
 
-release-meta: ## Prepares the release metadata
-	@scripts/run.sh checker scripts/release-meta.rb
+release-prepare: ## Prepares the release with metadata and highlights
+	@scripts/run.sh checker scripts/release-prepare.rb
 
 release-rollback:
 	@scripts/run.sh checker scripts/release-rollback.rb

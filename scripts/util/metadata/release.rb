@@ -21,18 +21,21 @@ class Release
     @version = Version.new(release_hash.fetch("version"))
     @permalink = "#{RELEASES_BASE_PATH}/#{@version}/"
 
-    # commits
-
-    @commits =
-      release_hash.fetch("commits").collect do |commit_hash|
-        Commit.new(commit_hash)
-      end
-
     # highlights
 
     @highlights =
       all_highlights.select do |h|
         h.release == version.to_s
+      end
+
+    # commits
+
+    @commits =
+      release_hash.fetch("commits").collect do |commit_hash|
+        commit = Commit.new(commit_hash)
+        highlight = @highlights.find { |h| h.pr_numbers.include?(commit.pr_number) }
+        commit.highlight_permalink = highlight ? highlight.permalink : nil
+        commit
       end
 
     # requirements
