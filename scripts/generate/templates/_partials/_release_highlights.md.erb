@@ -1,7 +1,8 @@
 <%= highlights(
-  release.highlights,
+  release.highlights.select { |h| !h.hide_on_release_notes? },
   author: false,
   group_by: "type",
   heading_depth: heading_depth,
+  tags: tags,
   timeline: false
 ) %>

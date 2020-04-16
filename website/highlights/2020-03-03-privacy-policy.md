@@ -6,7 +6,7 @@ description: "Our commitment to privacy"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1977, 1976]
 release: "0.8.1"
-importance: "low"
+hide_on_release_notes: true
 tags: ["type: announcement"]
 ---
 

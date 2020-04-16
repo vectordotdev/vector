@@ -275,7 +275,7 @@ class Templates
     render("#{partials_path}/_full_config_spec.toml", binding).strip.gsub(/ *$/, '')
   end
 
-  def highlights(highlights, author: true, group_by: "type", heading_depth: 3, size: nil, style: nil, timeline: true)
+  def highlights(highlights, author: true, group_by: "type", heading_depth: 3, size: nil, style: nil, tags: true, timeline: true)
     case group_by
     when "type"
       highlights.sort_by!(&:type)
@@ -288,7 +288,7 @@ class Templates
     highlight_maps =
       highlights.collect do |highlight|
         {
-          authorGithub: author ? highlight.author_github : nil,
+          authorGithub: highlight.author_github,
           dateString: "#{highlight.date}T00:00:00",
           description: highlight.description,
           permalink: highlight.permalink,
@@ -525,7 +525,7 @@ class Templates
     render("#{partials_path}/_release_header.md", binding).strip
   end
 
-  def release_highlights(release, heading_depth: 3)
+  def release_highlights(release, heading_depth: 3, tags: true)
     render("#{partials_path}/_release_highlights.md", binding).strip
   end
 

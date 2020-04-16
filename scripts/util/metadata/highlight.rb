@@ -6,8 +6,8 @@ class Highlight
   attr_reader :author_github,
     :date,
     :description,
+    :hide_on_release_notes,
     :id,
-    :importance,
     :path,
     :permalink,
     :pr_numbers,
@@ -26,13 +26,44 @@ class Highlight
 
     @author_github = front_matter.fetch("author_github")
     @description = front_matter.fetch("description")
+    @hide_on_release_notes = front_matter.fetch("hide_on_release_notes")
     @id = front_matter["id"] || @path.split("/").last.gsub(/\.md$/, '')
-    @importance = front_matter.fetch("importance")
     @permalink = "#{HIGHLIGHTS_BASE_PATH}/#{id}/"
     @pr_numbers = front_matter.fetch("pr_numbers")
     @release = front_matter.fetch("release")
     @tags = front_matter.fetch("tags")
     @title = front_matter.fetch("title")
+
+    # Requirements
+
+    if breaking_change? && !File.read(path).include?("## Upgrade Guide")
+      raise Exception.new(
+        <<~EOF
+        The following "breaking change" highlight does not have an "Upgrade
+        Guide" section:
+
+            #{path}
+
+        This is required for all "breaking change" highlights to ensure
+        we provide a good, consistent UX for upgrading users. To fix this,
+        please add a "Upgrade Guide" section:
+
+            ## Update Guide
+
+            Make the following changes in your `vector.toml` file:
+
+            ```diff title="vector.toml"
+             [sinks.example]
+               type = "example"
+            -  remove = "me"
+            +  add = "me"
+            ```
+
+            That's it!
+
+        EOF
+      )
+    end
   end
 
   def <=>(other)
@@ -47,8 +78,8 @@ class Highlight
     self.<=>(other) == 0
   end
 
-  def importance?(name)
-    importance == name
+  def hide_on_release_notes?
+    @hide_on_release_notes == true
   end
 
   def sink?(name)
@@ -84,8 +115,8 @@ class Highlight
       author_github: author_github,
       date: date,
       description: description,
+      hide_on_release_notes: hide_on_release_notes,
       id: id,
-      importance: importance,
       path: path,
       permalink: permalink,
       tags: tags,

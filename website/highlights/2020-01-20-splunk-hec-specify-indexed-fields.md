@@ -6,7 +6,7 @@ description: "This gives you full control over which fields are indexed"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1537]
 release: "0.7.0"
-importance: "low"
+hide_on_release_notes: false
 tags: ["type: breaking change","domain: sinks","sink: splunk_hec"]
 ---
 
@@ -14,8 +14,10 @@ There is no longer a distinction within Vector between explicit and implicit
 event fields. All fields are now implicit and therefore the `splunk_hec` sink
 will _not_ index any fields by default.
 
-In order to mark desired fields as indexed you can use the optional configuration
-option `indexed_fields`:
+## Upgrade Guide
+
+In order to mark desired fields as indexed you can use the optional
+configuration option `indexed_fields`:
 
 ```toml title="vector.toml"
  [sinks.my_sink_id]

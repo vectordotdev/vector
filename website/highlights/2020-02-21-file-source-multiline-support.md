@@ -6,7 +6,7 @@ description: "Merge multiple lines together based on rules"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1852]
 release: "0.8.0"
-importance: "medium"
+hide_on_release_notes: false
 tags: ["type: enhancement", "domain: sources", "source: file"]
 ---
 

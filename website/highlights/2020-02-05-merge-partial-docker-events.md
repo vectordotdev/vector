@@ -6,7 +6,7 @@ description: "Docker splits long messages by default, and now Vector merges them
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1457]
 release: "0.8.0"
-importance: "high"
+hide_on_release_notes: false
 tags: ["type: enhancement", "domain: sources", "source: docker", "platform: docker"]
 ---
 

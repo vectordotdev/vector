@@ -6,7 +6,7 @@ description: "A better way to manage complex Vector configurations"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1725]
 release: "0.8.0"
-importance: "low"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: config"]
 ---
 

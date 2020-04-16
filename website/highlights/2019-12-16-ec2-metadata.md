@@ -6,7 +6,7 @@ description: "Enrich your events with EC2 metadata"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1325]
 release: "0.6.0"
-importance: "high"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: transforms", "transform: aws_ec2_metadata"]
 ---
 

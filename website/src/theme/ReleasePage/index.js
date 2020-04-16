@@ -152,9 +152,9 @@ function ReleasePage(props) {
     warnings.push(<li>This is an outdated version. Outdated versions maybe contain bugs. It is recommended to use the <Link to={latestRelease.permalink}>latest version ({latestRelease.version})</Link>.</li>);
   }
 
-  if (breaking) {
-    warnings.push(<li>This release contains <a href="#breaking-changes">breaking changes</a>. Please review and follow the <a href="#breaking-change-highlights">upgrade guides</a>.</li>)
-  }
+  const enhancements = release.commits.filter(commit => commit.type == 'enhancement');
+  const features = release.commits.filter(commit => commit.type == 'feat');
+  const fixes = release.commits.filter(commit => commit.type == 'fix');
 
   //
   // Render
@@ -162,44 +162,58 @@ function ReleasePage(props) {
 
   return (
     <Layout title={title} description={description}>
-      <header className="hero hero--clean hero--flush">
-        <div className="container">
-          <DownloadDiagram />
-          <h1 className={styles.header}>{title}</h1>
-          <div class="hero--subtitle">{codename}</div>
-          <div class="hero--subsubtitle">
-            {formattedDate} / <TimeAgo pubdate="pubdate" title={formattedDate} datetime={date} />
+      <main className={styles.main}>
+        <header className="hero hero--clean hero--flush">
+          <div className="container">
+            <DownloadDiagram />
+            <h1>{title}</h1>
+            <div class="hero--subtitle">{codename}</div>
+            <div class="hero--subsubtitle">
+              {formattedDate} / <TimeAgo pubdate="pubdate" title={formattedDate} datetime={date} />
+            </div>
+            <div class="hero--buttons margin-vert--md">
+              <Link to={`/releases/${version}/download/`} className="button button--highlight">
+                <i className="feather icon-download"></i> download
+              </Link>
+            </div>
+            <div class="hero--toc">
+              <ul>
+                {release.highlights.length > 0 && <li><a href="#highlights">{pluralize('highlight', release.highlights.length, true)}</a></li>}
+                {features.length > 0 && <li><a href="#feat">{pluralize('new feature', features.length, true)}</a></li>}
+                {enhancements.length > 0 && <li><a href="#enhancement">{pluralize('enhancement', enhancements.length, true)}</a></li>}
+                {fixes.length > 0 && <li><a href="#fix">{pluralize('bug fix', fixes.length, true)}</a></li>}
+              </ul>
+            </div>
           </div>
-          <div class="hero--buttons margin-vert--md">
-            <Link to={`/releases/${version}/download/`} className="button button--highlight">
-              <i className="feather icon-download"></i> download
-            </Link>
-          </div>
-        </div>
-      </header>
-      <main className={classnames('container', 'container--xs')}>
-        <div class={styles.article}>
-          {warnings.length > 0 && <Alert icon={false} fill={true} type="danger" className="list--warnings margin-bottom--lg">
-            <ul>{warnings}</ul>
-          </Alert>}
-          <section className="markdown">
-            <MDXProvider components={MDXComponents}><ReleaseContents /></MDXProvider>
-          </section>
-          <section>
-            <h2>Like What You See?</h2>
+        </header>
+        <div className={classnames('container', 'container--xs')}>
+          <article>
+            {warnings.length > 0 && <Alert icon={false} fill={true} type="warning" className="list--warnings margin-bottom--lg">
+              <ul>{warnings}</ul>
+            </Alert>}
+            <section className="markdown">
+              <MDXProvider components={MDXComponents}><ReleaseContents /></MDXProvider>
+            </section>
+            <section>
+              <h2>Like What You See?</h2>
 
-            <CTA />
-          </section>
+              <CTA />
+            </section>
+          </article>
+          {(metadata.nextItem || metadata.prevItem) && (
+            <div className="margin-bottom--lg">
+              <PagePaginator
+                next={metadata.nextItem}
+                previous={metadata.prevItem}
+              />
+            </div>
+          )}
         </div>
-        {(metadata.nextItem || metadata.prevItem) && (
-          <div className="margin-bottom--lg">
-            <PagePaginator
-              next={metadata.nextItem}
-              previous={metadata.prevItem}
-            />
-          </div>
-        )}
       </main>
+      <nav className="pagination-controls">
+        {metadata.prevItem && <Link to={metadata.prevItem.permalink} className="prev"><i className="feather icon-chevron-left"></i></Link>}
+        {metadata.nextItem && <Link to={metadata.nextItem.permalink} className="next"><i className="feather icon-chevron-right"></i></Link>}
+      </nav>
     </Layout>
   );
 }

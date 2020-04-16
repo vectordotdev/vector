@@ -7,6 +7,7 @@ const fs_extra_1 = __importDefault(require("fs-extra"));
 const globby_1 = __importDefault(require("globby"));
 const path_1 = __importDefault(require("path"));
 const utils_1 = require("@docusaurus/utils");
+const semver_1 = __importDefault(require("semver"));
 function truncate(fileString, truncateMarker) {
     return fileString.split(truncateMarker, 1).shift();
 }
@@ -50,7 +51,7 @@ async function generateReleases(releaseDir, { siteConfig, siteDir }, options) {
             },
         });
     }));
-    return releases;
+    return releases.sort((a, b) => semver_1.default.compare(a.metadata.version, b.metadata.version));
 }
 exports.generateReleases = generateReleases;
 function linkify(fileContent, siteDir, releasePath, releases) {

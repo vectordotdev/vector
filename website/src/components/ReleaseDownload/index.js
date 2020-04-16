@@ -163,7 +163,7 @@ function ReleaseDownload({version}) {
                 placeholder="Select a version..."
                 value={releaseOptions.find(option => release && option.value == release.version)}
                 onChange={(selectedOption) => setVersion(selectedOption ? selectedOption.value : null)} />
-              {release && release.version != releases[0].version && <Alert fill={true} type="danger">
+              {release && release.version != releases[0].version && <Alert fill={true} type="warning">
                 This is an outdated version. Outdated versions maybe contain bugs. It is recommended to use the latest version. Please proceed with caution.
               </Alert>}
               {release && <DownloadTable

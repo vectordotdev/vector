@@ -2506,8 +2506,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-10-21",
       "description": "The `encoding` option is now required for these sinks",
+      "hide_on_release_notes": false,
       "id": "2019-10-21-require-encoding-option-for-console-and-file-sinks",
-      "importance": "low",
       "path": "website/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks.md",
       "permalink": "/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks/",
       "tags": [
@@ -2522,8 +2522,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-11-19",
       "description": "These architectures are widely used in embeded devices & servers",
+      "hide_on_release_notes": false,
       "id": "2019-11-19-arm-support-on-linux",
-      "importance": "high",
       "path": "website/highlights/2019-11-19-arm-support-on-linux.md",
       "permalink": "/highlights/2019-11-19-arm-support-on-linux/",
       "tags": [
@@ -2538,8 +2538,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-11-21",
       "description": "Bringing the performance and reliability of Vector to Windows",
+      "hide_on_release_notes": false,
       "id": "2019-11-21-windows-support",
-      "importance": "high",
       "path": "website/highlights/2019-11-21-windows-support.md",
       "permalink": "/highlights/2019-11-21-windows-support/",
       "tags": [
@@ -2553,8 +2553,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-11-25",
       "description": "Treating your Vector configuration files as code",
+      "hide_on_release_notes": false,
       "id": "2019-11-25-unit-testing-vector-config-files",
-      "importance": "medium",
       "path": "website/highlights/2019-11-25-unit-testing-vector-config-files.md",
       "permalink": "/highlights/2019-11-25-unit-testing-vector-config-files/",
       "tags": [
@@ -2567,8 +2567,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-12-04",
       "description": "This ensures that naming is consistent for the upcoming `datadog_logs` sink",
+      "hide_on_release_notes": false,
       "id": "2019-12-04-rename-datadog-sink-to-datadog_metrics",
-      "importance": "low",
       "path": "website/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics.md",
       "permalink": "/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics/",
       "tags": [
@@ -2582,8 +2582,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-12-13",
       "description": "Point Vector to custom DNS servers",
+      "hide_on_release_notes": false,
       "id": "2019-12-13-custom-dns",
-      "importance": "low",
       "path": "website/highlights/2019-12-13-custom-dns.md",
       "permalink": "/highlights/2019-12-13-custom-dns/",
       "tags": [
@@ -2596,8 +2596,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-12-14",
       "description": "Early adopters have a new Kuberenetes source to chew on",
+      "hide_on_release_notes": false,
       "id": "2019-12-14-kubernetes-source-alpha",
-      "importance": "low",
       "path": "website/highlights/2019-12-14-kubernetes-source-alpha.md",
       "permalink": "/highlights/2019-12-14-kubernetes-source-alpha/",
       "tags": [
@@ -2611,8 +2611,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-12-16",
       "description": "Enrich your events with EC2 metadata",
+      "hide_on_release_notes": false,
       "id": "2019-12-16-ec2-metadata",
-      "importance": "high",
       "path": "website/highlights/2019-12-16-ec2-metadata.md",
       "permalink": "/highlights/2019-12-16-ec2-metadata/",
       "tags": [
@@ -2626,8 +2626,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-01-03",
       "description": "We've simplified our socket based sources into a single `socket` source",
+      "hide_on_release_notes": false,
       "id": "2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source",
-      "importance": "low",
       "path": "website/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source.md",
       "permalink": "/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source/",
       "tags": [
@@ -2642,8 +2642,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-01-03",
       "description": "This renames the existing `tcp` sink to `socket`",
+      "hide_on_release_notes": false,
       "id": "2020-01-03-move-existing-tcp-sink-into-socket-sink",
-      "importance": "low",
       "path": "website/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink.md",
       "permalink": "/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink/",
       "tags": [
@@ -2657,8 +2657,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-01-07",
       "description": "Scrape prometheus metrics with Vector",
+      "hide_on_release_notes": false,
       "id": "2020-01-07-prometheus-source",
-      "importance": "high",
       "path": "website/highlights/2020-01-07-prometheus-source.md",
       "permalink": "/highlights/2020-01-07-prometheus-source/",
       "tags": [
@@ -2671,9 +2671,9 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-01-12",
-      "description": "<fill-in>",
+      "description": "We've simplified and organized our sink options",
+      "hide_on_release_notes": false,
       "id": "2020-01-12-request-options-refactored",
-      "importance": "low",
       "path": "website/highlights/2020-01-12-request-options-refactored.md",
       "permalink": "/highlights/2020-01-12-request-options-refactored/",
       "tags": [
@@ -2688,8 +2688,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-01-12",
       "description": "This change achieve consistency with our `kafka` source and other Kafka clients",
+      "hide_on_release_notes": false,
       "id": "2020-01-12-use-comma-delim-server-list-instead-of-an-array",
-      "importance": "low",
       "path": "website/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array.md",
       "permalink": "/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array/",
       "tags": [
@@ -2703,8 +2703,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-01-14",
       "description": "This change ensures the `splunk_hec` source conforms to Vector's schema",
+      "hide_on_release_notes": false,
       "id": "2020-01-14-rename-line-field-to-message",
-      "importance": "low",
       "path": "website/highlights/2020-01-14-rename-line-field-to-message.md",
       "permalink": "/highlights/2020-01-14-rename-line-field-to-message/",
       "tags": [
@@ -2718,8 +2718,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-01-20",
       "description": "This gives you full control over which fields are indexed",
+      "hide_on_release_notes": false,
       "id": "2020-01-20-splunk-hec-specify-indexed-fields",
-      "importance": "low",
       "path": "website/highlights/2020-01-20-splunk-hec-specify-indexed-fields.md",
       "permalink": "/highlights/2020-01-20-splunk-hec-specify-indexed-fields/",
       "tags": [
@@ -2733,8 +2733,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-05",
       "description": "We've dropped redundant AWS options that may break backward compatibility",
+      "hide_on_release_notes": true,
       "id": "2020-02-05-drop-aws-options",
-      "importance": "low",
       "path": "website/highlights/2020-02-05-drop-aws-options.md",
       "permalink": "/highlights/2020-02-05-drop-aws-options/",
       "tags": [
@@ -2749,8 +2749,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-05",
       "description": "Docker splits long messages by default, and now Vector merges them back for you",
+      "hide_on_release_notes": false,
       "id": "2020-02-05-merge-partial-docker-events",
-      "importance": "high",
       "path": "website/highlights/2020-02-05-merge-partial-docker-events.md",
       "permalink": "/highlights/2020-02-05-merge-partial-docker-events/",
       "tags": [
@@ -2763,24 +2763,10 @@ module.exports = {
     },
     {
       "author_github": "https://github.com/binarylogic",
-      "date": "2020-02-05",
-      "description": "The official Vector mascot",
-      "id": "2020-02-05-vic-the-vector-mascot",
-      "importance": "low",
-      "path": "website/highlights/2020-02-05-vic-the-vector-mascot.md",
-      "permalink": "/highlights/2020-02-05-vic-the-vector-mascot/",
-      "tags": [
-        "type: new feature",
-        "domain: website"
-      ],
-      "title": "Meet Vic, The Vector Mascot"
-    },
-    {
-      "author_github": "https://github.com/binarylogic",
       "date": "2020-02-07",
       "description": "A better way to manage complex Vector configurations",
+      "hide_on_release_notes": false,
       "id": "2020-02-07-multi-config-files",
-      "importance": "low",
       "path": "website/highlights/2020-02-07-multi-config-files.md",
       "permalink": "/highlights/2020-02-07-multi-config-files/",
       "tags": [
@@ -2793,8 +2779,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-11",
       "description": "Best effort parsing support for Syslog",
+      "hide_on_release_notes": true,
       "id": "2020-02-11-improved-syslog-parsing",
-      "importance": "low",
       "path": "website/highlights/2020-02-11-improved-syslog-parsing.md",
       "permalink": "/highlights/2020-02-11-improved-syslog-parsing/",
       "tags": [
@@ -2808,8 +2794,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-14",
       "description": "Set defaults for Vector's common log key names",
+      "hide_on_release_notes": false,
       "id": "2020-02-14-global-log-schema",
-      "importance": "low",
       "path": "website/highlights/2020-02-14-global-log-schema.md",
       "permalink": "/highlights/2020-02-14-global-log-schema/",
       "tags": [
@@ -2822,12 +2808,12 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-17",
       "description": "Use Vector's templating syntax to add new fields",
+      "hide_on_release_notes": true,
       "id": "2020-02-17-add-fields-transform-templating",
-      "importance": "low",
       "path": "website/highlights/2020-02-17-add-fields-transform-templating.md",
       "permalink": "/highlights/2020-02-17-add-fields-transform-templating/",
       "tags": [
-        "type: new feature",
+        "type: enhancement",
         "domain: transforms",
         "transform: add_fields"
       ],
@@ -2837,8 +2823,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-20",
       "description": "7 new sinks have been added to Vector",
+      "hide_on_release_notes": false,
       "id": "2020-02-20-new-sinks",
-      "importance": "medium",
       "path": "website/highlights/2020-02-20-new-sinks.md",
       "permalink": "/highlights/2020-02-20-new-sinks/",
       "tags": [
@@ -2851,8 +2837,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-21",
       "description": "Merge multiple lines together based on rules",
+      "hide_on_release_notes": false,
       "id": "2020-02-21-file-source-multiline-support",
-      "importance": "medium",
       "path": "website/highlights/2020-02-21-file-source-multiline-support.md",
       "permalink": "/highlights/2020-02-21-file-source-multiline-support/",
       "tags": [
@@ -2866,8 +2852,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-24",
       "description": "We're bringing our log data model closer to JSON",
+      "hide_on_release_notes": true,
       "id": "2020-02-24-log-data-model-changes",
-      "importance": "low",
       "path": "website/highlights/2020-02-24-log-data-model-changes.md",
       "permalink": "/highlights/2020-02-24-log-data-model-changes/",
       "tags": [
@@ -2875,14 +2861,14 @@ module.exports = {
         "domain: buffers",
         "event type: log"
       ],
-      "title": "Log Data Model Improvements"
+      "title": "Log Data Model Changes & Disk Buffers"
     },
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-24",
       "description": "An easier way to rename fields",
+      "hide_on_release_notes": false,
       "id": "2020-02-24-rename-fields-transform",
-      "importance": "low",
       "path": "website/highlights/2020-02-24-rename-fields-transform.md",
       "permalink": "/highlights/2020-02-24-rename-fields-transform/",
       "tags": [
@@ -2896,8 +2882,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-24",
       "description": "Split log streams with ease",
+      "hide_on_release_notes": false,
       "id": "2020-02-24-swimlanes-transform",
-      "importance": "medium",
       "path": "website/highlights/2020-02-24-swimlanes-transform.md",
       "permalink": "/highlights/2020-02-24-swimlanes-transform/",
       "tags": [
@@ -2911,8 +2897,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-27",
       "description": "Bringing Vector to NixOS",
+      "hide_on_release_notes": true,
       "id": "2020-02-27-nixos-support",
-      "importance": "low",
       "path": "website/highlights/2020-02-27-nixos-support.md",
       "permalink": "/highlights/2020-02-27-nixos-support/",
       "tags": [
@@ -2926,8 +2912,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-02-28",
       "description": "Build Vector with select components",
+      "hide_on_release_notes": false,
       "id": "2020-02-28-custom-vector-builds",
-      "importance": "medium",
       "path": "website/highlights/2020-02-28-custom-vector-builds.md",
       "permalink": "/highlights/2020-02-28-custom-vector-builds/",
       "tags": [
@@ -2941,8 +2927,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-03",
       "description": "Our commitment to privacy",
+      "hide_on_release_notes": true,
       "id": "2020-03-03-privacy-policy",
-      "importance": "low",
       "path": "website/highlights/2020-03-03-privacy-policy.md",
       "permalink": "/highlights/2020-03-03-privacy-policy/",
       "tags": [
@@ -2954,8 +2940,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-04",
       "description": "More control over which fields are included when encoding",
+      "hide_on_release_notes": true,
       "id": "2020-03-04-encoding-whitelist-blacklist",
-      "importance": "low",
       "path": "website/highlights/2020-03-04-encoding-whitelist-blacklist.md",
       "permalink": "/highlights/2020-03-04-encoding-whitelist-blacklist/",
       "tags": [
@@ -2968,8 +2954,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-09",
       "description": "Improve throughput by compressing data before writing it to Kafka",
+      "hide_on_release_notes": true,
       "id": "2020-03-09-kafka-sink-compression",
-      "importance": "low",
       "path": "website/highlights/2020-03-09-kafka-sink-compression.md",
       "permalink": "/highlights/2020-03-09-kafka-sink-compression/",
       "tags": [
@@ -2983,8 +2969,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-10",
       "description": "Shed duplicate logs",
+      "hide_on_release_notes": false,
       "id": "2020-03-10-dedupe-transform",
-      "importance": "medium",
       "path": "website/highlights/2020-03-10-dedupe-transform.md",
       "permalink": "/highlights/2020-03-10-dedupe-transform/",
       "tags": [
@@ -2998,8 +2984,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-11",
       "description": "Protect downstream metrics storages from high cardinality tags",
+      "hide_on_release_notes": false,
       "id": "2020-03-11-tag-cardinality-limit-transform",
-      "importance": "medium",
       "path": "website/highlights/2020-03-11-tag-cardinality-limit-transform.md",
       "permalink": "/highlights/2020-03-11-tag-cardinality-limit-transform/",
       "tags": [
@@ -3013,8 +2999,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-11",
       "description": "Securely forward data between Vector instances",
+      "hide_on_release_notes": true,
       "id": "2020-03-11-vector-sink-tls",
-      "importance": "low",
       "path": "website/highlights/2020-03-11-vector-sink-tls.md",
       "permalink": "/highlights/2020-03-11-vector-sink-tls/",
       "tags": [
@@ -3028,8 +3014,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-12",
       "description": "Sink logs to the Papertrail logging service",
+      "hide_on_release_notes": true,
       "id": "2020-03-12-papertrail-sink",
-      "importance": "low",
       "path": "website/highlights/2020-03-12-papertrail-sink.md",
       "permalink": "/highlights/2020-03-12-papertrail-sink/",
       "tags": [
@@ -3043,8 +3029,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-14",
       "description": "Sink logs to the Honeycomb logging service",
+      "hide_on_release_notes": true,
       "id": "2020-03-14-honeycomb-sink",
-      "importance": "low",
       "path": "website/highlights/2020-03-14-honeycomb-sink.md",
       "permalink": "/highlights/2020-03-14-honeycomb-sink/",
       "tags": [
@@ -3058,8 +3044,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-19",
       "description": "Sink logs to the Apache Pulsar service",
+      "hide_on_release_notes": true,
       "id": "2020-03-19-apache-pulsar-sink",
-      "importance": "low",
       "path": "website/highlights/2020-03-19-apache-pulsar-sink.md",
       "permalink": "/highlights/2020-03-19-apache-pulsar-sink/",
       "tags": [
@@ -3073,8 +3059,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-23",
       "description": "Sink logs to the Datadog logging service",
+      "hide_on_release_notes": true,
       "id": "2020-03-23-datadog-logs-sink",
-      "importance": "low",
       "path": "website/highlights/2020-03-23-datadog-logs-sink.md",
       "permalink": "/highlights/2020-03-23-datadog-logs-sink/",
       "tags": [
@@ -3088,8 +3074,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-31",
       "description": "Filter and route your logs based on defined conditions",
+      "hide_on_release_notes": false,
       "id": "2020-03-31-filter-transform",
-      "importance": "medium",
       "path": "website/highlights/2020-03-31-filter-transform.md",
       "permalink": "/highlights/2020-03-31-filter-transform/",
       "tags": [
@@ -3103,8 +3089,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-31",
       "description": "High quality guides and education for Vector",
+      "hide_on_release_notes": false,
       "id": "2020-03-31-guides-section",
-      "importance": "high",
       "path": "website/highlights/2020-03-31-guides-section.md",
       "permalink": "/highlights/2020-03-31-guides-section/",
       "tags": [
@@ -3117,8 +3103,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-04-01",
       "description": "Easily rnrich your logs with Kubernetes metadata",
+      "hide_on_release_notes": false,
       "id": "2020-04-01-kubernetes-pod-metadata-transform",
-      "importance": "high",
       "path": "website/highlights/2020-04-01-kubernetes-pod-metadata-transform.md",
       "permalink": "/highlights/2020-04-01-kubernetes-pod-metadata-transform/",
       "tags": [
@@ -3132,8 +3118,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-04-01",
       "description": "More options when filtering and routing events",
+      "hide_on_release_notes": true,
       "id": "2020-04-01-more-condition-predicates",
-      "importance": "low",
       "path": "website/highlights/2020-04-01-more-condition-predicates.md",
       "permalink": "/highlights/2020-04-01-more-condition-predicates/",
       "tags": [
@@ -3149,8 +3135,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-04-07",
       "description": "The next iteration of our Lua transform.",
+      "hide_on_release_notes": false,
       "id": "2020-04-07-lua-transform-version-2",
-      "importance": "high",
       "path": "website/highlights/2020-04-07-lua-transform-version-2.md",
       "permalink": "/highlights/2020-04-07-lua-transform-version-2/",
       "tags": [
@@ -3164,8 +3150,8 @@ module.exports = {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-04-07",
       "description": "It's not possible to forward metrics between Vector instances",
+      "hide_on_release_notes": true,
       "id": "2020-04-07-vector-to-vector-metrics",
-      "importance": "low",
       "path": "website/highlights/2020-04-07-vector-to-vector-metrics.md",
       "permalink": "/highlights/2020-04-07-vector-to-vector-metrics/",
       "tags": [
@@ -3178,15 +3164,15 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-04-11",
-      "description": "Significant performance gains for all Vector users",
+      "description": "We identified optimizations that net ~36% higher throughput",
+      "hide_on_release_notes": false,
       "id": "2020-04-11-overall-performance-increase",
-      "importance": "high",
       "path": "website/highlights/2020-04-11-overall-performance-increase.md",
       "permalink": "/highlights/2020-04-11-overall-performance-increase/",
       "tags": [
         "type: performance"
       ],
-      "title": "~36% Performance Improvement"
+      "title": "~36% Higher Throughput"
     }
   ],
   "installation": {
@@ -3613,15 +3599,15 @@ module.exports = {
   "latest_highlight": {
     "author_github": "https://github.com/binarylogic",
     "date": "2020-04-11",
-    "description": "Significant performance gains for all Vector users",
+    "description": "We identified optimizations that net ~36% higher throughput",
+    "hide_on_release_notes": false,
     "id": "2020-04-11-overall-performance-increase",
-    "importance": "high",
     "path": "website/highlights/2020-04-11-overall-performance-increase.md",
     "permalink": "/highlights/2020-04-11-overall-performance-increase/",
     "tags": [
       "type: performance"
     ],
-    "title": "~36% Performance Improvement"
+    "title": "~36% Higher Throughput"
   },
   "latest_post": {
     "author_github": "https://github.com/lukesteensen",
@@ -15538,8 +15524,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-10-21",
           "description": "The `encoding` option is now required for these sinks",
+          "hide_on_release_notes": false,
           "id": "2019-10-21-require-encoding-option-for-console-and-file-sinks",
-          "importance": "low",
           "path": "website/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks.md",
           "permalink": "/highlights/2019-10-21-require-encoding-option-for-console-and-file-sinks/",
           "tags": [
@@ -15552,25 +15538,10 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/binarylogic",
-          "date": "2019-12-04",
-          "description": "This ensures that naming is consistent for the upcoming `datadog_logs` sink",
-          "id": "2019-12-04-rename-datadog-sink-to-datadog_metrics",
-          "importance": "low",
-          "path": "website/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics.md",
-          "permalink": "/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics/",
-          "tags": [
-            "type: breaking change",
-            "domain: sinks",
-            "sink: datadog_metrics"
-          ],
-          "title": "The `datadog` sink has been renamed to `datadog_metrics`"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
           "date": "2019-11-19",
           "description": "These architectures are widely used in embeded devices & servers",
+          "hide_on_release_notes": false,
           "id": "2019-11-19-arm-support-on-linux",
-          "importance": "high",
           "path": "website/highlights/2019-11-19-arm-support-on-linux.md",
           "permalink": "/highlights/2019-11-19-arm-support-on-linux/",
           "tags": [
@@ -15585,8 +15556,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-11-21",
           "description": "Bringing the performance and reliability of Vector to Windows",
+          "hide_on_release_notes": false,
           "id": "2019-11-21-windows-support",
-          "importance": "high",
           "path": "website/highlights/2019-11-21-windows-support.md",
           "permalink": "/highlights/2019-11-21-windows-support/",
           "tags": [
@@ -15600,8 +15571,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-11-25",
           "description": "Treating your Vector configuration files as code",
+          "hide_on_release_notes": false,
           "id": "2019-11-25-unit-testing-vector-config-files",
-          "importance": "medium",
           "path": "website/highlights/2019-11-25-unit-testing-vector-config-files.md",
           "permalink": "/highlights/2019-11-25-unit-testing-vector-config-files/",
           "tags": [
@@ -15612,10 +15583,25 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/binarylogic",
+          "date": "2019-12-04",
+          "description": "This ensures that naming is consistent for the upcoming `datadog_logs` sink",
+          "hide_on_release_notes": false,
+          "id": "2019-12-04-rename-datadog-sink-to-datadog_metrics",
+          "path": "website/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics.md",
+          "permalink": "/highlights/2019-12-04-rename-datadog-sink-to-datadog_metrics/",
+          "tags": [
+            "type: breaking change",
+            "domain: sinks",
+            "sink: datadog_metrics"
+          ],
+          "title": "The `datadog` sink has been renamed to `datadog_metrics`"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
           "date": "2019-12-13",
           "description": "Point Vector to custom DNS servers",
+          "hide_on_release_notes": false,
           "id": "2019-12-13-custom-dns",
-          "importance": "low",
           "path": "website/highlights/2019-12-13-custom-dns.md",
           "permalink": "/highlights/2019-12-13-custom-dns/",
           "tags": [
@@ -15628,8 +15614,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-12-14",
           "description": "Early adopters have a new Kuberenetes source to chew on",
+          "hide_on_release_notes": false,
           "id": "2019-12-14-kubernetes-source-alpha",
-          "importance": "low",
           "path": "website/highlights/2019-12-14-kubernetes-source-alpha.md",
           "permalink": "/highlights/2019-12-14-kubernetes-source-alpha/",
           "tags": [
@@ -15643,8 +15629,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-12-16",
           "description": "Enrich your events with EC2 metadata",
+          "hide_on_release_notes": false,
           "id": "2019-12-16-ec2-metadata",
-          "importance": "high",
           "path": "website/highlights/2019-12-16-ec2-metadata.md",
           "permalink": "/highlights/2019-12-16-ec2-metadata/",
           "tags": [
@@ -18792,8 +18778,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-01-03",
           "description": "We've simplified our socket based sources into a single `socket` source",
+          "hide_on_release_notes": false,
           "id": "2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source",
-          "importance": "low",
           "path": "website/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source.md",
           "permalink": "/highlights/2020-01-03-merge-existing-tcp-and-udp-sources-into-a-single-socket-source/",
           "tags": [
@@ -18808,8 +18794,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-01-03",
           "description": "This renames the existing `tcp` sink to `socket`",
+          "hide_on_release_notes": false,
           "id": "2020-01-03-move-existing-tcp-sink-into-socket-sink",
-          "importance": "low",
           "path": "website/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink.md",
           "permalink": "/highlights/2020-01-03-move-existing-tcp-sink-into-socket-sink/",
           "tags": [
@@ -18821,10 +18807,25 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/binarylogic",
+          "date": "2020-01-07",
+          "description": "Scrape prometheus metrics with Vector",
+          "hide_on_release_notes": false,
+          "id": "2020-01-07-prometheus-source",
+          "path": "website/highlights/2020-01-07-prometheus-source.md",
+          "permalink": "/highlights/2020-01-07-prometheus-source/",
+          "tags": [
+            "type: new feature",
+            "domain: sources",
+            "source: prometheus"
+          ],
+          "title": "New Prometheus Source"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
           "date": "2020-01-12",
-          "description": "<fill-in>",
+          "description": "We've simplified and organized our sink options",
+          "hide_on_release_notes": false,
           "id": "2020-01-12-request-options-refactored",
-          "importance": "low",
           "path": "website/highlights/2020-01-12-request-options-refactored.md",
           "permalink": "/highlights/2020-01-12-request-options-refactored/",
           "tags": [
@@ -18839,8 +18840,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-01-12",
           "description": "This change achieve consistency with our `kafka` source and other Kafka clients",
+          "hide_on_release_notes": false,
           "id": "2020-01-12-use-comma-delim-server-list-instead-of-an-array",
-          "importance": "low",
           "path": "website/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array.md",
           "permalink": "/highlights/2020-01-12-use-comma-delim-server-list-instead-of-an-array/",
           "tags": [
@@ -18854,8 +18855,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-01-14",
           "description": "This change ensures the `splunk_hec` source conforms to Vector's schema",
+          "hide_on_release_notes": false,
           "id": "2020-01-14-rename-line-field-to-message",
-          "importance": "low",
           "path": "website/highlights/2020-01-14-rename-line-field-to-message.md",
           "permalink": "/highlights/2020-01-14-rename-line-field-to-message/",
           "tags": [
@@ -18869,8 +18870,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-01-20",
           "description": "This gives you full control over which fields are indexed",
+          "hide_on_release_notes": false,
           "id": "2020-01-20-splunk-hec-specify-indexed-fields",
-          "importance": "low",
           "path": "website/highlights/2020-01-20-splunk-hec-specify-indexed-fields.md",
           "permalink": "/highlights/2020-01-20-splunk-hec-specify-indexed-fields/",
           "tags": [
@@ -18879,21 +18880,6 @@ module.exports = {
             "sink: splunk_hec"
           ],
           "title": "The `splunk_hec` sink does not index fields by default"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "date": "2020-01-07",
-          "description": "Scrape prometheus metrics with Vector",
-          "id": "2020-01-07-prometheus-source",
-          "importance": "high",
-          "path": "website/highlights/2020-01-07-prometheus-source.md",
-          "permalink": "/highlights/2020-01-07-prometheus-source/",
-          "tags": [
-            "type: new feature",
-            "domain: sources",
-            "source: prometheus"
-          ],
-          "title": "New Prometheus Source"
         }
       ],
       "insertions_count": 24373,
@@ -23458,8 +23444,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-02-05",
           "description": "We've dropped redundant AWS options that may break backward compatibility",
+          "hide_on_release_notes": true,
           "id": "2020-02-05-drop-aws-options",
-          "importance": "low",
           "path": "website/highlights/2020-02-05-drop-aws-options.md",
           "permalink": "/highlights/2020-02-05-drop-aws-options/",
           "tags": [
@@ -23472,25 +23458,10 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/binarylogic",
-          "date": "2020-02-24",
-          "description": "We're bringing our log data model closer to JSON",
-          "id": "2020-02-24-log-data-model-changes",
-          "importance": "low",
-          "path": "website/highlights/2020-02-24-log-data-model-changes.md",
-          "permalink": "/highlights/2020-02-24-log-data-model-changes/",
-          "tags": [
-            "type: breaking change",
-            "domain: buffers",
-            "event type: log"
-          ],
-          "title": "Log Data Model Improvements"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
           "date": "2020-02-05",
           "description": "Docker splits long messages by default, and now Vector merges them back for you",
+          "hide_on_release_notes": false,
           "id": "2020-02-05-merge-partial-docker-events",
-          "importance": "high",
           "path": "website/highlights/2020-02-05-merge-partial-docker-events.md",
           "permalink": "/highlights/2020-02-05-merge-partial-docker-events/",
           "tags": [
@@ -23503,39 +23474,10 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/binarylogic",
-          "date": "2020-02-21",
-          "description": "Merge multiple lines together based on rules",
-          "id": "2020-02-21-file-source-multiline-support",
-          "importance": "medium",
-          "path": "website/highlights/2020-02-21-file-source-multiline-support.md",
-          "permalink": "/highlights/2020-02-21-file-source-multiline-support/",
-          "tags": [
-            "type: enhancement",
-            "domain: sources",
-            "source: file"
-          ],
-          "title": "Improved Multiline Support In The File Source"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "date": "2020-02-05",
-          "description": "The official Vector mascot",
-          "id": "2020-02-05-vic-the-vector-mascot",
-          "importance": "low",
-          "path": "website/highlights/2020-02-05-vic-the-vector-mascot.md",
-          "permalink": "/highlights/2020-02-05-vic-the-vector-mascot/",
-          "tags": [
-            "type: new feature",
-            "domain: website"
-          ],
-          "title": "Meet Vic, The Vector Mascot"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
           "date": "2020-02-07",
           "description": "A better way to manage complex Vector configurations",
+          "hide_on_release_notes": false,
           "id": "2020-02-07-multi-config-files",
-          "importance": "low",
           "path": "website/highlights/2020-02-07-multi-config-files.md",
           "permalink": "/highlights/2020-02-07-multi-config-files/",
           "tags": [
@@ -23548,8 +23490,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-02-11",
           "description": "Best effort parsing support for Syslog",
+          "hide_on_release_notes": true,
           "id": "2020-02-11-improved-syslog-parsing",
-          "importance": "low",
           "path": "website/highlights/2020-02-11-improved-syslog-parsing.md",
           "permalink": "/highlights/2020-02-11-improved-syslog-parsing/",
           "tags": [
@@ -23563,8 +23505,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-02-14",
           "description": "Set defaults for Vector's common log key names",
+          "hide_on_release_notes": false,
           "id": "2020-02-14-global-log-schema",
-          "importance": "low",
           "path": "website/highlights/2020-02-14-global-log-schema.md",
           "permalink": "/highlights/2020-02-14-global-log-schema/",
           "tags": [
@@ -23577,12 +23519,12 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-02-17",
           "description": "Use Vector's templating syntax to add new fields",
+          "hide_on_release_notes": true,
           "id": "2020-02-17-add-fields-transform-templating",
-          "importance": "low",
           "path": "website/highlights/2020-02-17-add-fields-transform-templating.md",
           "permalink": "/highlights/2020-02-17-add-fields-transform-templating/",
           "tags": [
-            "type: new feature",
+            "type: enhancement",
             "domain: transforms",
             "transform: add_fields"
           ],
@@ -23592,8 +23534,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-02-20",
           "description": "7 new sinks have been added to Vector",
+          "hide_on_release_notes": false,
           "id": "2020-02-20-new-sinks",
-          "importance": "medium",
           "path": "website/highlights/2020-02-20-new-sinks.md",
           "permalink": "/highlights/2020-02-20-new-sinks/",
           "tags": [
@@ -23604,10 +23546,40 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-21",
+          "description": "Merge multiple lines together based on rules",
+          "hide_on_release_notes": false,
+          "id": "2020-02-21-file-source-multiline-support",
+          "path": "website/highlights/2020-02-21-file-source-multiline-support.md",
+          "permalink": "/highlights/2020-02-21-file-source-multiline-support/",
+          "tags": [
+            "type: enhancement",
+            "domain: sources",
+            "source: file"
+          ],
+          "title": "Improved Multiline Support In The File Source"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-02-24",
+          "description": "We're bringing our log data model closer to JSON",
+          "hide_on_release_notes": true,
+          "id": "2020-02-24-log-data-model-changes",
+          "path": "website/highlights/2020-02-24-log-data-model-changes.md",
+          "permalink": "/highlights/2020-02-24-log-data-model-changes/",
+          "tags": [
+            "type: breaking change",
+            "domain: buffers",
+            "event type: log"
+          ],
+          "title": "Log Data Model Changes & Disk Buffers"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
           "date": "2020-02-24",
           "description": "An easier way to rename fields",
+          "hide_on_release_notes": false,
           "id": "2020-02-24-rename-fields-transform",
-          "importance": "low",
           "path": "website/highlights/2020-02-24-rename-fields-transform.md",
           "permalink": "/highlights/2020-02-24-rename-fields-transform/",
           "tags": [
@@ -23621,8 +23593,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-02-24",
           "description": "Split log streams with ease",
+          "hide_on_release_notes": false,
           "id": "2020-02-24-swimlanes-transform",
-          "importance": "medium",
           "path": "website/highlights/2020-02-24-swimlanes-transform.md",
           "permalink": "/highlights/2020-02-24-swimlanes-transform/",
           "tags": [
@@ -23673,8 +23645,8 @@ module.exports = {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-03-03",
           "description": "Our commitment to privacy",
+          "hide_on_release_notes": true,
           "id": "2020-03-03-privacy-policy",
-          "importance": "low",
           "path": "website/highlights/2020-03-03-privacy-policy.md",
           "permalink": "/highlights/2020-03-03-privacy-policy/",
           "tags": [

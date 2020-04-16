@@ -1142,10 +1142,6 @@ header h1 {
   padding-left: 0;
 }
 
-.hero .hero--toc ul li a {
-  color: var(--color);
-}
-
 /* -- modifiers -- */
 
 /* hero--clean */
@@ -1698,6 +1694,47 @@ ol li.list--li--pink {
 }
 
 /**
+ * pagination-controls
+ */
+
+.pagination-controls {
+  --offset: calc( 50% - ( var(--width) / 2 ) - ( 760px / 3 ) - 20vw );
+  --width: 150px;
+}
+
+.pagination-controls .prev,
+.pagination-controls .next {
+  display: block;
+  color: var(--ifm-color-emphasis-100);
+  font-size: 5em;
+  position: fixed;
+  text-align: center;
+  top: 220px;
+  width: var(--width);
+}
+
+.pagination-controls .prev {
+  left: var(--offset);
+}
+
+.pagination-controls .next {
+  right: var(--offset);
+}
+
+.pagination-controls .prev:hover,
+.pagination-controls .next:hover {
+  color: var(--ifm-color-primary);
+  text-decoration: none;
+  text-shadow: 0 0 10px var(--ifm-color-primary);
+}
+
+@media (max-width: 996px) {
+  .pagination-controls {
+    display: none;
+  }
+}
+
+/**
  * panel
  */
 
@@ -1766,6 +1803,7 @@ ol li.list--li--pink {
 
 .panel.panel--danger {
   --ifm-panel-background-color-active: rgba( var(--ifm-color-danger-rgb), 0.2 );
+  --ifm-panel-box-shadow-active: 0 0px 10px 0px rgba( var(--ifm-color-danger-rgb), 0.35 );
   --ifm-panel-color-active: var(--ifm-color-danger);
   border-left: 6px solid var(--ifm-panel-color-active);
 }
@@ -1957,6 +1995,15 @@ a.panel:hover h3 {
 
 .react-select--lg {
   font-size: 1.2em;
+}
+
+/**
+ * row
+ */
+
+.row.row--squished > .col {
+  padding-left: 0.5em;
+  padding-right: 0.5em;
 }
 
 /**

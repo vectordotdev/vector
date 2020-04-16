@@ -6,7 +6,7 @@ description: "More options when filtering and routing events"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1997, 2183, 2198]
 release: "nightly"
-importance: "low"
+hide_on_release_notes: true
 tags: ["type: enhancement", "domain: config", "domain: transforms", "transform: filter", "transform: swimlanes"]
 ---
 

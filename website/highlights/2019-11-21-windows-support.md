@@ -6,7 +6,7 @@ description: "Bringing the performance and reliability of Vector to Windows"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1205]
 release: "0.6.0"
-importance: "high"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: platforms", "platform: windows"]
 ---
 

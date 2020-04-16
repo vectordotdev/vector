@@ -6,7 +6,7 @@ description: "Point Vector to custom DNS servers"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1118, 1362, 1371, 1400, 1451]
 release: "0.6.0"
-importance: "low"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: networking"]
 ---
 

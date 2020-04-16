@@ -5,7 +5,7 @@ description: "Sink logs to the Apache Pulsar service"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1665]
 release: "nightly"
-importance: "low"
+hide_on_release_notes: true
 tags: ["type: new feature", "domain: sinks", "sink: pulsar"]
 ---
 
