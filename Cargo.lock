@@ -4464,7 +4464,7 @@ dependencies = [
  "tower-buffer 0.1.2",
  "tower-discover 0.1.0",
  "tower-layer 0.1.0",
- "tower-limit 0.1.1",
+ "tower-limit 0.1.2",
  "tower-load-shed 0.1.0",
  "tower-retry 0.1.0",
  "tower-service 0.2.0",
@@ -4557,9 +4557,9 @@ checksum = "a35d656f2638b288b33495d1053ea74c40dc05ec0b92084dd71ca5566c4ed1dc"
 
 [[package]]
 name = "tower-limit"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d990c5b6c0e4e192db8cf3dacaafefe1278962d0ec45dc84421175db32d33f0"
+checksum = "7b2807e2531b621e23e18693d49d0663bc617240ac0da8ed9b0c64cacd5c67fb"
 dependencies = [
  "futures 0.1.29",
  "tokio-sync",
