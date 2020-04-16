@@ -1,7 +1,11 @@
 use crate::sinks::HealthcheckError;
 use futures01::{Future, Stream};
 use goauth::scopes::Scope;
-use goauth::{auth::JwtClaims, auth::Token, credentials::Credentials, error::GOErr};
+use goauth::{
+    auth::{JwtClaims, Token, TokenErr},
+    credentials::Credentials,
+    error::GOErr,
+};
 use hyper::{
     header::{HeaderValue, AUTHORIZATION},
     Request, StatusCode,
@@ -10,7 +14,6 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
-use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio01::timer::Interval;
@@ -38,8 +41,10 @@ enum GcpError {
     GetTokenText { source: reqwest::Error },
     #[snafu(display("Failed to get implicit GCP token"))]
     GetImplicitToken { source: reqwest::Error },
-    #[snafu(display("Failed to parse OAuth token"))]
-    TokenFromStr { source: GOErr },
+    #[snafu(display("Failed to parse OAuth token JSON"))]
+    TokenFromJson { source: TokenErr },
+    #[snafu(display("Failed to parse OAuth token JSON text"))]
+    TokenJsonFromStr { source: serde_json::Error },
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -74,7 +79,15 @@ fn get_token_implicit() -> Result<Token, GcpError> {
         .header("Metadata-Flavor", "Google")
         .send()
         .context(GetImplicitToken)?;
-    Token::from_str(&response.text().context(GetTokenText)?).context(TokenFromStr)
+    let text = response.text().context(GetTokenText)?;
+    // Token::from_str is irresponsible and may panic!
+    match serde_json::from_str::<Token>(&text) {
+        Ok(token) => Ok(token),
+        Err(error) => Err(match serde_json::from_str::<TokenErr>(&text) {
+            Ok(error) => GcpError::TokenFromJson { source: error },
+            Err(_) => GcpError::TokenJsonFromStr { source: error },
+        }),
+    }
 }
 
 impl GcpCredentials {
