@@ -760,8 +760,6 @@ workflows:
 
   test:
     jobs:
-      - check-version:
-          <<: *master-filters
       # - test-stable-kubernetes
       - test-x86_64-pc-windows-msvc:
           <<: *prerelease-filters
