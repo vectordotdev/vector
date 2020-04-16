@@ -30,6 +30,15 @@ module.exports = {
         {
           "author_github": "https://github.com/a-rodin",
           "description": null,
+          "id": "/advanced/merge-multiline-logs",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/merge-multiline-logs.md",
+          "series_position": null,
+          "title": "Merge multi-line logs with Lua"
+        },
+        {
+          "author_github": "https://github.com/a-rodin",
+          "description": null,
           "id": "/advanced/parsing-csv-logs-with-lua",
           "last_modified_on": null,
           "path": "website/guides/advanced/parsing-csv-logs-with-lua.md",
