@@ -288,6 +288,11 @@ impl FileServer {
             }
             let backoff = backoff_cap.saturating_sub(global_bytes_read);
 
+            // This works only if run inside tokio context since we are using
+            // tokio's Timer. Outside of such context, this will panic on the first
+            // call. Also since we are using block_on here and in the above code,
+            // this should be run in it's own thread. `spawn_blocking` fulfills
+            // all of these requirements.
             match block_on(select(
                 shutdown,
                 delay_for(time::Duration::from_millis(backoff as u64)),
