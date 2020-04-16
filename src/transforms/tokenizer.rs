@@ -65,7 +65,7 @@ impl TransformConfig for TokenizerConfig {
 }
 
 pub struct Tokenizer {
-    field_names: Vec<(Vec<PathComponent>, Conversion)>,
+    field_names: Vec<(String, Vec<PathComponent>, Conversion)>,
     field: Atom,
     drop_field: bool,
 }
@@ -82,7 +82,7 @@ impl Tokenizer {
             .map(|name| {
                 let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
                 let path: Vec<PathComponent> = PathIter::new(&name).collect();
-                (path, conversion)
+                (name.to_string(), path, conversion)
             })
             .collect();
 
@@ -99,7 +99,8 @@ impl Transform for Tokenizer {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
-            for ((path, conversion), value) in self.field_names.iter().zip(parse(value).into_iter())
+            for ((name, path, conversion), value) in
+                self.field_names.iter().zip(parse(value).into_iter())
             {
                 match conversion.convert(value.as_bytes().into()) {
                     Ok(value) => {
@@ -108,7 +109,7 @@ impl Transform for Tokenizer {
                     Err(error) => {
                         debug!(
                             message = "Could not convert types.",
-                            path = ?path,
+                            path = &name[..],
                             %error,
                             rate_limit_secs = 30
                         );
