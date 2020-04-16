@@ -728,11 +728,6 @@ master-filters: &master-filters
 
 require-tests-checks-and-verifications: &require-tests-checks-and-verifications
   requires:
-    - check-code
-    - check-fmt
-    - check-generate
-    - check-blog
-    - test-stable
     # - test-stable-kubernetes
     - build-x86_64-unknown-linux-musl-archive-and-deb-package
     - build-aarch64-unknown-linux-musl-archive-and-deb-package
@@ -765,13 +760,8 @@ workflows:
 
   test:
     jobs:
-      - check-code
-      - check-fmt
-      - check-generate
-      - check-blog
       - check-version:
           <<: *master-filters
-      - test-stable
       # - test-stable-kubernetes
       - test-x86_64-pc-windows-msvc:
           <<: *prerelease-filters
@@ -844,16 +834,6 @@ workflows:
 
   release:
     jobs:
-      - check-code:
-          <<: *release-filters
-      - check-fmt:
-          <<: *release-filters
-      - check-generate:
-          <<: *release-filters
-      - check-blog:
-          <<: *release-filters
-      - test-stable:
-          <<: *release-filters
       # - test-stable-kubernetes:
           # <<: *release-filters
 
@@ -960,11 +940,6 @@ workflows:
           <<: *master-filters
 
     jobs:
-      - check-code
-      - check-fmt
-      - check-generate
-      - check-blog
-      - test-stable
       # - test-stable-kubernetes
 
       # Build & verify
