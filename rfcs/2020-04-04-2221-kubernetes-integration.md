@@ -147,6 +147,30 @@ TODO: insert diagram
       vector/vector
     ```
 
+#### Install using Kustomize
+
+1.  Install [`kustomize`][kustomize].
+
+1.  Prepare `kustomization.yaml`.
+
+    Use the same config as in [Kubectl Interface].
+
+    ```yaml
+    # kustomization.yaml
+    namespace: vector
+
+    resources:
+      - https://packages.timber.io/vector/latest/kubernetes/vector-global.yaml
+      - https://packages.timber.io/vector/latest/kubernetes/vector-namespaced.yaml
+      - vector-configmap.yaml
+    ```
+
+1.  Deploy Vector!
+
+    ```shell
+    kustomize build . | kubectl apply -f -
+    ```
+
 ## Design considerations
 
 ### Minimal supported Kubernetes version
@@ -869,6 +893,7 @@ See [motivation](#motivation).
 [kubectl_rollout_restart]: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-em-restart-em-
 [kubernetes version and version skew support policy]: https://kubernetes.io/docs/setup/release/version-skew-policy/
 [kubernetes_version_comment]: https://github.com/timberio/vector/pull/2188#discussion_r403120481
+[kustomize]: https://github.com/kubernetes-sigs/kustomize
 [logdna k8s integration]: https://docs.logdna.com/docs/kubernetes
 [logdna_daemonset]: https://raw.githubusercontent.com/logdna/logdna-agent/master/logdna-agent-ds.yaml
 [pr#2134]: https://github.com/timberio/vector/pull/2134
