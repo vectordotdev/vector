@@ -4,8 +4,8 @@ allow_you_to_description = "select events based on a set of logical conditions"
 beta = true
 common = true
 function_category = "filter"
-input_types = ["log"]
-output_types = ["log"]
+input_types = ["log", "metric"]
+output_types = ["log", "metric"]
 requirements = {}
 
 <%= render("_partials/fields/_component_options.toml", type: "transform", name: "filter") %>
@@ -21,7 +21,7 @@ messages that pass all conditions will be forwarded.\
 
 <%= render("_partials/fields/_conditions_options.toml", namespace: "transforms.filter.options.condition.children") %>
 
-[[transforms.filter.output.log.examples]]
+[[transforms.filter.examples]]
 label = "Hostname Matching"
 body = """\
 The `filter` transform is a simple conditional match, forwarding only those messages that pass all the conditions.

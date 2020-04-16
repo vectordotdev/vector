@@ -17,20 +17,14 @@
 
 <%%- end -%>
 <%- if component.source? || component.transform? -%>
-## Output
-
-<%- if component.output.log -%>
-<%%= component_output(component, component.output.log, heading_depth: 3) %>
-<%- elsif component.output.metric -%>
-<%%= component_output(component, component.output.metric, heading_depth: 3) %>
+<%%= component_fields(component, heading_depth: 2) -%>
 <%- end -%>
+<%%- if component.examples.any? -%>
+## Examples
 
-<%- elsif component.sink? && component.output -%>
-## Output
+<%%= component_examples(component) %>
 
-<%%= component_output(component, component.output) %>
-
-<%- end -%>
+<%%- end -%>
 ## How It Works [[sort]]
 
 <%%= component_sections(component) %>

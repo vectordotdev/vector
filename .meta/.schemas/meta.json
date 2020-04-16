@@ -46,6 +46,25 @@
         "enum": ["log", "metric"]
       }
     },
+    "examples": {
+      "type": "array",
+      "description": "An array of examples. These should be simple examples that demonstrate component behavior.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["body", "label"],
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "The output exmaple body. Markdown syntax is supported."
+          },
+          "label": {
+            "type": "string",
+            "description": "The output label. This will be used in the tab name if multiple output examples are provided."
+          }
+        }
+      }
+    },
     "fields": {
       "type": "object",
       "description": "An object of fields keyed by the field's name.",
@@ -153,6 +172,38 @@
           "type": "string",
           "description": "The unit of measurement for the option value",
           "enum": ["bytes", "events", "milliseconds", "requests", "seconds"]
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "visibility_level": {
+                "type": "string",
+                "description": "The visiblity level. `component` will bubble up the warning at the top of the component page (higher visibility). `option` will display the warning on the option only (lower visibility).",
+                "enum": ["component", "option"]
+              },
+              "text": {
+                "type": "string",
+                "description": "The warning text."
+              }
+            }
+          }
+        }
+      }
+    },
+    "fields": {
+      "type": "object",
+      "description": "Information about any fields that the component adds to events.",
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "$ref": "#/definitions/fields"
+        },
+        "global_log_schema_key": {
+          "type": "string",
+          "descripttion": "If these fields are inserted under a global log schema key, what is the name of that key?"
         }
       }
     },
@@ -173,46 +224,16 @@
         "enum": ["Linux", "MacOS", "Windows"]
       }
     },
-    "output": {
-      "type": "object",
-      "description": "An array of output examples used to demonstrate a component's output.",
-      "additionalProperties": false,
-      "properties": {
-        "examples": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["body", "label"],
-            "properties": {
-              "body": {
-                "type": "string",
-                "description": "The output exmaple body. Markdown syntax is supported."
-              },
-              "global_log_schema_key": {
-                "type": "string",
-                "descripttion": "If these fields are inserted under a global log schema key, what is the name of that key?"
-              },
-              "label": {
-                "type": "string",
-                "description": "The output label. This will be used in the tab name if multiple output examples are provided."
-              }
-            }
-          }
-        },
-        "fields": {
-          "$ref": "#/definitions/fields"
-        }
-      }
-    },
-<<<<<<< HEAD:.meta/.schema.json
     "test_examples": {
       "type": "array",
       "description": "An array of example unit tests used to demonstrate appropriate tests for a component.",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["body", "label"],
+        "required": [
+          "body",
+          "label"
+        ],
         "properties": {
           "body": {
             "type": "string",
@@ -222,7 +243,9 @@
             "type": "string",
             "description": "The test label. This will be used in the tab name if multiple test examples are provided."
           }
-=======
+        }
+      }
+    },
     "permissions": {
       "type": "object",
       "description": "An object of permissions keyed by the permission's name.",
@@ -245,7 +268,6 @@
         "name": {
           "type": "string",
           "description": "The permission name."
->>>>>>> master:.meta/.schemas/meta.json
         }
       }
     },
@@ -310,27 +332,6 @@
         "title",
         "write_to_description"
       ],
-      "anyOf": [
-        {
-          "properties": {
-            "egress_method": { "const": "batching" }
-          },
-          "required": [
-          ]
-        },
-        {
-          "properties": {
-            "egress_method": { "const": "exposing" }
-          },
-          "required": []
-        },
-        {
-          "properties": {
-            "egress_method": { "const": "streaming" }
-          },
-          "required": []
-        }
-      ],
       "properties": {
         "beta": {
           "type": "boolean",
@@ -356,7 +357,11 @@
         },
         "env_vars": {
           "$ref": "#/definitions/fields",
-          "description": "The environment variables supported by this source, keyed by the variables's name."
+          "description": "The environment variables supported by this sink, keyed by the variables's name."
+        },
+        "examples": {
+          "$ref": "#/definitions/examples",
+          "description": "Simple examples demonstrating how to use this sink."
         },
         "features": {
           "type": "array",
@@ -393,10 +398,6 @@
         "options": {
           "$ref": "#/definitions/fields",
           "description": "The options provided by this sink, keyed by the option's name."
-        },
-        "output": {
-          "$ref": "#/definitions/output",
-          "description": "Output examples of this sink."
         },
         "permissions": {
           "$ref": "#/definitions/permissions",
@@ -481,6 +482,10 @@
           "$ref": "#/definitions/fields",
           "description": "The environment variables supported by this source, keyed by the variables's name."
         },
+        "examples": {
+          "$ref": "#/definitions/examples",
+          "description": "Simple examples demonstrating how to use this source."
+        },
         "except_operating_systems": {
           "$ref": "#/definitions/operating_systems",
           "description": "A blacklist of operating systems not supported by this source."
@@ -491,6 +496,19 @@
           "minLength": 1,
           "items": {
             "type": "string"
+          }
+        },
+        "fields": {
+          "type": "object",
+          "description": "Information about any fields this source adds to events.",
+          "additionalProperties": false,
+          "properties": {
+            "log": {
+              "$ref": "#/definitions/fields"
+            },
+            "metric": {
+              "$ref": "#/definitions/fields"
+            }
           }
         },
         "function_category": {
@@ -516,19 +534,6 @@
         "permissions": {
           "$ref": "#/definitions/permissions",
           "description": "The permissions required for this source to work."
-        },
-        "output": {
-          "type": "object",
-          "description": "Output examples for this source.",
-          "additionalProperties": false,
-          "properties": {
-            "log": {
-              "$ref": "#/definitions/output"
-            },
-            "metric": {
-              "$ref": "#/definitions/output"
-            }
-          }
         },
         "output_types": {
           "$ref": "#/definitions/event_types",
@@ -615,6 +620,23 @@
           "$ref": "#/definitions/fields",
           "description": "A list of supported environment variables by this transform."
         },
+        "examples": {
+          "$ref": "#/definitions/examples",
+          "description": "Simple examples demonstrating how to use this transform."
+        },
+        "fields": {
+          "type": "object",
+          "description": "Information about fields that this transform adds to events.",
+          "additionalProperties": false,
+          "properties": {
+            "log": {
+              "$ref": "#/definitions/fields"
+            },
+            "metric": {
+              "$ref": "#/definitions/fields"
+            }
+          }
+        },
         "function_category": {
           "type": "string",
           "description": "The function category this transform performed. Used for filtering.",
@@ -637,23 +659,6 @@
         "options": {
           "$ref": "#/definitions/fields",
           "description": "The options provided by this transform, keyed by the option name."
-        },
-        "output": {
-          "type": "object",
-          "description": "Output examples of this transform",
-          "additionalProperties": false,
-          "properties": {
-            "log": {
-              "$ref": "#/definitions/output"
-            },
-            "metric": {
-              "$ref": "#/definitions/output"
-            }
-          }
-        },
-        "test_examples": {
-          "$ref": "#/definitions/test_examples",
-          "description": "Example tests for this transform."
         },
         "output_types": {
           "$ref": "#/definitions/event_types",

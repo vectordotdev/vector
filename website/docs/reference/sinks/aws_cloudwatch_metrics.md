@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-12"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
@@ -39,16 +39,15 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "aws_cloudwatch_metrics" # required
   inputs = ["my-source-id"] # required
+  healthcheck = true # optional, default
   namespace = "service" # required
   region = "us-east-1" # required, required when endpoint = ""
-  healthcheck = true # optional, default
 ```
 
 </TabItem>
@@ -59,11 +58,11 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
   # General
   type = "aws_cloudwatch_metrics" # required
   inputs = ["my-source-id"] # required
-  namespace = "service" # required
-  region = "us-east-1" # required, required when endpoint = ""
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
+  namespace = "service" # required
+  region = "us-east-1" # required, required when endpoint = ""
 
   # Batch
   batch.max_events = 20 # optional, default, events
@@ -78,29 +77,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["arn:aws:iam::123456789098:role/my_role"]}
-  groups={[]}
-  name={"assume_role"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### assume_role
-
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
- See [AWS Authentication](#aws-authentication) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={[]}
   groups={[]}
   name={"batch"}
@@ -110,6 +86,7 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -132,6 +109,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"events"}
+  warnings={[]}
   >
 
 #### max_events
@@ -155,6 +133,7 @@ The maximum size of a batch, in events, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -172,6 +151,30 @@ The maximum age of a batch before it is flushed.
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+
+ See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={["127.0.0.0:5000/path/to/service"]}
   groups={[]}
   name={"endpoint"}
@@ -181,6 +184,7 @@ The maximum age of a batch before it is flushed.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### endpoint
@@ -205,6 +209,7 @@ this option will make [`region`](#region) moot.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -228,6 +233,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### namespace
@@ -253,6 +259,7 @@ that will isolate different metrics from each other.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### region
@@ -282,6 +289,7 @@ provided it will override this value since the endpoint includes the region.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_ACCESS_KEY_ID
@@ -306,6 +314,7 @@ Used for AWS authentication when communicating with AWS services. See relevant
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_SECRET_ACCESS_KEY
@@ -318,6 +327,7 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 </Field>
 </Fields>
+
 
 ## How It Works
 
@@ -409,7 +419,7 @@ event-by-event basis. It does not batch data.
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
-[pages.aws_components]: /components?providers%5B%5D=aws/
+[pages.aws_components]: /components/?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_cloudwatch_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html

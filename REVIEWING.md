@@ -15,7 +15,12 @@ should be used for all pull requests:
 - [ ] Is there a risk of performance regressions? If so, have run the [Vector test harness](https://github.com/timberio/vector-test-harness)? (see [Performance Testing](#performance-testing))
 - [ ] Should documentation be adjusted to reflect any of these changes? (see [Documentation](#documentation))
 
-## Backwards Compatibility
+## Backward Compatibility
+
+All changes should strive to retain backward compatibility. If a change breaks
+backward compatibility it is much less likely to be approved. It is highlighly
+recommended you discuss this change with a Vector team member before investing
+development time.
 
 ## Code Of Conduct
 
@@ -46,7 +51,7 @@ should ask the following questions:
 
 Documentation is incredibly important to Vector, it is a feature and
 differentiator for Vector. Pull requests should not be merged without adequate
-documentation, not should they merged with "TODOs" opened for documentation.
+documentation, nor should they be merged with "TODOs" opened for documentation.
 
 ## Performance Testing
 
@@ -61,12 +66,12 @@ Vector currently offers 2 methods for performance testing:
 Changes in a pull request should address a single concern. This promotes quality
 reviews through focus. If a pull request addresses multiple concerns it should
 be closed and followed up with multiple pull requests addresses each concern
-separately.
+separately. If you are unsure about your change, please open an issue and the
+Vector maintainers will help guide you through the scope of the change.
 
 ## Readability
 
-Code is read more than it is written. Code must be documented
-and readable.
+Code is read more than it is written. Code must be documented and readable.
 
 ## Safe Code
 

@@ -58,7 +58,7 @@ body = """\
       "dest_field_name.eq" = "check my style"\
 """
 
-[[transforms.concat.output.log.examples]]
+[[transforms.concat.examples]]
 label = "Generic"
 body = """\
 Given the following input log event:

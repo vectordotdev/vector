@@ -1,11 +1,11 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-11"
 component_title: "Filter"
-description: "The Vector `filter` transform accepts and outputs `log` events allowing you to select events based on a set of logical conditions."
-event_types: ["log"]
+description: "The Vector `filter` transform accepts and outputs `log` and `metric` events allowing you to select events based on a set of logical conditions."
+event_types: ["log","metric"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+filter%22
-sidebar_label: "filter|[\"log\"]"
+sidebar_label: "filter|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/filter.rs
 status: "beta"
 title: "Filter Transform"
@@ -13,9 +13,12 @@ title: "Filter Transform"
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `filter` transform
-accepts and [outputs `log` events](#output) allowing you to select events based
+accepts and outputs [`log`][docs.data-model.log] and
+[`metric`][docs.data-model.metric] events allowing you to select events based
 on a set of logical conditions.
 
 <!--
@@ -27,6 +30,12 @@ on a set of logical conditions.
 -->
 
 ## Configuration
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
 
 ```toml title="vector.toml"
 [transforms.my_transform_id]
@@ -43,7 +52,28 @@ on a set of logical conditions.
   condition."environment.starts_with" = "staging-" # example
 ```
 
-## Options
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "filter" # required
+  inputs = ["my-source-id"] # required
+
+  # Condition
+  condition.type = "check_fields" # optional, default
+  condition."message.eq" = "this is the content to match against" # example
+  condition."host.exists" = true # example
+  condition."method.neq" = "POST" # example
+  condition."message.contains" = "foo" # example
+  condition."environment.ends_with" = "-staging" # example
+  condition."message.regex" = " (any|of|these|five|words) " # example
+  condition."environment.starts_with" = "staging-" # example
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field
@@ -59,6 +89,7 @@ on a set of logical conditions.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### condition
@@ -82,6 +113,7 @@ messages that pass all conditions will be forwarded.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -105,6 +137,7 @@ The type of the condition to execute.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`.eq
@@ -128,6 +161,7 @@ Check whether a fields contents exactly matches the value specified.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`.exists
@@ -152,6 +186,7 @@ being `true` or `false` respectively.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`.neq
@@ -175,6 +210,7 @@ Check whether a fields contents does not match the value specified.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field_name]`.contains
@@ -198,6 +234,7 @@ Checks whether a string field contains a string argument.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field_name]`.ends_with
@@ -221,6 +258,7 @@ Checks whether a string field ends with a string argument.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field_name]`.regex
@@ -248,6 +286,7 @@ preferred where possible.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field_name]`.starts_with
@@ -263,11 +302,7 @@ Checks whether a string field starts with a string argument.
 </Field>
 </Fields>
 
-## Output
-
-The `filter` transform accepts and [outputs `log` events](#output) allowing you to select events based on a set of logical conditions.
-For example:
-
+## Examples
 
 The `filter` transform is a simple conditional match, forwarding only those messages that pass all the conditions.
 In this example, we drop all events that do not come from the host `gerry`:
@@ -307,6 +342,8 @@ You can learn more in the
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model.metric]: /docs/about/data-model/metric/
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

@@ -31,6 +31,30 @@
 #
 
 [[redirects]]
+  from = "https://docs.vector.dev/v/:version/*"
+  to = "https://docs.vector.dev/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://docs.vector.dev/correctness"
+  to = "https://vector.dev/#correctness"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://docs.vector.dev/performance"
+  to = "https://vector.dev/#performance"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://docs.vector.dev/usage/administration"
+  to = "https://vector.dev/docs/administration/"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "https://docs.vector.dev/usage/administration/stopping"
   to = "https://vector.dev/docs/administration/process-management/#stopping"
   status = 301
@@ -45,6 +69,12 @@
 [[redirects]]
   from = "https://docs.vector.dev/usage/administration/starting"
   to = "https://vector.dev/docs/administration/process-management/#starting"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://docs.vector.dev/usage/administration/*"
+  to = "https://vector.dev/docs/administration/:splat"
   status = 301
   force = true
 
@@ -73,9 +103,81 @@
 #
 
 [[redirects]]
+  from = "/blog/arm-support-on-linux/"
+  to = "/highlights/2019-11-19-arm-support-on-linux/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/blog/custom-dns/"
+  to = "/highlights/2019-12-13-custom-dns/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/blog/ec2-metadata/"
+  to = "/highlights/2019-12-16-ec2-metadata/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/blog/kubernetes-source-alpha/"
+  to = "/highlights/2019-12-14-kubernetes-source-alpha/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/blog/prometheus-source/"
+  to = "/highlights/2020-01-07-prometheus-source/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/blog/tags/announcement/"
+  to = "/blog/tags/type-announcement/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/blog/unit-testing-vector-config-files/"
+  to = "/highlights/2019-11-25-unit-testing-vector-config-files/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/blog/windows-support/"
+  to = "/highlights/2019-11-21-windows-support/"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/docs/"
   to = "/docs/about/what-is-vector/"
   status = 302
+  force = true
+
+[[redirects]]
+  from = "/docs/about/correctness"
+  to = "https://vector.dev/#correctness"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/about/performance"
+  to = "https://vector.dev/#performance"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/components/*"
+  to = "/docs/reference/:splat"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/docs/configuration"
+  to = "/docs/setup/configuration/"
+  status = 301
   force = true
 
 [[redirects]]
@@ -86,13 +188,19 @@
 
 [[redirects]]
   from = "/docs/setup/deployment/roles/agent/"
-  to = "/docs/setup/deployment/strategies/"
+  to = "/docs/setup/deployment/strategies/#daemon"
   status = 301
   force = true
 
 [[redirects]]
   from = "/docs/setup/deployment/roles/service/"
-  to = "/docs/setup/deployment/strategies/"
+  to = "/docs/setup/deployment/strategies/#service"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/setup/getting-started"
+  to = "/guides/getting-started/"
   status = 301
   force = true
 
@@ -140,13 +248,25 @@
 
 [[redirects]]
   from = "/docs/setup/installation/deployment/roles/agent/"
-  to = "/docs/setup/installation/deployment/strategies/daemon"
+  to = "/docs/setup/installation/deployment/strategies/#daemon"
   status = 301
   force = true
 
 [[redirects]]
   from = "/docs/setup/installation/deployment/roles/service/"
-  to = "/docs/setup/installation/deployment/strategies/service"
+  to = "/docs/setup/installation/deployment/strategies/#service"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/setup/installation/package-managers/yum"
+  to = "/docs/setup/installation/package-managers/rpm/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/reference/sinks/s3"
+  to = "/docs/reference/sinks/aws_s3/"
   status = 301
   force = true
 
@@ -169,6 +289,12 @@
   force = true
 
 [[redirects]]
+  from = "/docs/usage/*"
+  to = "/docs/administration/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/download/"
   to = "/releases/latest/download/"
   status = 302
@@ -180,8 +306,14 @@
   status = 301
   force = true
 
-  [[redirects]]
+[[redirects]]
   from = "/releases/"
   to = "/releases/latest/download/"
   status = 302
+  force = true
+
+[[redirects]]
+  from = "/releases/nightly/"
+  to = "/releases/nightly/download/"
+  status = 301
   force = true

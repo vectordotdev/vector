@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-11"
 title: Log Event
 description: A detailed guide on Vector's internal log data model.
 ---
@@ -102,6 +102,7 @@ changed via the
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -128,6 +129,7 @@ or the source-level `host_key` option for relevant sources.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### message
@@ -137,6 +139,33 @@ Represents the log message. Change this field name via the [global
 source-level `message_key` option for relevant sources.
 
  See [Changing The Default Schema](#changing-the-default-schema) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["file","socket","http","kubernetes"]}
+  groups={[]}
+  name={"source_type"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### source_type
+
+The official `type` of [Vector's source component][docs.sources] from which the
+log originates. Change this field name via the [global `source_type_key`
+option][docs.reference.global-options#source_type_key] or the source-level
+`source_type_key` option for relevant sources.
+
+
 
 
 </Field>
@@ -153,6 +182,7 @@ source-level `message_key` option for relevant sources.
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### timestamp
@@ -179,6 +209,7 @@ option][docs.reference.global-options#message_key] or the source-level
   templateable={false}
   type={"*"}
   unit={null}
+  warnings={[]}
   >
 
 ### `[custom-key]`
@@ -236,7 +267,7 @@ The dot notation also supports accessing array fields using by placing the index
 array[0]
 ```
 
-The indexes start from 0, missing value are auto-filled by [null values](#null-values).
+The indexes start from 0, missing values are auto-filled by [null values](#null-values).
 
 <Alert type="warning">
 
@@ -296,6 +327,7 @@ Array fields are sequences of values of any type.
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.reference.global-options#message_key]: /docs/reference/global-options/#message_key
+[docs.reference.global-options#source_type_key]: /docs/reference/global-options/#source_type_key
 [docs.reference.transforms.rename_fields]: /docs/reference/transforms/rename_fields/
 [docs.sources]: /docs/reference/sources/
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/

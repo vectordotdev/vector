@@ -94,7 +94,7 @@ common = true
 default = true
 description = "Dynamically create a [log stream][urls.aws_cloudwatch_logs_stream_name] if it does not already exist."
 
-[[sinks.aws_cloudwatch_logs.output.examples]]
+[[sinks.aws_cloudwatch_logs.examples]]
 label = "Generic"
 body = """\
 ```http

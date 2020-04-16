@@ -92,7 +92,7 @@ fn array_eq(this: &Vec<Value>, other: &Vec<Value>) -> bool {
         .all(|(first, second)| value_eq(first, second))
 }
 
-fn map_eq(this: &BTreeMap<Atom, Value>, other: &BTreeMap<Atom, Value>) -> bool {
+fn map_eq(this: &BTreeMap<String, Value>, other: &BTreeMap<String, Value>) -> bool {
     if this.len() != other.len() {
         return false;
     }
@@ -143,7 +143,7 @@ fn hash_array<H: Hasher>(hasher: &mut H, array: &Vec<Value>) {
     }
 }
 
-fn hash_map<H: Hasher>(hasher: &mut H, map: &BTreeMap<Atom, Value>) {
+fn hash_map<H: Hasher>(hasher: &mut H, map: &BTreeMap<String, Value>) {
     for (key, val) in map.iter() {
         hasher.write(key.as_bytes());
         hash_value(hasher, val);
@@ -237,7 +237,7 @@ mod tests {
     }
 
     #[test]
-    fn map_values_array() {
+    fn array_values_insertion_order() {
         let mut event_1 = LogEvent::new();
         event_1.insert("array[0]", "a");
         event_1.insert("array[1]", "b");

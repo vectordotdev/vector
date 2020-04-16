@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-07"
 delivery_guarantee: "best_effort"
 component_title: "Vector"
 description: "The Vector `vector` source ingests data through another upstream `vector` sink and outputs `log` and `metric` events."
@@ -35,7 +35,7 @@ events.
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--warnings">
 
 * This component exposes a configured port. You must ensure your network allows access to this port.
 
@@ -47,7 +47,6 @@ events.
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"
@@ -92,6 +91,7 @@ events.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### address
@@ -117,6 +117,7 @@ include a port.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 ### shutdown_timeout_secs
@@ -140,6 +141,7 @@ The timeout before a connection is forcefully closed during shutdown.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tls
@@ -162,6 +164,7 @@ Configures the TLS options for connections from this source.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### ca_path
@@ -186,6 +189,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### crt_path
@@ -211,6 +215,7 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### enabled
@@ -235,6 +240,7 @@ is also required.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_pass
@@ -259,6 +265,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_path
@@ -283,13 +290,14 @@ PEM format (PKCS#8).
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` will cause OpenSSL to not request a certificate from the client","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
 
 If `true`, Vector will require a TLS certificate from the connecting host and
 terminate the connection if it is not valid. If `false` (the default), Vector
-will ignore the presence of a client certificate.
+will not request a certificate from the client.
 
 
 
@@ -299,12 +307,6 @@ will ignore the presence of a client certificate.
 
 </Field>
 </Fields>
-
-## Output
-
-The `vector` source is a pass-through source and is intended to accept data
-from an upstream [`vector` sink][docs.sinks.vector]. Datta is not changed or
-augmented.
 
 ## How It Works
 
@@ -330,8 +332,17 @@ Currently, Vector does not perform any application level message acknowledgement
 Upstream Vector instances forward data to downstream Vector instances via the TCP protocol.
 
 
+
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
+options.
+
+
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.sinks.vector]: /docs/reference/sinks/vector/
 [urls.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
+[urls.openssl]: https://www.openssl.org/

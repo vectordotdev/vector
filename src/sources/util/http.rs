@@ -1,12 +1,13 @@
 use crate::event::Event;
-use crate::tls::{MaybeTlsSettings, TlsConfig};
+use crate::{
+    shutdown::ShutdownSignal,
+    tls::{MaybeTlsSettings, TlsConfig},
+};
 use futures01::{sync::mpsc, Future, IntoFuture, Sink};
 use serde::Serialize;
 use std::error::Error;
 use std::fmt::{self, Display};
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
-use stream_cancel::Tripwire;
 use warp::filters::{body::FullBody, BoxedFilter};
 use warp::http::{HeaderMap, StatusCode};
 use warp::{Filter, Rejection};
@@ -44,10 +45,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         path: &'static str,
         tls: &Option<TlsConfig>,
         out: mpsc::Sender<Event>,
+        shutdown: ShutdownSignal,
     ) -> crate::Result<crate::sources::Source> {
-        let (trigger, tripwire) = Tripwire::new();
-        let trigger = Arc::new(Mutex::new(Some(trigger)));
-
         let mut filter: BoxedFilter<()> = warp::post2().boxed();
         if !path.is_empty() && path != "/" {
             for s in path.split('/') {
@@ -60,7 +59,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             .and(warp::body::concat())
             .and_then(move |headers: HeaderMap, body| {
                 let out = out.clone();
-                let trigger = trigger.clone();
                 info!("Handling http request: {:?}", headers);
 
                 self.build_event(body, headers)
@@ -69,12 +67,11 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     .and_then(|events| {
                         out.send_all(futures01::stream::iter_ok(events)).map_err(
                             move |e: mpsc::SendError<Event>| {
-                                //can only fail if receiving end disconnected, so shut down and make some error logs
+                                // can only fail if receiving end disconnected, so we are shuting down,
+                                // probably not gracefully.
                                 error!("Failed to forward events, downstream is closed");
                                 error!("Tried to send the following event: {:?}", e);
-                                error!("Shutting down");
 
-                                trigger.try_lock().ok().take().map(drop); // shut down the http server if someone hasn't already
                                 warp::reject::custom("shutting down")
                             },
                         )
@@ -102,8 +99,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let incoming = tls.bind(&address)?.incoming();
 
-        let server = warp::serve(routes).serve_incoming_with_graceful_shutdown(incoming, tripwire);
+        let server = warp::serve(routes)
+            .serve_incoming_with_graceful_shutdown(incoming, shutdown.clone().map(|_| ()));
 
-        Ok(Box::new(server))
+        // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
+        Ok(Box::new(server.map(|_| drop(shutdown))))
     }
 }

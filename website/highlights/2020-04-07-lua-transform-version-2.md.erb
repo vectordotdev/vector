@@ -1,0 +1,87 @@
+---
+last_modified_on: "2020-03-31"
+$schema: "/.meta/.schemas/highlights.json"
+title: "Lua Transform v2"
+description: "The next iteration of our Lua transform."
+author_github: "https://github.com/binarylogic"
+pr_numbers: [2126]
+release: "nightly"
+hide_on_release_notes: false
+tags: ["type: new feature", "domain: sources", "source: vector"]
+---
+
+This is an exciting one! v2 of our [`lua` transform][docs.transforms.lua] has
+been released. It contains an entirely new API for using Lua within Vector,
+unblocking some very important limitations that our v1 (MVP) contained:
+
+1. Correct data model and type conversions.
+2. Introduction of hooks to maintain global state.
+3. Introduction of timers to facilitate timed flushing. Useful for aggregations.
+4. The ability to accept and work with metrics data.
+
+This raises the bar in terms of capabilities, which is important! Lua is often
+used as an escape hatch when Vector's native transforms are not flexible enough.
+
+<Alert type="info">
+
+Did you know we're [working on a WASM integration][urls.pr_2006] 👀
+
+</Alert>
+
+## Example
+
+Here's an example demonstrating how to create aggregations form your log data:
+
+```toml title="vector.toml"
+[transforms.aggregator]
+type = "lua"
+version = "2"
+inputs = [] # add names of the input components here
+hooks.init = "init"
+hooks.process = "process"
+hooks.shutdown = "shutdown"
+timers = [{interval_seconds = 5, handler = "timer_handler"}]
+
+source = """
+  function init()
+    count = 0
+  end
+
+  function process()
+    count = count + 1
+  end
+
+  function timer_handler(emit)
+    emit(make_counter(counter))
+    counter = 0
+  end
+
+  function shutdown(emit)
+    emit(make_counter(counter))
+  end
+
+  function make_counter(value)
+    return metric = {
+      name = "event_counter",
+      kind = "incremental",
+      timestamp = os.date("!*t"),
+      counter = {
+        value = value
+      }
+    }
+  end
+"""
+```
+
+<Jump to="[[[guides.custom-aggregations-with-lua]]]" leftIcon="book-open">Learn how this works in the guide</Jump>
+<Vic style="cool" text="Vic approved" className="margin-vert--lg" />
+
+## Get Started
+
+<Jump to="[[[docs.transforms.lua]]]" leftIcon="book">Docs: Lua Transform</Jump>
+<Jump to="[[[guides.custom-aggregations-with-lua]]]" leftIcon="book-open">Guide: Custom aggregations with Lua</Jump>
+<Jump to="[[[guides.parsing-csv-logs-with-lua]]]" leftIcon="book-open">Guide: Parsing CSV logs with Lua</Jump>
+
+And for the curious:
+
+<Jump to="[[[urls.vector_lua_rfc]]]" leftIcon="book">Vector's Lua RFC</Jump>

@@ -3,7 +3,7 @@
  */
 
 .jump-to {
-  background: var(--ifm-panel-background);
+  background-color: var(--ifm-panel-background-color);
   border: 1px solid var(--ifm-panel-border-color);
   border-radius: var(--ifm-global-radius);
   box-shadow: var(--ifm-panel-box-shadow);
@@ -60,7 +60,7 @@
 }
 
 .jump-to:hover {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-color-active);
   border-color: var(--ifm-color-primary);
   box-shadow: var(--ifm-panel-box-shadow-active);
   text-decoration: none;
@@ -137,13 +137,4 @@
   font-size: 0.8em;
   line-height: 1em;
   text-transform: uppercase;
-}
-
-@media (max-width: 996px) {
-  .jump-to--inner-2 {
-    border-radius: var(--ifm-global-radius);
-    display: flex;
-    padding: 1em 0.25em;
-    transition: var(--ifm-transition-fast) ease;
-  }
 }

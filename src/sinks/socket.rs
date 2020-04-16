@@ -88,7 +88,7 @@ mod test {
     use super::*;
     use crate::{
         event::Event,
-        test_util::{next_addr, runtime},
+        test_util::{next_addr, random_lines_with_stream, receive, runtime},
         topology::config::SinkContext,
     };
     use futures01::Sink;
@@ -125,5 +125,34 @@ mod test {
         assert!(data.get("timestamp").is_some());
         let message = data.get("message").expect("No message in JSON");
         assert_eq!(message, &Value::String("raw log line".into()));
+    }
+
+    #[test]
+    fn tcp_stream() {
+        let addr = next_addr();
+        let config = SocketSinkConfig {
+            mode: Mode::Tcp(TcpSinkConfig {
+                address: addr.to_string(),
+                encoding: Encoding::Json.into(),
+                tls: None,
+            }),
+        };
+        let mut rt = runtime();
+        let context = SinkContext::new_test(rt.executor());
+        let (sink, _healthcheck) = config.build(context).unwrap();
+
+        let receiver = receive(&addr);
+
+        let (lines, events) = random_lines_with_stream(10, 100);
+        let pump = sink.send_all(events);
+        let _ = rt.block_on(pump).unwrap();
+
+        let output = receiver.wait();
+        assert_eq!(output.len(), lines.len());
+        for (source, received) in lines.iter().zip(output) {
+            let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
+            let received = json.get("message").unwrap().as_str().unwrap();
+            assert_eq!(source, received);
+        }
     }
 }

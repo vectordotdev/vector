@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-16"
 component_title: "Grok Parser"
 description: "The Vector `grok_parser` transform accepts and outputs `log` events allowing you to parse a log field value with Grok."
 event_types: ["log"]
@@ -13,6 +13,8 @@ title: "Grok Parser Transform"
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `grok_parser` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to parse a
@@ -28,14 +30,20 @@ log field value with [Grok][urls.grok].
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "grok_parser" # required
   inputs = ["my-source-id"] # required
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # required
   drop_field = true # optional, default
   field = "message" # optional, default
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # required
 
   # Types
   types.status = "int" # example
@@ -63,6 +71,47 @@ log field value with [Grok][urls.grok].
       "message.eq" = "hello world this is a test message"
 ```
 
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "grok_parser" # required
+  inputs = ["my-source-id"] # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # required
+
+  # Types
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
+
+# Optional unit tests
+[[tests]]
+  name = "test_grok_parser"
+
+  [[tests.inputs]]
+    insert_at = "my_transform_id"
+    type = "raw"
+    value = "2020-02-26T12:58:27+00:00 DEBUG hello world this is a test message"
+
+  [[tests.outputs]]
+    extract_from = "my_transform_id"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "timestamp.eq" = "2020-02-26T12:58:27+00:00"
+      "level.eq" = "DEBUG"
+      "message.eq" = "hello world this is a test message"
+```
+
+</TabItem>
+</Tabs>
+
 <Fields filters={true}>
 <Field
   common={true}
@@ -77,6 +126,7 @@ log field value with [Grok][urls.grok].
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_field
@@ -100,6 +150,7 @@ If `true` will drop the specified [`field`](#field) after parsing.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### field
@@ -123,6 +174,7 @@ The log field to execute the [`pattern`](#pattern) against. Must be a `string` v
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### pattern
@@ -146,6 +198,7 @@ The [Grok pattern][urls.grok_patterns]
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### types
@@ -169,6 +222,7 @@ coerce log fields into their proper types.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`
@@ -218,7 +272,7 @@ You can learn more in the
 ### Field Notation Syntax
 
 The [`field`](#field) options
-support [Vector's field notiation syntax][docs.reference.field-path-notation],
+support [Vector's field notation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
 ```toml title="vector.toml"
@@ -242,9 +296,53 @@ While this is still plenty fast for most use cases we recommend using the
 performance issues.
 
 
+
+### Value Coercion
+
+Values can be coerced upon extraction via the [`types.*`](#types) options. This functions
+exactly like the [`coercer` transform][docs.transforms.coercer] except that its
+coupled within this transform for convenience.
+
+#### Timestamps
+
+You can coerce values into timestamps via the `timestamp` type:
+
+```toml title="vector.toml"
+# ...
+types.first_timestamp = "timestamp" # best effort parsing
+types.second_timestamp = "timestamp|%Y-%m-%dT%H:%M:%S%z" # ISO8601
+# ...
+```
+
+As noted above, if you do not specify a specific `strftime` format, Vector
+will make a best effort attempt to parse the timestamp against the following
+common formats:
+
+| Format               | Description                                  |
+|:---------------------|:---------------------------------------------|
+| **Without Timezone** |                                              |
+| `%F %T`              | YYYY-MM-DD HH:MM:SS                          |
+| `%v %T`              | DD-Mmm-YYYY HH:MM:SS                         |
+| `FT%T`               | ISO 8601 / RFC 3339 without TZ               |
+| `m/%d/%Y:%T`         | US common date format                        |
+| `a, %d %b %Y %T`     | RFC 822/2822 without TZ                      |
+| `a %d %b %T %Y`      | `date` command output without TZ             |
+| `A %d %B %T %Y`      | `date` command output without TZ, long names |
+| `a %b %e %T %Y`      | ctime format                                 |
+| **With Timezone**    |                                              |
+| `%+`                 | ISO 8601 / RFC 3339                          |
+| `%a %d %b %T %Z %Y`  | `date` command output                        |
+| `%a %d %b %T %z %Y`  | `date` command output, numeric TZ            |
+| `%a %d %b %T %#z %Y` | `date` command output, numeric TZ            |
+| **UTC Formats**      |                                              |
+| `%s`                 | UNIX timestamp                               |
+| `%FT%TZ`             | ISO 8601 / RFC 3339 UTC                      |
+
+
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
+[docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [pages.index#performance]: /#performance
 [urls.grok]: http://grokdebug.herokuapp.com/
@@ -252,4 +350,4 @@ performance issues.
 [urls.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns
 [urls.rust_grok_library]: https://github.com/daschl/grok
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

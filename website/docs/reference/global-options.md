@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-11"
 title: Global Options
 description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---
@@ -30,10 +30,9 @@ dns_servers = ["0.0.0.0:53"] # optional, no default
 log_schema.host_key = "host" # optional, default
 log_schema.kubernetes_key = "kubernetes" # optional, default
 log_schema.message_key = "message" # optional, default
+log_schema.source_type_key = "source_type" # optional, default
 log_schema.timestamp_key = "timestamp" # optional, default
 ```
-
-## Options
 
 <Fields filters={true}>
 <Field
@@ -49,6 +48,7 @@ log_schema.timestamp_key = "timestamp" # optional, default
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### data_dir
@@ -74,6 +74,7 @@ permissions to this dir.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### dns_servers
@@ -100,6 +101,7 @@ system configuration.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### log_schema
@@ -123,6 +125,7 @@ model page][docs.data-model.log] for more info.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### host_key
@@ -147,6 +150,7 @@ page][docs.data-model.log#host] for more info.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### kubernetes_key
@@ -170,12 +174,38 @@ The key under which Kubernetes related fields are nested.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### message_key
 
 The key used to hold the log message. See the [log data model
 page][docs.data-model.log#message] for more info.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"source_type"}
+  enumValues={null}
+  examples={["source_type","@source_type","src_ty"]}
+  groups={[]}
+  name={"source_type_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### source_type_key
+
+The key used to hold the log source type. See the [log data model
+page][docs.data-model.log#source_type] for more info.
 
 
 
@@ -194,6 +224,7 @@ page][docs.data-model.log#message] for more info.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_key
@@ -222,6 +253,7 @@ specify a [`data_dir`](#data_dir).
 
 [docs.data-model.log#host]: /docs/about/data-model/log/#host
 [docs.data-model.log#message]: /docs/about/data-model/log/#message
+[docs.data-model.log#source_type]: /docs/about/data-model/log/#source_type
 [docs.data-model.log#timestamp]: /docs/about/data-model/log/#timestamp
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.sinks]: /docs/reference/sinks/

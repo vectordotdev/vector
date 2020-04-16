@@ -24,7 +24,7 @@ required = true
 examples = ["127.0.0.1:8126"]
 description = "UDP socket address to bind to."
 
-[[sources.statsd.output.metric.examples]]
+[[sources.statsd.examples]]
 label = "Counter"
 body = """\
 Given the following input:
@@ -48,7 +48,7 @@ A metric event will be output with the following structure:
 ```\
 """
 
-[[sources.statsd.output.metric.examples]]
+[[sources.statsd.examples]]
 label = "Gauge"
 body = """\
 Given the following input:
@@ -72,7 +72,7 @@ A metric event will be output with the following structure:
 ```\
 """
 
-[[sources.statsd.output.metric.examples]]
+[[sources.statsd.examples]]
 label = "Set"
 body = """\
 Given the following input:
@@ -96,7 +96,7 @@ A metric event will be output with the following structure:
 ```\
 """
 
-[[sources.statsd.output.metric.examples]]
+[[sources.statsd.examples]]
 label = "Timer"
 body = """\
 Given the following input:

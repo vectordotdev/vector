@@ -4,6 +4,12 @@ avatar = "https://github.com/a-rodin.png"
 github = "https://github.com/a-rodin"
 keybase = "https://keybase.io/arodin"
 name = "Alexander"
+bio = """\
+Alexander is a Senior Engineer at <a href="https://timber.io">Timber.io</a> \
+and a member of the <a href="/community#team">core Vector team</a>. He created \
+<a href="https://alexanderrodin.com/qstardict">QStarDict</a>, a dictionary \
+application written in C++.\
+"""
 
 [[team]]
 id = "ana"
@@ -47,12 +53,6 @@ open-source veteran, creating \
 <a href="https://github.com/binarylogic/authlogic">Authlogic</a> over 15 years \
 ago before helping to launch Vector.\
 """
-
-[[team]]
-id = "brady"
-avatar = "https://github.com/timber-bradybot.png"
-github = "https://github.com/timber-bradybot"
-name = "Brady"
 
 [[team]]
 id = "bruce"

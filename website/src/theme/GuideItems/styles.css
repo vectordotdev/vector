@@ -1,7 +1,7 @@
 .guide-items {
   display: grid;
   grid-template-columns: repeat(4, minmax(100px, 1fr));
-  grid-gap: 1.5rem;
+  grid-gap: 1.5em;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
 }
 
@@ -35,7 +35,7 @@
 @media (max-width: 996px) {
   .guide-items {
     grid-template-columns: repeat(4, 1fr);
-    font-size: 1rem;
+    font-size: 1em;
   }
 
   .guide-items--staggered > a:first-child {
@@ -45,7 +45,7 @@
   }
 
   .guide-items--staggered {
-    font-size: 1rem;
+    font-size: 1em;
   }
 }
 

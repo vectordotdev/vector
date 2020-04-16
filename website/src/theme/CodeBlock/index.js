@@ -14,6 +14,7 @@ import styles from './styles.module.css';
 
 (typeof global !== 'undefined' ? global : window).Prism = Prism;
 require('prismjs/components/prism-http');
+require('prismjs/components/prism-lua');
 require('prismjs/components/prism-powershell');
 require('prismjs/components/prism-protobuf');
 require('prismjs/components/prism-rust');

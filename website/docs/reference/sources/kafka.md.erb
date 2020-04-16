@@ -8,6 +8,12 @@
 <%= component_requirements(component) %>
 
 <%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
 ## Configuration
 
 <%= component_config_example(component) %>
@@ -20,10 +26,11 @@
 <%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
-<%- if component.output.log -%>
-## Output
+<%= component_fields(component, heading_depth: 2) -%>
+<%- if component.examples.any? -%>
+## Examples
 
-<%= component_output(component, component.output.log, heading_depth: 3) %>
+<%= component_examples(component) %>
 
 <%- end -%>
 ## How It Works [[sort]]
@@ -32,7 +39,7 @@
 
 ### librdkafka
 
-The `kafka` source uses [`lib_rdkafka`][urls.lib_rdkafka] under the hood. This
+The `kafka` source uses [`librdkafka`][urls.librdkafka] under the hood. This
 is a battle tested, performant, and reliabile library that facilitates
 communication with Kafka. And because Vector produces static MUSL builds,
 this dependency is packaged with Vector, meaning you do not need to install it.

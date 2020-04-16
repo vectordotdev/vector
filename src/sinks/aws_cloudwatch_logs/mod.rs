@@ -747,7 +747,7 @@ mod integration_tests {
         test_util::{random_lines_with_stream, random_string},
         topology::config::{SinkConfig, SinkContext},
     };
-    use futures01::Sink;
+    use futures01::{stream::Stream, Sink};
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
@@ -806,6 +806,79 @@ mod integration_tests {
             .map(|e| e.message.unwrap())
             .collect::<Vec<_>>();
 
+        assert_eq!(output_lines, input_lines);
+    }
+
+    #[test]
+    fn cloudwatch_insert_log_events_sorted() {
+        let mut rt = Runtime::single_threaded().unwrap();
+        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+
+        let stream_name = gen_name();
+
+        let region = Region::Custom {
+            name: "localstack".into(),
+            endpoint: "http://localhost:6000".into(),
+        };
+        ensure_group(region.clone());
+
+        let config = CloudwatchLogsSinkConfig {
+            stream_name: stream_name.clone().into(),
+            group_name: GROUP_NAME.into(),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            encoding: Encoding::Text.into(),
+            create_missing_group: None,
+            create_missing_stream: None,
+            batch: Default::default(),
+            request: Default::default(),
+            assume_role: None,
+        };
+
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+
+        let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
+
+        let (mut input_lines, events) = random_lines_with_stream(100, 11);
+
+        // add a historical timestamp to all but the first event, to simulate
+        // out-of-order timestamps.
+        let mut doit = false;
+        let pump = sink.send_all(events.map(move |mut event| {
+            if doit {
+                let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
+
+                event.as_mut_log().insert(
+                    event::log_schema().timestamp_key(),
+                    Value::Timestamp(timestamp),
+                );
+            }
+            doit = true;
+
+            event
+        }));
+        let (sink, _) = rt.block_on(pump).unwrap();
+        // drop the sink so it closes all its connections
+        drop(sink);
+
+        let mut request = GetLogEventsRequest::default();
+        request.log_stream_name = stream_name.clone().into();
+        request.log_group_name = GROUP_NAME.into();
+        request.start_time = Some(timestamp.timestamp_millis());
+
+        let client = create_client(region, None, resolver).unwrap();
+
+        let response = rt.block_on(client.get_log_events(request)).unwrap();
+
+        let events = response.events.unwrap();
+
+        let output_lines = events
+            .into_iter()
+            .map(|e| e.message.unwrap())
+            .collect::<Vec<_>>();
+
+        // readjust input_lines in the same way we have readjusted timestamps.
+        let first = input_lines.remove(0);
+        input_lines.push(first);
         assert_eq!(output_lines, input_lines);
     }
 

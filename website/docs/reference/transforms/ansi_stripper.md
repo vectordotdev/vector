@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-11"
 component_title: "ANSI Stripper"
 description: "The Vector `ansi_stripper` transform accepts and outputs `log` events allowing you to strips ANSI escape sequences from the specified field."
 event_types: ["log"]
@@ -13,6 +13,8 @@ title: "ANSI Stripper Transform"
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `ansi_stripper` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to strips
@@ -28,12 +30,31 @@ ANSI escape sequences from the specified field.
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "ansi_stripper" # required
   inputs = ["my-source-id"] # required
   field = "message" # optional, default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  type = "ansi_stripper" # required
+  inputs = ["my-source-id"] # required
+  field = "message" # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field
@@ -49,6 +70,7 @@ ANSI escape sequences from the specified field.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### field
@@ -83,7 +105,7 @@ You can learn more in the
 ### Field Notation Syntax
 
 The [`field`](#field) options
-support [Vector's field notiation syntax][docs.reference.field-path-notation],
+support [Vector's field notation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
 ```toml title="vector.toml"
@@ -102,4 +124,4 @@ You can learn more about Vector's field notation in the
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` sink exposes `metric` events to Prometheus metrics service."
@@ -34,7 +34,7 @@ The Vector `prometheus` sink
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--warnings">
 
 * [Prometheus][urls.prometheus] version `>= 1.0` is required.
 
@@ -46,7 +46,6 @@ The Vector `prometheus` sink
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"
@@ -65,9 +64,9 @@ The Vector `prometheus` sink
   type = "prometheus" # required
   inputs = ["my-source-id"] # required
   address = "0.0.0.0:9598" # required
-  namespace = "service" # required
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # optional, default, seconds
   flush_period_secs = 60 # optional, default, seconds
+  namespace = "service" # required
 ```
 
 </TabItem>
@@ -87,6 +86,7 @@ The Vector `prometheus` sink
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### address
@@ -110,6 +110,7 @@ The address to expose for scraping.
   templateable={false}
   type={"[float]"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 ### buckets
@@ -134,6 +135,7 @@ Default buckets to use for aggregating
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 ### flush_period_secs
@@ -157,6 +159,7 @@ Time interval between [set][docs.data-model.metric#set] values are reset.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### namespace
@@ -170,15 +173,13 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 </Field>
 </Fields>
 
-## Output
 
-The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service.
-For example:
-
+## Examples
 
 <Tabs
   block={true}
   defaultValue="histograms"
+  select={false}
   values={[{"label":"Histograms","value":"histograms"},{"label":"Counters","value":"counters"},{"label":"Gauges","value":"gauges"}]}>
 
 <TabItem value="histograms">

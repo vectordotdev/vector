@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-06"
 title: Monitoring
 description: How to monitor and observe Vector with logs, metrics, and more.
 ---
@@ -118,13 +118,14 @@ how you access Vector's logs.
 By default, Vector logs on the `info` level, you can change the level through
 a variety of methods:
 
-| Method | Description |
-| :----- | :---------- |
-| [`-v` flag][docs.process-management#flags] | Drops the log level to `debug`. |
-| [`-vv` flag][docs.process-management#flags] | Drops the log level to `trace`. |
-| [`-q` flag][docs.process-management#flags] | Raises the log level to `warn`. |
-| [`-qq` flag][docs.process-management#flags] | Raises the log level to `error`. |
-| `LOG=<level>` env var | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`. |
+| Method                                       | Description                                                                         |
+|:---------------------------------------------|:------------------------------------------------------------------------------------|
+| [`-v` flag][docs.process-management#flags]   | Drops the log level to `debug`.                                                     |
+| [`-vv` flag][docs.process-management#flags]  | Drops the log level to `trace`.                                                     |
+| [`-q` flag][docs.process-management#flags]   | Raises the log level to `warn`.                                                     |
+| [`-qq` flag][docs.process-management#flags]  | Raises the log level to `error`.                                                    |
+| [`-qqq` flag][docs.process-management#flags] | Turns logging off.                                                                  |
+| `LOG=<level>` env var                        | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`. |
 
 ### Full Backtraces
 

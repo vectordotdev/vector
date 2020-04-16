@@ -1,7 +1,10 @@
-use crate::shutdown::ShutdownSignal;
-use crate::stream::StreamExt;
-use crate::tls::{MaybeTlsListener, MaybeTlsSettings};
-use crate::Event;
+use crate::{
+    internal_events::TcpConnectionError,
+    shutdown::ShutdownSignal,
+    stream::StreamExt,
+    tls::{MaybeTlsListener, MaybeTlsSettings},
+    Event,
+};
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use listenfd::ListenFd;
@@ -159,7 +162,9 @@ fn handle_stream(
             let host = host.clone();
             source.build_event(frame, host)
         })
-        .map_err(|error| warn!(message = "connection error.", %error))
+        .map_err(|error| {
+            emit!(TcpConnectionError { error });
+        })
         .forward(out)
         .map(|_| debug!("connection closed."))
         .map_err(|_| warn!("Error received while processing TCP source"));

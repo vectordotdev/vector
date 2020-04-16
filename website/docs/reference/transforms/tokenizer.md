@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-11"
 component_title: "Tokenizer"
 description: "The Vector `tokenizer` transform accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
 event_types: ["log"]
@@ -13,6 +13,8 @@ title: "Tokenizer Transform"
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `tokenizer` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to
@@ -29,14 +31,20 @@ characters, and zip the tokens into ordered field names.
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "tokenizer" # required
   inputs = ["my-source-id"] # required
-  field_names = ["timestamp", "level", "message", "parent.child"] # required
   drop_field = true # optional, default
   field = "message" # optional, default
+  field_names = ["timestamp", "level", "message", "parent.child"] # required
 
   # Types
   types.status = "int" # example
@@ -46,6 +54,30 @@ characters, and zip the tokens into ordered field names.
   types.timestamp = "timestamp|%a %b %e %T %Y" # example
   types.parent.child = "int" # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "tokenizer" # required
+  inputs = ["my-source-id"] # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
+  field_names = ["timestamp", "level", "message", "parent.child"] # required
+
+  # Types
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field
@@ -61,6 +93,7 @@ characters, and zip the tokens into ordered field names.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_field
@@ -84,6 +117,7 @@ If `true` the [`field`](#field) will be dropped after parsing.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### field
@@ -107,6 +141,7 @@ The log field to tokenize.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### field_names
@@ -130,6 +165,7 @@ The log field names assigned to the resulting tokens, in order.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### types
@@ -153,6 +189,7 @@ coerce log fields into their proper types.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`
@@ -170,11 +207,11 @@ supported for the `timestamp` type.
 </Field>
 </Fields>
 
-## Output
+## Examples
 
 Given the following log line:
 
-```json
+```json title="log event"
 {
   "message": "5.86.210.12 - zieme4647 [19/06/2019:17:20:49 -0400] "GET /embrace/supply-chains/dynamic/vertical" 201 20574"
 }
@@ -182,7 +219,7 @@ Given the following log line:
 
 And the following configuration:
 
-```toml
+```toml title="vector.toml"
 [transforms.<transform-id>]
 type = "tokenizer"
 field = "message"
@@ -191,7 +228,7 @@ fields = ["remote_addr", "ident", "user_id", "timestamp", "message", "status", "
 
 A [`log` event][docs.data-model.log] will be output with the following structure:
 
-```javascript
+```javascript title="log event"
 {
   // ... existing fields
   "remote_addr": "5.86.210.12",
@@ -237,7 +274,7 @@ You can learn more in the
 ### Field Notation Syntax
 
 The [`field`](#field) and [`field_names`](#field_names) options
-support [Vector's field notiation syntax][docs.reference.field-path-notation],
+support [Vector's field notation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
 ```toml title="vector.toml"
@@ -261,8 +298,52 @@ certain characters as special. These characters will be discarded:
 * `\` - Can be used to escape the above characters, Vector will treat them as literal.
 
 
+
+### Value Coercion
+
+Values can be coerced upon extraction via the [`types.*`](#types) options. This functions
+exactly like the [`coercer` transform][docs.transforms.coercer] except that its
+coupled within this transform for convenience.
+
+#### Timestamps
+
+You can coerce values into timestamps via the `timestamp` type:
+
+```toml title="vector.toml"
+# ...
+types.first_timestamp = "timestamp" # best effort parsing
+types.second_timestamp = "timestamp|%Y-%m-%dT%H:%M:%S%z" # ISO8601
+# ...
+```
+
+As noted above, if you do not specify a specific `strftime` format, Vector
+will make a best effort attempt to parse the timestamp against the following
+common formats:
+
+| Format               | Description                                  |
+|:---------------------|:---------------------------------------------|
+| **Without Timezone** |                                              |
+| `%F %T`              | YYYY-MM-DD HH:MM:SS                          |
+| `%v %T`              | DD-Mmm-YYYY HH:MM:SS                         |
+| `FT%T`               | ISO 8601 / RFC 3339 without TZ               |
+| `m/%d/%Y:%T`         | US common date format                        |
+| `a, %d %b %Y %T`     | RFC 822/2822 without TZ                      |
+| `a %d %b %T %Y`      | `date` command output without TZ             |
+| `A %d %B %T %Y`      | `date` command output without TZ, long names |
+| `a %b %e %T %Y`      | ctime format                                 |
+| **With Timezone**    |                                              |
+| `%+`                 | ISO 8601 / RFC 3339                          |
+| `%a %d %b %T %Z %Y`  | `date` command output                        |
+| `%a %d %b %T %z %Y`  | `date` command output, numeric TZ            |
+| `%a %d %b %T %#z %Y` | `date` command output, numeric TZ            |
+| **UTC Formats**      |                                              |
+| `%s`                 | UNIX timestamp                               |
+| `%FT%TZ`             | ISO 8601 / RFC 3339 UTC                      |
+
+
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
+[docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

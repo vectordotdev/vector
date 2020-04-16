@@ -55,9 +55,9 @@
         "enum": <%= (
           ["type: guide", "type: post", "type: tutorial"] +
           metadata.domains.collect { |d| "domain: #{d.name}" } +
-          metadata.installation.platforms_list.collect { |p| "platform: #{p.name}" } +
+          metadata.platform_names.collect { |p| "platform: #{p.downcase}" } +
           metadata.sources_list.collect { |s| "source: #{s.name}" } +
-          metadata.transforms_list.collect { |t| "source: #{t.name}" } +
+          metadata.transforms_list.collect { |t| "transform: #{t.name}" } +
           metadata.sinks_list.collect { |s| "sink: #{s.name}" }
         ) .to_json %>
       }
@@ -65,6 +65,13 @@
     "title": {
       "type": "string",
       "description": "Title of the guide."
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "Array of assumptions",
+      "items": {
+        "type": "string"
+      }
     }
   }
 }

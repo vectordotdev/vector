@@ -1,6 +1,8 @@
 use crate::{
     buffers::Acker,
+    emit,
     event::{self, Event},
+    internal_events::BlackholeEventReceived,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::{future, AsyncSink, Future, Poll, Sink, StartSend};
@@ -71,7 +73,9 @@ impl Sink for BlackholeSink {
         self.total_events += 1;
         self.total_raw_bytes += message_len;
 
-        trace!(raw_bytes_counter = message_len, events_counter = 1);
+        emit!(BlackholeEventReceived {
+            byte_size: message_len
+        });
 
         if self.total_events % self.config.print_amount == 0 {
             info!({

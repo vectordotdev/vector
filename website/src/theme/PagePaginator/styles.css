@@ -1,0 +1,35 @@
+.pagination-nav .pagination-nav__item {
+  max-width: none;
+}
+
+.pagination-nav .pagination-nav__link {
+  background-color: var(--ifm-panel-background-color);
+  border-color: var(--ifm-panel-border-color);
+  box-shadow: var(--ifm-panel-box-shadow);
+  transition: border 250ms ease;
+}
+
+.pagination-nav .pagination-nav__link:hover {
+  background: var(--ifm-panel-background-color-active);
+  box-shadow: var(--ifm-panel-box-shadow-active);
+  color: var(--ifm-panel-color-active);
+}
+
+.pagination-nav .pagination-nav__link:hover * {
+  color: var(--ifm-panel-color-active);
+}
+
+@media (max-width: 540px) {
+  .pagination-nav {
+    display: block;
+  }
+
+  .pagination-nav .pagination-nav__item {
+    max-width: none;
+  }
+
+  .pagination-nav .pagination-nav__item + .pagination-nav__item {
+    margin-left: 0;
+    margin-top: var(--ifm-spacing-vertical);
+  }
+}

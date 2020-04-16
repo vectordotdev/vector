@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-14"
 title: Install Vector On Docker
 sidebar_label: Docker
 description: Install Vector on the Docker platform
@@ -346,4 +346,4 @@ Vector's Docker source files are located
 [urls.docker_debian]: https://hub.docker.com/_/debian
 [urls.docker_hub_vector]: https://hub.docker.com/r/timberio/vector
 [urls.vector_docker_source_files]: https://github.com/timberio/vector/tree/master/distribution/docker
-[urls.vector_releases]: https://vector.dev/releases/latest
+[urls.vector_releases]: https://vector.dev/releases/latest/

@@ -384,7 +384,7 @@ features, it is possible to use specific features from the list below:
 | `vendored`      | Forces vendoring of [OpenSSL][urls.openssl] and [ZLib][urls.zlib] dependencies instead of using their versions installed in the system. Requires `perl` as a build dependency.                                                 | <i className="feather icon-check"></i> |
 | `leveldb-plain` | Enables support for [disk buffers][docs.glossary#buffer] using vendored [LevelDB][urls.leveldb].                                                                                                                               | <i className="feather icon-check"></i> |
 | `leveldb-cmake` | The same as `leveldb-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `leveldb-plain`.                                                                          |                                        |
-| `rdkafka-plain` | Enables vendored [librdkafka][urls.lib_rdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka].                                                                 | <i className="feather icon-check"></i> |
+| `rdkafka-plain` | Enables vendored [librdkafka][urls.librdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka].                                                                 | <i className="feather icon-check"></i> |
 | `rdkafka-cmake` | The same as `rdkafka-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `rdkafka-plain`.                                                                          |                                        |
 
 In addition, it is possible to pick only a subset of Vector's components for
@@ -547,7 +547,7 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.tokenizer]: /docs/reference/transforms/tokenizer/
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc
 [urls.leveldb]: https://github.com/google/leveldb
-[urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
+[urls.librdkafka]: https://github.com/edenhill/librdkafka
 [urls.openssl]: https://www.openssl.org/
 [urls.perl_windows]: https://www.perl.org/get.html#win32
 [urls.rustup]: https://rustup.rs

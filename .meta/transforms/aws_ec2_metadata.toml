@@ -45,57 +45,57 @@ common = true
 default = "http://169.254.169.254"
 description = "Override the default EC2 Metadata host."
 
-[transforms.aws_ec2_metadata.output.log.fields.ami-id]
+[transforms.aws_ec2_metadata.fields.log.fields.ami-id]
 type = "string"
 examples = ["ami-00068cd7555f543d5"]
 description = "The `ami-id` that the current EC2 instance is using."
 
-[transforms.aws_ec2_metadata.output.log.fields.availability-zone]
+[transforms.aws_ec2_metadata.fields.log.fields.availability-zone]
 type = "string"
 examples = ["54.234.246.107"]
 description = "The `availability-zone` that the current EC2 instance is running in."
 
-[transforms.aws_ec2_metadata.output.log.fields.instance-id]
+[transforms.aws_ec2_metadata.fields.log.fields.instance-id]
 type = "string"
 examples = ["i-096fba6d03d36d262"]
 description = "The `instance-id` of the current EC2 instance."
 
-[transforms.aws_ec2_metadata.output.log.fields.local-hostname]
+[transforms.aws_ec2_metadata.fields.log.fields.local-hostname]
 type = "string"
 examples = ["ip-172-31-93-227.ec2.internal"]
 description = "The `local-hostname` of the current EC2 instance."
 
-[transforms.aws_ec2_metadata.output.log.fields.local-ipv4]
+[transforms.aws_ec2_metadata.fields.log.fields.local-ipv4]
 type = "string"
 examples = ["172.31.93.227"]
 description = "The `local-ipv4` of the current EC2 instance."
 
-[transforms.aws_ec2_metadata.output.log.fields.public-hostname]
+[transforms.aws_ec2_metadata.fields.log.fields.public-hostname]
 type = "string"
 examples = ["ec2-54-234-246-107.compute-1.amazonaws.com"]
 description = "The `public-hostname` of the current EC2 instance."
 
-[transforms.aws_ec2_metadata.output.log.fields.public-ipv4]
+[transforms.aws_ec2_metadata.fields.log.fields.public-ipv4]
 type = "string"
 examples = ["54.234.246.107"]
 description = "The `public-ipv4` of the current EC2 instance."
 
-[transforms.aws_ec2_metadata.output.log.fields.region]
+[transforms.aws_ec2_metadata.fields.log.fields.region]
 type = "string"
 examples = ["us-east-1"]
 description = "The `region` that the current EC2 instance is running in."
 
-[transforms.aws_ec2_metadata.output.log.fields.role-name]
+[transforms.aws_ec2_metadata.fields.log.fields.role-name]
 type = "string"
 examples = ["some_iam_role"]
 description = "The `role-name` that the current EC2 instance is using."
 
-[transforms.aws_ec2_metadata.output.log.fields.subnet-id]
+[transforms.aws_ec2_metadata.fields.log.fields.subnet-id]
 type = "string"
 examples = ["subnet-9d6713b9"]
 description = "The `subnet-id` of the current EC2 instance's default network interface."
 
-[transforms.aws_ec2_metadata.output.log.fields.vpc-id]
+[transforms.aws_ec2_metadata.fields.log.fields.vpc-id]
 type = "string"
 examples = ["vpc-a51da4dc"]
 description = "The `vpc-id` of the current EC2 instance's default network interface."

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-15"
 $schema: "/.meta/.schemas/guides.json"
 title: Deploying Vector
 description: How to deploy Vector to your target environment
@@ -171,7 +171,7 @@ sudo dpkg -i vector-amd64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"docker"}
+  sourceName={"journald"}
   sinkName={null} />
 
 </li>
@@ -217,7 +217,7 @@ sudo dpkg -i vector-arm64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"docker"}
+  sourceName={"journald"}
   sinkName={null} />
 
 </li>
@@ -263,7 +263,7 @@ sudo dpkg -i vector-armhf.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"docker"}
+  sourceName={"journald"}
   sinkName={null} />
 
 </li>
@@ -350,7 +350,7 @@ brew tap timberio/brew && brew install vector
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"docker"}
+  sourceName={"file"}
   sinkName={null} />
 
 </li>
@@ -403,7 +403,7 @@ brew services start vector
     <ConfigExample
       format="toml"
       path={"config\\vector.toml"}
-      sourceName={"docker"}
+      sourceName={"file"}
       sinkName={null} />
 
 5.  ### Start Vector
@@ -442,7 +442,7 @@ brew services start vector
     <ConfigExample
       format="toml"
       path={"/etc/vector/vector.toml"}
-      sourceName={"docker"}
+      sourceName={"journald"}
       sinkName={null} />
 
 3.  ### Start Vector
@@ -492,7 +492,7 @@ brew services start vector
     <ConfigExample
       format="toml"
       path={"/etc/vector/vector.toml"}
-      sourceName={"docker"}
+      sourceName={"journald"}
       sinkName={null} />
 
 4.  ### Start Vector
@@ -523,7 +523,7 @@ brew services start vector
     <ConfigExample
       format="toml"
       path={"/etc/vector/vector.toml"}
-      sourceName={"docker"}
+      sourceName={"journald"}
       sinkName={null} />
 
 4.  ### Start Vector
@@ -554,7 +554,7 @@ brew services start vector
     <ConfigExample
       format="toml"
       path={"/etc/vector/vector.toml"}
-      sourceName={"docker"}
+      sourceName={"journald"}
       sinkName={null} />
 
 4.  ### Start Vector
@@ -586,7 +586,7 @@ brew services start vector
 <ConfigExample
   format="toml"
   path={"vector.toml"}
-  sourceName={"docker"}
+  sourceName={"file"}
   sinkName={null} />
 
 </li>

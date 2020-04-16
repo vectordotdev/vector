@@ -122,10 +122,6 @@
   transform: translate(29px, 166px);
 }
 
-.diagram a:hover path {
-  fill: var(--ifm-color-primary) !important;
-}
-
 .diagram a circle {
   transition: all var(--ifm-transition-fast) ease;
 }

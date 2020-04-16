@@ -41,8 +41,7 @@ import TabItem from '@theme/TabItem';
   "tags": {
     "host": "my.host.com"
   },
-  "value": {
-    "type": "counter",
+  "counter": {
     "value": 24.2
   }
 }
@@ -59,8 +58,7 @@ import TabItem from '@theme/TabItem';
   "tags": {
     "host": "my.host.com"
   },
-  "value": {
-    "type": "gauge",
+  "gauge": {
     "value": 51200000000.0
   }
 }
@@ -77,8 +75,7 @@ import TabItem from '@theme/TabItem';
   "tags": {
     "host": "my.host.com"
   },
-  "value": {
-    "type": "set",
+  "set": {
     "values": ["bob", "sam", "ben"]
   }
 }
@@ -95,8 +92,7 @@ import TabItem from '@theme/TabItem';
   "tags": {
     "host": "my.host.com"
   },
-  "value": {
-    "type": "distribution",
+  "distribution": {
     "values": [2.21, 5.46, 10.22],
     "sample_rates": [5, 2, 5]
   }
@@ -114,8 +110,7 @@ import TabItem from '@theme/TabItem';
   "tags": {
     "host": "my.host.com"
   },
-  "value": {
-    "type": "aggregated_histogram",
+  "aggregated_histogram": {
     "buckets": [1.0, 2.0, 4.0, 8.0, 16.0, 32.0],
     "counts": [20, 10, 45, 12, 18, 92],
     "count": 197,
@@ -135,8 +130,7 @@ import TabItem from '@theme/TabItem';
   "tags": {
     "host": "my.host.com"
   },
-  "value": {
-    "type": "aggregated_summary",
+  "aggregated_summary": {
     "quantiles": [0.1, 0.25, 0.5, 0.9, 0.99, 1.0],
     "values": [2, 3, 5, 8, 9, 10],
     "count": 197,
@@ -150,8 +144,9 @@ import TabItem from '@theme/TabItem';
 
 ## Schema
 
-The metric data model is comprised of 6 types: `aggregated_histogram`, `aggregated_summary`, `counter`, `distribution`, `gauge`, `set`.
-You'll notice that certain fields are shared across all types.
+The metric data model is comprised of 6 types: `aggregated_histogram`,  `aggregated_summary`, `counter`, `distribution`, `gauge`, `set`. A metric event contains a map named after one of these types at the top level. This map contains corresponding numeric values.
+
+In addition, all kinds of metric events have the following top level fields: `name`, `timestamp`, `kind`, `tags`.
 
 <%= fields(metadata.data_model.metric.schema_list, heading_depth: 3) %>
 

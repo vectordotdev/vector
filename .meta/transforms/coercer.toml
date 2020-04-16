@@ -23,7 +23,7 @@ with other extraneous fields.\
 
 <%= render("_partials/fields/_types_options.toml", namespace: "transforms.coercer.options", common: true) %>
 
-[[transforms.coercer.output.log.examples]]
+[[transforms.coercer.examples]]
 label = "Generic"
 body = """\
 Given the following input:

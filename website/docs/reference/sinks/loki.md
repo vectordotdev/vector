@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-07"
 delivery_guarantee: "best_effort"
 component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
@@ -38,7 +38,6 @@ The Vector `loki` sink
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"
@@ -81,9 +80,9 @@ The Vector `loki` sink
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -131,6 +130,7 @@ The Vector `loki` sink
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### auth
@@ -153,6 +153,7 @@ Options for the authentication strategy.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### strategy
@@ -176,12 +177,13 @@ The authentication strategy to use.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### password
 
-The basic authentication password.If using GrafanaLab's hosted Loki then this
-must be setto your `instanceId`.
+The basic authentication password. If using GrafanaLab's hosted Loki then this
+must be set to your `instanceId`.
 
 
 
@@ -200,12 +202,13 @@ must be setto your `instanceId`.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### user
 
-The basic authentication user name.If using GrafanaLab's hosted Loki then this
-must be setto your Grafana.com api key.
+The basic authentication user name. If using GrafanaLab's hosted Loki then this
+must be set to your Grafana.com api key.
 
 
 
@@ -227,6 +230,7 @@ must be setto your Grafana.com api key.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -249,6 +253,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -272,6 +277,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -298,6 +304,7 @@ The maximum age of a batch before it is flushed.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### buffer
@@ -307,6 +314,30 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -320,6 +351,7 @@ Configures the sink specific buffer behavior.
   templateable={false}
   type={"int"}
   unit={"events"}
+  warnings={[]}
   >
 
 #### max_events
@@ -343,6 +375,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -350,29 +383,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 The maximum size of the buffer on the disk.
 
  See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
 
 
 </Field>
@@ -389,6 +399,7 @@ The buffer's type and storage mechanism.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### when_full
@@ -415,6 +426,7 @@ The behavior when the buffer becomes full.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### encoding
@@ -437,6 +449,7 @@ Configures the encoding specific sink behavior.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### codec
@@ -460,6 +473,7 @@ The encoding codec used to serialize the events before outputting.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### except_fields
@@ -483,6 +497,7 @@ Prevent the sink from encoding the specified labels.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### only_fields
@@ -506,6 +521,7 @@ Limit the sink to only encoding the specified labels.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_format
@@ -532,6 +548,7 @@ How to format event timestamps.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### endpoint
@@ -555,6 +572,7 @@ The endpoint used to ship logs to.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -563,58 +581,6 @@ Enables/disables the sink healthcheck upon start.
 
  See [Health Checks](#health-checks) for more info.
 
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"label":"value"}]}
-  groups={[]}
-  name={"labels"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### labels
-
-A set of labels that will be attached to each batch of events. These valuesare
-also templateable to allow events to provide dynamic label values.Note: If the
-set of label values has high cardinality this can cause drasticperformance
-issues with Loki. To ensure this does not happen one should tryto reduce the
-amount of unique label values.
-
-
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"key":"value"},{"key":"{{ event_field }}"}]}
-  groups={[]}
-  name={"`[label-name`"}
-  path={"labels"}
-  relevantWhen={null}
-  required={true}
-  templateable={true}
-  type={"string"}
-  unit={null}
-  >
-
-#### `[label-name`
-
-A key-value pair for labels.
-
-
-
-
-</Field>
-</Fields>
 
 </Field>
 <Field
@@ -630,6 +596,7 @@ A key-value pair for labels.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### remove_label_fields
@@ -654,15 +621,98 @@ fields will also get removed from the event.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### remove_timestamp
 
 If this is set to `true` then the timestamp will be removed from the event.
-This is useful because loki uses the timestamp to index the event.
+This is useful because Loki uses the timestamp to index the event.
 
 
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["some_tenant_id"]}
+  groups={[]}
+  name={"tenant_id"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### tenant_id
+
+The tenant id that will be sent with every request, by default this is not
+required since a proxy should set this header. When running Loki locally a
+tenant id is not required either.
+
+You can read more about tenant id's [here][urls.loki_multi_tenancy]
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"label":"value"}]}
+  groups={[]}
+  name={"labels"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### labels
+
+A set of labels that will be attached to each batch of events. These values are
+also templateable to allow events to provide dynamic label values.Note: If the
+set of label values has high cardinality this can cause drastic performance
+issues with Loki. To ensure this does not happen one should try to reduce the
+amount of unique label values.
+
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"key":"value"},{"key":"{{ event_field }}"}]}
+  groups={[]}
+  name={"`[label-name`"}
+  path={"labels"}
+  relevantWhen={null}
+  required={true}
+  templateable={true}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[label-name`
+
+A key-value pair for labels.
+
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -678,6 +728,7 @@ This is useful because loki uses the timestamp to index the event.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### request
@@ -700,6 +751,7 @@ Configures the sink request behavior.
   templateable={false}
   type={"int"}
   unit={"requests"}
+  warnings={[]}
   >
 
 #### in_flight_limit
@@ -723,6 +775,7 @@ The maximum number of in-flight requests allowed at any given time.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### rate_limit_duration_secs
@@ -746,6 +799,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### rate_limit_num
@@ -770,6 +824,7 @@ time window.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### retry_attempts
@@ -793,6 +848,7 @@ The maximum number of retries to make for failed requests.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_initial_backoff_secs
@@ -818,6 +874,7 @@ to select future backoffs.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_max_duration_secs
@@ -841,6 +898,7 @@ The maximum amount of time, in seconds, to wait between retries.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -861,33 +919,6 @@ duplicate data downstream.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["some_tenant_id"]}
-  groups={[]}
-  name={"tenant_id"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### tenant_id
-
-The tenant id that will be sent with every request, by default this is not
-required since a proxy should set this header. When running loki locally a
-tenant id is not required either.
-
-You can read more about tenant id's [here][urls.loki_multi_tenancy]
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={[]}
   groups={[]}
   name={"tls"}
@@ -897,6 +928,7 @@ You can read more about tenant id's [here][urls.loki_multi_tenancy]
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tls
@@ -919,6 +951,7 @@ Configures the TLS options for connections from this sink.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### ca_path
@@ -943,6 +976,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### crt_path
@@ -968,6 +1002,7 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_pass
@@ -992,6 +1027,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_path
@@ -1016,13 +1052,13 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be loaded and checked for validity, but the handshake will not attempt to verify the certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
-host. Do NOT set this to `false` unless you understand the risks of not
-verifying the remote certificate.
+host.
 
 
 
@@ -1041,6 +1077,7 @@ verifying the remote certificate.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### verify_hostname
@@ -1080,7 +1117,7 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 ### Decentralized Deployments
 
 Loki currently does not support out-of-order inserts. If Vector is deployed in
-a decentralized setup  then there is the possiblity that logs might get
+a decentralized setup then there is the possibility that logs might get
 rejected due to data races between Vector instances. To avoid this we suggest
 either assigning each Vector instance with a unique label or deploying a
 centralized Vector which will ensure no logs will get sent out-of-order.
@@ -1134,7 +1171,7 @@ any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][urls.new_loki_sink_issue].
+with the Vector team by [opening an issue][urls.new_loki_sink_issue].
 
 ### Retry Policy
 
@@ -1142,6 +1179,12 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
+
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
+options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
@@ -1152,3 +1195,4 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [urls.loki]: https://grafana.com/oss/loki/
 [urls.loki_multi_tenancy]: https://github.com/grafana/loki/blob/master/docs/operations/multi-tenancy.md
 [urls.new_loki_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+loki
+[urls.openssl]: https://www.openssl.org/
