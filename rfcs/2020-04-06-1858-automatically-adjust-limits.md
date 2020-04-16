@@ -79,12 +79,12 @@ The algorithm used to control the limit will follow the AIMD framework:
 * The current response's RTT is compared to this moving average:
 
   * If less than or equal to the average, the concurrency will be
-    incremented by one (additive increase) up to a maximum of the in
-    flight limit.
+    incremented by one (additive increase) once per RTT, up to a maximum
+    of the in flight limit.
 
   * If greater than the average, or the result was a failure of any
     kind, the concurrency will be reduced by a factor of one half
-    (multiplicative decrease) down to a minimum of one.
+    (multiplicative decrease) once per RTT, down to a minimum of one.
 
 ## Prior Art
 
