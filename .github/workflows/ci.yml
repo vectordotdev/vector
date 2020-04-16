@@ -65,7 +65,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           target: x86_64-unknown-linux-musl
-      - run: apt install -y musl musl-dev musl-tools
+      - run: sudo apt install -y musl musl-dev musl-tools
       - run: cargo test --all --no-default-features --features default-musl,docker --no-run --target $TARGET
       - run: |
           docker-compose pull
