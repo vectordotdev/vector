@@ -3,6 +3,7 @@
 [links.pages]
 aws_components = "/components/?providers%5B%5D=aws"
 blog = "/blog/"
+docs = "/docs/"
 guides = "/guides/"
 parse_transforms = "/components/?functions%5B%5D=parse"
 program_transforms = "/components/?functions%5B%5D=program"

@@ -115,7 +115,7 @@ package-rpm: ## Create a .rpm package from artifacts created via `build-archive`
 	@scripts/package-rpm.sh
 
 release-commit: ## Commits release changes
-	@scripts/release-commit.rb
+	@scripts/run.sh checker scripts/release-commit.rb
 
 release-docker: ## Release to Docker Hub
 	@scripts/release-docker.sh
@@ -128,12 +128,10 @@ release-homebrew: ## Release to timberio Homebrew tap
 	@scripts/release-homebrew.sh
 
 release-meta: ## Prepares the release metadata
-	@bundle install --gemfile=scripts/Gemfile --quiet
-	@scripts/release-meta.rb
+	@scripts/run.sh checker scripts/release-meta.rb
 
 release-rollback:
-	@bundle install --gemfile=scripts/Gemfile --quiet
-	@scripts/release-rollback.rb
+	@scripts/run.sh checker scripts/release-rollback.rb
 
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh

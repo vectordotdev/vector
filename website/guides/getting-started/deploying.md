@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-15"
+last_modified_on: "2020-04-16"
 $schema: "/.meta/.schemas/guides.json"
 title: Deploying Vector
 description: How to deploy Vector to your target environment
@@ -149,7 +149,7 @@ act of deploying Vector within your environment.
 ### Download the Vector `.deb` package
 
 ```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-amd64.deb
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-amd64.deb
 ```
 
 [Looking for a different version?][docs.package_managers.dpkg#versions]
@@ -195,7 +195,7 @@ sudo systemctl start vector
 ### Download the Vector `.deb` package
 
 ```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-arm64.deb
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-arm64.deb
 ```
 
 [Looking for a different version?][docs.package_managers.dpkg#versions]
@@ -241,7 +241,7 @@ sudo systemctl start vector
 ### Download the Vector `.deb` package
 
 ```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-armhf.deb
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-armhf.deb
 ```
 
 [Looking for a different version?][docs.package_managers.dpkg#versions]
@@ -381,7 +381,7 @@ brew services start vector
 1.  ### Download the Vector `.msi` file
 
     ```bat
-    powershell Invoke-WebRequest https://packages.timber.io/vector/0.8.X/vector-x64.msi -OutFile vector-x64.msi
+    powershell Invoke-WebRequest https://packages.timber.io/vector/0.9.X/vector-x64.msi -OutFile vector-x64.msi
     ```
 
     [Looking for a specific version?][docs.package_managers.msi#versions]
@@ -430,7 +430,7 @@ brew services start vector
     <CodeExplanation>
 
     * The `--file` flag ensures that you're installing the latest stable version
-      of Vector (0.8.2).
+      of Vector (0.9.0).
     * The `--attr` improves installation speed.
 
     </CodeExplanation>
@@ -476,7 +476,7 @@ brew services start vector
 1.  ### Download the Vector `.rpm` file
 
     ```bash
-    curl -O https://packages.timber.io/vector/0.8.X/vector-aarch64.rpm
+    curl -O https://packages.timber.io/vector/0.9.X/vector-aarch64.rpm
     ```
 
     [Looking for a specific version?][docs.package_managers.rpm#versions]
@@ -507,7 +507,7 @@ brew services start vector
 1.  ### Download the Vector `.rpm` file
 
     ```bash
-    curl -O https://packages.timber.io/vector/0.8.X/vector-armv7hl.rpm
+    curl -O https://packages.timber.io/vector/0.9.X/vector-armv7hl.rpm
     ```
 
     [Looking for a specific version?][docs.package_managers.rpm#versions]
@@ -538,7 +538,7 @@ brew services start vector
 1.  ### Download the Vector `.rpm` file
 
     ```bash
-    curl -O https://packages.timber.io/vector/0.8.X/vector-x86_64.rpm
+    curl -O https://packages.timber.io/vector/0.9.X/vector-x86_64.rpm
     ```
 
     [Looking for a specific version?][docs.package_managers.rpm#versions]

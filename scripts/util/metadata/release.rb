@@ -42,17 +42,16 @@ class Release
         if !@highlights.any? { |h| h.type?("breaking change") && h.pr_numbers.include?(commit.pr_number) }
           tags = ["type: breaking change"]
 
-          if commit.component_type
-            tags << "domain: #{commit.component_type.pluralize}"
-          end
-
-          if commit.component_type && commit.component_name
-            tags << "#{commit.component_type}: #{commit.component_name}"
+          commit.scopes.each do |scope|
+            if scope.component
+              tags << "domain: #{scope.component.type.pluralize}"
+              tags << "#{scope.component.type}: #{scope.component.name}"
+            end
           end
 
           raise ArgumentError.new(
             <<~EOF
-            Release #{@version} contains breaking commits without an breaking change!
+            Release #{@version} contains breaking commits without an upgrade guide!
 
               * Commiit #{commit.sha_short} - #{commit.description}
 
@@ -67,13 +66,26 @@ class Release
             title: "#{commit.description}"
             description: "<fill-in>"
             author_github: "https://github.com/binarylogic"
-            importance: "medium"
+            hide_on_release_notes: false
             pr_numbers: [#{commit.pr_number}]
             release: "#{@version}"
             tags: #{tags.to_json}
             ---
 
-            <fill-in>
+            Explain the change and the reasoning here.
+
+            ## Upgrade Guide
+
+            Make the following changes in your `vector.toml` file:
+
+            ```diff title="vector.toml"
+             [sinks.example]
+               type = "example"
+            -  remove = "me"
+            +  add = "me"
+            ```
+
+            That's it!
 
             EOF
           )

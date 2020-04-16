@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-16"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs to Honeycomb"
 description: "A simple guide to send logs to Honeycomb in just a few minutes."
@@ -101,7 +101,7 @@ To be clear, here's everything we'll accomplish in this short guide:
 ### Download the Vector `.deb` package
 
 ```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-amd64.deb
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-amd64.deb
 ```
 
 [Looking for a different version?][docs.package_managers.dpkg#versions]
@@ -147,7 +147,7 @@ sudo systemctl start vector
 ### Download the Vector `.deb` package
 
 ```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-arm64.deb
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-arm64.deb
 ```
 
 [Looking for a different version?][docs.package_managers.dpkg#versions]
@@ -193,7 +193,7 @@ sudo systemctl start vector
 ### Download the Vector `.deb` package
 
 ```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-armhf.deb
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-armhf.deb
 ```
 
 [Looking for a different version?][docs.package_managers.dpkg#versions]

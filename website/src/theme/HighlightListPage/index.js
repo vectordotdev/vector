@@ -19,6 +19,8 @@ function HighlightListPage(props) {
 
   let filteredItems = items;
 
+  fitleredItems = filteredItems.filter(item => !item.metadata.tags.includes("type: breaking change"));
+
   if (searchTerm) {
     filteredItems = filteredItems.filter(item => {
       let normalizedTerm = searchTerm.toLowerCase();

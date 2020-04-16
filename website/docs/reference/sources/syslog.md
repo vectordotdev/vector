@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-16"
 delivery_guarantee: "best_effort"
 component_title: "Syslog"
 description: "The Vector `syslog` source ingests data through the Syslog protocol and outputs `log` events."
