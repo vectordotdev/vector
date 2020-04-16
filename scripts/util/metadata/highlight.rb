@@ -16,7 +16,7 @@ class Highlight
     :title
 
   def initialize(path)
-    path_parts = path.split("-", 4)
+    path_parts = File.basename(path).split("-", 4)
 
     @date = Date.parse("#{path_parts.fetch(0)}-#{path_parts.fetch(1)}-#{path_parts.fetch(2)}")
     @path = Pathname.new(path).relative_path_from(ROOT_DIR).to_s
