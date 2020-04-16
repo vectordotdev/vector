@@ -58,7 +58,7 @@ jobs:
       TEST_LOG: debug
       AWS_ACCESS_KEY_ID: fake-aws-key
       AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-musl
+      TARGET: x86_64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v1
       - run: cargo test --all --no-run --target $TARGET
