@@ -15,7 +15,7 @@ import Jump from '@site/src/components/Jump';
 
 v2 of our [`lua` transform][docs.transforms.lua] has been released! This is a
 complete overhaul that provides a new and improved API, better data processing
-ergonomics, and better performance. Specific improvements include:
+ergonomics, and faster processing. Specific improvements include:
 
 1. Events are [represented as Lua tables][docs.transforms.lua#representation-of-events] with proper type conversion.
 2. Introduction of [hooks][docs.transforms.lua#hooks] to maintain global state.
@@ -45,6 +45,7 @@ Did you know we're also [working on a WASM integration][urls.pr_2006] 👀
 <Jump to="/docs/reference/transforms/lua/" leftIcon="book">Docs: Lua Transform</Jump>
 <Jump to="/guides/advanced/custom-aggregations-with-lua/" leftIcon="book-open">Guide: Custom aggregations with Lua</Jump>
 <Jump to="/guides/advanced/parsing-csv-logs-with-lua/" leftIcon="book-open">Guide: Parsing CSV logs with Lua</Jump>
+<Jump to="/guides/advanced/merge-multiline-logs-with-lua/" leftIcon="book-open">Guide: Merge multi-line logs with Lua</Jump>
 
 And for the curious:
 
