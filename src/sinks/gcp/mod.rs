@@ -41,13 +41,10 @@ impl GcpAuthConfig {
     pub fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpCredentials>> {
         let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
         let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
-        if self.api_key.is_none() && creds_path.is_none() {
-            Err(GcpError::MissingAuth.into())
-        } else {
-            Ok(match creds_path.as_ref() {
-                Some(path) => Some(GcpCredentials::new(path, scope)?),
-                None => None,
-            })
+        match (&creds_path, &self.api_key) {
+            (Some(path), _) => Ok(Some(GcpCredentials::new(path, scope)?)),
+            (None, Some(_)) => Ok(None),
+            (None, None) => Err(GcpError::MissingAuth.into()),
         }
     }
 }
