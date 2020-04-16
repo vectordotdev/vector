@@ -64,14 +64,12 @@ jobs:
       - run: sudo apt install -y docker-compose docker-io
       - run: cargo test --all --no-default-features --features default-musl,docker --no-run --target $TARGET
       - run: |
-        docker-compose pull
-        docker-compose up -d splunk
-        sleep 30 # Splunk crashes when started simultaneously with other services
-        docker-compose up -d test-runtime-deps
-        sleep 180
+          docker-compose pull
+          docker-compose up -d splunk
+          sleep 30 # Splunk crashes when started simultaneously with other services
+          docker-compose up -d test-runtime-deps
+          sleep 180
       - run: find ./target/$TARGET -maxdepth 2 -type f -executable -name '*-*' | sh -e
-
-
 
 ## Kubernetes
 # Build exectuables in parallel, and then tests on different Kubernetes versions in parallel.
