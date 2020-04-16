@@ -60,24 +60,16 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-musl
     steps:
-      - checkout
+      - uses: actions/checkout@v1
       - run: sudo apt install -y docker-compose docker-io
-      - run:
-          name: Build tests
-          command: |
-            cargo test --all --no-default-features --features default-musl,docker --no-run --target $TARGET
-      - run:
-          name: Start dependencies
-          command: |
-            docker-compose pull
-            docker-compose up -d splunk
-            sleep 30 # Splunk crashes when started simultaneously with other services
-            docker-compose up -d test-runtime-deps
-            sleep 180
-      - run:
-          name: Run tests
-          command: |
-            find ./target/$TARGET -maxdepth 2 -type f -executable -name '*-*' | sh -e
+      - run: cargo test --all --no-default-features --features default-musl,docker --no-run --target $TARGET
+      - run: |
+        docker-compose pull
+        docker-compose up -d splunk
+        sleep 30 # Splunk crashes when started simultaneously with other services
+        docker-compose up -d test-runtime-deps
+        sleep 180
+      - run: find ./target/$TARGET -maxdepth 2 -type f -executable -name '*-*' | sh -e
 
 
 ## Kubernetes
