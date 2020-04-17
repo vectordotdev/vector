@@ -25582,7 +25582,7 @@ module.exports = {
     },
     {
       "avatar": "https://github.com/hoverbear.png",
-      "bio": "Ana is a Senior Engineer at <a href=\"https://timber.io\">Timber.io</a> and member of the <a href=\"/community#team\">core Vector team</a>. She is actively invovled in the Rust community and contributing to project and organizing meetups.",
+      "bio": "Ana is the proprietor of <a href=\"https://hoverbear.org/\">Hoverbear Consulting</a>, and <a href=\"https://timber.io\">Timber.io</a> supports her work as a <a href=\"/community#team\">core Vector team</a> member. She is focused on building capacity within the Rust ecosystem and her local community. A frequent speaker, teacher, and mentor, she was a founding organizer of <a href=\"https://rustfest.eu/\">RustFest</a>, <a href=\"https://rustcon.asia/\">RustCon Asia</a>, and <a href=\"https://www.rust-belt-rust.com/\">Rust Belt Rust</a>.\n",
       "github": "https://github.com/hoverbear",
       "id": "ana",
       "keybase": "https://keybase.io/hoverbear",
