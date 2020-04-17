@@ -35,7 +35,7 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--warnings">
 
 * [Kafka][urls.kafka] version `>= 0.8` is required.
 
@@ -127,7 +127,7 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 
 ### librdkafka_options
 
-Advanced options. See [librdkafka documentation][urls.lib_rdkafka_config] for
+Advanced options. See [librdkafka documentation][urls.librdkafka_config] for
 details.
 
 
@@ -803,7 +803,7 @@ options.
 
 ### librdkafka
 
-The `kafka` sink uses [`lib_rdkafka`][urls.lib_rdkafka] under the hood. This
+The `kafka` sink uses [`librdkafka`][urls.librdkafka] under the hood. This
 is a battle tested, performant, and reliabile library that facilitates
 communication with Kafka. And because Vector produces static MUSL builds,
 this dependency is packaged with Vector, meaning you do not need to install it.
@@ -819,6 +819,6 @@ this dependency is packaged with Vector, meaning you do not need to install it.
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.kafka]: https://kafka.apache.org/
 [urls.kafka_protocol]: https://kafka.apache.org/protocol
-[urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
-[urls.lib_rdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+[urls.librdkafka]: https://github.com/edenhill/librdkafka
+[urls.librdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
 [urls.openssl]: https://www.openssl.org/

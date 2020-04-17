@@ -14,12 +14,3 @@
   font-size: 1em;
   margin-top: 1px;
 }
-
-.avatar.avatar--inline {
-  display: inline;
-}
-
-.avatar.avatar--inline .avatar__photo {
-  margin-right: 5px;
-  vertical-align: middle;
-}

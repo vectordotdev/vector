@@ -25,7 +25,7 @@
 }
 
 .vector-component {
-  background: var(--ifm-panel-background);
+  background-color: var(--ifm-panel-background-color);
   border: 1px solid var(--ifm-panel-border-color);
   border-radius: var(--ifm-global-radius);
   box-shadow: var(--ifm-panel-box-shadow);
@@ -36,7 +36,7 @@
 }
 
 .vector-component:hover {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-color-active);
   border-color: var(--ifm-panel-border-color-active);
   box-shadow: var(--ifm-panel-box-shadow-active);
   color: var(--ifm-panel-color-active);
@@ -79,7 +79,7 @@
   margin-top: 0.75em;
 }
 
-@media (min-width: 996px) {
+@media (min-width: 997px) {
   .vector-components {
     margin: 0;
   }
@@ -96,16 +96,16 @@
     padding-left: 0;
   }
 
-  .vector-components--cols .filters .search {
+  .vector-components--cols .filters > .search {
     margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
   }
 
-  .vector-components--cols .filter {
+  .vector-components--cols .filters > .filter {
     display: block;
     margin-bottom: var(--ifm-spacing-vertical);
   }
 
-  .vector-components--cols .filter--label {
+  .vector-components--cols .filters > .filter > .filter--label {
     border: 0px none;
     font-size: 0.9em;
     font-weight: bold;
@@ -115,12 +115,16 @@
     text-transform: uppercase;
   }
 
-  .vector-components--cols .filter--choices label {
+  .vector-components--cols .filters > .filter > .filter--choices {
+    padding-left: 0;
+  }
+
+  .vector-components--cols .filters > .filter > .filter--choices label {
     display: block;
     margin: 0;
   }
 
-  .vector-components--cols .filter--choices input[type="checkbox"] {
+  .vector-components--cols .filters > .filter > .filter--choices input[type="checkbox"] {
     margin-left: 0;
   }
 

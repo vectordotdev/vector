@@ -34,7 +34,7 @@ ingests data through [Kafka][urls.kafka] and outputs
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--warnings">
 
 * [Kafka][urls.kafka] version `>= 0.8` is required.
 
@@ -108,7 +108,7 @@ ingests data through [Kafka][urls.kafka] and outputs
 
 ### librdkafka_options
 
-Advanced options. See [librdkafka documentation][urls.lib_rdkafka_config] for
+Advanced options. See [librdkafka documentation][urls.librdkafka_config] for
 details.
 
 
@@ -160,7 +160,7 @@ The options and their values. Accepts `string` values.
 ### auto_offset_reset
 
 If offsets for consumer group do not exist, set them using this strategy.
-[librdkafka documentation][urls.lib_rdkafka_config] for `auto.offset.reset`
+[librdkafka documentation][urls.librdkafka_config] for `auto.offset.reset`
 option for explanation.
 
 
@@ -574,7 +574,7 @@ options.
 
 ### librdkafka
 
-The `kafka` source uses [`lib_rdkafka`][urls.lib_rdkafka] under the hood. This
+The `kafka` source uses [`librdkafka`][urls.librdkafka] under the hood. This
 is a battle tested, performant, and reliabile library that facilitates
 communication with Kafka. And because Vector produces static MUSL builds,
 this dependency is packaged with Vector, meaning you do not need to install it.
@@ -583,6 +583,6 @@ this dependency is packaged with Vector, meaning you do not need to install it.
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [urls.kafka]: https://kafka.apache.org/
-[urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
-[urls.lib_rdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+[urls.librdkafka]: https://github.com/edenhill/librdkafka
+[urls.librdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
 [urls.openssl]: https://www.openssl.org/

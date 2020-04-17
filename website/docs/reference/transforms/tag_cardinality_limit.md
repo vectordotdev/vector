@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-11"
 component_title: "Tag Cardinality Limit"
 description: "The Vector `tag_cardinality_limit` transform accepts and outputs `metric` events allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
 event_types: ["metric"]
@@ -323,4 +323,4 @@ for more info.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.metric]: /docs/about/data-model/metric/
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

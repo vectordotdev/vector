@@ -49,7 +49,7 @@ use string_cache::DefaultAtom as Atom;
 pub struct EncodingConfig<E> {
     pub(crate) codec: E,
     #[serde(default)]
-    pub(crate) only_fields: Option<Vec<Atom>>,
+    pub(crate) only_fields: Option<Vec<String>>,
     #[serde(default)]
     pub(crate) except_fields: Option<Vec<Atom>>,
     #[serde(default)]
@@ -60,7 +60,7 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
     fn codec(&self) -> &E {
         &self.codec
     }
-    fn only_fields(&self) -> &Option<Vec<Atom>> {
+    fn only_fields(&self) -> &Option<Vec<String>> {
         &self.only_fields
     }
     fn except_fields(&self) -> &Option<Vec<Atom>> {
@@ -89,7 +89,7 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(crate) only_fields: Option<Vec<Atom>>,
+    pub(crate) only_fields: Option<Vec<String>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
     #[serde(
         default,
@@ -108,7 +108,7 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
     fn codec(&self) -> &E {
         &self.codec
     }
-    fn only_fields(&self) -> &Option<Vec<Atom>> {
+    fn only_fields(&self) -> &Option<Vec<String>> {
         &self.only_fields
     }
     fn except_fields(&self) -> &Option<Vec<Atom>> {
@@ -146,7 +146,7 @@ pub trait EncodingConfiguration<E> {
     // Required Accessors
 
     fn codec(&self) -> &E;
-    fn only_fields(&self) -> &Option<Vec<Atom>>;
+    fn only_fields(&self) -> &Option<Vec<String>>;
     fn except_fields(&self) -> &Option<Vec<Atom>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
@@ -159,7 +159,7 @@ pub trait EncodingConfiguration<E> {
                         .filter(|f| !only_fields.contains(f))
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
-                        log_event.remove(&removal);
+                        log_event.remove(&Atom::from(removal));
                     }
                 }
                 Event::Metric(_) => {
@@ -215,7 +215,10 @@ pub trait EncodingConfiguration<E> {
         if let (Some(only_fields), Some(except_fields)) =
             (&self.only_fields(), &self.except_fields())
         {
-            if only_fields.iter().any(|f| except_fields.contains(f)) {
+            if only_fields
+                .iter()
+                .any(|f| except_fields.contains(&Atom::from(f.as_str())))
+            {
                 Err("`except_fields` and `only_fields` should be mutually exclusive.")?;
             }
         }
@@ -266,7 +269,7 @@ impl<E: Default + PartialEq> From<E> for EncodingConfigWithDefault<E> {
 struct Inner<E> {
     pub(crate) codec: E,
     #[serde(default)]
-    pub(crate) only_fields: Option<Vec<Atom>>,
+    pub(crate) only_fields: Option<Vec<String>>,
     #[serde(default)]
     pub(crate) except_fields: Option<Vec<Atom>>,
     #[serde(default)]
@@ -278,7 +281,7 @@ struct InnerWithDefault<E: Default> {
     #[serde(default)]
     pub(crate) codec: E,
     #[serde(default)]
-    pub(crate) only_fields: Option<Vec<Atom>>,
+    pub(crate) only_fields: Option<Vec<String>>,
     #[serde(default)]
     pub(crate) except_fields: Option<Vec<Atom>>,
     #[serde(default)]

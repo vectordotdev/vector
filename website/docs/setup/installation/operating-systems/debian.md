@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-14"
 title: Install Vector On Debian
 sidebar_label: Debian
 description: Install Vector on the Debian operating system

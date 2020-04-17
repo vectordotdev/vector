@@ -10,13 +10,11 @@
 #
 #   $FEATURES - a list of Vector features to include when building, defaults to all
 #   $NATIVE_BUILD - whether to pass the --target flag when building via cargo
-#   $RUST_LTO - possible values are "lto", "lto=thin", ""
 #   $STRIP - whether or not to strip the binary
 #   $TARGET - a target triple. ex: x86_64-apple-darwin
 #   $ARCHIVE_TYPE - archive type, either "tar.gz" or "zip"
 
 NATIVE_BUILD=${NATIVE_BUILD:-}
-RUST_LTO=${RUST_LTO:-}
 STRIP=${STRIP:-}
 FEATURES=${FEATURES:-}
 ARCHIVE_TYPE=${ARCHIVE_TYPE:-tar.gz}
@@ -57,22 +55,6 @@ if [ -z "$NATIVE_BUILD" ]; then
 fi
 
 on_exit=""
-
-# Currently the only way to set Rust codegen LTO type (-C lto, as opposed to
-# -C compiler-plugin-lto) at build time for a crate with library dependencies
-# is to patch Cargo.toml before the build. See
-# https://github.com/rust-lang/cargo/issues/4349 and
-# https://bugzilla.mozilla.org/show_bug.cgi?id=1386371#c2.
-if [ -n "$RUST_LTO" ]; then
-  on_exit="mv Cargo.toml.orig Cargo.toml; $on_exit"
-  trap "$on_exit" EXIT
-  cp Cargo.toml Cargo.toml.orig
-  case "$RUST_LTO" in
-    lto) lto_value="true";;
-    lto=thin) lto_value="\"thin\"";;
-  esac
-  printf "[profile.release]\nlto = $lto_value" >> Cargo.toml
-fi
 
 if [ "$FEATURES" != "default" ]; then
     cargo build $build_flags --no-default-features --features "$FEATURES"

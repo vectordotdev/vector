@@ -1,13 +1,14 @@
 mod interop;
-mod scripted_transform;
 
 use crate::{
     config_paths::CONFIG_PATHS,
     event::Event,
     topology::config::{DataType, TransformContext},
-    transforms::Transform,
+    transforms::{
+        util::runtime_transform::{RuntimeTransform, Timer},
+        Transform,
+    },
 };
-use scripted_transform::{ScriptedRuntime, Timer};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::path::PathBuf;
@@ -239,7 +240,7 @@ where
     })
 }
 
-impl ScriptedRuntime for Lua {
+impl RuntimeTransform for Lua {
     fn hook_process<F>(self: &mut Self, event: Event, emit_fn: F)
     where
         F: FnMut(Event) -> (),

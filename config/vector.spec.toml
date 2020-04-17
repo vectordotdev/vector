@@ -9,7 +9,7 @@
 # ------------------------------------------------------------------------------
 # Website: https://vector.dev
 # Docs: https://vector.dev/docs/
-# Community: https://vector.dev/community
+# Community: https://vector.dev/community/
 # ------------------------------------------------------------------------------
 # The file contains a full specification for the `vector.toml` configuration
 # file. It follows the TOML format and includes all options, types, and
@@ -79,16 +79,6 @@ dns_servers = ["0.0.0.0:53"]
   message_key = "message"
   message_key = "@message"
   message_key = "msg"
-
-  # The key used to hold the log source. See the log data model page for more
-  # info.
-  #
-  # * optional
-  # * default: "source"
-  # * type: string
-  source_key = "source"
-  source_key = "@source"
-  source_key = "src"
 
   # The key used to hold the log source type. See the log data model page for
   # more info.
@@ -5032,7 +5022,12 @@ require('custom_module')
   # authenticate access to the Cloud Storage API. If this is unset, Vector checks
   # the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
   #
-  # * required
+  # If no filename is named, Vector will attempt to fetch an instance service
+  # account for the compute instance the program is running on. If Vector is not
+  # running on a GCE instance, you must define a credentials file as above.
+  #
+  # * optional
+  # * no default
   # * type: string
   credentials_path = "/path/to/credentials.json"
 
@@ -5146,10 +5141,11 @@ require('custom_module')
   #
 
   # Predefined ACL to apply to the created objects. For more information, see
-  # Predefined ACLs.
+  # Predefined ACLs. If this is not set, GCS will apply a default ACL when the
+  # object is created.
   #
   # * optional
-  # * default: "projectPrivate"
+  # * no default
   # * type: string
   # * enum: "authenticatedRead", "bucketOwnerFullControl", "bucketOwnerRead", "private", "projectPrivate", and "publicRead"
   acl = "authenticatedRead"
@@ -5374,6 +5370,10 @@ require('custom_module')
   # authenticate access to the pubsub project and topic. If this is unset, Vector
   # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
   # filename.
+  #
+  # If no filename is named, Vector will attempt to fetch an instance service
+  # account for the compute instance the program is running on. If Vector is not
+  # running on a GCE instance, you must define a credentials file as above.
   #
   # * optional
   # * no default
@@ -5647,7 +5647,12 @@ require('custom_module')
   # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
   # filename.
   #
-  # * required
+  # If no filename is named, Vector will attempt to fetch an instance service
+  # account for the compute instance the program is running on. If Vector is not
+  # running on a GCE instance, you must define a credentials file as above.
+  #
+  # * optional
+  # * no default
   # * type: string
   credentials_path = "/path/to/credentials.json"
 

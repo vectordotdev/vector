@@ -60,7 +60,7 @@ examples = ["smallest", "earliest", "beginning", "largest", "latest", "end", "er
 default = "largest"
 description = """\
 If offsets for consumer group do not exist, set them using this strategy. \
-[librdkafka documentation][urls.lib_rdkafka_config] for `auto.offset.reset` \
+[librdkafka documentation][urls.librdkafka_config] for `auto.offset.reset` \
 option for explanation.\
 """
 

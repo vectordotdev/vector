@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-11"
 component_title: "Sampler"
 description: "The Vector `sampler` transform accepts and outputs `log` events allowing you to sample events with a configurable rate."
 event_types: ["log"]
@@ -162,4 +162,4 @@ You can learn more in the
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.global-options#message_key]: /docs/reference/global-options/#message_key
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

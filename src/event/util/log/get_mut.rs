@@ -1,8 +1,8 @@
-use super::{Atom, PathComponent, PathIter, Value};
+use super::{PathComponent, PathIter, Value};
 use std::collections::BTreeMap;
 
 /// Returns a mutable reference to field value specified by the given path.
-pub fn get_mut<'a>(fields: &'a mut BTreeMap<Atom, Value>, path: &str) -> Option<&'a mut Value> {
+pub fn get_mut<'a>(fields: &'a mut BTreeMap<String, Value>, path: &str) -> Option<&'a mut Value> {
     let mut path_iter = PathIter::new(path);
 
     match path_iter.next() {

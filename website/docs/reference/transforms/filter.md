@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-08"
+last_modified_on: "2020-04-11"
 component_title: "Filter"
 description: "The Vector `filter` transform accepts and outputs `log` and `metric` events allowing you to select events based on a set of logical conditions."
 event_types: ["log","metric"]
@@ -346,4 +346,4 @@ You can learn more in the
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

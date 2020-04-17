@@ -57,15 +57,6 @@ default = "kubernetes"
 examples = ["kubernetes", "kube", "k8s"]
 description = "The key under which Kubernetes related fields are nested."
 
-[options.log_schema.children.source_key]
-type = "string"
-default = "source"
-examples = ["source", "@source", "src"]
-description = """\
-The key used to hold the log source. See the \
-[log data model page][docs.data-model.log#source] for more info.\
-"""
-
 [options.log_schema.children.source_type_key]
 type = "string"
 default = "source_type"
