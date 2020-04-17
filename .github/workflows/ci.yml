@@ -158,6 +158,7 @@ jobs:
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
       FEATURES: docker-integration-tests
+      DOCKER_HOST: localhost:2375
     steps:
       - uses: actions/checkout@v1
       - name: Cache cargo registry
@@ -329,13 +330,6 @@ jobs:
 
   pulsar-integration-tests:
     runs-on: ubuntu-latest
-    services:
-      splunk:
-        image: timberio/splunk-hec-test:latest
-        ports:
-          - "8088:8088"
-          - "8000:8000"
-          - "8089:8089"
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
