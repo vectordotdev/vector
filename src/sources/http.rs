@@ -71,14 +71,14 @@ impl SourceConfig for SimpleHttpConfig {
         &self,
         _: &str,
         _: &GlobalOptions,
-        _shutdown: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let source = SimpleHttpSource {
             encoding: self.encoding,
             headers: self.headers.clone(),
         };
-        source.run(self.address, "", &self.tls, out)
+        source.run(self.address, "", &self.tls, out, shutdown)
     }
 
     fn output_type(&self) -> DataType {

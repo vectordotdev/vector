@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-12"
 title: Environment Variables
 description: "A full list of Vector's supported environment variables and how to use them."
 sidebar_label: Env Vars
@@ -269,5 +269,5 @@ variable example.
 [docs.monitoring#levels]: /docs/administration/monitoring/#levels
 [docs.process-management#reloading]: /docs/administration/process-management/#reloading
 [docs.process-management#starting]: /docs/administration/process-management/#starting
-[pages.aws_components]: /components?providers%5B%5D=aws/
+[pages.aws_components]: /components/?providers%5B%5D=aws/
 [urls.kubernetes_limit_resources]: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-16"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Splunk HEC to Loki"
 description: "A simple guide to send logs from Splunk HEC to Loki in just a few minutes."
@@ -57,7 +57,7 @@ we'll be deploying Vector as a
 [service][docs.strategies#service].
 
 The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
+separate service. It is designed to receive data from an upstream source and
 fan-out to one or more destinations.
 For this guide, Vector will receive data from
 Splunk HEC via Vector's

@@ -46,7 +46,7 @@
 }
 
 .indexAnnouncement:hover {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-color-active);
   text-decoration: none;
 }
 
@@ -226,7 +226,7 @@ html[data-theme="dark"] .hero {
   }
 
   .components ul li a {
-    background: var(--ifm-panel-background);
+    background-color: var(--ifm-panel-background-color);
     border: 1px solid var(--ifm-panel-border-color);
     border-radius: 0.25em;
     box-shadow: var(--ifm-panel-box-shadow);
@@ -242,7 +242,7 @@ html[data-theme="dark"] .hero {
   }
 
   .components ul li a:hover {
-    background: var(--ifm-panel-background-active);
+    background: var(--ifm-panel-background-color-active);
     border-color: var(--ifm-panel-border-color-active);
     box-shadow: var(--ifm-panel-box-shadow-active);
     color: var(--ifm-panel-color-active);

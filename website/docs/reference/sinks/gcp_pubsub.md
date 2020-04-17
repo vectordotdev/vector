@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-16"
 delivery_guarantee: "best_effort"
 component_title: "GCP PubSub"
 description: "The Vector `gcp_pubsub` sink batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface."
@@ -442,6 +442,10 @@ The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the pubsub project and topic. If this is unset, Vector
 checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
 filename.
+
+If no filename is named, Vector will attempt to fetch an instance service
+account for the compute instance the program is running on. If Vector is not
+running on a GCE instance, you must define a credentials file as above.
 
 
 

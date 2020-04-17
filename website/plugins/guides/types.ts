@@ -1,8 +1,6 @@
 export interface GuideContent {
   guides: Guide[];
-  guideListPaginated: GuidePaginated[];
   guideTags: GuideTags;
-  guideTagsListPath: string | null;
   guideCategories: GuideCategory[];
 }
 
@@ -40,21 +38,6 @@ export interface GuideTag {
 export interface Guide {
   id: string;
   metadata: MetaData;
-}
-
-export interface GuidePaginatedMetadata {
-  permalink: string;
-  page: number;
-  guidesPerPage: number;
-  totalPages: number;
-  totalCount: number;
-  previousPage: string | null;
-  nextPage: string | null;
-}
-
-export interface GuidePaginated {
-  metadata: GuidePaginatedMetadata;
-  items: string[];
 }
 
 export interface MetaData {

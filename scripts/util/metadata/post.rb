@@ -24,7 +24,7 @@ class Post
     @author_github = front_matter.fetch("author_github")
     @description = parsed.content.split("\n\n").first.remove_markdown_links
     @id = front_matter.fetch("id")
-    @permalink = "#{BLOG_HOST}/#{id}"
+    @permalink = "#{POSTS_BASE_PATH}/#{id}/"
     @tags = front_matter.fetch("tags")
     @title = front_matter.fetch("title")
   end

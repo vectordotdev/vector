@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-11"
 component_title: "Split"
 description: "The Vector `split` transform accepts and outputs `log` events allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
 event_types: ["log"]
@@ -298,7 +298,7 @@ You can learn more in the
 ### Field Notation Syntax
 
 The [`field`](#field) and [`field_names`](#field_names) options
-support [Vector's field notiation syntax][docs.reference.field-path-notation],
+support [Vector's field notation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
 ```toml title="vector.toml"
@@ -360,4 +360,4 @@ common formats:
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers
 [urls.unicode_whitespace]: https://en.wikipedia.org/wiki/Unicode_character_property#Whitespace
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

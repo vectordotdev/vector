@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    event::{self, Event},
+    event::{self, Event, PathComponent, PathIter},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -65,7 +65,7 @@ impl TransformConfig for TokenizerConfig {
 }
 
 pub struct Tokenizer {
-    field_names: Vec<(Atom, Conversion)>,
+    field_names: Vec<(String, Vec<PathComponent>, Conversion)>,
     field: Atom,
     drop_field: bool,
 }
@@ -81,7 +81,8 @@ impl Tokenizer {
             .into_iter()
             .map(|name| {
                 let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
-                (name, conversion)
+                let path: Vec<PathComponent> = PathIter::new(&name).collect();
+                (name.to_string(), path, conversion)
             })
             .collect();
 
@@ -98,16 +99,17 @@ impl Transform for Tokenizer {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
-            for ((name, conversion), value) in self.field_names.iter().zip(parse(value).into_iter())
+            for ((name, path, conversion), value) in
+                self.field_names.iter().zip(parse(value).into_iter())
             {
                 match conversion.convert(value.as_bytes().into()) {
                     Ok(value) => {
-                        event.as_mut_log().insert(name.clone(), value);
+                        event.as_mut_log().insert_path(path.clone(), value);
                     }
                     Err(error) => {
                         debug!(
                             message = "Could not convert types.",
-                            name = &name[..],
+                            path = &name[..],
                             %error,
                             rate_limit_secs = 30
                         );

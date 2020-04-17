@@ -1,5 +1,6 @@
 [releases."0.6.0"]
-date = 2019-12-09
+date = 2019-12-12
+codename = "The Long Stretch"
 commits = [
 {sha = "15b44d04a06c91d5e0d1017b251c32ac165f2bd6", message = "chore(operations): Push docker images so that `latest` tags are last", author = "Ben Johnson", date = 2019-10-10T15:01:52Z, files_count = 1, insertions_count = 1, deletions_count = 1},
 {sha = "4bc7696077e691f59811e8b1e078f1b029fe63a6", message = "chore(operations): Print grease command output", author = "Ben Johnson", date = 2019-10-10T15:19:21Z, files_count = 1, insertions_count = 1, deletions_count = 1},
@@ -156,7 +157,7 @@ commits = [
 {sha = "a9fbcb3ddbb3303f981257be064a995db59b7dbb", message = "feat(cli): Add `test` sub-command (#1220)", author = "Ashley Jeffs", date = 2019-11-25T21:56:15Z, files_count = 38, insertions_count = 2446, deletions_count = 79},
 {sha = "3e92c1eac7a44b0661f25b452a112e5024edf7b3", message = "docs: Re-generate unit test spec", author = "Ashley Jeffs", date = 2019-11-25T22:43:40Z, files_count = 1, insertions_count = 8},
 {sha = "a282db6df013b89d84694e68ecde38c4d544c1ba", message = "chore(website): Add hash links to all headings", author = "Ben Johnson", date = 2019-11-25T19:44:24Z, files_count = 2, insertions_count = 20, deletions_count = 8},
-{sha = "aed6f1bf1cb0d3d10b360e16bd118665a49c4ea5", message = "enhancement(metric data model)!: Reorganise metric model (#1217)", author = "Alexey Suslov", date = 2019-11-26T12:24:33Z, files_count = 16, insertions_count = 1389, deletions_count = 1036},
+{sha = "aed6f1bf1cb0d3d10b360e16bd118665a49c4ea5", message = "enhancement(metric data model): Reorganise metric model (#1217)", author = "Alexey Suslov", date = 2019-11-26T12:24:33Z, files_count = 16, insertions_count = 1389, deletions_count = 1036},
 {sha = "df3e70980bfc9f6cde60516df482949fd0bc592b", message = "docs: Turn \"executable\" bit off for some of docs files", author = "Alexander Rodin", date = 2019-11-26T15:24:00Z, files_count = 21, insertions_count = 0, deletions_count = 0},
 {sha = "f20fc4ad3ea88d112d84be58eb51b4a5e85df21f", message = "enhancement(docker source): Enrich events with metadata (#1149)", author = "Kruno Tomola Fabro", date = 2019-11-26T16:35:36Z, files_count = 39, insertions_count = 505, deletions_count = 298},
 {sha = "f5cfdfe2fb25703ea308992c3d106b5c4b3b7af1", message = "docs: Testing documentation touchups", author = "Ben Johnson", date = 2019-11-26T11:01:48Z, files_count = 4, insertions_count = 718, deletions_count = 2},
@@ -248,43 +249,3 @@ commits = [
 {sha = "779d727fb49c907d6babbd8ed48e0db2cec14604", message = "chore(operations): Compress release archives with `gzip -9` (#1294)", author = "Alexander Rodin", date = 2019-12-12T16:53:31Z, files_count = 1, insertions_count = 1, deletions_count = 1},
 {sha = "f8ad1b5a0edcf214865e4ba1133b3a0df1465905", message = "chore(operations): Add notices for OpenSSL to the license for binary distributions (#1351)", author = "Alexander Rodin", date = 2019-12-12T19:11:22Z, files_count = 4, insertions_count = 22, deletions_count = 1}
 ]
-
-[[releases."0.6.0".upgrade_guides]]
-id = "encoding-guide"
-commits = []
-title = "The `file` and `console` sinks now require `encoding`"
-body = """\
-<p>
-The `file` and `console` sinks now require an explicit `encoding` option. The \
-previous implicit nature was confusing and this should eliminate any suprises \
-related to the output encoding format. Migration is easy:
-</p>
-
-<pre>
- [sinks.my_console_sink]
-   type = "console"
-+  encoding = "json" # or "text"
-
-
- [sinks.my_file_sink]
-   type = "file"
-+  encoding = "json" # or "text"
-</pre>
-"""
-
-[[releases."0.6.0".upgrade_guides]]
-id = "datadog-guide"
-commits = []
-title = "The `datadog` sink has been renamed to `datadog_metrics`"
-body = """\
-<p>
-The `datadog` sink was incorrectly named since we'll be adding future support \
-for DataDog logs. Migrating is as simple as renaming your sink:
-</p>
-
-<pre>
- [sinks.my_sink]
--  type = "datadog"
-+  type = "datadog_metrics"
-</pre>
-"""

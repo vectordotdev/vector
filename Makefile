@@ -108,10 +108,10 @@ build-ci-docker-images: ## Build the various Docker images used for CI
 build-docker: ## Build the Vector docker images from artifacts created via `package-deb`, but do not push
 	@scripts/build-docker.sh
 
-package-deb: ## Create a .deb package from artifacts created via `build`
+package-deb: ## Create a .deb package from artifacts created via `build-archive`
 	@scripts/package-deb.sh
 
-package-rpm: ## Create a .rpm package from artifacts created via `build`
+package-rpm: ## Create a .rpm package from artifacts created via `build-archive`
 	@scripts/package-rpm.sh
 
 release-commit: ## Commits release changes

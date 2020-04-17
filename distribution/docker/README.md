@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev">Website<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Community<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://github.com/timberio/vector">Github<a/>
+    <a href="https://vector.dev">Website<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Community<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://github.com/timberio/vector">Github<a/>
   </strong>
 </p>
 
@@ -124,5 +124,5 @@ Vector's Docker source files are located
 [urls.docker_debian]: https://hub.docker.com/_/debian
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_docker_source_files]: https://github.com/timberio/vector/tree/master/distribution/docker
-[urls.vector_releases]: https://vector.dev/releases/latest
+[urls.vector_releases]: https://vector.dev/releases/latest/
 [urls.vector_repo]: https://github.com/timberio/vector

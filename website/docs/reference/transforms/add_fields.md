@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-11"
 component_title: "Add Fields"
 description: "The Vector `add_fields` transform accepts and outputs `log` events allowing you to add one or more log fields."
 event_types: ["log"]
@@ -201,4 +201,4 @@ and special types, such as [arrays](#arrays) and
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.configuration#types]: /docs/setup/configuration/#types
 [docs.data-model.log]: /docs/about/data-model/log/
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

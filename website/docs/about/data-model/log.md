@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-11"
 title: Log Event
 description: A detailed guide on Vector's internal log data model.
 ---
@@ -139,36 +139,6 @@ Represents the log message. Change this field name via the [global
 source-level `message_key` option for relevant sources.
 
  See [Changing The Default Schema](#changing-the-default-schema) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/var/log/myapp/logfile.log","197.23.0.8","/api/v1/pods/some-name"]}
-  groups={[]}
-  name={"source"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### source
-
-The source from which the log originated. This is a specific source that is
-chosen and set by each [Vector source][docs.sources]. For example, this the
-[`file` source][docs.sources.file] sets this to the file name, and the
-[`docker` source][docs.sources.docker] sets this to the container name. Change
-this field name via the [global `source_key`
-option][docs.reference.global-options#source_key] or the source-level
-`source_key` option for relevant sources.
-
-
 
 
 </Field>
@@ -357,11 +327,8 @@ Array fields are sequences of values of any type.
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.reference.global-options#message_key]: /docs/reference/global-options/#message_key
-[docs.reference.global-options#source_key]: /docs/reference/global-options/#source_key
 [docs.reference.global-options#source_type_key]: /docs/reference/global-options/#source_type_key
 [docs.reference.transforms.rename_fields]: /docs/reference/transforms/rename_fields/
-[docs.sources.docker]: /docs/reference/sources/docker/
-[docs.sources.file]: /docs/reference/sources/file/
 [docs.sources]: /docs/reference/sources/
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [urls.ieee_754]: https://en.wikipedia.org/wiki/IEEE_754

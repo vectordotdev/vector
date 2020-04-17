@@ -22,8 +22,8 @@ scopes:
   <%- end -%>
 
   # platforms
-  <%- metadata.platforms.each do |platform|  -%>
-  - <%= platform.name.downcase %> platform
+  <%- metadata.platform_names.each do |platform|  -%>
+  - <%= platform.downcase %> platform
   <%- end -%>
 
   # providers
