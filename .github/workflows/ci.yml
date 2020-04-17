@@ -156,7 +156,8 @@ jobs:
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
       FEATURES: docker-integration-tests
-      DOCKER_HOST: http://127.0.0.1:2375
+      DOCKER_HOST: tcp:/127.0.0.1:2376
+      DOCKER_TLS_VERIFY: 0
     steps:
       - uses: actions/checkout@v1
       - name: Cache cargo registry
