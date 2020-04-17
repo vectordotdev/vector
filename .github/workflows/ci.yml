@@ -235,7 +235,7 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo test -no-default-features --features $FEATURES
+      - run: cargo test --no-default-features --features $FEATURES
 
   kafka-integration-tests:
     runs-on: ubuntu-latest
