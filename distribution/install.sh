@@ -163,9 +163,8 @@ install_from_archive() {
 
     if [ "$modify_path" = "yes" ]; then
       local _path="export PATH=\"\$HOME/.vector/bin:\$PATH\""
-      add_to_path "${HOME}/.profile" "${_path}"
       add_to_path "${HOME}/.zprofile" "${_path}"
-      eval "${_path}"
+      add_to_path "${HOME}/.profile" "${_path}"
       printf " ✓\n"
     fi
 
@@ -187,8 +186,12 @@ install_from_archive() {
 add_to_path() {
   local file="$1"
   local new_path="$2"
-  if [[ -f "$file" ]]; then
-    printf "${_prompt} Adding Vector path to ${file}"
+
+  printf "${_prompt} Adding Vector path to ${file}"
+
+  if [ ! -f "$file" ]; then
+    echo "${new_path}" >> "${file}"
+  else
     grep -qxF "${new_path}" "${file}" || echo "${new_path}" >> "${file}"
   fi
 }
