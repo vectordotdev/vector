@@ -4,6 +4,8 @@ on:
     branches:
     - master
   pull_request: {}
+
+
 jobs:
   cargo-deny:
     runs-on: ubuntu-latest
@@ -107,6 +109,154 @@ jobs:
           docker-compose up -d test-runtime-deps
           sleep 180
       - run: find ./target/$TARGET -maxdepth 2 -type f -executable -name '*-*' | sh -e
+
+  clickhouse-integration-tests:
+    runs-on: ubuntu-latest
+    services:
+      clickhouse:
+        image: yandex/clickhouse-server:19
+        ports:
+          - "8123:8123"
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: clickhouse-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: cargo test --features $FEATURES
+
+  cloudwatch-logs-integration-tests:
+    runs-on: ubuntu-latest
+    services:
+      localstack:
+        image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+        ports:
+          - "4568:4568"
+          - "4582:4582"
+          - "4571:4571"
+          - "4573:4573"
+        environment:
+          SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571,firehose:4573
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: cloudwatch-logs-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: cargo test --features $FEATURES
+
+  cloudwatch-metrics-integration-tests:
+    runs-on: ubuntu-latest
+    services:
+      localstack:
+        image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+        ports:
+          - "4568:4568"
+          - "4582:4582"
+          - "4571:4571"
+          - "4573:4573"
+        environment:
+          SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571,firehose:4573
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: cloudwatch-metrics-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: cargo test --features $FEATURES-
+
+  docker-integration-tests:
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: docker-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: cargo test --features $FEATURES
+
+  ec2-metadata-integration-tests:
+    runs-on: ubuntu-latest
+    services:
+      ec2_metadata:
+        image: timberiodev/mock-ec2-metadata:latest
+        ports:
+          - "8111:8111"
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: ec2-metadata-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: cargo test --features $FEATURES
+
+  es-integration-tests:
+    runs-on: ubuntu-latest
+    services:
+      elasticsearch:
+        image: elasticsearch:6.6.2
+        ports:
+          - "9200:9200"
+          - "9300:9300"
+        environment:
+          - discovery.type=single-node
+      elasticsearch-tls:
+        image: elasticsearch:6.6.2
+        ports:
+          - "9201:9200"
+          - "9301:9300"
+        environment:
+          - discovery.type=single-node
+          - xpack.security.enabled=true
+          - xpack.security.http.ssl.enabled=true
+          - xpack.security.transport.ssl.enabled=true
+          - xpack.ssl.certificate=certs/localhost.crt
+          - xpack.ssl.key=certs/localhost.key
+        volumes:
+          - ./tests/data:/usr/share/elasticsearch/config/certs:ro
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: es-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: cargo test --features $FEATURES
+
+## Github actions doesn't support templates
+
+#firehose-integration-tests
+#gcp-pubsub-integration-tests
+#gcs-integration-tests
+#kafka-integration-tests
+#kinesis-integration-tests
+#s3-integration-tests
+#influxdb-integration-tests
+#splunk-integration-tests
+#pulsar-integration-tests
 
 ## Kubernetes
 # Build exectuables in parallel, and then tests on different Kubernetes versions in parallel.
