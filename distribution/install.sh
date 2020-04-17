@@ -162,10 +162,13 @@ install_from_archive() {
     printf " ✓\n"
 
     if [ "$modify_path" = "yes" ]; then
-      local _path="export PATH=\"\$HOME/.vector/${_dir_name}/bin:\$PATH\""
+      local _path="export PATH=\"\$HOME/.vector/bin:\$PATH\""
       add_to_path "${HOME}/.profile" "${_path}"
       add_to_path "${HOME}/.zprofile" "${_path}"
       eval "${_path}"
+      printf "\n"
+      printf "$PATH"
+      printf "\n"
       printf " ✓\n"
     fi
 
