@@ -117,8 +117,7 @@ jobs:
       FEATURES: docker-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: cargo test --no-default-features --features $FEATURES --no-run
-      - run: ./target/debug -maxdepth 2 -type f -executable -name '*-*' | sudo sh -e
+      - run: cargo test --no-default-features --features $FEATURES
 
   es-integration-tests:
     runs-on: ubuntu-latest
