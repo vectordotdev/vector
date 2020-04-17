@@ -1,14 +1,21 @@
 use super::retries2::{FixedRetryPolicy, RetryLogic};
+use super::{Batch, BatchSettings, BatchSink};
+use crate::buffers::Acker;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tower03::{
     layer::{util::Stack, Layer},
+    limit::{ConcurrencyLimit, RateLimit},
+    retry::Retry,
+    timeout::Timeout,
     util::BoxService,
     Service, ServiceBuilder,
 };
 
-// pub type TowerBatchedSink<S, B, L, Request> =
-// BatchSink<ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B, Request>;
+pub use compat::TowerCompat;
+
+pub type Svc<S, L> = ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>;
+pub type TowerBatchedSink<S, B, L, Request> = BatchSink<TowerCompat<Svc<S, L>>, B, Request>;
 
 pub trait ServiceBuilderExt<L> {
     fn settings<RL, Request>(
@@ -97,39 +104,38 @@ impl TowerRequestSettings {
         )
     }
 
-    // pub fn batch_sink<B, L, S, Request>(
-    //     &self,
-    //     retry_logic: L,
-    //     service: S,
-    //     batch: B,
-    //     batch_settings: BatchSettings,
-    //     acker: Acker,
-    // ) -> TowerBatchedSink<S, B, L, Request>
-    // // Would like to return `impl Sink + SinkExt<T>` here, but that
-    // // doesn't work with later calls to `batched_with_min` etc (via
-    // // `trait SinkExt` above), as it is missing a bound on the
-    // // associated types that cannot be expressed in stable Rust.
-    // where
-    //     L: RetryLogic<Response = S::Response> + Send + 'static,
-    //     S: Service<Request> + Clone + Send + 'static,
-    //     S::Error: Into<crate::Error> + Send + Sync + 'static,
-    //     S::Response: Send + std::fmt::Debug,
-    //     S::Future: Send + 'static,
-    //     B: Batch<Output = Request>,
-    //     Request: Send + Clone + 'static,
-    // {
-    //     let policy = self.retry_policy(retry_logic);
-    //     let service = ServiceBuilder::new()
-    //         .concurrency_limit(self.in_flight_limit)
-    //         .rate_limit(self.rate_limit_num, self.rate_limit_duration)
-    //         .retry(policy)
-    //         .layer(TimeoutLayer {
-    //             timeout: self.timeout,
-    //         })
-    //         .service(service);
+    pub fn batch_sink<B, L, S, Request>(
+        &self,
+        retry_logic: L,
+        service: S,
+        batch: B,
+        batch_settings: BatchSettings,
+        acker: Acker,
+    ) -> TowerBatchedSink<S, B, L, Request>
+    // Would like to return `impl Sink + SinkExt<T>` here, but that
+    // doesn't work with later calls to `batched_with_min` etc (via
+    // `trait SinkExt` above), as it is missing a bound on the
+    // associated types that cannot be expressed in stable Rust.
+    where
+        L: RetryLogic<Response = S::Response> + Send + 'static,
+        S: Service<Request> + Clone + Send + 'static,
+        S::Error: Into<crate::Error> + Send + Sync + 'static,
+        S::Response: Send + std::fmt::Debug,
+        S::Future: Send + 'static,
+        B: Batch<Output = Request>,
+        Request: Send + Clone + 'static,
+    {
+        let policy = self.retry_policy(retry_logic);
+        let service = ServiceBuilder::new()
+            .concurrency_limit(self.in_flight_limit)
+            .rate_limit(self.rate_limit_num, self.rate_limit_duration)
+            .retry(policy)
+            .timeout(self.timeout)
+            .service(service);
 
-    //     BatchSink::new(service, batch, batch_settings, acker)
-    // }
+        let service = TowerCompat::new(service);
+        BatchSink::new(service, batch, batch_settings, acker)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -164,5 +170,41 @@ where
             .service(inner);
 
         BoxService::new(l)
+    }
+}
+
+mod compat {
+    use futures::compat::Compat;
+    use futures01::Poll;
+    use std::pin::Pin;
+    use tower::Service as Service01;
+    use tower03::Service as Service03;
+
+    pub struct TowerCompat<S> {
+        inner: S,
+    }
+
+    impl<S> TowerCompat<S> {
+        pub fn new(inner: S) -> Self {
+            Self { inner }
+        }
+    }
+
+    impl<S, Request> Service01<Request> for TowerCompat<S>
+    where
+        S: Service03<Request>,
+    {
+        type Response = S::Response;
+        type Error = S::Error;
+        type Future = Compat<Pin<Box<S::Future>>>;
+
+        fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+            let p = task_compat::with_context(|cx| self.inner.poll_ready(cx));
+            task_compat::poll_03_to_01(p)
+        }
+
+        fn call(&mut self, req: Request) -> Self::Future {
+            Compat::new(Box::pin(self.inner.call(req)))
+        }
     }
 }

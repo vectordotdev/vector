@@ -4030,6 +4030,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "task-compat"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0328783c46b98ea9e2747a49761313f483cf7bba40e51d6f0b05bf31b988d578"
+dependencies = [
+ "futures 0.1.29",
+ "futures 0.3.4",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5122,6 +5132,7 @@ dependencies = [
  "structopt",
  "syslog",
  "syslog_loose",
+ "task-compat",
  "tempfile",
  "tokio 0.1.22",
  "tokio 0.2.13",
