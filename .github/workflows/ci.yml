@@ -118,7 +118,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - run: cargo test --no-default-features --features $FEATURES --no-run
-      - run: find ./target/$TARGET -maxdepth 2 -type f -executable -name '*-*' | sudo sh -e
+      - run: find ./target/debug -maxdepth 2 -type f -executable -name '*-*' | sudo sh -e
 
   es-integration-tests:
     runs-on: ubuntu-latest
