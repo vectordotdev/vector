@@ -58,7 +58,8 @@ queueing, the controls will be inserted at the same level as
 `TowerRequestSettings`. The existing rate limit controls will remain in
 order to provide a hard upper bound on service utilization (for example,
 to prevent over-use violations), but will be dynamically bounded by
-adjusting the concurrency.
+adjusting the concurrency. An additional control will be used to
+optionally disable these dynamic controls.
 
 The underlying control will replace the `tower::limit::ConcurrencyLimit`
 layer with a new custom layer that dynamically adjusts the concurrency
