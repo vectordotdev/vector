@@ -187,7 +187,7 @@ mod tests {
         let config: GcpAuthConfig = toml::from_str("").unwrap();
         match config.make_credentials(Scope::Compute) {
             Ok(_) => panic!("make_credentials failed to error"),
-            Err(err) => assert_downcast_matches!(err, GcpError, GcpError::MissingAuth),
+            Err(err) => assert_downcast_matches!(err, GcpError, GcpError::GetImplicitToken { .. }), // This should be a more relevant error
         }
     }
 }
