@@ -25,6 +25,7 @@ jobs:
       USE_CONTAINER: none
     steps:
     - uses: actions/checkout@v1
+    - run: python3 -m pip install remarshal --user
     - run: "make check-component-features"
   check-code:
     runs-on: ubuntu-latest
