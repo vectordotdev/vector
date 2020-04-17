@@ -804,25 +804,38 @@ See [motivation](#motivation).
    [this comment][kubernetes_version_comment].~~
    See the [Minimal supported Kubernetes version][anchor_minimal_supported_kubernetes_version]
    section.
-1. What is the best to avoid Vector from ingesting it's own logs? I'm assuming
+1. ~~What is the best to avoid Vector from ingesting it's own logs? I'm assuming
    that my [`kubectl` tutorial](#kubectl-interface) handles this with namespaces?
-   We'd just need to configure Vector to exclude this namespace?
-1. I've seen two different installation strategies. For example, Fluentd offers
+   We'd just need to configure Vector to exclude this namespace?~~
+   See the [Origin filtering][anchor_origin_filtering] section.
+1. ~~I've seen two different installation strategies. For example, Fluentd offers
    a [single daemonset configuration file][fluentd_daemonset] while Fluentbit
    offers [four separate configuration files][fluentbit_installation]
    (`service-account.yaml`, `role.yaml`, `role-binding.yaml`, `configmap.yaml`).
-   Which approach is better? Why are they different?
+   Which approach is better? Why are they different?~~
+   See the
+   [Strategy on YAML file grouping][anchor_strategy_on_yaml_file_grouping]
+   section.
 1. ~~Should we prefer `kubectl create ...` or `kubectl apply ...`? The examples
    in the [prior art](#prior-art) section use both.~~
    See [Helm vs raw YAML files][anchor_helm_vs_raw_yaml_files] section.
-1. From what I understand, Vector requires the Kubernetes `watch` verb in order
+1. ~~From what I understand, Vector requires the Kubernetes `watch` verb in order
    to receive updates to k8s cluster changes. This is required for the
    `kubernetes_pod_metadata` transform. Yet, Fluentbit [requires the `get`,
-   `list`, and `watch` verbs][fluentbit_role]. Why don't we require the same?
-1. What is `updateStrategy` ... `RollingUpdate`? This is not included in
+   `list`, and `watch` verbs][fluentbit_role]. Why don't we require the same?~~
+   Right, this is a requirement since we're using k8s API. The exact set of
+   permissions is to be determined at YAML files design stage - after we
+   complete the implementation. It's really trivial to determine from a set of
+   API calls used.
+1. ~~What is `updateStrategy` ... `RollingUpdate`? This is not included in
    [our daemonset][vector_daemonset] or in [any of Fluentbit's config
    files][fluentbit_installation]. But it is included in both [Fluentd's
-   daemonset][fluentd_daemonset] and [LogDNA's daemonset][logdna_daemonset].
+   daemonset][fluentd_daemonset] and [LogDNA's daemonset][logdna_daemonset].~~
+   `RollingUpdate` is the default value for
+   [`updateStrategy`][k8s_api_daemon_set_update_strategy] of the
+   [`DaemonSet`][daemonset]. Alternative is `OnDelete`. `RollingUpdate` makes
+   more sense for us to use as the default, more info on this is available at
+   the [docs][k8s_docs_rolling_update].
 1. I've also noticed `resources` declarations in some of these config files.
    For example [LogDNA's daemonset][logdna_daemonset]. I assume this is limiting
    resources. Do we want to consider this?
@@ -882,6 +895,8 @@ See [motivation](#motivation).
 [anchor_file_locations]: #file-locations
 [anchor_helm_vs_raw_yaml_files]: #helm-vs-raw-yaml-files
 [anchor_minimal_supported_kubernetes_version]: #minimal-supported-kubernetes-version
+[anchor_origin_filtering]: #origin-filtering
+[anchor_strategy_on_yaml_file_grouping]: #strategy-on-yaml-file-grouping
 [awesome operators list]: https://github.com/operator-framework/awesome-operators
 [bonzai logging operator]: https://github.com/banzaicloud/logging-operator
 [chartmuseum]: https://chartmuseum.com/
@@ -921,10 +936,12 @@ See [motivation](#motivation).
 [json file logging driver]: https://docs.docker.com/config/containers/logging/json-file/
 [jsonlines]: http://jsonlines.org/
 [k8s_api_config_map_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#configmapvolumesource-v1-core
+[k8s_api_daemon_set_update_strategy]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#daemonsetupdatestrategy-v1-apps
 [k8s_api_host_path_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#hostpathvolumesource-v1-core
 [k8s_docs_crds]: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/
 [k8s_docs_operator]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
 [k8s_docs_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
+[k8s_docs_rolling_update]: https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/
 [k8s_log_path_location_docs]: https://kubernetes.io/docs/concepts/cluster-administration/logging/#logging-at-the-node-level
 [k8s_src_build_container_logs_directory]: https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L173
 [k8s_src_parse_funcs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L116
