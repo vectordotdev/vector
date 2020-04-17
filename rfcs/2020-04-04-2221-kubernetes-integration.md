@@ -719,7 +719,45 @@ implementing an orchestrating component (such things are usually called
 
 ### Changes to Vector release process
 
-TODO
+We need to ship a particular Vector version along with a particular set of k8s
+configuration YAML files and a Helm chart. This is so that we can be sure
+all our configurations actually tested and known to work for a particular Vector
+release. This is very important for maintaining the legacy releases, and for
+people to be able to downgrade if needed, which is one of the major properties
+for a system-level component like Vector is.
+
+This means we need to orchestrate the releases of the YAML configs and Helm
+Charts together with the Vector releases.
+
+Naturally, it's easiest to implement if we keep the code for both the YAML
+configs and the Helm Chart in our Vector repo.
+
+The alternative - having either just the Helm Chart or it together with YAML
+files in a separate repo - has a benefit of being a smaller footprint to grasp -
+i.e. a dedicated repo with just the k8s deployment config would obviously have
+smaller code and history - but it would make it significantly more difficult to
+correlate histories with Vector mainline, and it's a major downside. For this
+reason, using the Vector repo for keeping everything is preferable.
+
+During the release process, together with shipping the Vector version, we'd
+have to also bump the Vector versions at the YAML and Helm Chart configs, and
+also bump the version of the Helm Chart as well. We then copy the YAML configs
+to the same location where we keep release artifacts (i.e. `.deb`s, `.rpm`s,
+etc) for that particular Vector version. We also publish a new Helm Chart
+release into our Helm Chart repo.
+
+While bumping the versions is human work, and is hard to automate - copying the
+YAML files and publishing a Helm Chart release is easy, and we should take care
+of that. We can also add CI lints to ensure the version of Vector at YAML
+file and Helm Chart and the one the Rust code has baked in match at all times.
+Ideally, they should be bumped together atomically and never diverge.
+
+If we need to ship an update to just YAML configs or a new Helm Chart without
+changes to the Vector code, as our default strategy we can consider cutting a
+patch release of Vector - simply as a way to go through the whole process.
+What is bumping Vector version as well, even though there's no practical reason
+for that since the code didn't change. This strategy will not only simplify the
+process on our end, but will also be very simple to understand for our users.
 
 ### Testing
 
@@ -729,6 +767,7 @@ TODO
 - at CI we test against `minikube` and against all versions from MSKV till the latest k8s
 - at test harness we run non-ephemeral "real" clusters and test against them (i.e. GCP GKE, AWS EKS, Azure K8s, DO K8s, RedHat OpenShift, Rancher, CoreOS Tekton, etc)
 - we integrate our unit tests into test harness in such a way that we can run them as correctness tests
+- we want to test our deployment configurations - Helm charts, YAML files and etc, in addition to unit tests
 
 ## Prior Art
 
