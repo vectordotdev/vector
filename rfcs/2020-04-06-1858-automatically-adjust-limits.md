@@ -83,8 +83,8 @@ The algorithm used to control the limit will follow the AIMD framework:
     incremented by one (additive increase) once per RTT, up to a maximum
     of the in flight limit.
 
-  * If greater than the average, or the result was a failure of any
-    kind, the concurrency will be reduced by a factor of one half
+  * If greater than the average, or the result indicated a server
+    failure, the concurrency will be reduced by a factor of one half
     (multiplicative decrease) once per RTT, down to a minimum of one.
 
 ## Prior Art
