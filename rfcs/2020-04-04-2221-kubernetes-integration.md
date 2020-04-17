@@ -769,6 +769,16 @@ TODO
 - we integrate our unit tests into test harness in such a way that we can run them as correctness tests
 - we want to test our deployment configurations - Helm charts, YAML files and etc, in addition to unit tests
 
+### Other data gathering
+
+> This section is on gathering data other than container logs.
+
+TODO
+
+- we can expose watch events that we get from the k8s API as Vector events
+- we can grab and process prometheus metrics from the pods that expose them
+- we can gather node-level logs, useful for cluster operators
+
 ## Prior Art
 
 1. [Filebeat k8s integration]
