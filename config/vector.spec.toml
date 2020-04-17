@@ -361,20 +361,20 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "generator"
   type = "generator"
 
-  # The number of times to repeat outputting the `lines`.
-  #
-  # * optional
-  # * default: "infinite"
-  # * type: int
-  count = "infinite"
-
   # The amount of time, in seconds, to pause between each batch of output lines.
   # If not set, there will be no delay.
   #
   # * optional
   # * no default
   # * type: float
-  interval = 1.0
+  batch_interval = 1.0
+
+  # The number of times to repeat outputting the `lines`.
+  #
+  # * optional
+  # * default: "infinite"
+  # * type: int
+  count = "infinite"
 
   # The list of lines to output.
   #

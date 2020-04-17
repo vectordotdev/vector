@@ -27,7 +27,7 @@ required = false
 default = "infinite"
 description = "The number of times to repeat outputting the `lines`."
 
-[sources.generator.options.interval]
+[sources.generator.options.batch_interval]
 type = "float"
 required = false
 examples = [ 1.0 ]
