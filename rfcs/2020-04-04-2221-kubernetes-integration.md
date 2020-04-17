@@ -457,6 +457,42 @@ they'll be able to split the files if required. They then maintain their
 configuration on their own, and we assume they're capable and know what they're
 doing.
 
+#### Resource Limits
+
+> This section is on [`Container`][k8s_api_container] [`resources`][k8s_api_resource_requirements] clause.
+
+Setting resource requirements for Vector container is very important to enable
+Kubernetes to properly manage node resources.
+
+Optimal configuration is very case-specific, and while we have some
+understanding of Vector performance characteristics, we can't account for the
+environment Vector will run at. This means it's nearly impossible for us to come
+up with sane defaults, and we have to rely on users properly configuring the
+resources for their use case.
+
+However, it doesn't mean we should ignore this concern. Instead, we must share
+our understanding of Vector runtime properties and data, and provide as much
+assistance to the users trying to determine the resource requirements as
+possible.
+
+We should provide the documentation explaining the inner architecture of Vector
+and our considerations on how to estimate memory / CPU usage.
+
+At to our configuration, we'll omit the `resources` from the YAML files, and
+make them configurable at Helm Charts.
+
+##### Vector Runtime Properties Bulletin
+
+It would be great to publish a regularly updated bulletin on Vector runtime
+properties (i.e. how much memory and CPU Vector can utilize and under what
+conditions). That would be a real killer feature for everyone that wants to
+deploy Vector under load, not just in the context of Kubernetes integration.
+Though it's a lot of hard work to determine these properties, people with large
+deployments tend to do this anyway to gain confidence in their setup. We could
+exchange this data with our partners and derive an even more realistic profile
+for Vector's runtime properties, based on real data from the multiple data sets.
+This worth a separate dedicated RFC though.
+
 ### Annotating events with metadata from Kubernetes
 
 Kubernetes has a lot of metadata that can be associated with the logs, and most
@@ -1021,8 +1057,10 @@ See [motivation](#motivation).
 [json file logging driver]: https://docs.docker.com/config/containers/logging/json-file/
 [jsonlines]: http://jsonlines.org/
 [k8s_api_config_map_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#configmapvolumesource-v1-core
+[k8s_api_container]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#container-v1-core
 [k8s_api_daemon_set_update_strategy]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#daemonsetupdatestrategy-v1-apps
 [k8s_api_host_path_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#hostpathvolumesource-v1-core
+[k8s_api_resource_requirements]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#resourcerequirements-v1-core
 [k8s_docs_crds]: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/
 [k8s_docs_operator]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
 [k8s_docs_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
