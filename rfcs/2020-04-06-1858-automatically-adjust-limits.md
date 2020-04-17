@@ -23,8 +23,8 @@ the concurrency limit), the maximum rate at which requests may be sent,
 expressed in terms of the number of requests over some time interval
 (AKA the rate limit number and duration).
 
-Many of these parameters _must_ be adjusted by the Vector administrator
-to maximize the throughput for each service. For high volume sites, this
+Many of these parameters _must_ be adjusted by the Vector operator to
+maximize the throughput for each service. For high volume sites, this
 can require considerable trial and error experimentation before a
 satisfactory set of parameters can be achieved. More importantly,
 changes in the service parameters, whether in terms of available
