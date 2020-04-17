@@ -761,6 +761,81 @@ process on our end, but will also be very simple to understand for our users.
 
 ### Testing
 
+We want to implement a comprehensive test system to maintain our k8s
+integration.
+
+As usual, we need a way to do unit tests to validate isolated individual
+components during development. We also need integration tests, whose purpose is
+to validate that, as a whole, Vector properly functions when deployed into a
+real Kubernetes cluster.
+
+#### Unit tests
+
+To be able to utilize unit tests, we have to build the code from the modular,
+composable, and loosely-coupled components. These requirements often allow unit
+testing individual components easily, thus significantly improving the
+confidence in the overall implementation.
+
+If we have to, we can rely on mocks to test all the edge cases of the individual
+components.
+
+#### Integration tests
+
+Integration tests are performed against the real k8s clusters.
+
+We have a matrix of concerns, we'd like to ensure Vectors works properly with.
+
+- Kubernetes Versions
+  - Minimal Supported Kubernetes Version
+  - Latest version
+  - All versions in between the latest and MSKV
+- Managed Kubernetes offers
+  - [Amazon Elastic Kubernetes Service](https://aws.amazon.com/ru/eks/)
+  - [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine/)
+  - [Azure Kubernetes Service](https://azure.microsoft.com/en-us/services/kubernetes-service/)
+  - [DigitalOcean Kubernetes](https://www.digitalocean.com/products/kubernetes/)
+  - [Platform9 Managed Kubernetes](https://platform9.com/managed-kubernetes/)
+  - [Red Hat OpenShift Container Platform](https://www.openshift.com/products/container-platform)
+  - [IBM Cloud Kubernetes Service](https://www.ibm.com/cloud/container-service/)
+  - [Alibaba Cloud Container Service for Kubernetes](https://www.alibabacloud.com/product/kubernetes)
+  - [Oracle Container Engine for Kubernetes](https://www.oracle.com/cloud/compute/container-engine-kubernetes.html)
+  - [OVH Managed Kubernetes Service](https://www.ovhcloud.com/en-gb/public-cloud/kubernetes/)
+  - [Rackspace Kubernetes-as-a-Service](https://www.rackspace.com/managed-kubernetes)
+  - [Linode Kubernetes Engine](https://www.linode.com/products/kubernetes/)
+  - [Yandex Managed Service for Kubernetes](https://cloud.yandex.com/services/managed-kubernetes)
+  - [Tencent Kubernetes Engine](https://intl.cloud.tencent.com/product/tke)
+- Kubernetes Distributions (for on-premise deployment)
+  - Production-grade
+    - bare `kubeadm`
+    - [OKD](https://www.okd.io/) (deploys OpenShift Origin)
+    - [Rancher Kubernetes Engine](https://rancher.com/products/rke/)
+    - [Metal3](http://metal3.io/)
+    - [Project Atomic Kubernetes](https://www.projectatomic.io/docs/kubernetes/)
+    - [Canonical Charmed Kubernetes](https://ubuntu.com/kubernetes/install#multi-node)
+    - [Kubernetes on DC/OS](https://github.com/mesosphere/dcos-kubernetes-quickstart)
+  - For small/dev deployments
+    - [Minikube](https://kubernetes.io/ru/docs/setup/learning-environment/minikube/)
+    - [MicroK8s](https://microk8s.io/)
+    - [Docker Desktop Kubernetes](https://www.docker.com/products/docker-desktop)
+    - [kind](https://kubernetes.io/docs/setup/learning-environment/kind/)
+    - [minishift](https://www.okd.io/minishift/)
+- [Container Runtimes (CRI impls)](https://kubernetes.io/docs/setup/production-environment/container-runtimes/)
+  - [Docker](https://www.docker.com/) (Kubernetes still has some "special"
+    integration with Docker; these days, "using Docker" technically means using
+    `runc` via `containerd` via `docker-engine`)
+  - OCI (via [CRI-O](https://cri-o.io/) or [containerd](https://containerd.io/))
+    - [runc](https://github.com/opencontainers/runc)
+    - [runhcs](https://github.com/Microsoft/hcsshim/tree/master/cmd/runhcs) -
+      see more [here][windows_in_kubernetes]
+    - [Kata Containers](https://github.com/kata-containers/runtime)
+    - [gVisor](https://github.com/google/gvisor)
+    - [Firecracker](https://github.com/firecracker-microvm/firecracker-containerd)
+
+We can't possibly expand this matrix densely due to the enormous amount of
+effort required to maintain the infrastructure and the costs. It may also be
+inefficient to test everything everywhere, because a lot of configurations
+don't have any significant or meaningful differences among each other.
+
 TODO
 
 - integration tests are cluster-agnostic
@@ -968,3 +1043,4 @@ See [motivation](#motivation).
 [sidecar_container]: https://github.com/kubernetes/enhancements/blob/a8262db2ce38b2ec7941bdb6810a8d81c5141447/keps/sig-apps/sidecarcontainers.md
 [the chart repository guide]: https://helm.sh/docs/topics/chart_repository/
 [vector_daemonset]: 2020-04-04-2221-kubernetes-integration/vector-daemonset.yaml
+[windows_in_kubernetes]: https://kubernetes.io/docs/setup/production-environment/windows/intro-windows-in-kubernetes/
