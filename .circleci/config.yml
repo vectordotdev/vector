@@ -35,10 +35,12 @@ restore-artifacts-from-workspace: &restore-artifacts-from-workspace
   attach_workspace:
     at: target/artifacts
 
-test-install-script: &test-install-script
+reload-shell: &reload-shell
   run:
     name: Reload shell
     command: source ~/.profile
+
+test-install-script: &test-install-script
   run:
     name: Verify installation
     command: vector --version
@@ -560,6 +562,7 @@ jobs:
     steps:
       - checkout
       - *install-vector
+      - *reload-shell
       - *test-install-script
 
   test-install-script-on-amazon-linux-2:
@@ -568,6 +571,7 @@ jobs:
     steps:
       - checkout
       - *install-vector
+      - *reload-shell
       - *test-install-script
 
   test-install-script-on-centos-7:
@@ -576,6 +580,7 @@ jobs:
     steps:
       - checkout
       - *install-vector
+      - *reload-shell
       - *test-install-script
 
   test-install-script-on-deb-8:
@@ -584,6 +589,7 @@ jobs:
     steps:
       - checkout
       - *install-vector
+      - *reload-shell
       - *test-install-script
 
   test-install-script-on-deb-9:
@@ -592,6 +598,7 @@ jobs:
     steps:
       - checkout
       - *install-vector
+      - *reload-shell
       - *test-install-script
 
   test-install-script-on-deb-10:
@@ -600,6 +607,7 @@ jobs:
     steps:
       - checkout
       - *install-vector
+      - *reload-shell
       - *test-install-script
 
   test-install-script-on-mac-archive:
@@ -608,6 +616,7 @@ jobs:
     steps:
       - checkout
       - *install-vector
+      - *reload-shell
       - *test-install-script
 
   test-install-script-on-mac-homebrew:
@@ -619,6 +628,7 @@ jobs:
           name: Install Homebrew
           command: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
       - *install-vector
+      - *reload-shell
       - *test-install-script
 
   test-install-script-on-unbuntu-16-04:
@@ -627,6 +637,7 @@ jobs:
     steps:
       - checkout
       - *install-vector
+      - *reload-shell
       - *test-install-script
 
   test-install-script-on-unbuntu-18-04:
@@ -635,6 +646,7 @@ jobs:
     steps:
       - checkout
       - *install-vector
+      - *reload-shell
       - *test-install-script
 
   test-install-script-on-unbuntu-19-04:
@@ -643,6 +655,7 @@ jobs:
     steps:
       - checkout
       - *install-vector
+      - *reload-shell
       - *test-install-script
 
   test-install-script-without-sudo:
@@ -650,6 +663,7 @@ jobs:
     steps:
       - checkout
       - *install-vector
+      - *reload-shell
       - *test-install-script
 
   verify-rpm-artifact-on-amazon-linux-1:
