@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - run: "make check-blog"
-  test-stable:
+  test-build:
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -61,22 +61,48 @@ jobs:
       TARGET: x86_64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v1
+      # Build Vector and our test fixtures.
       - run: cargo test --no-run --features docker --target $TARGET
       - name: Save vector
         uses: actions/upload-artifact@v1
         with:
           name: binary
           path: ./target/x86_64-unknown-linux-gnu/debug/vector
+      # We only get 14gb of disk space, so be frugal.
       - run: mkdir -p test-artifacts
       - run: find ./target/$TARGET -maxdepth 2 -type f -executable -name '*-*' |  xargs -I '{}' mv '{}' test-artifacts/
       - run: cargo clean # Get some disk space!
-      - run: find test-artifacts/ -maxdepth 2 -type f -executable -name '*-*' |  xargs sh -e
+      # Upload the artifacts for use later.
       - run: tar -zcvf test-artifacts.tar.gz test-artifacts/
       - name: Save vector test artifacts
         uses: actions/upload-artifact@v1
         with:
-          name: binary
+          name: test-artifacts
           path: test-artifacts.tar.gz
+  test-stable:
+    needs: test-build
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v1
+      - name: Download math result for job 1
+        uses: actions/download-artifact@v1
+        with:
+          name: test-artifacts
+      - run: tar -zxvf test-artifacts/test-artifacts.tar.gz
+      - run: |
+          docker-compose pull
+          docker-compose up -d splunk
+          sleep 30 # Splunk crashes when started simultaneously with other services
+          docker-compose up -d test-runtime-deps
+          sleep 180
+      - run: find test-artifacts/ -maxdepth 2 -type f -executable -name '*-*' |  xargs sh -e
+
 
 ## Kubernetes
 # Build exectuables in parallel, and then tests on different Kubernetes versions in parallel.
