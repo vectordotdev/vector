@@ -90,7 +90,7 @@ jobs:
       - run:
           name: Build and test
           shell: bash
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           environment:
             RUSTFLAGS: -Ctarget-feature=+crt-static
             RUST_BACKTRACE: full
@@ -155,7 +155,7 @@ jobs:
       - *install-rust
       - run:
           name: Build archive
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
             make build-archive
@@ -208,7 +208,7 @@ jobs:
       - run:
           name: Build archive
           shell: bash
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           command: |
             export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
             export RUSTFLAGS=-Ctarget-feature=+crt-static
@@ -223,7 +223,7 @@ jobs:
       - run:
           name: Build MSI package
           shell: bash
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           command: |
             export PATH="/c/wix:$PATH"
             ./scripts/package-msi.sh
@@ -239,7 +239,7 @@ jobs:
       - checkout
       - run:
           name: Build archive and .deb package
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           environment:
             PASS_FEATURES: "default-musl"
           command: |
@@ -256,7 +256,7 @@ jobs:
       - checkout
       - run:
           name: Build archive and .deb package
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           environment:
             PASS_FEATURES: "default-musl"
             DOCKER_PRIVILEGED: "true"
@@ -274,7 +274,7 @@ jobs:
       - checkout
       - run:
           name: Build archive and .deb package
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           environment:
             PASS_FEATURES: "default-musl"
             DOCKER_PRIVILEGED: "true"
@@ -467,7 +467,7 @@ jobs:
             ./scripts/upgrade-docker.sh
             export VERSION=$(make version)
             make build-docker
-          no_output_timeout: 30m
+          no_output_timeout: 60m
 
   verify-nixos:
     <<: *docker-machine
@@ -656,7 +656,7 @@ jobs:
             ./scripts/upgrade-docker.sh
             export VERSION=$(make version)
             make release-docker
-          no_output_timeout: 30m
+          no_output_timeout: 60m
 
   release-github:
     <<: *docker-machine

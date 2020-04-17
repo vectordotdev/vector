@@ -7723,11 +7723,154 @@ module.exports = {
         ],
         "sha": "f14ba50cbd3bad22b3aa5aadd60f83ccf7319ded",
         "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-04-16 21:56:11 +0000",
+        "deletions_count": 0,
+        "description": "Add a guide about merging multi-line events",
+        "files_count": 5,
+        "highlight_permalink": null,
+        "insertions_count": 1321,
+        "message": "docs(lua transform): Add a guide about merging multi-line events (#2354)",
+        "pr_number": 2354,
+        "scopes": [
+          {
+            "component": {
+              "name": "lua",
+              "type": "transform"
+            },
+            "name": "lua transform"
+          }
+        ],
+        "sha": "19bff5ca961d304744b2586f27ac24e3616a7024",
+        "type": "docs"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-04-17 10:50:47 +0000",
+        "deletions_count": 0,
+        "description": "Add highlights section to contributing",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 50,
+        "message": "docs: Add highlights section to contributing (#2348)",
+        "pr_number": 2348,
+        "scopes": [
+
+        ],
+        "sha": "225bee0537660cfa84d33cedce48e0926c533672",
+        "type": "docs"
+      },
+      {
+        "author": "Erwan D",
+        "breaking_change": false,
+        "date": "2020-04-17 16:55:17 +0000",
+        "deletions_count": 267,
+        "description": "fix typo 'desigend'",
+        "files_count": 134,
+        "highlight_permalink": null,
+        "insertions_count": 267,
+        "message": "docs: fix typo 'desigend' (#2350)",
+        "pr_number": 2350,
+        "scopes": [
+
+        ],
+        "sha": "b94373a614fdfb0a8baf231450d44fb0155b99c6",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-04-17 17:57:38 +0000",
+        "deletions_count": 7,
+        "description": "Cache paths for parsed fields",
+        "files_count": 2,
+        "highlight_permalink": null,
+        "insertions_count": 9,
+        "message": "perf(tokenizer transform): Cache paths for parsed fields (#2325)",
+        "pr_number": 2325,
+        "scopes": [
+          {
+            "component": {
+              "name": "tokenizer",
+              "type": "transform"
+            },
+            "name": "tokenizer transform"
+          }
+        ],
+        "sha": "d77a2f59e7ad18a28d4be90cc3da40e8ca49fe4f",
+        "type": "perf"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-04-17 11:57:04 +0000",
+        "deletions_count": 5,
+        "description": "Update Ana bio",
+        "files_count": 2,
+        "highlight_permalink": null,
+        "insertions_count": 9,
+        "message": "chore(website): Update Ana bio (#2360)",
+        "pr_number": 2360,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "website"
+          }
+        ],
+        "sha": "7c6608df02259778aaa3cc7770d96c6aabd75669",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-04-17 12:06:36 +0000",
+        "deletions_count": 120,
+        "description": "Migrate some PR checks to Github Actions from Circle",
+        "files_count": 5,
+        "highlight_permalink": null,
+        "insertions_count": 205,
+        "message": "chore(platforms): Migrate some PR checks to Github Actions from Circle (#2352)",
+        "pr_number": 2352,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "platforms"
+          }
+        ],
+        "sha": "72da605fd619c0321d9c8ffd176680f225ca88d5",
+        "type": "chore"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-04-17 13:47:27 +0000",
+        "deletions_count": 39,
+        "description": "Add support for instance accounts",
+        "files_count": 11,
+        "highlight_permalink": null,
+        "insertions_count": 114,
+        "message": "enhancement(gcp provider): Add support for instance accounts (#2351)",
+        "pr_number": 2351,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "gcp provider"
+          }
+        ],
+        "sha": "6b95f7e17e4af25c689a108cd3fa6941d97d5593",
+        "type": "enhancement"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.8.2...v0.9.0",
     "date": "2020-04-17",
-    "deletions_count": 29669,
+    "deletions_count": 29840,
     "description": "",
     "highlights": [
       {
@@ -8101,7 +8244,7 @@ module.exports = {
         "title": "4 New Sinks!"
       }
     ],
-    "insertions_count": 132437,
+    "insertions_count": 132774,
     "last_version": "0.8.2",
     "permalink": "/releases/0.9.0/",
     "title": "Vector v0.9.0",
@@ -8115,11 +8258,11 @@ module.exports = {
       },
       {
         "title": "WASM Driven Plugin Architecture",
-        "description": "This release included an overhaul of our [`lua` transform][docs.transforms.lua], which represents a big step towards making Vector more flexible. Lua is an excellent language when you need some quick scripting capabilities. But what if you need something more powerful? Like writing your own custom source, transform, or sink? Vector plans to solve this with [WASM][urls.wasm] foreign module support, enablign you to extend Vector in the language of your choice with very little performance penalty. ❤️ WASM. Check out the [WASM Foreign Module Support RFC][urls.pr_2341] for more info."
+        "description": "This release included an overhaul of our [`lua` transform][docs.transforms.lua], which represents a big step towards making Vector more flexible. Lua is an excellent language when you need some quick scripting capabilities. But what if you need something more powerful? Like writing your own custom source, transform, or sink? Vector plans to solve this with [WASM][urls.wasm] foreign module support, enabling you to extend Vector in the language of your choice with little performance penalty. ❤️ WASM. Check out the [WASM Foreign Module Support RFC][urls.pr_2341] for more info."
       },
       {
         "title": "Dynamic HTTP Rate-Limiting (AIMD)",
-        "description": "Is there anything more frustrating than fiddling with rate-limits? If your limits are too you risk overwhelming your downstream service, and if your limits are too low you're unecessarily reducing performance and throughput.\nAnd then what happens when you introduce multiple Vector instances into the mix? Vector planning to solve this by automatically detecting the optimal rate limits taking inspiration from TCP congestional control algorithms. Check out the [Dynamic HTTP Rate Limiting RFC][urls.pr_2329]."
+        "description": "Fiddling with rate-limits is a frustratin endaevor. If you set them too high you risk overwhelming the service; too low and you're unecessarily limiting throughput. And what happens if you deploy a few more Vector instances? Vector is planning to solve this by automatically detecting the optimal rate limits, taking inspiration from TCP congestional control algorithms. Check out the [Dynamic HTTP Rate Limiting RFC][urls.pr_2329]."
       },
       {
         "title": "Vector Observability",
@@ -32820,11 +32963,154 @@ module.exports = {
           ],
           "sha": "f14ba50cbd3bad22b3aa5aadd60f83ccf7319ded",
           "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-04-16 21:56:11 +0000",
+          "deletions_count": 0,
+          "description": "Add a guide about merging multi-line events",
+          "files_count": 5,
+          "highlight_permalink": null,
+          "insertions_count": 1321,
+          "message": "docs(lua transform): Add a guide about merging multi-line events (#2354)",
+          "pr_number": 2354,
+          "scopes": [
+            {
+              "component": {
+                "name": "lua",
+                "type": "transform"
+              },
+              "name": "lua transform"
+            }
+          ],
+          "sha": "19bff5ca961d304744b2586f27ac24e3616a7024",
+          "type": "docs"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-04-17 10:50:47 +0000",
+          "deletions_count": 0,
+          "description": "Add highlights section to contributing",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 50,
+          "message": "docs: Add highlights section to contributing (#2348)",
+          "pr_number": 2348,
+          "scopes": [
+
+          ],
+          "sha": "225bee0537660cfa84d33cedce48e0926c533672",
+          "type": "docs"
+        },
+        {
+          "author": "Erwan D",
+          "breaking_change": false,
+          "date": "2020-04-17 16:55:17 +0000",
+          "deletions_count": 267,
+          "description": "fix typo 'desigend'",
+          "files_count": 134,
+          "highlight_permalink": null,
+          "insertions_count": 267,
+          "message": "docs: fix typo 'desigend' (#2350)",
+          "pr_number": 2350,
+          "scopes": [
+
+          ],
+          "sha": "b94373a614fdfb0a8baf231450d44fb0155b99c6",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-04-17 17:57:38 +0000",
+          "deletions_count": 7,
+          "description": "Cache paths for parsed fields",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 9,
+          "message": "perf(tokenizer transform): Cache paths for parsed fields (#2325)",
+          "pr_number": 2325,
+          "scopes": [
+            {
+              "component": {
+                "name": "tokenizer",
+                "type": "transform"
+              },
+              "name": "tokenizer transform"
+            }
+          ],
+          "sha": "d77a2f59e7ad18a28d4be90cc3da40e8ca49fe4f",
+          "type": "perf"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-04-17 11:57:04 +0000",
+          "deletions_count": 5,
+          "description": "Update Ana bio",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 9,
+          "message": "chore(website): Update Ana bio (#2360)",
+          "pr_number": 2360,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "website"
+            }
+          ],
+          "sha": "7c6608df02259778aaa3cc7770d96c6aabd75669",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-04-17 12:06:36 +0000",
+          "deletions_count": 120,
+          "description": "Migrate some PR checks to Github Actions from Circle",
+          "files_count": 5,
+          "highlight_permalink": null,
+          "insertions_count": 205,
+          "message": "chore(platforms): Migrate some PR checks to Github Actions from Circle (#2352)",
+          "pr_number": 2352,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "platforms"
+            }
+          ],
+          "sha": "72da605fd619c0321d9c8ffd176680f225ca88d5",
+          "type": "chore"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-04-17 13:47:27 +0000",
+          "deletions_count": 39,
+          "description": "Add support for instance accounts",
+          "files_count": 11,
+          "highlight_permalink": null,
+          "insertions_count": 114,
+          "message": "enhancement(gcp provider): Add support for instance accounts (#2351)",
+          "pr_number": 2351,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "gcp provider"
+            }
+          ],
+          "sha": "6b95f7e17e4af25c689a108cd3fa6941d97d5593",
+          "type": "enhancement"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.8.2...v0.9.0",
       "date": "2020-04-17",
-      "deletions_count": 29669,
+      "deletions_count": 29840,
       "description": "",
       "highlights": [
         {
@@ -33198,7 +33484,7 @@ module.exports = {
           "title": "4 New Sinks!"
         }
       ],
-      "insertions_count": 132437,
+      "insertions_count": 132774,
       "last_version": "0.8.2",
       "permalink": "/releases/0.9.0/",
       "title": "Vector v0.9.0",
@@ -33212,11 +33498,11 @@ module.exports = {
         },
         {
           "title": "WASM Driven Plugin Architecture",
-          "description": "This release included an overhaul of our [`lua` transform][docs.transforms.lua], which represents a big step towards making Vector more flexible. Lua is an excellent language when you need some quick scripting capabilities. But what if you need something more powerful? Like writing your own custom source, transform, or sink? Vector plans to solve this with [WASM][urls.wasm] foreign module support, enablign you to extend Vector in the language of your choice with very little performance penalty. ❤️ WASM. Check out the [WASM Foreign Module Support RFC][urls.pr_2341] for more info."
+          "description": "This release included an overhaul of our [`lua` transform][docs.transforms.lua], which represents a big step towards making Vector more flexible. Lua is an excellent language when you need some quick scripting capabilities. But what if you need something more powerful? Like writing your own custom source, transform, or sink? Vector plans to solve this with [WASM][urls.wasm] foreign module support, enabling you to extend Vector in the language of your choice with little performance penalty. ❤️ WASM. Check out the [WASM Foreign Module Support RFC][urls.pr_2341] for more info."
         },
         {
           "title": "Dynamic HTTP Rate-Limiting (AIMD)",
-          "description": "Is there anything more frustrating than fiddling with rate-limits? If your limits are too you risk overwhelming your downstream service, and if your limits are too low you're unecessarily reducing performance and throughput.\nAnd then what happens when you introduce multiple Vector instances into the mix? Vector planning to solve this by automatically detecting the optimal rate limits taking inspiration from TCP congestional control algorithms. Check out the [Dynamic HTTP Rate Limiting RFC][urls.pr_2329]."
+          "description": "Fiddling with rate-limits is a frustratin endaevor. If you set them too high you risk overwhelming the service; too low and you're unecessarily limiting throughput. And what happens if you deploy a few more Vector instances? Vector is planning to solve this by automatically detecting the optimal rate limits, taking inspiration from TCP congestional control algorithms. Check out the [Dynamic HTTP Rate Limiting RFC][urls.pr_2329]."
         },
         {
           "title": "Vector Observability",
