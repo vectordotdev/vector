@@ -19,6 +19,8 @@ jobs:
     - run: "cd tests && make test-behavior"
   check-component-features:
     runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
     steps:
     - uses: actions/checkout@v1
     - run: "make check-component-features"
@@ -105,7 +107,6 @@ jobs:
           docker-compose up -d test-runtime-deps
           sleep 180
       - run: find ./target/$TARGET -maxdepth 2 -type f -executable -name '*-*' | sh -e
-
 
 ## Kubernetes
 # Build exectuables in parallel, and then tests on different Kubernetes versions in parallel.
