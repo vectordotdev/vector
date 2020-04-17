@@ -193,12 +193,12 @@ jobs:
           - "9201:9200"
           - "9301:9300"
         env:
-          - discovery.type=single-node
-          - xpack.security.enabled=true
-          - xpack.security.http.ssl.enabled=true
-          - xpack.security.transport.ssl.enabled=true
-          - xpack.ssl.certificate=certs/localhost.crt
-          - xpack.ssl.key=certs/localhost.key
+          discovery.type: single-node
+          xpack.security.enabled: true
+          xpack.security.http.ssl.enabled: true
+          xpack.security.transport.ssl.enabled: true
+          xpack.ssl.certificate: certs/localhost.crt
+          xpack.ssl.key: certs/localhost.key
         volumes:
           - ./tests/data:/usr/share/elasticsearch/config/certs:ro
     env:
