@@ -4485,7 +4485,7 @@ dependencies = [
 [[package]]
 name = "tower"
 version = "0.3.1"
-source = "git+https://github.com/tower-rs/tower?branch=lucio/remove-path-dep#fdfe6353a03b14791abba314808a332138611746"
+source = "git+https://github.com/tower-rs/tower#c87fdd9c1e4c0728fdaa87d3fafe3e48da9b498a"
 dependencies = [
  "futures-core",
  "futures-util",
