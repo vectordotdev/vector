@@ -1,5 +1,43 @@
 [releases."0.9.0"]
-date = 2020-04-16
+date = 2020-04-17
+codename = "The Homestretch"
+whats_next = [
+{title = "Kubernetes!", description = """\
+We're doing this integration right. We've been alpha testing with a number of \
+large clusters and we've honed in on a very high-quality approach that \
+reflects the UX Vector is going after. You can learn more in our \
+[Kubernetes Integration RFC][urls.pr_2222]. Feedback is welcome!\
+"""},
+{title = "WASM Driven Plugin Architecture", description = """\
+This release included an overhaul of our [`lua` transform][docs.transforms.lua], \
+which represents a big step towards making Vector more flexible. Lua is an \
+excellent language when you need some quick scripting capabilities. But what \
+if you need something more powerful? Like writing your own custom source, \
+transform, or sink? Vector plans to solve this with [WASM][urls.wasm] foreign \
+module support, enablign you to extend Vector in the language of your choice \
+with very little performance penalty. ❤️ WASM. Check out the \
+[WASM Foreign Module Support RFC][urls.pr_2341] for more info.\
+"""},
+{title = "Dynamic HTTP Rate-Limiting (AIMD)", description = """\
+Is there anything more frustrating than fiddling with rate-limits? If your \
+limits are too you risk overwhelming your downstream service, and if your \
+limits are too low you're unecessarily reducing performance and throughput.
+And then what happens when you introduce multiple Vector instances into the \
+mix? Vector planning to solve this by automatically detecting the optimal \
+rate limits taking inspiration from TCP congestional control algorithms. \
+Check out the [Dynamic HTTP Rate Limiting RFC][urls.pr_2329].\
+"""},
+{title = "Vector Observability", description = """\
+Did you know this release includes a new hidden `internal` source that emits \
+metrics reflecting Vector's own internal state? 👀 We didn't highlight this \
+source because we have not finished instrumenting Vector and we'll be \
+changing the internal schema used.
+
+Fun fact, we took an event-driven approach to Vector's internal observability, \
+which we strongly beleive in. We want Vector to be a good example of our own \
+advice. Checkout the [Event-Driven Observability RFC][urls.pr_2093].\
+"""}
+]
 commits = [
 {sha = "177bd7de7e38a24c4a6092c85b8f5eb9d0f5386f", message = "enhancement(config): Allow setting individual `log_schema.*` options (#1923)", author = "Kruno Tomola Fabro", date = 2020-02-25T21:55:37Z, pr_number = 1923, files_count = 1, insertions_count = 11, deletions_count = 1},
 {sha = "12cc1ca32d56853a99ff6916dcca49466e881dc4", message = "docs: Restructure getting started guide (#1854)", author = "Ashley Jeffs", date = 2020-02-26T10:31:46Z, pr_number = 1854, files_count = 1, insertions_count = 198, deletions_count = 78},

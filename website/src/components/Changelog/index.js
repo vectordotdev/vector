@@ -43,6 +43,14 @@ function Commit({commit, setSearchTerm}) {
             <i className="feather icon-alert-triangle"></i> breaking
           </Link>
         )}
+        {!commit.breaking_change && commit.highlight_permalink && (
+          <Link
+            to={commit.highlight_permalink}
+            className="badge badge--warning"
+            title="View highlight announcement...">
+            <i className="feather icon-gift"></i> highlight
+          </Link>
+        )}
         {commit.pr_number && (
           <a
             href={`https://github.com/timberio/vector/pull/${commit.pr_number}`}

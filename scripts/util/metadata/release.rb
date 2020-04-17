@@ -11,7 +11,8 @@ class Release
     :highlights,
     :last_version,
     :permalink,
-    :version
+    :version,
+    :whats_next
 
   def initialize(release_hash, last_version, all_highlights)
     @codename = release_hash["codename"] || ""
@@ -20,6 +21,7 @@ class Release
     @last_version = last_version
     @version = Version.new(release_hash.fetch("version"))
     @permalink = "#{RELEASES_BASE_PATH}/#{@version}/"
+    @whats_next = (release_hash["whats_next"] || []).collect(&:to_struct)
 
     # highlights
 
@@ -201,6 +203,7 @@ class Release
       type: type,
       type_url: type_url,
       version: version,
+      whats_next: whats_next.deep_to_h
     }
   end
 

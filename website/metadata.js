@@ -2948,6 +2948,20 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-03-04",
+      "description": "Vector now lets you whitelist, blacklist, and format fields when events are encoded",
+      "hide_on_release_notes": false,
+      "id": "2020-03-04-encoding-only-fields-except-fields",
+      "path": "website/highlights/2020-03-04-encoding-only-fields-except-fields.md",
+      "permalink": "/highlights/2020-03-04-encoding-only-fields-except-fields/",
+      "tags": [
+        "type: enhancement",
+        "domain: sinks"
+      ],
+      "title": "New Encoding Options"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-03-04",
       "description": "More control over which fields are included when encoding",
       "hide_on_release_notes": true,
       "id": "2020-03-04-encoding-whitelist-blacklist",
@@ -2987,7 +3001,7 @@ module.exports = {
         "domain: sources",
         "source: vector"
       ],
-      "title": "New Dedupe Trasnform"
+      "title": "New Dedupe Transform"
     },
     {
       "author_github": "https://github.com/binarylogic",
@@ -3107,7 +3121,7 @@ module.exports = {
         "domain: sinks",
         "sink: splunk_hec"
       ],
-      "title": "The `gcp_stackdriver_logging` sink has been renamed to `gcp_stackdrive_logs`"
+      "title": "The `gcp_stackdriver_logging` sink has been renamed to `gcp_stackdriver_logs`"
     },
     {
       "author_github": "https://github.com/binarylogic",
@@ -3141,7 +3155,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-04-01",
-      "description": "Easily rnrich your logs with Kubernetes metadata",
+      "description": "Easily enrich your logs with Kubernetes metadata",
       "hide_on_release_notes": false,
       "id": "2020-04-01-kubernetes-pod-metadata-transform",
       "path": "website/highlights/2020-04-01-kubernetes-pod-metadata-transform.md",
@@ -3270,6 +3284,20 @@ module.exports = {
         "type: performance"
       ],
       "title": "~36% Higher Throughput"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2020-04-17",
+      "description": "Papertrail, Honeycomb, Pulsar, and DataDog Logs",
+      "hide_on_release_notes": false,
+      "id": "2020-04-17-new-sinks",
+      "path": "website/highlights/2020-04-17-new-sinks.md",
+      "permalink": "/highlights/2020-04-17-new-sinks/",
+      "tags": [
+        "type: new feature",
+        "domain: sinks"
+      ],
+      "title": "4 New Sinks!"
     }
   ],
   "installation": {
@@ -3695,16 +3723,17 @@ module.exports = {
   },
   "latest_highlight": {
     "author_github": "https://github.com/binarylogic",
-    "date": "2020-04-11",
-    "description": "We identified optimizations that net ~36% higher throughput",
+    "date": "2020-04-17",
+    "description": "Papertrail, Honeycomb, Pulsar, and DataDog Logs",
     "hide_on_release_notes": false,
-    "id": "2020-04-11-overall-performance-increase",
-    "path": "website/highlights/2020-04-11-overall-performance-increase.md",
-    "permalink": "/highlights/2020-04-11-overall-performance-increase/",
+    "id": "2020-04-17-new-sinks",
+    "path": "website/highlights/2020-04-17-new-sinks.md",
+    "permalink": "/highlights/2020-04-17-new-sinks/",
     "tags": [
-      "type: performance"
+      "type: new feature",
+      "domain: sinks"
     ],
-    "title": "~36% Higher Throughput"
+    "title": "4 New Sinks!"
   },
   "latest_post": {
     "author_github": "https://github.com/lukesteensen",
@@ -3720,7 +3749,7 @@ module.exports = {
     "title": "How We Test Vector"
   },
   "latest_release": {
-    "codename": "",
+    "codename": "The Homestretch",
     "commits": [
       {
         "author": "Kruno Tomola Fabro",
@@ -4298,7 +4327,7 @@ module.exports = {
         "deletions_count": 652,
         "description": "Add new `encoding.only_fields` and `encoding.except_fields` options",
         "files_count": 72,
-        "highlight_permalink": "/highlights/2020-03-04-encoding-whitelist-blacklist/",
+        "highlight_permalink": "/highlights/2020-03-04-encoding-only-fields-except-fields/",
         "insertions_count": 4148,
         "message": "enhancement(sinks): Add new `encoding.only_fields` and `encoding.except_fields` options (#1915)",
         "pr_number": 1915,
@@ -4937,7 +4966,7 @@ module.exports = {
         "deletions_count": 1,
         "description": "Initial `honeycomb` sink implementation",
         "files_count": 14,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-04-17-new-sinks/",
         "insertions_count": 1102,
         "message": "feat(new sink): Initial `honeycomb` sink implementation (#1847)",
         "pr_number": 1847,
@@ -7697,7 +7726,7 @@ module.exports = {
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.8.2...v0.9.0",
-    "date": "2020-04-16",
+    "date": "2020-04-17",
     "deletions_count": 29669,
     "description": "",
     "highlights": [
@@ -7730,6 +7759,20 @@ module.exports = {
           "source: vector"
         ],
         "title": "À La Carte Custom Vector Builds"
+      },
+      {
+        "author_github": "https://github.com/binarylogic",
+        "date": "2020-03-04",
+        "description": "Vector now lets you whitelist, blacklist, and format fields when events are encoded",
+        "hide_on_release_notes": false,
+        "id": "2020-03-04-encoding-only-fields-except-fields",
+        "path": "website/highlights/2020-03-04-encoding-only-fields-except-fields.md",
+        "permalink": "/highlights/2020-03-04-encoding-only-fields-except-fields/",
+        "tags": [
+          "type: enhancement",
+          "domain: sinks"
+        ],
+        "title": "New Encoding Options"
       },
       {
         "author_github": "https://github.com/binarylogic",
@@ -7773,7 +7816,7 @@ module.exports = {
           "domain: sources",
           "source: vector"
         ],
-        "title": "New Dedupe Trasnform"
+        "title": "New Dedupe Transform"
       },
       {
         "author_github": "https://github.com/binarylogic",
@@ -7893,7 +7936,7 @@ module.exports = {
           "domain: sinks",
           "sink: splunk_hec"
         ],
-        "title": "The `gcp_stackdriver_logging` sink has been renamed to `gcp_stackdrive_logs`"
+        "title": "The `gcp_stackdriver_logging` sink has been renamed to `gcp_stackdriver_logs`"
       },
       {
         "author_github": "https://github.com/binarylogic",
@@ -7913,7 +7956,7 @@ module.exports = {
       {
         "author_github": "https://github.com/binarylogic",
         "date": "2020-04-01",
-        "description": "Easily rnrich your logs with Kubernetes metadata",
+        "description": "Easily enrich your logs with Kubernetes metadata",
         "hide_on_release_notes": false,
         "id": "2020-04-01-kubernetes-pod-metadata-transform",
         "path": "website/highlights/2020-04-01-kubernetes-pod-metadata-transform.md",
@@ -8042,6 +8085,20 @@ module.exports = {
           "type: performance"
         ],
         "title": "~36% Higher Throughput"
+      },
+      {
+        "author_github": "https://github.com/binarylogic",
+        "date": "2020-04-17",
+        "description": "Papertrail, Honeycomb, Pulsar, and DataDog Logs",
+        "hide_on_release_notes": false,
+        "id": "2020-04-17-new-sinks",
+        "path": "website/highlights/2020-04-17-new-sinks.md",
+        "permalink": "/highlights/2020-04-17-new-sinks/",
+        "tags": [
+          "type: new feature",
+          "domain: sinks"
+        ],
+        "title": "4 New Sinks!"
       }
     ],
     "insertions_count": 132437,
@@ -8050,7 +8107,25 @@ module.exports = {
     "title": "Vector v0.9.0",
     "type": "initial dev",
     "type_url": "https://semver.org/#spec-item-4",
-    "version": "0.9.0"
+    "version": "0.9.0",
+    "whats_next": [
+      {
+        "title": "Kubernetes!",
+        "description": "We're doing this integration right. We've been alpha testing with a number of large clusters and we've honed in on a very high-quality approach that reflects the UX Vector is going after. You can learn more in our [Kubernetes Integration RFC][urls.pr_2222]. Feedback is welcome!"
+      },
+      {
+        "title": "WASM Driven Plugin Architecture",
+        "description": "This release included an overhaul of our [`lua` transform][docs.transforms.lua], which represents a big step towards making Vector more flexible. Lua is an excellent language when you need some quick scripting capabilities. But what if you need something more powerful? Like writing your own custom source, transform, or sink? Vector plans to solve this with [WASM][urls.wasm] foreign module support, enablign you to extend Vector in the language of your choice with very little performance penalty. ❤️ WASM. Check out the [WASM Foreign Module Support RFC][urls.pr_2341] for more info."
+      },
+      {
+        "title": "Dynamic HTTP Rate-Limiting (AIMD)",
+        "description": "Is there anything more frustrating than fiddling with rate-limits? If your limits are too you risk overwhelming your downstream service, and if your limits are too low you're unecessarily reducing performance and throughput.\nAnd then what happens when you introduce multiple Vector instances into the mix? Vector planning to solve this by automatically detecting the optimal rate limits taking inspiration from TCP congestional control algorithms. Check out the [Dynamic HTTP Rate Limiting RFC][urls.pr_2329]."
+      },
+      {
+        "title": "Vector Observability",
+        "description": "Did you know this release includes a new hidden `internal` source that emits metrics reflecting Vector's own internal state? 👀 We didn't highlight this source because we have not finished instrumenting Vector and we'll be changing the internal schema used.\n\nFun fact, we took an event-driven approach to Vector's internal observability, which we strongly beleive in. We want Vector to be a good example of our own advice. Checkout the [Event-Driven Observability RFC][urls.pr_2093]."
+      }
+    ]
   },
   "post_tags": [
     "type: announcement",
@@ -13920,7 +13995,10 @@ module.exports = {
       "title": "Vector v0.4.0",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "version": "0.4.0"
+      "version": "0.4.0",
+      "whats_next": [
+
+      ]
     },
     "0.5.0": {
       "codename": "Platform Mingling",
@@ -15168,7 +15246,10 @@ module.exports = {
       "title": "Vector v0.5.0",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "version": "0.5.0"
+      "version": "0.5.0",
+      "whats_next": [
+
+      ]
     },
     "0.6.0": {
       "codename": "The Long Stretch",
@@ -20218,7 +20299,10 @@ module.exports = {
       "title": "Vector v0.6.0",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "version": "0.6.0"
+      "version": "0.6.0",
+      "whats_next": [
+
+      ]
     },
     "0.7.0": {
       "codename": "The Great Omelet",
@@ -23601,7 +23685,10 @@ module.exports = {
       "title": "Vector v0.7.0",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "version": "0.7.0"
+      "version": "0.7.0",
+      "whats_next": [
+
+      ]
     },
     "0.7.1": {
       "codename": "",
@@ -23878,7 +23965,10 @@ module.exports = {
       "title": "Vector v0.7.1",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "version": "0.7.1"
+      "version": "0.7.1",
+      "whats_next": [
+
+      ]
     },
     "0.7.2": {
       "codename": "",
@@ -24137,7 +24227,10 @@ module.exports = {
       "title": "Vector v0.7.2",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "version": "0.7.2"
+      "version": "0.7.2",
+      "whats_next": [
+
+      ]
     },
     "0.8.0": {
       "codename": "A Wholesome Platter Of Features",
@@ -28586,7 +28679,10 @@ module.exports = {
       "title": "Vector v0.8.0",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "version": "0.8.0"
+      "version": "0.8.0",
+      "whats_next": [
+
+      ]
     },
     "0.8.1": {
       "codename": "",
@@ -28640,7 +28736,10 @@ module.exports = {
       "title": "Vector v0.8.1",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "version": "0.8.1"
+      "version": "0.8.1",
+      "whats_next": [
+
+      ]
     },
     "0.8.2": {
       "codename": "",
@@ -28741,10 +28840,13 @@ module.exports = {
       "title": "Vector v0.8.2",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "version": "0.8.2"
+      "version": "0.8.2",
+      "whats_next": [
+
+      ]
     },
     "0.9.0": {
-      "codename": "",
+      "codename": "The Homestretch",
       "commits": [
         {
           "author": "Kruno Tomola Fabro",
@@ -29322,7 +29424,7 @@ module.exports = {
           "deletions_count": 652,
           "description": "Add new `encoding.only_fields` and `encoding.except_fields` options",
           "files_count": 72,
-          "highlight_permalink": "/highlights/2020-03-04-encoding-whitelist-blacklist/",
+          "highlight_permalink": "/highlights/2020-03-04-encoding-only-fields-except-fields/",
           "insertions_count": 4148,
           "message": "enhancement(sinks): Add new `encoding.only_fields` and `encoding.except_fields` options (#1915)",
           "pr_number": 1915,
@@ -29961,7 +30063,7 @@ module.exports = {
           "deletions_count": 1,
           "description": "Initial `honeycomb` sink implementation",
           "files_count": 14,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-04-17-new-sinks/",
           "insertions_count": 1102,
           "message": "feat(new sink): Initial `honeycomb` sink implementation (#1847)",
           "pr_number": 1847,
@@ -32721,7 +32823,7 @@ module.exports = {
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.8.2...v0.9.0",
-      "date": "2020-04-16",
+      "date": "2020-04-17",
       "deletions_count": 29669,
       "description": "",
       "highlights": [
@@ -32754,6 +32856,20 @@ module.exports = {
             "source: vector"
           ],
           "title": "À La Carte Custom Vector Builds"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-03-04",
+          "description": "Vector now lets you whitelist, blacklist, and format fields when events are encoded",
+          "hide_on_release_notes": false,
+          "id": "2020-03-04-encoding-only-fields-except-fields",
+          "path": "website/highlights/2020-03-04-encoding-only-fields-except-fields.md",
+          "permalink": "/highlights/2020-03-04-encoding-only-fields-except-fields/",
+          "tags": [
+            "type: enhancement",
+            "domain: sinks"
+          ],
+          "title": "New Encoding Options"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -32797,7 +32913,7 @@ module.exports = {
             "domain: sources",
             "source: vector"
           ],
-          "title": "New Dedupe Trasnform"
+          "title": "New Dedupe Transform"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -32917,7 +33033,7 @@ module.exports = {
             "domain: sinks",
             "sink: splunk_hec"
           ],
-          "title": "The `gcp_stackdriver_logging` sink has been renamed to `gcp_stackdrive_logs`"
+          "title": "The `gcp_stackdriver_logging` sink has been renamed to `gcp_stackdriver_logs`"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -32937,7 +33053,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-04-01",
-          "description": "Easily rnrich your logs with Kubernetes metadata",
+          "description": "Easily enrich your logs with Kubernetes metadata",
           "hide_on_release_notes": false,
           "id": "2020-04-01-kubernetes-pod-metadata-transform",
           "path": "website/highlights/2020-04-01-kubernetes-pod-metadata-transform.md",
@@ -33066,6 +33182,20 @@ module.exports = {
             "type: performance"
           ],
           "title": "~36% Higher Throughput"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-04-17",
+          "description": "Papertrail, Honeycomb, Pulsar, and DataDog Logs",
+          "hide_on_release_notes": false,
+          "id": "2020-04-17-new-sinks",
+          "path": "website/highlights/2020-04-17-new-sinks.md",
+          "permalink": "/highlights/2020-04-17-new-sinks/",
+          "tags": [
+            "type: new feature",
+            "domain: sinks"
+          ],
+          "title": "4 New Sinks!"
         }
       ],
       "insertions_count": 132437,
@@ -33074,7 +33204,25 @@ module.exports = {
       "title": "Vector v0.9.0",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
-      "version": "0.9.0"
+      "version": "0.9.0",
+      "whats_next": [
+        {
+          "title": "Kubernetes!",
+          "description": "We're doing this integration right. We've been alpha testing with a number of large clusters and we've honed in on a very high-quality approach that reflects the UX Vector is going after. You can learn more in our [Kubernetes Integration RFC][urls.pr_2222]. Feedback is welcome!"
+        },
+        {
+          "title": "WASM Driven Plugin Architecture",
+          "description": "This release included an overhaul of our [`lua` transform][docs.transforms.lua], which represents a big step towards making Vector more flexible. Lua is an excellent language when you need some quick scripting capabilities. But what if you need something more powerful? Like writing your own custom source, transform, or sink? Vector plans to solve this with [WASM][urls.wasm] foreign module support, enablign you to extend Vector in the language of your choice with very little performance penalty. ❤️ WASM. Check out the [WASM Foreign Module Support RFC][urls.pr_2341] for more info."
+        },
+        {
+          "title": "Dynamic HTTP Rate-Limiting (AIMD)",
+          "description": "Is there anything more frustrating than fiddling with rate-limits? If your limits are too you risk overwhelming your downstream service, and if your limits are too low you're unecessarily reducing performance and throughput.\nAnd then what happens when you introduce multiple Vector instances into the mix? Vector planning to solve this by automatically detecting the optimal rate limits taking inspiration from TCP congestional control algorithms. Check out the [Dynamic HTTP Rate Limiting RFC][urls.pr_2329]."
+        },
+        {
+          "title": "Vector Observability",
+          "description": "Did you know this release includes a new hidden `internal` source that emits metrics reflecting Vector's own internal state? 👀 We didn't highlight this source because we have not finished instrumenting Vector and we'll be changing the internal schema used.\n\nFun fact, we took an event-driven approach to Vector's internal observability, which we strongly beleive in. We want Vector to be a good example of our own advice. Checkout the [Event-Driven Observability RFC][urls.pr_2093]."
+        }
+      ]
     }
   },
   "sinks": {

@@ -1,0 +1,16 @@
+<%- if release.whats_next.any? -%>
+<ul className="connected-list">
+<%- release.whats_next.each do |whats_next| -%>
+<li>
+
+<%= "#" * heading_depth %> <%= whats_next.title %>
+
+<%= whats_next.description %>
+</li>
+<%- end -%>
+</ul>
+<%- end -%>
+
+The [Vector roadmap][urls.vector_roadmap] is publicly available and represents
+forward looking progress. Vector is [open-source][urls.vector_repo] and
+[community driven][pages.community]. Your feedback is welcome!

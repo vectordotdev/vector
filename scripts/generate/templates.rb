@@ -546,6 +546,10 @@ class Templates
     parts.join(", ")
   end
 
+  def release_whats_next(release, heading_depth: 3)
+    render("#{partials_path}/_release_whats_next.md", binding).strip
+  end
+
   def render(template_path, template_binding = nil)
     old_template_path = @_template_path
     template_binding = binding if template_binding.nil?

@@ -316,6 +316,9 @@ metadata.releases_list.each do |release|
 
     <Changelog version={<%= release.version.to_json %>} />
 
+    ## What's Next
+
+    <%= release_whats_next(release) %>
     EOF
   )
 end
