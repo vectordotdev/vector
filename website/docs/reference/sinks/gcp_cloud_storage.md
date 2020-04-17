@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-09"
+last_modified_on: "2020-04-16"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
@@ -47,7 +47,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   type = "gcp_cloud_storage" # required
   inputs = ["my-source-id"] # required
   compression = "gzip" # required
-  credentials_path = "/path/to/credentials.json" # required
+  credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 
   # Buffer
@@ -71,7 +71,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   inputs = ["my-source-id"] # required
   bucket = "my-bucket" # required
   compression = "gzip" # required
-  credentials_path = "/path/to/credentials.json" # required
+  credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 
   # Batch
@@ -498,7 +498,7 @@ The compression mechanism to use.
   name={"credentials_path"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -510,6 +510,10 @@ The compression mechanism to use.
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Cloud Storage API. If this is unset, Vector checks
 the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
+
+If no filename is named, Vector will attempt to fetch an instance service
+account for the compute instance the program is running on. If Vector is not
+running on a GCE instance, you must define a credentials file as above.
 
 
 

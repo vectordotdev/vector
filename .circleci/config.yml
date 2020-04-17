@@ -54,49 +54,6 @@ jobs:
   # Testing
   #
 
-  check-code:
-    <<: *docker-machine
-    steps:
-      - checkout
-      - run:
-          name: Check generate
-          environment:
-            PASS_RUSTFLAGS: "-D warnings"
-          command: make check-code
-
-  check-fmt:
-    <<: *docker-machine
-    steps:
-      - checkout
-      - run:
-          name: Check fmt
-          environment:
-            PASS_RUSTFLAGS: "-D warnings"
-          command: make check-fmt
-
-  check-generate:
-    <<: *docker-machine
-    steps:
-      - checkout
-      - run:
-          name: Check generate
-          command: make check-generate
-
-  check-version:
-    <<: *docker-machine
-    steps:
-      - checkout
-      - run:
-          name: Check version
-          command: make check-version
-
-  check-blog:
-    <<: *docker-machine
-    steps:
-      - checkout
-      - run:
-          name: Check blog
-          command: make check-blog
 
   test-x86_64-pc-windows-msvc:
     executor: win/vs2019
@@ -182,36 +139,6 @@ jobs:
           command: |
             export PATH=$PATH:$HOME/.cargo/bin
             cargo test kubernetes --no-default-features --features kubernetes-integration-tests
-
-
-  test-stable:
-    <<: *docker-machine
-    environment:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-musl
-    steps:
-      - checkout
-      - run:
-          name: Build tests
-          command: |
-            ./scripts/docker-run.sh builder-$TARGET cargo test --all --no-default-features --features default-musl,docker --no-run --target $TARGET
-      - run:
-          name: Start dependencies
-          command: |
-            docker-compose pull
-            docker-compose up -d splunk
-            sleep 30 # Splunk crashes when started simultaneously with other services
-            docker-compose up -d test-runtime-deps
-            sleep 180
-      - run:
-          name: Run tests
-          command: |
-            find ./target/$TARGET -maxdepth 2 -type f -executable -name '*-*' | sh -e
-      - store_test_results:
-          path: ./test-results
 
   #
   # Building
@@ -801,11 +728,6 @@ master-filters: &master-filters
 
 require-tests-checks-and-verifications: &require-tests-checks-and-verifications
   requires:
-    - check-code
-    - check-fmt
-    - check-generate
-    - check-blog
-    - test-stable
     # - test-stable-kubernetes
     - build-x86_64-unknown-linux-musl-archive-and-deb-package
     - build-aarch64-unknown-linux-musl-archive-and-deb-package
@@ -838,13 +760,6 @@ workflows:
 
   test:
     jobs:
-      - check-code
-      - check-fmt
-      - check-generate
-      - check-blog
-      - check-version:
-          <<: *master-filters
-      - test-stable
       # - test-stable-kubernetes
       - test-x86_64-pc-windows-msvc:
           <<: *prerelease-filters
@@ -917,16 +832,6 @@ workflows:
 
   release:
     jobs:
-      - check-code:
-          <<: *release-filters
-      - check-fmt:
-          <<: *release-filters
-      - check-generate:
-          <<: *release-filters
-      - check-blog:
-          <<: *release-filters
-      - test-stable:
-          <<: *release-filters
       # - test-stable-kubernetes:
           # <<: *release-filters
 
@@ -1033,11 +938,6 @@ workflows:
           <<: *master-filters
 
     jobs:
-      - check-code
-      - check-fmt
-      - check-generate
-      - check-blog
-      - test-stable
       # - test-stable-kubernetes
 
       # Build & verify

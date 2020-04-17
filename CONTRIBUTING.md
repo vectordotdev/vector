@@ -36,6 +36,9 @@ expanding into more specifics.
 1. [Humans](#humans)
    1. [Documentation](#documentation)
    1. [Changelog](#changelog)
+   1. [Highlights](#highlights)
+      1. [What makes a highlight noteworthy?](#what-makes-a-highlight-noteworthy)
+      1. [How is a highlight different from a blog post?](#how-is-a-highlight-different-from-a-blog-post)
 1. [Security](#security)
 1. [Legal](#legal)
    1. [DCO](#dco)
@@ -369,6 +372,50 @@ Developers do not need to maintain the [`Changelog`](/CHANGELOG.md). This is
 automatically generated via the `make release` command. This is made possible
 by the use of [conventional commit](#title) titles.
 
+### Highlights
+
+If your change is noteworthy it should be represented as a
+[highlight](/websites/highlights). Highlights are short announcements that make
+your change known to users. They are similar to
+[AWS' announcements][urls.aws_announcements]. The purpose is three-fold:
+
+1. First, like documentation, communicating features to users is very important.
+   This is usually done in the form of release notes and blog posts. This,
+   unfortunately, means releasing Vector requires a considerable amount of
+   effort. Preparing quality release notes at the 11th hour often results in
+   missed opportuniteis and low quality communication. Front loading this work
+   ensures that we announce the feature while it is fresh in our minds,
+   spreads the workload across the team over time, and promotes quality.
+
+2. Second, providing regular updates to Vector users helps to cultivate a
+   community. Highlights serve as a trigger for this communication. This could
+   be automated or manual. Either way, highlights pose the question in an
+   explicit manner.
+
+3. Finally, some Vector users live on the bleeding edge of Vector changes. They
+   [push it to the limit][urls.push_it_to_the_limit] and appreciate real-time
+   updates. This benefits Vector in that we can get users on a new feature,
+   testing the feature before it is released.
+
+#### What makes a highlight noteworthy?
+
+It should offer meaningful value to users. This is inherently subjective and
+it is impossible to define exact rules for this distinction. But we should be
+cautious not to dillute the meaning of a highlight by producing low values
+highlights.
+
+#### How is a highlight different from a blog post?
+
+Highlights are not blog posts. They are short one, maybe two, paragraph
+announcements. Highlights should allude to, or link to, a blog post if
+relevant.
+
+For example, [this performance increase announcement][urls.performance_highlight]
+is noteworthy, but also deserves an in-depth blog post covering the work that
+resulted in the performance benefit. Notice that the highlight alludes to an
+upcoming blog post. This allows us to communicate a high-value performance
+improvment without being blocked by an in-depth blog post.
+
 ## Security
 
 Please see the [`SECURITY.md` file](/SECURITY.md).
@@ -433,10 +480,13 @@ If you prefer to do this manually:
 https://stackoverflow.com/questions/13043357/git-sign-off-previous-commits
 
 
+[urls.aws_announcements]: https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&wn-featured-announcements.sort-by=item.additionalFields.numericSort&wn-featured-announcements.sort-order=asc
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
 [urls.existing_issues]: https://github.com/timberio/vector/issues
 [urls.fork_repo]: https://help.github.com/en/github/getting-started-with-github/fork-a-repo
 [urls.github_sign_commits]: https://help.github.com/en/github/authenticating-to-github/signing-commits
 [urls.new_issue]: https://github.com/timberio/vector/issues/new
+[urls.push_it_to_the_limit]: https://www.youtube.com/watch?v=ueRzA9GUj9c
+[urls.performance_highlight]: https://vector.dev/highlights/2020-04-11-overall-performance-increase
 [urls.submit_pr]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/

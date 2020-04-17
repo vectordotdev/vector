@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-16"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Syslog to an HTTP endpoint"
 description: "A simple guide to send logs from Syslog to an HTTP endpoint in just a few minutes."
@@ -53,7 +53,7 @@ we'll be deploying Vector as a
 [service][docs.strategies#service].
 
 The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
+separate service. It is designed to receive data from an upstream source and
 fan-out to one or more destinations.
 For this guide, Vector will receive data from
 Syslog via Vector's
