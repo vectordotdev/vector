@@ -4340,9 +4340,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-test"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09cf9705471976fa5fc6817d3fbc9c4ff9696a6647af0e5c1870c81ca7445b05"
+checksum = "ed0049c119b6d505c4447f5c64873636c7af6c75ab0d45fd9f618d82acb8016d"
 dependencies = [
  "bytes 0.5.4",
  "futures-core",
@@ -4523,7 +4523,8 @@ dependencies = [
 [[package]]
 name = "tower-layer"
 version = "0.3.0"
-source = "git+https://github.com/tower-rs/tower?branch=lucio/remove-path-dep#fdfe6353a03b14791abba314808a332138611746"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a35d656f2638b288b33495d1053ea74c40dc05ec0b92084dd71ca5566c4ed1dc"
 
 [[package]]
 name = "tower-limit"
@@ -4586,6 +4587,20 @@ dependencies = [
  "futures 0.1.29",
  "tokio-sync",
  "tower-service 0.2.0",
+]
+
+[[package]]
+name = "tower-test"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ba4bbc2c1e4a8543c30d4c13a4c8314ed72d6e07581910f665aa13fde0153c8"
+dependencies = [
+ "futures-util",
+ "pin-project",
+ "tokio 0.2.13",
+ "tokio-test",
+ "tower-layer 0.3.0",
+ "tower-service 0.3.0",
 ]
 
 [[package]]
@@ -5121,7 +5136,8 @@ dependencies = [
  "toml 0.4.10",
  "tower 0.1.1",
  "tower 0.3.1",
- "tower-test",
+ "tower-test 0.1.0",
+ "tower-test 0.3.0",
  "tracing",
  "tracing-futures 0.2.1",
  "tracing-limit",
