@@ -37,6 +37,9 @@ restore-artifacts-from-workspace: &restore-artifacts-from-workspace
 
 test-install-script: &test-install-script
   run:
+    name: Reload shell
+    command: source ~/.profile
+  run:
     name: Verify installation
     command: vector --version
 
