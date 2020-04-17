@@ -847,6 +847,7 @@ See [motivation](#motivation).
 1. Can we populate file at `terminationMessagePath` with some meaningful
    information when we exit or crash?
 1. Can we allow passing arbitrary fields from the `Pod` object to the event?
+   Currently we only to pass `pod_id`, pod `annotations` and pod `labels`.
 
 ## Plan Of Attack
 
