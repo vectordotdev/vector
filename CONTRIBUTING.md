@@ -410,7 +410,7 @@ Highlights are not blog posts. They are short one, maybe two, paragraph
 announcements. Highlights should allude to, or link to, a blog post if
 relevant.
 
-For example, [this performance increasone announcement][urls.performance_highlight]
+For example, [this performance increase announcement][urls.performance_highlight]
 is noteworthy, but also deserves an in-depth blog post covering the work that
 resulted in the performance benefit. Notice that the highlight alludes to an
 upcoming blog post. This allows us to communicate a high-value performance
