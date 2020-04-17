@@ -61,7 +61,7 @@ jobs:
       TARGET: x86_64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v1
-      - run: cargo test --no-run --target $TARGET
+      - run: cargo test --no-run --features docker --target $TARGET
       - name: Save vector
         uses: actions/upload-artifact@v1
         with:
