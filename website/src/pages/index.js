@@ -385,7 +385,7 @@ function InstallationSection() {
 
         <div className="row">
           <div className="col">
-            <Jump to="/docs/setup/installation/containers/">Containers</Jump>
+            <Jump to="/docs/setup/installation/platforms/">Platforms</Jump>
           </div>
           <div className="col">
             <Jump to="/docs/setup/installation/package-managers/">Package Managers</Jump>
