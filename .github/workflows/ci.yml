@@ -143,28 +143,6 @@ jobs:
 
   es-integration-tests:
     runs-on: ubuntu-latest
-    services:
-      elasticsearch:
-        image: elasticsearch:6.6.2
-        ports:
-          - "9200:9200"
-          - "9300:9300"
-        env:
-          discovery.type: single-node
-      elasticsearch-tls:
-        image: elasticsearch:6.6.2
-        ports:
-          - "9201:9200"
-          - "9301:9300"
-        env:
-          discovery.type: single-node
-          xpack.security.enabled: true
-          xpack.security.http.ssl.enabled: true
-          xpack.security.transport.ssl.enabled: true
-          xpack.ssl.certificate: certs/localhost.crt
-          xpack.ssl.key: certs/localhost.key
-        volumes:
-          - /home/runner/work/vector/vector/tests/data:/usr/share/elasticsearch/config/certs:ro
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -175,6 +153,7 @@ jobs:
       FEATURES: es-integration-tests
     steps:
       - uses: actions/checkout@v1
+      - run: docker-compose up -d elasticsearch elasticsearch-tls
       - run: cargo test --features $FEATURES
 
   gcp-integration-tests:
@@ -200,24 +179,6 @@ jobs:
 
   kafka-integration-tests:
     runs-on: ubuntu-latest
-    services:
-      kafka:
-        image: wurstmeister/kafka
-        ports:
-          - "9091-9093:9091-9093"
-        env:
-          KAFKA_BROKER_ID: 1
-          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-          KAFKA_LISTENERS: PLAINTEXT://:9092,SSL://:9091
-          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,SSL://localhost:9091
-          KAFKA_SSL_KEYSTORE_LOCATION: /certs/localhost.p12
-          KAFKA_SSL_KEYSTORE_PASSWORD: NOPASS
-          KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/localhost.p12
-          KAFKA_SSL_TRUSTSTORE_PASSWORD: NOPASS
-          KAFKA_SSL_KEY_PASSWORD: NOPASS
-          KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: none
-        volumes:
-          - /home/runner/work/vector/vector/tests/data/localhost.p12:/certs/localhost.p12:ro
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -228,6 +189,7 @@ jobs:
       FEATURES: kafka-integration-tests
     steps:
       - uses: actions/checkout@v1
+      - run: docker-compose up -d kafka
       - run: cargo test --features $FEATURES
 
   influxdb-integration-tests:
