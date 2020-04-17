@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-16"
 delivery_guarantee: "best_effort"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
@@ -45,7 +45,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
 [sinks.my_sink_id]
   type = "gcp_stackdriver_logs" # required
   inputs = ["my-source-id"] # required
-  credentials_path = "/path/to/credentials.json" # required
+  credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 ```
 
@@ -58,7 +58,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
   type = "gcp_stackdriver_logs" # required
   inputs = ["my-source-id"] # required
   billing_account_id = "012345-6789AB-CDEF01" # optional, no default
-  credentials_path = "/path/to/credentials.json" # required
+  credentials_path = "/path/to/credentials.json" # optional, no default
   folder_id = "My Folder" # optional, no default
   healthcheck = true # optional, default
   log_id = "vector-logs" # required
@@ -437,7 +437,7 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
   name={"credentials_path"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -450,6 +450,10 @@ The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Stackdriver Logging API. If this is unset, Vector
 checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
 filename.
+
+If no filename is named, Vector will attempt to fetch an instance service
+account for the compute instance the program is running on. If Vector is not
+running on a GCE instance, you must define a credentials file as above.
 
 
 

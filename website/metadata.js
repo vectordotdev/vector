@@ -24269,7 +24269,7 @@ module.exports = {
     "gcp_cloud_storage": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"gcp_cloud_storage\" # required\n  inputs = [\"in\"] # required\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  credentials_path = \"/path/to/credentials.json\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
+        "toml": "[sinks.out]\n  # General\n  type = \"gcp_cloud_storage\" # required\n  inputs = [\"in\"] # required\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Google Cloud Storage is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. This makes it a prime candidate for log data.",
@@ -24357,7 +24357,7 @@ module.exports = {
     "gcp_stackdriver_logs": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"gcp_stackdriver_logs\" # required\n  inputs = [\"in\"] # required\n  credentials_path = \"/path/to/credentials.json\" # required\n  log_id = \"vector-logs\" # required\n  project_id = \"vector-123456\" # required"
+        "toml": "[sinks.out]\n  type = \"gcp_stackdriver_logs\" # required\n  inputs = [\"in\"] # required\n  log_id = \"vector-logs\" # required\n  project_id = \"vector-123456\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": "Stackdriver is Google Cloud's embedded observability suite designed to monitor, troubleshoot, and improve cloud infrastructure, software, and application performance. Stackdriver enables you to efficiently build and run workloads, keeping applications performant and available.",
