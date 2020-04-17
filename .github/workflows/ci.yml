@@ -279,7 +279,6 @@ jobs:
         image: quay.io/influxdb/influxdb:2.0.0-beta
         ports:
           - "9999:9999"
-        command: influxd --reporting-disabled
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
