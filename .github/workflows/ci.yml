@@ -119,8 +119,8 @@ jobs:
       DOCKER_TLS_VERIFY: 0
     steps:
       - uses: actions/checkout@v1
-      - run: docker ps
-      - run: docker info
+      - run: sudo docker ps
+      - run: sudo docker info
       - run: sudo cat /etc/docker/daemon.json
       - run: sudo ls /etc/docker
       - run: cargo test --no-default-features --features $FEATURES
