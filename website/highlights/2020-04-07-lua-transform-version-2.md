@@ -7,7 +7,7 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [2126]
 release: "0.9.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: sources", "source: vector"]
+tags: ["type: enhancement", "domain: sources", "source: vector"]
 ---
 
 import Alert from '@site/src/components/Alert';
