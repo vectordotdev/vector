@@ -95,6 +95,7 @@ jobs:
         with:
           name: test-artifacts
       - run: tar -zxvf test-artifacts/test-artifacts.tar.gz
+      - run: rm test-artifacts/test-artifacts.tar.gz
       - run: |
           docker-compose pull
           docker-compose up -d splunk
