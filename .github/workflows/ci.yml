@@ -70,6 +70,7 @@ jobs:
       - run: mkdir -p test-artifacts
       - run: find ./target/$TARGET -maxdepth 2 -type f -executable -name '*-*' |  xargs -I '{}' mv '{}' test-artifacts/
       - run: cargo clean # Get some disk space!
+      - run: find test-artifacts/ -maxdepth 2 -type f -executable -name '*-*' |  xargs sh -e
       - run: tar -zcvf test-artifacts.tar.gz test-artifacts/
       - name: Save vector test artifacts
         uses: actions/upload-artifact@v1
