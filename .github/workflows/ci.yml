@@ -204,7 +204,7 @@ jobs:
       FEATURES: pulsar-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d pulsarg
+      - run: docker-compose up -d pulsar
       - run: cargo test --no-default-features --features $FEATURES
 
 ## Kubernetes
