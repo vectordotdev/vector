@@ -81,7 +81,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      # Build Vector and our test fixtures.
       - run: cargo test --no-run --target $TARGET
       - name: Save vector
         uses: actions/upload-artifact@v1
@@ -117,7 +116,7 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo test --features $FEATURES
+      - run: cargo test --no-default-features  --features $FEATURES
 
   aws-integration-tests:
     runs-on: ubuntu-latest
@@ -147,7 +146,7 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo test --features $FEATURES
+      - run: cargo test --no-default-features --features $FEATURES
 
   docker-integration-tests:
     runs-on: ubuntu-latest
@@ -176,7 +175,7 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo test --features $FEATURES
+      - run: cargo test --no-default-features --features $FEATURES
 
   es-integration-tests:
     runs-on: ubuntu-latest
@@ -206,7 +205,7 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo test --features $FEATURES
+      - run: cargo test --no-default-features --features $FEATURES
 
   gcp-integration-tests:
     runs-on: ubuntu-latest
@@ -236,7 +235,7 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo test --features $FEATURES
+      - run: cargo test -no-default-features --features $FEATURES
 
   kafka-integration-tests:
     runs-on: ubuntu-latest
@@ -266,7 +265,7 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo test --features $FEATURES
+      - run: cargo test --no-default-features --features $FEATURES
 
   influxdb-integration-tests:
     runs-on: ubuntu-latest
@@ -296,7 +295,7 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo test --features $FEATURES
+      - run: cargo test --no-default-features --features $FEATURES
 
   splunk-integration-tests:
     runs-on: ubuntu-latest
@@ -326,7 +325,7 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo test --features $FEATURES
+      - run: cargo test --no-default-features --features $FEATURES
 
   pulsar-integration-tests:
     runs-on: ubuntu-latest
@@ -363,7 +362,7 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo test --features $FEATURES
+      - run: cargo test --no-default-features --features $FEATURES
 
 ## Kubernetes
 # Build exectuables in parallel, and then tests on different Kubernetes versions in parallel.
