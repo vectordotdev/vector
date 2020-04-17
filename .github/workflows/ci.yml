@@ -76,11 +76,6 @@ jobs:
 
   clickhouse-integration-tests:
     runs-on: ubuntu-latest
-    services:
-      clickhouse:
-        image: yandex/clickhouse-server:19
-        ports:
-          - "8123:8123"
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -91,30 +86,11 @@ jobs:
       FEATURES: clickhouse-integration-tests
     steps:
       - uses: actions/checkout@v1
+      - run: docker-compose up -d clickhouse
       - run: cargo test --features $FEATURES
 
   aws-integration-tests:
     runs-on: ubuntu-latest
-    services:
-      localstack:
-        image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
-        ports:
-          - "4568:4568"
-          - "4582:4582"
-          - "4571:4571"
-          - "4573:4573"
-        env:
-          SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571,firehose:4573
-      mockwatchlogs:
-        image: luciofranco/mockwatchlogs:latest
-        ports:
-          - "6000:6000"
-        env:
-          RUST_LOG: trace
-      ec2_metadata:
-        image: timberiodev/mock-ec2-metadata:latest
-        ports:
-          - "8111:8111"
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -125,6 +101,7 @@ jobs:
       FEATURES: cloudwatch-logs-integration-tests,cloudwatch-metrics-integration-tests,ec2-metadata-integration-tests,firehose-integration-tests,kinesis-integration-tests,s3-integration-tests
     steps:
       - uses: actions/checkout@v1
+      - run: docker-compose up -d localstack mockwatchlogs ec2_metadata
       - run: cargo test --features $FEATURES
 
   docker-integration-tests:
@@ -158,13 +135,6 @@ jobs:
 
   gcp-integration-tests:
     runs-on: ubuntu-latest
-    services:
-      gcloud-pubsub:
-        image: messagebird/gcloud-pubsub-emulator
-        ports:
-          - 8681-8682:8681-8682
-        env:
-          PUBSUB_PROJECT1: testproject,topic1:subscription1
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -175,6 +145,7 @@ jobs:
       FEATURES: gcp-pubsub-integration-tests, gcs-integration-tests
     steps:
       - uses: actions/checkout@v1
+      - run: docker-compose up -d gcloud-pubsub
       - run: cargo test --features $FEATURES
 
   kafka-integration-tests:
@@ -194,17 +165,6 @@ jobs:
 
   influxdb-integration-tests:
     runs-on: ubuntu-latest
-    services:
-      influxdb_v1:
-        image: influxdb:1.7
-        ports:
-          - "8086:8086"
-        env:
-          INFLUXDB_REPORTING_DISABLED: true
-      influxdb_v2:
-        image: quay.io/influxdb/influxdb:2.0.0-beta
-        ports:
-          - "9999:9999"
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -215,17 +175,11 @@ jobs:
       FEATURES: influxdb-integration-tests
     steps:
       - uses: actions/checkout@v1
+      - run: docker-compose up -d influxdb_v1 influxdb_v2
       - run: cargo test --features $FEATURES
 
   splunk-integration-tests:
     runs-on: ubuntu-latest
-    services:
-      splunk:
-        image: timberio/splunk-hec-test:latest
-        ports:
-          - "8088:8088"
-          - "8000:8000"
-          - "8089:8089"
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -236,6 +190,7 @@ jobs:
       FEATURES: splunk-integration-tests
     steps:
       - uses: actions/checkout@v1
+      - run: docker-compose up -d splunk
       - run: cargo test --features $FEATURES
 
   pulsar-integration-tests:
@@ -257,6 +212,7 @@ jobs:
       FEATURES: pulsar-integration-tests
     steps:
       - uses: actions/checkout@v1
+      - run: docker-compose up -d pulsar
       - run: cargo test --features $FEATURES
 
 ## Kubernetes
