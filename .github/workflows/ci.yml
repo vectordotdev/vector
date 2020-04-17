@@ -25,7 +25,7 @@ jobs:
       USE_CONTAINER: none
     steps:
     - uses: actions/checkout@v1
-    - run: sudo apt install -y python3-pip python3-setuptools
+    - run: sudo apt install -y python3-pip python3-setuptools python3-wheel
     - run: python3 -m pip install remarshal --user
     - run: "make check-component-features"
   check-code:
