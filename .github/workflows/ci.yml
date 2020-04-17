@@ -4,6 +4,8 @@ on:
     branches:
     - master
   pull_request: {}
+
+
 jobs:
   cargo-deny:
     runs-on: ubuntu-latest
@@ -17,12 +19,195 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - run: "cd tests && make test-behavior"
-  check-component-features:
+#  check-component-features:
+#    runs-on: ubuntu-latest
+#    env:
+#      USE_CONTAINER: none
+#    steps:
+#    - uses: actions/checkout@v1
+#    - run: sudo apt install -y python3-pip python3-setuptools python3-wheel
+#    - run: sudo python3 -m pip install remarshal
+#    - run: "make check-component-features"
+  check-code:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-    - run: "cd tests && make check-component-features"
+      - uses: actions/checkout@v1
+      - run: "make check-code"
+        env:
+          PASS_RUSTFLAGS: "-D warnings"
+  check-fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: "make check-fmt"
+        env:
+          PASS_RUSTFLAGS: "-D warnings"
+  check-generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: "make check-fmt"
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: "make check-version"
+  check-blog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: "make check-blog"
+  test-stable:
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+    steps:
+      - uses: actions/checkout@v1
+      - run: cargo test --no-run --target $TARGET
+      - name: Save vector
+        uses: actions/upload-artifact@v1
+        with:
+          name: binary
+          path: ./target/x86_64-unknown-linux-gnu/debug/vector
 
+  clickhouse-integration-tests:
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: clickhouse-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: docker-compose up -d clickhouse
+      - run: cargo test --no-default-features  --features $FEATURES
+
+  aws-integration-tests:
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: cloudwatch-logs-integration-tests,cloudwatch-metrics-integration-tests,ec2-metadata-integration-tests,firehose-integration-tests,kinesis-integration-tests,s3-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: docker-compose up -d localstack mockwatchlogs ec2_metadata minio
+      - run: cargo test --no-default-features --features $FEATURES
+
+  docker-integration-tests:
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: docker-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: cargo test --no-default-features --features $FEATURES
+
+  es-integration-tests:
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: es-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: docker-compose up -d elasticsearch elasticsearch-tls localstack
+      - run: cargo test --no-default-features --features $FEATURES
+
+  gcp-integration-tests:
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: gcp-pubsub-integration-tests, gcs-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: docker-compose up -d gcloud-pubsub
+      - run: cargo test --no-default-features --features $FEATURES
+
+  kafka-integration-tests:
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: kafka-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: docker-compose up -d kafka
+      - run: cargo test --no-default-features --features $FEATURES
+
+  influxdb-integration-tests:
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: influxdb-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: docker-compose up -d influxdb_v1 influxdb_v2
+      - run: cargo test --no-default-features --features $FEATURES
+
+  splunk-integration-tests:
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: splunk-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: docker-compose up -d splunk
+      - run: cargo test --no-default-features --features $FEATURES
+
+  pulsar-integration-tests:
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+      FEATURES: pulsar-integration-tests
+    steps:
+      - uses: actions/checkout@v1
+      - run: docker-compose up -d pulsar
+      - run: cargo test --no-default-features --features $FEATURES
 
 ## Kubernetes
 # Build exectuables in parallel, and then tests on different Kubernetes versions in parallel.
