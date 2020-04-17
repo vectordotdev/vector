@@ -183,6 +183,7 @@ mod tests {
     use crate::assert_downcast_matches;
 
     #[test]
+    #[ignore]
     fn fails_missing_creds() {
         let config: GcpAuthConfig = toml::from_str("").unwrap();
         match config.make_credentials(Scope::Compute) {
