@@ -129,7 +129,7 @@ jobs:
       - uses: actions/checkout@v1
       - run: cargo test --features $FEATURES
 
-  cloudwatch-logs-integration-tests:
+  aws-integration-tests:
     runs-on: ubuntu-latest
     services:
       localstack:
@@ -141,6 +141,16 @@ jobs:
           - "4573:4573"
         env:
           SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571,firehose:4573
+      mockwatchlogs:
+        image: luciofranco/mockwatchlogs:latest
+        ports:
+          - "6000:6000"
+        env:
+          RUST_LOG: trace
+      ec2_metadata:
+        image: timberiodev/mock-ec2-metadata:latest
+        ports:
+          - "8111:8111"
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -148,34 +158,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: cloudwatch-logs-integration-tests
+      FEATURES: cloudwatch-logs-integration-tests,cloudwatch-metrics-integration-tests,ec2-metadata-integration-tests,firehose-integration-tests,kinesis-integration-tests,s3-integration-tests
     steps:
       - uses: actions/checkout@v1
       - run: cargo test --features $FEATURES
-
-  cloudwatch-metrics-integration-tests:
-    runs-on: ubuntu-latest
-    services:
-      localstack:
-        image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
-        ports:
-          - "4568:4568"
-          - "4582:4582"
-          - "4571:4571"
-          - "4573:4573"
-        env:
-          SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571,firehose:4573
-    env:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-gnu
-      USE_CONTAINER: none
-      FEATURES: cloudwatch-metrics-integration-tests
-    steps:
-      - uses: actions/checkout@v1
-      - run: cargo test --features $FEATURES-
 
   docker-integration-tests:
     runs-on: ubuntu-latest
@@ -191,25 +177,6 @@ jobs:
       - uses: actions/checkout@v1
       - run: cargo test --features $FEATURES
 
-  ec2-metadata-integration-tests:
-    runs-on: ubuntu-latest
-    services:
-      ec2_metadata:
-        image: timberiodev/mock-ec2-metadata:latest
-        ports:
-          - "8111:8111"
-    env:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-gnu
-      USE_CONTAINER: none
-      FEATURES: ec2-metadata-integration-tests
-    steps:
-      - uses: actions/checkout@v1
-      - run: cargo test --features $FEATURES
-
   es-integration-tests:
     runs-on: ubuntu-latest
     services:
@@ -219,7 +186,7 @@ jobs:
           - "9200:9200"
           - "9300:9300"
         env:
-          - discovery.type=single-node
+          - discovery.type: single-node
       elasticsearch-tls:
         image: elasticsearch:6.6.2
         ports:
@@ -246,17 +213,128 @@ jobs:
       - uses: actions/checkout@v1
       - run: cargo test --features $FEATURES
 
-## Github actions doesn't support templates
+    gcp-integration-tests:
+      runs-on: ubuntu-latest
+      services:
+        gcloud-pubsub:
+          image: messagebird/gcloud-pubsub-emulator
+          ports:
+            - 8681-8682:8681-8682
+          env:
+            - PUBSUB_PROJECT1=testproject,topic1:subscription1
+      env:
+        RUST_BACKTRACE: full
+        TEST_LOG: debug
+        AWS_ACCESS_KEY_ID: fake-aws-key
+        AWS_SECRET_ACCESS_KEY: fake-aws-key
+        TARGET: x86_64-unknown-linux-gnu
+        USE_CONTAINER: none
+        FEATURES: gcp-pubsub-integration-tests, gcs-integration-tests
+      steps:
+        - uses: actions/checkout@v1
+        - run: cargo test --features $FEATURES
 
-#firehose-integration-tests
-#gcp-pubsub-integration-tests
-#gcs-integration-tests
-#kafka-integration-tests
-#kinesis-integration-tests
-#s3-integration-tests
-#influxdb-integration-tests
-#splunk-integration-tests
-#pulsar-integration-tests
+    kafka-integration-tests:
+      runs-on: ubuntu-latest
+      services:
+        kafka:
+          image: wurstmeister/kafka
+          ports:
+            - "9091-9093:9091-9093"
+          env:
+            KAFKA_BROKER_ID: 1
+            KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+            KAFKA_LISTENERS: PLAINTEXT://:9092,SSL://:9091
+            KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,SSL://localhost:9091
+            KAFKA_SSL_KEYSTORE_LOCATION: /certs/localhost.p12
+            KAFKA_SSL_KEYSTORE_PASSWORD: NOPASS
+            KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/localhost.p12
+            KAFKA_SSL_TRUSTSTORE_PASSWORD: NOPASS
+            KAFKA_SSL_KEY_PASSWORD: NOPASS
+            KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: none
+          volumes:
+            - ./tests/data/localhost.p12:/certs/localhost.p12:ro
+      env:
+        RUST_BACKTRACE: full
+        TEST_LOG: debug
+        AWS_ACCESS_KEY_ID: fake-aws-key
+        AWS_SECRET_ACCESS_KEY: fake-aws-key
+        TARGET: x86_64-unknown-linux-gnu
+        USE_CONTAINER: none
+        FEATURES: kafka-integration-tests
+      steps:
+        - uses: actions/checkout@v1
+        - run: cargo test --features $FEATURES
+
+    influxdb-integration-tests:
+      runs-on: ubuntu-latest
+      services:
+        influxdb_v1:
+          image: influxdb:1.7
+          ports:
+            - "8086:8086"
+          env:
+            - INFLUXDB_REPORTING_DISABLED=true
+        influxdb_v2:
+          image: quay.io/influxdb/influxdb:2.0.0-beta
+          ports:
+            - "9999:9999"
+          command: influxd --reporting-disabled
+      env:
+        RUST_BACKTRACE: full
+        TEST_LOG: debug
+        AWS_ACCESS_KEY_ID: fake-aws-key
+        AWS_SECRET_ACCESS_KEY: fake-aws-key
+        TARGET: x86_64-unknown-linux-gnu
+        USE_CONTAINER: none
+        FEATURES: influxdb-integration-tests
+      steps:
+        - uses: actions/checkout@v1
+        - run: cargo test --features $FEATURES
+
+    splunk-integration-tests:
+      runs-on: ubuntu-latest
+      services:
+        splunk:
+          image: timberio/splunk-hec-test:latest
+          ports:
+            - "8088:8088"
+            - "8000:8000"
+            - "8089:8089"
+          entrypoint: ["sh", "-c", "./bin/splunk add index custom_index && ./entrypoint.sh"]
+      env:
+        RUST_BACKTRACE: full
+        TEST_LOG: debug
+        AWS_ACCESS_KEY_ID: fake-aws-key
+        AWS_SECRET_ACCESS_KEY: fake-aws-key
+        TARGET: x86_64-unknown-linux-gnu
+        USE_CONTAINER: none
+        FEATURES: splunk-integration-tests
+      steps:
+        - uses: actions/checkout@v1
+        - run: cargo test --features $FEATURES
+
+    pulsar-integration-tests:
+      runs-on: ubuntu-latest
+      services:
+        splunk:
+          image: timberio/splunk-hec-test:latest
+          ports:
+            - "8088:8088"
+            - "8000:8000"
+            - "8089:8089"
+          entrypoint: ["sh", "-c", "./bin/splunk add index custom_index && ./entrypoint.sh"]
+      env:
+        RUST_BACKTRACE: full
+        TEST_LOG: debug
+        AWS_ACCESS_KEY_ID: fake-aws-key
+        AWS_SECRET_ACCESS_KEY: fake-aws-key
+        TARGET: x86_64-unknown-linux-gnu
+        USE_CONTAINER: none
+        FEATURES: pulsar-integration-tests
+      steps:
+        - uses: actions/checkout@v1
+        - run: cargo test --features $FEATURES
 
 ## Kubernetes
 # Build exectuables in parallel, and then tests on different Kubernetes versions in parallel.
