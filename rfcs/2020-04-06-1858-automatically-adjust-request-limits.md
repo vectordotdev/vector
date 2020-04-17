@@ -1,4 +1,4 @@
-# RFC 1858 - 2020-04-06 - Automatically Adjust Limits
+# RFC 1858 - 2020-04-06 - Automatically Adjust Request Limits
 
 This RFC proposes a new scheme for rate limiting requests to external
 services in order to maximize the sustained transmission rate over
