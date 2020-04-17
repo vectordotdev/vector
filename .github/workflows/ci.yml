@@ -186,7 +186,7 @@ jobs:
           - "9200:9200"
           - "9300:9300"
         env:
-          - "discovery.type": single-node
+          discovery.type: single-node
       elasticsearch-tls:
         image: elasticsearch:6.6.2
         ports:
