@@ -139,7 +139,7 @@ jobs:
           - "4582:4582"
           - "4571:4571"
           - "4573:4573"
-        environment:
+        env:
           SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571,firehose:4573
     env:
       RUST_BACKTRACE: full
@@ -163,7 +163,7 @@ jobs:
           - "4582:4582"
           - "4571:4571"
           - "4573:4573"
-        environment:
+        env:
           SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571,firehose:4573
     env:
       RUST_BACKTRACE: full
@@ -225,7 +225,7 @@ jobs:
         ports:
           - "9201:9200"
           - "9301:9300"
-        environment:
+        env:
           - discovery.type=single-node
           - xpack.security.enabled=true
           - xpack.security.http.ssl.enabled=true
