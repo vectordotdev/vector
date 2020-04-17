@@ -957,9 +957,10 @@ See [motivation](#motivation).
    [`DaemonSet`][daemonset]. Alternative is `OnDelete`. `RollingUpdate` makes
    more sense for us to use as the default, more info on this is available at
    the [docs][k8s_docs_rolling_update].
-1. I've also noticed `resources` declarations in some of these config files.
+1. ~~I've also noticed `resources` declarations in some of these config files.
    For example [LogDNA's daemonset][logdna_daemonset]. I assume this is limiting
-   resources. Do we want to consider this?
+   resources. Do we want to consider this?~~
+   See the [Resource Limits][anchor_resource_limits] section of this RFC.
 1. What the hell is going on with [Honeycomb's integration
    strategy][honeycomb integration]? :) It seems like the whole "Heapster"
    pipeline is specifically for system events, but Heapster is deprecated?
@@ -1017,6 +1018,7 @@ See [motivation](#motivation).
 [anchor_helm_vs_raw_yaml_files]: #helm-vs-raw-yaml-files
 [anchor_minimal_supported_kubernetes_version]: #minimal-supported-kubernetes-version
 [anchor_origin_filtering]: #origin-filtering
+[anchor_resource_limits]: #resource-limits
 [anchor_strategy_on_yaml_file_grouping]: #strategy-on-yaml-file-grouping
 [awesome operators list]: https://github.com/operator-framework/awesome-operators
 [bonzai logging operator]: https://github.com/banzaicloud/logging-operator
