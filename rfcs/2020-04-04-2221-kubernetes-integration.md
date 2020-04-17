@@ -961,10 +961,14 @@ See [motivation](#motivation).
    For example [LogDNA's daemonset][logdna_daemonset]. I assume this is limiting
    resources. Do we want to consider this?~~
    See the [Resource Limits][anchor_resource_limits] section of this RFC.
-1. What the hell is going on with [Honeycomb's integration
+1. ~~What the hell is going on with [Honeycomb's integration
    strategy][honeycomb integration]? :) It seems like the whole "Heapster"
    pipeline is specifically for system events, but Heapster is deprecated?
-   This leads me to my next question...
+   This leads me to my next question...~~
+   Heapster is indeed outdated, as well as Honeycomb integration guide.
+   Kubernetes now solves it's internal autoscaling pipelines needs with
+   [`metrics-server`][metrics-server] - a similar idea yet much more lightweight
+   implementation.
 1. How are we collecting Kubernetes system events? Is that outside of the
    scope of this RFC? And why does this take an entirely different path?
    (ref [issue#1293])
@@ -1078,6 +1082,7 @@ See [motivation](#motivation).
 [kustomize]: https://github.com/kubernetes-sigs/kustomize
 [logdna k8s integration]: https://docs.logdna.com/docs/kubernetes
 [logdna_daemonset]: https://raw.githubusercontent.com/logdna/logdna-agent/master/logdna-agent-ds.yaml
+[metrics-server]: https://github.com/kubernetes-sigs/metrics-server
 [pr#2134]: https://github.com/timberio/vector/pull/2134
 [pr#2188]: https://github.com/timberio/vector/pull/2188
 [sidecar_container]: https://github.com/kubernetes/enhancements/blob/a8262db2ce38b2ec7941bdb6810a8d81c5141447/keps/sig-apps/sidecarcontainers.md
