@@ -166,6 +166,7 @@ install_from_archive() {
       add_to_path "${HOME}/.profile" "${_path}"
       add_to_path "${HOME}/.zprofile" "${_path}"
       eval "${_path}"
+      printf "$_prompt PATH => $PATH"
       printf " ✓\n"
     fi
 
