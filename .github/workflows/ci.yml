@@ -123,8 +123,6 @@ jobs:
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
       FEATURES: cloudwatch-logs-integration-tests,cloudwatch-metrics-integration-tests,ec2-metadata-integration-tests,firehose-integration-tests,kinesis-integration-tests,s3-integration-tests
@@ -190,7 +188,7 @@ jobs:
       FEATURES: es-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d elasticsearch elasticsearch-tls
+      - run: docker-compose up -d elasticsearch elasticsearch-tls localstack
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
