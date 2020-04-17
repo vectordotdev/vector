@@ -157,7 +157,7 @@ install_from_archive() {
     printf "$_prompt Unpacking archive to $HOME/.vector ..."
     ensure mkdir -p "$HOME/.vector"
     local _dir_name=$(tar -tzf ${_file} | head -1 | sed -e 's/\.\/\(.*\)\//\1/')
-    ensure tar -xzf "$_file" --directory="$HOME/.vector" --strip-components=1
+    ensure tar -xzf "$_file" --directory="$HOME/.vector" --strip-components=2
 
     printf " ✓\n"
 
@@ -166,7 +166,6 @@ install_from_archive() {
       add_to_path "${HOME}/.profile" "${_path}"
       add_to_path "${HOME}/.zprofile" "${_path}"
       eval "${_path}"
-      printf "$_prompt PATH => $PATH"
       printf " ✓\n"
     fi
 
