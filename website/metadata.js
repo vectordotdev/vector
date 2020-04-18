@@ -1967,6 +1967,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sinks/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from a file to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/file/aws_kinesis_firehose",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/aws_kinesis_firehose.md",
@@ -1990,6 +1999,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/file/pulsar.md",
           "series_position": null,
           "title": "Send logs from a file to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from a file to Clickhouse"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2030,6 +2048,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sinks/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from a file to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/file/gcp_pubsub",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/gcp_pubsub.md",
@@ -2053,6 +2080,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/file/honeycomb.md",
           "series_position": null,
           "title": "Send logs from a file to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from a file to Humio"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2098,6 +2134,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/file/new_relic_logs.md",
           "series_position": null,
           "title": "Send logs from a file to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from a file to Papertrail"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2183,15 +2228,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/integrate/sinks/aws_kinesis_firehose",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sinks/aws_kinesis_firehose.md",
-          "series_position": null,
-          "title": "Send logs to AWS Kinesis Firehose"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/integrate/sinks/aws_s3",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/aws_s3.md",
@@ -2206,15 +2242,6 @@ module.exports = {
           "path": "website/guides/integrate/sinks/pulsar.md",
           "series_position": null,
           "title": "Send logs to Apache Pulsar"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sinks/clickhouse",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sinks/clickhouse.md",
-          "series_position": null,
-          "title": "Send logs to Clickhouse"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2246,15 +2273,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/integrate/sinks/gcp_pubsub",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sinks/gcp_pubsub.md",
-          "series_position": null,
-          "title": "Send logs to GCP PubSub"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/integrate/sinks/gcp_stackdriver_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/gcp_stackdriver_logs.md",
@@ -2269,15 +2287,6 @@ module.exports = {
           "path": "website/guides/integrate/sinks/honeycomb.md",
           "series_position": null,
           "title": "Send logs to Honeycomb"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sinks/humio_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sinks/humio_logs.md",
-          "series_position": null,
-          "title": "Send logs to Humio"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2314,15 +2323,6 @@ module.exports = {
           "path": "website/guides/integrate/sinks/new_relic_logs.md",
           "series_position": null,
           "title": "Send logs to New Relic"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sinks/papertrail",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sinks/papertrail.md",
-          "series_position": null,
-          "title": "Send logs to Papertrail"
         },
         {
           "author_github": "https://github.com/binarylogic",

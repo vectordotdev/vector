@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-18"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics to InfluxDB"
 description: "A simple guide to send metrics to InfluxDB in just a few minutes."
@@ -123,7 +123,7 @@ sudo dpkg -i vector-amd64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={null}
+  sourceName={"statsd"}
   sinkName={"influxdb_metrics"} />
 
 </li>
@@ -169,7 +169,7 @@ sudo dpkg -i vector-arm64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={null}
+  sourceName={"statsd"}
   sinkName={"influxdb_metrics"} />
 
 </li>
@@ -215,7 +215,7 @@ sudo dpkg -i vector-armhf.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={null}
+  sourceName={"statsd"}
   sinkName={"influxdb_metrics"} />
 
 </li>
