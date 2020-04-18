@@ -18,13 +18,11 @@ jobs:
           ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive package-deb
         env:
           PASS_FEATURES: "default-musl"
-      - name: vector-x86_64-unknown-linux-musl.tar.gz artifact
-        uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v1
         with:
           name: "vector-x86_64-unknown-linux-musl.tar.gz"
           path: "./target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz"
-      - name: Vector vector-amd64.deb artifact
-        uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v1
         with:
           name: "vector-x86_64-unknown-linux-musl.tar.gz"
           path: "./target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz"
