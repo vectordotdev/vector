@@ -136,14 +136,19 @@ TODO: insert diagram
     kubectl create namespace vector
 
     # Helm v3
-    helm install \
-      cert-manager vector/vector \
-      --namespace vector
+    helm upgrade \
+      --install \
+      --namespace vector \
+      --values vector-values.yaml \
+      vector \
+      vector/vector
 
     # Helm v2
-    helm install \
-      --name vector \
+    helm upgrade
+      --install  \
       --namespace vector \
+      --values vector-values.yaml \
+      --name vector \
       vector/vector
     ```
 
