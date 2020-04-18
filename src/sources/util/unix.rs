@@ -1,4 +1,7 @@
-use crate::{emit, event::Event, internal_events::UnixSocketError, sources::Source};
+use crate::{
+    emit, event::Event, internal_events::UnixSocketError, shutdown::ShutdownSignal,
+    sources::Source, stream::StreamExt,
+};
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use std::path::PathBuf;
@@ -19,6 +22,7 @@ pub fn build_unix_source(
     path: PathBuf,
     max_length: usize,
     host_key: String,
+    shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
     build_event: impl Fn(&str, Option<Bytes>, &str) -> Option<Event>
         + std::marker::Send
@@ -35,6 +39,7 @@ pub fn build_unix_source(
 
         listener
             .incoming()
+            .take_until(shutdown.clone())
             .map_err(|e| error!("failed to accept socket; error = {:?}", e))
             .for_each(move |socket| {
                 let out = out.clone();
@@ -58,6 +63,7 @@ pub fn build_unix_source(
                 let received_from: Option<Bytes> =
                     path.map(|p| p.to_string_lossy().into_owned().into());
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
+                    .take_until(shutdown.clone())
                     .filter_map(move |line| build_event(&host_key, received_from.clone(), &line))
                     .map_err(move |error| {
                         emit!(UnixSocketError {

@@ -102,7 +102,13 @@ impl SourceConfig for SocketConfig {
                     .host_key
                     .clone()
                     .unwrap_or(event::log_schema().host_key().to_string());
-                Ok(unix::unix(config.path, config.max_length, host_key, out))
+                Ok(unix::unix(
+                    config.path,
+                    config.max_length,
+                    host_key,
+                    shutdown,
+                    out,
+                ))
             }
         }
     }

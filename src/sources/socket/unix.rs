@@ -1,6 +1,7 @@
 use crate::{
     event::{self, Event},
     internal_events::UnixSocketEventReceived,
+    shutdown::ShutdownSignal,
     sources::{util::build_unix_source, Source},
 };
 use bytes::Bytes;
@@ -52,7 +53,8 @@ pub fn unix(
     path: PathBuf,
     max_length: usize,
     host_key: String,
+    shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
 ) -> Source {
-    build_unix_source(path, max_length, host_key, out, build_event)
+    build_unix_source(path, max_length, host_key, shutdown, out, build_event)
 }
