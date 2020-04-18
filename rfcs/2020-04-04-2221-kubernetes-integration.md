@@ -877,6 +877,24 @@ effort required to maintain the infrastructure and the costs. It may also be
 inefficient to test everything everywhere, because a lot of configurations
 don't have any significant or meaningful differences among each other.
 
+Testing various managed offers and distributions is not as important as testing
+different Kubernetes versions and container runtimes.
+
+It's probably a good idea to also test against the most famous managed
+Kubernetes provides: AWS, GCP and Azure. Just because our users are most likely
+to be on one of those.
+
+So, the goal for integration tests is to somehow test Vector with Kubernetes
+versions from MSKV to latest, all the container runtimes listed above and,
+additionally, on AWS, GCP and Azure.
+
+We can combine our requirements with offers from cloud providers. For instance,
+`runhcs` (and Windows containers in general) are supported at Azure. Although,
+whether we want to address Windows containers support is a different topic, we
+still should plan ahead.
+
+We'll need to come up with an optimal configuration.
+
 TODO
 
 - integration tests are cluster-agnostic
