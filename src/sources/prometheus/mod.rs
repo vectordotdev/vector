@@ -1,6 +1,7 @@
 use crate::{
     internal_events::{PrometheusHttpError, PrometheusParseError, PrometheusRequestCompleted},
     shutdown::ShutdownSignal,
+    stream::StreamExt,
     topology::config::GlobalOptions,
     Event,
 };
@@ -31,7 +32,7 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let mut urls = Vec::new();
@@ -39,7 +40,7 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
             let base_uri = host.parse::<Uri>().context(super::UriParseError)?;
             urls.push(format!("{}metrics", base_uri));
         }
-        Ok(prometheus(urls, self.scrape_interval_secs, out))
+        Ok(prometheus(urls, self.scrape_interval_secs, shutdown, out))
     }
 
     fn output_type(&self) -> crate::topology::config::DataType {
@@ -51,11 +52,17 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
     }
 }
 
-fn prometheus(urls: Vec<String>, interval: u64, out: mpsc::Sender<Event>) -> super::Source {
+fn prometheus(
+    urls: Vec<String>,
+    interval: u64,
+    shutdown: ShutdownSignal,
+    out: mpsc::Sender<Event>,
+) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending metric: {:?}", e));
 
     let task = Interval::new(Instant::now(), Duration::from_secs(interval))
         .map_err(|e| error!("timer error: {:?}", e))
+        .take_until(shutdown)
         .map(move |_| futures01::stream::iter_ok(urls.clone()))
         .flatten()
         .map(move |url| {
