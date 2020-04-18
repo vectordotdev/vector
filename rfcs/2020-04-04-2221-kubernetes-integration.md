@@ -830,7 +830,7 @@ We have a matrix of concerns, we'd like to ensure Vectors works properly with.
   - Minimal Supported Kubernetes Version
   - Latest version
   - All versions in between the latest and MSKV
-- Managed Kubernetes offers
+- Managed Kubernetes offers (see also [CNCF Certified Kubernetes][cncf_software_conformance])
   - [Amazon Elastic Kubernetes Service](https://aws.amazon.com/ru/eks/)
   - [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine/)
   - [Azure Kubernetes Service](https://azure.microsoft.com/en-us/services/kubernetes-service/)
@@ -1032,6 +1032,7 @@ See [motivation](#motivation).
 [awesome operators list]: https://github.com/operator-framework/awesome-operators
 [bonzai logging operator]: https://github.com/banzaicloud/logging-operator
 [chartmuseum]: https://chartmuseum.com/
+[cncf_software_conformance]: https://www.cncf.io/certification/software-conformance/
 [configmap_updates]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
 [container_runtimes]: https://kubernetes.io/docs/setup/production-environment/container-runtimes/
 [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
