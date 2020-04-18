@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-09"
+last_modified_on: "2020-04-17"
 delivery_guarantee: "at_least_once"
 component_title: "Generator"
 description: "The Vector `generator` source ingests data through an internal data generator and outputs `log` events."
@@ -51,8 +51,8 @@ ingests data through an internal data generator and outputs
 ```toml title="vector.toml"
 [sources.my_source_id]
   type = "generator" # required
+  batch_interval = 1.0 # optional, no default
   count = "infinite" # optional, default
-  interval = 1.0 # optional, no default
   lines = ["Line 1", "Line 2"] # required
   sequence = false # optional, default
 ```
@@ -63,6 +63,31 @@ ingests data through an internal data generator and outputs
 ## Options
 
 <Fields filters={true}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[1.0]}
+  groups={[]}
+  name={"batch_interval"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"float"}
+  unit={null}
+  warnings={[]}
+  >
+
+### batch_interval
+
+The amount of time, in seconds, to pause between each batch of output lines. If
+not set, there will be no delay.
+
+
+
+
+</Field>
 <Field
   common={false}
   defaultValue={"infinite"}
@@ -82,31 +107,6 @@ ingests data through an internal data generator and outputs
 ### count
 
 The number of times to repeat outputting the [`lines`](#lines).
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[1.0]}
-  groups={[]}
-  name={"interval"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"float"}
-  unit={null}
-  warnings={[]}
-  >
-
-### interval
-
-The amount of time, in seconds, to pause between each batch of output lines. If
-not set, there will be no delay.
 
 
 

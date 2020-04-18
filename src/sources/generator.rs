@@ -20,7 +20,7 @@ pub(self) struct GeneratorConfig {
     sequence: bool,
     lines: Vec<String>,
     #[serde(default)]
-    interval: Option<f64>,
+    batch_interval: Option<f64>,
     #[serde(default = "usize::max_value")]
     count: usize,
 }
@@ -64,7 +64,9 @@ impl GeneratorConfig {
         mut shutdown: ShutdownSignal,
         mut out: mpsc::Sender<Event>,
     ) -> Result<(), ()> {
-        let mut interval = self.interval.map(|i| interval(Duration::from_secs_f64(i)));
+        let mut batch_interval = self
+            .batch_interval
+            .map(|i| interval(Duration::from_secs_f64(i)));
         let mut number: usize = 0;
 
         for _ in 0..self.count {
@@ -72,8 +74,8 @@ impl GeneratorConfig {
                 break;
             }
 
-            if let Some(interval) = &mut interval {
-                interval.next().await;
+            if let Some(batch_interval) = &mut batch_interval {
+                batch_interval.next().await;
             }
 
             let events = self
@@ -177,12 +179,12 @@ mod tests {
     }
 
     #[test]
-    fn obeys_interval() {
+    fn obeys_batch_interval() {
         let start = Instant::now();
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 3
-               interval = 1.0"#,
+               batch_interval = 1.0"#,
         );
 
         for _ in 0..6 {
