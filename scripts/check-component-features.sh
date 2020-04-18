@@ -30,7 +30,7 @@ cat Cargo.toml |
 
 if (${CI:-false}); then
   echo "Cleaning to save some disk space"
-  cargo clean -p vector
+  cargo clean
 fi
 
 echo "Checking that each transform feature can be built without other features..."
@@ -41,7 +41,7 @@ cat Cargo.toml |
 
 if (${CI:-false}); then
   echo "Cleaning to save some disk space"
-  cargo clean -p vector
+  cargo clean
 fi
 
 echo "Checking that each sink feature can be built without other features..."
