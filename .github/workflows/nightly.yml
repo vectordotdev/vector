@@ -129,8 +129,6 @@ jobs:
           path: "./target/artifacts/vector-x64.msi"
 
 
-  build-x86_64-pc-windows-msvc-archive-and-msi-package:
-    runs-on:
   # release-docker:
   #   runs-on: ubuntu-latest
   #   needs:
