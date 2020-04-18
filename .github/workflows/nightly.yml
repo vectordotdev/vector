@@ -14,7 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: |
+      - name: "Build archive and package"
+        run: |
           ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive package-deb
         env:
           PASS_FEATURES: "default-musl"
@@ -31,7 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: |
+      - name: "Build archive and package"
+        run: |
           ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build-archive package-deb
         env:
           DOCKER_PRIVILEGED: "true"
@@ -49,7 +51,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: |
+      - name: "Build archive and package"
+        run: |
           ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build-archive package-deb
         env:
           DOCKER_PRIVILEGED: "true"
@@ -67,7 +70,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
-      - run: |
+      - name: "Build archive"
+        run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           make build-archive
         env:
@@ -126,7 +130,7 @@ jobs:
 
           ./scripts/build-archive.sh
           ls -lha target/artifacts
-      - name: "Build archive"
+      - name: "Build package"
         shell: bash
         run: |
           export PATH="/c/wix:$PATH"
