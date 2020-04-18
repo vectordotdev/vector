@@ -1,6 +1,7 @@
 use crate::{
     event::{self, Event},
     shutdown::ShutdownSignal,
+    stream::StreamExt,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
@@ -39,12 +40,13 @@ impl SourceConfig for StdinConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         Ok(stdin_source(
             io::BufReader::new(io::stdin()),
             self.clone(),
+            shutdown,
             out,
         ))
     }
@@ -58,7 +60,12 @@ impl SourceConfig for StdinConfig {
     }
 }
 
-pub fn stdin_source<R>(stdin: R, config: StdinConfig, out: mpsc::Sender<Event>) -> super::Source
+pub fn stdin_source<R>(
+    stdin: R,
+    config: StdinConfig,
+    shutdown: ShutdownSignal,
+    out: mpsc::Sender<Event>,
+) -> super::Source
 where
     R: Send + io::BufRead + 'static,
 {
@@ -84,17 +91,20 @@ where
                         while let Err(e) = tx.try_send(msg.clone()) {
                             if e.is_full() {
                                 thread::sleep(Duration::from_millis(10));
-                                continue;
+                            } else if e.is_disconnected() {
+                                return;
+                            } else {
+                                error!(message = "Unable to send event.", error = %e);
+                                break;
                             }
-                            error!(message = "Unable to send event.", error = %e);
-                            break;
                         }
                     }
                 }
             }
         });
 
-        rx.map(move |line| create_event(line, &host_key, &hostname))
+        rx.take_until(shutdown)
+            .map(move |line| create_event(line, &host_key, &hostname))
             .map_err(|e| error!("error reading line: {:?}", e))
             .forward(
                 out.sink_map_err(|e| error!(message = "Unable to send event to out.", error = %e)),
@@ -151,7 +161,7 @@ mod tests {
         let buf = Cursor::new(String::from("hello world\nhello world again"));
 
         let mut rt = Runtime::new().unwrap();
-        let source = stdin_source(buf, config, tx);
+        let source = stdin_source(buf, config, ShutdownSignal::noop(), tx);
 
         rt.block_on(source).unwrap();
 
