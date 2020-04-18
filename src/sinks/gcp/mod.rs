@@ -1,11 +1,16 @@
 use crate::sinks::HealthcheckError;
 use futures01::{Future, Stream};
 use goauth::scopes::Scope;
-use goauth::{auth::JwtClaims, auth::Token, credentials::Credentials, error::GOErr};
+use goauth::{
+    auth::{JwtClaims, Token, TokenErr},
+    credentials::Credentials,
+    error::GOErr,
+};
 use hyper::{
     header::{HeaderValue, AUTHORIZATION},
     Request, StatusCode,
 };
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
@@ -16,6 +21,9 @@ use tokio01::timer::Interval;
 pub mod cloud_storage;
 pub mod pubsub;
 pub mod stackdriver_logs;
+
+const SERVICE_ACCOUNT_TOKEN_URL: &str =
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
 #[derive(Debug, Snafu)]
 enum GcpError {
@@ -28,7 +36,15 @@ enum GcpError {
     #[snafu(display("Invalid RSA key in GCP credentials"))]
     InvalidRsaKey { source: GOErr },
     #[snafu(display("Failed to get OAuth token"))]
-    GetTokenFailed { source: GOErr },
+    GetToken { source: GOErr },
+    #[snafu(display("Failed to get OAuth token text"))]
+    GetTokenText { source: reqwest::Error },
+    #[snafu(display("Failed to get implicit GCP token"))]
+    GetImplicitToken { source: reqwest::Error },
+    #[snafu(display("Failed to parse OAuth token JSON"))]
+    TokenFromJson { source: TokenErr },
+    #[snafu(display("Failed to parse OAuth token JSON text"))]
+    TokenJsonFromStr { source: serde_json::Error },
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -41,34 +57,57 @@ impl GcpAuthConfig {
     pub fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpCredentials>> {
         let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
         let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
-        if self.api_key.is_none() && creds_path.is_none() {
-            Err(GcpError::MissingAuth.into())
-        } else {
-            Ok(match creds_path.as_ref() {
-                Some(path) => Some(GcpCredentials::new(path, scope)?),
-                None => None,
-            })
-        }
+        Ok(match (&creds_path, &self.api_key) {
+            (Some(path), _) => Some(GcpCredentials::from_file(path, scope)?),
+            (None, Some(_)) => None,
+            (None, None) => Some(GcpCredentials::new_implicit(scope)?),
+        })
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct GcpCredentials {
-    creds: Credentials,
+    creds: Option<Credentials>,
     scope: Scope,
     token: Arc<RwLock<Token>>,
 }
 
+fn get_token_implicit() -> Result<Token, GcpError> {
+    let client = Client::new();
+    let mut response = client
+        .get(SERVICE_ACCOUNT_TOKEN_URL)
+        .header("Metadata-Flavor", "Google")
+        .send()
+        .context(GetImplicitToken)?;
+    let text = response.text().context(GetTokenText)?;
+    // Token::from_str is irresponsible and may panic!
+    match serde_json::from_str::<Token>(&text) {
+        Ok(token) => Ok(token),
+        Err(error) => Err(match serde_json::from_str::<TokenErr>(&text) {
+            Ok(error) => GcpError::TokenFromJson { source: error },
+            Err(_) => GcpError::TokenJsonFromStr { source: error },
+        }),
+    }
+}
+
 impl GcpCredentials {
-    pub fn new(path: &str, scope: Scope) -> crate::Result<Self> {
+    fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
         let creds = Credentials::from_file(path).context(InvalidCredentials1)?;
         let jwt = make_jwt(&creds, &scope)?;
-        let token = goauth::get_token_with_creds(&jwt, &creds).context(GetTokenFailed)?;
-        let token = Arc::new(RwLock::new(token));
+        let token = goauth::get_token_with_creds(&jwt, &creds).context(GetToken)?;
         Ok(Self {
-            creds,
+            creds: Some(creds),
             scope,
-            token,
+            token: Arc::new(RwLock::new(token)),
+        })
+    }
+
+    fn new_implicit(scope: Scope) -> crate::Result<Self> {
+        let token = get_token_implicit()?;
+        Ok(Self {
+            creds: None,
+            scope,
+            token: Arc::new(RwLock::new(token)),
         })
     }
 
@@ -81,8 +120,13 @@ impl GcpCredentials {
     }
 
     fn regenerate_token(&self) -> crate::Result<()> {
-        let jwt = make_jwt(&self.creds, &self.scope).unwrap(); // Errors caught above
-        let token = goauth::get_token_with_creds(&jwt, &self.creds)?;
+        let token = match &self.creds {
+            Some(creds) => {
+                let jwt = make_jwt(creds, &self.scope).unwrap(); // Errors caught above
+                goauth::get_token_with_creds(&jwt, creds)?
+            }
+            None => get_token_implicit()?,
+        };
         *self.token.write().unwrap() = token;
         Ok(())
     }
@@ -139,11 +183,12 @@ mod tests {
     use crate::assert_downcast_matches;
 
     #[test]
+    #[ignore]
     fn fails_missing_creds() {
         let config: GcpAuthConfig = toml::from_str("").unwrap();
         match config.make_credentials(Scope::Compute) {
             Ok(_) => panic!("make_credentials failed to error"),
-            Err(err) => assert_downcast_matches!(err, GcpError, GcpError::MissingAuth),
+            Err(err) => assert_downcast_matches!(err, GcpError, GcpError::GetImplicitToken { .. }), // This should be a more relevant error
         }
     }
 }

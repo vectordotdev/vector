@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-16"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
@@ -47,7 +47,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   type = "gcp_cloud_storage" # required
   inputs = ["my-source-id"] # required
   compression = "gzip" # required
-  credentials_path = "/path/to/credentials.json" # required
+  credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 
   # Buffer
@@ -71,7 +71,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   inputs = ["my-source-id"] # required
   bucket = "my-bucket" # required
   compression = "gzip" # required
-  credentials_path = "/path/to/credentials.json" # required
+  credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 
   # Batch
@@ -91,7 +91,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # Object Attributes
-  acl = "projectPrivate" # optional, default
+  acl = "authenticatedRead" # optional, no default
   metadata.Key1 = "Value1" # example
   storage_class = "STANDARD" # optional, no default
 
@@ -498,7 +498,7 @@ The compression mechanism to use.
   name={"credentials_path"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -510,6 +510,10 @@ The compression mechanism to use.
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Cloud Storage API. If this is unset, Vector checks
 the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
+
+If no filename is named, Vector will attempt to fetch an instance service
+account for the compute instance the program is running on. If Vector is not
+running on a GCE instance, you must define a credentials file as above.
 
 
 
@@ -541,7 +545,7 @@ Enables/disables the sink healthcheck upon start.
 </Field>
 <Field
   common={false}
-  defaultValue={"projectPrivate"}
+  defaultValue={null}
   enumValues={{"authenticatedRead":"Gives the bucket or object owner OWNER permission, and gives all authenticated Google account holders READER permission.","bucketOwnerFullControl":"Gives the object and bucket owners OWNER permission.","bucketOwnerRead":"Gives the object owner OWNER permission, and gives the bucket owner READER permission.","private":"Gives the bucket or object owner OWNER permission for a bucket or object.","projectPrivate":"Gives permission to the project team based on their roles. Anyone who is part of the team has READER permission. Project owners and project editors have OWNER permission. This the default.","publicRead":"Gives the bucket or object owner OWNER permission, and gives all users, both authenticated and anonymous, READER permission. When you apply this to an object, anyone on the Internet can read the object without authenticating."}}
   examples={["authenticatedRead","bucketOwnerFullControl","bucketOwnerRead","private","projectPrivate","publicRead"]}
   groups={[]}
@@ -558,7 +562,8 @@ Enables/disables the sink healthcheck upon start.
 ### acl
 
 Predefined ACL to apply to the created objects. For more information, see
-[Predefined ACLs][urls.gcs_predefined_acl].
+[Predefined ACLs][urls.gcs_predefined_acl]. If this is not set, GCS will apply
+a default ACL when the object is created.
 
  See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 

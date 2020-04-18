@@ -34,7 +34,7 @@ utility and outputs [`log`][docs.data-model.log] events.
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--warnings">
 
 * The [`journalctl`](#journalctl) binary is required, this is the interface Vector uses to retrieve JournalD logs. See the ["Communication Strategy" section][docs.sources.journald#communication-strategy] for more info.
 * The Vector user must be part of the `systemd-journal` group in order to execute the [`journalctl`](#journalctl) binary. See the ["User Permissions" section][docs.sources.journald#user-permissions] for more info.

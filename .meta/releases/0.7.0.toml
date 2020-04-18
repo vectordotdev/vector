@@ -1,10 +1,12 @@
 [releases."0.7.0"]
-subtitle = "The Great Omelet"
-description = """You can't make an omelet without cracking some eggs. We have \
-our eyes set on version 1 and a backlog of breaking changes we wanted to merge \
-before we reach it. Version 0.7.0 is our attempt to cluster as many breaking \
-changes as we can into a single release."""
 date = 2020-01-22
+codename = "The Great Omelet"
+description = """\
+You can't make an omelet without cracking some eggs. We have our eyes set on \
+version 1 and a backlog of breaking changes we wanted to merge before we reach \
+it. Version 0.7.0 is our attempt to cluster as many breaking changes as we can \
+into a single release.\
+"""
 commits = [
 {sha = "fba1b3e0676f6abc1b1ed5178a4972cd62b7fb01", message = "docs: Fix handling of locally-installed bundles (#1354)", author = "Bruce Guenter", date = 2019-12-12T11:24:50Z, files_count = 1, insertions_count = 2, deletions_count = 2},
 {sha = "e46e4601c28862e211f518a592152146be9f35ad", message = "chore: Rename Alex to Alexander", author = "Ben Johnson", date = 2019-12-12T12:28:17Z, files_count = 2, insertions_count = 2, deletions_count = 2},
@@ -156,8 +158,8 @@ commits = [
 {sha = "f11fedd726b4da2f20e834e24d33e084fd00e7e5", message = "feat(socket source): Add unix domain socket support to the 'socket` source (#1489)", author = "Spencer T Brody", date = 2020-01-15T16:04:11Z, files_count = 8, insertions_count = 335, deletions_count = 101},
 {sha = "e11ba357543b67841b3c38aab214aa29f7d34f49", message = "chore(log data model): Deprecate `LogEvent::into_value` in favor of `LogEvent::remove` (#1528)", author = "Alexander Rodin", date = 2020-01-16T13:38:07Z, files_count = 2, insertions_count = 2, deletions_count = 6},
 {sha = "fe0e43a60b0ccb4dc7980b8b1edfa5e7b074b189", message = "chore(testing): Use `.iter()` instead of `.into_iter()` for arrays (#1529)", author = "Alexander Rodin", date = 2020-01-16T13:38:21Z, files_count = 1, insertions_count = 3, deletions_count = 3},
-{sha = "fff92728c9490824ff9d0ae76669adc901bb5499", message = "chore(log data model)!: Remove distinction between explicit and implicit fields (#1530)", author = "Alexander Rodin", date = 2020-01-17T14:32:43Z, files_count = 49, insertions_count = 426, deletions_count = 574},
-{sha = "41be43d7ce8ac4d665525bd15bda044d4822c779", message = "feat(journald source)!: Switch from libsystemd to piping journalctl (#1526)", author = "Bruce Guenter", date = 2020-01-17T14:59:29Z, files_count = 8, insertions_count = 200, deletions_count = 453},
+{sha = "fff92728c9490824ff9d0ae76669adc901bb5499", message = "chore(log data model): Remove distinction between explicit and implicit fields (#1530)", author = "Alexander Rodin", date = 2020-01-17T14:32:43Z, files_count = 49, insertions_count = 426, deletions_count = 574},
+{sha = "41be43d7ce8ac4d665525bd15bda044d4822c779", message = "feat(journald source): Switch from libsystemd to piping journalctl (#1526)", author = "Bruce Guenter", date = 2020-01-17T14:59:29Z, files_count = 8, insertions_count = 200, deletions_count = 453},
 {sha = "b2cdcdabd4535e4d3c40fd656a1fcbcc37ef8804", message = "chore(website): Homepage language cleanup", author = "binarylogic", date = 2020-01-19T14:09:14Z, files_count = 9, insertions_count = 103, deletions_count = 258},
 {sha = "34735be2dd5f51d94cccca5b7d57219f24e6de11", message = "chore(website): Customize toggle button", author = "binarylogic", date = 2020-01-19T14:11:53Z, files_count = 2, insertions_count = 189},
 {sha = "6758f6a7ff7809c2f2c50137e2db9a005355ac26", message = "chore(website): Add free language", author = "binarylogic", date = 2020-01-19T15:37:06Z, files_count = 1, insertions_count = 1, deletions_count = 1},
@@ -171,196 +173,3 @@ commits = [
 {sha = "b290ceb2aee4242834d434a4bd092fe2a0cece3b", message = "chore(operations): Remove build and verify steps for non-releases (#1558)", author = "Binary Logic", date = 2020-01-21T14:11:30Z, files_count = 1, insertions_count = 46, deletions_count = 20},
 {sha = "b07f99ea1e3cb39a9f23471684e881a610cc3d36", message = "chore(docs): Add PR length guidelines to contrib (#1539)", author = "Lucio Franco", date = 2020-01-22T00:29:51Z, files_count = 1, insertions_count = 7, deletions_count = 1},
 ]
-
-[[releases."0.7.0".upgrade_guides]]
-id = "tcp-udp-to-socket-guide"
-commits = []
-title = "The `tcp` and `udp` sources & sinks have been merged into `socket`"
-body = """\
-<p>
-The `tcp` and `udp` sources no longer exist and have been merged into a new
-`socket` type. Likewise, the `tcp` sink has been merged into the `socket` sink.
-
-Migration is straight forward, simply change the `type` to `socket` and add the
-field `mode` to match the socket type (`tcp` or `udp`):
-</p>
-
-<pre>
- [sources.my_tcp_source]
--  type = "tcp"
-+  type = "socket"
-   address = "0.0.0.0:9000"
-+  mode = "tcp"
-
- [sources.my_tcp_sink]
--  type = "tcp"
-+  type = "socket"
-   address = "92.12.333.224:5000"
-+  mode = "tcp"
-</pre>
-"""
-
-[[releases."0.7.0".upgrade_guides]]
-id = "request-changed-guide"
-commits = []
-title = "Request, batching and auth fields refactored for sink components"
-body = """\
-<p>
-Request based sinks have had their request fields nested under the table
-`request` and no longer use fixed retry intervals, instead using a fibonacci
-sequence for backing off retry attempts.
-</p>
-
-<p>
-Batching fields are now nested under the table `batch`, with the field `size`
-replaced with either `max_events` or `max_size` in order to clarify its purpose
-(capping discrete events or bytes respectively).
-</p>
-
-<p>
-Finally, authentication fields have been moved from the table `basic_auth` into
-a general purpose `auth` table complemented with a `strategy` field.
-</p>
-
-<p>
-These changes effect the following sinks:
-</p>
-
-<ul>
-  <li> `aws_cloudwatch_logs` </li>
-  <li> `aws_kinesis_firehose` </li>
-  <li> `aws_kinesis_streams` </li>
-  <li> `aws_s3` </li>
-  <li> `clickhouse` </li>
-  <li> `datadog_metrics` </li>
-  <li> `elasticsearch` </li>
-  <li> `gcp_pubsub` </li>
-  <li> `http` </li>
-  <li> `new_relic_logs` </li>
-  <li> `splunk_hec` </li>
-</ul>
-
-<p>
-In order to migrate all fields prefixed with `request_` must be placed within a
-`request` table with the prefix removed.
-
-The config field `retry_backoff_secs` must also be replaced with two new fields
-`retry_initial_backoff_secs` and `retry_max_duration_secs`.
-
-Fields prefixed with `batch_` must be placed within a `batch` table with the
-prefix removed. Instances of `batch_size` should be renamed `max_size` or
-`max_events` (refer to the relevant sink docs for the correct variant).
-
-Finally, the table `basic_auth` should renamed `auth` with a field `strategy`
-added:
-</p>
-
-<pre>
- [sinks.my_sink_id]
-   type = "http"
-   inputs = ["my-source-id"]
-   uri = "https://10.22.212.22:9000/endpoint"
-
--  batch_size = 1049000
-+  [sinks.my_sink_id.batch]
-+    max_size = 1049000
-
--  [sinks.my_sink_id.basic_auth]
-+  [sinks.my_sink_id.auth]
-+    strategy = "basic"
-     user = "${USERNAME_ENV_VAR}"
-     password = "${PASSWORD_ENV_VAR}"
-
--  request_in_flight_limit = 5
--  request_retry_backoff_secs = 1
-+  [sinks.my_sink_id.request]
-+    in_flight_limit = 5
-+    retry_initial_backoff_secs = 1
-+    retry_max_duration_secs = 10
-</pre>
-"""
-
-[[releases."0.7.0".upgrade_guides]]
-id = "buffer-num-items-changed"
-commits = []
-title = "The buffer field `num_items` has been renamed to `max_events`"
-body = """\
-<p>
-The buffer field `num_items` has been renamed to `max_events` in order to clarify
-its purpose.
-
-Migration involves simply changing all occurrences of `buffer.num_items` to
-`buffer.max_events`:
-</p>
-
-<pre>
- [sinks.my_sink_id]
-   type = "aws_s3"
-   inputs = ["my-source-id"]
-   bucket = "my-bucket"
-
-   [sinks.my_sink_id.buffer]
-     type = "memory"
--    num_items = 500
-+    max_events = 500
-</pre>
-"""
-
-[[releases."0.7.0".upgrade_guides]]
-id = "kafka-sink-comma-list"
-commits = []
-title = "The `kafka` sink now takes a comma separated list of bootstrap servers"
-body = """\
-<p>
-The `kafka` sink field `bootstrap_servers` has been changed from an array to a
-string, expecting a comma separated list of bootstrap servers similar to the
-`kafka` source:
-</p>
-
-<pre>
- [sinks.my_sink_id]
-   type = "kafka"
-   inputs = ["my-source-id"]
--  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
-+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
-</pre>
-"""
-
-[[releases."0.7.0".upgrade_guides]]
-id = "journald-source-switch"
-commits = []
-title = "The `journald` source now pipes from journalctl"
-body = """\
-<p>
-The `journald` source originally used libsystemd in order to consume logs from
-Journald. Since this was causing issues for some distributions of Vector it has
-now been changed to pipe logs from journalctl.
-</p>
-<p>
-Therefore, when using a `journald` source users must now ensure that the
-`journalctl` binary is available. The field `local_only` has also been removed
-as it is no longer applicable.
-</p>
-"""
-
-[[releases."0.7.0".upgrade_guides]]
-id = "splunk-hec-sink-explicit"
-commits = []
-title = "The `splunk_hec` sink does not index any fields by default"
-body = """\
-<p>
-There is no longer a distinction within Vector between explicit and implicit
-event fields. All fields are now implicit and therefore the `splunk_hec` sink
-will <i>not</i> index any fields by default.
-</p>
-<p>
-In order to mark desired fields as indexed you can use the optional configuration
-option `indexed_fields`:
-</p>
-<pre>
- [sinks.my_sink_id]
-   type = "splunk_hec"
-   inputs = ["my-source-id"]
-+  indexed_fields = ["foo", "bar"]
-</pre>
-"""

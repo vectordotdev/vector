@@ -35,21 +35,24 @@ scopes:
   - website
 
   # platforms
+  - arm64 platform
+  - armv7 platform
   - amazon-linux platform
   - centos platform
   - debian platform
-  - macos platform
-  - nixos platform
-  - rhel platform
-  - raspbian platform
-  - ubuntu platform
-  - windows platform
+  - docker platform
   - dpkg platform
   - homebrew platform
+  - macos platform
   - msi platform
   - nix platform
+  - nixos platform
+  - raspbian platform
+  - rhel platform
   - rpm platform
-  - docker platform
+  - ubuntu platform
+  - windows platform
+  - x86_64 platform
 
   # providers
   - aws provider

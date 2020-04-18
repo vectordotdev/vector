@@ -8,6 +8,7 @@ require_relative "metadata/data_model"
 require_relative "metadata/exposing_sink"
 require_relative "metadata/field"
 require_relative "metadata/guides"
+require_relative "metadata/highlight"
 require_relative "metadata/installation"
 require_relative "metadata/links"
 require_relative "metadata/post"
@@ -115,6 +116,7 @@ class Metadata
     :domains,
     :env_vars,
     :guides,
+    :highlights,
     :installation,
     :links,
     :options,
@@ -141,12 +143,37 @@ class Metadata
 
     @domains = hash.fetch("domains").collect { |h| OpenStruct.new(h) }
 
+    # highlights
+
+    @highlights ||=
+      Dir.
+        glob("#{HIGHLIGHTS_ROOT}/**/*.md").
+        filter do |path|
+          content = File.read(path)
+          content.start_with?("---\n")
+        end.
+        collect do |path|
+          Highlight.new(path)
+        end.
+        sort_by do |highlight|
+          [ highlight.date, highlight.id ]
+        end
+
     # posts
 
     @posts ||=
-      Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
-        Post.new(path)
-      end.sort_by { |post| [ post.date, post.id ] }
+      Dir.
+        glob("#{POSTS_ROOT}/**/*.md").
+        filter do |path|
+          content = File.read(path)
+          content.start_with?("---\n")
+        end.
+        collect do |path|
+          Post.new(path)
+        end.
+        sort_by do |post|
+          [ post.date, post.id ]
+        end
 
     # releases
 
@@ -164,10 +191,8 @@ class Metadata
           sort.
           last
 
-      last_date = last_version && hash.fetch("releases").fetch(last_version.to_s).fetch("date").to_date
-
       release_hash["version"] = version_string
-      release = Release.new(release_hash, last_version, last_date, @posts)
+      release = Release.new(release_hash, last_version, @highlights)
       @releases.send("#{version_string}=", release)
     end
 
@@ -304,10 +329,16 @@ class Metadata
     @post_tags ||= posts.collect(&:tags).flatten.uniq
   end
 
-  def platforms
-    @platforms ||= installation.operating_systems_list +
-      installation.package_managers_list +
-      installation.platforms_list
+  def platform_names
+    @platforms ||=
+      begin
+        (
+          installation.operating_systems_list.collect(&:name) +
+          installation.package_managers_list.collect(&:name) +
+          installation.package_managers_list.collect(&:archs).flatten.uniq +
+          installation.platforms_list.collect(&:name)
+        ).sort
+      end
   end
 
   def previous_minor_releases(release)
@@ -343,8 +374,10 @@ class Metadata
       event_types: event_types,
       guides: guides.deep_to_h,
       installation: installation.deep_to_h,
+      latest_highlight: highlights.last.deep_to_h,
       latest_post: posts.last.deep_to_h,
       latest_release: latest_release.deep_to_h,
+      highlights: highlights.deep_to_h,
       posts: posts.deep_to_h,
       post_tags: post_tags,
       releases: releases.deep_to_h,

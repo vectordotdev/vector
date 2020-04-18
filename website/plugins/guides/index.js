@@ -33,9 +33,13 @@ function pluginContentGuide(context, opts) {
             const globPattern = include.map(pattern => `${contentPath}/${pattern}`);
             return [...globPattern];
         },
-        // Fetches guide contents and returns metadata for the necessary routes.
         async loadContent() {
             const { routeBasePath } = options;
+            const { siteConfig: { baseUrl = '' } } = context;
+            const basePageUrl = utils_1.normalizeUrl([baseUrl, routeBasePath]);
+            //
+            // Guides
+            //
             guides = await guideUtils_1.generateGuides(contentPath, context, options);
             if (!guides.length) {
                 return null;
@@ -57,25 +61,9 @@ function pluginContentGuide(context, opts) {
                     };
                 }
             });
-            // Guide pagination routes.
-            // Example: `/guides`
-            const totalCount = guides.length;
-            const { siteConfig: { baseUrl = '' }, } = context;
-            const basePageUrl = utils_1.normalizeUrl([baseUrl, routeBasePath]);
-            const guideListPaginated = [];
-            guideListPaginated.push({
-                metadata: {
-                    permalink: basePageUrl,
-                    page: 1,
-                    guidesPerPage: 1,
-                    totalPages: 1,
-                    totalCount,
-                    previousPage: basePageUrl,
-                    nextPage: basePageUrl,
-                },
-                items: guides.filter(guide => guide.metadata.categories.length <= 2).map(item => item.id),
-            });
+            //
             // Guide tags
+            //
             const guideTags = {};
             const tagsPath = utils_1.normalizeUrl([basePageUrl, 'tags']);
             guides.forEach(guide => {
@@ -110,15 +98,14 @@ function pluginContentGuide(context, opts) {
                     }
                 });
             });
-            const guideTagsListPath = Object.keys(guideTags).length > 0 ? tagsPath : null;
+            //
             // Guide categories
+            //
             let guideCategories = lodash_1.default.flatMap(guides, (guide => guide.metadata.categories));
             guideCategories = lodash_1.default.uniqBy(guideCategories, ((guideCategory) => guideCategory.permalink));
             return {
                 guides,
-                guideListPaginated,
                 guideTags,
-                guideTagsListPath,
                 guideCategories,
             };
         },
@@ -126,50 +113,52 @@ function pluginContentGuide(context, opts) {
             if (!guideContents) {
                 return;
             }
+            //
+            // Prepare
+            //
             const { guideListComponent, guideComponent, guideTagListComponent, guideTagComponent, guideCategoryComponent, } = options;
             const aliasedSource = (source) => `~guide/${path_1.default.relative(dataDir, source)}`;
             const { addRoute, createData } = actions;
-            const { guides, guideListPaginated, guideTags, guideTagsListPath, guideCategories, } = guideContents;
+            const { guides, guideTags, guideCategories, } = guideContents;
             const guideItemsToMetadata = {};
             guides.map(guide => {
                 guideItemsToMetadata[guide.id] = guide.metadata;
             });
-            // Guides list
-            await Promise.all(guideListPaginated.map(async (listPage) => {
-                const { metadata, items } = listPage;
-                const { permalink } = metadata;
-                const pageMetadataPath = await createData(`${utils_1.docuHash(permalink)}.json`, JSON.stringify(metadata, null, 2));
-                addRoute({
-                    path: permalink,
-                    component: guideListComponent,
-                    exact: true,
-                    modules: {
-                        items: items.map(guideID => {
-                            const metadata = guideItemsToMetadata[guideID];
-                            // To tell routes.js this is an import and not a nested object to recurse.
-                            return {
-                                content: {
-                                    __import: true,
-                                    path: metadata.source,
-                                    query: {
-                                        truncated: true,
-                                    },
+            const { routeBasePath } = options;
+            const { siteConfig: { baseUrl = '' } } = context;
+            const basePageUrl = utils_1.normalizeUrl([baseUrl, routeBasePath]);
+            //
+            // Guides
+            //
+            addRoute({
+                path: basePageUrl,
+                component: guideListComponent,
+                exact: true,
+                modules: {
+                    items: guides.filter(guide => guide.metadata.categories.length <= 2).map(guide => {
+                        const metadata = guide.metadata;
+                        // To tell routes.js this is an import and not a nested object to recurse.
+                        return {
+                            content: {
+                                __import: true,
+                                path: metadata.source,
+                                query: {
+                                    truncated: true,
                                 },
-                            };
-                        }),
-                        metadata: aliasedSource(pageMetadataPath),
-                    },
-                });
-            }));
-            // Tags
-            if (guideTagsListPath === null) {
-                return;
-            }
+                            },
+                        };
+                    }),
+                },
+            });
+            //
+            // Guide tags
+            //
+            const tagsPath = utils_1.normalizeUrl([basePageUrl, 'tags']);
             const tagsModule = {};
             await Promise.all(Object.keys(guideTags).map(async (tag) => {
                 const { name, items, permalink } = guideTags[tag];
                 tagsModule[tag] = {
-                    allTagsPath: guideTagsListPath,
+                    allTagsPath: tagsPath,
                     slug: tag,
                     name,
                     count: items.length,
@@ -197,19 +186,18 @@ function pluginContentGuide(context, opts) {
                     },
                 });
             }));
-            // Only create /tags page if there are tags.
-            if (Object.keys(guideTags).length > 0) {
-                const tagsListPath = await createData(`${utils_1.docuHash(`${guideTagsListPath}-tags`)}.json`, JSON.stringify(tagsModule, null, 2));
-                addRoute({
-                    path: guideTagsListPath,
-                    component: guideTagListComponent,
-                    exact: true,
-                    modules: {
-                        tags: aliasedSource(tagsListPath),
-                    },
-                });
-            }
+            const tagsListPath = await createData(`${utils_1.docuHash(`${tagsPath}-tags`)}.json`, JSON.stringify(tagsModule, null, 2));
+            addRoute({
+                path: tagsPath,
+                component: guideTagListComponent,
+                exact: true,
+                modules: {
+                    tags: aliasedSource(tagsListPath),
+                },
+            });
+            //
             // Guide categories
+            //
             if (guideCategories.length > 0) {
                 let guidePermalinks = lodash_1.default.uniq(guides.map(guide => guide.metadata.permalink));
                 await Promise.all(guideCategories.
@@ -243,7 +231,9 @@ function pluginContentGuide(context, opts) {
                     });
                 }));
             }
-            // Guide pages
+            //
+            // Guides
+            //
             await Promise.all(guides.map(async (guide) => {
                 const { metadata } = guide;
                 await createData(

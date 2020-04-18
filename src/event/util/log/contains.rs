@@ -1,8 +1,8 @@
-use super::{Atom, PathComponent, PathIter, Value};
+use super::{PathComponent, PathIter, Value};
 use std::collections::BTreeMap;
 
 /// Checks whether a field specified by a given path is present.
-pub fn contains(fields: &BTreeMap<Atom, Value>, path: &str) -> bool {
+pub fn contains(fields: &BTreeMap<String, Value>, path: &str) -> bool {
     let mut path_iter = PathIter::new(path);
 
     match path_iter.next() {

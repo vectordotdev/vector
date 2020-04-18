@@ -8,14 +8,22 @@ module PostProcessors
   #
   # See the `Links` class for more info on how links are resoolved.
   class LinkDefiner
+    DEFINITION_REGEX = "\\[((?:#{Links::CATEGORIES.join("|")})(?:[a-zA-Z0-9_\\-\\.\\/#\\?= ]*))\\]"
+
     class << self
       def define!(*args)
         new(*args).define!
       end
 
       def remove_link_footers(content)
-        parts = content.partition(/\n\n\[([a-zA-Z0-9_\-\.\/#\?= ]*)\]:/)
-        parts.first.strip
+        new_content = content.gsub(/#{DEFINITION_REGEX}: ([^\s]*)\n/, '').strip
+
+        parts = new_content.partition(/\n\n\[(?:[a-zA-Z0-9_\-\.\/#\?= ]*)\]:/)
+        top = parts.first.strip
+        middle = parts.fetch(1)
+        bottom = parts.last.strip
+
+        "#{top}\n\n#{middle}#{bottom}".strip
       end
     end
 
@@ -31,14 +39,14 @@ module PostProcessors
     def define!
       verify_no_direct_links!
 
-      link_ids = content.scan(/\[\[\[([a-zA-Z0-9_\-\.\/#\?=]*)\]\]\]/).flatten.uniq
+      link_ids = content.scan(/\[\[#{DEFINITION_REGEX}\]\]/).collect(&:first).uniq
 
       link_ids.each do |link_id|
         definition = get_path_or_url(link_id)
         content.gsub!("[[[#{link_id}]]]", definition)
       end
 
-      link_ids = content.scan(/\]\[([a-zA-Z0-9_\-\.\/#\?=]*)\]/).flatten.uniq
+      link_ids = content.scan(/\]#{DEFINITION_REGEX}/).collect(&:first).uniq
 
       footer_links = []
 

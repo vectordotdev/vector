@@ -1,10 +1,10 @@
-use super::{all_fields, Atom, Value};
+use super::{all_fields, Value};
 use std::collections::BTreeMap;
 
 /// Iterates over all paths in form "a.b[0].c[1]" in alphabetical order.
 /// It is implemented as a wrapper around `all_fields` to reduce code
 /// duplication.
-pub fn keys<'a>(fields: &'a BTreeMap<Atom, Value>) -> impl Iterator<Item = Atom> + 'a {
+pub fn keys<'a>(fields: &'a BTreeMap<String, Value>) -> impl Iterator<Item = String> + 'a {
     all_fields(fields).map(|(k, _)| k)
 }
 
@@ -23,7 +23,7 @@ mod test {
         }));
         let expected: Vec<_> = vec!["field1", "field2", "field3"]
             .into_iter()
-            .map(|s| Atom::from(s))
+            .map(|s| String::from(s))
             .collect();
 
         let collected: Vec<_> = keys(&fields).collect();
@@ -52,7 +52,7 @@ mod test {
             "a.b.c",
         ]
         .into_iter()
-        .map(|s| Atom::from(s))
+        .map(|s| String::from(s))
         .collect();
 
         let collected: Vec<_> = keys(&fields).collect();

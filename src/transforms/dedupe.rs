@@ -15,7 +15,7 @@ pub enum FieldMatchConfig {
     #[serde(rename = "match")]
     MatchFields(Vec<Atom>),
     #[serde(rename = "ignore")]
-    IgnoreFields(Vec<Atom>),
+    IgnoreFields(Vec<String>),
     #[serde(skip)]
     Default,
 }
@@ -166,7 +166,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
             for (field_name, value) in event.as_log().all_fields() {
                 if !fields.contains(&field_name) {
                     entry.push((
-                        field_name.clone(),
+                        Atom::from(field_name),
                         type_id_for_value(&value),
                         value.as_bytes(),
                     ));
@@ -212,7 +212,7 @@ mod tests {
         })
     }
 
-    fn make_ignore_transform(num_events: usize, given_fields: Vec<Atom>) -> Dedupe {
+    fn make_ignore_transform(num_events: usize, given_fields: Vec<String>) -> Dedupe {
         // "message" and "timestamp" are added automatically to all Events
         let mut fields = vec!["message".into(), "timestamp".into()];
         fields.extend(given_fields);
@@ -411,12 +411,12 @@ mod tests {
     /// Test that two events where the matched field is a sub object and that object contains values
     /// that have different types but the same string representation aren't considered duplicates.
     fn type_matching_nested_objects(mut transform: Dedupe) {
-        let mut map1: BTreeMap<Atom, Value> = BTreeMap::new();
+        let mut map1: BTreeMap<String, Value> = BTreeMap::new();
         map1.insert("key".into(), "123".into());
         let mut event1 = Event::from("message");
         event1.as_mut_log().insert("matched", map1);
 
-        let mut map2: BTreeMap<Atom, Value> = BTreeMap::new();
+        let mut map2: BTreeMap<String, Value> = BTreeMap::new();
         map2.insert("key".into(), 123.into());
         let mut event2 = Event::from("message");
         event2.as_mut_log().insert("matched", map2);
@@ -425,7 +425,7 @@ mod tests {
         let new_event = transform.transform(event1).unwrap();
         let res_value = new_event.as_log()[&"matched".into()].clone();
         if let Value::Map(map) = res_value {
-            assert_eq!(map.get(&"key".into()).unwrap().clone(), Value::from("123"));
+            assert_eq!(map.get("key").unwrap(), &Value::from("123"));
         }
 
         // Second event should also get passed through even though the string representations of
@@ -433,7 +433,7 @@ mod tests {
         let new_event = transform.transform(event2).unwrap();
         let res_value = new_event.as_log()[&"matched".into()].clone();
         if let Value::Map(map) = res_value {
-            assert_eq!(map.get(&"key".into()).unwrap().clone(), Value::from(123));
+            assert_eq!(map.get("key").unwrap(), &Value::from(123));
         }
     }
 

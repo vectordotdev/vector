@@ -15,6 +15,7 @@
 # Setup
 #
 
+require 'etc'
 require 'uri'
 require_relative "setup"
 
@@ -235,7 +236,11 @@ end
 #
 
 metadata.sources_list.
-  select { |s| !s.for_platform? && !BLACKLISTED_SOURCES.include?(s.name) }.
+  select do |source|
+    !source.for_platform? &&
+      !source.function_category?("test") &&
+      !BLACKLISTED_SOURCES.include?(source.name)
+  end.
   each do |source|
     template_path = "#{GUIDES_ROOT}/integrate/sources/#{source.name}.md.erb"
 
@@ -293,39 +298,31 @@ metadata.sinks_list.
 #
 
 metadata.releases_list.each do |release|
-  template_path = "#{PAGES_ROOT}/releases/#{release.version}/download.js"
+  template_path = "#{RELEASES_ROOT}/#{release.version}.md.erb"
 
   write_new_file(
     template_path,
     <<~EOF
-    import React from 'react';
+    <%- release = metadata.releases.send("#{release.version}") -%>
+    <%= release_header(release) %>
 
-    import ReleaseDownload from '@site/src/components/ReleaseDownload';
+    <%- if release.highlights.any? -%>
+    ## Highlights
 
-    function Download() {
-      return <ReleaseDownload version="#{release.version}" />
-    }
+    Highlights are noteworthy changes in this release. For a complete list of
+    changes please refer to the [changelog](#changelog).
 
-    export default Download;
-    EOF
-  )
+    <%= release_highlights(release, heading_depth: 3) %>
 
-  template_path = "#{PAGES_ROOT}/releases/#{release.version}.js"
+    <%- end -%>
+    ## Changelog
 
-  write_new_file(
-    template_path,
-    <<~EOF
-    import React from 'react';
+    The changelog represents _all_ changes in this release. Vector follows the
+    [Conventional Commits spec][urls.conventional_commits]. The Vector specific
+    scopes can be found [in the Vector repo][urls.vector_semantic_yml].
 
-    import ReleaseNotes from '@site/src/components/ReleaseNotes';
+    <Changelog version={<%= release.version.to_json %>} />
 
-    function ReleaseNotesPage() {
-      const version = "#{release.version}";
-
-      return <ReleaseNotes version={version} />;
-    }
-
-    export default ReleaseNotesPage;
     EOF
   )
 end
@@ -366,25 +363,24 @@ end
 
 metadata = Metadata.load!(META_ROOT, DOCS_ROOT, GUIDES_ROOT, PAGES_ROOT)
 templates = Templates.new(ROOT_DIR, metadata)
+root_erb_paths = erb_paths.select { |path| !templates.partial?(path) }
 
-erb_paths.
-  select { |path| !templates.partial?(path) }.
-  each do |template_path|
-    target_file = template_path.gsub(/^#{ROOT_DIR}\//, "").gsub(/\.erb$/, "")
-    target_path = "#{ROOT_DIR}/#{target_file}"
-    content = templates.render(target_file)
-    content = post_process(content, target_path, metadata.links)
-    current_content = File.read(target_path)
+Parallel.map(root_erb_paths, in_threads: Etc.nprocessors) do |template_path|
+  target_file = template_path.gsub(/^#{ROOT_DIR}\//, "").gsub(/\.erb$/, "")
+  target_path = "#{ROOT_DIR}/#{target_file}"
+  content = templates.render(target_file)
+  content = post_process(content, target_path, metadata.links)
+  current_content = File.read(target_path)
 
-    if current_content != content
-      action = dry_run ? "Will be changed" : "Changed"
-      Printer.say("#{action} - #{target_file}", color: :green)
-      File.write(target_path, content) if !dry_run
-    else
-      action = dry_run ? "Will not be changed" : "Not changed"
-      Printer.say("#{action} - #{target_file}", color: :blue)
-    end
+  if current_content != content
+    action = dry_run ? "Will be changed" : "Changed"
+    Printer.say("#{action} - #{target_file}", color: :green)
+    File.write(target_path, content) if !dry_run
+  else
+    action = dry_run ? "Will not be changed" : "Not changed"
+    Printer.say("#{action} - #{target_file}", color: :blue)
   end
+end
 
 if dry_run
   return
@@ -398,6 +394,8 @@ Printer.title("Post processing generated files...")
 
 docs =
   Dir.glob("#{DOCS_ROOT}/**/*.md").to_a +
+    Dir.glob("#{GUIDES_ROOT}/**/*.md").to_a +
+    Dir.glob("#{HIGHLIGHTS_ROOT}/**/*.md").to_a +
     Dir.glob("#{POSTS_ROOT}/**/*.md").to_a +
     ["#{ROOT_DIR}/README.md"]
 

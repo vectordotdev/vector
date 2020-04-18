@@ -34,7 +34,7 @@ ingests data through the [HTTP protocol][urls.http] and outputs
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--warnings">
 
 * This component exposes a configured port. You must ensure your network allows access to this port.
 

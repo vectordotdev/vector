@@ -103,8 +103,50 @@
 #
 
 [[redirects]]
+  from = "/blog/arm-support-on-linux/"
+  to = "/highlights/2019-11-19-arm-support-on-linux/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/blog/custom-dns/"
+  to = "/highlights/2019-12-13-custom-dns/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/blog/ec2-metadata/"
+  to = "/highlights/2019-12-16-ec2-metadata/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/blog/kubernetes-source-alpha/"
+  to = "/highlights/2019-12-14-kubernetes-source-alpha/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/blog/prometheus-source/"
+  to = "/highlights/2020-01-07-prometheus-source/"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/blog/tags/announcement/"
   to = "/blog/tags/type-announcement/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/blog/unit-testing-vector-config-files/"
+  to = "/highlights/2019-11-25-unit-testing-vector-config-files/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/blog/windows-support/"
+  to = "/highlights/2019-11-21-windows-support/"
   status = 301
   force = true
 
@@ -268,4 +310,10 @@
   from = "/releases/"
   to = "/releases/latest/download/"
   status = 302
+  force = true
+
+[[redirects]]
+  from = "/releases/nightly/"
+  to = "/releases/nightly/download/"
+  status = 301
   force = true
