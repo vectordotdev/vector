@@ -24,5 +24,70 @@ jobs:
           path: "./target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-x86_64-unknown-linux-musl.tar.gz"
-          path: "./target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz"
+          name: "vector-amd64.deb"
+          path: "./target/artifacts/vector-amd64.deb"
+
+  build-aarch64-unknown-linux-musl-archive-and-deb-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: |
+          ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build-archive package-deb
+        env:
+          DOCKER_PRIVILEGED: "true"
+          PASS_FEATURES: "default-musl"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-aarch64-unknown-linux-musl.tar.gz"
+          path: "./target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-arm64.deb"
+          path: "./target/artifacts/vector-arm64.deb"
+
+  build-armv7-unknown-linux-musleabihf-archive-and-deb-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: |
+          ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build-archive package-deb
+        env:
+          DOCKER_PRIVILEGED: "true"
+          PASS_FEATURES: "default-musl"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-armv7-unknown-linux-musleabihf.tar.gz"
+          path: "./target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-armhf.deb"
+          path: "./target/artifacts/vector-armhf.deb"
+
+  build-x86_64-apple-darwin-archive:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          make build-archive
+        env:
+          TARGET: "x86_64-apple-darwin"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-x86_64-apple-darwin.tar.gz"
+          path: "./target/artifacts/vector-x86_64-apple-darwin.tar.gz"
+
+  # release-docker:
+  #   runs-on: ubuntu-latest
+  #   needs:
+  #     - build-x86_64-unknown-linux-musl-archive-and-deb-package
+  #     - build-aarch64-unknown-linux-musl-archive-and-deb-package
+  #     - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
+  #   steps:
+  #     - uses: actions/checkout@v1
+  #     - run: |
+  #         ./scripts/upgrade-docker.sh
+  #         export VERSION=$(make version)
+  #         make release-docker
+  #       env:
+  #         PLATFORM: "linux/amd64,linux/arm64,linux/arm"
