@@ -64,6 +64,20 @@ jobs:
           path: "./target/artifacts/vector-armhf.deb"
 
   build-x86_64-apple-darwin-archive:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          make build-archive
+        env:
+          TARGET: "x86_64-apple-darwin"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-x86_64-apple-darwin.tar.gz"
+          path: "./target/artifacts/vector-x86_64-apple-darwin.tar.gz"
+
+  build-x86_64-pc-windows-msvc-archive-and-msi-package:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v1
@@ -127,7 +141,6 @@ jobs:
         with:
           name: "vector-x64.msi"
           path: "./target/artifacts/vector-x64.msi"
-
 
   # release-docker:
   #   runs-on: ubuntu-latest
