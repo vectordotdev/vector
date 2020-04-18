@@ -90,7 +90,7 @@ jobs:
           curl -sSf http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
           echo "$SHA256SUM perl-installer.msi" | sha256sum --check --status
       - name: "Install Perl"
-        shell: cmd.exe # msiexec fails when called from bash
+        shell: cmd # msiexec fails when called from bash
         run: |
           VERSION=5.30.0.1
           # we need to verify checksum because strawberryperl.com doesn't support HTTPS
@@ -103,7 +103,7 @@ jobs:
           VERSION=3.15.5
           curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
       - name: "Install CMake"
-        shell: cmd.exe # msiexec fails when called from bash
+        shell: cmd # msiexec fails when called from bash
         run: |
           msiexec /quiet /i cmake-installer.msi
           del cmake-installer.msi
