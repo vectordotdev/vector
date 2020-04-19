@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-06"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-04-19"
+delivery_guarantee: "at_least_once"
 component_title: "LogDNA"
 description: "The Vector `logdna` sink batches `log` events to LogDna's HTTP Ingestion API."
 event_types: ["log"]

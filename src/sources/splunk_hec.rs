@@ -694,7 +694,7 @@ fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
     }
 }
 
-#[cfg(features = "sinks-splunk_hec")]
+#[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
     use super::SplunkConfig;
@@ -702,6 +702,7 @@ mod tests {
     use crate::test_util::{self, collect_n};
     use crate::{
         event::{self, Event},
+        shutdown::ShutdownSignal,
         sinks::{
             splunk_hec::{Encoding, HecSinkConfig},
             util::{encoding::EncodingConfigWithDefault, Compression},
@@ -727,9 +728,18 @@ mod tests {
         let (sender, recv) = mpsc::channel(CHANNEL_CAPACITY);
         let address = test_util::next_addr();
         rt.spawn(
-            SplunkConfig { address, token }
-                .build("default", &GlobalOptions::default(), sender)
-                .unwrap(),
+            SplunkConfig {
+                address,
+                token,
+                tls: None,
+            }
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                sender,
+            )
+            .unwrap(),
         );
         (recv, address)
     }

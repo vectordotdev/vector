@@ -10,6 +10,15 @@ module.exports = {
       "description": "Go beyond the basics, become a Vector pro, and extract the full potential of Vector.",
       "guides": [
         {
+          "author_github": "https://github.com/Jeffail",
+          "description": null,
+          "id": "/advanced/managing-complex-configs",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/managing-complex-configs.md",
+          "series_position": null,
+          "title": "Building & Managing Complex Configs"
+        },
+        {
           "author_github": "https://github.com/a-rodin",
           "description": null,
           "id": "/advanced/custom-aggregations-with-lua",
@@ -17,15 +26,6 @@ module.exports = {
           "path": "website/guides/advanced/custom-aggregations-with-lua.md",
           "series_position": null,
           "title": "Custom Aggregations with Lua"
-        },
-        {
-          "author_github": "https://github.com/Jeffail",
-          "description": null,
-          "id": "/advanced/managing-complex-configs",
-          "last_modified_on": null,
-          "path": "website/guides/advanced/managing-complex-configs.md",
-          "series_position": null,
-          "title": "Managing Complex Configs"
         },
         {
           "author_github": "https://github.com/a-rodin",
@@ -3107,21 +3107,6 @@ module.exports = {
         "domain: website"
       ],
       "title": "A New Guides Section"
-    },
-    {
-      "author_github": "https://github.com/binarylogic",
-      "date": "2020-04-01",
-      "description": "Easily rnrich your logs with Kubernetes metadata",
-      "hide_on_release_notes": false,
-      "id": "2020-04-01-kubernetes-pod-metadata-transform",
-      "path": "website/highlights/2020-04-01-kubernetes-pod-metadata-transform.md",
-      "permalink": "/highlights/2020-04-01-kubernetes-pod-metadata-transform/",
-      "tags": [
-        "type: new feature",
-        "domain: sources",
-        "source: vector"
-      ],
-      "title": "New Kubernetes Pod Metdata Transform"
     },
     {
       "author_github": "https://github.com/binarylogic",
@@ -23982,7 +23967,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sinks.out]\n  type = \"blackhole\" # required\n  inputs = [\"in\"] # required\n  print_amount = 1000 # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": null,
       "event_types": [
         "log",
@@ -24023,7 +24008,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sinks.out]\n  type = \"clickhouse\" # required\n  inputs = [\"in\"] # required\n  host = \"http://localhost:8123\" # required\n  table = \"mytable\" # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": null,
       "event_types": [
         "log"
@@ -24065,7 +24050,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sinks.out]\n  # General\n  type = \"console\" # required\n  inputs = [\"in\"] # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": null,
       "event_types": [
         "log",
@@ -24106,7 +24091,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sinks.out]\n  # General\n  type = \"datadog_logs\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${DATADOG_API_KEY_ENV_VAR}\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "Datadog is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform.",
       "event_types": [
         "log"
@@ -24148,7 +24133,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sinks.out]\n  type = \"datadog_metrics\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${DATADOG_API_KEY}\" # required\n  namespace = \"service\" # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "Datadog is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform.",
       "event_types": [
         "metric"
@@ -24189,7 +24174,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sinks.out]\n  type = \"elasticsearch\" # required\n  inputs = [\"in\"] # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "Elasticsearch is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch.",
       "event_types": [
         "log"
@@ -24232,7 +24217,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sinks.out]\n  # General\n  type = \"file\" # required\n  inputs = [\"in\"] # required\n  path = \"vector-%Y-%m-%d.log\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": null,
       "event_types": [
         "log"
@@ -24317,7 +24302,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sinks.out]\n  type = \"gcp_pubsub\" # required\n  inputs = [\"in\"] # required\n  project = \"vector-123456\" # required\n  topic = \"this-is-a-topic\" # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "GCP Pub/Sub is a fully-managed real-time messaging service that allows you to send and receive messages between independent applications on the Google Cloud Platform.",
       "event_types": [
         "log"
@@ -24359,7 +24344,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sinks.out]\n  type = \"gcp_stackdriver_logs\" # required\n  inputs = [\"in\"] # required\n  log_id = \"vector-logs\" # required\n  project_id = \"vector-123456\" # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "Stackdriver is Google Cloud's embedded observability suite designed to monitor, troubleshoot, and improve cloud infrastructure, software, and application performance. Stackdriver enables you to efficiently build and run workloads, keeping applications performant and available.",
       "event_types": [
         "log"
@@ -24609,7 +24594,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sinks.out]\n  type = \"logdna\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${LOGDNA_API_KEY}\" # required\n  hostname = \"${HOSTNAME}\" # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "LogDNA is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface.",
       "event_types": [
         "log"
@@ -24650,7 +24635,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sinks.out]\n  # General\n  type = \"loki\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"http://localhost:3100\" # required\n\n  # Labels\n  labels.key = \"value\" # example\n  labels.key = \"{{ event_field }}\" # example"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "Loki is a horizontally-scalable, highly-available, multi-tenant log aggregation system inspired by Prometheus. It is designed to be very cost effective and easy to operate. It does not index the contents of the logs, but rather a set of labels for each log stream.",
       "event_types": [
         "log"
@@ -24733,7 +24718,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sinks.out]\n  # General\n  type = \"papertrail\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"logs.papertrailapp.com:12345\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "Papertrail is a web-based log aggregation application used by developers and IT team to search and view logs in real time.",
       "event_types": [
         "log"
@@ -24853,7 +24838,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sinks.out]\n  type = \"sematext_logs\" # required\n  inputs = [\"in\"] # required\n  token = \"${SEMATEXT_TOKEN}\" # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "Sematext is a hosted monitoring platform based on Elasticsearch. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time.",
       "event_types": [
         "log"
@@ -25139,7 +25124,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sources.in]\n  type = \"http\" # required\n  address = \"0.0.0.0:80\" # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": null,
       "event_types": [
         "log"
@@ -25299,7 +25284,7 @@ module.exports = {
       "config_examples": {
         "toml": "[sources.in]\n  type = \"prometheus\" # required\n  hosts = [\"http://localhost:9090\"] # required"
       },
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "Prometheus is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points.",
       "event_types": [
         "metric"
@@ -26057,43 +26042,6 @@ module.exports = {
       "short_description": "Accepts log events and allows you to parse a log field value as JSON.",
       "status": "prod-ready",
       "title": "JSON Parser",
-      "type": "transform",
-      "unsupported_operating_systems": [
-
-      ]
-    },
-    "kubernetes_pod_metadata": {
-      "beta": true,
-      "config_examples": {
-        "toml": "[transforms.out]\n  type = \"kubernetes_pod_metadata\" # required\n  inputs = [\"in\"] # required"
-      },
-      "delivery_guarantee": null,
-      "description": null,
-      "event_types": [
-        "log"
-      ],
-      "features": [
-
-      ],
-      "function_category": "enrich",
-      "id": "kubernetes_pod_metadata_transform",
-      "inpuut_types": [
-        "log"
-      ],
-      "logo_path": null,
-      "name": "kubernetes_pod_metadata",
-      "operating_systems": [
-
-      ],
-      "output_types": [
-        "log"
-      ],
-      "service_providers": [
-
-      ],
-      "short_description": "Accepts log events and allows you to enrich Kubernetes logs with Pod metadata.",
-      "status": "beta",
-      "title": "Kubernetes Pod Metadata",
       "type": "transform",
       "unsupported_operating_systems": [
 

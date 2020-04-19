@@ -3,7 +3,7 @@ title = "Elasticsearch"
 noun = "Elasticsearch"
 beta = false
 common = true
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 description = """\
 [Elasticsearch][urls.elasticsearch] is a search engine based on the Lucene \
 library. It provides a distributed, multitenant-capable full-text search \

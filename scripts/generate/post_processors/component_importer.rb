@@ -10,6 +10,7 @@ module PostProcessors
     IMPORTS = {
       'Accordion' => "import Accordion from '@site/src/components/Accordion';",
       'Alert' => "import Alert from '@site/src/components/Alert';",
+      'Assumptions' => "import Assumptions from '@site/src/components/Assumptions';",
       'Changelog' => "import Changelog from '@site/src/components/Changelog';",
       'CodeExplanation' => "import CodeExplanation from '@site/src/components/CodeExplanation';",
       'ConfigExample' => "import ConfigExample from '@site/src/components/ConfigExample';",

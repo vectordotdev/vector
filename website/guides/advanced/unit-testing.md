@@ -1,11 +1,19 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: Unit Testing Your Configs
 description: Learn how to write and execute unit tests for your Vector configs
 author_github: https://github.com/Jeffail
 tags: ["type: guide", "domain: config"]
 ---
+
+import Assumptions from '@site/src/components/Assumptions';
+
+<Assumptions name="guide">
+
+* You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][guides.getting-started.your-first-pipeline].
+
+</Assumptions>
 
 It's possible to define unit tests within a Vector configuration file that cover
 a network of transforms within the topology. The purpose of these tests is to
@@ -46,10 +54,10 @@ writing and executing a unit test for the following config:
 
 In this config we:
 
-- Parse a log line into the fields `timestamp`, `level` and `message` with the
+* Parse a log line into the fields `timestamp`, `level` and `message` with the
   transform `foo`.
-- Add a static string field `new_field` using the transform `bar`.
-- Remove the field `level` with the transform `baz`.
+* Add a static string field `new_field` using the transform `bar`.
+* Remove the field `level` with the transform `baz`.
 
 In reality it's unlikely that a config this simple would be worth the investment
 of writing unit tests. Regardless, for the purpose of this guide we've concluded
@@ -59,9 +67,9 @@ Specifically, we need to ensure that the resulting events of our topology
 (whatever comes out of the `baz` transform) always meets the following
 requirements:
 
-- Does NOT contain the field `level`.
-- Contains the field `new_field`, with a static value `this is a static value`.
-- Has a `timestamp` and `message` field containing the values extracted from the
+* Does NOT contain the field `level`.
+* Contains the field `new_field`, with a static value `this is a static value`.
+* Has a `timestamp` and `message` field containing the values extracted from the
   raw message of the input log.
 
 Otherwise our system fails and an annoying relative (uncle Cecil) moves in to
@@ -210,4 +218,6 @@ ensure that uncle Cecil remains in Shoreditch after any future config change.
 What an insufferable hipster he is.
 
 
+[docs.about.concepts]: /docs/about/concepts/
 [docs.reference.tests]: /docs/reference/tests/
+[guides.getting-started.your-first-pipeline]: /guides/getting-started/your-first-pipeline/

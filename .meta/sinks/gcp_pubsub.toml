@@ -3,7 +3,7 @@ title = "GCP PubSub"
 noun = "GCP PubSub"
 beta = true
 common = true
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 description = """\
 [GCP Pub/Sub][urls.gcp_pubsub] is a fully-managed real-time messaging service \
 that allows you to send and receive messages between independent applications \

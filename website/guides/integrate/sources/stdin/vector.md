@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from STDIN to another Vector instance"
 description: "A simple guide to send logs from STDIN to another Vector instance in just a few minutes."
@@ -61,18 +61,18 @@ each service. Typically data is collected by tailing local files via Vector's
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Accept new line delimited log data through STDIN.
-    <ol>
+    <ul>
       <li>Automatically enrich logs with host-level context.</li>
-    </ol>
+    </ul>
   </li>
   <li>
     Send data to another downstream Vector instance.
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 

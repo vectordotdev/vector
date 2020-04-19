@@ -76,7 +76,7 @@ usage][urls.vector_performance].
 ### Reference
 
 * [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [7 more...][docs.sources]
-* [**Transforms**][docs.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [kubernetes_pod_metadata][docs.transforms.kubernetes_pod_metadata], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], and [19 more...][docs.transforms]
+* [**Transforms**][docs.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], and [18 more...][docs.transforms]
 * [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], [gcp_pubsub][docs.sinks.gcp_pubsub], and [25 more...][docs.sinks]
 
 ### Administration
@@ -198,7 +198,7 @@ Or use your own [preferred method][docs.installation].
 * [The Vector Source Now Accepts Metrics](https://vector.dev/highlights/2020-04-07-vector-to-vector-metrics/)
 * [Lua Transform v2](https://vector.dev/highlights/2020-04-07-lua-transform-version-2/)
 * [More Condition Predicates](https://vector.dev/highlights/2020-04-01-more-condition-predicates/)
-* [New Kubernetes Pod Metdata Transform](https://vector.dev/highlights/2020-04-01-kubernetes-pod-metadata-transform/)
+* [A New Guides Section](https://vector.dev/highlights/2020-03-31-guides-section/)
 
 [view all...][urls.vector_highlights]
 
@@ -259,7 +259,6 @@ Or use your own [preferred method][docs.installation].
 [docs.transforms.filter]: https://vector.dev/docs/reference/transforms/filter/
 [docs.transforms.grok_parser]: https://vector.dev/docs/reference/transforms/grok_parser/
 [docs.transforms.json_parser]: https://vector.dev/docs/reference/transforms/json_parser/
-[docs.transforms.kubernetes_pod_metadata]: https://vector.dev/docs/reference/transforms/kubernetes_pod_metadata/
 [docs.transforms.log_to_metric]: https://vector.dev/docs/reference/transforms/log_to_metric/
 [docs.transforms.logfmt_parser]: https://vector.dev/docs/reference/transforms/logfmt_parser/
 [docs.transforms.lua]: https://vector.dev/docs/reference/transforms/lua/

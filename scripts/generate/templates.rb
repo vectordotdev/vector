@@ -313,6 +313,19 @@ class Templates
       raise ArgumentError.new("You must supply at lease a source or sink")
     end
 
+    # Default to common sources so that the tutorial flows. Otherwise,
+    # the user is not prompted with a Vector configuration example.
+    if source.nil?
+      source =
+        if sink.logs?
+          metadata.sources.file
+        elsif sink.metrics?
+          metadata.sources.statsd
+        else
+          nil
+        end
+    end
+
     render("#{partials_path}/interface_installation_tutorial/_#{interface.name}.md", binding).strip
   end
 

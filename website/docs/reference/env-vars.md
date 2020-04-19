@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-12"
+last_modified_on: "2020-04-19"
 title: Environment Variables
 description: "A full list of Vector's supported environment variables and how to use them."
 sidebar_label: Env Vars
@@ -204,32 +204,6 @@ it can degrade performance.
 
 
 </Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["minikube"]}
-  groups={[]}
-  name={"VECTOR_NODE_NAME"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### VECTOR_NODE_NAME
-
-The name of the node whose Pod's log should be enriched. If you're using the
-[provided daemon set][urls.kubernetes_limit_resources] then this environment
-variable is set for you.
-
-
-
-
-</Field>
 </Fields>
 
 ## Custom Variables
@@ -270,4 +244,3 @@ variable example.
 [docs.process-management#reloading]: /docs/administration/process-management/#reloading
 [docs.process-management#starting]: /docs/administration/process-management/#starting
 [pages.aws_components]: /components/?providers%5B%5D=aws/
-[urls.kubernetes_limit_resources]: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/
