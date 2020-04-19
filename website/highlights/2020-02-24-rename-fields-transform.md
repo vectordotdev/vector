@@ -6,7 +6,7 @@ description: "An easier way to rename fields"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1800]
 release: "0.8.0"
-importance: "low"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: transforms", "transform: rename_fields"]
 ---
 

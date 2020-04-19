@@ -6,7 +6,7 @@ description: "Protect downstream metrics storages from high cardinality tags"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1959]
 release: "nightly"
-importance: "medium"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: transforms", "transform: tag_cardinality_limit"]
 ---
 

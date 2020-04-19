@@ -194,7 +194,7 @@ Or use your own [preferred method][docs.installation].
 
 ## Latest Highlights
 
-* [~36% Performance Improvement](https://vector.dev/highlights/2020-04-11-overall-performance-increase/)
+* [~36% Higher Throughput](https://vector.dev/highlights/2020-04-11-overall-performance-increase/)
 * [The Vector Source Now Accepts Metrics](https://vector.dev/highlights/2020-04-07-vector-to-vector-metrics/)
 * [Lua Transform v2](https://vector.dev/highlights/2020-04-07-lua-transform-version-2/)
 * [More Condition Predicates](https://vector.dev/highlights/2020-04-01-more-condition-predicates/)

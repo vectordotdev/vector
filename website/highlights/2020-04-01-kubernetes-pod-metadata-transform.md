@@ -6,7 +6,7 @@ description: "Easily rnrich your logs with Kubernetes metadata"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1888]
 release: "nightly"
-importance: "high"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: sources", "source: vector"]
 ---
 

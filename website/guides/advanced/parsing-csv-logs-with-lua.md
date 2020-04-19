@@ -1,14 +1,20 @@
 ---
-last_modified_on: "2020-04-12"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: Parsing CSV logs with Lua
 description: Parse structured application logs in CSV format using Lua transform
 author_github: https://github.com/a-rodin
 tags: ["type: guide", "domain: transforms", "transform: lua"]
-assumptions:
-- You understand the [basic Lua concepts][docs.reference.transforms.lua].
-- You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][guides.getting-started.your-first-pipeline].
 ---
+
+import Assumptions from '@site/src/components/Assumptions';
+
+<Assumptions>
+
+* You understand the [basic Lua concepts][docs.reference.transforms.lua].
+* You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][guides.getting-started.your-first-pipeline].
+
+</Assumptions>
 
 Vector has many built-in [parsers][pages.parse_transforms] for structured logs formats. However, when you need to ship
 logs in a custom or application-specific format, [programmable transforms][pages.program_transforms] have got you

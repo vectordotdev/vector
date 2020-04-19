@@ -6,7 +6,7 @@ description: "Scrape prometheus metrics with Vector"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1264]
 release: "0.7.0"
-importance: "high"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: sources", "source: prometheus"]
 ---
 

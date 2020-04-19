@@ -6,7 +6,7 @@ description: "Early adopters have a new Kuberenetes source to chew on"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [893]
 release: "0.6.0"
-importance: "low"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: sources", "source: kubernetes"]
 ---
 

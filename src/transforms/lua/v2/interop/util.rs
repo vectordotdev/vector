@@ -18,9 +18,7 @@ pub fn timestamp_to_table<'a>(ctx: LuaContext<'a>, ts: DateTime<Utc>) -> LuaResu
 }
 
 pub fn table_is_timestamp<'a>(t: &LuaTable<'a>) -> LuaResult<bool> {
-    for &key in &[
-        "year", "month", "day", "hour", "min", "sec", "wday", "yday", "isdst",
-    ] {
+    for &key in &["year", "month", "day", "hour", "min", "sec"] {
         if !t.contains_key(key)? {
             return Ok(false);
         }

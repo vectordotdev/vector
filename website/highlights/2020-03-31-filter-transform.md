@@ -6,7 +6,7 @@ description: "Filter and route your logs based on defined conditions"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [2088]
 release: "nightly"
-importance: "medium"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: transforms", "transform: filter"]
 ---
 

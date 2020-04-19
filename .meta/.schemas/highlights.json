@@ -8,7 +8,7 @@
     "$schema",
     "author_github",
     "description",
-    "importance",
+    "hide_on_release_notes",
     "last_modified_on",
     "pr_numbers",
     "tags",
@@ -36,10 +36,9 @@
       "type": "boolean",
       "description": "Hides the pagination nav"
     },
-    "importance": {
-      "type": "string",
-      "description": "The importance level of this highlight. low = only listed on /highlights, m & l = listed in release announcements",
-      "enum": ["low", "medium", "high"]
+    "hide_on_release_notes": {
+      "type": "boolean",
+      "description": "Should this highlight appear in the upcoming release notes? Setting this to `false` allows you to make announce a highlight of low imortance without adding noise to the release notes."
     },
     "last_modified_on": {
       "type": "string",

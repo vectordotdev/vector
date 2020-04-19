@@ -43,15 +43,27 @@ function Header({groupBy, group}) {
     case 'release':
       return (
         <li className="header sticky">
-          <h3><Link to={`/releases/${group}/download/`}>{humanizeString(group)}</Link></h3>
+          <h3><Link to={`/releases/${group}/`}>{humanizeString(group)}</Link></h3>
         </li>
       );
       break;
 
     case 'type':
+      let icon = null;
+      let textColor = null;
+
+      switch(group) {
+        case 'breaking change':
+          icon = 'alert-triangle';
+          textColor = 'danger';
+          break;
+      }
+
       return (
         <li className="header sticky">
-          <AnchoredH3 id={slugger.slug(`${group}-highlights`)}>{pluralize(humanizeString(group))}</AnchoredH3>
+          <AnchoredH3 id={slugger.slug(`${group}-highlights`)} className={`text--${textColor}`}>
+            {icon && <i className={`feather icon-${icon}`}></i>} {pluralize(humanizeString(group))}
+          </AnchoredH3>
         </li>
       );
       break;
@@ -62,24 +74,24 @@ function Header({groupBy, group}) {
   }
 }
 
-function HighlightItems({clean, groupBy, items, timeline}) {
+function HighlightItems({author, clean, groupBy, items, tags, timeline}) {
   let defaultedGroupBy = groupBy || 'release';
   let normalizedItems = normalizeItems(items);
   let groupedItems = _.groupBy(normalizedItems, defaultedGroupBy);
   let groupKeys = timeline !== false ? Object.keys(groupedItems) : Object.keys(groupedItems).sort();
 
   return (
-    <ul className={classnames('connected-list', 'connected-list--clean', {'connected-list--timeline': timeline !== false})}>
+    <ul className={classnames('connected-list', 'connected-list--clean')}>
       {groupKeys.map((group, idx) => {
         let groupItems = groupedItems[group];
 
         return (
           <>
             <Header groupBy={defaultedGroupBy} group={group} />
-            <ul className="connected-list">
+            <ul className={classnames('connected-list', {'connected-list--timeline': timeline !== false})}>
               {groupItems.map((highlight, idx) => {
                 return <li key={idx}>
-                  <HighlightItem {...highlight} />
+                  <HighlightItem {...highlight} hideAuthor={author == false} hideTags={tags == false} />
                 </li>
               })}
             </ul>

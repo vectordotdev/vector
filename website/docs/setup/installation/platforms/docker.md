@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-14"
+last_modified_on: "2020-04-16"
 title: Install Vector On Docker
 sidebar_label: Docker
 description: Install Vector on the Docker platform
@@ -182,7 +182,7 @@ compose!
 <TabItem value="service">
 
 The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
+separate service. It is designed to receive data from an upstream source and
 fan-out to one or more destinations.
 Typically, upstream sources are other Vector instances sending data via the
 [`vector` sink][docs.sinks.vector], but can be collected through any of Vector's

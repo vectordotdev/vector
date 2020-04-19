@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: "Collect logs from Syslog and send them anywhere"
 description: "A simple guide to collect logs from Syslog and send them anywhere in just a few minutes."
@@ -53,7 +53,7 @@ we'll be deploying Vector as a
 [service][docs.strategies#service].
 
 The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
+separate service. It is designed to receive data from an upstream source and
 fan-out to one or more destinations.
 For this guide, Vector will receive data from
 Syslog via Vector's
@@ -69,18 +69,18 @@ The following diagram demonstrates how it works.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Accept log data over the Syslog protocol via TCP, UDP, or Unix sockets.
-    <ol>
+    <ul>
       <li>Automatically parse Syslog 3164 and 5424 formats.</li>
-    </ol>
+    </ul>
   </li>
   <li>
     Send your logs to one or more destinations
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 

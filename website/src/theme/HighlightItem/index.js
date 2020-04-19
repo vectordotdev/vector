@@ -23,7 +23,7 @@ function prTags(numbers) {
   }));
 }
 
-function HighlightItem({authorGithub, dateString, description, headingDepth, permalink, prNumbers, style, tags, title}) {
+function HighlightItem({authorGithub, dateString, description, headingDepth, hideAuthor, hideTags, permalink, prNumbers, style, tags, title}) {
   const date = new Date(Date.parse(dateString));
   const formattedDate = dateFormat(date, "mmm dS, yyyy");
   let enrichedTags = enrichTags(tags, 'highlights');
@@ -47,14 +47,14 @@ function HighlightItem({authorGithub, dateString, description, headingDepth, per
       <article>
         <HeadingTag>{title}</HeadingTag>
         <div className="subtitle">{description}</div>
-        <Avatar
+        {!hideAuthor && authorGithub && <Avatar
           github={authorGithub}
           size="sm"
           subTitle={subTitle}
-          rel="author" />
-        <div>
+          rel="author" />}
+        {!hideTags && enrichedTags.length > 0 && <div>
           <Tags colorProfile="blog" tags={enrichedTags} />
-        </div>
+        </div>}
       </article>
     </Link>
   );

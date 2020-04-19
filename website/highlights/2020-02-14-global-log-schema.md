@@ -6,7 +6,7 @@ description: "Set defaults for Vector's common log key names"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1769, 1795]
 release: "0.8.0"
-importance: "low"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: config"]
 ---
 

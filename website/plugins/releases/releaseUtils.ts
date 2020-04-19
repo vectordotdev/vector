@@ -6,6 +6,7 @@ import fs from 'fs-extra';
 import globby from 'globby';
 import path from 'path';
 import {parse, normalizeUrl, aliasedSitePath} from '@docusaurus/utils';
+import semver from 'semver';
 
 export function truncate(fileString: string, truncateMarker: RegExp) {
   return fileString.split(truncateMarker, 1).shift()!;
@@ -64,7 +65,7 @@ export async function generateReleases(
     }),
   );
 
-  return releases;
+  return releases.sort((a, b) => semver.compare(a.metadata.version, b.metadata.version));
 }
 
 export function linkify(

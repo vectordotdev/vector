@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-06"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-04-19"
+delivery_guarantee: "at_least_once"
 component_title: "Console"
 description: "The Vector `console` sink streams `log` and `metric` events to standard output streams, such as STDOUT and STDERR."
 event_types: ["log","metric"]

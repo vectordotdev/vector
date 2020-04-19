@@ -6,7 +6,7 @@ description: "The next iteration of our Lua transform."
 author_github: "https://github.com/binarylogic"
 pr_numbers: [2126]
 release: "nightly"
-importance: "high"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: sources", "source: vector"]
 ---
 

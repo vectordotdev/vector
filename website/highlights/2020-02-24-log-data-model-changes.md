@@ -1,12 +1,12 @@
 ---
 last_modified_on: "2020-04-13"
 $schema: "/.meta/.schemas/highlights.json"
-title: "Log Data Model Improvements"
+title: "Log Data Model Changes & Disk Buffers"
 description: "We're bringing our log data model closer to JSON"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1836, 1898]
 release: "0.8.0"
-importance: "low"
+hide_on_release_notes: true
 tags: ["type: breaking change", "domain: buffers", "event type: log"]
 ---
 
@@ -20,14 +20,14 @@ data model to be as close to JSON as possible. This means:
 2. Nested fields are represented in an actual nested representation.
 
 Both of these changes bring Vector's internal data model closer to JSON.
+Unfortunately, this breaks disk buffer serialization which means you must
+drain your disk bufffer before upgrading Vector.
 
-## What does this mean for you?
+## Upgrade Guide
 
-The data model changes break serialization and therefore any data in your
-disk buffer will not be recoverable when Vector is upgraded. You should
-ensure that your disk buffer is drained before upgrading Vector. This can
-be achieved by allowing Vector to shut down normally (not forcibly killed).
-That's it!
+1. Make sure Vector shuts down normally to ensure your disk buffers are fully
+   drained.
+2. That's it! Update Vector as usual.
 
 Note, Vector will discard invalid disk buffer data, bad data will not prevent
 Vector from starting.
