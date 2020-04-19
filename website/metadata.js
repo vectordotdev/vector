@@ -3111,21 +3111,6 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-04-01",
-      "description": "Easily rnrich your logs with Kubernetes metadata",
-      "hide_on_release_notes": false,
-      "id": "2020-04-01-kubernetes-pod-metadata-transform",
-      "path": "website/highlights/2020-04-01-kubernetes-pod-metadata-transform.md",
-      "permalink": "/highlights/2020-04-01-kubernetes-pod-metadata-transform/",
-      "tags": [
-        "type: new feature",
-        "domain: sources",
-        "source: vector"
-      ],
-      "title": "New Kubernetes Pod Metdata Transform"
-    },
-    {
-      "author_github": "https://github.com/binarylogic",
-      "date": "2020-04-01",
       "description": "More options when filtering and routing events",
       "hide_on_release_notes": true,
       "id": "2020-04-01-more-condition-predicates",
@@ -26057,43 +26042,6 @@ module.exports = {
       "short_description": "Accepts log events and allows you to parse a log field value as JSON.",
       "status": "prod-ready",
       "title": "JSON Parser",
-      "type": "transform",
-      "unsupported_operating_systems": [
-
-      ]
-    },
-    "kubernetes_pod_metadata": {
-      "beta": true,
-      "config_examples": {
-        "toml": "[transforms.out]\n  type = \"kubernetes_pod_metadata\" # required\n  inputs = [\"in\"] # required"
-      },
-      "delivery_guarantee": null,
-      "description": null,
-      "event_types": [
-        "log"
-      ],
-      "features": [
-
-      ],
-      "function_category": "enrich",
-      "id": "kubernetes_pod_metadata_transform",
-      "inpuut_types": [
-        "log"
-      ],
-      "logo_path": null,
-      "name": "kubernetes_pod_metadata",
-      "operating_systems": [
-
-      ],
-      "output_types": [
-        "log"
-      ],
-      "service_providers": [
-
-      ],
-      "short_description": "Accepts log events and allows you to enrich Kubernetes logs with Pod metadata.",
-      "status": "beta",
-      "title": "Kubernetes Pod Metadata",
       "type": "transform",
       "unsupported_operating_systems": [
 

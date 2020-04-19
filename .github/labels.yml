@@ -324,9 +324,6 @@
 - name: "transform: json_parser"
   description: Anything `json_parser` transform related
   color: 54a0ff
-- name: "transform: kubernetes_pod_metadata"
-  description: Anything `kubernetes_pod_metadata` transform related
-  color: 54a0ff
 - name: "transform: log_to_metric"
   description: Anything `log_to_metric` transform related
   color: 54a0ff
