@@ -25,11 +25,12 @@ By default, Vector primarily operates on three fields: `host`, `message`, and `t
 }
 ```
 
-It may be that your data does not follow this convention. In this case you can modify the global defaults for all
-incoming data in the `log_schema` section of your `config.toml`.
+All of these fields are set when data is ingested (in a [source][docs.sources]). It may be that your data does not
+follow this convention. In this case you can modify the global defaults for all incoming data in the `log_schema`
+section of your `vector.toml`.
 
-```toml
-[log_schema] title="config.toml"
+```toml title="vector.toml"
+[log_schema]
 host_key = "instance" # default "host"
 message_key = "info" # default "message"
 timestamp_key = "datetime" # default "timestamp"
@@ -37,7 +38,11 @@ timestamp_key = "datetime" # default "timestamp"
 # Sources, transforms, and sinks...
 ```
 
-> **Gotcha:** Not all sources use the `host` field.
+<Alert type="info">
+
+Not all sources use the `host` field.
+
+</Alert>
 
 We find this feature is useful when used with simple configs! As your number of components grows, your needs will change
 and you'll likely need to configure this at a more fine grained level.
@@ -47,9 +52,9 @@ and you'll likely need to configure this at a more fine grained level.
 
 Some services will produce logs with the timestamp field mapped to `@timestamp` or some other value.
 
-If your vector pipeline is only consuming data from these sources, you can add the following to your `config.toml`:
+If your vector pipeline is only consuming data from these sources, you can add the following to your `vector.toml`:
 
-```toml title="config.toml"
+```toml title="vector.toml"
 [log_schema]
   timestamp_key = "@timestamp"
 
@@ -73,7 +78,7 @@ Commonly you'll want to do this near either the source or sink of your pipeline.
 
 A transform of this type looks like this:
 
-```toml title="config.toml"
+```toml title="vector.toml"
 [transforms.strip_personal_details]
 type = "remove_fields"
 inputs = ["my-source-id"]
@@ -96,7 +101,7 @@ application can't send EU user data to our US based kafka.
 
 We can build a config that will do the first part of this, but we'll just output to console for ease of this example.
 
-```toml title="config.toml"
+```toml title="vector.toml"
 data_dir = "./data"
 dns_servers = []
 
@@ -111,16 +116,16 @@ drop_invalid = false
 type = "json_parser"
 
 [transforms.not_gdpr]
-type = "field_filter"
+type = "filter"
 inputs = ["parse"]
-field = "gdpr"
-value = "false"
+condition.type = "check_fields"
+condition."gdpr.eq" = "false"
 
 [transforms.gdpr_to_strip]
-type = "field_filter"
+type = "filter"
 inputs = ["parse"]
-field = "gdpr"
-value = "true"
+condition.type = "check_fields"
+condition."gdpr.eq" = "true"
 
 [transforms.gdpr_stripped]
 type = "remove_fields"
@@ -140,9 +145,12 @@ when_full = "block"
 
 Let's have a look:
 
-> TODO: A one-liner invocation.
-
-```
+```bash
+$ cat <<-EOF | cargo run -- --config test.toml
+{ "id": "user1", "gdpr": false, "email": "us-user1@timber.io" }
+{ "id": "user2", "gdpr": false, "email": "us-user2@timber.io" }
+{ "id": "user3", "gdpr": true, "email": "eu-user3@timber.io" }
+EOF
 Feb 05 16:13:59.241  INFO source{name=application type=stdin}: vector::sources::stdin: finished sending
 {"id":"user1","timestamp":"2020-02-06T00:13:59.241801798Z","host":"obsidian","email":"us-user1@timber.io","gdpr":false}
 {"gdpr":false,"host":"obsidian","email":"us-user2@timber.io","timestamp":"2020-02-06T00:13:59.241815255Z","id":"user2"}
@@ -169,7 +177,7 @@ The applications for this include some of the reasons discussed in
 
 Lets take a look at what that might look like:
 
-```toml title="config.toml"
+```toml title="vector.toml"
 [sinks.output]
   inputs = ["demo"]
   type = "kafka"
@@ -180,16 +188,19 @@ Lets take a look at what that might look like:
   # ...
 ```
 
-> Gotcha: Not all fields are templatable! Make sure to check the documentation and test before deploying. If you find
-> a field which you want templatable open an issue and let us know.
+<Alert type="warning">
 
+Gotcha: Not all fields are templatable! Make sure to check the documentation and test before deploying. If you find
+a field which you want templatable open an issue and let us know.
+
+</Alert>
 
 ## Moving and Concatenating Fields
 
 It's fairly common for one part of your pipeline to expect a field to be named differently than another part! Vector can
 slide data around for you with the `rename_fields` transform.
 
-```toml title="config.toml"
+```toml title="vector.toml"
 [transforms.rename_timestamp]
   type = "rename_fields"
   inputs = ["source0"]
@@ -212,13 +223,11 @@ It's useful for when:
 Let's pretend one of your teammates falsely assumed folks always have first and last names, so we have a `first_name`
 and a `last_name` field coming from a source, and we'd like to output a `name` field to a sink.
 
-```toml title="config.toml"
+```toml title="vector.toml"
 [transforms.moosh_names]
   type = "add_fields"
   inputs = ["source0"]
-  [transform.moosh_names.fields]
-    field = "name"
-    value = "{{first_name}} {{last_name}}"
+  fields.name = "{{first_name}} {{last_name}}"
 
 [transforms.drop_old_names]
   type = "remove_fields"
@@ -226,8 +235,13 @@ and a `last_name` field coming from a source, and we'd like to output a `name` f
   fields = ["first_name", "last_name"]
 ```
 
+
+<Alert type="info">
+
 What if you had to do this in reverse? Try using the [`regex`][transform_regex_parser] or
 [`split`][transform_split] transforms.
+
+</Alert>
 
 
 ## Coercing Data Types
@@ -237,7 +251,7 @@ should be a number, or vice versa.
 
 The [`coercer`][transform_coercer] transform is the correct tool for this job!
 
-```toml title="config.toml"
+```toml title="vector.toml"
 [transforms.correct_source_types]
   type = "coercer"
   inputs = ["source0"]
@@ -255,7 +269,7 @@ To do this we'll use `timestamp| $FORMAT`. To build a `$FORMAT`, we can referenc
 [`strftime`](https://docs.rs/chrono/0.4.10/chrono/format/strftime/index.html) documentation. Let's ship some Canadian
 friendly logs up to the great white north!
 
-```toml title="config.toml"
+```toml title="vector.toml"
 [transforms.format_timestamp]
   type = "coercer"
   types.timestamp = "timestamp|%Y/%m/%d:%H:%M:%S %z"
@@ -272,7 +286,7 @@ supported. In these cases, you can use the `encoding` option.
 The [`console`](/docs/reference/sinks/console/#encoding) sink supports both `json` and `text` as its
 output format
 
-```toml title="config.toml"
+```toml title="vector.toml"
 [sinks.print]
   type = "console"
   inputs = ["source0"]
@@ -282,33 +296,6 @@ output format
 
 You can also use a transform like [`json_parser`][transform_json_parser] or
 [`grok_parser`][transform_grok_parser] to parse out data in a given field.
-
-## Using a Schema
-
-> https://github.com/timberio/vector/issues/165
-
-Instead of writing a custom filter or whitelist, you can reuse existing JSON schemas to validate or coerce data. Using
-the `json_parser` transform, specify an optional schema, and optionally specify coercion/filtering preferences.
-
-```toml title="config.toml"
-[transforms.parse]
-  inputs = ["application"]
-  type = "json_parser"
-  schema = "./schemas/message.json"
-  drop_invalid = true
-```
-
-
-### Example: AWS Glue
-
-```toml title="config.toml"
-[transforms.parse]
-  inputs = ["application"]
-  type = "aws_glue"
-  database = "datalake"
-  table = "events"
-  coerce_types = true
-```
 
 ## Parting thoughts
 
