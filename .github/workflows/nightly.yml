@@ -181,6 +181,8 @@ jobs:
           export VERSION=$(make version)
           make release-docker
         env:
+          DOCKER_USERNAME: '${{ secrets.CI_DOCKER_USERNAME }}'
+          DOCKER_PASSWORD: '${{ secrets.CI_DOCKER_PASSWORD }}'
           PLATFORM: "linux/amd64,linux/arm64,linux/arm"
 
   release-s3:
@@ -230,3 +232,6 @@ jobs:
           name: vector-x64.msi
           path: target/artifacts/vector-x64.msi
       - run: make release-s3
+        env:
+          AWS_ACCESS_KEY_ID: '${{ secrets.CI_AWS_ACCESS_KEY_ID }}'
+          AWS_SECRET_ACCESS_KEY: '${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}'
