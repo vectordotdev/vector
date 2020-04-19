@@ -3,7 +3,7 @@ title = "Clickhouse"
 noun = "Clickhouse"
 beta = true
 common = true
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 descriptioon = """\
 [ClickHouse][urls.clickhouse] is an open-source column-oriented database \
 management system that manages extremely large volumes of data, including \

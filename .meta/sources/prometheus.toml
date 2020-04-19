@@ -3,7 +3,7 @@ title = "Prometheus"
 noun = "Prometheus"
 beta = true
 common = false
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 <%= render("_partials/descriptions/_prometheus.toml") %>
 features = [
   "Scrape one or more Prometheus endpoints.",
