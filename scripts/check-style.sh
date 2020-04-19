@@ -28,7 +28,6 @@ for i in $(git ls-files); do
     *svg) continue;;
     *ico) continue;;
     *sig) continue;;
-    test-data*) continue;;
     tests/data*) continue;;
     website/plugins/*) continue;;
     website/sidebars.js) continue;;
