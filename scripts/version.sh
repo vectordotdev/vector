@@ -11,8 +11,8 @@
 
 set -e
 
-VERSION="$(sed -n 's/^version\s=\s"\(.*\)"/\1/p' Cargo.toml)"
-CHANNEL="$(scripts/util/release-channel.sh)"
+VERSION=${VERSION:-$(sed -n 's/^version\s=\s"\(.*\)"/\1/p' Cargo.toml)}
+CHANNEL=${CHANNEL:-$(scripts/util/release-channel.sh)}
 if [ "$CHANNEL" == "nightly" ]; then
   VERSION="$VERSION-nightly"
 fi

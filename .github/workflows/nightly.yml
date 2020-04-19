@@ -9,6 +9,9 @@ on:
 #   schedule:
 #     - cron:  "0 14 * * *"
 
+env:
+  CHANNEL: nightly
+
 jobs:
   build-x86_64-unknown-linux-musl-archive-and-deb-package:
     runs-on: ubuntu-latest
@@ -155,27 +158,27 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-x86_64-unknown-linux-musl.tar.gz
-          path: target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-aarch64-unknown-linux-musl.tar.gz
-          path: target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-armv7-unknown-linux-musleabihf.tar.gz
-          path: target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-amd64.deb
-          path: target/artifacts/vector-amd64.deb
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-arm64.deb
-          path: target/artifacts/vector-arm64.deb
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-armhf.deb
-          path: target/artifacts/vector-armhf.deb
+          path: target/artifacts
       - run: |
           ./scripts/upgrade-docker.sh
           export VERSION=$(make version)
@@ -198,39 +201,39 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-x86_64-unknown-linux-musl.tar.gz
-          path: target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-aarch64-unknown-linux-musl.tar.gz
-          path: target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-armv7-unknown-linux-musleabihf.tar.gz
-          path: target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-amd64.deb
-          path: target/artifacts/vector-amd64.deb
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-arm64.deb
-          path: target/artifacts/vector-arm64.deb
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-armhf.deb
-          path: target/artifacts/vector-armhf.deb
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-x86_64-apple-darwin.tar.gz
-          path: target/artifacts/vector-x86_64-apple-darwin.tar.gz
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-x86_64-pc-windows-msvc.zip
-          path: target/artifacts/vector-x86_64-pc-windows-msvc.zip
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-x64.msi
-          path: target/artifacts/vector-x64.msi
+          path: target/artifacts
       - run: make release-s3
         env:
           AWS_ACCESS_KEY_ID: '${{ secrets.CI_AWS_ACCESS_KEY_ID }}'
