@@ -1,11 +1,19 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: Unit Testing Your Configs
 description: Learn how to write and execute unit tests for your Vector configs
 author_github: https://github.com/Jeffail
 tags: ["type: guide", "domain: config"]
 ---
+
+import Assumptions from '@site/src/components/Assumptions';
+
+<Assumptions name="guide">
+
+* You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][guides.getting-started.your-first-pipeline].
+
+</Assumptions>
 
 It's possible to define unit tests within a Vector configuration file that cover
 a network of transforms within the topology. The purpose of these tests is to
@@ -210,4 +218,6 @@ ensure that uncle Cecil remains in Shoreditch after any future config change.
 What an insufferable hipster he is.
 
 
+[docs.about.concepts]: /docs/about/concepts/
 [docs.reference.tests]: /docs/reference/tests/
+[guides.getting-started.your-first-pipeline]: /guides/getting-started/your-first-pipeline/

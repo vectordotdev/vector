@@ -35,7 +35,7 @@ The Vector `clickhouse` sink
 
 ## Requirements
 
-<Alert icon={false} type="danger" className="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * [Clickhouse][urls.clickhouse] version `>= 1.1.54378` is required.
 

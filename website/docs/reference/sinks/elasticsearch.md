@@ -36,7 +36,7 @@ endpoint][urls.elasticsearch_bulk].
 
 ## Warnings
 
-<Alert icon={false} type="warning" className="list--warnings">
+<Alert icon={false} type="warning" className="list--icons list--icons--warnings">
 
 * [`compression`](#compression) - AWS hosted Elasticsearch is unable to use compression
 

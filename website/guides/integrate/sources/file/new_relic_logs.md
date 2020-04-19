@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a file to New Relic"
 description: "A simple guide to send logs from a file to New Relic in just a few minutes."
@@ -69,26 +69,26 @@ The following diagram demonstrates how it works.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Tail one or more files.
-    <ol>
+    <ul>
       <li>Automatically discover new files with glob patterns.</li>
       <li>Merge multi-line logs into one event.</li>
       <li>Checkpoint your position to ensure data is not lost between restarts.</li>
       <li>Enrich your logs with useful file and host-level context.</li>
-    </ol>
+    </ul>
   </li>
   <li>
     Send logs to the New Relic logging service.
-    <ol>
+    <ul>
       <li>Batch data to maximize throughput.</li>
       <li>Automatically retry failed requests, with backoff.</li>
       <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
+    </ul>
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 

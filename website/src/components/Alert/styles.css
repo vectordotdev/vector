@@ -3,19 +3,20 @@
  */
 
 .alert {
-  background-color: var(--ifm-panel-background-color) !important;
+  border-left: 6px solid var(--ifm-alert-color) !important;
+  border-top: 0px none !important;
+  border-right: 0px none !important;
+  border-bottom: 0px none !important;
+  border-radius: 0;
+  font-weight: 500;
+/*  background-color: var(--ifm-panel-background-color) !important;
   border: 1px solid var(--ifm-panel-background-color) !important;
   border-left: 6px solid var(--ifm-alert-background-color) !important;
   border-radius: 0;
   box-shadow: var(--ifm-panel-box-shadow);
   font-size: 95%;
   font-weight: 500;
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
-}
-
-.alert.alert--fill {
-  background: rgba( var(--ifm-color-primary-rgb), 0.15 ) !important;
-  color: var(--ifm-color-primary) !important;
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );*/
 }
 
 .alert > i.feather {
@@ -28,7 +29,7 @@
 
 .alert a,
 .alert code {
-  color: var(--ifm-alert-background-color);
+  color: inherit;
 }
 
 .alert.alert--icon {
@@ -40,40 +41,55 @@
   margin-bottom: 0;
 }
 
+.alert.alert--rounded {
+  border-radius: var(--ifm-global-radius);
+}
+
+.alert.alert--danger {
+  --ifm-alert-background-color: var(--ifm-panel-background-color);
+  --ifm-alert-color: var(--ifm-color-danger);
+  box-shadow: var(--ifm-panel-box-shadow);
+}
+
+.alert.alert--info {
+  --ifm-alert-background-color: var(--ifm-panel-background-color);
+  --ifm-alert-color: var(--ifm-color-info);
+  box-shadow: var(--ifm-panel-box-shadow);
+}
+
+.alert.alert--success {
+  --ifm-alert-background-color: var(--ifm-panel-background-color);
+  --ifm-alert-color: var(--ifm-color-success);
+  box-shadow: var(--ifm-panel-box-shadow);
+}
+
+.alert.alert--warning {
+  --ifm-alert-background-color: var(--ifm-panel-background-color);
+  --ifm-alert-color: var(--ifm-color-warning);
+  box-shadow: var(--ifm-panel-box-shadow);
+}
+
 
 /**
  * fill
  */
 
+.alert.alert--fill {
+  box-shadow: none;
+}
+
 .alert.alert--fill.alert--danger {
-  background: rgba( var(--ifm-color-danger-rgb), 0.15 ) !important;
-  border: 1px solid var(--ifm-color-danger);
-  color: var(--ifm-color-danger) !important;
+  --ifm-alert-background-color: rgba( var(--ifm-color-danger-rgb), 0.15 );
 }
-.alert.alert--fill.alert--primary {
-  background: rgba( var(--ifm-color-primary-rgb), 0.15 ) !important;
-  border: 1px solid var(--ifm-color-primary);
-  color: var(--ifm-color-primary) !important;
+
+.alert.alert--fill.alert--info {
+  --ifm-alert-background-color: rgba( var(--ifm-color-info-rgb), 0.15 );
 }
+
 .alert.alert--fill.alert--success {
-  background: rgba( var(--ifm-color-success-rgb), 0.15 ) !important;
-  border: 1px solid var(--ifm-color-success);
-  color: var(--ifm-color-success) !important;
+  --ifm-alert-background-color: rgba( var(--ifm-color-success-rgb), 0.15 );
 }
+
 .alert.alert--fill.alert--warning {
-  background: rgba( var(--ifm-color-warning-rgb), 0.15 ) !important;
-  border-top: 0px none !important;
-  border-right: 0px none !important;
-  border-bottom: 0px none !important;
-  color: var(--ifm-color-warning) !important;
-}
-.alert.alert--fill a {
-  color: inherit;
-  text-decoration: underline;
-}
-.alert.alert--fill a code {
-  color: inherit;
-}
-.alert.alert--fill code {
-  color: inherit;
+  --ifm-alert-background-color: rgba( var(--ifm-color-warning-rgb), 0.15 );
 }
