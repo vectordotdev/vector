@@ -87,6 +87,29 @@ The algorithm used to control the limit will follow the AIMD framework:
     failure, the concurrency will be reduced by a factor of one half
     (multiplicative decrease) once per RTT, down to a minimum of one.
 
+This algorithm should have the following responses to service
+conditions:
+
+* Under normal use, the RTT will stay relatively constant or increase
+  slightly in proportion with the concurrency. This should allow the
+  concurrency to increase slowly to the configured maximum, increasing
+  the delivery rate (assuming no limit is reached).
+
+* If a remote service suddenly becomes unresponsive, with sustained
+  timeouts, Vector will rapidly reduce the request concurrency down to
+  the minimum of one.
+
+* If a remote service gradually increase its response time, Vector will
+  gracefully reduce its request concurrency, with it going down to the
+  minimum if the response time continues to increase.
+
+* If a remote service has a hard rate limit, expressed with either HTTP
+  response 429 or timeouts for example, lower than what Vector has ready
+  to deliver to it, Vector's concurrency should hover around `rate_limit
+  / RTT`, peeking over and then briefly dropping down when queries are
+  limited. This will keep the delivery rate close to the discovered rate
+  limit.
+
 ## Prior Art
 
 * [TCP congestion control algorithms](https://en.wikipedia.org/wiki/TCP_congestion_control)
