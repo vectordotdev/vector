@@ -1,34 +1,34 @@
 ---
-last_modified_on: "2020-04-14"
+last_modified_on: "2020-04-17"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Lua Transform v2"
 description: "The next iteration of our Lua transform."
 author_github: "https://github.com/binarylogic"
 pr_numbers: [2126]
-release: "nightly"
+release: "0.9.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: sources", "source: vector"]
+tags: ["type: enhancement", "domain: sources", "source: vector"]
 ---
 
 import Alert from '@site/src/components/Alert';
 import Jump from '@site/src/components/Jump';
-import Vic from '@site/src/components/Vic';
 
-This is an exciting one! v2 of our [`lua` transform][docs.transforms.lua] has
-been released. It contains an entirely new API for using Lua within Vector,
-unblocking some very important limitations that our v1 (MVP) contained:
+v2 of our [`lua` transform][docs.transforms.lua] has been released! This is a
+complete overhaul that provides a new and improved API, better data processing
+ergonomics, and faster processing. Specific improvements include:
 
-1. Correct data model and type conversions.
-2. Introduction of hooks to maintain global state.
-3. Introduction of timers to facilitate timed flushing. Useful for aggregations.
-4. The ability to accept and work with metrics data.
+1. Events are [represented as Lua tables][docs.transforms.lua#representation-of-events] with proper type conversion.
+2. Introduction of [hooks][docs.transforms.lua#hooks] to maintain global state.
+3. Introduction of [timers][docs.transforms.lua#timers] to facilitate timed flushing. Useful for aggregations.
+4. The ability to accept and work with metric events in addition to log events.
 
 This raises the bar in terms of capabilities, which is important! Lua is often
-used as an escape hatch when Vector's native transforms are not flexible enough.
+used as an escape hatch when Vector's native transforms are not expressive
+enough.
 
 <Alert type="info">
 
-Did you know we're [working on a WASM integration][urls.pr_2006] 👀
+Did you know we're also [working on a WASM integration][urls.pr_2006] 👀
 
 </Alert>
 
@@ -40,64 +40,20 @@ Did you know we're [working on a WASM integration][urls.pr_2006] 👀
      website/highlights/2020-04-07-lua-transform-version-2.md.erb
 -->
 
-## Example
-
-Here's an example demonstrating how to create aggregations form your log data:
-
-```toml title="vector.toml"
-[transforms.aggregator]
-type = "lua"
-version = "2"
-inputs = [] # add names of the input components here
-hooks.init = "init"
-hooks.process = "process"
-hooks.shutdown = "shutdown"
-timers = [{interval_seconds = 5, handler = "timer_handler"}]
-
-source = """
-  function init()
-    count = 0
-  end
-
-  function process()
-    count = count + 1
-  end
-
-  function timer_handler(emit)
-    emit(make_counter(counter))
-    counter = 0
-  end
-
-  function shutdown(emit)
-    emit(make_counter(counter))
-  end
-
-  function make_counter(value)
-    return metric = {
-      name = "event_counter",
-      kind = "incremental",
-      timestamp = os.date("!*t"),
-      counter = {
-        value = value
-      }
-    }
-  end
-"""
-```
-
-<Jump to="/guides/advanced/custom-aggregations-with-lua/" leftIcon="book-open">Learn how this works in the guide</Jump>
-<Vic style="cool" text="Vic approved" className="margin-vert--lg" />
-
 ## Get Started
 
 <Jump to="/docs/reference/transforms/lua/" leftIcon="book">Docs: Lua Transform</Jump>
 <Jump to="/guides/advanced/custom-aggregations-with-lua/" leftIcon="book-open">Guide: Custom aggregations with Lua</Jump>
 <Jump to="/guides/advanced/parsing-csv-logs-with-lua/" leftIcon="book-open">Guide: Parsing CSV logs with Lua</Jump>
+<Jump to="/guides/advanced/merge-multiline-logs-with-lua/" leftIcon="book-open">Guide: Merge multi-line logs with Lua</Jump>
 
 And for the curious:
 
 <Jump to="https://github.com/timberio/vector/blob/master/rfcs/2020-03-06-1999-api-extensions-for-lua-transform.md" leftIcon="book">Vector's Lua RFC</Jump>
 
 
+[docs.transforms.lua#hooks]: /docs/reference/transforms/lua/#hooks
+[docs.transforms.lua#representation-of-events]: /docs/reference/transforms/lua/#representation-of-events
+[docs.transforms.lua#timers]: /docs/reference/transforms/lua/#timers
 [docs.transforms.lua]: /docs/reference/transforms/lua/
 [urls.pr_2006]: https://github.com/timberio/vector/pull/2006

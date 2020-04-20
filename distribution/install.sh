@@ -46,6 +46,7 @@ USAGE:
 
 FLAGS:
     -y                      Disable confirmation prompt.
+        --no-modify-path    Don't configure the PATH environment variable
     -h, --help              Prints help information
 EOF
 }
@@ -55,11 +56,15 @@ main() {
     header
 
     local prompt=yes
+    local modify_path=yes
     for arg in "$@"; do
         case "$arg" in
             -h|--help)
                 usage
                 exit 0
+                ;;
+            --no-modify-path)
+                modify_path=no
                 ;;
             -y)
                 prompt=no
@@ -98,7 +103,7 @@ main() {
         echo ""
     fi
 
-    install_from_archive
+    install_from_archive $modify_path
 }
 
 install_from_archive() {
@@ -113,6 +118,7 @@ install_from_archive() {
     need_cmd sed
 
     get_architecture || return 1
+    local modify_path="$1"
     local _arch="$RETVAL"
     assert_nz "$_arch" "arch"
 
@@ -151,15 +157,16 @@ install_from_archive() {
     printf "$_prompt Unpacking archive to $HOME/.vector ..."
     ensure mkdir -p "$HOME/.vector"
     local _dir_name=$(tar -tzf ${_file} | head -1 | sed -e 's/\.\/\(.*\)\//\1/')
-    ensure tar -xzf "$_file" --directory="$HOME/.vector" --strip-components=1
+    ensure tar -xzf "$_file" --directory="$HOME/.vector" --strip-components=2
 
     printf " ✓\n"
 
-    printf "$_prompt Adding Vector path to ~/.profile"
-    local _path="export PATH=\"\$HOME/.vector/${_dir_name}/bin:\$PATH\""
-    grep -qxF "${_path}" "${HOME}/.profile" || echo "${_path}" >> "${HOME}/.profile"
-    grep -qxF "${_path}" "${HOME}/.zprofile" || echo "${_path}" >> "${HOME}/.zprofile"
-    printf " ✓\n"
+    if [ "$modify_path" = "yes" ]; then
+      local _path="export PATH=\"\$HOME/.vector/bin:\$PATH\""
+      add_to_path "${HOME}/.zprofile" "${_path}"
+      add_to_path "${HOME}/.profile" "${_path}"
+      printf " ✓\n"
+    fi
 
     printf "$_prompt Install succeeded! 🚀\n"
     printf "$_prompt To start Vector:\n"
@@ -174,6 +181,19 @@ install_from_archive() {
     ignore rmdir "$_dir"
 
     return "$_retval"
+}
+
+add_to_path() {
+  local file="$1"
+  local new_path="$2"
+
+  printf "${_prompt} Adding Vector path to ${file}"
+
+  if [ ! -f "$file" ]; then
+    echo "${new_path}" >> "${file}"
+  else
+    grep -qxF "${new_path}" "${file}" || echo "${new_path}" >> "${file}"
+  fi
 }
 
 # ------------------------------------------------------------------------------
@@ -359,6 +379,14 @@ get_architecture() {
             powerpc64)
                 _cputype=powerpc
                 ;;
+            aarch64)
+                _cputype=armv7
+                if [ "$_ostype" = "linux-android" ]; then
+                    _ostype=linux-androideabi
+                else
+                    _ostype="${_ostype}eabihf"
+                fi
+                ;;
         esac
     fi
 
@@ -384,7 +412,6 @@ err() {
 
 need_cmd() {
     if ! check_cmd "$1"; then
-
         err "need '$1' (command not found)"
     fi
 }
@@ -411,14 +438,6 @@ ensure() {
         echo ""
         echo "$output" >&2
         exit 1
-    fi
-}
-
-ensure_with_sudo() {
-    if ! [ -x "$(command -v sudo)" ]; then
-        ensure $@
-    else
-        ensure sudo $@
     fi
 }
 

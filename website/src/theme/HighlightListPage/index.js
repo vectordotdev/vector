@@ -19,6 +19,10 @@ function HighlightListPage(props) {
 
   let filteredItems = items;
 
+  // Filter breaking changes by default since these will be included in the
+  // release notes
+  // filteredItems = filteredItems.filter(item => !item.content.metadata.tags.some(tag => tag.label == "type: breaking change"));
+
   if (searchTerm) {
     filteredItems = filteredItems.filter(item => {
       let normalizedTerm = searchTerm.toLowerCase();
