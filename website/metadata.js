@@ -6198,7 +6198,7 @@ module.exports = {
         "deletions_count": 6156,
         "description": "Add new guides section",
         "files_count": 1118,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-03-31-guides-section/",
         "insertions_count": 74832,
         "message": "chore(website): Add new guides section (#2132)",
         "pr_number": 2132,
@@ -8096,11 +8096,49 @@ module.exports = {
         ],
         "sha": "ec30c6166b69e2a91514440347abf090a52fd6e9",
         "type": "fix"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-04-20 13:29:30 +0000",
+        "deletions_count": 0,
+        "description": "Optimize binaries in `test-stable` CI to reduce binary sizes. This should make it more stable.",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 14,
+        "message": "chore(operations): Optimize binaries in `test-stable` CI to reduce binary sizes. This should make it more stable. (#2380)",
+        "pr_number": 2380,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "74126709debf66fc576a1a064244be98e223a0a6",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-04-20 16:29:54 +0000",
+        "deletions_count": 16436,
+        "description": "Prepare 0.9.0",
+        "files_count": 119,
+        "highlight_permalink": null,
+        "insertions_count": 27658,
+        "message": "chore: Prepare 0.9.0 (#2353)",
+        "pr_number": 2353,
+        "scopes": [
+
+        ],
+        "sha": "514f8b1ed5596691e4f083657a61ffe935b06b7f",
+        "type": "chore"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.8.2...v0.9.0",
     "date": "2020-04-17",
-    "deletions_count": 30233,
+    "deletions_count": 46669,
     "description": "",
     "highlights": [
       {
@@ -8328,6 +8366,20 @@ module.exports = {
       },
       {
         "author_github": "https://github.com/binarylogic",
+        "date": "2020-03-31",
+        "description": "High quality guides and education for Vector",
+        "hide_on_release_notes": false,
+        "id": "2020-03-31-guides-section",
+        "path": "website/highlights/2020-03-31-guides-section.md",
+        "permalink": "/highlights/2020-03-31-guides-section/",
+        "tags": [
+          "type: new feature",
+          "domain: website"
+        ],
+        "title": "A New Guides Section"
+      },
+      {
+        "author_github": "https://github.com/binarylogic",
         "date": "2020-04-01",
         "description": "More options when filtering and routing events",
         "hide_on_release_notes": true,
@@ -8460,7 +8512,7 @@ module.exports = {
         "title": "Improved Shutdown"
       }
     ],
-    "insertions_count": 133526,
+    "insertions_count": 161198,
     "last_version": "0.8.2",
     "permalink": "/releases/0.9.0/",
     "title": "Vector v0.9.0",
@@ -31668,7 +31720,7 @@ module.exports = {
           "deletions_count": 6156,
           "description": "Add new guides section",
           "files_count": 1118,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-03-31-guides-section/",
           "insertions_count": 74832,
           "message": "chore(website): Add new guides section (#2132)",
           "pr_number": 2132,
@@ -33566,11 +33618,49 @@ module.exports = {
           ],
           "sha": "ec30c6166b69e2a91514440347abf090a52fd6e9",
           "type": "fix"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-04-20 13:29:30 +0000",
+          "deletions_count": 0,
+          "description": "Optimize binaries in `test-stable` CI to reduce binary sizes. This should make it more stable.",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 14,
+          "message": "chore(operations): Optimize binaries in `test-stable` CI to reduce binary sizes. This should make it more stable. (#2380)",
+          "pr_number": 2380,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "74126709debf66fc576a1a064244be98e223a0a6",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-04-20 16:29:54 +0000",
+          "deletions_count": 16436,
+          "description": "Prepare 0.9.0",
+          "files_count": 119,
+          "highlight_permalink": null,
+          "insertions_count": 27658,
+          "message": "chore: Prepare 0.9.0 (#2353)",
+          "pr_number": 2353,
+          "scopes": [
+
+          ],
+          "sha": "514f8b1ed5596691e4f083657a61ffe935b06b7f",
+          "type": "chore"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.8.2...v0.9.0",
       "date": "2020-04-17",
-      "deletions_count": 30233,
+      "deletions_count": 46669,
       "description": "",
       "highlights": [
         {
@@ -33798,6 +33888,20 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/binarylogic",
+          "date": "2020-03-31",
+          "description": "High quality guides and education for Vector",
+          "hide_on_release_notes": false,
+          "id": "2020-03-31-guides-section",
+          "path": "website/highlights/2020-03-31-guides-section.md",
+          "permalink": "/highlights/2020-03-31-guides-section/",
+          "tags": [
+            "type: new feature",
+            "domain: website"
+          ],
+          "title": "A New Guides Section"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
           "date": "2020-04-01",
           "description": "More options when filtering and routing events",
           "hide_on_release_notes": true,
@@ -33930,7 +34034,7 @@ module.exports = {
           "title": "Improved Shutdown"
         }
       ],
-      "insertions_count": 133526,
+      "insertions_count": 161198,
       "last_version": "0.8.2",
       "permalink": "/releases/0.9.0/",
       "title": "Vector v0.9.0",
