@@ -8073,11 +8073,34 @@ module.exports = {
         ],
         "sha": "b7af16744363667c75948cbbf1b197a21f237324",
         "type": "chore"
+      },
+      {
+        "author": "Joe Schafer",
+        "breaking_change": false,
+        "date": "2020-04-20 13:21:43 +0000",
+        "deletions_count": 9,
+        "description": "support sub-second timestamp resolution",
+        "files_count": 4,
+        "highlight_permalink": null,
+        "insertions_count": 77,
+        "message": "fix(lua transform): support sub-second timestamp resolution (#2333)",
+        "pr_number": 2333,
+        "scopes": [
+          {
+            "component": {
+              "name": "lua",
+              "type": "transform"
+            },
+            "name": "lua transform"
+          }
+        ],
+        "sha": "ec30c6166b69e2a91514440347abf090a52fd6e9",
+        "type": "fix"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.8.2...v0.9.0",
     "date": "2020-04-17",
-    "deletions_count": 30224,
+    "deletions_count": 30233,
     "description": "",
     "highlights": [
       {
@@ -8437,7 +8460,7 @@ module.exports = {
         "title": "Improved Shutdown"
       }
     ],
-    "insertions_count": 133449,
+    "insertions_count": 133526,
     "last_version": "0.8.2",
     "permalink": "/releases/0.9.0/",
     "title": "Vector v0.9.0",
@@ -33520,11 +33543,34 @@ module.exports = {
           ],
           "sha": "b7af16744363667c75948cbbf1b197a21f237324",
           "type": "chore"
+        },
+        {
+          "author": "Joe Schafer",
+          "breaking_change": false,
+          "date": "2020-04-20 13:21:43 +0000",
+          "deletions_count": 9,
+          "description": "support sub-second timestamp resolution",
+          "files_count": 4,
+          "highlight_permalink": null,
+          "insertions_count": 77,
+          "message": "fix(lua transform): support sub-second timestamp resolution (#2333)",
+          "pr_number": 2333,
+          "scopes": [
+            {
+              "component": {
+                "name": "lua",
+                "type": "transform"
+              },
+              "name": "lua transform"
+            }
+          ],
+          "sha": "ec30c6166b69e2a91514440347abf090a52fd6e9",
+          "type": "fix"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.8.2...v0.9.0",
       "date": "2020-04-17",
-      "deletions_count": 30224,
+      "deletions_count": 30233,
       "description": "",
       "highlights": [
         {
@@ -33884,7 +33930,7 @@ module.exports = {
           "title": "Improved Shutdown"
         }
       ],
-      "insertions_count": 133449,
+      "insertions_count": 133526,
       "last_version": "0.8.2",
       "permalink": "/releases/0.9.0/",
       "title": "Vector v0.9.0",
