@@ -182,7 +182,10 @@ reason about the causes of bandwidth limits.
 
 ## Plan Of Attack
 
-* [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
+* [ ] Submit a PR with spike-level code _roughly_ demonstrating the
+      change.
+* [ ] Expose statistics of the concurrency management (through metrics?).
 * [ ] Benchmark the approach under various conditions to determine a good
       value for α.
-* [ ] ………
+* [ ] Develop test harness to ensure desired rate management behavior
+      actually happens and will not regress.
