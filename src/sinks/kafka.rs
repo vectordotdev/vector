@@ -211,14 +211,16 @@ impl Sink for KafkaSink {
 fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
     let consumer: BaseConsumer = config.to_rdkafka().unwrap().create().unwrap();
 
-    let check = tokio::task::block_in_place(|| {
-        consumer
-            .fetch_metadata(Some(&config.topic), Duration::from_secs(3))
-            .map(|_| ())
-            .map_err(|err| err.into())
+    let check = future::lazy(move || {
+        tokio::task::block_in_place(|| {
+            consumer
+                .fetch_metadata(Some(&config.topic), Duration::from_secs(3))
+                .map(|_| ())
+                .map_err(|err| err.into())
+        })
     });
 
-    Box::new(future::result(check))
+    Box::new(check)
 }
 
 fn encode_event(
@@ -307,6 +309,29 @@ mod integration_test {
     #[test]
     fn kafka_happy_path_plaintext() {
         kafka_happy_path("localhost:9092", None, None);
+    }
+
+    #[test]
+    fn healthcheck() {
+        let topic = format!("test-{}", random_string(10));
+
+        let config = KafkaSinkConfig {
+            bootstrap_servers: "localhost:9092".into(),
+            topic: topic.clone(),
+            compression: None,
+            encoding: EncodingConfigWithDefault::from(Encoding::Text),
+            key_field: None,
+            tls: None,
+            socket_timeout_ms: 60000,
+            message_timeout_ms: 300000,
+            ..Default::default()
+        };
+
+        let mut rt = crate::test_util::runtime();
+        use futures::compat::Future01CompatExt;
+        let jh = rt.spawn_handle(super::healthcheck(config).compat());
+
+        rt.block_on_std(jh).unwrap().unwrap();
     }
 
     const TEST_CA: &str = "tests/data/Vector_CA.crt";

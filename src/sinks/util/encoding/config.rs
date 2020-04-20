@@ -20,7 +20,7 @@ use string_cache::DefaultAtom as Atom;
 pub struct EncodingConfig<E> {
     pub(super) codec: E,
     #[serde(default)]
-    pub(super) only_fields: Option<Vec<Atom>>,
+    pub(super) only_fields: Option<Vec<String>>,
     #[serde(default)]
     pub(super) except_fields: Option<Vec<Atom>>,
     #[serde(default)]
@@ -31,7 +31,7 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
     fn codec(&self) -> &E {
         &self.codec
     }
-    fn only_fields(&self) -> &Option<Vec<Atom>> {
+    fn only_fields(&self) -> &Option<Vec<String>> {
         &self.only_fields
     }
     fn except_fields(&self) -> &Option<Vec<Atom>> {
@@ -44,12 +44,12 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
         self.codec = codec;
         self
     }
-    fn set_only_fields(&mut self, fields: Option<Vec<Atom>>) -> &mut Self {
+    fn set_only_fields(&mut self, fields: Option<Vec<String>>) -> &mut Self {
         self.only_fields = fields;
         self
     }
     fn set_except_fields(&mut self, fields: Option<Vec<Atom>>) -> &mut Self {
-        self.only_fields = fields;
+        self.except_fields = fields;
         self
     }
     fn set_timestamp_format(&mut self, format: Option<TimestampFormat>) -> &mut Self {
@@ -154,7 +154,7 @@ where
 pub struct Inner<E> {
     codec: E,
     #[serde(default)]
-    only_fields: Option<Vec<Atom>>,
+    only_fields: Option<Vec<String>>,
     #[serde(default)]
     except_fields: Option<Vec<Atom>>,
     #[serde(default)]

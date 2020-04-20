@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-11"
 component_title: "JSON Parser"
 description: "The Vector `json_parser` transform accepts and outputs `log` events allowing you to parse a log field value as JSON."
 event_types: ["log"]
@@ -300,7 +300,7 @@ You can learn more in the
 ### Field Notation Syntax
 
 The [`field`](#field) and [`target_field`](#target_field) options
-support [Vector's field notiation syntax][docs.reference.field-path-notation],
+support [Vector's field notation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
 ```toml title="vector.toml"
@@ -360,4 +360,4 @@ Notice that the `parent.child1` key was preserved.
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

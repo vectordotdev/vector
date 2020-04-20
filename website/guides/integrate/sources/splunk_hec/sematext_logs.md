@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Splunk HEC to Sematext"
 description: "A simple guide to send logs from Splunk HEC to Sematext in just a few minutes."
@@ -57,7 +57,7 @@ we'll be deploying Vector as a
 [service][docs.strategies#service].
 
 The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
+separate service. It is designed to receive data from an upstream source and
 fan-out to one or more destinations.
 For this guide, Vector will receive data from
 Splunk HEC via Vector's
@@ -73,24 +73,24 @@ The following diagram demonstrates how it works.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Accept log data just like the Splunk HTTP event collector.
-    <ol>
+    <ul>
       <li>Automatically parse incoming data into structured events.</li>
       <li>Optionally require authentication on all requests.</li>
-    </ol>
+    </ul>
   </li>
   <li>
     Send logs to the Sematext monitoring service.
-    <ol>
+    <ul>
       <li>Batch data to maximize throughput.</li>
       <li>Automatically retry failed requests, with backoff.</li>
       <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
+    </ul>
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 

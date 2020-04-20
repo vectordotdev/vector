@@ -2,6 +2,7 @@ pub mod batch;
 pub mod buffer;
 pub mod encoding;
 pub mod http;
+pub mod http2;
 pub mod retries;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;

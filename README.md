@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/guides/getting-started/">Getting Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.8.2<a/>
+    <a href="https://vector.dev/components/">Components<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog/">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Community<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download/">Download v0.8.2<a/>
   </strong>
 </p>
 
@@ -14,7 +14,7 @@
 
 <p align="center">
   <strong>
-    New post! <a href="https://vector.dev/blog/how-we-test-vector">How we test Vector</a>
+    New post! <a href="https://vector.dev/blog/how-we-test-vector/">How We Test Vector</a>
   </strong>
 </p>
 
@@ -76,7 +76,7 @@ usage][urls.vector_performance].
 ### Reference
 
 * [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [7 more...][docs.sources]
-* [**Transforms**][docs.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [kubernetes_pod_metadata][docs.transforms.kubernetes_pod_metadata], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], and [19 more...][docs.transforms]
+* [**Transforms**][docs.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], and [18 more...][docs.transforms]
 * [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], [gcp_pubsub][docs.sinks.gcp_pubsub], and [25 more...][docs.sinks]
 
 ### Administration
@@ -192,15 +192,15 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 Or use your own [preferred method][docs.installation].
 
 
-## Latest Posts & Announcements
+## Latest Highlights
 
-* [How we test Vector](https://vector.dev/blog/how-we-test-vector)
-* [Prometheus Source](https://vector.dev/blog/prometheus-source)
-* [EC2 Metadata Enrichments](https://vector.dev/blog/ec2-metadata)
-* [Alpha Kubernetes Source](https://vector.dev/blog/kubernetes-source-alpha)
-* [Use Custom DNS Servers](https://vector.dev/blog/custom-dns)
+* [~36% Higher Throughput](https://vector.dev/highlights/2020-04-11-overall-performance-increase/)
+* [The Vector Source Now Accepts Metrics](https://vector.dev/highlights/2020-04-07-vector-to-vector-metrics/)
+* [Lua Transform v2](https://vector.dev/highlights/2020-04-07-lua-transform-version-2/)
+* [More Condition Predicates](https://vector.dev/highlights/2020-04-01-more-condition-predicates/)
+* [A New Guides Section](https://vector.dev/highlights/2020-03-31-guides-section/)
 
-[view all...][urls.vector_blog]
+[view all...][urls.vector_highlights]
 
 ---
 
@@ -259,7 +259,6 @@ Or use your own [preferred method][docs.installation].
 [docs.transforms.filter]: https://vector.dev/docs/reference/transforms/filter/
 [docs.transforms.grok_parser]: https://vector.dev/docs/reference/transforms/grok_parser/
 [docs.transforms.json_parser]: https://vector.dev/docs/reference/transforms/json_parser/
-[docs.transforms.kubernetes_pod_metadata]: https://vector.dev/docs/reference/transforms/kubernetes_pod_metadata/
 [docs.transforms.log_to_metric]: https://vector.dev/docs/reference/transforms/log_to_metric/
 [docs.transforms.logfmt_parser]: https://vector.dev/docs/reference/transforms/logfmt_parser/
 [docs.transforms.lua]: https://vector.dev/docs/reference/transforms/lua/
@@ -278,15 +277,15 @@ Or use your own [preferred method][docs.installation].
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/
 [urls.v0.8.2]: https://vector.dev/releases/0.8.2/download
-[urls.vector_blog]: https://vector.dev/blog
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
-[urls.vector_community]: https://vector.dev/community
-[urls.vector_enriching_transforms]: https://vector.dev/components?functions%5B%5D=enrich
-[urls.vector_parsing_transforms]: https://vector.dev/components?functions%5B%5D=parse
+[urls.vector_community]: https://vector.dev/community/
+[urls.vector_enriching_transforms]: https://vector.dev/components/?functions%5B%5D=enrich
+[urls.vector_highlights]: https://vector.dev/highlights/
+[urls.vector_parsing_transforms]: https://vector.dev/components/?functions%5B%5D=parse
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
-[urls.vector_releases]: https://vector.dev/releases/latest
+[urls.vector_releases]: https://vector.dev/releases/latest/
 [urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
 [urls.vector_security_policy]: https://github.com/timberio/vector/security/policy

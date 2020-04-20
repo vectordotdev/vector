@@ -44,9 +44,8 @@ The documentation site is built using [Docusaurus](https://docusaurus.io/) and
 can be found in the [website](./website) folder. You can read more about how it
 works and how to run it locally in [the README](./website/README.md).
 
-
 ### Scripting
 
 Vector documentation is mostly generated using Ruby, where the scripts can be
-found within the [scripts](./scripts) folder. You can read more about these
-scripts in [the README](./scripts/README.md).
+found within the [scripts/generate](./scripts/generate) folder. You can read
+more about these scripts in [the README](./scripts/README.md).

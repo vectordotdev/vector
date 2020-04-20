@@ -75,6 +75,7 @@ rusoto_sts = { version = "0.41.0", optional = true }
 
 # Tower
 tower = "0.1.1"
+tower03 = { package = "tower", version = "0.3" }
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }
@@ -88,6 +89,7 @@ prost-types = "0.5"
 # GCP
 goauth = { version = "0.6.1", optional = true }
 smpl_jwt = { version = "0.4.0", optional = true }
+reqwest = "0.9.5"
 
 # External libs
 derivative = "1.0"
@@ -95,17 +97,22 @@ chrono = "0.4.6"
 rand = "0.5.5"
 regex = "1.3.5"
 bytes = { version = "0.4.10", features = ["serde"] }
+bytes05 = { package = "bytes", version = "0.5", features = ["serde"] }
 stream-cancel = "0.4.3"
 hyper = "0.12.35"
+hyper13 = { package = "hyper", version = "0.13" }
 hyper-openssl = "0.7"
+hyper-openssl08 = { package = "hyper-openssl", version = "0.8" }
 native-tls = "0.2.3"
 openssl = "0.10.26"
 openssl-probe = "0.1.2"
 string_cache = "0.7.3"
 flate2 = "1.0.6"
-structopt = "0.2.16"
+structopt = "0.3.13"
 indexmap = {version = "1.0.2", features = ["serde-1"]}
 http = "0.1.14"
+http02 = { package = "http", version = "0.2" }
+http-body = "0.3"
 typetag = "0.1"
 toml = "0.4"
 syslog = "5"
@@ -115,6 +122,7 @@ derive_is_enum_variant = "0.1.1"
 leveldb = { git = "https://github.com/timberio/leveldb", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.2.1"
+headers03 = { package = "headers", version = "0.3" }
 rdkafka = { version = "0.23.1", features = ["libz", "ssl", "zstd"], optional = true }
 hostname = "0.1.5"
 seahash = { version = "3.0.6", optional = true }
@@ -163,7 +171,6 @@ built = "0.3"
 [dev-dependencies]
 approx = "0.3.0"
 criterion = "0.3"
-reqwest = "0.9.5"
 tempfile = "3.0.6"
 libc = "0.2.43"
 libz-sys = "1.0"
@@ -378,21 +385,21 @@ docker = [
   "splunk-integration-tests",
   "pulsar-integration-tests",
 ]
-clickhouse-integration-tests = []
-cloudwatch-logs-integration-tests = []
-cloudwatch-metrics-integration-tests = []
-docker-integration-tests = []
-ec2-metadata-integration-tests = []
-es-integration-tests = []
-firehose-integration-tests = []
-gcp-pubsub-integration-tests = []
-gcs-integration-tests = []
-kafka-integration-tests = []
-kinesis-integration-tests = []
-s3-integration-tests = []
-splunk-integration-tests = []
-influxdb-integration-tests = []
-pulsar-integration-tests = []
+clickhouse-integration-tests = ["sinks-clickhouse"]
+cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
+cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
+docker-integration-tests = ["sources-docker", "unix"]
+ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
+es-integration-tests = ["sinks-elasticsearch"]
+firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-elasticsearch"]
+gcp-pubsub-integration-tests = ["sinks-gcp"]
+gcs-integration-tests = ["sinks-gcp"]
+kafka-integration-tests = ["sinks-kafka"]
+kinesis-integration-tests = ["sinks-aws_kinesis_streams"]
+s3-integration-tests = ["sinks-aws_s3"]
+splunk-integration-tests = ["sinks-splunk_hec", "warp"]
+influxdb-integration-tests = ["sinks-influxdb_metrics"]
+pulsar-integration-tests = ["sinks-pulsar"]
 
 kubernetes = ["kubernetes-integration-tests"]
 kubernetes-integration-tests = ["uuid"]
@@ -402,3 +409,7 @@ disable-resolv-conf = []
 [[bench]]
 name = "bench"
 harness = false
+
+[profile.release]
+lto = true
+codegen-units = 1

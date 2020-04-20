@@ -43,14 +43,14 @@ use string_cache::DefaultAtom as Atom;
 pub trait EncodingConfiguration<E> {
     fn codec(&self) -> &E;
     /// If `Some(_)` this configuration will filter out any field not listed.
-    fn only_fields(&self) -> &Option<Vec<Atom>>;
+    fn only_fields(&self) -> &Option<Vec<String>>;
     /// If `Some(_)` this configuration will filter out any field listed.
     fn except_fields(&self) -> &Option<Vec<Atom>>;
     /// If `Some(_)` this configuration will configure the timestamp output.
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
     fn set_codec(&mut self, codec: E) -> &mut Self;
-    fn set_only_fields(&mut self, fields: Option<Vec<Atom>>) -> &mut Self;
+    fn set_only_fields(&mut self, fields: Option<Vec<String>>) -> &mut Self;
     fn set_except_fields(&mut self, fields: Option<Vec<Atom>>) -> &mut Self;
     fn set_timestamp_format(&mut self, format: Option<TimestampFormat>) -> &mut Self;
 
@@ -63,7 +63,7 @@ pub trait EncodingConfiguration<E> {
                         .filter(|f| !only_fields.contains(f))
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
-                        log_event.remove(&removal);
+                        log_event.remove(&Atom::from(removal));
                     }
                 }
                 Event::Metric(_) => {
@@ -119,7 +119,7 @@ pub trait EncodingConfiguration<E> {
         if let (Some(only_fields), Some(except_fields)) =
             (&self.only_fields(), &self.except_fields())
         {
-            if only_fields.iter().any(|f| except_fields.contains(f)) {
+            if only_fields.iter().any(|f| except_fields.contains(&Atom::from(f.clone()))) {
                 Err("`except_fields` and `only_fields` should be mutually exclusive.")?;
             }
         }

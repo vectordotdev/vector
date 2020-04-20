@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-07"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-04-19"
+delivery_guarantee: "at_least_once"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
 event_types: ["log"]
@@ -36,7 +36,7 @@ endpoint][urls.elasticsearch_bulk].
 
 ## Warnings
 
-<Alert icon={false} type="warning" classNames="list--warnings">
+<Alert icon={false} type="warning" className="list--icons list--icons--warnings">
 
 * [`compression`](#compression) - AWS hosted Elasticsearch is unable to use compression
 
@@ -1349,7 +1349,7 @@ You can learn more about the complete syntax in the
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [docs.reference.templating]: /docs/reference/templating/
-[pages.aws_components]: /components?providers%5B%5D=aws/
+[pages.aws_components]: /components/?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html

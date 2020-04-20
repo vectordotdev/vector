@@ -26,4 +26,4 @@ echo "Checking that each component feature can be built without other features..
 cat Cargo.toml |
   remarshal --if toml --of json |
   jq -r ".features.sources,.features.transforms,.features.sinks|.[]" |
-  xargs -I{} sh -cx "cargo check --tests --no-default-features --features {} || exit 255"
+  xargs -I{} sh -cx "(cargo check --tests --no-default-features --features {} && cargo clean) || exit 255"

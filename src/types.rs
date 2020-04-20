@@ -102,6 +102,19 @@ pub fn parse_conversion_map(
         .collect()
 }
 
+pub fn parse_conversion_map_no_atoms(
+    types: &HashMap<String, String>,
+) -> Result<HashMap<String, Conversion>, ConversionError> {
+    types
+        .iter()
+        .map(|(field, typename)| {
+            typename
+                .parse::<Conversion>()
+                .map(|conv| (field.to_string(), conv))
+        })
+        .collect()
+}
+
 #[derive(Debug, Eq, PartialEq, Snafu)]
 pub enum Error {
     #[snafu(display("Invalid boolean value {:?}", s))]

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-19"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
@@ -384,7 +384,7 @@ features, it is possible to use specific features from the list below:
 | `vendored`      | Forces vendoring of [OpenSSL][urls.openssl] and [ZLib][urls.zlib] dependencies instead of using their versions installed in the system. Requires `perl` as a build dependency.                                                 | <i className="feather icon-check"></i> |
 | `leveldb-plain` | Enables support for [disk buffers][docs.glossary#buffer] using vendored [LevelDB][urls.leveldb].                                                                                                                               | <i className="feather icon-check"></i> |
 | `leveldb-cmake` | The same as `leveldb-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `leveldb-plain`.                                                                          |                                        |
-| `rdkafka-plain` | Enables vendored [librdkafka][urls.lib_rdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka].                                                                 | <i className="feather icon-check"></i> |
+| `rdkafka-plain` | Enables vendored [librdkafka][urls.librdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka].                                                                 | <i className="feather icon-check"></i> |
 | `rdkafka-cmake` | The same as `rdkafka-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `rdkafka-plain`.                                                                          |                                        |
 
 In addition, it is possible to pick only a subset of Vector's components for
@@ -420,7 +420,6 @@ features one has to pass a comma-separated list of component features.
 | `transforms-geoip` | Enables building of [`geoip` transform][docs.transforms.geoip].  |
 | `transforms-grok_parser` | Enables building of [`grok_parser` transform][docs.transforms.grok_parser].  |
 | `transforms-json_parser` | Enables building of [`json_parser` transform][docs.transforms.json_parser].  |
-| `transforms-kubernetes_pod_metadata` | Enables building of [`kubernetes_pod_metadata` transform][docs.transforms.kubernetes_pod_metadata].  |
 | `transforms-log_to_metric` | Enables building of [`log_to_metric` transform][docs.transforms.log_to_metric].  |
 | `transforms-logfmt_parser` | Enables building of [`logfmt_parser` transform][docs.transforms.logfmt_parser].  |
 | `transforms-lua` | Enables building of [`lua` transform][docs.transforms.lua].  |
@@ -531,7 +530,6 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.geoip]: /docs/reference/transforms/geoip/
 [docs.transforms.grok_parser]: /docs/reference/transforms/grok_parser/
 [docs.transforms.json_parser]: /docs/reference/transforms/json_parser/
-[docs.transforms.kubernetes_pod_metadata]: /docs/reference/transforms/kubernetes_pod_metadata/
 [docs.transforms.log_to_metric]: /docs/reference/transforms/log_to_metric/
 [docs.transforms.logfmt_parser]: /docs/reference/transforms/logfmt_parser/
 [docs.transforms.lua]: /docs/reference/transforms/lua/
@@ -547,7 +545,7 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.tokenizer]: /docs/reference/transforms/tokenizer/
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc
 [urls.leveldb]: https://github.com/google/leveldb
-[urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
+[urls.librdkafka]: https://github.com/edenhill/librdkafka
 [urls.openssl]: https://www.openssl.org/
 [urls.perl_windows]: https://www.perl.org/get.html#win32
 [urls.rustup]: https://rustup.rs

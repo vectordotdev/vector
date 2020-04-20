@@ -3,7 +3,7 @@ title = "Loki"
 noun = "Loki"
 beta = true
 common = true
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 description = """\
 [Loki][urls.loki] is a horizontally-scalable, highly-available, multi-tenant \
 log aggregation system inspired by [Prometheus][urls.prometheus]. It is \

@@ -10,6 +10,7 @@ set -euo pipefail
 
 CHANNEL=${CHANNEL:-$(scripts/util/release-channel.sh)}
 VERSION=${VERSION:-$(scripts/version.sh)}
+DATE=${DATE:-$(date -u +%Y-%m-%d)}
 
 #
 # Setup
@@ -24,10 +25,9 @@ ls $td
 #
 
 if [[ "$CHANNEL" == "nightly" ]]; then
-  # Add nightly files with today's date for posterity
-  today=$(date +"%F")
-  echo "Uploading all artifacts to s3://packages.timber.io/vector/nightly/$today"
-  aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/$today" --recursive --sse --acl public-read
+  # Add nightly files with the $DATE for posterity
+  echo "Uploading all artifacts to s3://packages.timber.io/vector/nightly/$DATE"
+  aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/$DATE" --recursive --sse --acl public-read
   echo "Uploaded archives"
 
   # Add "latest" nightly files
@@ -45,7 +45,7 @@ if [[ "$CHANNEL" == "nightly" ]]; then
     --acl public-read
 
   # Verify that the files exist and can be downloaded
-  cmp <(curl https://packages.timber.io/vector/nightly/$today/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+  cmp <(curl https://packages.timber.io/vector/nightly/$DATE/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
   cmp <(curl https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
   cmp <(curl -L https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-gnu.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
 elif [[ "$CHANNEL" == "latest" ]]; then

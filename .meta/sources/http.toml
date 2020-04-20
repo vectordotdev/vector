@@ -3,7 +3,7 @@ title = "HTTP"
 noun = "HTTP"
 beta = true
 common = true
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 features = [
   "Accept log data over HTTP.",
   "Decode JSON, NDJSON, and text.",

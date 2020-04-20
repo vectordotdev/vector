@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-07"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-04-19"
+delivery_guarantee: "at_least_once"
 component_title: "HTTP"
 description: "The Vector `http` source ingests data through the HTTP protocol and outputs `log` events."
 event_types: ["log"]
@@ -34,7 +34,7 @@ ingests data through the [HTTP protocol][urls.http] and outputs
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * This component exposes a configured port. You must ensure your network allows access to this port.
 

@@ -1,5 +1,5 @@
 use crate::{
-    event::Event,
+    event::{self, Event},
     kafka::{KafkaCompression, KafkaTlsConfig},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -124,6 +124,11 @@ fn kafka_source(
                         };
                         let mut event = Event::from(payload);
 
+                        // Add source type
+                        event
+                            .as_mut_log()
+                            .insert(event::log_schema().source_type_key(), "kafka");
+
                         if let Some(key_field) = &config.key_field {
                             match msg.key_view::<[u8]>() {
                                 None => (),
@@ -135,6 +140,7 @@ fn kafka_source(
                                 }
                             }
                         }
+
                         consumer_ref.store_offset(&msg).map_err(
                             |e| error!(message = "Cannot store offset for the message", error = ?e),
                         )?;
@@ -304,6 +310,10 @@ mod integration_test {
         assert_eq!(
             events[0].as_log()[&Atom::from("message_key")],
             "my key".into()
+        );
+        assert_eq!(
+            events[0].as_log()[event::log_schema().source_type_key()],
+            "kafka".into()
         );
     }
 }

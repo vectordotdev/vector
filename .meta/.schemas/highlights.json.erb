@@ -1,0 +1,91 @@
+{
+  "$id": "https://raw.githubusercontent.com/timberio/vector/master/.meta/schemas/highlights.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Vector Highlights Front Matter Schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "author_github",
+    "description",
+    "hide_on_release_notes",
+    "last_modified_on",
+    "pr_numbers",
+    "tags",
+    "title"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The path to this schema.",
+      "enum": ["/.meta/.schemas/highlights.json"]
+    },
+    "author_github": {
+      "type": "string",
+      "description": "Github URL of the author."
+    },
+    "description": {
+      "type": "string",
+      "description": "Short single-line description"
+    },
+    "draft": {
+      "type": "boolean",
+      "description": "Draft mode ensure this guide is not included in releases."
+    },
+    "hide_pagination": {
+      "type": "boolean",
+      "description": "Hides the pagination nav"
+    },
+    "hide_on_release_notes": {
+      "type": "boolean",
+      "description": "Should this highlight appear in the upcoming release notes? Setting this to `false` allows you to make announce a highlight of low imortance without adding noise to the release notes."
+    },
+    "last_modified_on": {
+      "type": "string",
+      "description": "When the guide was last modified."
+    },
+    "pr_numbers": {
+      "type": "array",
+      "description": "List of pull request numbers relevant to this highlight.",
+      "items": {
+        "type": "int"
+      }
+    },
+    "release": {
+      "type": "string",
+      "description": "The release/version number this highlight is included in.",
+      "enum": <%= (["nightly"] + metadata.releases_list.collect(&:version)).to_json %>
+    },
+    "tags": {
+      "type": "array",
+      "description": "Array of tags",
+      "items": {
+        "type": "string",
+        "enum": <%= (
+          [
+            "sink: tcp",
+            "source: tcp",
+            "source: udp",
+            "type: announcement",
+            "type: enhancement",
+            "type: new feature",
+            "type: performance",
+            "type: breaking change"
+          ] +
+          metadata.domains.collect { |d| "domain: #{d.name}" } +
+          metadata.data_model.types.collect { |t| "event type: #{t}" } +
+          metadata.platform_names.collect { |p| "platform: #{p.downcase}" } +
+          metadata.service_providers.collect { |p| "provider: #{p.downcase}" } +
+          metadata.sources_list.collect { |s| "source: #{s.name}" } +
+          ["source: kubernetes"] +
+          metadata.transforms_list.collect { |t| "transform: #{t.name}" } +
+          metadata.sinks_list.collect { |s| "sink: #{s.name}" }
+        ) .to_json %>
+      }
+    },
+    "title": {
+      "type": "string",
+      "description": "Title of the guide."
+    }
+  }
+}

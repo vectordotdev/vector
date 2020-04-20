@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-06"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-04-19"
+delivery_guarantee: "at_least_once"
 component_title: "Datadog Metrics"
 description: "The Vector `datadog_metrics` sink batches `metric` events to Datadog's metrics service using HTTP API."
 event_types: ["metric"]

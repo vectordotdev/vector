@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-16"
 title: Install Vector On Docker
 sidebar_label: Docker
 description: Install Vector on the Docker platform
@@ -182,7 +182,7 @@ compose!
 <TabItem value="service">
 
 The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
+separate service. It is designed to receive data from an upstream source and
 fan-out to one or more destinations.
 Typically, upstream sources are other Vector instances sending data via the
 [`vector` sink][docs.sinks.vector], but can be collected through any of Vector's
@@ -346,4 +346,4 @@ Vector's Docker source files are located
 [urls.docker_debian]: https://hub.docker.com/_/debian
 [urls.docker_hub_vector]: https://hub.docker.com/r/timberio/vector
 [urls.vector_docker_source_files]: https://github.com/timberio/vector/tree/master/distribution/docker
-[urls.vector_releases]: https://vector.dev/releases/latest
+[urls.vector_releases]: https://vector.dev/releases/latest/

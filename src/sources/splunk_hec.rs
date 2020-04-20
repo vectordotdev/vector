@@ -380,6 +380,9 @@ impl<R: Read> Stream for EventStream<R> {
         let mut event = Event::new_empty_log();
         let log = event.as_mut_log();
 
+        // Add source type
+        log.insert(event::log_schema().source_type_key(), "splunk_hec");
+
         // Process event field
         match json.get_mut("event") {
             Some(event) => match event.take() {
@@ -560,6 +563,11 @@ fn raw_event(
     // Add timestamp
     log.insert(event::log_schema().timestamp_key().clone(), Utc::now());
 
+    // Add source type
+    event
+        .as_mut_log()
+        .try_insert(event::log_schema().source_type_key(), "splunk_hec");
+
     Ok(event)
 }
 
@@ -686,7 +694,7 @@ fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
     }
 }
 
-#[cfg(features = "sinks-splunk_hec")]
+#[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
     use super::SplunkConfig;
@@ -694,6 +702,7 @@ mod tests {
     use crate::test_util::{self, collect_n};
     use crate::{
         event::{self, Event},
+        shutdown::ShutdownSignal,
         sinks::{
             splunk_hec::{Encoding, HecSinkConfig},
             util::{encoding::EncodingConfigWithDefault, Compression},
@@ -719,9 +728,18 @@ mod tests {
         let (sender, recv) = mpsc::channel(CHANNEL_CAPACITY);
         let address = test_util::next_addr();
         rt.spawn(
-            SplunkConfig { address, token }
-                .build("default", &GlobalOptions::default(), sender)
-                .unwrap(),
+            SplunkConfig {
+                address,
+                token,
+                tls: None,
+            }
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                sender,
+            )
+            .unwrap(),
         );
         (recv, address)
     }
@@ -811,6 +829,10 @@ mod tests {
             .as_log()
             .get(&event::log_schema().timestamp_key())
             .is_some());
+        assert_eq!(
+            event.as_log()[event::log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
     }
 
     #[test]
@@ -828,6 +850,10 @@ mod tests {
             .as_log()
             .get(&event::log_schema().timestamp_key())
             .is_some());
+        assert_eq!(
+            event.as_log()[event::log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
     }
 
     #[test]
@@ -850,6 +876,10 @@ mod tests {
                 .as_log()
                 .get(&event::log_schema().timestamp_key())
                 .is_some());
+            assert_eq!(
+                event.as_log()[event::log_schema().source_type_key()],
+                "splunk_hec".into()
+            );
         }
     }
 
@@ -868,6 +898,10 @@ mod tests {
             .as_log()
             .get(&event::log_schema().timestamp_key())
             .is_some());
+        assert_eq!(
+            event.as_log()[event::log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
     }
 
     #[test]
@@ -890,6 +924,10 @@ mod tests {
                 .as_log()
                 .get(&event::log_schema().timestamp_key())
                 .is_some());
+            assert_eq!(
+                event.as_log()[event::log_schema().source_type_key()],
+                "splunk_hec".into()
+            );
         }
     }
 
@@ -911,6 +949,10 @@ mod tests {
             .as_log()
             .get(&event::log_schema().timestamp_key())
             .is_some());
+        assert_eq!(
+            event.as_log()[event::log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
     }
 
     #[test]
@@ -948,6 +990,10 @@ mod tests {
             .as_log()
             .get(&event::log_schema().timestamp_key())
             .is_some());
+        assert_eq!(
+            event.as_log()[event::log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
     }
 
     #[test]
@@ -1008,6 +1054,10 @@ mod tests {
             .as_log()
             .get(&event::log_schema().timestamp_key())
             .is_some());
+        assert_eq!(
+            event.as_log()[event::log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
     }
 
     #[test]

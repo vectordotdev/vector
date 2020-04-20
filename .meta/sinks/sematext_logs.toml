@@ -3,7 +3,7 @@ title = "Sematext Logs"
 noun = "Sematext"
 beta = true
 common = false
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 description = """\
 [Sematext][urls.sematext] is a hosted monitoring platform based on \
 Elasticsearch. Providing powerful monitoring and management solutions to \

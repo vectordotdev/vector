@@ -28,7 +28,7 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(super) only_fields: Option<Vec<Atom>>,
+    pub(super) only_fields: Option<Vec<String>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
     #[serde(
         default,
@@ -47,7 +47,7 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
     fn codec(&self) -> &E {
         &self.codec
     }
-    fn only_fields(&self) -> &Option<Vec<Atom>> {
+    fn only_fields(&self) -> &Option<Vec<String>> {
         &self.only_fields
     }
     fn except_fields(&self) -> &Option<Vec<Atom>> {
@@ -60,12 +60,12 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
         self.codec = codec;
         self
     }
-    fn set_only_fields(&mut self, fields: Option<Vec<Atom>>) -> &mut Self {
+    fn set_only_fields(&mut self, fields: Option<Vec<String>>) -> &mut Self {
         self.only_fields = fields;
         self
     }
     fn set_except_fields(&mut self, fields: Option<Vec<Atom>>) -> &mut Self {
-        self.only_fields = fields;
+        self.except_fields = fields;
         self
     }
     fn set_timestamp_format(&mut self, format: Option<TimestampFormat>) -> &mut Self {
@@ -209,7 +209,7 @@ pub struct InnerWithDefault<E: Default> {
     #[serde(default)]
     codec: E,
     #[serde(default)]
-    only_fields: Option<Vec<Atom>>,
+    only_fields: Option<Vec<String>>,
     #[serde(default)]
     except_fields: Option<Vec<Atom>>,
     #[serde(default)]
