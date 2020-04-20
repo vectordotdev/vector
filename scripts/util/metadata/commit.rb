@@ -17,9 +17,11 @@ class Commit
     :insertions_count,
     :message,
     :pr_number,
-    :scope,
+    :scopes,
     :sha,
     :type
+
+  attr_accessor :highlight_permalink
 
   def initialize(attributes)
     @author = attributes.fetch("author")
@@ -34,7 +36,7 @@ class Commit
     @breaking_change = message_attributes.fetch("breaking_change")
     @description = message_attributes.fetch("description")
     @pr_number = message_attributes["pr_number"]
-    @scope = CommitScope.new(message_attributes["scope"] || "core")
+    @scopes = (message_attributes["scopes"] || []).collect { |s| CommitScope.new(s) }
     @type = message_attributes.fetch("type")
   end
 
@@ -46,53 +48,27 @@ class Commit
     type == "fix"
   end
 
-  def category
-    scope.category
-  end
-
   def chore?
     type == "chore"
   end
 
-  def component?
-    !component_name.nil? && !component_type.nil?
-  end
+  def components
+    return @components if defined?(@components)
 
-  def component_name
-    return @component_name if defined?(@component_name)
-
-    @component_name =
+    @components =
       if new_feature?
-        match =  description.match(/`?(?<name>[a-zA-Z_]*)`? (source|transform|sink)/)
+        match =  description.match(/`?(?<name>[a-zA-Z_]*)`? (?<type>source|transform|sink)/i)
 
-        if !match.nil? && !match[:name].nil?
-          match[:name].downcase
+        if !match.nil?
+          [
+            {name: match.fetch(:name).downcase, type: match.fetch(:type).downcase}.to_struct
+          ]
         else
-          nil
+          []
         end
       else
-        scope.component_name
+        scopes.collect(&:component)
       end
-  end
-
-  def component_name!
-    if component_name.nil?
-      raise "Component name could not be found in commit: #{message}"
-    end
-
-    component_name
-  end
-
-  def component_type
-    scope.component_type
-  end
-
-  def component_type!
-    if component_type.nil?
-      raise "Component type could not be found in commit: #{message}"
-    end
-
-    component_type
   end
 
   def doc_update?
@@ -101,10 +77,6 @@ class Commit
 
   def enhancement?
     type == "enhancement"
-  end
-
-  def new_component?
-    new_feature? && !component_name.nil?
   end
 
   def new_feature?
@@ -135,10 +107,11 @@ class Commit
       deletions_count: deletions_count,
       description: description,
       files_count: files_count,
+      highlight_permalink: highlight_permalink,
       insertions_count: insertions_count,
       message: message,
       pr_number: pr_number,
-      scope: scope.deep_to_h,
+      scopes: scopes.deep_to_h,
       sha: sha,
       type: type,
     }
@@ -150,7 +123,7 @@ class Commit
 
   private
     def parse_commit_message!(message)
-      match = message.match(/^(?<type>[a-z]*)(\((?<scope>[a-z0-9_ ]*)\))?(?<breaking_change>!)?: (?<description>.*?)( \(#(?<pr_number>[0-9]*)\))?$/)
+      match = message.match(/^(?<type>[a-z]*)(\((?<scope>[a-z0-9_, ]*)\))?(?<breaking_change>!)?: (?<description>.*?)( \(#(?<pr_number>[0-9]*)\))?$/)
 
       if match.nil?
         raise <<~EOF
@@ -172,7 +145,7 @@ class Commit
         }
 
       if match[:scope]
-        attributes["scope"] = match[:scope]
+        attributes["scopes"] = match[:scope].split(",").collect(&:strip)
       end
 
       if match[:pr_number]
@@ -180,7 +153,7 @@ class Commit
       end
 
       type = attributes.fetch("type")
-      scope = attributes["scope"]
+      scopes = attributes["scopes"]
 
       if !type.nil? && !TYPES.include?(type)
         raise <<~EOF
@@ -193,7 +166,7 @@ class Commit
         EOF
       end
 
-      if TYPES_THAT_REQUIRE_SCOPES.include?(type) && scope.nil?
+      if TYPES_THAT_REQUIRE_SCOPES.include?(type) && scopes.empty?
         raise <<~EOF
         Commit does not have a scope!
 

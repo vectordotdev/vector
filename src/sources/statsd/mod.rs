@@ -1,4 +1,4 @@
-use crate::{shutdown::ShutdownSignal, topology::config::GlobalOptions, Event};
+use crate::{shutdown::ShutdownSignal, stream::StreamExt, topology::config::GlobalOptions, Event};
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use parser::parse;
 use serde::{Deserialize, Serialize};
@@ -23,10 +23,10 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        Ok(statsd(self.address, out))
+        Ok(statsd(self.address, shutdown, out))
     }
 
     fn output_type(&self) -> crate::topology::config::DataType {
@@ -38,7 +38,7 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
     }
 }
 
-fn statsd(addr: SocketAddr, out: mpsc::Sender<Event>) -> super::Source {
+fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: mpsc::Sender<Event>) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending metric: {:?}", e));
 
     Box::new(
@@ -53,8 +53,9 @@ fn statsd(addr: SocketAddr, out: mpsc::Sender<Event>) -> super::Source {
 
             future::ok(socket)
         })
-        .and_then(|socket| {
+        .and_then(move |socket| {
             let metrics_in = UdpFramed::new(socket, BytesCodec::new())
+                .take_until(shutdown)
                 .map(|(bytes, _sock)| {
                     let packet = String::from_utf8_lossy(bytes.as_ref());
                     let metrics = packet

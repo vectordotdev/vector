@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-14"
+last_modified_on: "2020-04-16"
 title: Install Vector On Debian
 sidebar_label: Debian
 description: Install Vector on the Debian operating system
@@ -70,7 +70,7 @@ The following diagram demonstrates how it works.
 ### Download the Vector `.deb` package
 
 ```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-amd64.deb
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-amd64.deb
 ```
 
 [Looking for a different version?][docs.package_managers.dpkg#versions]
@@ -116,7 +116,7 @@ sudo systemctl start vector
 ### Download the Vector `.deb` package
 
 ```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-arm64.deb
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-arm64.deb
 ```
 
 [Looking for a different version?][docs.package_managers.dpkg#versions]
@@ -162,7 +162,7 @@ sudo systemctl start vector
 ### Download the Vector `.deb` package
 
 ```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-armhf.deb
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-armhf.deb
 ```
 
 [Looking for a different version?][docs.package_managers.dpkg#versions]
