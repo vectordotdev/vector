@@ -1,16 +1,13 @@
 name: ci
+
 on:
-  push:
-    branches:
-      - master
+  pull_request:
     paths:
       - ".github/workflows/ci.yml"
       - "src/**"
       - "tests/**"
       - "Cargo.lock"
       - "Cargo.toml"
-  pull_request: {}
-
 
 jobs:
   cargo-deny:
