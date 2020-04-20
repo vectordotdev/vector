@@ -4,10 +4,14 @@ on:
   pull_request:
     paths:
       - ".github/workflows/ci.yml"
+      - "lib/**"
+      - "proto/**"
       - "src/**"
       - "tests/**"
       - "Cargo.lock"
       - "Cargo.toml"
+      - "docker-compose.yml"
+      - "rust-toolchain"
 
 jobs:
   cargo-deny:
