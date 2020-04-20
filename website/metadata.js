@@ -3259,19 +3259,6 @@ module.exports = {
     },
     {
       "author_github": "https://github.com/binarylogic",
-      "date": "2020-04-11",
-      "description": "We identified optimizations that net ~36% higher throughput",
-      "hide_on_release_notes": false,
-      "id": "2020-04-11-overall-performance-increase",
-      "path": "website/highlights/2020-04-11-overall-performance-increase.md",
-      "permalink": "/highlights/2020-04-11-overall-performance-increase/",
-      "tags": [
-        "type: performance"
-      ],
-      "title": "~36% Higher Throughput"
-    },
-    {
-      "author_github": "https://github.com/binarylogic",
       "date": "2020-04-17",
       "description": "Papertrail, Honeycomb, Pulsar, and DataDog Logs",
       "hide_on_release_notes": false,
@@ -7324,7 +7311,7 @@ module.exports = {
         "deletions_count": 98,
         "description": "Start removing Atom from the hot path",
         "files_count": 17,
-        "highlight_permalink": "/highlights/2020-04-11-overall-performance-increase/",
+        "highlight_permalink": null,
         "insertions_count": 92,
         "message": "perf: Start removing Atom from the hot path (#2295)",
         "pr_number": 2295,
@@ -7364,7 +7351,7 @@ module.exports = {
         "deletions_count": 13,
         "description": "Add fast path and caching api to event insert",
         "files_count": 5,
-        "highlight_permalink": "/highlights/2020-04-11-overall-performance-increase/",
+        "highlight_permalink": null,
         "insertions_count": 67,
         "message": "perf: Add fast path and caching api to event insert (#2296)",
         "pr_number": 2296,
@@ -8065,11 +8052,32 @@ module.exports = {
         ],
         "sha": "512cb2ebb3f85997ef5b9966e1b501d531125c35",
         "type": "enhancement"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-04-20 10:55:19 +0000",
+        "deletions_count": 12,
+        "description": "Reenable component feature check",
+        "files_count": 3,
+        "highlight_permalink": null,
+        "insertions_count": 36,
+        "message": "chore(platforms): Reenable component feature check (#2371)",
+        "pr_number": 2371,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "platforms"
+          }
+        ],
+        "sha": "b7af16744363667c75948cbbf1b197a21f237324",
+        "type": "chore"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.8.2...v0.9.0",
     "date": "2020-04-17",
-    "deletions_count": 30212,
+    "deletions_count": 30224,
     "description": "",
     "highlights": [
       {
@@ -8402,19 +8410,6 @@ module.exports = {
       },
       {
         "author_github": "https://github.com/binarylogic",
-        "date": "2020-04-11",
-        "description": "We identified optimizations that net ~36% higher throughput",
-        "hide_on_release_notes": false,
-        "id": "2020-04-11-overall-performance-increase",
-        "path": "website/highlights/2020-04-11-overall-performance-increase.md",
-        "permalink": "/highlights/2020-04-11-overall-performance-increase/",
-        "tags": [
-          "type: performance"
-        ],
-        "title": "~36% Higher Throughput"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
         "date": "2020-04-17",
         "description": "Papertrail, Honeycomb, Pulsar, and DataDog Logs",
         "hide_on_release_notes": false,
@@ -8442,7 +8437,7 @@ module.exports = {
         "title": "Improved Shutdown"
       }
     ],
-    "insertions_count": 133413,
+    "insertions_count": 133449,
     "last_version": "0.8.2",
     "permalink": "/releases/0.9.0/",
     "title": "Vector v0.9.0",
@@ -32763,7 +32758,7 @@ module.exports = {
           "deletions_count": 98,
           "description": "Start removing Atom from the hot path",
           "files_count": 17,
-          "highlight_permalink": "/highlights/2020-04-11-overall-performance-increase/",
+          "highlight_permalink": null,
           "insertions_count": 92,
           "message": "perf: Start removing Atom from the hot path (#2295)",
           "pr_number": 2295,
@@ -32803,7 +32798,7 @@ module.exports = {
           "deletions_count": 13,
           "description": "Add fast path and caching api to event insert",
           "files_count": 5,
-          "highlight_permalink": "/highlights/2020-04-11-overall-performance-increase/",
+          "highlight_permalink": null,
           "insertions_count": 67,
           "message": "perf: Add fast path and caching api to event insert (#2296)",
           "pr_number": 2296,
@@ -33504,11 +33499,32 @@ module.exports = {
           ],
           "sha": "512cb2ebb3f85997ef5b9966e1b501d531125c35",
           "type": "enhancement"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-04-20 10:55:19 +0000",
+          "deletions_count": 12,
+          "description": "Reenable component feature check",
+          "files_count": 3,
+          "highlight_permalink": null,
+          "insertions_count": 36,
+          "message": "chore(platforms): Reenable component feature check (#2371)",
+          "pr_number": 2371,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "platforms"
+            }
+          ],
+          "sha": "b7af16744363667c75948cbbf1b197a21f237324",
+          "type": "chore"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.8.2...v0.9.0",
       "date": "2020-04-17",
-      "deletions_count": 30212,
+      "deletions_count": 30224,
       "description": "",
       "highlights": [
         {
@@ -33841,19 +33857,6 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/binarylogic",
-          "date": "2020-04-11",
-          "description": "We identified optimizations that net ~36% higher throughput",
-          "hide_on_release_notes": false,
-          "id": "2020-04-11-overall-performance-increase",
-          "path": "website/highlights/2020-04-11-overall-performance-increase.md",
-          "permalink": "/highlights/2020-04-11-overall-performance-increase/",
-          "tags": [
-            "type: performance"
-          ],
-          "title": "~36% Higher Throughput"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
           "date": "2020-04-17",
           "description": "Papertrail, Honeycomb, Pulsar, and DataDog Logs",
           "hide_on_release_notes": false,
@@ -33881,7 +33884,7 @@ module.exports = {
           "title": "Improved Shutdown"
         }
       ],
-      "insertions_count": 133413,
+      "insertions_count": 133449,
       "last_version": "0.8.2",
       "permalink": "/releases/0.9.0/",
       "title": "Vector v0.9.0",

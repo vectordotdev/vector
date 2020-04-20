@@ -196,9 +196,9 @@ Or use your own [preferred method][docs.installation].
 
 * [Improved Shutdown](https://vector.dev/highlights/2020-04-20-improved-shutdown/)
 * [4 New Sinks!](https://vector.dev/highlights/2020-04-17-new-sinks/)
-* [~36% Higher Throughput](https://vector.dev/highlights/2020-04-11-overall-performance-increase/)
 * [Set the Lua transform `search_dirs` option to Vector's config dir by default](https://vector.dev/highlights/2020-04-09-set-search_dirs-to-config-dirs-by-default/)
 * [ACL is now optional for the Google Cloud Storage sink](https://vector.dev/highlights/2020-04-09-make-acl-optional/)
+* [The Vector Source Now Accepts Metrics](https://vector.dev/highlights/2020-04-07-vector-to-vector-metrics/)
 
 [view all...][urls.vector_highlights]
 
