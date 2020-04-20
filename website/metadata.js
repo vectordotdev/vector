@@ -3154,19 +3154,6 @@ module.exports = {
         "source: vector"
       ],
       "title": "The Vector Source Now Accepts Metrics"
-    },
-    {
-      "author_github": "https://github.com/binarylogic",
-      "date": "2020-04-11",
-      "description": "We identified optimizations that net ~36% higher throughput",
-      "hide_on_release_notes": false,
-      "id": "2020-04-11-overall-performance-increase",
-      "path": "website/highlights/2020-04-11-overall-performance-increase.md",
-      "permalink": "/highlights/2020-04-11-overall-performance-increase/",
-      "tags": [
-        "type: performance"
-      ],
-      "title": "~36% Higher Throughput"
     }
   ],
   "installation": {
@@ -3592,16 +3579,18 @@ module.exports = {
   },
   "latest_highlight": {
     "author_github": "https://github.com/binarylogic",
-    "date": "2020-04-11",
-    "description": "We identified optimizations that net ~36% higher throughput",
-    "hide_on_release_notes": false,
-    "id": "2020-04-11-overall-performance-increase",
-    "path": "website/highlights/2020-04-11-overall-performance-increase.md",
-    "permalink": "/highlights/2020-04-11-overall-performance-increase/",
+    "date": "2020-04-07",
+    "description": "It's not possible to forward metrics between Vector instances",
+    "hide_on_release_notes": true,
+    "id": "2020-04-07-vector-to-vector-metrics",
+    "path": "website/highlights/2020-04-07-vector-to-vector-metrics.md",
+    "permalink": "/highlights/2020-04-07-vector-to-vector-metrics/",
     "tags": [
-      "type: performance"
+      "type: new feature",
+      "domain: sources",
+      "source: vector"
     ],
-    "title": "~36% Higher Throughput"
+    "title": "The Vector Source Now Accepts Metrics"
   },
   "latest_post": {
     "author_github": "https://github.com/lukesteensen",
