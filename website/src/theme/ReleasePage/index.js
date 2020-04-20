@@ -188,7 +188,7 @@ function ReleasePage(props) {
         </header>
         <div className={classnames('container', 'container--xs')}>
           <article>
-            {warnings.length > 0 && <Alert icon={false} fill={true} type="warning" className="list--warnings margin-bottom--lg">
+            {warnings.length > 0 && <Alert icon={false} fill={true} type="warning" className="list--icons list--icons--warnings margin-bottom--lg">
               <ul>{warnings}</ul>
             </Alert>}
             <section className="markdown">

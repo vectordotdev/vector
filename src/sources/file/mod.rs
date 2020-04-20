@@ -7,14 +7,18 @@ use crate::{
 };
 use bytes::Bytes;
 use file_source::{FileServer, Fingerprinter};
+use futures::{
+    compat::{Compat01As03Sink, Future01CompatExt},
+    future::{FutureExt, TryFutureExt},
+};
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
-use std::thread;
 use std::time::{Duration, SystemTime};
+use tokio::task::spawn_blocking;
 
 mod line_agg;
 use line_agg::LineAgg;
@@ -188,7 +192,7 @@ impl SourceConfig for FileConfig {
         &self,
         name: &str,
         globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can
@@ -205,7 +209,7 @@ impl SourceConfig for FileConfig {
             Regex::new(indicator).with_context(|| InvalidMessageStartIndicator { indicator })?;
         }
 
-        Ok(file_source(self, data_dir, out))
+        Ok(file_source(self, data_dir, shutdown, out))
     }
 
     fn output_type(&self) -> DataType {
@@ -220,10 +224,9 @@ impl SourceConfig for FileConfig {
 pub fn file_source(
     config: &FileConfig,
     data_dir: PathBuf,
+    shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
 ) -> super::Source {
-    let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
-
     let ignore_before = config
         .ignore_older
         .map(|secs| SystemTime::now() - Duration::from_secs(secs));
@@ -278,6 +281,8 @@ pub fn file_source(
                 Box::new(rx)
             };
 
+        // Once file server ends this will run until it has finished processing remaining
+        // logs in the queue.
         let span = current_span();
         let span2 = span.clone();
         tokio01::spawn(
@@ -296,17 +301,16 @@ pub fn file_source(
         );
 
         let span = info_span!("file_server");
-        thread::spawn(move || {
+        spawn_blocking(move || {
             let _enter = span.enter();
             file_server.run(
-                futures::compat::Compat01As03Sink::new(tx.sink_map_err(drop)),
-                shutdown_rx,
+                Compat01As03Sink::new(tx.sink_map_err(drop)),
+                shutdown.compat(),
             );
-        });
-
-        // Dropping shutdown_tx is how we signal to the file server that it's time to shut down,
-        // so it needs to be held onto until the future we return is dropped.
-        future::empty().inspect(|_| drop(shutdown_tx))
+        })
+        .boxed()
+        .compat()
+        .map_err(|error| error!(message="File server unexpectedly stopped.",%error))
     }))
 }
 
@@ -340,6 +344,7 @@ mod tests {
     use super::*;
     use crate::{
         event, runtime,
+        shutdown::ShutdownSignal,
         sources::file,
         test_util::{block_on, shutdown_on_idle},
         topology::Config,
@@ -351,7 +356,6 @@ mod tests {
         fs::{self, File},
         io::{Seek, Write},
     };
-    use stream_cancel::Tripwire;
     use tempfile::tempdir;
     use tokio01::util::FutureExt;
 
@@ -472,7 +476,7 @@ mod tests {
     fn file_happy_path() {
         let n = 5;
         let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
-        let (trigger, tripwire) = Tripwire::new();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -480,11 +484,11 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
         let mut rt = runtime::Runtime::new().unwrap();
 
-        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+        rt.spawn(source);
 
         let path1 = dir.path().join("file1");
         let path2 = dir.path().join("file2");
@@ -500,7 +504,7 @@ mod tests {
 
         sleep();
 
-        drop(trigger);
+        drop(trigger_shutdown);
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(rx.collect());
@@ -534,18 +538,18 @@ mod tests {
     fn file_truncate() {
         let n = 5;
         let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
-        let (trigger, tripwire) = Tripwire::new();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
         let mut rt = runtime::Runtime::new().unwrap();
 
-        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+        rt.spawn(source);
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
@@ -569,7 +573,7 @@ mod tests {
 
         sleep();
 
-        drop(trigger);
+        drop(trigger_shutdown);
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(rx.collect());
@@ -603,18 +607,18 @@ mod tests {
     fn file_rotate() {
         let n = 5;
         let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
-        let (trigger, tripwire) = Tripwire::new();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
         let mut rt = runtime::Runtime::new().unwrap();
 
-        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+        rt.spawn(source);
 
         let path = dir.path().join("file");
         let archive_path = dir.path().join("file");
@@ -639,7 +643,7 @@ mod tests {
 
         sleep();
 
-        drop(trigger);
+        drop(trigger_shutdown);
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(rx.collect());
@@ -673,7 +677,7 @@ mod tests {
     fn file_multiple_paths() {
         let n = 5;
         let (tx, rx) = futures01::sync::mpsc::channel(4 * n);
-        let (trigger, tripwire) = Tripwire::new();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -682,11 +686,11 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
         let mut rt = runtime::Runtime::new().unwrap();
 
-        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+        rt.spawn(source);
 
         let path1 = dir.path().join("a.txt");
         let path2 = dir.path().join("b.txt");
@@ -708,7 +712,7 @@ mod tests {
 
         sleep();
 
-        drop(trigger);
+        drop(trigger_shutdown);
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(rx.collect());
@@ -733,10 +737,10 @@ mod tests {
     fn file_file_key() {
         let mut rt = runtime::Runtime::new().unwrap();
 
-        let (trigger, tripwire) = Tripwire::new();
-
         // Default
         {
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
@@ -744,9 +748,9 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
-            rt.spawn(source.select(tripwire.clone()).map(|_| ()).map_err(|_| ()));
+            rt.spawn(source);
 
             let path = dir.path().join("file");
             let mut file = File::create(&path).unwrap();
@@ -756,6 +760,9 @@ mod tests {
             writeln!(&mut file, "hello there").unwrap();
 
             sleep();
+
+            drop(trigger_shutdown);
+            let _ = rt.block_on(shutdown_done);
 
             let received = wait_with_timeout(rx.into_future()).0.unwrap();
             assert_eq!(
@@ -766,6 +773,8 @@ mod tests {
 
         // Custom
         {
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
@@ -774,9 +783,9 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
-            rt.spawn(source.select(tripwire.clone()).map(|_| ()).map_err(|_| ()));
+            rt.spawn(source);
 
             let path = dir.path().join("file");
             let mut file = File::create(&path).unwrap();
@@ -786,6 +795,9 @@ mod tests {
             writeln!(&mut file, "hello there").unwrap();
 
             sleep();
+
+            drop(trigger_shutdown);
+            let _ = rt.block_on(shutdown_done);
 
             let received = wait_with_timeout(rx.into_future()).0.unwrap();
             assert_eq!(
@@ -796,6 +808,8 @@ mod tests {
 
         // Hidden
         {
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
@@ -804,9 +818,9 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
-            rt.spawn(source.select(tripwire.clone()).map(|_| ()).map_err(|_| ()));
+            rt.spawn(source);
 
             let path = dir.path().join("file");
             let mut file = File::create(&path).unwrap();
@@ -816,6 +830,9 @@ mod tests {
             writeln!(&mut file, "hello there").unwrap();
 
             sleep();
+
+            drop(trigger_shutdown);
+            let _ = rt.block_on(shutdown_done);
 
             let received = wait_with_timeout(rx.into_future()).0.unwrap();
             assert_eq!(
@@ -831,7 +848,6 @@ mod tests {
             );
         }
 
-        drop(trigger);
         shutdown_on_idle(rt);
     }
 
@@ -850,17 +866,18 @@ mod tests {
 
         // First time server runs it picks up existing lines.
         {
+            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
             let (tx, rx) = futures01::sync::mpsc::channel(10);
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             let mut rt = runtime::Runtime::new().unwrap();
-            let (trigger, tripwire) = Tripwire::new();
-            rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+            rt.spawn(source);
 
             sleep();
             writeln!(&mut file, "first line").unwrap();
             sleep();
 
-            drop(trigger);
+            drop(trigger_shutdown);
             shutdown_on_idle(rt);
 
             let received = wait_with_timeout(rx.collect());
@@ -872,17 +889,18 @@ mod tests {
         }
         // Restart server, read file from checkpoint.
         {
+            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
             let (tx, rx) = futures01::sync::mpsc::channel(10);
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             let mut rt = runtime::Runtime::new().unwrap();
-            let (trigger, tripwire) = Tripwire::new();
-            rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+            rt.spawn(source);
 
             sleep();
             writeln!(&mut file, "second line").unwrap();
             sleep();
 
-            drop(trigger);
+            drop(trigger_shutdown);
             shutdown_on_idle(rt);
 
             let received = wait_with_timeout(rx.collect());
@@ -894,22 +912,23 @@ mod tests {
         }
         // Restart server, read files from beginning.
         {
+            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 start_at_beginning: true,
                 ..test_default_file_config(&dir)
             };
             let (tx, rx) = futures01::sync::mpsc::channel(10);
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             let mut rt = runtime::Runtime::new().unwrap();
-            let (trigger, tripwire) = Tripwire::new();
-            rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+            rt.spawn(source);
 
             sleep();
             writeln!(&mut file, "third line").unwrap();
             sleep();
 
-            drop(trigger);
+            drop(trigger_shutdown);
             shutdown_on_idle(rt);
 
             let received = wait_with_timeout(rx.collect());
@@ -935,18 +954,19 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
+            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
             let (tx, rx) = futures01::sync::mpsc::channel(10);
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             let mut rt = runtime::Runtime::new().unwrap();
-            let (trigger, tripwire) = Tripwire::new();
-            rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+            rt.spawn(source);
 
             let mut file = File::create(&path).unwrap();
             sleep();
             writeln!(&mut file, "first line").unwrap();
             sleep();
 
-            drop(trigger);
+            drop(trigger_shutdown);
             shutdown_on_idle(rt);
 
             let received = wait_with_timeout(rx.collect());
@@ -961,18 +981,19 @@ mod tests {
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {
+            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
             let (tx, rx) = futures01::sync::mpsc::channel(10);
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             let mut rt = runtime::Runtime::new().unwrap();
-            let (trigger, tripwire) = Tripwire::new();
-            rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+            rt.spawn(source);
 
             let mut file = File::create(&path).unwrap();
             sleep();
             writeln!(&mut file, "second line").unwrap();
             sleep();
 
-            drop(trigger);
+            drop(trigger_shutdown);
             shutdown_on_idle(rt);
 
             let received = wait_with_timeout(rx.collect());
@@ -992,7 +1013,7 @@ mod tests {
 
         let mut rt = runtime::Runtime::new().unwrap();
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger, tripwire) = Tripwire::new();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1001,9 +1022,9 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
-        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+        rt.spawn(source);
 
         let before_path = dir.path().join("before");
         let mut before_file = File::create(&before_path).unwrap();
@@ -1048,7 +1069,7 @@ mod tests {
 
         sleep();
 
-        drop(trigger);
+        drop(trigger_shutdown);
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(rx.collect());
@@ -1077,7 +1098,7 @@ mod tests {
     #[test]
     fn file_max_line_bytes() {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger, tripwire) = Tripwire::new();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1086,11 +1107,11 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
         let mut rt = runtime::Runtime::new().unwrap();
 
-        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+        rt.spawn(source);
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
@@ -1114,7 +1135,7 @@ mod tests {
         sleep();
         sleep();
 
-        drop(trigger);
+        drop(trigger_shutdown);
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
@@ -1137,7 +1158,7 @@ mod tests {
     #[test]
     fn test_multi_line_aggregation_legacy() {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger, tripwire) = Tripwire::new();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1147,11 +1168,11 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
         let mut rt = runtime::Runtime::new().unwrap();
 
-        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+        rt.spawn(source);
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
@@ -1178,7 +1199,7 @@ mod tests {
 
         sleep();
 
-        drop(trigger);
+        drop(trigger_shutdown);
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
@@ -1210,7 +1231,7 @@ mod tests {
     #[test]
     fn test_multi_line_aggregation() {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger, tripwire) = Tripwire::new();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1224,11 +1245,11 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
         let mut rt = runtime::Runtime::new().unwrap();
 
-        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+        rt.spawn(source);
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
@@ -1255,7 +1276,7 @@ mod tests {
 
         sleep();
 
-        drop(trigger);
+        drop(trigger_shutdown);
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
@@ -1287,7 +1308,7 @@ mod tests {
     #[test]
     fn test_fair_reads() {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger, tripwire) = Tripwire::new();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1316,13 +1337,13 @@ mod tests {
 
         sleep();
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
         let mut rt = runtime::Runtime::new().unwrap();
-        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+        rt.spawn(source);
 
         sleep();
 
-        drop(trigger);
+        drop(trigger_shutdown);
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
@@ -1352,7 +1373,7 @@ mod tests {
     #[test]
     fn test_oldest_first() {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger, tripwire) = Tripwire::new();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1381,13 +1402,13 @@ mod tests {
 
         sleep();
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
         let mut rt = runtime::Runtime::new().unwrap();
-        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+        rt.spawn(source);
 
         sleep();
 
-        drop(trigger);
+        drop(trigger_shutdown);
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
@@ -1417,21 +1438,21 @@ mod tests {
     #[test]
     fn test_gzipped_file() {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger, tripwire) = Tripwire::new();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![PathBuf::from("test-data/gzipped.log")],
+            include: vec![PathBuf::from("tests/data/gzipped.log")],
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
         let mut rt = runtime::Runtime::new().unwrap();
-        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+        rt.spawn(source);
 
         sleep();
 
-        drop(trigger);
+        drop(trigger_shutdown);
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(

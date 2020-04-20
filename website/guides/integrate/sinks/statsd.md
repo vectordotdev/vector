@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics to Statsd"
 description: "A simple guide to send metrics to Statsd in just a few minutes."
@@ -70,18 +70,18 @@ The following diagram demonstrates how it works.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Collect your metrics from one or more sources
   </li>
   <li>
     Stream metrics over a StatsD UDP protocol.
-    <ol>
+    <ul>
       <li>Automatically aggregate metrics at the edge for improved performance.</li>
-    </ol>
+    </ul>
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 
@@ -121,7 +121,7 @@ sudo dpkg -i vector-amd64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={null}
+  sourceName={"statsd"}
   sinkName={"statsd"} />
 
 </li>
@@ -167,7 +167,7 @@ sudo dpkg -i vector-arm64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={null}
+  sourceName={"statsd"}
   sinkName={"statsd"} />
 
 </li>
@@ -213,7 +213,7 @@ sudo dpkg -i vector-armhf.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={null}
+  sourceName={"statsd"}
   sinkName={"statsd"} />
 
 </li>

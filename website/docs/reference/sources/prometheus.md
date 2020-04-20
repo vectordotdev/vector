@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-11"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-04-19"
+delivery_guarantee: "at_least_once"
 component_title: "Prometheus"
 description: "The Vector `prometheus` source ingests data through the Prometheus text exposition format and outputs `metric` events."
 event_types: ["metric"]

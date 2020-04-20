@@ -122,7 +122,19 @@ impl Future for CloudwatchFuture {
                 }
 
                 State::CreateGroup(fut) => {
-                    try_ready!(fut.poll().map_err(CloudwatchError::CreateGroup));
+                    try_ready!(fut
+                        .poll()
+                        .or_else(|e| {
+                            if let RusotoError::Service(
+                                CreateLogGroupError::ResourceAlreadyExists(_),
+                            ) = e
+                            {
+                                Ok(Async::Ready(()))
+                            } else {
+                                Err(e)
+                            }
+                        })
+                        .map_err(CloudwatchError::CreateGroup));
 
                     info!(message = "group created.", name = %self.client.group_name);
 
@@ -133,7 +145,19 @@ impl Future for CloudwatchFuture {
                 }
 
                 State::CreateStream(fut) => {
-                    try_ready!(fut.poll().map_err(CloudwatchError::CreateStream));
+                    try_ready!(fut
+                        .poll()
+                        .or_else(|e| {
+                            if let RusotoError::Service(
+                                CreateLogStreamError::ResourceAlreadyExists(_),
+                            ) = e
+                            {
+                                Ok(Async::Ready(()))
+                            } else {
+                                Err(e)
+                            }
+                        })
+                        .map_err(CloudwatchError::CreateStream));
 
                     info!(message = "stream created.", name = %self.client.stream_name);
 
