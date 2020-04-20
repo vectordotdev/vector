@@ -7865,11 +7865,211 @@ module.exports = {
         ],
         "sha": "6b95f7e17e4af25c689a108cd3fa6941d97d5593",
         "type": "enhancement"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-04-18 11:35:30 +0000",
+        "deletions_count": 94,
+        "description": "Wire in new `ShutdownSignal` for improved shutdown",
+        "files_count": 4,
+        "highlight_permalink": null,
+        "insertions_count": 139,
+        "message": "chore(file source): Wire in new `ShutdownSignal` for improved shutdown (#2261)",
+        "pr_number": 2261,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "file source"
+          }
+        ],
+        "sha": "7ea0eed5ee4c24df66efba60403ecf0b5486ebb4",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-04-18 10:29:23 +0000",
+        "deletions_count": 2,
+        "description": "Allow creation race of groups and streams",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 26,
+        "message": "fix(aws_cloudwatch_logs sink): Allow creation race of groups and streams (#2355)",
+        "pr_number": 2355,
+        "scopes": [
+          {
+            "component": {
+              "name": "aws_cloudwatch_logs",
+              "type": "sink"
+            },
+            "name": "aws_cloudwatch_logs sink"
+          }
+        ],
+        "sha": "9c9def9d7d9f6d2319ec31241632f521d8e597d4",
+        "type": "fix"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-04-18 15:47:29 +0000",
+        "deletions_count": 60,
+        "description": "Only run CI workflow when relevant files change",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 65,
+        "message": "chore: Only run CI workflow when relevant files change (#2369)",
+        "pr_number": 2369,
+        "scopes": [
+
+        ],
+        "sha": "f119d617293e81a2f7093dac549cd8ac5c26303f",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-04-19 12:48:00 +0000",
+        "deletions_count": 4,
+        "description": "Fix tests",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 14,
+        "message": "chore: Fix tests (#2372)",
+        "pr_number": 2372,
+        "scopes": [
+
+        ],
+        "sha": "32e73588a7e2b3e9fd80f3eb0184339405b044fc",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-04-19 21:21:23 +0000",
+        "deletions_count": 86,
+        "description": "Add nightly GH action workflow",
+        "files_count": 6,
+        "highlight_permalink": null,
+        "insertions_count": 246,
+        "message": "chore(operations): Add nightly GH action workflow (#2370)",
+        "pr_number": 2370,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "fde51c235f6d3c205a34a768c9df9e3f5e537dd5",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-04-19 21:37:28 +0000",
+        "deletions_count": 5,
+        "description": "Move /test-data to /tests/data",
+        "files_count": 6,
+        "highlight_permalink": null,
+        "insertions_count": 4,
+        "message": "chore: Move /test-data to /tests/data (#2375)",
+        "pr_number": 2375,
+        "scopes": [
+
+        ],
+        "sha": "c59eedf0943f7b02295c75907fbf3024bd884f11",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-04-20 12:57:02 +0000",
+        "deletions_count": 1,
+        "description": "Run ci workflow on pull requests only",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 16,
+        "message": "chore(operations): Run ci workflow on pull requests only (#2378)",
+        "pr_number": 2378,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "e041007b0849c8de0e1b80272e1875d413a5aad8",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-04-20 19:15:22 +0000",
+        "deletions_count": 50,
+        "description": "Wire in new `ShutdownSignal` for improved shutdown",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 22,
+        "message": "enhancement(splunk_hec source): Wire in new `ShutdownSignal` for improved shutdown (#2373)",
+        "pr_number": 2373,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "splunk_hec source"
+          }
+        ],
+        "sha": "8442531f7190e30820be157be21be77bd9c27a15",
+        "type": "enhancement"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-04-20 19:17:28 +0000",
+        "deletions_count": 52,
+        "description": "Wire in `ShutdownSignal` for improved shutdown",
+        "files_count": 3,
+        "highlight_permalink": null,
+        "insertions_count": 57,
+        "message": "enhancement(journald source): Wire in `ShutdownSignal` for improved shutdown (#2364)",
+        "pr_number": 2364,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "journald source"
+          }
+        ],
+        "sha": "806f24664147d71ab866ef156d9f3762bac7992c",
+        "type": "enhancement"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-04-20 19:20:14 +0000",
+        "deletions_count": 18,
+        "description": "Wire in new `ShutdownSignal` for improved shutdown",
+        "files_count": 7,
+        "highlight_permalink": null,
+        "insertions_count": 50,
+        "message": "enhancement(sources): Wire in new `ShutdownSignal` for improved shutdown (#2365)",
+        "pr_number": 2365,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "sources"
+          }
+        ],
+        "sha": "512cb2ebb3f85997ef5b9966e1b501d531125c35",
+        "type": "enhancement"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.8.2...v0.9.0",
     "date": "2020-04-17",
-    "deletions_count": 29840,
+    "deletions_count": 30212,
     "description": "",
     "highlights": [
       {
@@ -8242,7 +8442,7 @@ module.exports = {
         "title": "Improved Shutdown"
       }
     ],
-    "insertions_count": 132774,
+    "insertions_count": 133413,
     "last_version": "0.8.2",
     "permalink": "/releases/0.9.0/",
     "title": "Vector v0.9.0",
@@ -33104,11 +33304,211 @@ module.exports = {
           ],
           "sha": "6b95f7e17e4af25c689a108cd3fa6941d97d5593",
           "type": "enhancement"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-04-18 11:35:30 +0000",
+          "deletions_count": 94,
+          "description": "Wire in new `ShutdownSignal` for improved shutdown",
+          "files_count": 4,
+          "highlight_permalink": null,
+          "insertions_count": 139,
+          "message": "chore(file source): Wire in new `ShutdownSignal` for improved shutdown (#2261)",
+          "pr_number": 2261,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "file source"
+            }
+          ],
+          "sha": "7ea0eed5ee4c24df66efba60403ecf0b5486ebb4",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-04-18 10:29:23 +0000",
+          "deletions_count": 2,
+          "description": "Allow creation race of groups and streams",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 26,
+          "message": "fix(aws_cloudwatch_logs sink): Allow creation race of groups and streams (#2355)",
+          "pr_number": 2355,
+          "scopes": [
+            {
+              "component": {
+                "name": "aws_cloudwatch_logs",
+                "type": "sink"
+              },
+              "name": "aws_cloudwatch_logs sink"
+            }
+          ],
+          "sha": "9c9def9d7d9f6d2319ec31241632f521d8e597d4",
+          "type": "fix"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-04-18 15:47:29 +0000",
+          "deletions_count": 60,
+          "description": "Only run CI workflow when relevant files change",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 65,
+          "message": "chore: Only run CI workflow when relevant files change (#2369)",
+          "pr_number": 2369,
+          "scopes": [
+
+          ],
+          "sha": "f119d617293e81a2f7093dac549cd8ac5c26303f",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-04-19 12:48:00 +0000",
+          "deletions_count": 4,
+          "description": "Fix tests",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 14,
+          "message": "chore: Fix tests (#2372)",
+          "pr_number": 2372,
+          "scopes": [
+
+          ],
+          "sha": "32e73588a7e2b3e9fd80f3eb0184339405b044fc",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-04-19 21:21:23 +0000",
+          "deletions_count": 86,
+          "description": "Add nightly GH action workflow",
+          "files_count": 6,
+          "highlight_permalink": null,
+          "insertions_count": 246,
+          "message": "chore(operations): Add nightly GH action workflow (#2370)",
+          "pr_number": 2370,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "fde51c235f6d3c205a34a768c9df9e3f5e537dd5",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-04-19 21:37:28 +0000",
+          "deletions_count": 5,
+          "description": "Move /test-data to /tests/data",
+          "files_count": 6,
+          "highlight_permalink": null,
+          "insertions_count": 4,
+          "message": "chore: Move /test-data to /tests/data (#2375)",
+          "pr_number": 2375,
+          "scopes": [
+
+          ],
+          "sha": "c59eedf0943f7b02295c75907fbf3024bd884f11",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-04-20 12:57:02 +0000",
+          "deletions_count": 1,
+          "description": "Run ci workflow on pull requests only",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 16,
+          "message": "chore(operations): Run ci workflow on pull requests only (#2378)",
+          "pr_number": 2378,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "e041007b0849c8de0e1b80272e1875d413a5aad8",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-04-20 19:15:22 +0000",
+          "deletions_count": 50,
+          "description": "Wire in new `ShutdownSignal` for improved shutdown",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 22,
+          "message": "enhancement(splunk_hec source): Wire in new `ShutdownSignal` for improved shutdown (#2373)",
+          "pr_number": 2373,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "splunk_hec source"
+            }
+          ],
+          "sha": "8442531f7190e30820be157be21be77bd9c27a15",
+          "type": "enhancement"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-04-20 19:17:28 +0000",
+          "deletions_count": 52,
+          "description": "Wire in `ShutdownSignal` for improved shutdown",
+          "files_count": 3,
+          "highlight_permalink": null,
+          "insertions_count": 57,
+          "message": "enhancement(journald source): Wire in `ShutdownSignal` for improved shutdown (#2364)",
+          "pr_number": 2364,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "journald source"
+            }
+          ],
+          "sha": "806f24664147d71ab866ef156d9f3762bac7992c",
+          "type": "enhancement"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-04-20 19:20:14 +0000",
+          "deletions_count": 18,
+          "description": "Wire in new `ShutdownSignal` for improved shutdown",
+          "files_count": 7,
+          "highlight_permalink": null,
+          "insertions_count": 50,
+          "message": "enhancement(sources): Wire in new `ShutdownSignal` for improved shutdown (#2365)",
+          "pr_number": 2365,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "sources"
+            }
+          ],
+          "sha": "512cb2ebb3f85997ef5b9966e1b501d531125c35",
+          "type": "enhancement"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.8.2...v0.9.0",
       "date": "2020-04-17",
-      "deletions_count": 29840,
+      "deletions_count": 30212,
       "description": "",
       "highlights": [
         {
@@ -33481,7 +33881,7 @@ module.exports = {
           "title": "Improved Shutdown"
         }
       ],
-      "insertions_count": 132774,
+      "insertions_count": 133413,
       "last_version": "0.8.2",
       "permalink": "/releases/0.9.0/",
       "title": "Vector v0.9.0",
