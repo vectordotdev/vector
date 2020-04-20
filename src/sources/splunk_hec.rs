@@ -5,7 +5,7 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Buf, Bytes};
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Datelike, LocalResult, TimeZone, Utc};
 use flate2::read::GzDecoder;
 use futures01::{sync::mpsc, Async, Future, Sink, Stream};
 use hyper::{Body, Response, StatusCode};
@@ -443,7 +443,9 @@ impl<R: Read> Stream for EventStream<R> {
             None => (),
             Some(Some(t)) => {
                 if let Some(t) = t.as_u64() {
-                    self.time = Time::Provided(Utc.timestamp(t as i64, 0));
+                    let time = parse_timestamp(t as i64);
+
+                    self.time = Time::Provided(time);
                 } else if let Some(t) = t.as_f64() {
                     self.time = Time::Provided(Utc.timestamp(
                         t.floor() as i64,
@@ -470,6 +472,33 @@ impl<R: Read> Stream for EventStream<R> {
         self.events += 1;
 
         Ok(Async::Ready(Some(event)))
+    }
+}
+
+/// Parse a `i64` unix timestamp that can either be in seconds, milliseconds or
+/// nanoseconds.
+///
+/// This will first attempt tp arse millaseconds and check that the date
+/// produced is larger than the year 2001. This is due to the fact that we can
+/// successfully parse milliseconds via the seconds fn and get incorrect dates.
+/// To enforce that we get correct dates and don't incorrectly parse a
+/// millisecond timestamp we check this date. If that fails we then attempt to
+/// parse it as seconds then nano seconds.
+fn parse_timestamp(t: i64) -> DateTime<Utc> {
+    if let LocalResult::Single(t) = Utc.timestamp_millis_opt(t) {
+        if t.date().year() > 2001 {
+            return t;
+        }
+    }
+
+    match Utc.timestamp_opt(t, 0) {
+        LocalResult::Single(t) => t,
+        LocalResult::None => Utc.timestamp_nanos(t),
+        // According the `timestamp_opt` implementation only the `Single`
+        // and `None` variants are produced.
+        //
+        // Reference: https://docs.rs/chrono/0.4.11/src/chrono/offset/mod.rs.html#335
+        _ => unreachable!(),
     }
 }
 
@@ -697,7 +726,7 @@ fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
 #[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
-    use super::SplunkConfig;
+    use super::{parse_timestamp, SplunkConfig};
     use crate::runtime::{Runtime, TaskExecutor};
     use crate::test_util::{self, collect_n};
     use crate::{
@@ -710,6 +739,7 @@ mod tests {
         },
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
     };
+    use chrono::Utc;
     use futures01::{stream, sync::mpsc, Sink};
     use http::Method;
     use std::net::SocketAddr;
@@ -1087,5 +1117,24 @@ mod tests {
             "third".into()
         );
         assert_eq!(events[2].as_log()[&super::SOURCE], "secondary".into());
+    }
+
+    #[test]
+    fn parse_timestamps() {
+        let now = Utc::now();
+
+        let sec = now.timestamp();
+        let millis = now.timestamp_millis();
+        let nano = now.timestamp_nanos();
+
+        assert_eq!(parse_timestamp(sec as i64).timestamp(), now.timestamp());
+        assert_eq!(
+            parse_timestamp(millis as i64).timestamp_millis(),
+            now.timestamp_millis()
+        );
+        assert_eq!(
+            parse_timestamp(nano as i64).timestamp_nanos(),
+            now.timestamp_nanos()
+        );
     }
 }
