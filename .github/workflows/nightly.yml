@@ -1,13 +1,8 @@
 name: nightly
-on:
-  push:
-    branches:
-      - master
-  pull_request: {}
 
-# on:
-#   schedule:
-#     - cron:  "0 14 * * *"
+on:
+  schedule:
+    - cron:  "0 14 * * *"
 
 env:
   CHANNEL: nightly
