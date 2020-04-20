@@ -1,10 +1,24 @@
 name: ci
 
 on:
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/ci.yml"
+      - "lib/*s"
+      - "proto/**"
+      - "src/**"
+      - "tests/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docker-compose.yml"
+      - "rust-toolchain"
+
   pull_request:
     paths:
       - ".github/workflows/ci.yml"
-      - "lib/**"
+      - "lib/*s"
       - "proto/**"
       - "src/**"
       - "tests/**"
