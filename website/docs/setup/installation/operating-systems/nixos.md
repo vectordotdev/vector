@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-16"
 title: Install Vector On NixOS
 sidebar_label: NixOS
 description: Install Vector on NixOS
@@ -67,7 +67,7 @@ The following diagram demonstrates how it works.
     <CodeExplanation>
 
     * The `--file` flag ensures that you're installing the latest stable version
-      of Vector (0.8.2).
+      of Vector (0.9.0).
     * The `--attr` improves installation speed.
 
     </CodeExplanation>

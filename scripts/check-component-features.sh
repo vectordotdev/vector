@@ -22,8 +22,30 @@ if (echo "$components" | egrep -v "^(Sources:|Transforms:|Sinks:|)$" >/dev/null)
   exit 1
 fi
 
-echo "Checking that each component feature can be built without other features..."
+echo "Checking that each source feature can be built without other features..."
 cat Cargo.toml |
   remarshal --if toml --of json |
-  jq -r ".features.sources,.features.transforms,.features.sinks|.[]" |
-  xargs -I{} sh -cx "(cargo check --tests --no-default-features --features {} && cargo clean) || exit 255"
+  jq -r ".features.sources|.[]" |
+  xargs -I{} sh -cx "(cargo check --tests --no-default-features --features {}) || exit 255"
+
+if (${CI:-false}); then
+  echo "Cleaning to save some disk space"
+  cargo clean
+fi
+
+echo "Checking that each transform feature can be built without other features..."
+cat Cargo.toml |
+  remarshal --if toml --of json |
+  jq -r ".features.transforms|.[]" |
+  xargs -I{} sh -cx "(cargo check --tests --no-default-features --features {}) || exit 255"
+
+if (${CI:-false}); then
+  echo "Cleaning to save some disk space"
+  cargo clean
+fi
+
+echo "Checking that each sink feature can be built without other features..."
+cat Cargo.toml |
+  remarshal --if toml --of json |
+  jq -r ".features.sinks|.[]" |
+  xargs -I{} sh -cx "(cargo check --tests --no-default-features --features {}) || exit 255"

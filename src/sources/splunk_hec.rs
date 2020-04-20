@@ -13,12 +13,10 @@ use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
 use serde_json::{de::IoRead, json, Deserializer, Value as JsonValue};
 use snafu::Snafu;
-use std::sync::{Arc, Mutex};
 use std::{
     io::Read,
     net::{Ipv4Addr, SocketAddr},
 };
-use stream_cancel::{Trigger, Tripwire};
 use string_cache::DefaultAtom as Atom;
 use warp::{body::FullBody, filters::BoxedFilter, path, Filter, Rejection, Reply};
 
@@ -62,16 +60,14 @@ impl SourceConfig for SplunkConfig {
         &self,
         _: &str,
         _: &GlobalOptions,
-        _: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        let (trigger, tripwire) = Tripwire::new();
+        let source = SplunkSource::new(self);
 
-        let source = Arc::new(SplunkSource::new(self, out, trigger));
-
-        let event_service = SplunkSource::event_service(source.clone());
-        let raw_service = SplunkSource::raw_service(source.clone());
-        let health_service = SplunkSource::health_service(source);
+        let event_service = source.event_service(out.clone());
+        let raw_service = source.raw_service(out.clone());
+        let health_service = source.health_service(out.clone());
         let options = SplunkSource::options();
 
         let services = path!("services" / "collector")
@@ -89,10 +85,11 @@ impl SourceConfig for SplunkConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let incoming = tls.bind(&self.address)?.incoming();
 
-        let server =
-            warp::serve(services).serve_incoming_with_graceful_shutdown(incoming, tripwire);
+        let server = warp::serve(services)
+            .serve_incoming_with_graceful_shutdown(incoming, shutdown.clone().map(|_| ()));
 
-        Ok(Box::new(server))
+        // We should drop the last copy of ShutdownSignalToken only after the server has shut down.
+        Ok(Box::new(server.map(move |()| drop(shutdown))))
     }
 
     fn output_type(&self) -> DataType {
@@ -106,37 +103,30 @@ impl SourceConfig for SplunkConfig {
 
 /// Shared data for responding to requests.
 struct SplunkSource {
-    /// Source output
-    out: mpsc::Sender<Event>,
-    /// Trigger for ending http server
-    trigger: Arc<Mutex<Option<Trigger>>>,
-
     credentials: Option<Bytes>,
 }
 
 impl SplunkSource {
-    fn new(config: &SplunkConfig, out: mpsc::Sender<Event>, trigger: Trigger) -> Self {
+    fn new(config: &SplunkConfig) -> Self {
         SplunkSource {
             credentials: config
                 .token
                 .as_ref()
                 .map(|token| format!("Splunk {}", token).into()),
-            out,
-            trigger: Arc::new(Mutex::new(Some(trigger))),
         }
     }
 
-    fn event_service(source: Arc<Self>) -> BoxedFilter<(Response<Body>,)> {
+    fn event_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response<Body>,)> {
         warp::post2()
             .and(
                 warp::path::end()
                     .or(path!("event").and(warp::path::end()))
                     .or(path!("event" / "1.0").and(warp::path::end())),
             )
-            .and(source.authorization())
+            .and(self.authorization())
             .and(warp::header::optional::<String>("x-splunk-request-channel"))
             .and(warp::header::optional::<String>("host"))
-            .and(source.gzip())
+            .and(self.gzip())
             .and(warp::body::concat())
             .and_then(
                 move |_,
@@ -149,14 +139,14 @@ impl SplunkSource {
                     if gzip {
                         Box::new(
                             EventStream::new(GzDecoder::new(body.reader()), channel, host)
-                                .forward(source.sink_with_shutdown())
+                                .forward(out.clone().sink_map_err(|_| ApiError::ServerShutdown))
                                 .map(|_| ()),
                         )
                             as Box<dyn Future<Item = (), Error = Rejection> + Send>
                     } else {
                         Box::new(
                             EventStream::new(body.reader(), channel, host)
-                                .forward(source.sink_with_shutdown())
+                                .forward(out.clone().sink_map_err(|_| ApiError::ServerShutdown))
                                 .map(|_| ()),
                         )
                             as Box<dyn Future<Item = (), Error = Rejection> + Send>
@@ -167,13 +157,13 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn raw_service(source: Arc<Self>) -> BoxedFilter<(Response<Body>,)> {
+    fn raw_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response<Body>,)> {
         warp::post2()
             .and(
                 (path!("raw" / "1.0").and(warp::path::end()))
                     .or(path!("raw").and(warp::path::end())),
             )
-            .and(source.authorization())
+            .and(self.authorization())
             .and(
                 warp::header::optional::<String>("x-splunk-request-channel").and_then(
                     |channel: Option<String>| {
@@ -186,13 +176,13 @@ impl SplunkSource {
                 ),
             )
             .and(warp::header::optional::<String>("host"))
-            .and(source.gzip())
+            .and(self.gzip())
             .and(warp::body::concat())
             .and_then(
                 move |_, _, channel: String, host: Option<String>, gzip: bool, body: FullBody| {
                     // Construct event parser
                     futures01::stream::once(raw_event(body, gzip, channel, host))
-                        .forward(source.sink_with_shutdown())
+                        .forward(out.clone().sink_map_err(|_| ApiError::ServerShutdown))
                         .map(|_| ())
                 },
             )
@@ -200,8 +190,8 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn health_service(source: Arc<Self>) -> BoxedFilter<(Response<Body>,)> {
-        let credentials = source.credentials.clone();
+    fn health_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response<Body>,)> {
+        let credentials = self.credentials.clone();
         let authorize =
             warp::header::optional("Authorization").and_then(move |token: Option<String>| {
                 match (token, credentials.as_ref()) {
@@ -220,7 +210,7 @@ impl SplunkSource {
             )
             .and(authorize)
             .and_then(move |_, _| {
-                match source.out.clone().poll_ready() {
+                match out.clone().poll_ready() {
                     Ok(Async::Ready(())) => Ok(warp::reply().into_response()),
                     // Since channel of mpsc::Sender increase by one with each sender, technically
                     // channel will never be full, and this will never be returned.
@@ -283,24 +273,6 @@ impl SplunkSource {
                 None => Ok(false),
             })
             .boxed()
-    }
-
-    /// Sink shutdowns this source once source output is closed
-    fn sink_with_shutdown(&self) -> impl Sink<SinkItem = Event, SinkError = Rejection> + 'static {
-        let trigger = self.trigger.clone();
-        self.out.clone().sink_map_err(move |_| {
-            // Sink has been closed so server should stop listening
-            trigger
-                .try_lock()
-                .map(|mut lock| {
-                    // Stopping
-                    lock.take();
-                })
-                // If locking fails, that means someone else is stopping it.
-                .ok();
-
-            ApiError::ServerShutdown.into()
-        })
     }
 }
 

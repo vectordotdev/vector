@@ -63,6 +63,15 @@ impl ShutdownSignal {
             shutdown_complete: Some(ShutdownSignalToken::new(trigger)),
         }
     }
+
+    #[cfg(test)]
+    pub fn new_wired() -> (Trigger, ShutdownSignal, Tripwire) {
+        let (trigger_shutdown, tripwire) = Tripwire::new();
+        let (trigger, shutdown_done) = Tripwire::new();
+        let shutdown = ShutdownSignal::new(tripwire, trigger);
+
+        (trigger_shutdown, shutdown, shutdown_done)
+    }
 }
 
 pub struct SourceShutdownCoordinator {
