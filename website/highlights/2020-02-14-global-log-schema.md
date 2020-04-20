@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-13"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Introducing Vector's Global Log Schema"
 description: "Set defaults for Vector's common log key names"
@@ -35,17 +35,15 @@ Why is this useful?
 1. Many Vector users already have a schema in-place and this makes it easy for
    Vector to adopt that schema.
 2. Components often times need to coordinate. For example, the
-   [`kubernetes_key`][docs.global-options#message_key] is used in both the
-   [`kubernetes_pod_metadata` transform][docs.transforms.kubernetes_pod_metadata]
-   and the [`datadog_logs` sink][docs.sinks.datadog_logs]. This allows Vector
-   to perform intelligent mapping across fields making our sinks "smart".
+   [`host_key`][docs.global-options#host_key] is used in a variety of
+   [sinks][docs.sinks] to ensure that Vector's internal "host" field is mapped
+   to the downstream service's "host" field.
 
 
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.global-options#message_key]: /docs/reference/global-options/#message_key
-[docs.sinks.datadog_logs]: /docs/reference/sinks/datadog_logs/
+[docs.sinks]: /docs/reference/sinks/
 [docs.sources]: /docs/reference/sources/
-[docs.transforms.kubernetes_pod_metadata]: /docs/reference/transforms/kubernetes_pod_metadata/
 [docs.transforms.rename_fields]: /docs/reference/transforms/rename_fields/

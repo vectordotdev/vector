@@ -34,7 +34,7 @@ ingests data through the [Syslog protocol][urls.syslog_5424] and outputs
 
 ## Requirements
 
-<Alert icon={false} type="danger" className="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * This component exposes a configured port. You must ensure your network allows access to this port.
 

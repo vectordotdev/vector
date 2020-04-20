@@ -157,8 +157,6 @@ module.exports = {
             
               "reference/transforms/json_parser",
             
-              "reference/transforms/kubernetes_pod_metadata",
-            
               "reference/transforms/log_to_metric",
             
               "reference/transforms/logfmt_parser",

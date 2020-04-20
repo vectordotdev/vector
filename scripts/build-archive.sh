@@ -23,7 +23,7 @@ if [ -z "$FEATURES" ]; then
     FEATURES="default"
 fi
 
-CHANNEL="$(scripts/util/release-channel.sh)"
+CHANNEL=${CHANNEL:-$(scripts/util/release-channel.sh)}
 if [ "$CHANNEL" == "nightly" ]; then
   FEATURES="$FEATURES nightly"
 fi

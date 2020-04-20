@@ -34,7 +34,7 @@ ingests data through [Kafka][urls.kafka] and outputs
 
 ## Requirements
 
-<Alert icon={false} type="danger" className="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * [Kafka][urls.kafka] version `>= 0.8` is required.
 

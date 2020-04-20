@@ -1,18 +1,23 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: Merge multi-line logs with Lua
 description: Combine multi-line CSV rows into single events using Lua transform
 author_github: https://github.com/a-rodin
 tags: ["type: guide", "domain: transforms", "transform: lua"]
-assumptions:
-- You understand the [basic Lua concepts][docs.reference.transforms.lua].
-- You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][guides.getting-started.your-first-pipeline].
-- You know how to [parse CSV logs with Lua][guides.parsing-csv-logs-with-lua].
 ---
 
+import Assumptions from '@site/src/components/Assumptions';
 import CodeExplanation from '@site/src/components/CodeExplanation';
 import SVG from 'react-inlinesvg';
+
+<Assumptions name="guide">
+
+* You understand the [basic Lua concepts][docs.reference.transforms.lua].
+* You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][guides.getting-started.your-first-pipeline].
+* You know how to [parse CSV logs with Lua][guides.parsing-csv-logs-with-lua].
+
+</Assumptions>
 
 The [guide on parsing CSV logs with Lua][guides.parsing-csv-logs-with-lua] describes how to parse CSV logs containing
 values which do not contain line breaks. However, according to [RFC 4180][urls.rfc_4180], CSV values enclosed in double

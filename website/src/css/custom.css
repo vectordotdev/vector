@@ -5,7 +5,6 @@
  * the rest of the elements.
  */
 :root {
-  --ifm-alert-color: var(--ifm-heading-color);
   --ifm-background-color: white;
   --ifm-background-color-rgb: 255, 255, 255;
   --ifm-background-surface-color: var(--ifm-panel-background-color);
@@ -42,6 +41,8 @@
   --ifm-color-emphasis-50: var(--ifm-color-gray-50);
   --ifm-color-emphasis-50-solid: #f2f3f5;
   --ifm-color-emphasis-75: var(--ifm-color-gray-75);
+  --ifm-color-info: var(--ifm-color-primary);
+  --ifm-color-info-rgb: var(--ifm-color-primary-rgb);
   --ifm-color-pink: #f44af5;
   --ifm-color-pink-rgb: 244, 74 ,245;
   --ifm-color-primary: #28D9F2;
@@ -1322,22 +1323,31 @@ input.input--highlight-wrapper {
   padding: 1px;
 }
 
-/**
- * list--warnings
- *
- * Generic list with warnings as list styles.
+/*
+ * list
  */
 
-div.list--warnings > ul,
-ul.list--warnings {
+.list--icons {
+  --ifm-spacing-vertical: 0.5em;
+}
+
+div.list--icons > ul,
+ul.list--icons {
   list-style: none;
   margin-left: 1em;
   padding-left: 1em;
 }
 
-div.list--warnings > ul > li:before,
-ul.list--warnings > li:before {
-  content: "⚠";
+div.list--icons > ul ul,
+ul.list--icons ul {
+  list-style: none;
+  margin: var(--ifm-spacing-vertical) 0 var(--ifm-spacing-vertical) 1em;
+  padding-left: 1em;
+}
+
+div.list--icons > ul li:before,
+ul.list--icons li:before {
+  content: var(--list-icon);
   display: block;
   float: left;
   font-size: 1.25em;
@@ -1346,66 +1356,39 @@ ul.list--warnings > li:before {
   margin-top: -0.2em;
 }
 
-div.list--warnings > ul > li,
-ul.list--warnings > li {
-  margin: 0 0 1em 0;
+div.list--icons > ul > li,
+ul.list--icons > li {
+  margin: 0 0 var(--ifm-spacing-vertical) 0;
   padding: 0;
 }
 
-/*
- * list
- */
+.list--icons--checks {
+  --list-icon: '✓';
+}
 
-ol.list--flush,
-ul.list--flush {
-  padding-left: 0;
+.list--icons--info {
+  --list-icon: 'ⓘ';
+}
+
+.list--icons--warnings {
+  --list-icon: '⚠';
+}
+
+.list--icons--arrow {
+  --list-icon: '→';
+}
+
+div.list--indent > ul,
+ul.list--indent {
+  margin-left: 2em !important;
 }
 
 .list--lg {
   font-size: 1.2em;
 }
 
-.list--primary {
-  color: var(--ifm-color-primary);
-}
-
-.list--semi-bold {
-  font-weight: 500;
-}
-
-/**
- * list--checks
- *
- * A simple list that uses check marks as bullets.
- */
-
-ol.list--checks,
-ol.list--checks ol {
-  list-style: none;
-}
-
-ol.list--checks ol {
-  font-size: 0.9em;
-  margin: var(--ifm-spacing-vertical) 0;
-}
-
-ol.list--checks li:before {
-  content: '✓';
-  font-weight: bold;
-  margin-right: 10px;
-}
-
-/**
- * list--li
- */
-
-ol li.list--li--arrow:before {
-  content: "→";
-}
-
-ol li.list--li--pink:before,
-ol li.list--li--pink {
-  color: var(--ifm-color-pink);
+.list--tight {
+  --ifm-spacing-vertical: 0;
 }
 
 /**
@@ -2306,12 +2289,24 @@ ul.tabs.rounded li.tab-item.tab-item--active {
   color: transparent;
 }
 
+.text--lg {
+  font-size: 1.2em;
+}
+
+.text--pink {
+  color: var(--ifm-color-pink);
+}
+
 .text--secondary {
   color: var(--ifm-color-content-secondary);
 }
 
 .text--upcase {
   text-transform: uppercase;
+}
+
+.text--xl {
+  font-size: 1.4em;
 }
 
 /*

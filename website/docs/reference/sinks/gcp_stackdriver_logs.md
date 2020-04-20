@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-16"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-04-19"
+delivery_guarantee: "at_least_once"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
 event_types: ["log"]
