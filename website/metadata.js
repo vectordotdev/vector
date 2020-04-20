@@ -3287,14 +3287,14 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2020-04-20",
-      "description": "Vector's shutdown process has been improved",
+      "description": "A faster and more reliable shutdown process",
       "hide_on_release_notes": false,
       "id": "2020-04-20-improved-shutdown",
       "path": "website/highlights/2020-04-20-improved-shutdown.md",
       "permalink": "/highlights/2020-04-20-improved-shutdown/",
       "tags": [
-        "type: new feature",
-        "domain: sinks"
+        "type: enhancement",
+        "domain: topology"
       ],
       "title": "Improved Shutdown"
     }
@@ -3723,14 +3723,14 @@ module.exports = {
   "latest_highlight": {
     "author_github": "https://github.com/binarylogic",
     "date": "2020-04-20",
-    "description": "Vector's shutdown process has been improved",
+    "description": "A faster and more reliable shutdown process",
     "hide_on_release_notes": false,
     "id": "2020-04-20-improved-shutdown",
     "path": "website/highlights/2020-04-20-improved-shutdown.md",
     "permalink": "/highlights/2020-04-20-improved-shutdown/",
     "tags": [
-      "type: new feature",
-      "domain: sinks"
+      "type: enhancement",
+      "domain: topology"
     ],
     "title": "Improved Shutdown"
   },
@@ -5335,7 +5335,7 @@ module.exports = {
         "deletions_count": 68,
         "description": "Refactor source shutdown and make it two-phase",
         "files_count": 27,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-04-20-improved-shutdown/",
         "insertions_count": 875,
         "message": "chore(topology): Refactor source shutdown and make it two-phase (#1994)",
         "pr_number": 1994,
@@ -8430,14 +8430,14 @@ module.exports = {
       {
         "author_github": "https://github.com/binarylogic",
         "date": "2020-04-20",
-        "description": "Vector's shutdown process has been improved",
+        "description": "A faster and more reliable shutdown process",
         "hide_on_release_notes": false,
         "id": "2020-04-20-improved-shutdown",
         "path": "website/highlights/2020-04-20-improved-shutdown.md",
         "permalink": "/highlights/2020-04-20-improved-shutdown/",
         "tags": [
-          "type: new feature",
-          "domain: sinks"
+          "type: enhancement",
+          "domain: topology"
         ],
         "title": "Improved Shutdown"
       }
@@ -30774,7 +30774,7 @@ module.exports = {
           "deletions_count": 68,
           "description": "Refactor source shutdown and make it two-phase",
           "files_count": 27,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-04-20-improved-shutdown/",
           "insertions_count": 875,
           "message": "chore(topology): Refactor source shutdown and make it two-phase (#1994)",
           "pr_number": 1994,
@@ -33869,14 +33869,14 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2020-04-20",
-          "description": "Vector's shutdown process has been improved",
+          "description": "A faster and more reliable shutdown process",
           "hide_on_release_notes": false,
           "id": "2020-04-20-improved-shutdown",
           "path": "website/highlights/2020-04-20-improved-shutdown.md",
           "permalink": "/highlights/2020-04-20-improved-shutdown/",
           "tags": [
-            "type: new feature",
-            "domain: sinks"
+            "type: enhancement",
+            "domain: topology"
           ],
           "title": "Improved Shutdown"
         }

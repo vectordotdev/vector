@@ -1,28 +1,25 @@
 ---
-last_modified_on: "2020-04-17"
+last_modified_on: "2020-04-20"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Improved Shutdown"
-description: "Vector's shutdown process has been improved"
+description: "A faster and more reliable shutdown process"
 author_github: "https://github.com/binarylogic"
-pr_numbers: [1835, 1847, 1665, 1832]
+pr_numbers: [1994]
 release: "0.9.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: sinks"]
+tags: ["type: enhancement", "domain: topology"]
 ---
 
-We all love a good sink. Now you can enjoy our latest offerings:
+A graceful shutdown process is often a problematic achievement in software.
+It takes a lot of coordination to ensure interconnected components shut down
+in the right order and in time. In the context of Vector, it's critically
+essential because it prevents data loss in real-world practice. As a result,
+this is one area we want to get right. [PR#1994][urls.pr_1994] introduces a
+clear shutdown strategy that moves the shutdown logic into Vector's topology,
+simplifying the shutdown implementation for each component. This change ensures
+that shutdown is easily and correctly implemented. The result is not only faster
+shutdowns but much higher confidence that components in the future will reliably
+shutdown.
 
-* [`papertrail` sink][docs.sinks.papertrail]
-* [`honeycomb` sink][docs.sinks.honeycomb]
-* [`pulsar` sink][docs.sinks.pulsar]
-* [`datadog_logs` sink][docs.sinks.datadog_logs]
 
-Expanding support is a fundamental requirement we're aiming to achieve before
-hitting [1.0][urls.vector_roadmap].
-
-
-[docs.sinks.datadog_logs]: /docs/reference/sinks/datadog_logs/
-[docs.sinks.honeycomb]: /docs/reference/sinks/honeycomb/
-[docs.sinks.papertrail]: /docs/reference/sinks/papertrail/
-[docs.sinks.pulsar]: /docs/reference/sinks/pulsar/
-[urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
+[urls.pr_1994]: https://github.com/timberio/vector/pull/1994
