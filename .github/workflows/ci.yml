@@ -89,6 +89,20 @@ jobs:
       USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
+      - run: |
+          mkdir -p .cargo/
+          cat <<-EOF >> ./.cargo/config
+            # focus on fast, lean builds
+            [build]
+            incremental = false
+          EOF
+          cat <<-EOF >> ./Cargo.toml
+            # focus on fast, lean builds
+            [profile.dev]
+            debug = false
+            opt-level = "s" # Binary size
+            lto = false # Don't LTO on CI
+          EOF
       - run: cargo test --no-run --target $TARGET
       - name: Save vector
         uses: actions/upload-artifact@v1
