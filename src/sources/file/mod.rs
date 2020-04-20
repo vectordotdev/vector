@@ -1451,7 +1451,7 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![PathBuf::from("test-data/gzipped.log")],
+            include: vec![PathBuf::from("tests/data/gzipped.log")],
             ..test_default_file_config(&dir)
         };
 
