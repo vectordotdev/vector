@@ -115,7 +115,7 @@ package-rpm: ## Create a .rpm package from artifacts created via `build-archive`
 	@scripts/package-rpm.sh
 
 release-commit: ## Commits release changes
-	@scripts/run.sh checker scripts/release-commit.rb
+	scripts/release-commit.rb
 
 release-docker: ## Release to Docker Hub
 	@scripts/release-docker.sh
