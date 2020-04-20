@@ -356,7 +356,6 @@ mod tests {
         fs::{self, File},
         io::{Seek, Write},
     };
-    use stream_cancel::{Trigger, Tripwire};
     use tempfile::tempdir;
     use tokio01::util::FutureExt;
 
@@ -388,14 +387,6 @@ mod tests {
 
     fn sleep() {
         std::thread::sleep(std::time::Duration::from_millis(500));
-    }
-
-    fn shutdown() -> (Trigger, ShutdownSignal, Tripwire) {
-        let (trigger_shutdown, tripwire) = Tripwire::new();
-        let (trigger, shutdown_done) = Tripwire::new();
-        let shutdown = ShutdownSignal::new(tripwire, trigger);
-
-        (trigger_shutdown, shutdown, shutdown_done)
     }
 
     #[test]
@@ -485,7 +476,7 @@ mod tests {
     fn file_happy_path() {
         let n = 5;
         let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
-        let (trigger_shutdown, shutdown, _) = shutdown();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -547,7 +538,7 @@ mod tests {
     fn file_truncate() {
         let n = 5;
         let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
-        let (trigger_shutdown, shutdown, _) = shutdown();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -616,7 +607,7 @@ mod tests {
     fn file_rotate() {
         let n = 5;
         let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
-        let (trigger_shutdown, shutdown, _) = shutdown();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -686,7 +677,7 @@ mod tests {
     fn file_multiple_paths() {
         let n = 5;
         let (tx, rx) = futures01::sync::mpsc::channel(4 * n);
-        let (trigger_shutdown, shutdown, _) = shutdown();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -748,7 +739,7 @@ mod tests {
 
         // Default
         {
-            let (trigger_shutdown, shutdown, shutdown_done) = shutdown();
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let dir = tempdir().unwrap();
@@ -782,7 +773,7 @@ mod tests {
 
         // Custom
         {
-            let (trigger_shutdown, shutdown, shutdown_done) = shutdown();
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let dir = tempdir().unwrap();
@@ -817,7 +808,7 @@ mod tests {
 
         // Hidden
         {
-            let (trigger_shutdown, shutdown, shutdown_done) = shutdown();
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let dir = tempdir().unwrap();
@@ -875,7 +866,7 @@ mod tests {
 
         // First time server runs it picks up existing lines.
         {
-            let (trigger_shutdown, shutdown, _) = shutdown();
+            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
@@ -898,7 +889,7 @@ mod tests {
         }
         // Restart server, read file from checkpoint.
         {
-            let (trigger_shutdown, shutdown, _) = shutdown();
+            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
@@ -921,7 +912,7 @@ mod tests {
         }
         // Restart server, read files from beginning.
         {
-            let (trigger_shutdown, shutdown, _) = shutdown();
+            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -963,7 +954,7 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let (trigger_shutdown, shutdown, _) = shutdown();
+            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
@@ -990,7 +981,7 @@ mod tests {
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {
-            let (trigger_shutdown, shutdown, _) = shutdown();
+            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
@@ -1022,7 +1013,7 @@ mod tests {
 
         let mut rt = runtime::Runtime::new().unwrap();
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger_shutdown, shutdown, _) = shutdown();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1107,7 +1098,7 @@ mod tests {
     #[test]
     fn file_max_line_bytes() {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger_shutdown, shutdown, _) = shutdown();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1167,7 +1158,7 @@ mod tests {
     #[test]
     fn test_multi_line_aggregation_legacy() {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger_shutdown, shutdown, _) = shutdown();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1240,7 +1231,7 @@ mod tests {
     #[test]
     fn test_multi_line_aggregation() {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger_shutdown, shutdown, _) = shutdown();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1317,7 +1308,7 @@ mod tests {
     #[test]
     fn test_fair_reads() {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger_shutdown, shutdown, _) = shutdown();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1382,7 +1373,7 @@ mod tests {
     #[test]
     fn test_oldest_first() {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger_shutdown, shutdown, _) = shutdown();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1447,7 +1438,7 @@ mod tests {
     #[test]
     fn test_gzipped_file() {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger_shutdown, shutdown, _) = shutdown();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
