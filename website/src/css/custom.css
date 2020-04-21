@@ -2328,13 +2328,10 @@ ul.tabs.rounded li.tab-item.tab-item--active {
   color: transparent;
 }
 
-<<<<<<< HEAD
-=======
 .text--lg {
   font-size: 1.2em;
 }
 
->>>>>>> master
 .text--pink {
   color: var(--ifm-color-pink);
 }
