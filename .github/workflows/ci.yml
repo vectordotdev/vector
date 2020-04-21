@@ -45,7 +45,36 @@ jobs:
     env:
       USE_CONTAINER: none
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: cargo-index-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: cargo-build-target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: |
+          mkdir -p .cargo/
+          cat <<-EOF >> ./.cargo/config
+            # focus on fast, lean builds
+            [build]
+            incremental = false
+          EOF
+          cat <<-EOF >> ./Cargo.toml
+            # focus on fast, lean builds
+            [profile.dev]
+            debug = false
+            opt-level = "s" # Binary size
+            lto = false # Don't LTO on CI
+          EOF
       - run: sudo apt install -y python3-pip python3-setuptools python3-wheel
       - run: sudo python3 -m pip install remarshal
       - run: "make check-component-features"
@@ -88,7 +117,22 @@ jobs:
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: cargo-index-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: cargo-build-target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -103,15 +147,17 @@ jobs:
             opt-level = "s" # Binary size
             lto = false # Don't LTO on CI
           EOF
-      - run: cargo test --no-run --target $TARGET
+      - run: cargo test --target $TARGET
       - name: Save vector
         uses: actions/upload-artifact@v1
         with:
           name: binary
           path: ./target/x86_64-unknown-linux-gnu/debug/vector
 
-  clickhouse-integration-tests:
+  test-integration-clickhouse:
     runs-on: ubuntu-latest
+    needs:
+      - test-base
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -119,14 +165,45 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: clickhouse-integration-tests
     steps:
-      - uses: actions/checkout@v1
+      # Fetch
+      - uses: actions/checkout@v2
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: cargo-index-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: cargo-build-target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: |
+          mkdir -p .cargo/
+          cat <<-EOF >> ./.cargo/config
+            # focus on fast, lean builds
+            [build]
+            incremental = false
+          EOF
+          cat <<-EOF >> ./Cargo.toml
+            # focus on fast, lean builds
+            [profile.dev]
+            debug = false
+            opt-level = "s" # Binary size
+            lto = false # Don't LTO on CI
+          EOF
       - run: docker-compose up -d clickhouse
-      - run: cargo test --no-default-features  --features $FEATURES
+      - run: cargo test --no-default-features --features clickhouse-integration-tests
 
-  aws-integration-tests:
+  test-integration-aws:
     runs-on: ubuntu-latest
+    needs:
+      - test-base
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -134,14 +211,45 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: cloudwatch-logs-integration-tests,cloudwatch-metrics-integration-tests,ec2-metadata-integration-tests,firehose-integration-tests,kinesis-integration-tests,s3-integration-tests
     steps:
-      - uses: actions/checkout@v1
+      # Fetch
+      - uses: actions/checkout@v2
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: cargo-index-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: cargo-build-target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: |
+          mkdir -p .cargo/
+          cat <<-EOF >> ./.cargo/config
+            # focus on fast, lean builds
+            [build]
+            incremental = false
+          EOF
+          cat <<-EOF >> ./Cargo.toml
+            # focus on fast, lean builds
+            [profile.dev]
+            debug = false
+            opt-level = "s" # Binary size
+            lto = false # Don't LTO on CI
+          EOF
       - run: docker-compose up -d localstack mockwatchlogs ec2_metadata minio
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: cargo test --no-default-features --features cloudwatch-logs-integration-tests,cloudwatch-metrics-integration-tests,ec2-metadata-integration-tests,firehose-integration-tests,kinesis-integration-tests,s3-integration-tests
 
-  docker-integration-tests:
+  test-integration-docker:
     runs-on: ubuntu-latest
+    needs:
+      - test-base
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -149,13 +257,45 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: docker-integration-tests
     steps:
-      - uses: actions/checkout@v1
-      - run: cargo test --no-default-features --features $FEATURES
+      # Fetch
+      - uses: actions/checkout@v2
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: cargo-index-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: cargo-build-target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: |
+          mkdir -p .cargo/
+          cat <<-EOF >> ./.cargo/config
+            # focus on fast, lean builds
+            [build]
+            incremental = false
+          EOF
+          cat <<-EOF >> ./Cargo.toml
+            # focus on fast, lean builds
+            [profile.dev]
+            debug = false
+            opt-level = "s" # Binary size
+            lto = false # Don't LTO on CI
+          EOF
+      - run: docker-compose up -d 
+      - run: cargo test --no-default-features --features docker-integration-tests
 
-  es-integration-tests:
+  test-integration-es:
     runs-on: ubuntu-latest
+    needs:
+      - test-base
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -163,14 +303,45 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: es-integration-tests
     steps:
-      - uses: actions/checkout@v1
+      # Fetch
+      - uses: actions/checkout@v2
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: cargo-index-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: cargo-build-target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: |
+          mkdir -p .cargo/
+          cat <<-EOF >> ./.cargo/config
+            # focus on fast, lean builds
+            [build]
+            incremental = false
+          EOF
+          cat <<-EOF >> ./Cargo.toml
+            # focus on fast, lean builds
+            [profile.dev]
+            debug = false
+            opt-level = "s" # Binary size
+            lto = false # Don't LTO on CI
+          EOF
       - run: docker-compose up -d elasticsearch elasticsearch-tls localstack
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: cargo test --no-default-features --features es-integration-tests
 
-  gcp-integration-tests:
+  test-integration-gcp:
     runs-on: ubuntu-latest
+    needs:
+      - test-base
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -178,14 +349,45 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: gcp-pubsub-integration-tests, gcs-integration-tests
     steps:
-      - uses: actions/checkout@v1
+      # Fetch
+      - uses: actions/checkout@v2
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: cargo-index-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: cargo-build-target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: |
+          mkdir -p .cargo/
+          cat <<-EOF >> ./.cargo/config
+            # focus on fast, lean builds
+            [build]
+            incremental = false
+          EOF
+          cat <<-EOF >> ./Cargo.toml
+            # focus on fast, lean builds
+            [profile.dev]
+            debug = false
+            opt-level = "s" # Binary size
+            lto = false # Don't LTO on CI
+          EOF
       - run: docker-compose up -d gcloud-pubsub
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: cargo test --no-default-features --features gcp-pubsub-integration-tests,gcs-integration-tests
 
-  kafka-integration-tests:
+  test-integration-kafka:
     runs-on: ubuntu-latest
+    needs:
+      - test-base
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -193,14 +395,45 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: kafka-integration-tests
     steps:
-      - uses: actions/checkout@v1
+      # Fetch
+      - uses: actions/checkout@v2
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: cargo-index-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: cargo-build-target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: |
+          mkdir -p .cargo/
+          cat <<-EOF >> ./.cargo/config
+            # focus on fast, lean builds
+            [build]
+            incremental = false
+          EOF
+          cat <<-EOF >> ./Cargo.toml
+            # focus on fast, lean builds
+            [profile.dev]
+            debug = false
+            opt-level = "s" # Binary size
+            lto = false # Don't LTO on CI
+          EOF
       - run: docker-compose up -d kafka
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: cargo test --no-default-features --features kafka-integration-tests
 
-  influxdb-integration-tests:
+  test-integration-influxdb:
     runs-on: ubuntu-latest
+    needs:
+      - test-base
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -208,14 +441,45 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: influxdb-integration-tests
     steps:
-      - uses: actions/checkout@v1
+      # Fetch
+      - uses: actions/checkout@v2
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: cargo-index-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: cargo-build-target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: |
+          mkdir -p .cargo/
+          cat <<-EOF >> ./.cargo/config
+            # focus on fast, lean builds
+            [build]
+            incremental = false
+          EOF
+          cat <<-EOF >> ./Cargo.toml
+            # focus on fast, lean builds
+            [profile.dev]
+            debug = false
+            opt-level = "s" # Binary size
+            lto = false # Don't LTO on CI
+          EOF
       - run: docker-compose up -d influxdb_v1 influxdb_v2
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: cargo test --no-default-features --features influxdb-integration-tests
 
-  splunk-integration-tests:
+  test-integration-splunk:
     runs-on: ubuntu-latest
+    needs:
+      - test-base
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -223,14 +487,45 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: splunk-integration-tests
     steps:
-      - uses: actions/checkout@v1
+      # Fetch
+      - uses: actions/checkout@v2
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: cargo-index-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: cargo-build-target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: |
+          mkdir -p .cargo/
+          cat <<-EOF >> ./.cargo/config
+            # focus on fast, lean builds
+            [build]
+            incremental = false
+          EOF
+          cat <<-EOF >> ./Cargo.toml
+            # focus on fast, lean builds
+            [profile.dev]
+            debug = false
+            opt-level = "s" # Binary size
+            lto = false # Don't LTO on CI
+          EOF
       - run: docker-compose up -d splunk
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: cargo test --no-default-features --features splunk-integration-tests
 
-  pulsar-integration-tests:
+  test-integration-pulsar:
     runs-on: ubuntu-latest
+    needs:
+      - test-base
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -238,14 +533,45 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: pulsar-integration-tests
     steps:
-      - uses: actions/checkout@v1
+      # Fetch
+      - uses: actions/checkout@v2
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: cargo-index-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: cargo-build-target-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: |
+          mkdir -p .cargo/
+          cat <<-EOF >> ./.cargo/config
+            # focus on fast, lean builds
+            [build]
+            incremental = false
+          EOF
+          cat <<-EOF >> ./Cargo.toml
+            # focus on fast, lean builds
+            [profile.dev]
+            debug = false
+            opt-level = "s" # Binary size
+            lto = false # Don't LTO on CI
+          EOF
       - run: docker-compose up -d pulsar
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: cargo test --no-default-features --features pulsar-integration-tests
 
-## Kubernetes
-# Build exectuables in parallel, and then tests on different Kubernetes versions in parallel.
+
+
+  ## Kubernetes
+  # Build exectuables in parallel, and then tests on different Kubernetes versions in parallel.
 
   # Builds vector executable that will be tested.
   build-vector-kubernetes:
@@ -308,3 +634,4 @@ jobs:
         run: chmod +x ./builds/vector-test
       - name: Run kubernetes integration tests
         run: KUBE_TEST_IMAGE=localhost:5000/vector_test:latest TEST_LOG=debug ./builds/vector-test --test-threads=1 kubernetes
+
