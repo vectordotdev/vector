@@ -195,7 +195,7 @@ jobs:
   test-integration-<%= component %>:
     runs-on: ubuntu-latest
     needs:
-      - test-base
+      - test-stable
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug

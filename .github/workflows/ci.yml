@@ -157,7 +157,7 @@ jobs:
   test-integration-clickhouse:
     runs-on: ubuntu-latest
     needs:
-      - test-base
+      - test-stable
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -203,7 +203,7 @@ jobs:
   test-integration-aws:
     runs-on: ubuntu-latest
     needs:
-      - test-base
+      - test-stable
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -249,7 +249,7 @@ jobs:
   test-integration-docker:
     runs-on: ubuntu-latest
     needs:
-      - test-base
+      - test-stable
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -295,7 +295,7 @@ jobs:
   test-integration-es:
     runs-on: ubuntu-latest
     needs:
-      - test-base
+      - test-stable
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -341,7 +341,7 @@ jobs:
   test-integration-gcp:
     runs-on: ubuntu-latest
     needs:
-      - test-base
+      - test-stable
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -387,7 +387,7 @@ jobs:
   test-integration-kafka:
     runs-on: ubuntu-latest
     needs:
-      - test-base
+      - test-stable
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -433,7 +433,7 @@ jobs:
   test-integration-influxdb:
     runs-on: ubuntu-latest
     needs:
-      - test-base
+      - test-stable
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -479,7 +479,7 @@ jobs:
   test-integration-splunk:
     runs-on: ubuntu-latest
     needs:
-      - test-base
+      - test-stable
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -525,7 +525,7 @@ jobs:
   test-integration-pulsar:
     runs-on: ubuntu-latest
     needs:
-      - test-base
+      - test-stable
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
