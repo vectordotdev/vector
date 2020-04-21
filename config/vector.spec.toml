@@ -2002,11 +2002,7 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
-    init = """
-  function (emit)
-    count = 0 -- initialize state by setting a global variable
-  end
-  """
+    init = "init"
     init = "init"
 
     # A function which is called for each incoming event. It can produce new events
@@ -2024,11 +2020,7 @@ dns_servers = ["0.0.0.0:53"]
     emit(event)
   end
   """
-    process = """
-  function (event, emit)
-    count = count + 1 -- increment the counter and exit
-  end
-  """
+    process = "process"
     process = "process"
 
     # A function which is called when Vector is stopped. It can produce new events
@@ -2037,20 +2029,7 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
-    shutdown = """
-  function (emit)
-    emit {
-      metric = {
-        name = "event_counter",
-        kind = "incremental",
-        timestamp = os.date("!*t"),
-        counter = {
-          value = counter
-        }
-      }
-    }
-  end
-  """
+    shutdown = "shutdown"
     shutdown = "shutdown"
 
   #
@@ -2063,21 +2042,6 @@ dns_servers = ["0.0.0.0:53"]
     #
     # * required
     # * type: string
-    handler = """
-  function (emit)
-    emit {
-      metric = {
-        name = "event_counter",
-        kind = "incremental",
-        timestamp = os.date("!*t"),
-        counter = {
-          value = counter
-        }
-      }
-    }
-    counter = 0
-  end
-  """
     handler = "timer_handler"
 
     # Defines the interval at which the timer handler would be executed.
@@ -2098,6 +2062,35 @@ dns_servers = ["0.0.0.0:53"]
   # * optional
   # * no default
   # * type: string
+  source = """
+function init()
+  count = 0
+end
+
+function process()
+  count = count + 1
+end
+
+function timer_handler(emit)
+  emit(make_counter(counter))
+  counter = 0
+end
+
+function shutdown(emit)
+  emit(make_counter(counter))
+end
+
+function make_counter(value)
+  return metric = {
+    name = "event_counter",
+    kind = "incremental",
+    timestamp = os.date("!*t"),
+    counter = {
+      value = value
+    }
+  }
+end
+"""
   source = """
 -- external file with hooks and timers defined
 require('custom_module')
