@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics from Statsd to InfluxDB"
 description: "A simple guide to send metrics from Statsd to InfluxDB in just a few minutes."
@@ -73,23 +73,23 @@ The following diagram demonstrates how it works.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Accept metrics data over the Statsd UDP protocol.
-    <ol>
+    <ul>
       <li>Automatically parse metrics into a lossless interoperable data model.</li>
-    </ol>
+    </ul>
   </li>
   <li>
     Send metrics to InfluxDB v1 or v2.
-    <ol>
+    <ul>
       <li>Batch data to maximize throughput.</li>
       <li>Automatically retry failed requests, with backoff.</li>
       <li>Automatically aggregate metrics at the edge for improved performance.</li>
-    </ol>
+    </ul>
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 

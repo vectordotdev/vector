@@ -963,6 +963,7 @@ dependencies = [
  "quickcheck",
  "scan_fmt",
  "tempfile",
+ "tokio 0.2.13",
  "tracing",
  "winapi 0.3.8",
 ]

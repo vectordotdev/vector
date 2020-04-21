@@ -3,7 +3,7 @@ title = "LogDNA"
 noun = "LogDNA"
 beta = true
 common = false
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 description = """\
 [LogDNA][urls.logdna] is a log management system that allows engineering and \
 DevOps to aggregate all system, server, and application logs into one \

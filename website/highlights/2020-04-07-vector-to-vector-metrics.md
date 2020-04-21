@@ -5,7 +5,7 @@ title: "The Vector Source Now Accepts Metrics"
 description: "It's not possible to forward metrics between Vector instances"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [2245]
-release: "nightly"
+release: "0.9.0"
 hide_on_release_notes: true
 tags: ["type: new feature", "domain: sources", "source: vector"]
 ---

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-20"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
@@ -70,7 +70,7 @@ The following steps should be used to compile Vector directly on Linux based sys
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.2)', value: 'latest'},
+        { label: 'Latest (0.9.0)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -78,7 +78,7 @@ The following steps should be used to compile Vector directly on Linux based sys
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.8 | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.9 | \
       tar xzf - -C vector --strip-components=1
     ```
 
@@ -158,7 +158,7 @@ operating systems.
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.2)', value: 'latest'},
+        { label: 'Latest (0.9.0)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -166,7 +166,7 @@ operating systems.
 
     ```bat
     git clone https://github.com/timberio/vector
-    git checkout v0.8.2
+    git checkout v0.9.0
     cd vector
     ```
 
@@ -217,7 +217,7 @@ Building steps:
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.2)', value: 'latest'},
+        { label: 'Latest (0.9.0)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -225,7 +225,7 @@ Building steps:
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.8.X | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.9.X | \
       tar xzf - -C vector --strip-components=1
     ```
 
@@ -420,7 +420,6 @@ features one has to pass a comma-separated list of component features.
 | `transforms-geoip` | Enables building of [`geoip` transform][docs.transforms.geoip].  |
 | `transforms-grok_parser` | Enables building of [`grok_parser` transform][docs.transforms.grok_parser].  |
 | `transforms-json_parser` | Enables building of [`json_parser` transform][docs.transforms.json_parser].  |
-| `transforms-kubernetes_pod_metadata` | Enables building of [`kubernetes_pod_metadata` transform][docs.transforms.kubernetes_pod_metadata].  |
 | `transforms-log_to_metric` | Enables building of [`log_to_metric` transform][docs.transforms.log_to_metric].  |
 | `transforms-logfmt_parser` | Enables building of [`logfmt_parser` transform][docs.transforms.logfmt_parser].  |
 | `transforms-lua` | Enables building of [`lua` transform][docs.transforms.lua].  |
@@ -531,7 +530,6 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.geoip]: /docs/reference/transforms/geoip/
 [docs.transforms.grok_parser]: /docs/reference/transforms/grok_parser/
 [docs.transforms.json_parser]: /docs/reference/transforms/json_parser/
-[docs.transforms.kubernetes_pod_metadata]: /docs/reference/transforms/kubernetes_pod_metadata/
 [docs.transforms.log_to_metric]: /docs/reference/transforms/log_to_metric/
 [docs.transforms.logfmt_parser]: /docs/reference/transforms/logfmt_parser/
 [docs.transforms.lua]: /docs/reference/transforms/lua/

@@ -187,7 +187,7 @@ mod tests {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "2.125.160.216", "request_path": "foo/bar"}"#);
         let event = parser.transform(event).unwrap();
-        let reader = maxminddb::Reader::open_readfile("test-data/GeoIP2-City-Test.mmdb").unwrap();
+        let reader = maxminddb::Reader::open_readfile("tests/data/GeoIP2-City-Test.mmdb").unwrap();
 
         let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
@@ -217,7 +217,7 @@ mod tests {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "67.43.156.9", "request_path": "foo/bar"}"#);
         let event = parser.transform(event).unwrap();
-        let reader = maxminddb::Reader::open_readfile("test-data/GeoIP2-City-Test.mmdb").unwrap();
+        let reader = maxminddb::Reader::open_readfile("tests/data/GeoIP2-City-Test.mmdb").unwrap();
 
         let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
@@ -246,7 +246,7 @@ mod tests {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#);
         let event = parser.transform(event).unwrap();
-        let reader = maxminddb::Reader::open_readfile("test-data/GeoIP2-City-Test.mmdb").unwrap();
+        let reader = maxminddb::Reader::open_readfile("tests/data/GeoIP2-City-Test.mmdb").unwrap();
 
         let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
         let new_event = augment.transform(event).unwrap();

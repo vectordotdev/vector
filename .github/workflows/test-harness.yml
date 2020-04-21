@@ -103,7 +103,7 @@ jobs:
         VECTOR_TEST_RESULTS_S3_BUCKET_NAME: test-results.vector.dev
         AWS_ACCESS_KEY_ID: '${{ secrets.TEST_HARNESS_RESULTS_AWS_ACCESS_KEY_ID }}'
         AWS_SECRET_ACCESS_KEY: '${{ secrets.TEST_HARNESS_RESULTS_AWS_SECRET_ACCESS_KEY }}'
-        AWS_DEFAULT_REGION: '${{ secrets.AWS_DEFAULT_REGION }}'
+        AWS_DEFAULT_REGION: '${{ secrets.TEST_HARNESS_AWS_DEFAULT_REGION }}'
 
     - name: Post a comment with the results
       uses: actions/github-script@0.9.0

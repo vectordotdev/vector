@@ -1,0 +1,235 @@
+name: nightly
+
+on:
+  schedule:
+    - cron:  "0 14 * * *"
+
+env:
+  CHANNEL: nightly
+
+jobs:
+  build-x86_64-unknown-linux-musl-archive-and-deb-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: "Build archive and package"
+        run: |
+          ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive package-deb
+        env:
+          PASS_FEATURES: "default-musl"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-x86_64-unknown-linux-musl.tar.gz"
+          path: "./target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-amd64.deb"
+          path: "./target/artifacts/vector-amd64.deb"
+
+  build-aarch64-unknown-linux-musl-archive-and-deb-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: "Build archive and package"
+        run: |
+          ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build-archive package-deb
+        env:
+          DOCKER_PRIVILEGED: "true"
+          PASS_FEATURES: "default-musl"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-aarch64-unknown-linux-musl.tar.gz"
+          path: "./target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-arm64.deb"
+          path: "./target/artifacts/vector-arm64.deb"
+
+  build-armv7-unknown-linux-musleabihf-archive-and-deb-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: "Build archive and package"
+        run: |
+          ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build-archive package-deb
+        env:
+          DOCKER_PRIVILEGED: "true"
+          PASS_FEATURES: "default-musl"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-armv7-unknown-linux-musleabihf.tar.gz"
+          path: "./target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-armhf.deb"
+          path: "./target/artifacts/vector-armhf.deb"
+
+  build-x86_64-apple-darwin-archive:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: "Build archive"
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          make build-archive
+        env:
+          TARGET: "x86_64-apple-darwin"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-x86_64-apple-darwin.tar.gz"
+          path: "./target/artifacts/vector-x86_64-apple-darwin.tar.gz"
+
+  build-x86_64-pc-windows-msvc-archive-and-msi-package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: "Download Perl"
+        shell: bash
+        run: |
+          curl -sSf http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
+          echo "$SHA256SUM perl-installer.msi" | sha256sum --check --status
+        env:
+          VERSION: "5.30.0.1"
+          SHA256SUM: "459de13a284a4c83213208c9caa1c372c81136b6e863a3f13d42f631048e0b12" # we need to verify checksum because strawberryperl.com doesn't support HTTPS
+      - name: "Install Perl"
+        shell: cmd # msiexec fails when called from bash
+        run: |
+          msiexec /quiet /i perl-installer.msi
+          del perl-installer.msi
+      - name: "Download CMake"
+        shell: bash
+        run: |
+          curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
+        env:
+          VERSION: "3.15.5"
+      - name: "Install CMake"
+        shell: cmd # msiexec fails when called from bash
+        run: |
+          msiexec /quiet /i cmake-installer.msi
+          del cmake-installer.msi
+      - name: "Install Wix"
+        shell: bash
+        run: |
+          mkdir -p /c/wix
+          cd /c/wix
+          curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
+          unzip wix-binaries.zip
+          rm wix-binaries.zip
+      - name: "Build archive"
+        shell: bash
+        run: |
+          export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
+          export RUSTFLAGS=-Ctarget-feature=+crt-static
+          export FEATURES="default-msvc"
+          export ARCHIVE_TYPE="zip"
+          export STRIP="false"
+          export RUST_LTO=""
+          export TARGET="x86_64-pc-windows-msvc"
+
+          ./scripts/build-archive.sh
+          ls -lha target/artifacts
+      - name: "Build package"
+        shell: bash
+        run: |
+          export PATH="/c/wix:$PATH"
+          ./scripts/package-msi.sh
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-x86_64-pc-windows-msvc.zip"
+          path: "./target/artifacts/vector-x86_64-pc-windows-msvc.zip"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-x64.msi"
+          path: "./target/artifacts/vector-x64.msi"
+
+  release-docker:
+    runs-on: ubuntu-latest
+    needs:
+      - build-x86_64-unknown-linux-musl-archive-and-deb-package
+      - build-aarch64-unknown-linux-musl-archive-and-deb-package
+      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-x86_64-unknown-linux-musl.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-aarch64-unknown-linux-musl.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-armv7-unknown-linux-musleabihf.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-amd64.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-arm64.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-armhf.deb
+          path: target/artifacts
+      - run: |
+          ./scripts/upgrade-docker.sh
+          export VERSION=$(make version)
+          make release-docker
+        env:
+          DOCKER_USERNAME: '${{ secrets.CI_DOCKER_USERNAME }}'
+          DOCKER_PASSWORD: '${{ secrets.CI_DOCKER_PASSWORD }}'
+          PLATFORM: "linux/amd64,linux/arm64,linux/arm"
+
+  release-s3:
+    runs-on: ubuntu-latest
+    needs:
+      - build-x86_64-unknown-linux-musl-archive-and-deb-package
+      - build-aarch64-unknown-linux-musl-archive-and-deb-package
+      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
+      - build-x86_64-apple-darwin-archive
+      - build-x86_64-pc-windows-msvc-archive-and-msi-package
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-x86_64-unknown-linux-musl.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-aarch64-unknown-linux-musl.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-armv7-unknown-linux-musleabihf.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-amd64.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-arm64.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-armhf.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-x86_64-apple-darwin.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-x86_64-pc-windows-msvc.zip
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-x64.msi
+          path: target/artifacts
+      - run: make release-s3
+        env:
+          AWS_ACCESS_KEY_ID: '${{ secrets.CI_AWS_ACCESS_KEY_ID }}'
+          AWS_SECRET_ACCESS_KEY: '${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}'

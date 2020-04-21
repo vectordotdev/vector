@@ -1,0 +1,14 @@
+name: install-script
+on:
+  push:
+    branches:
+    - master
+  pull_request: {}
+jobs:
+  cargo-deny:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: EmbarkStudios/cargo-deny-action@v0
+      with:
+        command: "check advisories"

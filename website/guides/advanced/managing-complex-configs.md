@@ -1,11 +1,19 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
-title: Managing Complex Configs
+title: Building & Managing Complex Configs
 description: Strategies for building and managing complex Vector configs
 author_github: https://github.com/Jeffail
 tags: ["type: guide", "domain: config"]
 ---
+
+import Assumptions from '@site/src/components/Assumptions';
+
+<Assumptions name="guide">
+
+* You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][guides.getting-started.your-first-pipeline].
+
+</Assumptions>
 
 Writing large configuration files is not yet an official olympic event. However,
 it's still a good idea to get yourself ahead of the competition. In this guide
@@ -20,7 +28,51 @@ free Vector configs that are easy to maintain.
      website/guides/advanced/managing-complex-configs.md.erb
 -->
 
-## Test Driven Configuration
+## Generating Configs
+
+In Vector each component of a pipeline specifies which components it consumes
+events from. This makes it very easy to build multiplexed topologies. However,
+writing a chain of transforms this way can sometimes be frustrating as the
+number of transforms increases.
+
+Luckily, the Vector team are desperate for your approval and have worked hard to
+mitigate this with the `generate` subcommand, which can be used to generate the
+boilerplate for you. The command expects a list of components, where it then
+creates a config with all of those components connected in a linear chain.
+
+For example, if we wished to create a chain of three transforms; `json_parser`,
+`add_fields`, and `remove_fields`, we can run:
+
+```bash
+vector generate /json_parser,add_fields,remove_fields > vector.toml
+# Find out more with `vector generate --help`
+```
+
+And most of the boilerplate will be written for us, with each component printed
+with an `inputs` field that specifies the component before it:
+
+```toml title="vector.toml"
+[transforms.transform0]
+  inputs = [ "somewhere" ]
+  type = "json_parser"
+  # etc ...
+
+[transforms.transform1]
+  inputs = [ "transform0" ]
+  type = "add_fields"
+  # etc ...
+
+[transforms.transform2]
+  inputs = [ "transform1" ]
+  type = "remove_fields"
+  # etc ...
+```
+
+The names of the generated components are sequential (`transform0`,
+`transform1`, and so on). It's therefore worth doing a search and replace with
+your editor to give them better names, e.g. `s/transform2/scrub_emails/g`.
+
+## Testing Configs
 
 Test driven Configurationn is a paradigm we just made up, so there's still time
 for you to adopt it _before_ it's cool. Vector supports complementing your
@@ -31,7 +83,7 @@ Let's imagine we are in the process of building the config from the [unit test
 guide][guides.unit-testing], we might start off with our source and
 the grok parser:
 
-```toml
+```toml title="vector.toml"
 [sources.over_tcp]
   type = "socket"
   mode = "tcp"
@@ -51,7 +103,7 @@ our config to run tests rather than focusing on features.
 Instead, we can leave our source as a `socket` type and add a unit test to the
 end of our config:
 
-```toml
+```toml title="vector.toml"
 [[tests]]
   name = "check_simple_log"
 
@@ -68,13 +120,13 @@ When we add a unit test output without any conditions it will simply print the
 input and output events of a transform, allowing us to inspect its behavior:
 
 ```sh
-$ vector test ./example.toml
-Running example.toml tests
-test example.toml: check_simple_log ... passed
+$ vector test ./vector.toml
+Running vector.toml tests
+test vector.toml: check_simple_log ... passed
 
 inspections:
 
---- example.toml ---
+--- vector.toml ---
 
 test 'check_simple_log':
 
@@ -87,7 +139,7 @@ As we introduce new transforms to our config we can change the test output
 to check the latest transform. Or, occasionally, we can add conditions to an
 output in order to turn it into a regression test:
 
-```toml
+```toml title="vector.toml"
 [[tests]]
   name = "check_simple_log"
 
@@ -112,50 +164,6 @@ output in order to turn it into a regression test:
 How many tests you add is at your discretion, but you probably don't need to
 test every single transform. We recommend every four transforms, except during a
 full moon when you should test every two just to be sure.
-
-## Building Pipelines
-
-In Vector each component of a pipeline specifies which components it consumes
-events from. This makes it very easy to build multiplexed topologies. However,
-writing a chain of transforms this way can sometimes be frustrating as the
-number of transforms increases.
-
-Luckily, the Vector team are desperate for your approval and have worked hard to
-mitigate this with the `generate` subcommand, which can be used to generate the
-boilerplate for you. The command expects a list of components, where it then
-creates a config with all of those components connected in a linear chain.
-
-For example, if we wished to create a chain of three transforms; `json_parser`,
-`add_fields`, and `remove_fields`, we can run:
-
-```bash
-vector generate /json_parser,add_fields,remove_fields > example.toml
-# Find out more with `vector generate --help`
-```
-
-And most of the boilerplate will be written for us, with each component printed
-with an `inputs` field that specifies the component before it:
-
-```toml
-[transforms.transform0]
-  inputs = [ "somewhere" ]
-  type = "json_parser"
-  # etc ...
-
-[transforms.transform1]
-  inputs = [ "transform0" ]
-  type = "add_fields"
-  # etc ...
-
-[transforms.transform2]
-  inputs = [ "transform1" ]
-  type = "remove_fields"
-  # etc ...
-```
-
-The names of the generated components are sequential (`transform0`,
-`transform1`, and so on). It's therefore worth doing a search and replace with
-your editor to give them better names, e.g. `s/transform2/scrub_emails/g`.
 
 ## Organizing Configs
 
@@ -187,5 +195,7 @@ If you're running Vector in environments where it's not possible to issue
 automatically gobble up changes whenever the file is written to.
 
 
+[docs.about.concepts]: /docs/about/concepts/
 [guides.advanced.unit-testing]: /guides/advanced/unit-testing/
+[guides.getting-started.your-first-pipeline]: /guides/getting-started/your-first-pipeline/
 [guides.unit-testing]: /guides/advanced/unit-testing/
