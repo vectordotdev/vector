@@ -344,6 +344,11 @@ to automatically inject Vector `Container` into `Pod`s (via admission
 controller), but that doesn't make a lot of sense for us to work on, since
 [`DaemonSet`][daemonset] works for most of the use cases already.
 
+Note that [`DaemonSet`][daemonset] deployment does require special support at
+Vector code (a dedicated `kubernetes` source), while a perfectly valid sidecar
+configuration can be implemented with just a simple `file` source.
+This is another reason why we don't pay as much attention to sidecar model.
+
 ### Deployment configuration
 
 It is important that provide a well-thought deployment configuration for the
