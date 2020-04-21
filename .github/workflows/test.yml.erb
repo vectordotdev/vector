@@ -1,4 +1,4 @@
-name: ci
+name: test
 
 on:
   push:
@@ -68,7 +68,7 @@ jobs:
   # Test vector <%= archetype %>-<%= component.name %>
   test-<%= archetype %>-<%= component.name %>:
     needs: test-base
-    runs_on: ubuntu-latest
+    runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
