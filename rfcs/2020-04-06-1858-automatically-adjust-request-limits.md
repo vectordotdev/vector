@@ -19,9 +19,9 @@ Most sinks in Vector have their request structure managed by the [tower
 crate](https://github.com/tower-rs/tower).  This service builder allows
 for setting how requests are sent to remote sinks. In particular, Vector
 fixes the number of requests that may be simultaneously in flight (AKA
-the concurrency limit), the maximum rate at which requests may be sent,
-expressed in terms of the number of requests over some time interval
-(AKA the rate limit number and duration).
+the concurrency limit or `in_flight_limit`) and the maximum rate at
+which requests may be sent, expressed in terms of the number of requests
+over some time interval (AKA the rate limit number and duration).
 
 Many of these parameters _must_ be adjusted by the Vector operator to
 maximize the throughput for each service. For high volume sites, this
@@ -46,6 +46,8 @@ deferrals. These all decrease the overall flow rate while actually
 increasing actual bandwidth usage.
 
 ## Guide-level Proposal
+
+### Control Mechanism
 
 There are two levels of controls we have in play—static and dynamic. The
 existing controls are static, and best describe service limits, such as
@@ -87,6 +89,50 @@ The algorithm used to control the limit will follow the AIMD framework:
     failure, the concurrency will be reduced by a factor of one half
     (multiplicative decrease) once per RTT, down to a minimum of one.
 
+
+```rust
+impl Service<Request> for ConcurrencyLimit {
+    fn call(&mut self, request: Request) -> Self::Future {
+        let future = self.inner.call(request);
+        ...
+        emit!(ConcurrencyLimit { concurrency: self.limit.maximum() });
+        emit!(ConcurrencyActual { concurrency: self.limit.used() });
+        ResponseFuture::new(future, self.limit.semaphore.clone(), Instant::now())
+    }
+}
+
+impl Future for ResponseFuture {
+    fn poll(&mut self, cx: &mut Context) -> Poll<Self::Output> {
+        match self.inner.poll() {
+            Pending => Pending,
+            Ready(output) => {
+                let now = Instant::now();
+                let rtt = now.duration_since(self.start_time);
+                emit!(RTTMeasurement { rtt: rtt.as_millis() });
+
+                if now >= controller.next_update {
+                    let mut controller = self.controller.lock();
+                    if rtt > controller.rtt + controller.threshold {
+                        // The `+ 1` prevents this from going to zero
+                        controller.concurrency = (controller.concurrency + 1) / 2;
+                    }
+                    else if controller.concurrency < controller.in_flight_limit
+                        && rtt <= controller.rtt {
+                        controller.concurrency += 1;
+                    }
+                    controller.next_update = now + controller.average_rtt
+                }
+                controller.average_rtt.update(rtt);
+
+                Ready(output)
+            }
+        }
+    }
+}
+```
+
+### Observed Behavior
+
 This algorithm should have the following responses to service
 conditions:
 
@@ -109,6 +155,23 @@ conditions:
   / RTT`, peeking over and then briefly dropping down when queries are
   limited. This will keep the delivery rate close to the discovered rate
   limit.
+
+### Observability
+
+Vector operators need to be able to observe the behavior of this
+algorithm to ensure that it is operating as desired. To this end, the
+mechanism will expose the following data:
+
+* a rate-limited event logged every time a remote service explicitly
+  limits the request rate:
+  
+  `Requests throttled by remote service, concurrency reduced.`
+
+* a histogram metric recording the observed RTTs,
+
+* a histogram metric recording the effective concurrency limit, and
+
+* a histogram metric recording the actual concurrent requests in flight.
 
 ## Prior Art
 
@@ -184,7 +247,10 @@ reason about the causes of bandwidth limits.
 
 * [ ] Submit a PR with spike-level code _roughly_ demonstrating the
       change.
-* [ ] Expose statistics of the concurrency management (through metrics?).
+* [ ] Expose major concurrency limiting events as rate-limited logs (ie
+      explicit limiting responses).
+* [ ] Expose statistics of the concurrency management through internal
+      metrics' gauges.
 * [ ] Benchmark the approach under various conditions to determine a good
       value for α.
 * [ ] Develop test harness to ensure desired rate management behavior
