@@ -454,7 +454,7 @@ an example:
 
 We must be careful with our `.yaml` files to make them play well with not just
 `kubectl create -f`, but also with `kubectl apply -f`. There are often issues
-with impotency when labels and selectors aren't configured properly and we
+with idempotency when labels and selectors aren't configured properly and we
 should be wary of that.
 
 ##### Considered Alternatives
