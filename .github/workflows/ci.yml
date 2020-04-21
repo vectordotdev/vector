@@ -289,7 +289,7 @@ jobs:
             opt-level = "s" # Binary size
             lto = false # Don't LTO on CI
           EOF
-      - run: docker-compose up -d 
+      - run: docker-compose up -d
       - run: cargo test --no-default-features --features docker-integration-tests
 
   test-integration-es:
