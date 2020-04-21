@@ -25,7 +25,7 @@ Updrading is easy:
 ```toml title="vector.toml"
  [sinks.my-sink]
    type = "..."
--  format = "json"
+-  encoding = "json"
 +  encoding.codec = "json"
 +  encoding.except_fields = ["_meta"] # optional
 +  encoding.timestamp_format = "rfc3339" # optional
