@@ -824,6 +824,8 @@ components.
 
 Integration tests are performed against the real k8s clusters.
 
+##### Test targets
+
 We have a matrix of concerns, we'd like to ensure Vectors works properly with.
 
 - Kubernetes Versions
@@ -894,6 +896,154 @@ whether we want to address Windows containers support is a different topic, we
 still should plan ahead.
 
 We'll need to come up with an optimal configuration.
+
+##### Where to keep and how to manage integration infrastructure config
+
+This is a very controversial question.
+
+Currently we have:
+
+- the Vector repo (with the Github Actions based CI flow)
+- the test harness (also integrated with CI, but this is it's own thing)
+
+We don't necessarily have to choose one of those places: we can add a new
+location if it's justified enough.
+
+Let's outline the requirements on the properties of the solution:
+
+- We want to have the ability to run the checks from the Vector repo CI, i.e.
+  per commit, per PR, per tag etc. This might not be immediately utilized, but
+  we just want to have that option.
+
+- We want to consolidate the management of the _cloud_ resources we allocate and
+  pay for Kubernetes test infrastructure in a single place. This is to avoid
+  spreading the responsibility, duplicating the logic, reusing allocated
+  resources for all our testing needs, and simplify accounting and make the
+  configuration management more flexible.
+  We can, for example, have a shared dependency for Vector CI flow, Test Harness
+  invocations, locally run tests - and whatever else we have - to rely on.
+
+- We want our test infrastructure easily available for the trusted developers
+  (Vector core team) to run experiments and tests against locally. This doesn't
+  mean we want to automate this and include running tests locally against our
+  whole k8s test infrastructure - but the ability to do it with little effort is
+  very important: even if we employ super-reliable CI automation, the turnaround
+  time of going through it is way higher than conducting an experiment locally.
+  Locally means using local code tree and binaries - the infrastructure itself
+  is still in the cloud.
+
+- Ideally, we want the test system to be available not just to the Vector core
+  team, but to the whole open-source community. Of course, we don't want to give
+  unrestricted access to _our_ cloud testing infrastructure - but the solution
+  we employ should allow third-parties to bring their own resources. Things that
+  are local in essence (like `minikube`) should just work. There shouldn't be a
+  situation where one can't run tests in `minikube` because cloud parts aren't
+  available. We already have a similar constraints at the Vector Test Harness.
+
+- We need the required efforts to managements the solution to be low, and the
+  price to be relatively small. This means that the solution has to be simple.
+
+- We want to expose the same kind of interface to each of the clusters, so the
+  cluster we run the tests is easily interchangeable.
+  A kubectl config file is a good option, since it encapsulates all the
+  necessary information tp connect to a cluster.
+
+Based on all of the above, it makes sense to split the infrastructure into two
+parts.
+
+- Cloud infrastructure that we manage and pay for.
+
+  We will create a dedicated public repo with [Terraform] configs to setup a
+  long-running Kubernetes test infrastructure.
+  The goal here is to make the real, live cloud environments available for
+  people and automation to work with.
+
+- Self-hosted infrastructure that we maintain configs for.
+
+  This is what keep so that it's easy to run the a self-hosted cluster. Most
+  likely locally - for things like `minikube`, but not limited to. The focus
+  here is lock particular _versions_ and _configuration_ of the tooling, so it's
+  easy to run tests against. Potentially even having multiple versions of the
+  same tool, for instance, when you need to compare `minikube` `1.9.2` and
+  `1.8.2`.
+  The goal here is to address the problem of configuring the self hosted cluster
+  management tools once and for all, and share those configurations. For people
+  it has the benefit of enabling them to spend time on soling the problem (or
+  doing whatever they need to do with k8s) rather than spending time on
+  configuration. For automation flows - it'll make it really simple to reference
+  a particular self-hosted configuration - and offload the complexity of
+  preparing it.
+
+  This one we'll have to figure out, but most likely we'll create a dedicated
+  repo per tool, each with different rules - but with a single interface.
+
+The interface (and the goal) those repos is to provide kubectl-compatible config
+files, enabling access to clusters where we can deploy Vector to and conduct
+some tests (and, in general, _other arbitrary activity_).
+
+##### What to assert/verify in integration tests
+
+We can recognize three typical categories of integration tests that are relevant
+to the Kubernetes integration: correctness, performance and reliability.
+In fact, this is actually how we split things at the Vector Test Harness
+already.
+
+It is important that with Kubernetes we don't only have to test that Vector
+itself perform correctly, but also that our YAML configs and Helm Chart
+templates are sane and work properly. So in a sense, we still have the same
+test categories, but the scope is broader than just testing Vector binary. We
+want to test the whole integration.
+
+Ideally we want to test everything: the correctness, performance and
+reliability. Correctness tests are relatively easy, however, it's not yet clear
+how to orchestrate the performance and reliability tests. Measuring performance
+in clusters is quite difficult and requires insight thought to make it right.
+For example, we have to consider and control a lot more variables of the
+environment - like CNI driver, underlying network topology and so on - to
+understand the conditions we're testing. Reliability tests also require
+more careful designing the test environment.
+For this reason, the initial Kubernetes integration only focuses on correctness
+tests. Once we get som experience with correctness test we can expand our test
+suite with tests from other categories.
+
+It is important that we do actually test correctness on all the configurations -
+see this [comment][why_so_much_configurations] as an example. Kubernetes is has
+a lot of LOC, is very complex and properly supporting it is quite a challenge.
+
+The exact design of the tests is an implementation detail, so it's not specified
+in this RFC, but the suggested approach, as a starting point, could be to deploy
+Vector using our documented installation methods, then run some log-generating
+workload and then run assertions on the collected logs.
+
+The things we'd generally want to ensure work properly include (but are not
+limited to):
+
+- basic log collection and parsing
+- log message filtering (both by file paths and by metadata)
+- log events enhancement with metadata
+- partial log events merging
+
+We want the assertions and tests to be cluster-agnostic, so that they work with
+any supplied kubectl config.
+
+#### Existing k8s tests
+
+We already have k8s integration tests implemented in Rust in the Vector repo.
+Currently, they're being run as part of the `cd tests; make tests`. They
+assert that Vector code works properly by deploying Vector plus some test
+log producers and asserting that Vector produced the expected output. This is
+very elegant solution.
+However, these tests are really more like unit tests - in a sense that they
+completely ignore the YAMLs and Helm Charts and
+use their own test configs. While they do a good job in what they're built for -
+we probably shouldn't really consider them integration tests in a broad sense.
+
+It was discussed that we'd want to reuse them as our integration tests, however,
+for the reasons above I don't think it's a good idea. At least as they're now.
+We can decouple the deployment of Vector from the deployment of test containers
+and assertions - then we use just the second half with Vector deployed via YAMLs
+and/or Helm Charts. For now, we should probably leave them as is, maintain them,
+but hold the adoption as integration tests.
 
 TODO
 
@@ -1110,6 +1260,8 @@ See [motivation](#motivation).
 [pr#2134]: https://github.com/timberio/vector/pull/2134
 [pr#2188]: https://github.com/timberio/vector/pull/2188
 [sidecar_container]: https://github.com/kubernetes/enhancements/blob/a8262db2ce38b2ec7941bdb6810a8d81c5141447/keps/sig-apps/sidecarcontainers.md
+[terraform]: https://www.terraform.io/
 [the chart repository guide]: https://helm.sh/docs/topics/chart_repository/
 [vector_daemonset]: 2020-04-04-2221-kubernetes-integration/vector-daemonset.yaml
+[why_so_much_configurations]: https://github.com/timberio/vector/pull/2134/files#r401634895
 [windows_in_kubernetes]: https://kubernetes.io/docs/setup/production-environment/windows/intro-windows-in-kubernetes/
