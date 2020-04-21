@@ -45,15 +45,14 @@ Kubernetes logs and metrics to any destination you please.
 
 #### How This Guide Works
 
-Our recommended strategy deploys Vector as a Kubernetes [DaemonSet]. This is
-the most efficient means of collecting Kubernetes observability data since
-Vector is guaranteed to deploy _once_ on each of your Nodes. In addition,
-we'll use the [`kubernetes_pod_metadata` transform][kubernetes_pod_metadata_transform]
-to enrich your logs with the Kubernetes context. This transform interacts with
-the Kubernetes watch API to collect cluster metadata and update in real-time
-when things change. The following diagram demonstrates how this works:
+Our recommended strategy deploys Vector as a Kubernetes
+[`DaemonSet`][daemonset]. Vector is reading the logs files directly from the
+file system, so to collect the logs from all the `Pod`s it has to be deployed
+on every `Node` in your cluster.
 
-TODO: insert diagram
+The following diagram demonstrates how this works:
+
+TODO: add deployment topology diagram here.
 
 ### What We'll Accomplish
 
