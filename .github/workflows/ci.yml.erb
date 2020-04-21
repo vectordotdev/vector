@@ -235,7 +235,9 @@ jobs:
             opt-level = "s" # Binary size
             lto = false # Don't LTO on CI
           EOF
-      - run: docker-compose up -d <%= opts[:dependencies].join(' ') %>
+      <%- if opts[:dependencies].length != 0 -%>
+      - run: docker-compose up -d <%= opts[:dependencies].join(' ').strip %>
+      <%- end -%>
       - run: cargo test --no-default-features --features <%= opts[:features].join(',') %>
 
   <%- end -%>
