@@ -575,10 +575,15 @@ This means that there has to be a way to make the data from the k8s API related
 to the log file available to Vector.
 
 Based on the k8s API structure, it looks like we should aim for obtaining the
-`Pod` object, since it contains essential information about the containers
-that produced the log file. Also, is is the `Pod` objects that `kubelet` relies
-on to manage the workloads on the node, so this makes `Pod` objects the best
-option for our case, i.e. better than fetching `Deployment` objects.
+[`Pod`][k8s_api_pod] object, since it contains essential information about the
+containers that produced the log file. Also, it is the [`Pod`][k8s_api_pod]
+objects that control the desired workload state that `kubelet` strives to
+achieve on the node, which this makes [`Pod`][k8s_api_pod] objects the best
+option for our case. In particular - better than
+[`Deployment`][k8s_api_deployment] objects. Technically, everything that needs
+to run containers will produce a [`Pod`][k8s_api_pod] object, and live
+[`Container`s][k8s_api_container] can only exist inside of the
+[`Pod`][k8s_api_pod].
 
 There in a number of approaches to get the required `Pod` objects:
 
