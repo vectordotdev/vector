@@ -42,6 +42,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -57,7 +58,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       # Build
       - run: cargo test --target $TARGET --no-default-features
       # Upload artifacts
@@ -82,6 +82,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -97,7 +98,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -129,6 +129,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -144,7 +145,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -176,6 +176,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -191,7 +192,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -223,6 +223,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -238,7 +239,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -270,6 +270,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -285,7 +286,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -317,6 +317,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -332,7 +333,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -364,6 +364,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -379,7 +380,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -411,6 +411,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -426,7 +427,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -458,6 +458,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -473,7 +474,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -505,6 +505,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -520,7 +521,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -552,6 +552,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -567,7 +568,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -599,6 +599,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -614,7 +615,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -646,6 +646,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -661,7 +662,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -694,6 +694,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -709,7 +710,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -741,6 +741,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -756,7 +757,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -788,6 +788,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -803,7 +804,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -835,6 +835,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -850,7 +851,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -882,6 +882,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -897,7 +898,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -929,6 +929,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -944,7 +945,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -976,6 +976,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -991,7 +992,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1023,6 +1023,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1038,7 +1039,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1070,6 +1070,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1085,7 +1086,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1117,6 +1117,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1132,7 +1133,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1164,6 +1164,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1179,7 +1180,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1211,6 +1211,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1226,7 +1227,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1258,6 +1258,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1273,7 +1274,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1305,6 +1305,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1320,7 +1321,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1352,6 +1352,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1367,7 +1368,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1399,6 +1399,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1414,7 +1415,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1446,6 +1446,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1461,7 +1462,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1493,6 +1493,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1508,7 +1509,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1540,6 +1540,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1555,7 +1556,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1587,6 +1587,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1602,7 +1603,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1634,6 +1634,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1649,7 +1650,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1681,6 +1681,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1696,7 +1697,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1728,6 +1728,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1743,7 +1744,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1775,6 +1775,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1790,7 +1791,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1823,6 +1823,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1838,7 +1839,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1870,6 +1870,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1885,7 +1886,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1917,6 +1917,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1932,7 +1933,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -1964,6 +1964,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -1979,7 +1980,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2011,6 +2011,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2026,7 +2027,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2058,6 +2058,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2073,7 +2074,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2105,6 +2105,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2120,7 +2121,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2152,6 +2152,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2167,7 +2168,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2199,6 +2199,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2214,7 +2215,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2246,6 +2246,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2261,7 +2262,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2293,6 +2293,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2308,7 +2309,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2340,6 +2340,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2355,7 +2356,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2387,6 +2387,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2402,7 +2403,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2434,6 +2434,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2449,7 +2450,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2481,6 +2481,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2496,7 +2497,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2528,6 +2528,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2543,7 +2544,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2575,6 +2575,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2590,7 +2591,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2622,6 +2622,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2637,7 +2638,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2669,6 +2669,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2684,7 +2685,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2716,6 +2716,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2731,7 +2732,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2763,6 +2763,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2778,7 +2779,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2810,6 +2810,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2825,7 +2826,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2857,6 +2857,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2872,7 +2873,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2904,6 +2904,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2919,7 +2920,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2951,6 +2951,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -2966,7 +2967,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -2998,6 +2998,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3013,7 +3014,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3045,6 +3045,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3060,7 +3061,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3092,6 +3092,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3107,7 +3108,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3139,6 +3139,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3154,7 +3155,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3186,6 +3186,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3201,7 +3202,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3233,6 +3233,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3248,7 +3249,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3279,6 +3279,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3294,7 +3295,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3324,6 +3324,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3339,7 +3340,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3369,6 +3369,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3384,7 +3385,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3414,6 +3414,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3429,7 +3430,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3459,6 +3459,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3474,7 +3475,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3504,6 +3504,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3519,7 +3520,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3549,6 +3549,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3564,7 +3565,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3594,6 +3594,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3609,7 +3610,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
@@ -3639,6 +3639,7 @@ jobs:
       USE_CONTAINER: none
     steps:
       # Fetch
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v1
         with:
@@ -3654,7 +3655,6 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('Cargo.lock') }}
-      - uses: actions/checkout@v2
       - run: |
           mkdir -p .cargo/
           cat <<-EOF >> ./.cargo/config
