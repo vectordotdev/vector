@@ -46,9 +46,9 @@ Kubernetes logs and metrics to any destination you please.
 #### How This Guide Works
 
 Our recommended strategy deploys Vector as a Kubernetes
-[`DaemonSet`][daemonset]. Vector is reading the logs files directly from the
-file system, so to collect the logs from all the [`Pod`s][k8s_docs_pod] it has
-to be deployed on every [`Node`][k8s_docs_node] in your cluster.
+[`DaemonSet`][k8s_docs_daemon_set]. Vector is reading the logs files directly
+from the file system, so to collect the logs from all the [`Pod`s][k8s_docs_pod]
+it has to be deployed on every [`Node`][k8s_docs_node] in your cluster.
 
 The following diagram demonstrates how this works:
 
@@ -324,11 +324,11 @@ repo at `https://charts.vector.dev` - short and easy to remember or even guess.
 
 We have two ways to deploy vector:
 
-- as a [`DaemonSet`][daemonset];
+- as a [`DaemonSet`][k8s_docs_daemon_set];
 - as a [sidecar `Container`][sidecar_container].
 
-Deploying as a [`DaemonSet`][daemonset] is trivial, applies cluster-wide and
-makes sense to as default scenario for the most use cases.
+Deployment as a [`DaemonSet`][k8s_docs_daemon_set] is trivial, applies
+cluster-wide and makes sense to as default scenario for the most use cases.
 
 Sidecar container deployments make sense when cluster-wide deployment is not
 available. This can generally occur when users are not in control of the whole
@@ -345,9 +345,9 @@ to automatically inject Vector [`Container`][k8s_api_container] into
 but that doesn't make a lot of sense for us to work on, since
 [`DaemonSet`][k8s_api_daemon_set] works for most of the use cases already.
 
-Note that [`DaemonSet`][daemonset] deployment does require special support at
-Vector code (a dedicated `kubernetes` source), while a perfectly valid sidecar
-configuration can be implemented with just a simple `file` source.
+Note that [`DaemonSet`][k8s_docs_daemon_set] deployment does require special
+support at Vector code (a dedicated `kubernetes` source), while a perfectly
+valid sidecar configuration can be implemented with just a simple `file` source.
 This is another reason why we don't pay as much attention to sidecar model.
 
 ### Deployment configuration
@@ -366,7 +366,8 @@ of design considerations apply to both of them.
 
 #### Managing Object
 
-For the reasons discussed above, we'll be using [`DaemonSet`][daemonset].
+For the reasons discussed above, we'll be using
+[`DaemonSet`][k8s_api_daemon_set].
 
 #### Data directory
 
@@ -375,8 +376,8 @@ operation at runtime. This directory has to persist across restarts, since it's
 essential for some features to function (i.e. not losing buffered data if/while
 the sink is gone).
 
-We'll be using [`DaemonSet`][daemonset], so, naturally, we can leverage
-[`hostPath`][k8s_api_host_path_volume_source] volumes.
+We'll be using [`DaemonSet`][k8s_api_daemon_set], so, naturally, we can
+leverage [`hostPath`][k8s_api_host_path_volume_source] volumes.
 
 We'll be using `hostPath` volumes at our YAML config, and at the Helm Chart
 we'll be using this by default, but we'll also allow configuring this to provide
@@ -1225,9 +1226,9 @@ See [motivation](#motivation).
    daemonset][fluentd_daemonset] and [LogDNA's daemonset][logdna_daemonset].~~
    `RollingUpdate` is the default value for
    [`updateStrategy`][k8s_api_daemon_set_update_strategy] of the
-   [`DaemonSet`][daemonset]. Alternative is `OnDelete`. `RollingUpdate` makes
-   more sense for us to use as the default, more info on this is available at
-   the [docs][k8s_docs_rolling_update].
+   [`DaemonSet`][k8s_api_daemon_set]. The only alternative is `OnDelete`.
+   `RollingUpdate` makes more sense for us to use as the default, more info on
+   this is available at the [docs][k8s_docs_rolling_update].
 1. ~~I've also noticed `resources` declarations in some of these config files.
    For example [LogDNA's daemonset][logdna_daemonset]. I assume this is limiting
    resources. Do we want to consider this?~~
@@ -1302,7 +1303,6 @@ See [motivation](#motivation).
 [configmap_updates]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
 [container_runtimes]: https://kubernetes.io/docs/setup/production-environment/container-runtimes/
 [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
-[daemonset]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
 [downward api]: https://kubernetes.io/docs/tasks/inject-data-application/downward-api-volume-expose-pod-information/#store-pod-fields
 [filebeat k8s integration]: https://www.elastic.co/guide/en/beats/filebeat/master/running-on-kubernetes.html
 [firecracker]: https://github.com/firecracker-microvm/firecracker
@@ -1336,8 +1336,8 @@ See [motivation](#motivation).
 [jsonlines]: http://jsonlines.org/
 [k8s_api_config_map_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#configmapvolumesource-v1-core
 [k8s_api_container]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#container-v1-core
-[k8s_api_daemon_set]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#daemonset-v1-apps
 [k8s_api_daemon_set_update_strategy]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#daemonsetupdatestrategy-v1-apps
+[k8s_api_daemon_set]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#daemonset-v1-apps
 [k8s_api_deployment]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#deployment-v1-apps
 [k8s_api_event]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#event-v1-core
 [k8s_api_host_path_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#hostpathvolumesource-v1-core
@@ -1346,6 +1346,7 @@ See [motivation](#motivation).
 [k8s_api_resource_requirements]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#resourcerequirements-v1-core
 [k8s_docs_controller]: https://kubernetes.io/docs/concepts/architecture/controller/
 [k8s_docs_crds]: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/
+[k8s_docs_daemon_set]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
 [k8s_docs_node]: https://kubernetes.io/docs/concepts/architecture/nodes/
 [k8s_docs_operator]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
 [k8s_docs_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
