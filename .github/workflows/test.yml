@@ -94,8 +94,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -136,8 +136,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -178,8 +178,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -220,8 +220,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -262,8 +262,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -304,8 +304,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -346,8 +346,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -388,8 +388,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -430,8 +430,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -472,8 +472,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -514,8 +514,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -556,8 +556,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -598,8 +598,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -641,8 +641,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -683,8 +683,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -725,8 +725,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -767,8 +767,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -809,8 +809,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -851,8 +851,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -893,8 +893,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -935,8 +935,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -977,8 +977,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1019,8 +1019,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1061,8 +1061,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1103,8 +1103,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1145,8 +1145,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1187,8 +1187,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1229,8 +1229,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1271,8 +1271,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1313,8 +1313,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1355,8 +1355,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1397,8 +1397,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1439,8 +1439,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1481,8 +1481,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1523,8 +1523,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1565,8 +1565,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1607,8 +1607,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1650,8 +1650,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1692,8 +1692,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1734,8 +1734,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1776,8 +1776,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1818,8 +1818,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1860,8 +1860,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1902,8 +1902,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1944,8 +1944,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -1986,8 +1986,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2028,8 +2028,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2070,8 +2070,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2112,8 +2112,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2154,8 +2154,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2196,8 +2196,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2238,8 +2238,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2280,8 +2280,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2322,8 +2322,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2364,8 +2364,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2406,8 +2406,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2448,8 +2448,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2490,8 +2490,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2532,8 +2532,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2574,8 +2574,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2616,8 +2616,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2658,8 +2658,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2700,8 +2700,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2742,8 +2742,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2784,8 +2784,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2826,8 +2826,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2868,8 +2868,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2910,8 +2910,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2951,8 +2951,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -2991,8 +2991,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -3031,8 +3031,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -3071,8 +3071,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -3111,8 +3111,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -3151,8 +3151,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -3191,8 +3191,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -3231,8 +3231,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
@@ -3271,8 +3271,8 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
+          EOF
+          cat <<-EOF >> ./Cargo.toml
             # focus on fast, lean builds
             [profile.dev]
             debug = false
