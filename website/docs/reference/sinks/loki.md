@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-21"
 delivery_guarantee: "at_least_once"
 component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
@@ -52,8 +52,7 @@ The Vector `loki` sink
   encoding.codec = "json" # optional, default
 
   # Labels
-  labels.key = "value" # example
-  labels.key = "{{ event_field }}" # example
+  labels = {label = "value"} # required
 ```
 
 </TabItem>
@@ -92,8 +91,7 @@ The Vector `loki` sink
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # Labels
-  labels.key = "value" # example
-  labels.key = "{{ event_field }}" # example
+  labels = {label = "value"} # required
 
   # Request
   request.in_flight_limit = 5 # optional, default, requests

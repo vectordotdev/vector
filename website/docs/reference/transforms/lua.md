@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-20"
+last_modified_on: "2020-04-21"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
@@ -68,48 +68,43 @@ a full embedded [Lua][urls.lua] engine.
   version = "2" # required
 
   # Hooks
-  hooks.init = """
-  function (emit)
-    count = 0 -- initialize state by setting a global variable
-  end
-  """
-  hooks.process = """
-  function (event, emit)
-    count = count + 1 -- increment the counter and exit
-  end
-  """
-  hooks.shutdown = """
-  function (emit)
-    emit {
-      metric = {
-        name = "event_counter",
-        kind = "incremental",
-        timestamp = os.date("!*t"),
-        counter = {
-          value = counter
-        }
-      }
-    }
-  end
-  """
+  hooks.init = "init" # optional, no default
+  hooks.process = "process" # required
+  hooks.shutdown = "shutdown" # optional, no default
 
   # Timers
-  timers.handler = """
-  function (emit)
-    emit {
-      metric = {
-        name = "event_counter",
-        kind = "incremental",
-        timestamp = os.date("!*t"),
-        counter = {
-          value = counter
-        }
-      }
-    }
+  timers = {interval_seconds = 5, handler = "timer_handler"} # optional, no default
+
+  # Source Code
+  source = """
+  function init()
+    count = 0
+  end
+
+  function process()
+    count = count + 1
+  end
+
+  function timer_handler(emit)
+    emit(make_counter(counter))
     counter = 0
   end
+
+  function shutdown(emit)
+    emit(make_counter(counter))
+  end
+
+  function make_counter(value)
+    return metric = {
+      name = "event_counter",
+      kind = "incremental",
+      timestamp = os.date("!*t"),
+      counter = {
+        value = value
+      }
+    }
+  end
   """
-  timers.interval_seconds = 1 # required, seconds
 ```
 
 </TabItem>
@@ -129,8 +124,7 @@ a full embedded [Lua][urls.lua] engine.
   hooks.shutdown = "shutdown" # optional, no default
 
   # Timers
-  timers.handler = "timer_handler" # required
-  timers.interval_seconds = 1 # required, seconds
+  timers = {interval_seconds = 5, handler = "timer_handler"} # optional, no default
 
   # Source Code
   source = """
@@ -221,7 +215,7 @@ Configures hooks handlers.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["function (emit)\n  count = 0 -- initialize state by setting a global variable\nend","init"]}
+  examples={["init","init"]}
   groups={["inline","module"]}
   name={"init"}
   path={"hooks"}
@@ -246,7 +240,7 @@ A function which is called when the first event comes, before calling
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["function (event, emit)\n  event.log.field = \"value\" -- set value of a field\n  event.log.another_field = nil -- remove field\n  event.log.first, event.log.second = nil, event.log.first -- rename field\n\n  -- Very important! Emit the processed event.\n  emit(event)\nend","function (event, emit)\n  count = count + 1 -- increment the counter and exit\nend","process"]}
+  examples={["function (event, emit)\n  event.log.field = \"value\" -- set value of a field\n  event.log.another_field = nil -- remove field\n  event.log.first, event.log.second = nil, event.log.first -- rename field\n\n  -- Very important! Emit the processed event.\n  emit(event)\nend","process","process"]}
   groups={["simple","inline","module"]}
   name={"process"}
   path={"hooks"}
@@ -271,7 +265,7 @@ using `emit` function.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["function (emit)\n  emit {\n    metric = {\n      name = \"event_counter\",\n      kind = \"incremental\",\n      timestamp = os.date(\"!*t\"),\n      counter = {\n        value = counter\n      }\n    }\n  }\nend","shutdown"]}
+  examples={["shutdown","shutdown"]}
   groups={["inline","module"]}
   name={"shutdown"}
   path={"hooks"}
@@ -299,7 +293,7 @@ using `emit` function.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={[{"interval_seconds":5,"handler":"timer_handler"},{"interval_seconds":5,"handler":"timer_handler"}]}
   groups={["inline","module"]}
   name={"timers"}
   path={null}
@@ -322,7 +316,7 @@ Configures timers which are executed periodically at given interval.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["function (emit)\n  emit {\n    metric = {\n      name = \"event_counter\",\n      kind = \"incremental\",\n      timestamp = os.date(\"!*t\"),\n      counter = {\n        value = counter\n      }\n    }\n  }\n  counter = 0\nend","timer_handler"]}
+  examples={["timer_handler"]}
   groups={["inline","module"]}
   name={"handler"}
   path={"timers"}
@@ -374,8 +368,8 @@ Defines the interval at which the timer handler would be executed.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["-- external file with hooks and timers defined\nrequire('custom_module')"]}
-  groups={["module"]}
+  examples={["function init()\n  count = 0\nend\n\nfunction process()\n  count = count + 1\nend\n\nfunction timer_handler(emit)\n  emit(make_counter(counter))\n  counter = 0\nend\n\nfunction shutdown(emit)\n  emit(make_counter(counter))\nend\n\nfunction make_counter(value)\n  return metric = {\n    name = \"event_counter\",\n    kind = \"incremental\",\n    timestamp = os.date(\"!*t\"),\n    counter = {\n      value = value\n    }\n  }\nend","-- external file with hooks and timers defined\nrequire('custom_module')"]}
+  groups={["inline","module"]}
   name={"source"}
   path={null}
   relevantWhen={null}

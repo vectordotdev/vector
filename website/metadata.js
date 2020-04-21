@@ -6198,7 +6198,7 @@ module.exports = {
         "deletions_count": 6156,
         "description": "Add new guides section",
         "files_count": 1118,
-        "highlight_permalink": "/highlights/2020-03-31-guides-section/",
+        "highlight_permalink": null,
         "insertions_count": 74832,
         "message": "chore(website): Add new guides section (#2132)",
         "pr_number": 2132,
@@ -8363,20 +8363,6 @@ module.exports = {
           "transform: filter"
         ],
         "title": "New Filter Transform"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-31",
-        "description": "High quality guides and education for Vector",
-        "hide_on_release_notes": false,
-        "id": "2020-03-31-guides-section",
-        "path": "website/highlights/2020-03-31-guides-section.md",
-        "permalink": "/highlights/2020-03-31-guides-section/",
-        "tags": [
-          "type: new feature",
-          "domain: website"
-        ],
-        "title": "A New Guides Section"
       },
       {
         "author_github": "https://github.com/binarylogic",
@@ -31720,7 +31706,7 @@ module.exports = {
           "deletions_count": 6156,
           "description": "Add new guides section",
           "files_count": 1118,
-          "highlight_permalink": "/highlights/2020-03-31-guides-section/",
+          "highlight_permalink": null,
           "insertions_count": 74832,
           "message": "chore(website): Add new guides section (#2132)",
           "pr_number": 2132,
@@ -33888,20 +33874,6 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/binarylogic",
-          "date": "2020-03-31",
-          "description": "High quality guides and education for Vector",
-          "hide_on_release_notes": false,
-          "id": "2020-03-31-guides-section",
-          "path": "website/highlights/2020-03-31-guides-section.md",
-          "permalink": "/highlights/2020-03-31-guides-section/",
-          "tags": [
-            "type: new feature",
-            "domain: website"
-          ],
-          "title": "A New Guides Section"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
           "date": "2020-04-01",
           "description": "More options when filtering and routing events",
           "hide_on_release_notes": true,
@@ -34941,7 +34913,7 @@ module.exports = {
     "loki": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"loki\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"http://localhost:3100\" # required\n\n  # Labels\n  labels.key = \"value\" # example\n  labels.key = \"{{ event_field }}\" # example"
+        "toml": "[sinks.out]\n  # General\n  type = \"loki\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"http://localhost:3100\" # required\n\n  # Labels\n  labels = {label = \"value\"} # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Loki is a horizontally-scalable, highly-available, multi-tenant log aggregation system inspired by Prometheus. It is designed to be very cost effective and easy to operate. It does not index the contents of the logs, but rather a set of labels for each log stream.",
@@ -35422,6 +35394,44 @@ module.exports = {
       "status": "prod-ready",
       "through_description": "one or more local files",
       "title": "File",
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "generator": {
+      "beta": false,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"generator\" # required\n  lines = [\"Line 1\", \"Line 2\"] # required"
+      },
+      "delivery_guarantee": "at_least_once",
+      "description": null,
+      "event_types": [
+        "log"
+      ],
+      "features": [
+        "Generate fixed log data for testing."
+      ],
+      "function_category": "test",
+      "id": "generator_source",
+      "logo_path": null,
+      "name": "generator",
+      "noun": "Generator",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "output_types": [
+        "log"
+      ],
+      "service_providers": [
+
+      ],
+      "short_description": "Ingests data through an internal data generator and outputs log events.",
+      "status": "prod-ready",
+      "through_description": "an internal data generator",
+      "title": "Generator",
       "type": "source",
       "unsupported_operating_systems": [
 

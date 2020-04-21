@@ -75,6 +75,7 @@ scopes:
   # sources
   - docker source
   - file source
+  - generator source
   - http source
   - journald source
   - kafka source
