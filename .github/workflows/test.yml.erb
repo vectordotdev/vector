@@ -54,7 +54,7 @@ jobs:
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
       - uses: actions/checkout@v1
       # Build
-      - run: cargo test --no-run --target $TARGET --no-default--features
+      - run: cargo test --no-run --target $TARGET --no-default-features
       # Upload artifacts
       - name: Save vector
         uses: actions/upload-artifact@v1
@@ -104,7 +104,7 @@ jobs:
             lto = false # Don't LTO on CI
           EOF
       # Build
-      - run: cargo test --no-run --target $TARGET --no-default--features --features <%= archetype %>-<%= component.name %> vector::<%= archetype %>::<%= component.name %>
+      - run: cargo test --no-run --target $TARGET --no-default-features --features <%= archetype %>-<%= component.name %> vector::<%= archetype %>::<%= component.name %>
 
   <%- end -%>
   <%- end -%>
