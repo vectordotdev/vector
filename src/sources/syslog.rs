@@ -5,6 +5,7 @@ use crate::{
     event::{self, Event, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
+    stream::StreamExt,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
@@ -93,12 +94,13 @@ impl SourceConfig for SyslogConfig {
                 let tls = MaybeTlsSettings::from_config(&tls, true)?;
                 source.run(address, shutdown_secs, tls, shutdown, out)
             }
-            Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
+            Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, shutdown, out)),
             #[cfg(unix)]
             Mode::Unix { path } => Ok(build_unix_source(
                 path,
                 self.max_length,
                 host_key,
+                shutdown,
                 out,
                 event_from_str,
             )),
@@ -143,6 +145,7 @@ pub fn udp(
     addr: SocketAddr,
     _max_length: usize,
     host_key: String,
+    shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
 ) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
@@ -163,6 +166,7 @@ pub fn udp(
             let host_key = host_key.clone();
 
             let lines_in = UdpFramed::new(socket, BytesCodec::new())
+                .take_until(shutdown)
                 .filter_map(move |(bytes, received_from)| {
                     let host_key = host_key.clone();
                     let received_from = received_from.to_string().into();

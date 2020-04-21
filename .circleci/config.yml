@@ -38,7 +38,7 @@ restore-artifacts-from-workspace: &restore-artifacts-from-workspace
 test-install-script: &test-install-script
   run:
     name: Verify installation
-    command: vector --version
+    command: source ~/.profile && vector --version
 
 #
 # Main document
@@ -90,7 +90,7 @@ jobs:
       - run:
           name: Build and test
           shell: bash
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           environment:
             RUSTFLAGS: -Ctarget-feature=+crt-static
             RUST_BACKTRACE: full
@@ -155,7 +155,7 @@ jobs:
       - *install-rust
       - run:
           name: Build archive
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
             make build-archive
@@ -208,7 +208,7 @@ jobs:
       - run:
           name: Build archive
           shell: bash
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           command: |
             export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
             export RUSTFLAGS=-Ctarget-feature=+crt-static
@@ -223,7 +223,7 @@ jobs:
       - run:
           name: Build MSI package
           shell: bash
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           command: |
             export PATH="/c/wix:$PATH"
             ./scripts/package-msi.sh
@@ -239,7 +239,7 @@ jobs:
       - checkout
       - run:
           name: Build archive and .deb package
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           environment:
             PASS_FEATURES: "default-musl"
           command: |
@@ -256,7 +256,7 @@ jobs:
       - checkout
       - run:
           name: Build archive and .deb package
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           environment:
             PASS_FEATURES: "default-musl"
             DOCKER_PRIVILEGED: "true"
@@ -274,7 +274,7 @@ jobs:
       - checkout
       - run:
           name: Build archive and .deb package
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           environment:
             PASS_FEATURES: "default-musl"
             DOCKER_PRIVILEGED: "true"
@@ -467,7 +467,7 @@ jobs:
             ./scripts/upgrade-docker.sh
             export VERSION=$(make version)
             make build-docker
-          no_output_timeout: 30m
+          no_output_timeout: 60m
 
   verify-nixos:
     <<: *docker-machine
@@ -656,7 +656,7 @@ jobs:
             ./scripts/upgrade-docker.sh
             export VERSION=$(make version)
             make release-docker
-          no_output_timeout: 30m
+          no_output_timeout: 60m
 
   release-github:
     <<: *docker-machine
@@ -729,6 +729,29 @@ master-filters: &master-filters
 require-tests-checks-and-verifications: &require-tests-checks-and-verifications
   requires:
     # - test-stable-kubernetes
+    - build-x86_64-unknown-linux-musl-archive-and-deb-package
+    - build-aarch64-unknown-linux-musl-archive-and-deb-package
+    - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
+    - package-rpm-x86_64-unknown-linux-musl
+    - package-rpm-aarch64-unknown-linux-musl
+    - package-rpm-armv7-unknown-linux-musleabihf
+    - build-x86_64-apple-darwin-archive
+    - build-x86_64-pc-windows-msvc-archive-and-msi-package
+    - verify-deb-artifact-on-deb-8
+    - verify-deb-artifact-on-deb-9
+    - verify-deb-artifact-on-deb-10
+    - verify-deb-artifact-on-ubuntu-16-04
+    - verify-deb-artifact-on-ubuntu-18-04
+    - verify-deb-artifact-on-ubuntu-19-04
+    - verify-zip-artifact-on-wine
+    - verify-docker
+    - verify-rpm-artifact-on-amazon-linux-1
+    - verify-rpm-artifact-on-amazon-linux-2
+    - verify-rpm-artifact-on-centos-7
+    - verify-systemd-on-debian
+
+require-artifacts: &require-artifacts
+  requires:
     - build-x86_64-unknown-linux-musl-archive-and-deb-package
     - build-aarch64-unknown-linux-musl-archive-and-deb-package
     - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
@@ -917,13 +940,13 @@ workflows:
 
       - release-docker:
           <<: *release-filters
-          <<: *require-tests-checks-and-verifications
+          <<: *require-artifacts
       - release-github:
           <<: *release-filters
-          <<: *require-tests-checks-and-verifications
+          <<: *require-artifacts
       - release-s3:
           <<: *release-filters
-          <<: *require-tests-checks-and-verifications
+          <<: *require-artifacts
 
       # Must come after S3 since Homebrew installs from S3
       - release-homebrew:

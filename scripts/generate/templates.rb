@@ -275,7 +275,7 @@ class Templates
     render("#{partials_path}/_full_config_spec.toml", binding).strip.gsub(/ *$/, '')
   end
 
-  def highlights(highlights, author: true, group_by: "type", heading_depth: 3, size: nil, style: nil, tags: true, timeline: true)
+  def highlights(highlights, author: true, colorize: false, group_by: "type", heading_depth: 3, size: nil, tags: true, timeline: true)
     case group_by
     when "type"
       highlights.sort_by!(&:type)
@@ -294,7 +294,6 @@ class Templates
           permalink: highlight.permalink,
           prNumbers: highlight.pr_numbers,
           release: highlight.release,
-          style: highlight.breaking_change? ? "danger" : nil,
           tags: highlight.tags,
           title: highlight.title,
           type: highlight.type
@@ -558,6 +557,10 @@ class Templates
     end
 
     parts.join(", ")
+  end
+
+  def release_whats_next(release, heading_depth: 3)
+    render("#{partials_path}/_release_whats_next.md", binding).strip
   end
 
   def render(template_path, template_binding = nil)

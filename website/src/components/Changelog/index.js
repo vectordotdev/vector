@@ -18,20 +18,62 @@ const AnchoredH3 = Heading('h3');
 const AnchoredH4 = Heading('h4');
 const DEFAULT_TYPES = ['enhancement', 'feat', 'fix', 'perf'];
 
+function ScopeTags({scopes}) {
+  return scopes.map((scope, idx) => (
+    <span
+      key={idx}
+      className="badge badge--primary badge--small link"
+      onClick={() => setSearchTerm(scope.name)}
+      style={{marginRight: "4px"}}
+      title={`Filter to '${scope.name}' changes only`}>
+      {scope.name}
+    </span>
+  ));
+}
+
 function Commit({commit, setSearchTerm}) {
   return (
     <li>
       <div className="badges">
-        {commit.breaking_change && <span className="badge badge--danger"><i className="feather icon-alert-triangle"></i> breaking</span>}
-        {commit.pr_number && (<span className="badge badge--secondary" style={{minWidth: "65px", textAlign: "center"}}>
-          <a href={`https://github.com/timberio/vector/pull/${commit.pr_number}`} target="_blank"><i className="feather icon-git-pull-request"></i> {commit.pr_number}</a>
-        </span>)}
-        {!commit.pr_number && (<span className="badge badge--secondary" style={{minWidth: "65px", textAlign: "center"}}>
-          <a href={`https://github.com/timberio/vector/commit/${commit.sha}`} target="_blank"><i className="feather icon-git-commit"></i> {commit.sha.slice(0,5)}</a>
-        </span>)}
+        {commit.breaking_change && (
+          <Link
+            to={commit.highlight_permalink}
+            className="badge badge--danger"
+            title="View upgrade guide...">
+            <i className="feather icon-alert-triangle"></i> breaking
+          </Link>
+        )}
+        {!commit.breaking_change && commit.highlight_permalink && (
+          <Link
+            to={commit.highlight_permalink}
+            className="badge badge--warning"
+            title="View highlight announcement...">
+            <i className="feather icon-gift"></i> highlight
+          </Link>
+        )}
+        {commit.pr_number && (
+          <a
+            href={`https://github.com/timberio/vector/pull/${commit.pr_number}`}
+            target="_blank"
+            className="badge badge--secondary"
+            style={{minWidth: "65px", textAlign: "center"}}
+            title="View pull request...">
+            <i className="feather icon-git-pull-request"></i> {commit.pr_number}
+          </a>
+        )}
+        {!commit.pr_number && (
+          <a
+            href={`https://github.com/timberio/vector/commit/${commit.sha}`}
+            target="_blank"
+            className="badge badge--secondary"
+            style={{minWidth: "65px", textAlign: "center"}}
+            title="View commit...">
+            <i className="feather icon-git-commit"></i> {commit.sha.slice(0,5)}
+          </a>
+        )}
       </div>
       <AnchoredH4 id={commit.sha}>
-        <span className="badge badge--primary badge--small link" onClick={() => setSearchTerm(commit.scope.name)}>{commit.scope.name}</span>&nbsp;
+        <ScopeTags scopes={commit.scopes} />
         {commit.description}
       </AnchoredH4>
     </li>
@@ -40,7 +82,7 @@ function Commit({commit, setSearchTerm}) {
 
 function Commits({commits, groupBy, setSearchTerm}) {
   if (groupBy) {
-    const groupedCommits = _(commits).sortBy(commit => commit.scope.name).groupBy(groupBy).value();
+    const groupedCommits = _(commits).sortBy(commit => commit.type).groupBy(groupBy).value();
     const groupKeys = sortCommitTypes(Object.keys(groupedCommits));
 
     return(
