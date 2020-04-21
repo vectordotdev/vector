@@ -560,7 +560,7 @@ available to us without and extra work - we're reading the files anyways.
 
 #### Filtering based on Kubernetes API metadata
 
-Filtering bu Kubernetes metadata is way more advanced and flexible from the user
+Filtering by Kubernetes metadata is way more advanced and flexible from the user
 perspective.
 
 The idea of doing filtering like that is when Vector picks up a new log file to
