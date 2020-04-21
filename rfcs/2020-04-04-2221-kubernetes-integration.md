@@ -1059,6 +1059,20 @@ TODO
 - we can grab and process prometheus metrics from the pods that expose them
 - we can gather node-level logs, useful for cluster operators
 
+### Windows support
+
+We don't aim to support Windows Kubernetes clusters initially. The reason for
+that is Windows support in general (i.e. outside of Kubernetes context) is a bit
+lacking - we don't measure performance on Windows, don't run unit tests on
+Windows, don't build Windows docker images, etc.
+This is a blocker for a proper integration with Kubernetes clusters running on
+Windows.
+
+To sum up: if it works - it works, if it doesn't - we'll take care of it later.
+
+> If you're reading this and want to use Vector with Windows - please let us
+> know.
+
 ## Prior Art
 
 1. [Filebeat k8s integration]
