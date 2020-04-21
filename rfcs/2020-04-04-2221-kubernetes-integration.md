@@ -585,19 +585,20 @@ to run containers will produce a [`Pod`][k8s_api_pod] object, and live
 [`Container`s][k8s_api_container] can only exist inside of the
 [`Pod`][k8s_api_pod].
 
-There in a number of approaches to get the required `Pod` objects:
+There in a number of approaches to get the required [`Pod`][k8s_api_pod]
+objects:
 
 1. Per-file requests.
 
    The file paths provide enough data for us to make a query to the k8s API. In
-   fact, we only need a `pod namespace` and a `pod uuid` to successfully obtain
-   the `Pod` object.
+   fact, we only need a `pod namespace` and a `pod uuid` to successfully
+   [obtain][k8s_api_pod_read] the [`Pod`][k8s_api_pod] object.
 
 2. Per-node requests.
 
-   This approach is to list all the pods that are running at the same node as
-   Vector runs. This effectively lists all the `Pod` objects we could possibly
-   care about.
+   This approach is to [list][k8s_api_pod_list_all_namespaces] all the pods that
+   are running at the same node as Vector runs. This effectively lists all the
+   [`Pod`][k8s_api_pod] objects we could possibly care about.
 
 One important thing to note is metadata for the given pod can change over time,
 and the implementation has to take that into account, and update the filtering
@@ -606,8 +607,8 @@ state accordingly.
 We also can't overload the k8s API with requests. The general rule of thumb is
 we shouldn't do requests much more often that k8s itself generates events.
 
-Each approach has very different properties. It is hard to estimate which ones
-are a better fit.
+Each approach has very different properties. It is hard to estimate which set is
+is a better fit.
 
 A single watch call for a list of pods running per node (2) should generate
 less overhead and would probably be easier to implement.
@@ -1347,6 +1348,8 @@ See [motivation](#motivation).
 [k8s_api_deployment]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#deployment-v1-apps
 [k8s_api_event]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#event-v1-core
 [k8s_api_host_path_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#hostpathvolumesource-v1-core
+[k8s_api_pod_list_all_namespaces]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#list-all-namespaces-pod-v1-core
+[k8s_api_pod_read]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#read-pod-v1-core
 [k8s_api_pod_spec]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podspec-v1-core
 [k8s_api_pod]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#pod-v1-core
 [k8s_api_resource_requirements]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#resourcerequirements-v1-core
