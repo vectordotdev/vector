@@ -63,50 +63,50 @@ jobs:
           path: ./target/x86_64-unknown-linux-gnu/debug/vector
 
   <%- [:sources, :transforms, :sinks].each do |archetype| -%>
-    # Test vector <%= archetype %>
-    <%- metadata.send("#{archetype}_list").each do |component| %>
-    # Test vector <%= archetype %>-<%= component.name %>
-    test-<%= archetype %>-<%= component.name %>:
-      needs: test-base
-      runs_on: ubuntu-latest
-      env:
-        RUST_BACKTRACE: full
-        TEST_LOG: debug
-        AWS_ACCESS_KEY_ID: fake-aws-key
-        AWS_SECRET_ACCESS_KEY: fake-aws-key
-        TARGET: x86_64-unknown-linux-gnu
-        USE_CONTAINER: none
-      steps:
-        # Fetch
-        - name: Cache cargo registry
-          uses: actions/cache@v1
-          with:
-            path: ~/.cargo/registry
-            key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-        - name: Cache cargo index
-          uses: actions/cache@v1
-          with:
-            path: ~/.cargo/git
-            key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-        - uses: actions/checkout@v1
-        - run: |
-            mkdir -p .cargo/
-            cat <<-EOF >> ./.cargo/config
-              # focus on fast, lean builds
-              [build]
-              incremental = false
-              EOF
-              cat <<-EOF >> ./Cargo.toml
-              # focus on fast, lean builds
-              [profile.dev]
-              debug = false
-              opt-level = "s" # Binary size
-              lto = false # Don't LTO on CI
+  # Test vector <%= archetype %>
+  <%- metadata.send("#{archetype}_list").each do |component| %>
+  # Test vector <%= archetype %>-<%= component.name %>
+  test-<%= archetype %>-<%= component.name %>:
+    needs: test-base
+    runs_on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+    steps:
+      # Fetch
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/checkout@v1
+      - run: |
+          mkdir -p .cargo/
+          cat <<-EOF >> ./.cargo/config
+            # focus on fast, lean builds
+            [build]
+            incremental = false
             EOF
-        # Build
-        - run: cargo test --no-run --target $TARGET --no-default--features --features <%= archetype %>-<%= component.name %> vector::<%= archetype %>::<%= component.name %>
+            cat <<-EOF >> ./Cargo.toml
+            # focus on fast, lean builds
+            [profile.dev]
+            debug = false
+            opt-level = "s" # Binary size
+            lto = false # Don't LTO on CI
+          EOF
+      # Build
+      - run: cargo test --no-run --target $TARGET --no-default--features --features <%= archetype %>-<%= component.name %> vector::<%= archetype %>::<%= component.name %>
 
-    <%- end -%>
+  <%- end -%>
   <%- end -%>
 
   <%- {
