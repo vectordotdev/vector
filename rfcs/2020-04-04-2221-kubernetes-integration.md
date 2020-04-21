@@ -1156,6 +1156,10 @@ To sum up: if it works - it works, if it doesn't - we'll take care of it later.
 > If you're reading this and want to use Vector with Windows - please let us
 > know.
 
+### Security
+
+TODO
+
 ## Prior Art
 
 1. [Filebeat k8s integration]
