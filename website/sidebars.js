@@ -103,6 +103,8 @@ module.exports = {
             
               "reference/sources/file",
             
+              "reference/sources/generator",
+            
               "reference/sources/http",
             
               "reference/sources/journald",

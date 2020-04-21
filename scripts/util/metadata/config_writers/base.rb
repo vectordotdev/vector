@@ -54,7 +54,7 @@ module ConfigWriters
       def kv(key, value, path: [], tags: [])
         quoted_key = key.include?(" ") ? key.to_toml : key
         full_key = (path + [quoted_key]).join(PATH_DELIMITER)
-        line = "#{full_key} = #{value.to_toml}"
+        line = "#{full_key} = #{value.to_toml(hash_style: :inline)}"
 
         if !line.include?("\n") && tags.any?
           line << " # #{tags.join(", ")}"

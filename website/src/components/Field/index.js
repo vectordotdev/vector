@@ -105,6 +105,22 @@ function Examples({name, path, values}) {
 }
 
 //
+// Groups
+//
+
+function Groups({values}) {
+  let elements = [];
+
+  for (var index in values) {
+    let value = values[index];
+    elements.push(<code key={value}>{value}</code>);
+    elements.push(" ");
+  }
+
+  return elements;
+}
+
+//
 // Values
 //
 
@@ -160,17 +176,13 @@ function FieldFooter({defaultValue, enumValues, examples, groups, name, path, re
             <i className="feather icon-alert-triangle"></i> WARNING: {warning.text}
           </li>
         ))}
-        {relevantWhen ?
-          <li>Only {required ? 'required' : 'relevant'} when: <RelevantWhen value={relevantWhen} /></li> :
-          null}
+        {relevantWhen && <li>Only {required ? 'required' : 'relevant'} when: <RelevantWhen value={relevantWhen} /></li>}
         {defaultValue !== undefined ?
           (defaultValue !== null ?
             <li>Default: <Value unit={unit} value={defaultValue} /></li> :
             <li>No default</li>) :
           null}
-        {enumValues ?
-          <li>Enum, must be one of: <Enum values={enumValues} /></li> :
-          null}
+        {enumValues && enumValues.length > 0 && <li>Enum, must be one of: <Enum values={enumValues} /></li>}
         <li>
           <div className="show-more" onClick={() => setShowExamples(!showExamples)}>
             {showExamples ? "Hide examples" : "View examples"}
@@ -196,7 +208,6 @@ function Field({children, common, defaultValue, enumValues, examples, groups, na
   return (
     <li className={classnames({'field-required': required, 'field-collapsed': collapse})} required={required}>
       <div className="badges">
-        {groups && groups.map((group, idx) => <span key={idx} className="badge badge--secondary">{group}</span>)}
         {templateable && <span className="badge badge--primary with-info-icon" title="This option is dynamic and accepts the Vector template syntax">templateable</span>}
         {type && <span className="badge badge--secondary">{type}{unit && <> ({unit})</>}</span>}
         {enumValues && Object.keys(enumValues).length > 0 && <span className="badge badge--secondary with-info-icon" title="This option is an enumation and only allows specific values">enum</span>}

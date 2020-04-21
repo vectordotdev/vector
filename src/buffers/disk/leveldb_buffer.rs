@@ -1,5 +1,3 @@
-#![cfg(feature = "leveldb")]
-
 use crate::event::{proto, Event};
 use futures01::{
     task::{self, AtomicTask, Task},
@@ -14,37 +12,23 @@ use leveldb::database::{
     Database,
 };
 use prost::Message;
-use snafu::{ResultExt, Snafu};
-use std::collections::VecDeque;
-use std::convert::TryInto;
-use std::io;
-use std::mem::size_of;
-use std::path::{Path, PathBuf};
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
+use snafu::ResultExt;
+use std::{
+    collections::VecDeque,
+    convert::TryInto,
+    mem::size_of,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
 };
 
-#[derive(Debug, Snafu)]
-pub enum Error {
-    #[snafu(display("The configured data_dir {:?} does not exist, please create it and make sure the vector process can write to it", data_dir))]
-    DataDirNotFound { data_dir: PathBuf },
-    #[snafu(display("The configured data_dir {:?} is not writable by the vector process, please ensure vector can write to that directory", data_dir))]
-    DataDirNotWritable { data_dir: PathBuf },
-    #[snafu(display("Unable to look up data_dir {:?}", data_dir))]
-    DataDirMetadataError {
-        data_dir: PathBuf,
-        source: std::io::Error,
-    },
-    #[snafu(display("Unable to open data_dir {:?}", data_dir))]
-    DataDirOpenError {
-        data_dir: PathBuf,
-        source: leveldb::database::error::Error,
-    },
-}
+use super::{DataDirOpenError, Error};
+use crate::buffers::Acker;
 
 #[derive(Copy, Clone, Debug)]
-struct Key(usize);
+struct Key(pub usize);
 
 impl db_key::Key for Key {
     fn from_u8(key: &[u8]) -> Self {
@@ -258,84 +242,63 @@ impl Reader {
     }
 }
 
-pub fn open(
-    data_dir: &Path,
-    buffer_dir: &Path,
-    max_size: usize,
-) -> Result<(Writer, Reader, super::Acker), Error> {
-    let path = data_dir.join(buffer_dir);
+pub struct Buffer;
 
-    // Check data dir
-    std::fs::metadata(&data_dir)
-        .map_err(|e| match e.kind() {
-            io::ErrorKind::PermissionDenied => Error::DataDirNotWritable {
-                data_dir: data_dir.into(),
-            },
-            io::ErrorKind::NotFound => Error::DataDirNotFound {
-                data_dir: data_dir.into(),
-            },
-            _ => Error::DataDirMetadataError {
-                data_dir: data_dir.into(),
-                source: e,
-            },
-        })
-        .and_then(|m| {
-            if m.permissions().readonly() {
-                Err(Error::DataDirNotWritable {
-                    data_dir: data_dir.into(),
-                })
-            } else {
-                Ok(())
-            }
-        })?;
+impl super::DiskBuffer for Buffer {
+    type Writer = Writer;
+    type Reader = Reader;
 
-    let mut options = Options::new();
-    options.create_if_missing = true;
+    fn build(path: PathBuf, max_size: usize) -> Result<(Self::Writer, Self::Reader, Acker), Error> {
+        let mut options = Options::new();
+        options.create_if_missing = true;
 
-    let db: Database<Key> = Database::open(&path, options).with_context(|| DataDirOpenError {
-        data_dir: data_dir.to_path_buf(),
-    })?;
-    let db = Arc::new(db);
+        let db: Database<Key> =
+            Database::open(&path, options).with_context(|| DataDirOpenError {
+                data_dir: path.parent().expect("always a parent"),
+            })?;
+        let db = Arc::new(db);
 
-    let head;
-    let tail;
-    {
-        let mut iter = db.keys_iter(ReadOptions::new());
-        head = iter.next().map(|k| k.0).unwrap_or(0);
-        iter.seek_to_last();
-        tail = if iter.valid() { iter.key().0 + 1 } else { 0 };
+        let head;
+        let tail;
+        {
+            let mut iter = db.keys_iter(ReadOptions::new());
+            head = iter.next().map(|k| k.0).unwrap_or(0);
+            iter.seek_to_last();
+            tail = if iter.valid() { iter.key().0 + 1 } else { 0 };
+        }
+
+        let initial_size = db.value_iter(ReadOptions::new()).map(|v| v.len()).sum();
+        let current_size = Arc::new(AtomicUsize::new(initial_size));
+
+        let write_notifier = Arc::new(AtomicTask::new());
+
+        let blocked_write_tasks = Arc::new(Mutex::new(Vec::new()));
+
+        let ack_counter = Arc::new(AtomicUsize::new(0));
+        let acker = Acker::Disk(Arc::clone(&ack_counter), Arc::clone(&write_notifier));
+
+        let writer = Writer {
+            db: Arc::clone(&db),
+            write_notifier: Arc::clone(&write_notifier),
+            blocked_write_tasks: Arc::clone(&blocked_write_tasks),
+            offset: Arc::new(AtomicUsize::new(tail)),
+            writebatch: Writebatch::new(),
+            batch_size: 0,
+            max_size,
+            current_size: Arc::clone(&current_size),
+        };
+
+        let reader = Reader {
+            db: Arc::clone(&db),
+            write_notifier: Arc::clone(&write_notifier),
+            blocked_write_tasks,
+            read_offset: head,
+            delete_offset: head,
+            current_size,
+            ack_counter,
+            unacked_sizes: VecDeque::new(),
+        };
+
+        Ok((writer, reader, acker))
     }
-
-    let initial_size = db.value_iter(ReadOptions::new()).map(|v| v.len()).sum();
-    let current_size = Arc::new(AtomicUsize::new(initial_size));
-
-    let write_notifier = Arc::new(AtomicTask::new());
-
-    let blocked_write_tasks = Arc::new(Mutex::new(Vec::new()));
-
-    let ack_counter = Arc::new(AtomicUsize::new(0));
-    let acker = super::Acker::Disk(Arc::clone(&ack_counter), Arc::clone(&write_notifier));
-
-    let writer = Writer {
-        db: Arc::clone(&db),
-        write_notifier: Arc::clone(&write_notifier),
-        blocked_write_tasks: Arc::clone(&blocked_write_tasks),
-        offset: Arc::new(AtomicUsize::new(tail)),
-        writebatch: Writebatch::new(),
-        batch_size: 0,
-        max_size,
-        current_size: Arc::clone(&current_size),
-    };
-    let reader = Reader {
-        db: Arc::clone(&db),
-        write_notifier: Arc::clone(&write_notifier),
-        blocked_write_tasks,
-        read_offset: head,
-        delete_offset: head,
-        current_size,
-        ack_counter,
-        unacked_sizes: VecDeque::new(),
-    };
-
-    Ok((writer, reader, acker))
 }

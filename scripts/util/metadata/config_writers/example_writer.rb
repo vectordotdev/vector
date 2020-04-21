@@ -21,7 +21,7 @@ module ConfigWriters
         category_fields.each do |field|
           examples = field.examples.fetch_group_values!(group)
 
-          if field.children?
+          if field.children? && field.examples.empty?
             field_table_style = (field.toml_display || :inline).to_sym
             child_table_path = field_table_style == :normal ? (full_path + [field.name]) : table_path
             child_key_path = field_table_style == :normal ? [] : (key_path + [field.name])

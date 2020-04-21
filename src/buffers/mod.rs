@@ -8,7 +8,7 @@ use std::sync::{
 };
 
 #[cfg(feature = "leveldb")]
-mod disk;
+pub mod disk;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "type")]

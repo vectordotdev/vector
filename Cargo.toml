@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.9.0"
+version = "0.10.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -179,7 +179,6 @@ walkdir = "2.2.7"
 elastic_responses = "0.20"
 matches = "0.1.8"
 pretty_assertions = "0.6.1"
-proptest = "0.9"
 tokio01-test = "0.1.1"
 tower-test03 = { package = "tower-test", version = "0.3" }
 tower-test01 = { package = "tower-test", version = "0.1" }
@@ -219,6 +218,7 @@ leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
 sources = [
   "sources-docker",
   "sources-file",
+  "sources-generator",
   "sources-http",
   "sources-internal_metrics",
   "sources-journald",
@@ -234,21 +234,22 @@ sources = [
   "sources-tls",
   "sources-vector",
 ]
-sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-docker = ["shiplift"]
 sources-file = ["bytesize"]
+sources-generator = []
+sources-http = ["warp", "sources-tls"]
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["owning_ref"]
 sources-kubernetes = ["sources-file", "transforms-json_parser", "transforms-regex_parser"]
 sources-logplex = ["warp", "sources-tls"]
 sources-prometheus = []
-sources-http = ["warp", "sources-tls"]
 sources-socket = ["bytesize", "listenfd", "tokio-uds", "sources-tls"]
 sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
 sources-statsd = []
 sources-stdin = ["bytesize"]
 sources-syslog = ["sources-socket", "syslog_loose"]
+sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-vector = ["sources-socket"]
 
 # Transforms
