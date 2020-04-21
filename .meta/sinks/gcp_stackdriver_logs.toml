@@ -3,7 +3,7 @@ title = "GCP Stackdriver Logs"
 noun = "GCP Stackdriver Logs"
 beta = true
 common = true
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 <%= render("_partials/descriptions/_gcp_stackdriver.toml") %>
 features = [
   "Send logs to GCP Stackdriver.",
@@ -52,8 +52,7 @@ write_to_description = "[Google Cloud Platform's Stackdriver Logging service][ur
 
 <%= render("_partials/fields/_gcp.toml",
   namespace: "sinks.gcp_stackdriver_logs",
-  access: "Stackdriver Logging API",
-  required: true) %>
+  access: "Stackdriver Logging API") %>
 
 [sinks.gcp_stackdriver_logs.options.project_id]
 type = "string"

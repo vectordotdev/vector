@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-14"
+last_modified_on: "2020-04-16"
 title: Install Vector via Window Installer
 sidebar_label: MSI
 description: Install Vector through the Windows Installer
@@ -67,7 +67,7 @@ The following diagram demonstrates how it works.
 1.  ### Download the Vector `.msi` file
 
     ```bat
-    powershell Invoke-WebRequest https://packages.timber.io/vector/0.8.X/vector-x64.msi -OutFile vector-x64.msi
+    powershell Invoke-WebRequest https://packages.timber.io/vector/0.9.X/vector-x64.msi -OutFile vector-x64.msi
     ```
 
     [Looking for a specific version?][docs.package_managers.msi#versions]

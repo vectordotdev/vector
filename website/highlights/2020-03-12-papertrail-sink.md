@@ -5,7 +5,7 @@ title: "New Papertrail Sink"
 description: "Sink logs to the Papertrail logging service"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1835]
-release: "nightly"
+release: "0.9.0"
 hide_on_release_notes: true
 tags: ["type: new feature", "domain: sinks", "sink: papertrail"]
 ---

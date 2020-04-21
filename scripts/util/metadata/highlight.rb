@@ -48,7 +48,7 @@ class Highlight
         we provide a good, consistent UX for upgrading users. To fix this,
         please add a "Upgrade Guide" section:
 
-            ## Update Guide
+            ## Upgrade Guide
 
             Make the following changes in your `vector.toml` file:
 

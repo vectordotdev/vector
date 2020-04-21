@@ -58,21 +58,21 @@ we'll be deploying Vector as a
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <%- guide.features.each do |feature| -%>
   <li>
     <%= feature.text %>
     <%- if feature.features.any? -%>
-    <ol>
+    <ul>
       <%- feature.features.each do |feature| -%>
       <li><%= feature.text %></li>
       <%- end -%>
-    </ol>
+    </ul>
     <%- end -%>
   </li>
   <%- end -%>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 

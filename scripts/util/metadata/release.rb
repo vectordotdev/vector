@@ -11,7 +11,8 @@ class Release
     :highlights,
     :last_version,
     :permalink,
-    :version
+    :version,
+    :whats_next
 
   def initialize(release_hash, last_version, all_highlights)
     @codename = release_hash["codename"] || ""
@@ -20,19 +21,23 @@ class Release
     @last_version = last_version
     @version = Version.new(release_hash.fetch("version"))
     @permalink = "#{RELEASES_BASE_PATH}/#{@version}/"
-
-    # commits
-
-    @commits =
-      release_hash.fetch("commits").collect do |commit_hash|
-        Commit.new(commit_hash)
-      end
+    @whats_next = (release_hash["whats_next"] || []).collect(&:to_struct)
 
     # highlights
 
     @highlights =
       all_highlights.select do |h|
         h.release == version.to_s
+      end
+
+    # commits
+
+    @commits =
+      release_hash.fetch("commits").collect do |commit_hash|
+        commit = Commit.new(commit_hash)
+        highlight = @highlights.find { |h| h.pr_numbers.include?(commit.pr_number) }
+        commit.highlight_permalink = highlight ? highlight.permalink : nil
+        commit
       end
 
     # requirements
@@ -42,17 +47,16 @@ class Release
         if !@highlights.any? { |h| h.type?("breaking change") && h.pr_numbers.include?(commit.pr_number) }
           tags = ["type: breaking change"]
 
-          if commit.component_type
-            tags << "domain: #{commit.component_type.pluralize}"
-          end
-
-          if commit.component_type && commit.component_name
-            tags << "#{commit.component_type}: #{commit.component_name}"
+          commit.scopes.each do |scope|
+            if scope.component
+              tags << "domain: #{scope.component.type.pluralize}"
+              tags << "#{scope.component.type}: #{scope.component.name}"
+            end
           end
 
           raise ArgumentError.new(
             <<~EOF
-            Release #{@version} contains breaking commits without an breaking change!
+            Release #{@version} contains breaking commits without an upgrade guide!
 
               * Commiit #{commit.sha_short} - #{commit.description}
 
@@ -67,13 +71,26 @@ class Release
             title: "#{commit.description}"
             description: "<fill-in>"
             author_github: "https://github.com/binarylogic"
-            importance: "medium"
+            hide_on_release_notes: false
             pr_numbers: [#{commit.pr_number}]
             release: "#{@version}"
             tags: #{tags.to_json}
             ---
 
-            <fill-in>
+            Explain the change and the reasoning here.
+
+            ## Upgrade Guide
+
+            Make the following changes in your `vector.toml` file:
+
+            ```diff title="vector.toml"
+             [sinks.example]
+               type = "example"
+            -  remove = "me"
+            +  add = "me"
+            ```
+
+            That's it!
 
             EOF
           )
@@ -186,6 +203,7 @@ class Release
       type: type,
       type_url: type_url,
       version: version,
+      whats_next: whats_next.deep_to_h
     }
   end
 

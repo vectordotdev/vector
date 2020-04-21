@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 
+import Alert from '@site/src/components/Alert';
 import Avatar from '@site/src/components/Avatar';
 import CodeBlock from '@theme/CodeBlock';
 import Heading from '@theme/Heading';
@@ -74,6 +75,7 @@ function GuidePage(props) {
   const {frontMatter, metadata} = GuideContents;
   const {author_github: authorGithub, id, last_modified_on: lastModifiedOn, series_position: seriesPosition, title} = frontMatter;
   const {categories, readingTime, tags} = metadata;
+  const {assumptions} = frontMatter;
 
   //
   // Site config
@@ -229,6 +231,14 @@ function GuidePage(props) {
           </section>
         </aside>
         <div className={styles.article}>
+          {assumptions && assumptions.length > 0 && <Alert type="info" icon={false} className="list--icons list--icons--info">
+            <p>Before you begin, this guide assumes the following:</p>
+            <ul>
+              {assumptions.map((assumption,idx) => (
+                <li key={idx}>{assumption}</li>
+              ))}
+            </ul>
+          </Alert>}
           <article>
             <div className="markdown">
               <a aria-hidden="true" tabIndex="-1" className="anchor" id="overview"></a>

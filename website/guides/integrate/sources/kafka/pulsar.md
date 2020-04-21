@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Kafka to Apache Pulsar"
 description: "A simple guide to send logs from Kafka to Apache Pulsar in just a few minutes."
@@ -73,23 +73,23 @@ The following diagram demonstrates how it works.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Consume one or more Kafka topics.
-    <ol>
+    <ul>
       <li>Checkpoint your position to ensure data is not lost between restarts.</li>
       <li>Enrich your logs with useful Kafka context.</li>
-    </ol>
+    </ul>
   </li>
   <li>
     Send logs to Apache Pulsar.
-    <ol>
+    <ul>
       <li>Stream data in a real-time fashion.</li>
       <li>Automatically retry failed requests, with backoff.</li>
-    </ol>
+    </ul>
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 

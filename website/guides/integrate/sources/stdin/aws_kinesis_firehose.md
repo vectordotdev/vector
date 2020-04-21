@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from STDIN to AWS Kinesis Firehose"
 description: "A simple guide to send logs from STDIN to AWS Kinesis Firehose in just a few minutes."
@@ -67,23 +67,23 @@ each service. Typically data is collected by tailing local files via Vector's
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Accept new line delimited log data through STDIN.
-    <ol>
+    <ul>
       <li>Automatically enrich logs with host-level context.</li>
-    </ol>
+    </ul>
   </li>
   <li>
     Send logs to AWS Kinesis Firehose.
-    <ol>
+    <ul>
       <li>Batch data to maximize throughput.</li>
       <li>Automatically retry failed requests, with backoff.</li>
       <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
+    </ul>
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 

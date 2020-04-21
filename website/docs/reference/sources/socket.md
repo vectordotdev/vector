@@ -35,7 +35,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 
 ## Requirements
 
-<Alert icon={false} type="danger" className="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * This component exposes a configured port. You must ensure your network allows access to this port.
 
