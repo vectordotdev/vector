@@ -178,7 +178,6 @@ walkdir = "2.2.7"
 elastic_responses = "0.20"
 matches = "0.1.8"
 pretty_assertions = "0.6.1"
-proptest = "0.9"
 tokio01-test = "0.1.1"
 tower-test = "0.1"
 kube = { version = "0.16.1", features = ["openapi"] }
