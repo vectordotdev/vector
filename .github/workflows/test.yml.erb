@@ -95,13 +95,13 @@ jobs:
             # focus on fast, lean builds
             [build]
             incremental = false
-            EOF
-            cat <<-EOF >> ./Cargo.toml
-            # focus on fast, lean builds
-            [profile.dev]
-            debug = false
-            opt-level = "s" # Binary size
-            lto = false # Don't LTO on CI
+          EOF
+          cat <<-EOF >> ./Cargo.toml
+          # focus on fast, lean builds
+          [profile.dev]
+          debug = false
+          opt-level = "s" # Binary size
+          lto = false # Don't LTO on CI
           EOF
       # Build
       - run: cargo test --no-run --target $TARGET --no-default-features --features <%= archetype %>-<%= component.name %> vector::<%= archetype %>::<%= component.name %>
