@@ -1045,14 +1045,6 @@ and assertions - then we use just the second half with Vector deployed via YAMLs
 and/or Helm Charts. For now, we should probably leave them as is, maintain them,
 but hold the adoption as integration tests.
 
-TODO
-
-- integration tests are cluster-agnostic
-- at CI we test against `minikube` and against all versions from MSKV till the latest k8s
-- at test harness we run non-ephemeral "real" clusters and test against them (i.e. GCP GKE, AWS EKS, Azure K8s, DO K8s, RedHat OpenShift, Rancher, CoreOS Tekton, etc)
-- we integrate our unit tests into test harness in such a way that we can run them as correctness tests
-- we want to test our deployment configurations - Helm charts, YAML files and etc, in addition to unit tests
-
 ### Other data gathering
 
 > This section is on gathering data other than container logs.
