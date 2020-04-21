@@ -1,0 +1,188 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/ci.yml"
+      - "lib/*s"
+      - "proto/**"
+      - "src/**"
+      - "tests/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docker-compose.yml"
+      - "rust-toolchain"
+
+  pull_request:
+    paths:
+      - ".github/workflows/ci.yml"
+      - "lib/*s"
+      - "proto/**"
+      - "src/**"
+      - "tests/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docker-compose.yml"
+      - "rust-toolchain"
+
+jobs:
+  # Test Vector without any features.
+  test-base:
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+    steps:
+      # Fetch
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/checkout@v1
+      # Build
+      - run: cargo test --no-run --target $TARGET --no-default--features
+      # Upload artifacts
+      - name: Save vector
+        uses: actions/upload-artifact@v1
+        with:
+          name: binary
+          path: ./target/x86_64-unknown-linux-gnu/debug/vector
+
+  <%- [:sources, :transforms, :sinks].each do |archetype| -%>
+    # Test vector <%= archetype %>
+    <%- metadata.send("#{archetype}_list").each do |component| %>
+    # Test vector <%= archetype %>-<%= component.name %>
+    test-<%= archetype %>-<%= component.name %>:
+      needs: test-base
+      runs_on: ubuntu-latest
+      env:
+        RUST_BACKTRACE: full
+        TEST_LOG: debug
+        AWS_ACCESS_KEY_ID: fake-aws-key
+        AWS_SECRET_ACCESS_KEY: fake-aws-key
+        TARGET: x86_64-unknown-linux-gnu
+        USE_CONTAINER: none
+      steps:
+        # Fetch
+        - name: Cache cargo registry
+          uses: actions/cache@v1
+          with:
+            path: ~/.cargo/registry
+            key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        - name: Cache cargo index
+          uses: actions/cache@v1
+          with:
+            path: ~/.cargo/git
+            key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+        - uses: actions/checkout@v1
+        - run: |
+            mkdir -p .cargo/
+            cat <<-EOF >> ./.cargo/config
+              # focus on fast, lean builds
+              [build]
+              incremental = false
+              EOF
+              cat <<-EOF >> ./Cargo.toml
+              # focus on fast, lean builds
+              [profile.dev]
+              debug = false
+              opt-level = "s" # Binary size
+              lto = false # Don't LTO on CI
+            EOF
+        # Build
+        - run: cargo test --no-run --target $TARGET --no-default--features --features <%= archetype %>-<%= component.name %> vector::<%= archetype %>::<%= component.name %>
+
+    <%- end -%>
+  <%- end -%>
+
+  <%- {
+  clickhouse: {
+    features: ["clickhous-integration-teste",],
+    dependencies: ["clickhouse"],
+  },
+  aws: {
+    features: ["cloudwatch-logs-integration-tests","cloudwatch-metrics-integration-tests","ec2-metadata-integration-tests","firehose-integration-tests","kinesis-integration-tests","s3-integration-tests",],
+    dependencies: ["localstack", "mockwatchlogs", "ec2_metadata", "minio",],
+  },
+  docker: {
+    features: ["docker-integration-test",],
+    dependencies: [],
+  },
+  es: {
+    features: ["es-integration-test"],
+    dependencies: ["elasticsearch", "elasticsearch-tls", "localstack",],
+  },
+  gcp: {
+    features: ["gcp-pubsub-integration-tests", "gcs-integration-tests",],
+    dependencies: ["gcloud-pubsub",],
+  },
+  kafka: {
+    features: ["kafka-integration-tests",],
+    dependencies: ["kafka",],
+  },
+  influxdb: {
+    features: ["influxdb-integration-tests",],
+    dependencies: ["influxdb_v1", "influxdb_v2",],
+  },
+  splunk: {
+    features: ["splunk-integration-tests",],
+    dependencies: ["splunk",],
+  },
+  pulsar: {
+    features: ["pulsar-integration-tests",],
+    dependencies: ["pulsar",],
+  },
+}.each do |component, opts| -%>
+  test-integration-<%= component %>:
+    runs-on: ubuntu-latest
+    needs: test-base
+    env:
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-gnu
+      USE_CONTAINER: none
+    steps:
+      # Fetch
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/checkout@v1
+      - run: |
+          mkdir -p .cargo/
+          cat <<-EOF >> ./.cargo/config
+            # focus on fast, lean builds
+            [build]
+            incremental = false
+            EOF
+            cat <<-EOF >> ./Cargo.toml
+            # focus on fast, lean builds
+            [profile.dev]
+            debug = false
+            opt-level = "s" # Binary size
+            lto = false # Don't LTO on CI
+          EOF
+      - run: docker-compose up -d <%= opts[:dependencies].join(' ') %>
+      - run: cargo test --no-default-features --features <%= opts[:features].join(',') %>
+
+  <%- end -%>
