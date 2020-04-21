@@ -2960,7 +2960,7 @@ jobs:
             lto = false # Don't LTO on CI
           EOF
       - run: docker-compose up -d clickhouse
-      - run: cargo test --no-default-features --features clickhous-integration-teste
+      - run: cargo test --no-default-features --features clickhouse-integration-tests
 
   test-integration-aws:
     runs-on: ubuntu-latest
@@ -3040,7 +3040,7 @@ jobs:
             lto = false # Don't LTO on CI
           EOF
       - run: docker-compose up -d 
-      - run: cargo test --no-default-features --features docker-integration-test
+      - run: cargo test --no-default-features --features docker-integration-tests
 
   test-integration-es:
     runs-on: ubuntu-latest
@@ -3080,7 +3080,7 @@ jobs:
             lto = false # Don't LTO on CI
           EOF
       - run: docker-compose up -d elasticsearch elasticsearch-tls localstack
-      - run: cargo test --no-default-features --features es-integration-test
+      - run: cargo test --no-default-features --features es-integration-tests
 
   test-integration-gcp:
     runs-on: ubuntu-latest

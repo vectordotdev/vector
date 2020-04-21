@@ -111,7 +111,7 @@ jobs:
 
   <%- {
   clickhouse: {
-    features: ["clickhous-integration-teste",],
+    features: ["clickhouse-integration-tests",],
     dependencies: ["clickhouse"],
   },
   aws: {
@@ -119,11 +119,11 @@ jobs:
     dependencies: ["localstack", "mockwatchlogs", "ec2_metadata", "minio",],
   },
   docker: {
-    features: ["docker-integration-test",],
+    features: ["docker-integration-tests",],
     dependencies: [],
   },
   es: {
-    features: ["es-integration-test"],
+    features: ["es-integration-tests"],
     dependencies: ["elasticsearch", "elasticsearch-tls", "localstack",],
   },
   gcp: {
