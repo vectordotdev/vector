@@ -219,29 +219,6 @@ to the [Kubernetes version and version skew support policy], only versions
 
 Considering all of the above, we assign **1.14** as the initial MSKV.
 
-### Helm vs raw YAML files
-
-We consider both raw YAML files and Helm Chart officially supported installation
-methods.
-
-With Helm, people usually use the Chart we provide, and tweak it to their needs
-via variables we expose as the chart configuration. This means we can offer a
-lot of customization, however, in the end, we're in charge of generating the
-YAML configuration that will k8s will run from our templates.
-This means that, while it is very straightforward for users, we have to keep in
-mind the compatibility concerns when we update our Helm Chart.
-We should provide a lot of flexibility in our Helm Charts, but also have sane
-defaults that would be work for the majority of users.
-
-With raw YAML files, they have to be usable out of the box, but we shouldn't
-expect users to use them as-is. People would often maintain their own "forks" of
-those, tailored to their use case. We shouldn't overcomplicate our recommended
-configuration, but we shouldn't oversimplify it either. It has to be
-production-ready. But it also has to be portable, in the sense that it should
-work without tweaking with as much cluster setups as possible.
-We should support both `kubectl create` and `kubectl apply` flows.
-`kubectl apply` is generally more limiting than `kubectl create`.
-
 ### Reading container logs
 
 #### Kubernetes logging architecture
@@ -302,6 +279,29 @@ following formats:
 - [CRI format][cri_log_format].
 
 We have to support both formats.
+
+### Helm vs raw YAML files
+
+We consider both raw YAML files and Helm Chart officially supported installation
+methods.
+
+With Helm, people usually use the Chart we provide, and tweak it to their needs
+via variables we expose as the chart configuration. This means we can offer a
+lot of customization, however, in the end, we're in charge of generating the
+YAML configuration that will k8s will run from our templates.
+This means that, while it is very straightforward for users, we have to keep in
+mind the compatibility concerns when we update our Helm Chart.
+We should provide a lot of flexibility in our Helm Charts, but also have sane
+defaults that would be work for the majority of users.
+
+With raw YAML files, they have to be usable out of the box, but we shouldn't
+expect users to use them as-is. People would often maintain their own "forks" of
+those, tailored to their use case. We shouldn't overcomplicate our recommended
+configuration, but we shouldn't oversimplify it either. It has to be
+production-ready. But it also has to be portable, in the sense that it should
+work without tweaking with as much cluster setups as possible.
+We should support both `kubectl create` and `kubectl apply` flows.
+`kubectl apply` is generally more limiting than `kubectl create`.
 
 ### Helm Chart Repository
 
