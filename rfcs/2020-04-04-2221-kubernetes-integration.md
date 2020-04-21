@@ -1053,11 +1053,94 @@ but hold the adoption as integration tests.
 
 > This section is on gathering data other than container logs.
 
-TODO
+While our main focus for the integration is collecting log data from the `Pod`s,
+there are other possibilities to gain observaravibility in the Kubernetes
+environment.
 
-- we can expose watch events that we get from the k8s API as Vector events
-- we can grab and process prometheus metrics from the pods that expose them
-- we can gather node-level logs, useful for cluster operators
+#### Exposing Kubernetes [`Event`s][k8s_api_event] as Vector events
+
+It is possible to subscribe to Kubernetes [`Event`s][k8s_api_event], similarly
+to how this command works:
+
+```shell
+kubectl get events --all-namespaces --watch
+```
+
+Implementing this in Vector would allow capturing the Kubernetes
+[`Event`s][k8s_api_event] and processing them as Vector events.
+
+This feature might be very useful for anyone that wants to see what's going on
+in their cluster.
+
+Note that this feature would require deploying Vector in a differently: instead
+of running Vector on every node, here we need only once Vector instance running
+per cluster. If run on every node, it'd be unnecessarily capturing each event
+multiple times.
+
+So, to implement this, we'd need to add a special source that captures events
+from Kubernetes API, and provide a new workload configuration based on
+[`Deployment`][k8s_api_deployment].
+
+### Discover and gather Prometheus metrics for Kubernetes API resources
+
+Prometheus already has a built-in
+[Kubernetes Service Discovery][prometheus_kubernetes_sd_config] support, so one
+could just deploy a Prometheus server, make it discover and gather the metrics,
+and the configure Vector to read metrics from it.
+
+However, to pursue our goal of making Vector the only agent one would need to
+deploy - we can consider reimplementing what prometheus
+[does][prometheus_kubernetes_sd_config] in Vector code, eliminate the need for
+the intermediary.
+
+We don't aim to implement this in the initial Kubernetes integration.
+
+### Gather data from the host OS
+
+This is very useful for Kubernetes Cluster Operators willing to deploy Vector
+for the purposes of gaining observability on what's going on with their cluster
+nodes.
+
+Example use cases are:
+
+- reading `kubelet`/`docker` logs from `journald`;
+- capturing `kubelet`/`docker` prometheus metrics;
+- gathering system metrics from the node, things like `iostat -x`, `df -h`,
+  `uptime`, `free`, etc;
+- gathering system logs, like `sshd`, `dmesg` and etc.
+
+There are countless use cases here, and good news Vector already well fit to
+perform those kinds of tasks! Even without any Kubernetes integration
+whatsoever, it's possible to just deploy Vector as a
+[`DaemonSet`][k8s_api_daemon_set], expose the system data to it via
+[`hostPath` volume][k8s_api_host_path_volume_source] mounts and/or enabling
+`hostNetwork` at the [`PodSpec`][k8s_api_pod_spec].
+
+#### Automatic discovery of things to monitor on the host OS
+
+While nothing prevents users from manually configuring Vector for gathering data
+from the host OS, it's very hard for us to offer sane defaults that would work
+out-of-the box for all clusters, since there's a miriad of configurations.
+
+We can consider offering some kind of user-selectable presets for well known
+popular setups - like AWS and CGP.
+
+We can also solve this a general problem of automatic discovery of what we can
+monitor on a given system - something similar to what [`netdata`][netdata] has.
+
+In the context of the current integration efforts, it doesn't make a lot of
+sense to try to address this issue in Vector code or deployment configs:
+
+- gathering data from the host OS works with manual configuration;
+- cluster operators mostly know what they're doing, and are capable to configure
+  Vector as they require;
+- there's a myriad of configurations we'd have to support, and it'd be very hard
+  (if even possible) to come up with sane defaults.
+- related to the point above, even with sane defaults, in 95% on cases, cluster
+  operators would want to tailor the configuration for their use case.
+
+What we can do, though, is provide guides, blog posts and explainers with
+concrete examples for Vector usage for Kubernetes Cluster Operators.
 
 ### Windows support
 
@@ -1248,8 +1331,12 @@ See [motivation](#motivation).
 [jsonlines]: http://jsonlines.org/
 [k8s_api_config_map_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#configmapvolumesource-v1-core
 [k8s_api_container]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#container-v1-core
+[k8s_api_daemon_set]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#daemonset-v1-apps
 [k8s_api_daemon_set_update_strategy]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#daemonsetupdatestrategy-v1-apps
+[k8s_api_deployment]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#deployment-v1-apps
+[k8s_api_event]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#event-v1-core
 [k8s_api_host_path_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#hostpathvolumesource-v1-core
+[k8s_api_pod_spec]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podspec-v1-core
 [k8s_api_resource_requirements]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#resourcerequirements-v1-core
 [k8s_docs_crds]: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/
 [k8s_docs_operator]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
@@ -1267,8 +1354,10 @@ See [motivation](#motivation).
 [logdna k8s integration]: https://docs.logdna.com/docs/kubernetes
 [logdna_daemonset]: https://raw.githubusercontent.com/logdna/logdna-agent/master/logdna-agent-ds.yaml
 [metrics-server]: https://github.com/kubernetes-sigs/metrics-server
+[netdata]: https://github.com/netdata/netdata
 [pr#2134]: https://github.com/timberio/vector/pull/2134
 [pr#2188]: https://github.com/timberio/vector/pull/2188
+[prometheus_kubernetes_sd_config]: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#kubernetes_sd_config
 [sidecar_container]: https://github.com/kubernetes/enhancements/blob/a8262db2ce38b2ec7941bdb6810a8d81c5141447/keps/sig-apps/sidecarcontainers.md
 [terraform]: https://www.terraform.io/
 [the chart repository guide]: https://helm.sh/docs/topics/chart_repository/
