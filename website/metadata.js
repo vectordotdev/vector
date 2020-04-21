@@ -35427,6 +35427,44 @@ module.exports = {
 
       ]
     },
+    "generator": {
+      "beta": false,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"generator\" # required\n  lines = [\"Line 1\", \"Line 2\"] # required"
+      },
+      "delivery_guarantee": "at_least_once",
+      "description": null,
+      "event_types": [
+        "log"
+      ],
+      "features": [
+        "Generate fixed log data for testing."
+      ],
+      "function_category": "test",
+      "id": "generator_source",
+      "logo_path": null,
+      "name": "generator",
+      "noun": "Generator",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "output_types": [
+        "log"
+      ],
+      "service_providers": [
+
+      ],
+      "short_description": "Ingests data through an internal data generator and outputs log events.",
+      "status": "prod-ready",
+      "through_description": "an internal data generator",
+      "title": "Generator",
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "http": {
       "beta": true,
       "config_examples": {

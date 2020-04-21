@@ -253,6 +253,9 @@
 - name: "source: file"
   description: Anything `file` source realted
   color: ff9ff3
+- name: "source: generator"
+  description: Anything `generator` source realted
+  color: ff9ff3
 - name: "source: http"
   description: Anything `http` source realted
   color: ff9ff3

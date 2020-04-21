@@ -215,6 +215,7 @@ leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
 sources = [
   "sources-docker",
   "sources-file",
+  "sources-generator",
   "sources-http",
   "sources-internal_metrics",
   "sources-journald",
@@ -230,21 +231,22 @@ sources = [
   "sources-tls",
   "sources-vector",
 ]
-sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-docker = ["shiplift"]
 sources-file = ["bytesize"]
+sources-generator = []
+sources-http = ["warp", "sources-tls"]
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["owning_ref"]
 sources-kubernetes = ["sources-file", "transforms-json_parser", "transforms-regex_parser"]
 sources-logplex = ["warp", "sources-tls"]
 sources-prometheus = []
-sources-http = ["warp", "sources-tls"]
 sources-socket = ["bytesize", "listenfd", "tokio-uds", "sources-tls"]
 sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
 sources-statsd = []
 sources-stdin = ["bytesize"]
 sources-syslog = ["sources-socket", "syslog_loose"]
+sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-vector = ["sources-socket"]
 
 # Transforms

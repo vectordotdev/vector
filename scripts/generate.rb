@@ -236,7 +236,11 @@ end
 #
 
 metadata.sources_list.
-  select { |s| !s.for_platform? && !BLACKLISTED_SOURCES.include?(s.name) }.
+  select do |source|
+    !source.for_platform? &&
+      !source.function_category?("test") &&
+      !BLACKLISTED_SOURCES.include?(source.name)
+  end.
   each do |source|
     template_path = "#{GUIDES_ROOT}/integrate/sources/#{source.name}.md.erb"
 

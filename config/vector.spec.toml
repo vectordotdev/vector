@@ -351,6 +351,45 @@ dns_servers = ["0.0.0.0:53"]
   oldest_first = false
   oldest_first = true
 
+# Ingests data through an internal data generator and outputs `log` events.
+[sources.generator]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "generator"
+  type = "generator"
+
+  # The amount of time, in seconds, to pause between each batch of output lines.
+  # If not set, there will be no delay.
+  #
+  # * optional
+  # * no default
+  # * type: float
+  batch_interval = 1.0
+
+  # The number of times to repeat outputting the `lines`.
+  #
+  # * optional
+  # * default: "infinite"
+  # * type: int
+  count = "infinite"
+
+  # The list of lines to output.
+  #
+  # * required
+  # * type: ["int"]
+  lines = ["Line 1", "Line 2"]
+
+  # If `true`, each output line will start with an increasing sequence number.
+  #
+  # * optional
+  # * default: false
+  # * type: bool
+  sequence = false
+  sequence = true
+
 # Ingests data through the HTTP protocol and outputs `log` events.
 [sources.http]
   #
