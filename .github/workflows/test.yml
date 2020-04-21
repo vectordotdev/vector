@@ -3283,7 +3283,75 @@ jobs:
 
   test-integration-clickhouse:
     runs-on: ubuntu-latest
-    needs: test-base
+    needs:
+      - test-sources-docker
+      - test-sources-file
+      - test-sources-http
+      - test-sources-journald
+      - test-sources-kafka
+      - test-sources-logplex
+      - test-sources-prometheus
+      - test-sources-socket
+      - test-sources-splunk_hec
+      - test-sources-statsd
+      - test-sources-stdin
+      - test-sources-syslog
+      - test-sources-vector
+      - test-transforms-add_fields
+      - test-transforms-add_tags
+      - test-transforms-ansi_stripper
+      - test-transforms-aws_ec2_metadata
+      - test-transforms-coercer
+      - test-transforms-concat
+      - test-transforms-dedupe
+      - test-transforms-filter
+      - test-transforms-geoip
+      - test-transforms-grok_parser
+      - test-transforms-json_parser
+      - test-transforms-log_to_metric
+      - test-transforms-logfmt_parser
+      - test-transforms-lua
+      - test-transforms-merge
+      - test-transforms-regex_parser
+      - test-transforms-remove_fields
+      - test-transforms-remove_tags
+      - test-transforms-rename_fields
+      - test-transforms-sampler
+      - test-transforms-split
+      - test-transforms-swimlanes
+      - test-transforms-tag_cardinality_limit
+      - test-transforms-tokenizer
+      - test-sinks-aws_cloudwatch_logs
+      - test-sinks-aws_cloudwatch_metrics
+      - test-sinks-aws_kinesis_firehose
+      - test-sinks-aws_kinesis_streams
+      - test-sinks-aws_s3
+      - test-sinks-blackhole
+      - test-sinks-clickhouse
+      - test-sinks-console
+      - test-sinks-datadog_logs
+      - test-sinks-datadog_metrics
+      - test-sinks-elasticsearch
+      - test-sinks-file
+      - test-sinks-gcp_cloud_storage
+      - test-sinks-gcp_pubsub
+      - test-sinks-gcp_stackdriver_logs
+      - test-sinks-honeycomb
+      - test-sinks-http
+      - test-sinks-humio_logs
+      - test-sinks-influxdb_metrics
+      - test-sinks-kafka
+      - test-sinks-logdna
+      - test-sinks-loki
+      - test-sinks-new_relic_logs
+      - test-sinks-papertrail
+      - test-sinks-prometheus
+      - test-sinks-pulsar
+      - test-sinks-sematext_logs
+      - test-sinks-socket
+      - test-sinks-splunk_hec
+      - test-sinks-statsd
+      - test-sinks-vector
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -3328,7 +3396,75 @@ jobs:
 
   test-integration-aws:
     runs-on: ubuntu-latest
-    needs: test-base
+    needs:
+      - test-sources-docker
+      - test-sources-file
+      - test-sources-http
+      - test-sources-journald
+      - test-sources-kafka
+      - test-sources-logplex
+      - test-sources-prometheus
+      - test-sources-socket
+      - test-sources-splunk_hec
+      - test-sources-statsd
+      - test-sources-stdin
+      - test-sources-syslog
+      - test-sources-vector
+      - test-transforms-add_fields
+      - test-transforms-add_tags
+      - test-transforms-ansi_stripper
+      - test-transforms-aws_ec2_metadata
+      - test-transforms-coercer
+      - test-transforms-concat
+      - test-transforms-dedupe
+      - test-transforms-filter
+      - test-transforms-geoip
+      - test-transforms-grok_parser
+      - test-transforms-json_parser
+      - test-transforms-log_to_metric
+      - test-transforms-logfmt_parser
+      - test-transforms-lua
+      - test-transforms-merge
+      - test-transforms-regex_parser
+      - test-transforms-remove_fields
+      - test-transforms-remove_tags
+      - test-transforms-rename_fields
+      - test-transforms-sampler
+      - test-transforms-split
+      - test-transforms-swimlanes
+      - test-transforms-tag_cardinality_limit
+      - test-transforms-tokenizer
+      - test-sinks-aws_cloudwatch_logs
+      - test-sinks-aws_cloudwatch_metrics
+      - test-sinks-aws_kinesis_firehose
+      - test-sinks-aws_kinesis_streams
+      - test-sinks-aws_s3
+      - test-sinks-blackhole
+      - test-sinks-clickhouse
+      - test-sinks-console
+      - test-sinks-datadog_logs
+      - test-sinks-datadog_metrics
+      - test-sinks-elasticsearch
+      - test-sinks-file
+      - test-sinks-gcp_cloud_storage
+      - test-sinks-gcp_pubsub
+      - test-sinks-gcp_stackdriver_logs
+      - test-sinks-honeycomb
+      - test-sinks-http
+      - test-sinks-humio_logs
+      - test-sinks-influxdb_metrics
+      - test-sinks-kafka
+      - test-sinks-logdna
+      - test-sinks-loki
+      - test-sinks-new_relic_logs
+      - test-sinks-papertrail
+      - test-sinks-prometheus
+      - test-sinks-pulsar
+      - test-sinks-sematext_logs
+      - test-sinks-socket
+      - test-sinks-splunk_hec
+      - test-sinks-statsd
+      - test-sinks-vector
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -3373,7 +3509,75 @@ jobs:
 
   test-integration-docker:
     runs-on: ubuntu-latest
-    needs: test-base
+    needs:
+      - test-sources-docker
+      - test-sources-file
+      - test-sources-http
+      - test-sources-journald
+      - test-sources-kafka
+      - test-sources-logplex
+      - test-sources-prometheus
+      - test-sources-socket
+      - test-sources-splunk_hec
+      - test-sources-statsd
+      - test-sources-stdin
+      - test-sources-syslog
+      - test-sources-vector
+      - test-transforms-add_fields
+      - test-transforms-add_tags
+      - test-transforms-ansi_stripper
+      - test-transforms-aws_ec2_metadata
+      - test-transforms-coercer
+      - test-transforms-concat
+      - test-transforms-dedupe
+      - test-transforms-filter
+      - test-transforms-geoip
+      - test-transforms-grok_parser
+      - test-transforms-json_parser
+      - test-transforms-log_to_metric
+      - test-transforms-logfmt_parser
+      - test-transforms-lua
+      - test-transforms-merge
+      - test-transforms-regex_parser
+      - test-transforms-remove_fields
+      - test-transforms-remove_tags
+      - test-transforms-rename_fields
+      - test-transforms-sampler
+      - test-transforms-split
+      - test-transforms-swimlanes
+      - test-transforms-tag_cardinality_limit
+      - test-transforms-tokenizer
+      - test-sinks-aws_cloudwatch_logs
+      - test-sinks-aws_cloudwatch_metrics
+      - test-sinks-aws_kinesis_firehose
+      - test-sinks-aws_kinesis_streams
+      - test-sinks-aws_s3
+      - test-sinks-blackhole
+      - test-sinks-clickhouse
+      - test-sinks-console
+      - test-sinks-datadog_logs
+      - test-sinks-datadog_metrics
+      - test-sinks-elasticsearch
+      - test-sinks-file
+      - test-sinks-gcp_cloud_storage
+      - test-sinks-gcp_pubsub
+      - test-sinks-gcp_stackdriver_logs
+      - test-sinks-honeycomb
+      - test-sinks-http
+      - test-sinks-humio_logs
+      - test-sinks-influxdb_metrics
+      - test-sinks-kafka
+      - test-sinks-logdna
+      - test-sinks-loki
+      - test-sinks-new_relic_logs
+      - test-sinks-papertrail
+      - test-sinks-prometheus
+      - test-sinks-pulsar
+      - test-sinks-sematext_logs
+      - test-sinks-socket
+      - test-sinks-splunk_hec
+      - test-sinks-statsd
+      - test-sinks-vector
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -3418,7 +3622,75 @@ jobs:
 
   test-integration-es:
     runs-on: ubuntu-latest
-    needs: test-base
+    needs:
+      - test-sources-docker
+      - test-sources-file
+      - test-sources-http
+      - test-sources-journald
+      - test-sources-kafka
+      - test-sources-logplex
+      - test-sources-prometheus
+      - test-sources-socket
+      - test-sources-splunk_hec
+      - test-sources-statsd
+      - test-sources-stdin
+      - test-sources-syslog
+      - test-sources-vector
+      - test-transforms-add_fields
+      - test-transforms-add_tags
+      - test-transforms-ansi_stripper
+      - test-transforms-aws_ec2_metadata
+      - test-transforms-coercer
+      - test-transforms-concat
+      - test-transforms-dedupe
+      - test-transforms-filter
+      - test-transforms-geoip
+      - test-transforms-grok_parser
+      - test-transforms-json_parser
+      - test-transforms-log_to_metric
+      - test-transforms-logfmt_parser
+      - test-transforms-lua
+      - test-transforms-merge
+      - test-transforms-regex_parser
+      - test-transforms-remove_fields
+      - test-transforms-remove_tags
+      - test-transforms-rename_fields
+      - test-transforms-sampler
+      - test-transforms-split
+      - test-transforms-swimlanes
+      - test-transforms-tag_cardinality_limit
+      - test-transforms-tokenizer
+      - test-sinks-aws_cloudwatch_logs
+      - test-sinks-aws_cloudwatch_metrics
+      - test-sinks-aws_kinesis_firehose
+      - test-sinks-aws_kinesis_streams
+      - test-sinks-aws_s3
+      - test-sinks-blackhole
+      - test-sinks-clickhouse
+      - test-sinks-console
+      - test-sinks-datadog_logs
+      - test-sinks-datadog_metrics
+      - test-sinks-elasticsearch
+      - test-sinks-file
+      - test-sinks-gcp_cloud_storage
+      - test-sinks-gcp_pubsub
+      - test-sinks-gcp_stackdriver_logs
+      - test-sinks-honeycomb
+      - test-sinks-http
+      - test-sinks-humio_logs
+      - test-sinks-influxdb_metrics
+      - test-sinks-kafka
+      - test-sinks-logdna
+      - test-sinks-loki
+      - test-sinks-new_relic_logs
+      - test-sinks-papertrail
+      - test-sinks-prometheus
+      - test-sinks-pulsar
+      - test-sinks-sematext_logs
+      - test-sinks-socket
+      - test-sinks-splunk_hec
+      - test-sinks-statsd
+      - test-sinks-vector
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -3463,7 +3735,75 @@ jobs:
 
   test-integration-gcp:
     runs-on: ubuntu-latest
-    needs: test-base
+    needs:
+      - test-sources-docker
+      - test-sources-file
+      - test-sources-http
+      - test-sources-journald
+      - test-sources-kafka
+      - test-sources-logplex
+      - test-sources-prometheus
+      - test-sources-socket
+      - test-sources-splunk_hec
+      - test-sources-statsd
+      - test-sources-stdin
+      - test-sources-syslog
+      - test-sources-vector
+      - test-transforms-add_fields
+      - test-transforms-add_tags
+      - test-transforms-ansi_stripper
+      - test-transforms-aws_ec2_metadata
+      - test-transforms-coercer
+      - test-transforms-concat
+      - test-transforms-dedupe
+      - test-transforms-filter
+      - test-transforms-geoip
+      - test-transforms-grok_parser
+      - test-transforms-json_parser
+      - test-transforms-log_to_metric
+      - test-transforms-logfmt_parser
+      - test-transforms-lua
+      - test-transforms-merge
+      - test-transforms-regex_parser
+      - test-transforms-remove_fields
+      - test-transforms-remove_tags
+      - test-transforms-rename_fields
+      - test-transforms-sampler
+      - test-transforms-split
+      - test-transforms-swimlanes
+      - test-transforms-tag_cardinality_limit
+      - test-transforms-tokenizer
+      - test-sinks-aws_cloudwatch_logs
+      - test-sinks-aws_cloudwatch_metrics
+      - test-sinks-aws_kinesis_firehose
+      - test-sinks-aws_kinesis_streams
+      - test-sinks-aws_s3
+      - test-sinks-blackhole
+      - test-sinks-clickhouse
+      - test-sinks-console
+      - test-sinks-datadog_logs
+      - test-sinks-datadog_metrics
+      - test-sinks-elasticsearch
+      - test-sinks-file
+      - test-sinks-gcp_cloud_storage
+      - test-sinks-gcp_pubsub
+      - test-sinks-gcp_stackdriver_logs
+      - test-sinks-honeycomb
+      - test-sinks-http
+      - test-sinks-humio_logs
+      - test-sinks-influxdb_metrics
+      - test-sinks-kafka
+      - test-sinks-logdna
+      - test-sinks-loki
+      - test-sinks-new_relic_logs
+      - test-sinks-papertrail
+      - test-sinks-prometheus
+      - test-sinks-pulsar
+      - test-sinks-sematext_logs
+      - test-sinks-socket
+      - test-sinks-splunk_hec
+      - test-sinks-statsd
+      - test-sinks-vector
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -3508,7 +3848,75 @@ jobs:
 
   test-integration-kafka:
     runs-on: ubuntu-latest
-    needs: test-base
+    needs:
+      - test-sources-docker
+      - test-sources-file
+      - test-sources-http
+      - test-sources-journald
+      - test-sources-kafka
+      - test-sources-logplex
+      - test-sources-prometheus
+      - test-sources-socket
+      - test-sources-splunk_hec
+      - test-sources-statsd
+      - test-sources-stdin
+      - test-sources-syslog
+      - test-sources-vector
+      - test-transforms-add_fields
+      - test-transforms-add_tags
+      - test-transforms-ansi_stripper
+      - test-transforms-aws_ec2_metadata
+      - test-transforms-coercer
+      - test-transforms-concat
+      - test-transforms-dedupe
+      - test-transforms-filter
+      - test-transforms-geoip
+      - test-transforms-grok_parser
+      - test-transforms-json_parser
+      - test-transforms-log_to_metric
+      - test-transforms-logfmt_parser
+      - test-transforms-lua
+      - test-transforms-merge
+      - test-transforms-regex_parser
+      - test-transforms-remove_fields
+      - test-transforms-remove_tags
+      - test-transforms-rename_fields
+      - test-transforms-sampler
+      - test-transforms-split
+      - test-transforms-swimlanes
+      - test-transforms-tag_cardinality_limit
+      - test-transforms-tokenizer
+      - test-sinks-aws_cloudwatch_logs
+      - test-sinks-aws_cloudwatch_metrics
+      - test-sinks-aws_kinesis_firehose
+      - test-sinks-aws_kinesis_streams
+      - test-sinks-aws_s3
+      - test-sinks-blackhole
+      - test-sinks-clickhouse
+      - test-sinks-console
+      - test-sinks-datadog_logs
+      - test-sinks-datadog_metrics
+      - test-sinks-elasticsearch
+      - test-sinks-file
+      - test-sinks-gcp_cloud_storage
+      - test-sinks-gcp_pubsub
+      - test-sinks-gcp_stackdriver_logs
+      - test-sinks-honeycomb
+      - test-sinks-http
+      - test-sinks-humio_logs
+      - test-sinks-influxdb_metrics
+      - test-sinks-kafka
+      - test-sinks-logdna
+      - test-sinks-loki
+      - test-sinks-new_relic_logs
+      - test-sinks-papertrail
+      - test-sinks-prometheus
+      - test-sinks-pulsar
+      - test-sinks-sematext_logs
+      - test-sinks-socket
+      - test-sinks-splunk_hec
+      - test-sinks-statsd
+      - test-sinks-vector
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -3553,7 +3961,75 @@ jobs:
 
   test-integration-influxdb:
     runs-on: ubuntu-latest
-    needs: test-base
+    needs:
+      - test-sources-docker
+      - test-sources-file
+      - test-sources-http
+      - test-sources-journald
+      - test-sources-kafka
+      - test-sources-logplex
+      - test-sources-prometheus
+      - test-sources-socket
+      - test-sources-splunk_hec
+      - test-sources-statsd
+      - test-sources-stdin
+      - test-sources-syslog
+      - test-sources-vector
+      - test-transforms-add_fields
+      - test-transforms-add_tags
+      - test-transforms-ansi_stripper
+      - test-transforms-aws_ec2_metadata
+      - test-transforms-coercer
+      - test-transforms-concat
+      - test-transforms-dedupe
+      - test-transforms-filter
+      - test-transforms-geoip
+      - test-transforms-grok_parser
+      - test-transforms-json_parser
+      - test-transforms-log_to_metric
+      - test-transforms-logfmt_parser
+      - test-transforms-lua
+      - test-transforms-merge
+      - test-transforms-regex_parser
+      - test-transforms-remove_fields
+      - test-transforms-remove_tags
+      - test-transforms-rename_fields
+      - test-transforms-sampler
+      - test-transforms-split
+      - test-transforms-swimlanes
+      - test-transforms-tag_cardinality_limit
+      - test-transforms-tokenizer
+      - test-sinks-aws_cloudwatch_logs
+      - test-sinks-aws_cloudwatch_metrics
+      - test-sinks-aws_kinesis_firehose
+      - test-sinks-aws_kinesis_streams
+      - test-sinks-aws_s3
+      - test-sinks-blackhole
+      - test-sinks-clickhouse
+      - test-sinks-console
+      - test-sinks-datadog_logs
+      - test-sinks-datadog_metrics
+      - test-sinks-elasticsearch
+      - test-sinks-file
+      - test-sinks-gcp_cloud_storage
+      - test-sinks-gcp_pubsub
+      - test-sinks-gcp_stackdriver_logs
+      - test-sinks-honeycomb
+      - test-sinks-http
+      - test-sinks-humio_logs
+      - test-sinks-influxdb_metrics
+      - test-sinks-kafka
+      - test-sinks-logdna
+      - test-sinks-loki
+      - test-sinks-new_relic_logs
+      - test-sinks-papertrail
+      - test-sinks-prometheus
+      - test-sinks-pulsar
+      - test-sinks-sematext_logs
+      - test-sinks-socket
+      - test-sinks-splunk_hec
+      - test-sinks-statsd
+      - test-sinks-vector
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -3598,7 +4074,75 @@ jobs:
 
   test-integration-splunk:
     runs-on: ubuntu-latest
-    needs: test-base
+    needs:
+      - test-sources-docker
+      - test-sources-file
+      - test-sources-http
+      - test-sources-journald
+      - test-sources-kafka
+      - test-sources-logplex
+      - test-sources-prometheus
+      - test-sources-socket
+      - test-sources-splunk_hec
+      - test-sources-statsd
+      - test-sources-stdin
+      - test-sources-syslog
+      - test-sources-vector
+      - test-transforms-add_fields
+      - test-transforms-add_tags
+      - test-transforms-ansi_stripper
+      - test-transforms-aws_ec2_metadata
+      - test-transforms-coercer
+      - test-transforms-concat
+      - test-transforms-dedupe
+      - test-transforms-filter
+      - test-transforms-geoip
+      - test-transforms-grok_parser
+      - test-transforms-json_parser
+      - test-transforms-log_to_metric
+      - test-transforms-logfmt_parser
+      - test-transforms-lua
+      - test-transforms-merge
+      - test-transforms-regex_parser
+      - test-transforms-remove_fields
+      - test-transforms-remove_tags
+      - test-transforms-rename_fields
+      - test-transforms-sampler
+      - test-transforms-split
+      - test-transforms-swimlanes
+      - test-transforms-tag_cardinality_limit
+      - test-transforms-tokenizer
+      - test-sinks-aws_cloudwatch_logs
+      - test-sinks-aws_cloudwatch_metrics
+      - test-sinks-aws_kinesis_firehose
+      - test-sinks-aws_kinesis_streams
+      - test-sinks-aws_s3
+      - test-sinks-blackhole
+      - test-sinks-clickhouse
+      - test-sinks-console
+      - test-sinks-datadog_logs
+      - test-sinks-datadog_metrics
+      - test-sinks-elasticsearch
+      - test-sinks-file
+      - test-sinks-gcp_cloud_storage
+      - test-sinks-gcp_pubsub
+      - test-sinks-gcp_stackdriver_logs
+      - test-sinks-honeycomb
+      - test-sinks-http
+      - test-sinks-humio_logs
+      - test-sinks-influxdb_metrics
+      - test-sinks-kafka
+      - test-sinks-logdna
+      - test-sinks-loki
+      - test-sinks-new_relic_logs
+      - test-sinks-papertrail
+      - test-sinks-prometheus
+      - test-sinks-pulsar
+      - test-sinks-sematext_logs
+      - test-sinks-socket
+      - test-sinks-splunk_hec
+      - test-sinks-statsd
+      - test-sinks-vector
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
@@ -3643,7 +4187,75 @@ jobs:
 
   test-integration-pulsar:
     runs-on: ubuntu-latest
-    needs: test-base
+    needs:
+      - test-sources-docker
+      - test-sources-file
+      - test-sources-http
+      - test-sources-journald
+      - test-sources-kafka
+      - test-sources-logplex
+      - test-sources-prometheus
+      - test-sources-socket
+      - test-sources-splunk_hec
+      - test-sources-statsd
+      - test-sources-stdin
+      - test-sources-syslog
+      - test-sources-vector
+      - test-transforms-add_fields
+      - test-transforms-add_tags
+      - test-transforms-ansi_stripper
+      - test-transforms-aws_ec2_metadata
+      - test-transforms-coercer
+      - test-transforms-concat
+      - test-transforms-dedupe
+      - test-transforms-filter
+      - test-transforms-geoip
+      - test-transforms-grok_parser
+      - test-transforms-json_parser
+      - test-transforms-log_to_metric
+      - test-transforms-logfmt_parser
+      - test-transforms-lua
+      - test-transforms-merge
+      - test-transforms-regex_parser
+      - test-transforms-remove_fields
+      - test-transforms-remove_tags
+      - test-transforms-rename_fields
+      - test-transforms-sampler
+      - test-transforms-split
+      - test-transforms-swimlanes
+      - test-transforms-tag_cardinality_limit
+      - test-transforms-tokenizer
+      - test-sinks-aws_cloudwatch_logs
+      - test-sinks-aws_cloudwatch_metrics
+      - test-sinks-aws_kinesis_firehose
+      - test-sinks-aws_kinesis_streams
+      - test-sinks-aws_s3
+      - test-sinks-blackhole
+      - test-sinks-clickhouse
+      - test-sinks-console
+      - test-sinks-datadog_logs
+      - test-sinks-datadog_metrics
+      - test-sinks-elasticsearch
+      - test-sinks-file
+      - test-sinks-gcp_cloud_storage
+      - test-sinks-gcp_pubsub
+      - test-sinks-gcp_stackdriver_logs
+      - test-sinks-honeycomb
+      - test-sinks-http
+      - test-sinks-humio_logs
+      - test-sinks-influxdb_metrics
+      - test-sinks-kafka
+      - test-sinks-logdna
+      - test-sinks-loki
+      - test-sinks-new_relic_logs
+      - test-sinks-papertrail
+      - test-sinks-prometheus
+      - test-sinks-pulsar
+      - test-sinks-sematext_logs
+      - test-sinks-socket
+      - test-sinks-splunk_hec
+      - test-sinks-statsd
+      - test-sinks-vector
     env:
       RUST_BACKTRACE: full
       TEST_LOG: debug
