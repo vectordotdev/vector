@@ -47,8 +47,8 @@ Kubernetes logs and metrics to any destination you please.
 
 Our recommended strategy deploys Vector as a Kubernetes
 [`DaemonSet`][daemonset]. Vector is reading the logs files directly from the
-file system, so to collect the logs from all the `Pod`s it has to be deployed
-on every `Node` in your cluster.
+file system, so to collect the logs from all the [`Pod`s][k8s_docs_pod] it has
+to be deployed on every [`Node`][k8s_docs_node] in your cluster.
 
 The following diagram demonstrates how this works:
 
@@ -1346,8 +1346,10 @@ See [motivation](#motivation).
 [k8s_api_resource_requirements]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#resourcerequirements-v1-core
 [k8s_docs_controller]: https://kubernetes.io/docs/concepts/architecture/controller/
 [k8s_docs_crds]: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/
+[k8s_docs_node]: https://kubernetes.io/docs/concepts/architecture/nodes/
 [k8s_docs_operator]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
 [k8s_docs_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
+[k8s_docs_pod]: https://kubernetes.io/docs/concepts/workloads/pods/pod/
 [k8s_docs_rolling_update]: https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/
 [k8s_log_path_location_docs]: https://kubernetes.io/docs/concepts/cluster-administration/logging/#logging-at-the-node-level
 [k8s_src_build_container_logs_directory]: https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L173
