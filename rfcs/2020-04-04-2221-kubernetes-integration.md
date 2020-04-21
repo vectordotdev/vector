@@ -556,6 +556,7 @@ following information via the file path:
 - `pod namespace`
 - `pod name`
 - `pod uuid`
+- `container name`
 
 This is enough information for the basic filtering, and the best part is it's
 available to us without and extra work - we're reading the files anyways.
