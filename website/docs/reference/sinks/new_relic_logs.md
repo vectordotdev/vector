@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "New Relic Logs"
 description: "The Vector `new_relic_logs` sink batches `log` events to New Relic's log service via their log API."
@@ -45,7 +45,7 @@ API][urls.new_relic_log_api].
 [sinks.my_sink_id]
   # General
   type = "new_relic_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   healthcheck = true # optional, default
   insert_key = "xxxx" # optional, no default
   license_key = "xxxx" # optional, no default
@@ -62,7 +62,7 @@ API][urls.new_relic_log_api].
 [sinks.my_sink_id]
   # General
   type = "new_relic_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   healthcheck = true # optional, default
   insert_key = "xxxx" # optional, no default
   license_key = "xxxx" # optional, no default

@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-04-22"
 component_title: "Remove Fields"
-description: "The Vector `remove_fields` transform accepts and outputs `log` events allowing you to remove one or more log fields."
+description: "The Vector `remove_fields` transform accepts and outputs `log` events, allowing you to remove one or more log fields."
 event_types: ["log"]
 function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_fields%22
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `remove_fields` transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to remove
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to remove
 one or more log fields.
 
 <!--
@@ -39,7 +39,7 @@ one or more log fields.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "remove_fields" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   fields = ["field1", "field2", "parent.child"] # required
 ```
 
@@ -49,7 +49,7 @@ one or more log fields.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "remove_fields" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   drop_empty = false # optional, default
   fields = ["field1", "field2", "parent.child"] # required
 ```

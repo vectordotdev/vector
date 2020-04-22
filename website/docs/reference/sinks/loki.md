@@ -44,7 +44,7 @@ The Vector `loki` sink
 [sinks.my_sink_id]
   # General
   type = "loki" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "http://localhost:3100" # required
   healthcheck = true # optional, default
 
@@ -63,7 +63,7 @@ The Vector `loki` sink
 [sinks.my_sink_id]
   # General
   type = "loki" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "http://localhost:3100" # required
   healthcheck = true # optional, default
   remove_label_fields = false # optional, default

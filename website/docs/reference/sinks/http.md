@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "HTTP"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
@@ -44,7 +44,7 @@ The Vector `http` sink
 [sinks.my_sink_id]
   # General
   type = "http" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   compression = "none" # optional, default
   healthcheck = true # optional, default
   uri = "https://10.22.212.22:9000/endpoint" # required
@@ -74,7 +74,7 @@ The Vector `http` sink
 [sinks.my_sink_id]
   # General
   type = "http" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   compression = "none" # optional, default
   healthcheck = true # optional, default
   healthcheck_uri = "https://10.22.212.22:9000/_health" # optional, no default

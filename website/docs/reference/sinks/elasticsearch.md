@@ -53,7 +53,7 @@ endpoint][urls.elasticsearch_bulk].
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "elasticsearch" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   compression = "none" # optional, default
   healthcheck = true # optional, default
   host = "http://10.24.32.122:9000" # optional, no default
@@ -67,7 +67,7 @@ endpoint][urls.elasticsearch_bulk].
 [sinks.my_sink_id]
   # General
   type = "elasticsearch" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   compression = "none" # optional, default
   doc_type = "_doc" # optional, default
   healthcheck = true # optional, default

@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-04-22"
 component_title: "Rename Fields"
-description: "The Vector `rename_fields` transform accepts and outputs `log` events allowing you to rename one or more log fields."
+description: "The Vector `rename_fields` transform accepts and outputs `log` events, allowing you to rename one or more log fields."
 event_types: ["log"]
 function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+rename_fields%22
@@ -18,7 +18,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `rename_fields` transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to rename
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to rename
 one or more log fields.
 
 <!--
@@ -41,7 +41,7 @@ one or more log fields.
 [transforms.my_transform_id]
   # General
   type = "rename_fields" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
 
   # Fields
   fields.old_field_name = "new_field_name" # example
@@ -55,7 +55,7 @@ one or more log fields.
 [transforms.my_transform_id]
   # General
   type = "rename_fields" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   drop_empty = false # optional, default
 
   # Fields

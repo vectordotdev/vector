@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "Datadog Metrics"
 description: "The Vector `datadog_metrics` sink batches `metric` events to Datadog's metrics service using HTTP API."
@@ -43,7 +43,7 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "datadog_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${DATADOG_API_KEY}" # required
   healthcheck = true # optional, default
   namespace = "service" # required
@@ -56,7 +56,7 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 [sinks.my_sink_id]
   # General
   type = "datadog_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${DATADOG_API_KEY}" # required
   healthcheck = true # optional, default
   host = "https://api.datadoghq.com" # optional, default

@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-04-22"
 component_title: "Sampler"
-description: "The Vector `sampler` transform accepts and outputs `log` events allowing you to sample events with a configurable rate."
+description: "The Vector `sampler` transform accepts and outputs `log` events, allowing you to sample events with a configurable rate."
 event_types: ["log"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+sampler%22
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `sampler` transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to sample
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to sample
 events with a configurable rate.
 
 <!--
@@ -39,7 +39,7 @@ events with a configurable rate.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "sampler" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   pass_list = ["[error]", "field2"] # optional, no default
   rate = 10 # required
 ```
@@ -50,7 +50,7 @@ events with a configurable rate.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "sampler" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   key_field = "message" # optional, no default
   pass_list = ["[error]", "field2"] # optional, no default
   rate = 10 # required

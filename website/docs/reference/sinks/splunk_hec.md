@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."
@@ -44,7 +44,7 @@ HTTP Event Collector][urls.splunk_hec].
 [sinks.my_sink_id]
   # General
   type = "splunk_hec" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   healthcheck = true # optional, default
   host = "http://my-splunk-host.com" # required
   host_key = "hostname" # optional, no default
@@ -62,7 +62,7 @@ HTTP Event Collector][urls.splunk_hec].
 [sinks.my_sink_id]
   # General
   type = "splunk_hec" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   healthcheck = true # optional, default
   host = "http://my-splunk-host.com" # required
   host_key = "hostname" # optional, no default

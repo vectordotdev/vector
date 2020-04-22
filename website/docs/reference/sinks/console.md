@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "Console"
 description: "The Vector `console` sink streams `log` and `metric` events to standard output streams, such as STDOUT and STDERR."
@@ -45,7 +45,7 @@ streams][urls.standard_streams], such as [STDOUT][urls.stdout] and
 [sinks.my_sink_id]
   # General
   type = "console" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   target = "stdout" # optional, default
 
   # Encoding
@@ -59,7 +59,7 @@ streams][urls.standard_streams], such as [STDOUT][urls.stdout] and
 [sinks.my_sink_id]
   # General
   type = "console" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   target = "stdout" # optional, default
 
   # Encoding

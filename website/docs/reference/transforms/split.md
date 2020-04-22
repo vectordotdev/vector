@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-04-22"
 component_title: "Split"
-description: "The Vector `split` transform accepts and outputs `log` events allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
+description: "The Vector `split` transform accepts and outputs `log` events, allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+split%22
@@ -17,8 +17,8 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `split` transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to split a
-field's value on a _literal_ separator and zip the tokens into ordered field
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to split
+a field's value on a _literal_ separator and zip the tokens into ordered field
 names.
 
 <!--
@@ -41,7 +41,7 @@ names.
 [transforms.my_transform_id]
   # General
   type = "split" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   drop_field = true # optional, default
   field = "message" # optional, default
   field_names = ["timestamp", "level", "message", "parent.child"] # required
@@ -63,7 +63,7 @@ names.
 [transforms.my_transform_id]
   # General
   type = "split" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   drop_field = true # optional, default
   field = "message" # optional, default
   field_names = ["timestamp", "level", "message", "parent.child"] # required

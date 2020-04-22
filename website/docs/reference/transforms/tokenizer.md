@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-04-22"
 component_title: "Tokenizer"
-description: "The Vector `tokenizer` transform accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
+description: "The Vector `tokenizer` transform accepts and outputs `log` events, allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+tokenizer%22
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `tokenizer` transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to
 tokenize a field's value by splitting on white space, ignoring special wrapping
 characters, and zip the tokens into ordered field names.
 
@@ -41,7 +41,7 @@ characters, and zip the tokens into ordered field names.
 [transforms.my_transform_id]
   # General
   type = "tokenizer" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   drop_field = true # optional, default
   field = "message" # optional, default
   field_names = ["timestamp", "level", "message", "parent.child"] # required
@@ -62,7 +62,7 @@ characters, and zip the tokens into ordered field names.
 [transforms.my_transform_id]
   # General
   type = "tokenizer" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   drop_field = true # optional, default
   field = "message" # optional, default
   field_names = ["timestamp", "level", "message", "parent.child"] # required

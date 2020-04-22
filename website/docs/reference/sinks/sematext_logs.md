@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "Sematext Logs"
 description: "The Vector `sematext_logs` sink batches `log` events to Sematext via the Elasticsearch API."
@@ -43,7 +43,7 @@ The Vector `sematext_logs` sink
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "sematext_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   healthcheck = true # optional, default
   token = "${SEMATEXT_TOKEN}" # required
 ```
@@ -55,7 +55,7 @@ The Vector `sematext_logs` sink
 [sinks.my_sink_id]
   # General
   type = "sematext_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   healthcheck = true # optional, default
   host = "http://127.0.0.1" # optional, no default
   region = "na" # optional, no default

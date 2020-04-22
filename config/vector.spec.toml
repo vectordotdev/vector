@@ -1277,7 +1277,7 @@ dns_servers = ["0.0.0.0:53"]
 # ------------------------------------------------------------------------------
 # Transforms parse, structure, and enrich events.
 
-# Accepts and outputs `log` events allowing you to add one or more log fields.
+# Accepts and outputs `log` events, allowing you to add one or more log fields.
 [transforms.add_fields]
   #
   # General
@@ -1295,7 +1295,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   #
   # Fields
@@ -1317,7 +1317,7 @@ dns_servers = ["0.0.0.0:53"]
     parent = {child_field = "child_value"}
     list_field = ["first", "second", "third"]
 
-# Accepts and outputs `metric` events allowing you to add one or more metric tags.
+# Accepts and outputs `metric` events, allowing you to add one or more metric tags.
 [transforms.add_tags]
   #
   # General
@@ -1335,7 +1335,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   #
   # Tags
@@ -1350,7 +1350,7 @@ dns_servers = ["0.0.0.0:53"]
     static_tag = "my value"
     env_tag = "${ENV_VAR}"
 
-# Accepts and outputs `log` events allowing you to strips ANSI escape sequences from the specified field.
+# Accepts and outputs `log` events, allowing you to strips ANSI escape sequences from the specified field.
 [transforms.ansi_stripper]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1364,7 +1364,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The target field to strip ANSI escape sequences from.
   #
@@ -1375,7 +1375,7 @@ dns_servers = ["0.0.0.0:53"]
   field = "parent.child"
   field = "array[0]"
 
-# Accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata.
+# Accepts and outputs `log` events, allowing you to enrich logs with AWS EC2 instance metadata.
 [transforms.aws_ec2_metadata]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1389,7 +1389,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # A list of fields to include in each event.
   #
@@ -1419,7 +1419,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: int
   refresh_interval_secs = 10
 
-# Accepts and outputs `log` events allowing you to coerce log fields into fixed types.
+# Accepts and outputs `log` events, allowing you to coerce log fields into fixed types.
 [transforms.coercer]
   #
   # General
@@ -1437,7 +1437,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # Set to `true` to drop all fields that are not specified in the `types` table.
   # Make sure both `message` and `timestamp` are specified in the `types` table
@@ -1470,7 +1470,7 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%a %b %e %T %Y"
     parent = {child = "int"}
 
-# Accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one.
+# Accepts and outputs `log` events, allowing you to concat (substrings) of other fields to a new one.
 [transforms.concat]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1484,7 +1484,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # A list of substring definitons in the format of source_field[start..end]. For
   # both start and end negative values are counted from the end of the string.
@@ -1511,7 +1511,7 @@ dns_servers = ["0.0.0.0:53"]
   target = "parent.child"
   target = "array[0]"
 
-# Accepts and outputs `log` events allowing you to prevent duplicate Events from being outputted by using an LRU cache.
+# Accepts and outputs `log` events, allowing you to prevent duplicate Events from being outputted by using an LRU cache.
 [transforms.dedupe]
   #
   # General
@@ -1529,7 +1529,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   #
   # Cache
@@ -1565,7 +1565,7 @@ dns_servers = ["0.0.0.0:53"]
     # * type: [string]
     match = ["field1", "parent.child_field"]
 
-# Accepts and outputs `log` and `metric` events allowing you to select events based on a set of logical conditions.
+# Accepts and outputs `log` and `metric` events, allowing you to select events based on a set of logical conditions.
 [transforms.filter]
   #
   # General
@@ -1583,7 +1583,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   #
   # Condition
@@ -1660,7 +1660,7 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "environment.starts_with" = "staging-"
 
-# Accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+# Accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 [transforms.geoip]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1674,7 +1674,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # Path to the MaxMind GeoIP2 or GeoLite2 binary city database file
   # (`GeoLite2-City.mmdb`). Other databases, such as the the country database are
@@ -1703,7 +1703,7 @@ dns_servers = ["0.0.0.0:53"]
   target = "geoip"
   target = "parent.child"
 
-# Accepts and outputs `log` events allowing you to parse a log field value with Grok.
+# Accepts and outputs `log` events, allowing you to parse a log field value with Grok.
 [transforms.grok_parser]
   #
   # General
@@ -1721,7 +1721,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # If `true` will drop the specified `field` after parsing.
   #
@@ -1766,7 +1766,7 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%a %b %e %T %Y"
     parent = {child = "int"}
 
-# Accepts and outputs `log` events allowing you to parse a log field value as JSON.
+# Accepts and outputs `log` events, allowing you to parse a log field value as JSON.
 [transforms.json_parser]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1780,7 +1780,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # If the specified `field` should be dropped (removed) after parsing. If
   # parsing fails, the field will not be removed, irrespective of this setting.
@@ -1826,7 +1826,7 @@ dns_servers = ["0.0.0.0:53"]
   target_field = "root_field"
   target_field = "parent.child"
 
-# Accepts `log` events but outputs `metric` events allowing you to convert logs into one or more metrics.
+# Accepts `log` events, but outputs `metric` events, allowing you to convert logs into one or more metrics.
 [transforms.log_to_metric]
   #
   # General
@@ -1844,7 +1844,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   #
   # Metrics
@@ -1897,7 +1897,7 @@ dns_servers = ["0.0.0.0:53"]
       region = "us-east-1"
       status = "{{status}}"
 
-# Accepts and outputs `log` events allowing you to parse a log field's value in the logfmt format.
+# Accepts and outputs `log` events, allowing you to parse a log field's value in the logfmt format.
 [transforms.logfmt_parser]
   #
   # General
@@ -1915,7 +1915,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # If the specified `field` should be dropped (removed) after parsing.
   #
@@ -1954,7 +1954,7 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%a %b %e %T %Y"
     parent = {child = "int"}
 
-# Accepts and outputs `log` and `metric` events allowing you to transform events with a full embedded Lua engine.
+# Accepts and outputs `log` and `metric` events, allowing you to transform events with a full embedded Lua engine.
 [transforms.lua]
   #
   # General
@@ -1972,7 +1972,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # Transform API version. Specifying this version ensures that Vector does not
   # break backward compatibility.
@@ -2096,7 +2096,7 @@ end
 require('custom_module')
 """
 
-# Accepts and outputs `log` events allowing you to merge partial log events into a single event.
+# Accepts and outputs `log` events, allowing you to merge partial log events into a single event.
 [transforms.merge]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -2110,7 +2110,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # Fields to merge. The values of these fields will be merged into the first
   # partial event. Fields not specified here will be ignored. Merging process
@@ -2145,7 +2145,7 @@ require('custom_module')
   stream_discriminant_fields = ["host"]
   stream_discriminant_fields = ["host", "parent.child"]
 
-# Accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression.
+# Accepts and outputs `log` events, allowing you to parse a log field's value with a Regular Expression.
 [transforms.regex_parser]
   #
   # General
@@ -2163,7 +2163,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # If the specified `field` should be dropped (removed) after parsing.
   #
@@ -2226,7 +2226,7 @@ require('custom_module')
     timestamp = "timestamp|%a %b %e %T %Y"
     parent = {child = "int"}
 
-# Accepts and outputs `log` events allowing you to remove one or more log fields.
+# Accepts and outputs `log` events, allowing you to remove one or more log fields.
 [transforms.remove_fields]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -2240,7 +2240,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # If set to `true`, after removing fields, remove any parent objects that are
   # now empty.
@@ -2257,7 +2257,7 @@ require('custom_module')
   # * type: [string]
   fields = ["field1", "field2", "parent.child"]
 
-# Accepts and outputs `metric` events allowing you to remove one or more metric tags.
+# Accepts and outputs `metric` events, allowing you to remove one or more metric tags.
 [transforms.remove_tags]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -2271,7 +2271,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The tag names to drop.
   #
@@ -2279,7 +2279,7 @@ require('custom_module')
   # * type: [string]
   tags = ["tag1", "tag2"]
 
-# Accepts and outputs `log` events allowing you to rename one or more log fields.
+# Accepts and outputs `log` events, allowing you to rename one or more log fields.
 [transforms.rename_fields]
   #
   # General
@@ -2297,7 +2297,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # If set to `true`, after renaming fields, remove any parent objects of the old
   # field that are now empty.
@@ -2320,7 +2320,7 @@ require('custom_module')
     old_field_name = "new_field_name"
     parent = {old_child_name = "parent.new_child_name"}
 
-# Accepts and outputs `log` events allowing you to sample events with a configurable rate.
+# Accepts and outputs `log` events, allowing you to sample events with a configurable rate.
 [transforms.sampler]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -2334,7 +2334,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The name of the log field to use to determine if the event should be passed.
   # This defaults to the global `message_key` option.
@@ -2361,7 +2361,7 @@ require('custom_module')
   # * type: int
   rate = 10
 
-# Accepts and outputs `log` events allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names.
+# Accepts and outputs `log` events, allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names.
 [transforms.split]
   #
   # General
@@ -2379,7 +2379,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # If `true` the `field` will be dropped after parsing.
   #
@@ -2432,7 +2432,7 @@ require('custom_module')
     timestamp = "timestamp|%a %b %e %T %Y"
     parent = {child = "int"}
 
-# Accepts and outputs `log` events allowing you to route events across parallel streams using logical filters.
+# Accepts and outputs `log` events, allowing you to route events across parallel streams using logical filters.
 [transforms.swimlanes]
   #
   # General
@@ -2450,7 +2450,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   #
   # Lanes
@@ -2528,7 +2528,7 @@ require('custom_module')
       # * relevant when type = "check_fields"
       "environment.starts_with" = "staging-"
 
-# Accepts and outputs `metric` events allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.
+# Accepts and outputs `metric` events, allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.
 [transforms.tag_cardinality_limit]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -2542,7 +2542,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The size of the cache in bytes to use to detect duplicate tags. The bigger
   # the cache the less likely it is to have a 'false positive' or a case where we
@@ -2581,7 +2581,7 @@ require('custom_module')
   # * type: int
   value_limit = 500
 
-# Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
+# Accepts and outputs `log` events, allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
   #
   # General
@@ -2599,7 +2599,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # If `true` the `field` will be dropped after parsing.
   #
@@ -2667,7 +2667,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The ARN of an IAM role to assume at startup.
   #
@@ -2914,7 +2914,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The ARN of an IAM role to assume at startup.
   #
@@ -2993,7 +2993,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The ARN of an IAM role to assume at startup.
   #
@@ -3213,7 +3213,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The ARN of an IAM role to assume at startup.
   #
@@ -3432,7 +3432,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The ARN of an IAM role to assume at startup.
   #
@@ -3806,7 +3806,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The number of events that must be received in order to print a summary of
   # activity.
@@ -3833,7 +3833,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The database that contains the stable that data will be inserted into.
   #
@@ -4134,7 +4134,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The standard stream to write to.
   #
@@ -4199,7 +4199,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # Datadog API key
   #
@@ -4384,7 +4384,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # Datadog API key
   #
@@ -4519,7 +4519,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The compression mechanism to use.
   #
@@ -4856,7 +4856,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -4935,7 +4935,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The GCS bucket name.
   #
@@ -5288,7 +5288,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # A Google Cloud API key used to authenticate access the pubsub project and
   # topic. Either this or `credentials_path` must be set.
@@ -5563,7 +5563,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The billing account ID to which to publish logs.
   #
@@ -5894,7 +5894,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The team key that will be used to authenticate against Honeycomb.
   #
@@ -6061,7 +6061,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The compression strategy used to compress the encoded event data before
   # outputting.
@@ -6374,7 +6374,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -6578,7 +6578,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # InfluxDB endpoint to send metrics to.
   #
@@ -6778,7 +6778,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # A comma-separated list of host and port pairs that are the addresses of the
   # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
@@ -6993,7 +6993,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The Ingestion API key.
   #
@@ -7227,7 +7227,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The endpoint used to ship logs to.
   #
@@ -7554,7 +7554,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -7769,7 +7769,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The endpoint to stream logs to.
   #
@@ -7875,7 +7875,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The address to expose for scraping.
   #
@@ -7924,7 +7924,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # A host and port pair that the pulsar client should connect to.
   #
@@ -8021,7 +8021,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -8228,7 +8228,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The address to connect to. The address _must_ include a port.
   #
@@ -8421,7 +8421,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -8702,7 +8702,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The UDP socket address to send stats to.
   #
@@ -8743,7 +8743,7 @@ require('custom_module')
   #
   # * required
   # * type: [string]
-  inputs = ["my-source-id"]
+  inputs = ["my-source-or-transform-id"]
 
   # The downstream Vector address to connect to. The address _must_ include a
   # port.
