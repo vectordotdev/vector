@@ -339,11 +339,12 @@ cases are often very custom, we probably don't have to go deeper than explaining
 the generic concerns. We should provide enough flexibility at the Vector code
 level for those use cases to be possible.
 
-It is possible to implement a sidecar deployment via implementing an operator
-to automatically inject Vector [`Container`][k8s_api_container] into
-[`Pod`s][k8s_api_pod] (via a special [controller][k8s_docs_controller]),
-but that doesn't make a lot of sense for us to work on, since
-[`DaemonSet`][k8s_api_daemon_set] works for most of the use cases already.
+It is possible to implement a sidecar deployment via implementing an
+[operator][k8s_docs_operator] to automatically inject Vector
+[`Container`][k8s_api_container] into [`Pod`s][k8s_api_pod], via a custom
+[admission controller][k8s_docs_admission_controllers], but that doesn't make
+a lot of sense for us to work on, since [`DaemonSet`][k8s_api_daemon_set]
+works for most of the use cases already.
 
 Note that [`DaemonSet`][k8s_docs_daemon_set] deployment does require special
 support at Vector code (a dedicated `kubernetes` source), while a perfectly
@@ -1353,7 +1354,7 @@ See [motivation](#motivation).
 [k8s_api_pod_spec]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podspec-v1-core
 [k8s_api_pod]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#pod-v1-core
 [k8s_api_resource_requirements]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#resourcerequirements-v1-core
-[k8s_docs_controller]: https://kubernetes.io/docs/concepts/architecture/controller/
+[k8s_docs_admission_controllers]: https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers
 [k8s_docs_crds]: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/
 [k8s_docs_daemon_set]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
 [k8s_docs_node]: https://kubernetes.io/docs/concepts/architecture/nodes/
