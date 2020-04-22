@@ -157,7 +157,7 @@ The following diagram demonstrates how this works:
 
 1.  Prepare `kustomization.yaml`.
 
-    Use the same config as in [Kubectl Interface].
+    Use the same config as in [Kubectl Interface](#kubectl-interface).
 
     ```yaml
     # kustomization.yaml
