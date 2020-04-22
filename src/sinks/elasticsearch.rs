@@ -402,26 +402,20 @@ fn signed_request(method: &str, uri: &Uri) -> SignedRequest {
 
 /// Derive a region name from a hostname
 fn derive_region(uri: &Uri) -> Region {
+    // Standard AWS ES service domain names look like:
+    // DOMAIN-CODE.REGION.es.amazonaws.com
+    // DOMAIN-CODE.REGION.es.amazonaws.com.cn
+    // So, split the domain name on '.' and take the second part.
     uri.host()
-        // Strip the standard domain name top level
         .and_then(|hostname| {
-            if hostname.ends_with(".amazonaws.com") {
-                Some(&hostname[..hostname.len() - 14])
-            } else if hostname.ends_with(".amazonaws.com.cn") {
-                Some(&hostname[..hostname.len() - 17])
+            let parts: Vec<&str> = hostname.split('.').collect();
+            if parts.len() > 2 {
+                // Turn it into a standard region
+                Region::from_str(parts[1]).ok()
             } else {
                 None
             }
         })
-        // Strip trailing ".es" suffix
-        .map(|region| region.trim_end_matches(".es"))
-        // Strip any additional domain name prefix
-        .map(|region| match region.rfind('.') {
-            Some(i) => &region[i + 1..],
-            None => region,
-        })
-        // Turn it into a standard region
-        .and_then(|region| Region::from_str(region).ok())
         // Give up, it's something custom
         .unwrap_or_else(|| Region::Custom {
             name: "custom".into(),
