@@ -156,9 +156,11 @@ pub trait EncodingConfiguration<E> {
                 Event::Log(log_event) => {
                     let to_remove = log_event
                         .keys()
-                        .filter(|f|
-                            !only_fields.iter().any(|only| f.starts_with(&(only.to_string() + "[")) || only == f)
-                        )
+                        .filter(|f| {
+                            !only_fields
+                                .iter()
+                                .any(|only| f.starts_with(&(only.to_string() + "[")) || only == f)
+                        })
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
                         log_event.remove(&Atom::from(removal));
