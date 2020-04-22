@@ -15,6 +15,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext},
 };
 use bytes::Bytes;
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use futures01::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{request::BufferedHttpResponse, Region, RusotoError};
@@ -266,7 +267,7 @@ impl CloudwatchLogsSvc {
             if let Some(Value::Timestamp(ts)) = log.remove(&event::log_schema().timestamp_key()) {
                 ts.timestamp_millis()
             } else {
-                chrono::Utc::now().timestamp_millis()
+                Utc::now().timestamp_millis()
             };
 
         match self.encoding.codec {
@@ -314,6 +315,16 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
 
     fn call(&mut self, req: Vec<Event>) -> Self::Future {
         if self.token_rx.is_none() {
+            // Addresses cases when we have an event who is close to be
+            // filtered out now, and could age enough, between now and it being
+            // delivered to AWS, to being filtered out.
+            let buffer_time = Duration::minutes(1);
+            let now = Utc::now();
+            // Acceptable range of Event timestamps.
+            let age_range =
+                (now - Duration::days(14) + buffer_time)..(now + Duration::hours(2) - buffer_time);
+            // TODO: 4. point and retention period of the log group.
+
             let events = req
                 .into_iter()
                 .map(|mut e| {
@@ -322,6 +333,15 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
                 })
                 .map(|e| e.into_log())
                 .map(|e| self.encode_log(e))
+                .filter(|e| {
+                    age_range.contains(&DateTime::from_utc(
+                        NaiveDateTime::from_timestamp(
+                            e.timestamp / 1000,
+                            (e.timestamp % 1000) * 1000 * 1000,
+                        ),
+                        Utc,
+                    ))
+                })
                 .collect::<Vec<_>>();
 
             let (tx, rx) = oneshot::channel();
