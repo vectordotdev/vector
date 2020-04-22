@@ -75,7 +75,7 @@ rusoto_sts = { version = "0.41.0", optional = true }
 
 # Tower
 tower = "0.1.1"
-tower03 = { package = "tower", version = "0.3" }
+tower03 = { package = "tower", version = "0.3", git = "https://github.com/tower-rs/tower", features = ["limit", "retry", "timeout", "util"] }
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }
@@ -159,6 +159,7 @@ lru = "0.4.3"
 k8s-openapi = { version = "0.5.1", features = ["v1_15"], optional = true }
 bloom = "0.3.2"
 pulsar = { version = "0.3.0", optional = true }
+task-compat = "0.1"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
@@ -179,7 +180,8 @@ elastic_responses = "0.20"
 matches = "0.1.8"
 pretty_assertions = "0.6.1"
 tokio01-test = "0.1.1"
-tower-test = "0.1"
+tower-test03 = { package = "tower-test", version = "0.3" }
+tower-test01 = { package = "tower-test", version = "0.1" }
 kube = { version = "0.16.1", features = ["openapi"] }
 serde_yaml = "0.8.9"
 trust-dns-server = "0.17.0"
@@ -187,6 +189,7 @@ trust-dns = "0.17.0"
 trust-dns-proto = "0.8.0"
 dirs = "2.0.2"
 tokio-test = "0.2"
+tokio = { version = "0.2", features = ["test-util"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -414,3 +417,6 @@ harness = false
 [profile.release]
 lto = true
 codegen-units = 1
+
+[patch.'https://github.com/tower-rs/tower']
+tower-layer = "0.3"
