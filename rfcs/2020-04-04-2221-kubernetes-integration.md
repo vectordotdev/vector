@@ -508,7 +508,7 @@ This worth a separate dedicated RFC though.
 #### Security considerations on deployment configuration
 
 Security considerations on deployment configuration are grouped together with
-other security related measures. See [here][#deployment-hardening].
+other security-related measures. See [here](#deployment-hardening).
 
 #### TODO
 
