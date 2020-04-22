@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
+use std::str::FromStr;
 use tower::Service;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -395,11 +396,37 @@ fn healthcheck(
 }
 
 fn signed_request(method: &str, uri: &Uri) -> SignedRequest {
-    let region = Region::Custom {
-        name: "custom".into(),
-        endpoint: uri.to_string(),
-    };
+    let region = derive_region(uri);
     SignedRequest::new(method, "es", &region, uri.path())
+}
+
+/// Derive a region name from a hostname
+fn derive_region(uri: &Uri) -> Region {
+    uri.host()
+        // Strip the standard domain name top level
+        .and_then(|hostname| {
+            if hostname.ends_with(".amazonaws.com") {
+                Some(&hostname[..hostname.len() - 14])
+            } else if hostname.ends_with(".amazonaws.com.cn") {
+                Some(&hostname[..hostname.len() - 17])
+            } else {
+                None
+            }
+        })
+        // Strip trailing ".es" suffix
+        .map(|region| region.trim_end_matches(".es"))
+        // Strip any additional domain name prefix
+        .map(|region| match region.rfind('.') {
+            Some(i) => &region[i + 1..],
+            None => region,
+        })
+        // Turn it into a standard region
+        .and_then(|region| Region::from_str(region).ok())
+        // Give up, it's something custom
+        .unwrap_or_else(|| Region::Custom {
+            name: "custom".into(),
+            endpoint: uri.to_string(),
+        })
 }
 
 fn finish_signer(
@@ -487,6 +514,22 @@ mod tests {
             logic.should_retry_response(&response),
             RetryAction::DontRetry(_)
         ));
+    }
+
+    #[test]
+    fn parses_region_from_hostname() {
+        let uri = "https://this-is-a-test-5dec2c2qbgsuekvsecuylqu.us-east-1.es.amazonaws.com"
+            .parse::<Uri>()
+            .unwrap();
+        assert_eq!(derive_region(&uri), Region::UsEast1);
+
+        let uri = "https://this-is-a-test-5dec2c2qbgsuekvsecuylqu.cn-north-1.es.amazonaws.com.cn"
+            .parse::<Uri>()
+            .unwrap();
+        assert_eq!(derive_region(&uri), Region::CnNorth1);
+
+        let uri = "https://my.own.domain.com".parse::<Uri>().unwrap();
+        assert!(matches!(derive_region(&uri), Region::Custom { .. }));
     }
 }
 
