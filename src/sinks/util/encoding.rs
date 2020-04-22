@@ -159,6 +159,7 @@ pub trait EncodingConfiguration<E> {
                         .filter(|f| {
                             !only_fields
                                 .iter()
+                                // TODO: This is a hack for #2407, #2410 should fix this fully.
                                 .any(|only| f.starts_with(&(only.to_string() + "[")) || only == f)
                         })
                         .collect::<VecDeque<_>>();
