@@ -566,14 +566,6 @@ other security-related measures. See [here](#deployment-hardening).
   Vector works with non-standard runtime; we shouldn't set it in our default
   YAMLs, nor set it at Helm by default;
 
-#### TODO
-
-Add to resources sections:
-
-- We can pass thread limit to vector via env var, see
-  https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#envvarsource-v1-core
-  via https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#resourcefieldselector-v1-core
-
 ### Annotating events with metadata from Kubernetes
 
 Kubernetes has a lot of metadata that can be associated with the logs, and most
