@@ -1168,7 +1168,117 @@ To sum up: if it works - it works, if it doesn't - we'll take care of it later.
 
 ### Security
 
-TODO
+There are different aspects of security. In this RFC we're going to focus on
+Kubernetes specific aspects.
+
+Securing in Kubernetes environment plays a major role, and the more we do to
+ensure our code and deployment recommendations are safe - the better. Big
+deployments often have dedicated security teams that will be doing what we do
+on their own - just to double check, but the majority of our people out there
+don't have enough resources to dedicate enough attention to the security
+aspects. This is why implementing security measures in our integration is
+important.
+
+#### Vector Code Audit
+
+There have to be automated security audit of the Vector codebase, to ensure
+we don't have easily detectable issues. Things like automated CVE checks and
+static analyzers fall into this category.
+We're already doing a good job in this aspect.
+
+#### Vector Docker Images Audit
+
+There has to be an automated security audit of the Vector docker images that we
+ship.
+
+We should consider using tools like this:
+
+- [trivy](https://github.com/aquasecurity/trivy)
+- [clair](https://github.com/quay/clair)
+- [anchore-engine](https://github.com/anchore/anchore-engine)
+
+... and similar.
+
+#### Deployment Hardening
+
+We should harden the Vector deployment by default. This means that our suggested
+YAML files should be hardened, and Helm Chart should be configurable, but also
+hardened by default.
+
+- We should properly configure
+  [PodSecurityContext][k8s_api_pod_security_context]
+  ([docs][k8s_docs_security_context]):
+
+  - properly configure [`sysctls`][k8s_api_sysctl];
+  - `fsGroup` - should be unset.
+
+- We should properly configure [SecurityContext][k8s_api_security_context]
+  ([docs][k8s_docs_security_context]):
+
+  - enable `readOnlyRootFilesystem` since we don't need to write to files at
+    rootfs;
+  - enable `runAsNonRoot` if possible - we shouldn't need root access to conduct
+    most of our operations, but this has to be validated in practice; the aim
+    is to enable it if possible;
+  - disable `allowPrivilegeEscalation` since we shouldn't need extra any special
+    privileges in the first place, and definitely we don't need escalation;
+  - properly configure [`seLinuxOptions`][k8s_api_se_linux_options];
+  - properly configure [`capabilities`][k8s_api_capabilities] - see
+    [`man 7 capabilities`][man_7_capabilities] for more info;
+  - disable `privileged` - we shouldn't don't need privileged access, and it's
+    me a major security issue if we do.
+
+- We should properly use [`ServiceAccount`][k8s_api_service_account],
+  [`Role`][k8s_api_role], [`RoleBinding`][k8s_api_role_binding],
+  [`ClusterRole`][k8s_api_cluster_role] and
+  [`ClusterRoleBinding`][k8s_api_cluster_role_binding] ([docs][k8s_docs_rbac]).
+
+  The service accounts at Kubernetes by default have no permissions, except for
+  the service accounts at the `kube-system` namespace. We'll be using a
+  dedicated `vector` namespace, so it's our responsibility to request the
+  required permissions.
+
+  The exact set of permissions to request at default deployment configuration
+  depends on the implementation we'll land and the Vector settings of the
+  default deployment configuration.
+  The goal is to eliminate any non-required permissions - we don't have to keep
+  anything extra there for demonstration purposes.
+
+  We also have to document all possible required permissions, so that users are
+  aware of the possible configuration options. At Helm Charts we should allow
+  configuring arbitrary permissions via values (while providing sane defaults).
+
+#### Securing secrets
+
+Vector sometimes needs access to secrets, like AWS API access tokens and so on.
+That data has to be adequately protected.
+
+We should recommend users to use [`Secret`][k8s_api_secret]
+([docs][k8s_docs_secret]) instead of [`ConfigMap`][k8s_api_config_map] if they
+have secret data embedded in their Vector `.toml` config files.
+
+We should also consider integrating with tools like [Vault] and [redoctober].
+
+#### Recommend users additional steps to secure the cluster
+
+- Suggest using [Falco].
+- Suggest setting up proper RBAC rules for cluster operators and users;
+  [`audit2rbac`](https://github.com/liggitt/audit2rbac) is a useful tool to
+  help with this.
+- Suggest using [Pod Security Policies][k8s_docs_pod_security_policiy]
+  ([API][k8s_api_pod_security_policy]).
+- Suggest using [NetworkPolicy][k8s_api_network_policy].
+- Suggest runnig [kube-bench].
+- Suggest reading the
+  [Kubernetes security documentation][k8s_docs_securing_a_cluster].
+
+#### Automatic container rebuilds
+
+The ability to rebuild containers with a CVE fix automatically quickly is a very
+important part of a successful vulnerability mitigation strategy.
+We should prepare in advance and rollout the infrastructure and automation to
+make it possible to rebuild the containers for _all_ (not just the latest or
+nightly!) the supported Vector versions.
 
 ## Prior Art
 
@@ -1312,6 +1422,7 @@ See [motivation](#motivation).
 [container_runtimes]: https://kubernetes.io/docs/setup/production-environment/container-runtimes/
 [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
 [downward api]: https://kubernetes.io/docs/tasks/inject-data-application/downward-api-volume-expose-pod-information/#store-pod-fields
+[falco]: https://github.com/falcosecurity/falco
 [filebeat k8s integration]: https://www.elastic.co/guide/en/beats/filebeat/master/running-on-kubernetes.html
 [firecracker]: https://github.com/firecracker-microvm/firecracker
 [fluentbit k8s integration]: https://docs.fluentbit.io/manual/installation/kubernetes
@@ -1342,45 +1453,68 @@ See [motivation](#motivation).
 [issue#2225]: https://github.com/timberio/vector/issues/2225
 [json file logging driver]: https://docs.docker.com/config/containers/logging/json-file/
 [jsonlines]: http://jsonlines.org/
+[k8s_api_capabilities]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#capabilities-v1-core
+[k8s_api_cluster_role_binding]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#clusterrolebinding-v1-rbac-authorization-k8s-io
+[k8s_api_cluster_role]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#clusterrole-v1-rbac-authorization-k8s-io
 [k8s_api_config_map_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#configmapvolumesource-v1-core
+[k8s_api_config_map]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#configmap-v1-core
 [k8s_api_container]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#container-v1-core
 [k8s_api_daemon_set_update_strategy]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#daemonsetupdatestrategy-v1-apps
 [k8s_api_daemon_set]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#daemonset-v1-apps
 [k8s_api_deployment]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#deployment-v1-apps
 [k8s_api_event]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#event-v1-core
 [k8s_api_host_path_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#hostpathvolumesource-v1-core
+[k8s_api_network_policy]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#networkpolicy-v1-networking-k8s-io
 [k8s_api_pod_list_all_namespaces]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#list-all-namespaces-pod-v1-core
 [k8s_api_pod_read]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#read-pod-v1-core
+[k8s_api_pod_security_context]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podsecuritycontext-v1-core
+[k8s_api_pod_security_policy]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podsecuritypolicy-v1beta1-policy
 [k8s_api_pod_spec]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podspec-v1-core
 [k8s_api_pod]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#pod-v1-core
 [k8s_api_resource_requirements]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#resourcerequirements-v1-core
+[k8s_api_role_binding]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#rolebinding-v1-rbac-authorization-k8s-io
+[k8s_api_role]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#role-v1-rbac-authorization-k8s-io
+[k8s_api_se_linux_options]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#selinuxoptions-v1-core
+[k8s_api_secret]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#secret-v1-core
+[k8s_api_security_context]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#securitycontext-v1-core
+[k8s_api_service_account]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#serviceaccount-v1-core
+[k8s_api_sysctl]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#sysctl-v1-core
 [k8s_docs_admission_controllers]: https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers
 [k8s_docs_crds]: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/
 [k8s_docs_daemon_set]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
 [k8s_docs_node]: https://kubernetes.io/docs/concepts/architecture/nodes/
 [k8s_docs_operator]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
 [k8s_docs_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
+[k8s_docs_pod_security_policiy]: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
 [k8s_docs_pod]: https://kubernetes.io/docs/concepts/workloads/pods/pod/
+[k8s_docs_rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
 [k8s_docs_rolling_update]: https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/
+[k8s_docs_secret]: https://kubernetes.io/docs/concepts/configuration/secret/
+[k8s_docs_securing_a_cluster]: https://kubernetes.io/docs/tasks/administer-cluster/securing-a-cluster/
+[k8s_docs_security_context]: https://kubernetes.io/docs/tasks/configure-pod-container/security-context
 [k8s_log_path_location_docs]: https://kubernetes.io/docs/concepts/cluster-administration/logging/#logging-at-the-node-level
 [k8s_src_build_container_logs_directory]: https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L173
 [k8s_src_parse_funcs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L116
 [k8s_src_read_logs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L277
 [k8s_src_var_log_pods]: https://github.com/kubernetes/kubernetes/blob/58596b2bf5eb0d84128fa04d0395ddd148d96e51/pkg/kubelet/kuberuntime/kuberuntime_manager.go#L60
+[kube-bench]: https://github.com/aquasecurity/kube-bench
 [kubectl_rollout_restart]: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-em-restart-em-
 [kubernetes version and version skew support policy]: https://kubernetes.io/docs/setup/release/version-skew-policy/
 [kubernetes_version_comment]: https://github.com/timberio/vector/pull/2188#discussion_r403120481
 [kustomize]: https://github.com/kubernetes-sigs/kustomize
 [logdna k8s integration]: https://docs.logdna.com/docs/kubernetes
 [logdna_daemonset]: https://raw.githubusercontent.com/logdna/logdna-agent/master/logdna-agent-ds.yaml
+[man_7_capabilities]: http://man7.org/linux/man-pages/man7/capabilities.7.html
 [metrics-server]: https://github.com/kubernetes-sigs/metrics-server
 [netdata]: https://github.com/netdata/netdata
 [pr#2134]: https://github.com/timberio/vector/pull/2134
 [pr#2188]: https://github.com/timberio/vector/pull/2188
 [prometheus_kubernetes_sd_config]: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#kubernetes_sd_config
+[redoctober]: https://github.com/cloudflare/redoctober
 [sidecar_container]: https://github.com/kubernetes/enhancements/blob/a8262db2ce38b2ec7941bdb6810a8d81c5141447/keps/sig-apps/sidecarcontainers.md
 [terraform]: https://www.terraform.io/
 [the chart repository guide]: https://helm.sh/docs/topics/chart_repository/
+[vault]: https://www.vaultproject.io/
 [vector_daemonset]: 2020-04-04-2221-kubernetes-integration/vector-daemonset.yaml
 [why_so_much_configurations]: https://github.com/timberio/vector/pull/2134/files#r401634895
 [windows_in_kubernetes]: https://kubernetes.io/docs/setup/production-environment/windows/intro-windows-in-kubernetes/
