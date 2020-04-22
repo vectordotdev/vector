@@ -156,7 +156,9 @@ pub trait EncodingConfiguration<E> {
                 Event::Log(log_event) => {
                     let to_remove = log_event
                         .keys()
-                        .filter(|f| !only_fields.contains(f))
+                        .filter(|f|
+                            !only_fields.iter().any(|only| f.starts_with(&(only.to_string() + "[")) || only == f)
+                        )
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
                         log_event.remove(&Atom::from(removal));
@@ -439,9 +441,9 @@ mod tests {
         encoding: EncodingConfig<TestEncoding>,
     }
 
-    const TOML_SIMPLE_STRING: &str = "
-        encoding = \"Snoot\"
-    ";
+    const TOML_SIMPLE_STRING: &str = r#"
+        encoding = "Snoot"
+    "#;
     #[test]
     fn config_string() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRING).unwrap();
@@ -449,11 +451,11 @@ mod tests {
         assert_eq!(config.encoding.codec, TestEncoding::Snoot);
     }
 
-    const TOML_SIMPLE_STRUCT: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.except_fields = [\"Doop\"]
-        encoding.only_fields = [\"Boop\"]
-    ";
+    const TOML_SIMPLE_STRUCT: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.except_fields = ["Doop"]
+        encoding.only_fields = ["Boop"]
+    "#;
     #[test]
     fn config_struct() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRUCT).unwrap();
@@ -463,21 +465,21 @@ mod tests {
         assert_eq!(config.encoding.only_fields, Some(vec!["Boop".into()]));
     }
 
-    const TOML_EXCLUSIVITY_VIOLATION: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.except_fields = [\"Doop\"]
-        encoding.only_fields = [\"Doop\"]
-    ";
+    const TOML_EXCLUSIVITY_VIOLATION: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.except_fields = ["Doop"]
+        encoding.only_fields = ["Doop"]
+    "#;
     #[test]
     fn exclusivity_violation() {
         let config: std::result::Result<TestConfig, _> = toml::from_str(TOML_EXCLUSIVITY_VIOLATION);
         assert!(config.is_err())
     }
 
-    const TOML_EXCEPT_FIELD: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.except_fields = [\"Doop\"]
-    ";
+    const TOML_EXCEPT_FIELD: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.except_fields = ["Doop"]
+    "#;
     #[test]
     fn test_except() {
         let config: TestConfig = toml::from_str(TOML_EXCEPT_FIELD).unwrap();
@@ -493,10 +495,10 @@ mod tests {
         assert!(event.as_mut_log().contains(&Atom::from("Beep")));
     }
 
-    const TOML_ONLY_FIELD: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.only_fields = [\"Doop\"]
-    ";
+    const TOML_ONLY_FIELD: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.only_fields = ["a.b.c", "b", "c[0].y"]
+    "#;
     #[test]
     fn test_only() {
         let config: TestConfig = toml::from_str(TOML_ONLY_FIELD).unwrap();
@@ -504,18 +506,29 @@ mod tests {
         let mut event = Event::new_empty_log();
         {
             let log = event.as_mut_log();
-            log.insert("Doop", 1);
-            log.insert("Beep", 1);
+            log.insert("a", 1);
+            log.insert("a.b", 1);
+            log.insert("a.b.c", 1);
+            log.insert("a.b.d", 1);
+            log.insert("b[0]", 1);
+            log.insert("b[1].x", 1);
+            log.insert("c[0].x", 1);
+            log.insert("c[0].y", 1);
         }
         config.encoding.apply_rules(&mut event);
-        assert!(event.as_mut_log().contains(&Atom::from("Doop")));
-        assert!(!event.as_mut_log().contains(&Atom::from("Beep")));
+        assert!(event.as_mut_log().contains(&Atom::from("a.b.c")));
+        assert!(event.as_mut_log().contains(&Atom::from("b")));
+        assert!(event.as_mut_log().contains(&Atom::from("b[1].x")));
+        assert!(event.as_mut_log().contains(&Atom::from("c[0].y")));
+
+        assert!(!event.as_mut_log().contains(&Atom::from("a.b.d")));
+        assert!(!event.as_mut_log().contains(&Atom::from("c[0].x")));
     }
 
-    const TOML_TIMESTAMP_FORMAT: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.timestamp_format = \"unix\"
-    ";
+    const TOML_TIMESTAMP_FORMAT: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.timestamp_format = "unix"
+    "#;
     #[test]
     fn test_timestamp() {
         let config: TestConfig = toml::from_str(TOML_TIMESTAMP_FORMAT).unwrap();
