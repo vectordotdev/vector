@@ -351,6 +351,44 @@ support at Vector code (a dedicated `kubernetes` source), while a perfectly
 valid sidecar configuration can be implemented with just a simple `file` source.
 This is another reason why we don't pay as much attention to sidecar model.
 
+#### Container probes
+
+Kubernetes allows configuring a number of [`Probe`s][k8s_api_probe] on
+[`Container`][k8s_api_container], and taking action based on those probes.
+See the [documentation](k8s_docs_pod_lifecycle_container_probes) to learn more.
+
+- `readinessProbe`
+
+  Periodic probe of container service readiness. Container will be removed from
+  service endpoints if the probe fails.
+
+- `livenessProbe`
+
+  Periodic probe of container liveness. Container will be restarted if the probe
+  fails.
+
+- `startupProbe`
+
+  Startup probe indicates that the container has successfully initialized. If
+  specified, no other probes are executed until this completes successfully. If
+  this probe fails, the container will be restarted, just as if the
+  `livenessProbe` failed.
+
+Vector should implement proper support for all of those one way or another at
+the code level.
+
+- `startupProbe` can be tight to the initial topology healthcheck - i.e. we
+  consider it failed until the initial topology health check is complete, and
+  consider it ok at any moment after that;
+
+- `livenessProbe` should probably be tied to the async executor threadpool
+  responsiveness - i.e. if we can handle an HTTP request in a special liveness
+  server we expose in Vector - consider the probe ok, else something's very
+  wrong, and we should consider the probe failed;
+
+- `readinessProbe` is the most tricky one; it is unclear what the semantics
+  makes sense there.
+
 ### Deployment configuration
 
 It is important that provide a well-thought deployment configuration for the
@@ -1402,6 +1440,7 @@ See [motivation](#motivation).
    might be differences in how different container runtimes handle logs.
 1. How do we want to approach Helm Chart Repository management.
 1. How do we implement liveness, readiness and startup probes?
+   Readiness probe is a tricky one. See [Container probes](#container-probes).
 1. Can we populate file at `terminationMessagePath` with some meaningful
    information when we exit or crash?
 1. Can we allow passing arbitrary fields from the `Pod` object to the event?
@@ -1501,6 +1540,7 @@ See [motivation](#motivation).
 [k8s_api_pod_security_policy]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podsecuritypolicy-v1beta1-policy
 [k8s_api_pod_spec]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podspec-v1-core
 [k8s_api_pod]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#pod-v1-core
+[k8s_api_probe]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#probe-v1-core
 [k8s_api_resource_requirements]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#resourcerequirements-v1-core
 [k8s_api_role_binding]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#rolebinding-v1-rbac-authorization-k8s-io
 [k8s_api_role]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#role-v1-rbac-authorization-k8s-io
@@ -1516,6 +1556,7 @@ See [motivation](#motivation).
 [k8s_docs_node]: https://kubernetes.io/docs/concepts/architecture/nodes/
 [k8s_docs_operator]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
 [k8s_docs_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
+[k8s_docs_pod_lifecycle_container_probes]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 [k8s_docs_pod_security_policiy]: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
 [k8s_docs_pod]: https://kubernetes.io/docs/concepts/workloads/pods/pod/
 [k8s_docs_rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
