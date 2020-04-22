@@ -64,7 +64,7 @@ The following diagram demonstrates how this works:
 
 ### Tutorial
 
-#### Kubectl Interface
+#### Deploy using `kubectl`
 
 1.  Configure Vector:
 
@@ -114,7 +114,7 @@ The following diagram demonstrates how this works:
 
     That's it!
 
-#### Helm Interface
+#### Deploy using Helm
 
 1.  Install [`helm`][helm_install].
 
@@ -151,13 +151,13 @@ The following diagram demonstrates how this works:
       vector/vector
     ```
 
-#### Install using Kustomize
+#### Deploy using Kustomize
 
 1.  Install [`kustomize`][kustomize].
 
 1.  Prepare `kustomization.yaml`.
 
-    Use the same config as in [Kubectl Interface](#kubectl-interface).
+    Use the same config as in [`kubectl` guide][anchor_tutorial_kubectl].
 
     ```yaml
     # kustomization.yaml
@@ -431,9 +431,9 @@ the new config) via
 YAML files storing Kubernetes API objects configuration can be grouped
 differently.
 
-The layout proposed in [guide above](#kubectl-interface) is what we're planing
-to use. It is in line with the sections above on Vector configuration splitting
-into the common and custom parts.
+The layout proposed in [guide above][anchor_tutorial_kubectl] is what we're
+planing to use. It is in line with the sections above on Vector configuration
+splitting into the common and custom parts.
 
 The idea is to have a single file with a namespaced configuration (`DaemonSet`,
 `ServiceAccount`, `ClusterRoleBinding`, common `ConfigMap`, etc), a single file
@@ -1344,7 +1344,8 @@ See [motivation](#motivation).
    See the [Minimal supported Kubernetes version][anchor_minimal_supported_kubernetes_version]
    section.
 1. ~~What is the best to avoid Vector from ingesting it's own logs? I'm assuming
-   that my [`kubectl` tutorial](#kubectl-interface) handles this with namespaces?
+   that my [`kubectl` tutorial][anchor_tutorial_kubectl] handles this with
+   namespaces?
    We'd just need to configure Vector to exclude this namespace?~~
    See the [Origin filtering][anchor_origin_filtering] section.
 1. ~~I've seen two different installation strategies. For example, Fluentd offers
@@ -1442,6 +1443,7 @@ See [motivation](#motivation).
 [anchor_origin_filtering]: #origin-filtering
 [anchor_resource_limits]: #resource-limits
 [anchor_strategy_on_yaml_file_grouping]: #strategy-on-yaml-file-grouping
+[anchor_tutorial_kubectl]: #deploy-using-kubectl
 [awesome operators list]: https://github.com/operator-framework/awesome-operators
 [bonzai logging operator]: https://github.com/banzaicloud/logging-operator
 [chartmuseum]: https://chartmuseum.com/
