@@ -26,7 +26,7 @@ is replaces our old `field_filter` transform since it is much more expressive.
 
   # Conditions
   condition."level.eq" = "error"
-  condition."service" = "haproxy"
+  condition."service.eq" = "haproxy"
 ```
 
 Check out the [docs][docs.transforms.filter] for a fill list of available

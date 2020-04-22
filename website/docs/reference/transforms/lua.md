@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-21"
+last_modified_on: "2020-04-22"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
@@ -73,7 +73,9 @@ a full embedded [Lua][urls.lua] engine.
   hooks.shutdown = "shutdown" # optional, no default
 
   # Timers
-  timers = {interval_seconds = 5, handler = "timer_handler"} # optional, no default
+  timers = [
+  {interval_seconds = 5, handler = "timer_handler"}
+  ]
 
   # Source Code
   source = """
@@ -124,7 +126,9 @@ a full embedded [Lua][urls.lua] engine.
   hooks.shutdown = "shutdown" # optional, no default
 
   # Timers
-  timers = {interval_seconds = 5, handler = "timer_handler"} # optional, no default
+  timers = [
+  {interval_seconds = 5, handler = "timer_handler"}
+  ]
 
   # Source Code
   source = """
@@ -293,7 +297,7 @@ using `emit` function.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"interval_seconds":5,"handler":"timer_handler"},{"interval_seconds":5,"handler":"timer_handler"}]}
+  examples={[[{"interval_seconds":5,"handler":"timer_handler"}],[{"interval_seconds":5,"handler":"timer_handler"}]]}
   groups={["inline","module"]}
   name={"timers"}
   path={null}
@@ -471,15 +475,6 @@ end
 
 ## How It Works
 
-### Environment Variables
-
-Environment variables are supported through all of Vector's configuration.
-Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
-will be replaced before being evaluated.
-
-You can learn more in the
-[Environment Variables][docs.configuration#environment-variables] section.
-
 ### Add Fields & Tags
 
 To add `log` fields and `metric` tags just set the desired key to the
@@ -496,6 +491,34 @@ event.log.nested.field = "nested value"
 event.metric.tags.tag = "new value"
 ```
 
+### Defining Timestamps
+
+To parse a timestamp with an optional milliseconds field, like `2020-04-07 06:26:02.643` or `2020-04-07 06:26:02`:
+
+```lua
+timestamp_pattern = "(%d%d%d%d)[-](%d%d)[-](%d%d) (%d%d):(%d%d):(%d%d).?(%d*)"
+
+function parse_timestamp(str)
+  local year, month, day, hour, min, sec, millis = string.match(str, timestamp_pattern)
+  local ms = 0
+  if millis and millis ~= "" then
+    ms = tonumber(millis)
+  end
+  return {
+    year    = tonumber(year),
+    month   = tonumber(month),
+    day     = tonumber(day),
+    hour    = tonumber(hour),
+    min     = tonumber(min),
+    sec     = tonumber(sec),
+    nanosec = ms * 1000000
+  }
+end
+
+parse_timestamp('2020-04-07 06:26:02.643')
+parse_timestamp('2020-04-07 06:26:02')
+```
+
 ### Drop Events
 
 To drop events, simply do not call the emitting function with it. For example:
@@ -507,6 +530,44 @@ function (event, emit)
   end
 end
 ```
+
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
+will be replaced before being evaluated.
+
+You can learn more in the
+[Environment Variables][docs.configuration#environment-variables] section.
+
+### Iterate Over Fields & Tags
+
+To iterate over all fields of an `event` use the [`pairs`][urls.lua_pairs]
+method.  For example:
+
+```lua
+function (event, emit)
+  -- Remove all fields where the value is "-"
+  for f, v in pairs(event) do
+    if v == "-" then
+      event[f] = nil
+    end
+  end
+
+  emit(event)
+end
+```
+
+### Learning Lua
+
+In order to write non-trivial transforms in Lua, one has to have basic
+understanding of Lua. Because Lua is an easy to learn language, reading a few
+first chapters of [the official book][urls.lua_pil] or consulting
+[the manual][urls.lua_manual] would suffice.
+
+### Lua Version
+
+Vector uses the [`rlua` Rust crate][urls.rlua] which currently embeds Lua 5.3.
 
 ### Remove Fields & Tags
 
@@ -716,69 +777,12 @@ by the following table:
 | [`Map`][docs.about.data-model.log#maps]| [`table`][urls.lua_table] | |
 | [`Array`][docs.about.data-model.log#arrays] | [`sequence`][urls.lua_sequence] | Sequences are a special case of tables. Indexes start from 1, following the Lua convention. |
 
-### Iterate Over Fields & Tags
-
-To iterate over all fields of an `event` use the [`pairs`][urls.lua_pairs]
-method.  For example:
-
-```lua
-function (event, emit)
-  -- Remove all fields where the value is "-"
-  for f, v in pairs(event) do
-    if v == "-" then
-      event[f] = nil
-    end
-  end
-
-  emit(event)
-end
-```
-
-### Defining timestamps
-
-To parse a timestamp with an optional milliseconds field, like `2020-04-07 06:26:02.643` or `2020-04-07 06:26:02`:
-
-```lua
-timestamp_pattern = "(%d%d%d%d)[-](%d%d)[-](%d%d) (%d%d):(%d%d):(%d%d).?(%d*)"
-
-function parse_timestamp(str)
-  local year, month, day, hour, min, sec, millis = string.match(str, timestamp_pattern)
-  local ms = 0
-  if millis and millis ~= "" then
-    ms = tonumber(millis)
-  end
-  return {
-    year    = tonumber(year),
-    month   = tonumber(month),
-    day     = tonumber(day),
-    hour    = tonumber(hour),
-    min     = tonumber(min),
-    sec     = tonumber(sec),
-    nanosec = ms * 1000000
-  }
-end
-
-parse_timestamp('2020-04-07 06:26:02.643')
-parse_timestamp('2020-04-07 06:26:02')
-```
-
 ### Search Directories
 
 Vector provides a [`search_dirs`](#search_dirs) option that allows you to specify absolute
 paths that will be searched when using the [Lua `require`
 function][urls.lua_require]. If this option is not set, the directories of
 the [configuration files][docs.setup.configuration] will be used instead.
-
-### Lua Version
-
-Vector uses the [`rlua` Rust crate][urls.rlua] which currently embeds Lua 5.3.
-
-### Learning Lua
-
-In order to write non-trivial transforms in Lua, one has to have basic
-understanding of Lua. Because Lua is an easy to learn language, reading a few
-first chapters of [the official book][urls.lua_pil] or consulting
-[the manual][urls.lua_manual] would suffice.
 
 
 [docs.about.data-model.log#arrays]: /docs/about/data-model/log/#arrays
