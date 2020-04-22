@@ -440,8 +440,7 @@ set.
 
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the pubsub project and topic. If this is unset, Vector
-checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
-filename.
+checks the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) environment variable for a filename.
 
 If no filename is named, Vector will attempt to fetch an instance service
 account for the compute instance the program is running on. If Vector is not
@@ -970,7 +969,7 @@ and will find credentials in the following order:
 
 1. If the [`credentials_path`](#credentials_path) option is set.
 1. If the [`api_key`](#api_key) option is set.
-1. If the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
+1. If the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) envrionment variable is set.
 1. Finally, Vector will check for an [instance service account][urls.gcp_authentication_service_account].
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an

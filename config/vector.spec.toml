@@ -4953,7 +4953,7 @@ require('custom_module')
 
   # The filename for a Google Cloud service account credentials JSON file used to
   # authenticate access to the Cloud Storage API. If this is unset, Vector checks
-  # the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
+  # the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
   #
   # If no filename is named, Vector will attempt to fetch an instance service
   # account for the compute instance the program is running on. If Vector is not
@@ -5301,7 +5301,7 @@ require('custom_module')
 
   # The filename for a Google Cloud service account credentials JSON file used to
   # authenticate access to the pubsub project and topic. If this is unset, Vector
-  # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
+  # checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
   # filename.
   #
   # If no filename is named, Vector will attempt to fetch an instance service
@@ -5577,7 +5577,7 @@ require('custom_module')
 
   # The filename for a Google Cloud service account credentials JSON file used to
   # authenticate access to the Stackdriver Logging API. If this is unset, Vector
-  # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
+  # checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
   # filename.
   #
   # If no filename is named, Vector will attempt to fetch an instance service
