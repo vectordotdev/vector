@@ -1157,6 +1157,12 @@ sense to try to address this issue in Vector code or deployment configs:
 What we can do, though, is provide guides, blog posts and explainers with
 concrete examples for Vector usage for Kubernetes Cluster Operators.
 
+#### Kubernetes audit logs
+
+We can also collect [Kubernetes audit logs][k8s_docs_audit].
+
+TODO: elaborate more.
+
 ### Windows support
 
 We don't aim to support Windows Kubernetes clusters initially. The reason for
@@ -1485,6 +1491,7 @@ See [motivation](#motivation).
 [k8s_api_service_account]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#serviceaccount-v1-core
 [k8s_api_sysctl]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#sysctl-v1-core
 [k8s_docs_admission_controllers]: https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers
+[k8s_docs_audit]: https://kubernetes.io/docs/tasks/debug-application-cluster/audit/
 [k8s_docs_crds]: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/
 [k8s_docs_daemon_set]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
 [k8s_docs_node]: https://kubernetes.io/docs/concepts/architecture/nodes/
