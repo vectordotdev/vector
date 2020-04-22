@@ -119,9 +119,9 @@ impl HttpSink for HecSinkConfig {
         let timestamp = if let Some(Value::Timestamp(ts)) =
             event.remove(&event::log_schema().timestamp_key())
         {
-            ts.timestamp()
+            ts.timestamp_nanos()
         } else {
-            chrono::Utc::now().timestamp()
+            chrono::Utc::now().timestamp_nanos()
         };
         let sourcetype = event.get(&event::log_schema().source_type_key()).cloned();
 
