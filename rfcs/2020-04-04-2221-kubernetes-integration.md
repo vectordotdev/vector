@@ -1063,7 +1063,7 @@ but hold the adoption as integration tests.
 > This section is on gathering data other than container logs.
 
 While our main focus for the integration is collecting log data from the `Pod`s,
-there are other possibilities to gain observaravibility in the Kubernetes
+there are other possibilities to gain observability in the Kubernetes
 environment.
 
 #### Exposing Kubernetes [`Event`s][k8s_api_event] as Vector events
