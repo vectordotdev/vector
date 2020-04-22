@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "GCP PubSub"
 description: "The Vector `gcp_pubsub` sink batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface."
@@ -416,7 +416,7 @@ A [Google Cloud API key][urls.gcp_authentication_api_key] used to authenticate
 access the pubsub project and topic. Either this or [`credentials_path`](#credentials_path) must be
 set.
 
-
+ See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -447,7 +447,7 @@ If no filename is named, Vector will attempt to fetch an instance service
 account for the compute instance the program is running on. If Vector is not
 running on a GCE instance, you must define a credentials file as above.
 
-
+ See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -927,7 +927,7 @@ you understand the risks of not verifying the remote hostname.
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the pubsub project and topic.
 
-
+ See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -961,6 +961,21 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
+
+### GCP Authentication
+
+GCP offers a [variety of authentication methods][urls.gcp_authentication] and
+Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
+and will find credentials in the following order:
+
+1. If the [`credentials_path`](#credentials_path) option is set.
+1. If the [`api_key`](#api_key) option is set.
+1. If the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
+1. Finally, Vector will check for an [instance service account][urls.gcp_authentication_service_account].
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
 
 ### Health Checks
 
@@ -1015,7 +1030,11 @@ options.
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
+[docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
 [urls.gcp_authentication_api_key]: https://cloud.google.com/docs/authentication/api-keys
+[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
+[urls.gcp_authentication_service_account]: https://cloud.google.com/docs/authentication/production#obtaining_and_providing_service_account_credentials_manually
 [urls.gcp_pubsub]: https://cloud.google.com/pubsub/
 [urls.gcp_pubsub_rest]: https://cloud.google.com/pubsub/docs/reference/rest/
 [urls.new_gcp_pubsub_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_pubsub
