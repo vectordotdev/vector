@@ -510,6 +510,23 @@ This worth a separate dedicated RFC though.
 Security considerations on deployment configuration are grouped together with
 other security related measures. See [here][#deployment-hardening].
 
+#### TODO
+
+- https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podspec-v1-core
+
+  - terminationGracePeriodSeconds
+  - hostNetwork
+  - preemptionPolicy
+  - priorityClassName
+  - readinessGates
+  - runtimeClassName
+
+Add to resources sections:
+
+- We can pass thread limit to vector via env var, see
+  https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#envvarsource-v1-core
+  via https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#resourcefieldselector-v1-core
+
 ### Annotating events with metadata from Kubernetes
 
 Kubernetes has a lot of metadata that can be associated with the logs, and most
