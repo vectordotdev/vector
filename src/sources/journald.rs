@@ -164,7 +164,10 @@ fn create_event(record: Record) -> Event {
         log.insert(event::log_schema().host_key().clone(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
-    if let Some(timestamp) = log.get(&SOURCE_TIMESTAMP).or(log.get(&RECEIVED_TIMESTAMP)) {
+    if let Some(timestamp) = log
+        .get(&SOURCE_TIMESTAMP)
+        .or_else(|| log.get(&RECEIVED_TIMESTAMP))
+    {
         if let Value::Bytes(timestamp) = timestamp {
             if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {
                 let timestamp = chrono::Utc.timestamp(
