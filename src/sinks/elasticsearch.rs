@@ -129,6 +129,7 @@ impl SinkConfig for ElasticSearchConfig {
 #[derive(Debug)]
 pub struct ElasticSearchCommon {
     pub base_url: String,
+    request_uri: Uri,
     authorization: Option<String>,
     credentials: Option<AwsCredentials>,
     index: Template,
@@ -194,13 +195,10 @@ impl HttpSink for ElasticSearchCommon {
     }
 
     fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
-        let uri = format!("{}{}", self.base_url, self.path_and_query)
-            .parse::<Uri>()
-            .unwrap();
-        let mut builder = Request::post(&uri);
+        let mut builder = Request::post(&self.request_uri);
 
         if let Some(credentials) = &self.credentials {
-            let mut request = signed_request("POST", &uri, &self.region);
+            let mut request = signed_request("POST", &self.request_uri, &self.region);
 
             request.add_header("Content-Type", "application/x-ndjson");
 
@@ -350,12 +348,16 @@ impl ElasticSearchCommon {
             }
         }
         let path_and_query = path_query.finish();
+        let request_uri = format!("{}{}", base_url, path_and_query)
+            .parse::<Uri>()
+            .expect("Invalid host URL");
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
         let config = config.clone();
 
         Ok(Self {
             base_url,
+            request_uri,
             authorization,
             credentials,
             index,
