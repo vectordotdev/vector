@@ -1,4 +1,3 @@
-use super::service::Elapsed;
 use crate::Error;
 use futures::FutureExt;
 use std::{
@@ -9,7 +8,7 @@ use std::{
     time::Duration,
 };
 use tokio::time::{delay_for, Delay};
-use tower03::retry::Policy;
+use tower03::{retry::Policy, timeout::error::Elapsed};
 
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
