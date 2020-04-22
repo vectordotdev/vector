@@ -548,16 +548,25 @@ This worth a separate dedicated RFC though.
 Security considerations on deployment configuration are grouped together with
 other security-related measures. See [here](#deployment-hardening).
 
+#### Other notable [`PodSpec`][k8s_api_pod_spec] properties
+
+- `terminationGracePeriodSeconds` - we should set this to a value slightly
+  bigger than Vector topology grace termination period;
+- `hostNetwork` - we shouldn't use host network since we need access to
+  `kube-apiserver`, and the easiest way to get that is to use cluster network;
+- `preemptionPolicy` - our default deployment mode - aggregating logs from
+  pods - is not considered critical for cluster itself, so we should _not_
+  disable preemption;
+- `priorityClassName` - see [`PriorityClass` docs][k8s_docs_priority_class]; we
+  could ship a [`PriorityClass`][k8s_api_priority_class] and set this value, but
+  the priority value is not normalized, so it's probably not a good idea to
+  provide a default our of the box, and leave it for cluster operator to
+  configure;
+- `runtimeClassName` - we'll be using this value in tests to validate that
+  Vector works with non-standard runtime; we shouldn't set it in our default
+  YAMLs, nor set it at Helm by default;
+
 #### TODO
-
-- https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podspec-v1-core
-
-  - terminationGracePeriodSeconds
-  - hostNetwork
-  - preemptionPolicy
-  - priorityClassName
-  - readinessGates
-  - runtimeClassName
 
 Add to resources sections:
 
@@ -1540,6 +1549,7 @@ See [motivation](#motivation).
 [k8s_api_pod_security_policy]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podsecuritypolicy-v1beta1-policy
 [k8s_api_pod_spec]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podspec-v1-core
 [k8s_api_pod]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#pod-v1-core
+[k8s_api_priority_class]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#priorityclass-v1-scheduling-k8s-io
 [k8s_api_probe]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#probe-v1-core
 [k8s_api_resource_requirements]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#resourcerequirements-v1-core
 [k8s_api_role_binding]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#rolebinding-v1-rbac-authorization-k8s-io
@@ -1559,6 +1569,7 @@ See [motivation](#motivation).
 [k8s_docs_pod_lifecycle_container_probes]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 [k8s_docs_pod_security_policiy]: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
 [k8s_docs_pod]: https://kubernetes.io/docs/concepts/workloads/pods/pod/
+[k8s_docs_priority_class]: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass
 [k8s_docs_rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
 [k8s_docs_rolling_update]: https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/
 [k8s_docs_secret]: https://kubernetes.io/docs/concepts/configuration/secret/
