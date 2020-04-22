@@ -152,8 +152,8 @@ sort = 3
 type = "[table]"
 category = "Timers"
 common = false
-examples.inline = [{interval_seconds = 5, handler = "timer_handler"}]
-examples.module = [{interval_seconds = 5, handler = "timer_handler"}]
+examples.inline = [[{interval_seconds = 5, handler = "timer_handler"}]]
+examples.module = [[{interval_seconds = 5, handler = "timer_handler"}]]
 groups = ["inline", "module"]
 required = false
 description = """\
