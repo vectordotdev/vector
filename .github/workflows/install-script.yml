@@ -1,9 +1,12 @@
 name: install-script
+
 on:
   push:
     branches:
-    - master
-  pull_request: {}
+      - master
+    paths:
+      - "distribution/install.sh"
+
 jobs:
   cargo-deny:
     runs-on: ubuntu-latest

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "best_effort"
 component_title: "Docker"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
@@ -477,7 +477,7 @@ The UTC timestamp extracted from the Docker log event.
 
 Vector will automatically attempt to connect to the docker daemon for you. If
 the user that Vector is running under can run `docker ps` then Vector will be
-able to connect. Vector will also respect if `DOCKER_HOST` and
+able to connect. Vector will also respect if [`DOCKER_HOST`](#docker_host) and
 `DOCKER_VERIFY_TLS` are set (as well as other Docker environment variables).
 See the [Docker daemon docs][urls.docker_daemon_socket_option].
 

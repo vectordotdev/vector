@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
@@ -665,7 +665,7 @@ You can read more about tenant id's [here][urls.loki_multi_tenancy]
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"label":"value"}]}
+  examples={[]}
   groups={[]}
   name={"labels"}
   path={null}
@@ -694,7 +694,7 @@ amount of unique label values.
   enumValues={null}
   examples={[{"key":"value"},{"key":"{{ event_field }}"}]}
   groups={[]}
-  name={"`[label-name`"}
+  name={"`[label-name]`"}
   path={"labels"}
   relevantWhen={null}
   required={true}
@@ -704,7 +704,7 @@ amount of unique label values.
   warnings={[]}
   >
 
-#### `[label-name`
+#### `[label-name]`
 
 A key-value pair for labels.
 

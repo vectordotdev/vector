@@ -16,7 +16,7 @@ required = false
 description = """\
 The filename for a Google Cloud service account credentials JSON file \
 used to authenticate access to the <%= access %>. If this is unset, \
-Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for \
+Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for \
 a filename.
 
 If no filename is named, Vector will attempt to fetch an instance \

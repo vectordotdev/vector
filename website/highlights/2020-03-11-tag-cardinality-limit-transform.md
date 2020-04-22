@@ -12,10 +12,9 @@ tags: ["type: new feature", "domain: transforms", "transform: tag_cardinality_li
 
 import CodeExplanation from '@site/src/components/CodeExplanation';
 
-High cardinality labels got you up at night...literally? Check out our new
+High cardinality metric tags can severy disrupt downstream metrics storages. To
+protet against this we built a new
 [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit].
-It protects your metrics storage from label misuse and let's your sleep at
-night.
 
 ## Getting Started
 

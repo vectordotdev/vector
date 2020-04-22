@@ -123,6 +123,7 @@ impl HttpSink for HecSinkConfig {
         } else {
             chrono::Utc::now().timestamp()
         };
+        let sourcetype = event.get(&event::log_schema().source_type_key()).cloned();
 
         let mut body = match self.encoding.codec() {
             Encoding::Json => event_to_json(event, &self.indexed_fields, timestamp),
@@ -139,6 +140,11 @@ impl HttpSink for HecSinkConfig {
 
         if let Some(index) = &self.index {
             body["index"] = json!(index);
+        }
+
+        if let Some(sourcetype) = sourcetype {
+            let sourcetype = sourcetype.to_string_lossy();
+            body["sourcetype"] = json!(sourcetype);
         }
 
         serde_json::to_vec(&body)
@@ -483,6 +489,45 @@ mod integration_tests {
         assert_eq!("hello", asdf);
         let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
         assert_eq!("example.com:1234", host);
+    }
+
+    #[test]
+    fn splunk_sourcetype() {
+        let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
+
+        let indexed_fields = vec![Atom::from("asdf")];
+        let config = config(Encoding::Json, indexed_fields);
+        let (sink, _) = config.build(cx).unwrap();
+
+        let message = random_string(100);
+        let mut event = Event::from(message.clone());
+        event.as_mut_log().insert("asdf", "hello");
+        event
+            .as_mut_log()
+            .insert(event::log_schema().source_type_key(), "file");
+
+        let pump = sink.send(event);
+
+        rt.block_on(pump).unwrap();
+
+        let entry = (0..20)
+            .find_map(|_| {
+                recent_entries(None)
+                    .into_iter()
+                    .find(|entry| entry["message"].as_str() == Some(message.as_str()))
+                    .or_else(|| {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        None
+                    })
+            })
+            .expect("Didn't find event in Splunk");
+
+        assert_eq!(message, entry["message"].as_str().unwrap());
+        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("hello", asdf);
+        let sourcetype = entry["sourcetype"].as_str().unwrap();
+        assert_eq!("file", sourcetype);
     }
 
     #[test]
