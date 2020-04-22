@@ -137,6 +137,7 @@ pub struct ElasticSearchCommon {
     path_and_query: String,
     config: ElasticSearchConfig,
     compression: Compression,
+    region: Region,
 }
 
 #[derive(Debug, Snafu)]
@@ -199,7 +200,7 @@ impl HttpSink for ElasticSearchCommon {
         let mut builder = Request::post(&uri);
 
         if let Some(credentials) = &self.credentials {
-            let mut request = signed_request("POST", &uri);
+            let mut request = signed_request("POST", &uri, &self.region);
 
             request.add_header("Content-Type", "application/x-ndjson");
 
@@ -305,6 +306,8 @@ impl ElasticSearchCommon {
             .into());
         }
 
+        let region = derive_region(&uri);
+
         let credentials = match &config.auth {
             Some(ElasticSearchAuth::Basic { .. }) | None => None,
             Some(ElasticSearchAuth::Aws) => {
@@ -361,6 +364,7 @@ impl ElasticSearchCommon {
             tls_settings,
             config,
             compression,
+            region,
         })
     }
 }
@@ -378,7 +382,7 @@ fn healthcheck(
             }
         }
         Some(credentials) => {
-            let mut signer = signed_request("GET", builder.uri_ref().unwrap());
+            let mut signer = signed_request("GET", builder.uri_ref().unwrap(), &common.region);
             finish_signer(&mut signer, &credentials, &mut builder);
         }
     }
@@ -395,9 +399,8 @@ fn healthcheck(
     ))
 }
 
-fn signed_request(method: &str, uri: &Uri) -> SignedRequest {
-    let region = derive_region(uri);
-    SignedRequest::new(method, "es", &region, uri.path())
+fn signed_request(method: &str, uri: &Uri, region: &Region) -> SignedRequest {
+    SignedRequest::new(method, "es", region, uri.path())
 }
 
 /// Derive a region name from a hostname
