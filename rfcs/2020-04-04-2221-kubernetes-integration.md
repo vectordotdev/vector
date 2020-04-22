@@ -1152,6 +1152,9 @@ So, to implement this, we'd need to add a special source that captures events
 from Kubernetes API, and provide a new workload configuration based on
 [`Deployment`][k8s_api_deployment].
 
+See also a section on collecting
+[Kubernetes audit logs][anchor_kubernetes_audit_logs].
+
 ### Discover and gather Prometheus metrics for Kubernetes API resources
 
 Prometheus already has a built-in
@@ -1217,7 +1220,18 @@ concrete examples for Vector usage for Kubernetes Cluster Operators.
 
 We can also collect [Kubernetes audit logs][k8s_docs_audit].
 
-TODO: elaborate more.
+This is very similar to
+[collecting Kubernetes Events][anchor_collecting_kubernetes_events], but
+provides a more fine-grained control over what events are audited.
+
+It's important to understand that events, unfiltered, should be considered very
+sensitive and privileged data.
+
+Kubernetes audit [`Policy`][k8s_api_policy] allows cluster operator to configure
+`kubelet`s to manage the audit data with a high degree of flexibility.
+
+The best part is this is something that should already work great with Vector -
+we can already support operation via both log and webhook backends.
 
 ### Windows support
 
@@ -1477,8 +1491,10 @@ See [motivation](#motivation).
 - [ ] Add Kubernetes setup/integration guide.
 - [ ] Release `0.10.0` and announce.
 
+[anchor_collecting_kubernetes_events]: #exposing-kubernetes-event-s-k8s-api-event-as-vector-events
 [anchor_file_locations]: #file-locations
 [anchor_helm_vs_raw_yaml_files]: #helm-vs-raw-yaml-files
+[anchor_kubernetes_audit_logs]: #kubernetes-audit-logs
 [anchor_minimal_supported_kubernetes_version]: #minimal-supported-kubernetes-version
 [anchor_origin_filtering]: #origin-filtering
 [anchor_resource_limits]: #resource-limits
@@ -1541,6 +1557,7 @@ See [motivation](#motivation).
 [k8s_api_pod_security_policy]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podsecuritypolicy-v1beta1-policy
 [k8s_api_pod_spec]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podspec-v1-core
 [k8s_api_pod]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#pod-v1-core
+[k8s_api_policy]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#policy-v1alpha1-auditregistration-k8s-io
 [k8s_api_priority_class]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#priorityclass-v1-scheduling-k8s-io
 [k8s_api_probe]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#probe-v1-core
 [k8s_api_resource_requirements]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#resourcerequirements-v1-core
