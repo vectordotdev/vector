@@ -415,7 +415,10 @@ impl<R: Read> Stream for EventStream<R> {
             None => (),
             Some(Some(t)) => {
                 if let Some(t) = t.as_u64() {
-                    self.time = Time::Provided(Utc.timestamp(t as i64, 0));
+                    let time = parse_timestamp(t as i64)
+                        .ok_or_else(|| ApiError::InvalidDataFormat { event: self.events })?;
+
+                    self.time = Time::Provided(time);
                 } else if let Some(t) = t.as_f64() {
                     self.time = Time::Provided(Utc.timestamp(
                         t.floor() as i64,
@@ -443,6 +446,38 @@ impl<R: Read> Stream for EventStream<R> {
 
         Ok(Async::Ready(Some(event)))
     }
+}
+
+/// Parse a `i64` unix timestamp that can either be in seconds, milliseconds or
+/// nanoseconds.
+///
+/// This attempts to parse timestamps based on what cutoff range they fall into.
+/// For seconds to be parsed the timestamp must be less than the unix epoch of
+/// the year `2400`. For this to parse milliseconds the time must be smaller
+/// than the year `10,000` in unix epcoch milliseconds. If the value is larger
+/// than both we attempt to parse it as nanoseconds.
+///
+/// Returns `None` if `t` is negative.
+fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
+    // Utc.ymd(2400, 1, 1).and_hms(0,0,0).timestamp();
+    const SEC_CUTOFF: i64 = 13569465600;
+    // Utc.ymd(10_000, 1, 1).and_hms(0,0,0).timestamp_millis();
+    const MILLISEC_CUTOFF: i64 = 253402300800000;
+
+    // Timestamps can't be negative!
+    if t < 0 {
+        return None;
+    }
+
+    let ts = if t < SEC_CUTOFF {
+        Utc.timestamp(t, 0)
+    } else if t < MILLISEC_CUTOFF {
+        Utc.timestamp_millis(t)
+    } else {
+        Utc.timestamp_nanos(t)
+    };
+
+    Some(ts)
 }
 
 /// Maintains last known extracted value of field and uses it in the absence of field.
@@ -669,7 +704,7 @@ fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
 #[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
-    use super::SplunkConfig;
+    use super::{parse_timestamp, SplunkConfig};
     use crate::runtime::{Runtime, TaskExecutor};
     use crate::test_util::{self, collect_n};
     use crate::{
@@ -682,6 +717,7 @@ mod tests {
         },
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
     };
+    use chrono::{TimeZone, Utc};
     use futures01::{stream, sync::mpsc, Sink};
     use http::Method;
     use std::net::SocketAddr;
@@ -1059,5 +1095,36 @@ mod tests {
             "third".into()
         );
         assert_eq!(events[2].as_log()[&super::SOURCE], "secondary".into());
+    }
+
+    #[test]
+    fn parse_timestamps() {
+        let cases = vec![
+            Utc::now(),
+            Utc.ymd(1971, 11, 7).and_hms(1, 1, 1),
+            Utc.ymd(2011, 08, 5).and_hms(1, 1, 1),
+            Utc.ymd(2189, 11, 4).and_hms(2, 2, 2),
+        ];
+
+        for case in cases {
+            let sec = case.timestamp();
+            let millis = case.timestamp_millis();
+            let nano = case.timestamp_nanos();
+
+            assert_eq!(
+                parse_timestamp(sec as i64).unwrap().timestamp(),
+                case.timestamp()
+            );
+            assert_eq!(
+                parse_timestamp(millis as i64).unwrap().timestamp_millis(),
+                case.timestamp_millis()
+            );
+            assert_eq!(
+                parse_timestamp(nano as i64).unwrap().timestamp_nanos(),
+                case.timestamp_nanos()
+            );
+        }
+
+        assert!(parse_timestamp(-1).is_none());
     }
 }
