@@ -46,7 +46,7 @@ endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords
 [sinks.my_sink_id]
   # General
   type = "aws_kinesis_streams" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   partition_key_field = "user_id" # optional, no default
   region = "us-east-1" # required, required when endpoint = ""
   stream_name = "my-stream" # required
@@ -62,7 +62,7 @@ endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords
 [sinks.my_sink_id]
   # General
   type = "aws_kinesis_streams" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   partition_key_field = "user_id" # optional, no default

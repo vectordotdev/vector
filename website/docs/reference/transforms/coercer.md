@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-04-22"
 component_title: "Coercer"
-description: "The Vector `coercer` transform accepts and outputs `log` events allowing you to coerce log fields into fixed types."
+description: "The Vector `coercer` transform accepts and outputs `log` events, allowing you to coerce log fields into fixed types."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `coercer` transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to coerce
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to coerce
 log fields into fixed types.
 
 <!--
@@ -40,7 +40,7 @@ log fields into fixed types.
 [transforms.my_transform_id]
   # General
   type = "coercer" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
 
   # Types
   types.status = "int" # example
@@ -58,7 +58,7 @@ log fields into fixed types.
 [transforms.my_transform_id]
   # General
   type = "coercer" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   drop_unspecified = false # optional, default
 
   # Types

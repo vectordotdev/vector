@@ -46,7 +46,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 [sinks.my_sink_id]
   # General
   type = "aws_cloudwatch_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   create_missing_group = true # optional, default
   create_missing_stream = true # optional, default
   group_name = "group-name" # required
@@ -65,7 +65,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 [sinks.my_sink_id]
   # General
   type = "aws_cloudwatch_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   create_missing_group = true # optional, default
   create_missing_stream = true # optional, default

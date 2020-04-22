@@ -44,7 +44,7 @@ Interface][urls.gcp_pubsub_rest].
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "gcp_pubsub" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 ```
@@ -56,7 +56,7 @@ Interface][urls.gcp_pubsub_rest].
 [sinks.my_sink_id]
   # General
   type = "gcp_pubsub" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${GCP_API_KEY}" # optional, no default
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default

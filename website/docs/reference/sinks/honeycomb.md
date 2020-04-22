@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "Honeycomb"
 description: "The Vector `honeycomb` sink batches `log` events to Honeycomb via the batch events API."
@@ -43,7 +43,7 @@ The Vector `honeycomb` sink
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "honeycomb" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${HONEYCOMB_API_KEY}" # required
   dataset = "my-honeycomb-dataset" # required
   healthcheck = true # optional, default
@@ -56,7 +56,7 @@ The Vector `honeycomb` sink
 [sinks.my_sink_id]
   # General
   type = "honeycomb" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${HONEYCOMB_API_KEY}" # required
   dataset = "my-honeycomb-dataset" # required
   healthcheck = true # optional, default

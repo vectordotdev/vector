@@ -45,7 +45,7 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 [sinks.my_sink_id]
   # General
   type = "aws_s3" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   bucket = "my-bucket" # required
   compression = "gzip" # required
   healthcheck = true # optional, default
@@ -73,7 +73,7 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 [sinks.my_sink_id]
   # General
   type = "aws_s3" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   bucket = "my-bucket" # required
   compression = "gzip" # required

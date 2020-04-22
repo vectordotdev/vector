@@ -44,7 +44,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "gcp_stackdriver_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 ```
@@ -56,7 +56,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
 [sinks.my_sink_id]
   # General
   type = "gcp_stackdriver_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   billing_account_id = "012345-6789AB-CDEF01" # optional, no default
   credentials_path = "/path/to/credentials.json" # optional, no default
   folder_id = "My Folder" # optional, no default

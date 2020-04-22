@@ -45,7 +45,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 [sinks.my_sink_id]
   # General
   type = "gcp_cloud_storage" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   compression = "gzip" # required
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
@@ -68,7 +68,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 [sinks.my_sink_id]
   # General
   type = "gcp_cloud_storage" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   bucket = "my-bucket" # required
   compression = "gzip" # required
   credentials_path = "/path/to/credentials.json" # optional, no default

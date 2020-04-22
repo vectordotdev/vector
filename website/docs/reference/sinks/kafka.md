@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
@@ -53,7 +53,7 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 [sinks.my_sink_id]
   # General
   type = "kafka" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
   compression = "none" # optional, default
   healthcheck = true # optional, default
@@ -71,7 +71,7 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 [sinks.my_sink_id]
   # General
   type = "kafka" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
   compression = "none" # optional, default
   healthcheck = true # optional, default

@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-04-22"
 component_title: "ANSI Stripper"
-description: "The Vector `ansi_stripper` transform accepts and outputs `log` events allowing you to strips ANSI escape sequences from the specified field."
+description: "The Vector `ansi_stripper` transform accepts and outputs `log` events, allowing you to strips ANSI escape sequences from the specified field."
 event_types: ["log"]
 function_category: "sanitize"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+ansi_stripper%22
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `ansi_stripper` transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to strips
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to strips
 ANSI escape sequences from the specified field.
 
 <!--
@@ -39,7 +39,7 @@ ANSI escape sequences from the specified field.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "ansi_stripper" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   field = "message" # optional, default
 ```
 
@@ -49,7 +49,7 @@ ANSI escape sequences from the specified field.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "ansi_stripper" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   field = "message" # optional, default
 ```
 

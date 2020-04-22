@@ -18,7 +18,7 @@ sort = -2
 [<%= type.pluralize %>.<%= name %>.options.inputs]
 type = "[string]"
 common = true
-examples = [["my-source-id"]]
+examples = [["my-source-or-transform-id"]]
 groups = <%= groups.to_toml %>
 required = true
 description = """\

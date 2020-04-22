@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "LogDNA"
 description: "The Vector `logdna` sink batches `log` events to LogDna's HTTP Ingestion API."
@@ -43,7 +43,7 @@ The Vector `logdna` sink
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "logdna" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${LOGDNA_API_KEY}" # required
   healthcheck = true # optional, default
   hostname = "${HOSTNAME}" # required
@@ -56,7 +56,7 @@ The Vector `logdna` sink
 [sinks.my_sink_id]
   # General
   type = "logdna" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${LOGDNA_API_KEY}" # required
   default_app = "vector" # optional, default
   healthcheck = true # optional, default
