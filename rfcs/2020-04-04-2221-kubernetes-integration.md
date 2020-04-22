@@ -505,6 +505,11 @@ exchange this data with our partners and derive an even more realistic profile
 for Vector's runtime properties, based on real data from the multiple data sets.
 This worth a separate dedicated RFC though.
 
+#### Security considerations on deployment configuration
+
+Security considerations on deployment configuration are grouped together with
+other security related measures. See [here][#deployment-hardening].
+
 ### Annotating events with metadata from Kubernetes
 
 Kubernetes has a lot of metadata that can be associated with the logs, and most
