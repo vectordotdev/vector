@@ -29,7 +29,7 @@
 //       `Encoder` that defines some `encode` function which this config then calls internally as
 //       part of it's own (yet to be written) `encode() -> Vec<u8>` function.
 
-use crate::{event::Value, Event, Result};
+use crate::{event::{Value, PathIter}, Event, Result};
 use serde::de::{MapAccess, Visitor};
 use serde::{
     de::{self, DeserializeOwned, Deserializer, IntoDeserializer},
@@ -156,11 +156,24 @@ pub trait EncodingConfiguration<E> {
                 Event::Log(log_event) => {
                     let to_remove = log_event
                         .keys()
-                        .filter(|f| {
+                        .filter(|field| {
+                            let field_path = PathIter::new(field).collect::<Vec<_>>();
                             !only_fields
                                 .iter()
-                                // TODO: This is a hack for #2407, #2410 should fix this fully.
-                                .any(|only| f.starts_with(&(only.to_string() + "[")) || only == f)
+                                .any(|only| {
+                                    if only == field {
+                                        true // fastpath
+                                    } else {
+                                        // TODO: This is a hack for #2407, #2410 should fix this fully.
+                                        // This is *slow*.
+                                        let only_path = PathIter::new(only);
+                                        if field_path.starts_with(&only_path.collect::<Vec<_>>()[..]) {
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    }
+                                })
                         })
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
