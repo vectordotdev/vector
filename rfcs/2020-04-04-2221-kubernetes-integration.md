@@ -52,7 +52,7 @@ it has to be deployed on every [`Node`][k8s_docs_node] in your cluster.
 
 The following diagram demonstrates how this works:
 
-TODO: add deployment topology diagram here.
+<img src="2020-04-04-2221-kubernetes-integration/deployment-topology.svg" />
 
 ### What We'll Accomplish
 
