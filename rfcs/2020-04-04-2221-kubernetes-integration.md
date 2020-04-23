@@ -1441,9 +1441,10 @@ See [motivation](#motivation).
    Kubernetes now solves it's internal autoscaling pipelines needs with
    [`metrics-server`][metrics-server] - a similar idea yet much more lightweight
    implementation.
-1. How are we collecting Kubernetes system events? Is that outside of the
+1. ~~How are we collecting Kubernetes system events? Is that outside of the
    scope of this RFC? And why does this take an entirely different path?
-   (ref [issue#1293])
+   (ref [issue#1293])~~
+   See the [Other data gathering][anchor_other_data_gathering] section.
 1. What are some of the details that set Vector's Kubernetes integration apart?
    This is for marketing purposes and also helps us "raise the bar".
 
@@ -1497,6 +1498,7 @@ See [motivation](#motivation).
 [anchor_kubernetes_audit_logs]: #kubernetes-audit-logs
 [anchor_minimal_supported_kubernetes_version]: #minimal-supported-kubernetes-version
 [anchor_origin_filtering]: #origin-filtering
+[anchor_other_data_gathering]: #anchor-other-data-gathering
 [anchor_resource_limits]: #resource-limits
 [anchor_strategy_on_yaml_file_grouping]: #strategy-on-yaml-file-grouping
 [anchor_tutorial_kubectl]: #deploy-using-kubectl
