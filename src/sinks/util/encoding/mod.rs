@@ -119,7 +119,10 @@ pub trait EncodingConfiguration<E> {
         if let (Some(only_fields), Some(except_fields)) =
             (&self.only_fields(), &self.except_fields())
         {
-            if only_fields.iter().any(|f| except_fields.contains(&Atom::from(f.clone()))) {
+            if only_fields
+                .iter()
+                .any(|f| except_fields.contains(&Atom::from(f.clone())))
+            {
                 Err("`except_fields` and `only_fields` should be mutually exclusive.")?;
             }
         }
