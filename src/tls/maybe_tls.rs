@@ -32,6 +32,13 @@ impl<R, T> MaybeTls<R, T> {
             Self::Tls(tls) => Some(&tls),
         }
     }
+
+    pub fn tls_mut(&mut self) -> Option<&mut T> {
+        match self {
+            Self::Raw(_) => None,
+            Self::Tls(tls) => Some(tls),
+        }
+    }
 }
 
 impl<T> From<Option<T>> for MaybeTls<(), T> {
