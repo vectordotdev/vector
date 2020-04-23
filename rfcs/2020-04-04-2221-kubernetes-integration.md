@@ -1155,7 +1155,7 @@ from Kubernetes API, and provide a new workload configuration based on
 See also a section on collecting
 [Kubernetes audit logs][anchor_kubernetes_audit_logs].
 
-### Discover and gather Prometheus metrics for Kubernetes API resources
+#### Discover and gather Prometheus metrics for Kubernetes API resources
 
 Prometheus already has a built-in
 [Kubernetes Service Discovery][prometheus_kubernetes_sd_config] support, so one
@@ -1169,7 +1169,7 @@ the intermediary.
 
 We don't aim to implement this in the initial Kubernetes integration.
 
-### Gather data from the host OS
+#### Gather data from the host OS
 
 This is very useful for Kubernetes Cluster Operators willing to deploy Vector
 for the purposes of gaining observability on what's going on with their cluster
@@ -1190,7 +1190,7 @@ whatsoever, it's possible to just deploy Vector as a
 [`hostPath` volume][k8s_api_host_path_volume_source] mounts and/or enabling
 `hostNetwork` at the [`PodSpec`][k8s_api_pod_spec].
 
-#### Automatic discovery of things to monitor on the host OS
+##### Automatic discovery of things to monitor on the host OS
 
 While nothing prevents users from manually configuring Vector for gathering data
 from the host OS, it's very hard for us to offer sane defaults that would work
