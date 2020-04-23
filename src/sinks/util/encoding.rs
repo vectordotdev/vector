@@ -495,7 +495,7 @@ mod tests {
 
     const TOML_EXCEPT_FIELD: &str = r#"
         encoding.codec = "Snoot"
-        encoding.except_fields = ["Doop"]
+        encoding.except_fields = ["a.b.c", "b", "c[0].y"]
     "#;
     #[test]
     fn test_except() {
@@ -504,12 +504,23 @@ mod tests {
         let mut event = Event::new_empty_log();
         {
             let log = event.as_mut_log();
-            log.insert("Doop", 1);
-            log.insert("Beep", 1);
+            log.insert("a", 1);
+            log.insert("a.b", 1);
+            log.insert("a.b.c", 1);
+            log.insert("a.b.d", 1);
+            log.insert("b[0]", 1);
+            log.insert("b[1].x", 1);
+            log.insert("c[0].x", 1);
+            log.insert("c[0].y", 1);
         }
         config.encoding.apply_rules(&mut event);
-        assert!(!event.as_mut_log().contains(&Atom::from("Doop")));
-        assert!(event.as_mut_log().contains(&Atom::from("Beep")));
+        assert!(!event.as_mut_log().contains(&Atom::from("a.b.c")));
+        assert!(!event.as_mut_log().contains(&Atom::from("b")));
+        assert!(!event.as_mut_log().contains(&Atom::from("b[1].x")));
+        assert!(!event.as_mut_log().contains(&Atom::from("c[0].y")));
+
+        assert!(event.as_mut_log().contains(&Atom::from("a.b.d")));
+        assert!(event.as_mut_log().contains(&Atom::from("c[0].x")));
     }
 
     const TOML_ONLY_FIELD: &str = r#"
