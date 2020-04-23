@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "Apache Pulsar"
 description: "The Vector `pulsar` sink streams `log` events to Apache Pulsar via the Pulsar protocol."
@@ -43,7 +43,7 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
 [sinks.my_sink_id]
   # General
   type = "pulsar" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   address = "127.0.0.1:6650" # required
   healthcheck = true # optional, default
   topic = "topic-1234" # required
@@ -59,7 +59,7 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
 [sinks.my_sink_id]
   # General
   type = "pulsar" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   address = "127.0.0.1:6650" # required
   healthcheck = true # optional, default
   topic = "topic-1234" # required

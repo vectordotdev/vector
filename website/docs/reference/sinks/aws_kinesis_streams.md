@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-12"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Kinesis Data Streams"
 description: "The Vector `aws_kinesis_streams` sink batches `log` events to Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint."
@@ -46,7 +46,7 @@ endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords
 [sinks.my_sink_id]
   # General
   type = "aws_kinesis_streams" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   partition_key_field = "user_id" # optional, no default
   region = "us-east-1" # required, required when endpoint = ""
   stream_name = "my-stream" # required
@@ -62,7 +62,7 @@ endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords
 [sinks.my_sink_id]
   # General
   type = "aws_kinesis_streams" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   partition_key_field = "user_id" # optional, no default
@@ -832,7 +832,7 @@ X-Amz-Target: Kinesis_20131202.PutRecords
 
 Vector checks for AWS credentials in the following order:
 
-1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+1. Environment variables [`AWS_ACCESS_KEY_ID`](#aws_access_key_id) and [`AWS_SECRET_ACCESS_KEY`](#aws_secret_access_key).
 2. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
 3. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
 4. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."
@@ -53,7 +53,7 @@ The Vector `clickhouse` sink
 [sinks.my_sink_id]
   # General
   type = "clickhouse" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   database = "mydatabase" # optional, no default
   healthcheck = true # optional, default
   host = "http://localhost:8123" # required
@@ -70,7 +70,7 @@ The Vector `clickhouse` sink
 [sinks.my_sink_id]
   # General
   type = "clickhouse" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   database = "mydatabase" # optional, no default
   healthcheck = true # optional, default
   host = "http://localhost:8123" # required

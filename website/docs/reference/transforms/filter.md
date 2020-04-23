@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-04-22"
 component_title: "Filter"
-description: "The Vector `filter` transform accepts and outputs `log` and `metric` events allowing you to select events based on a set of logical conditions."
+description: "The Vector `filter` transform accepts and outputs `log` and `metric` events, allowing you to select events based on a set of logical conditions."
 event_types: ["log","metric"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+filter%22
@@ -18,7 +18,7 @@ import TabItem from '@theme/TabItem';
 
 The Vector `filter` transform
 accepts and outputs [`log`][docs.data-model.log] and
-[`metric`][docs.data-model.metric] events allowing you to select events based
+[`metric`][docs.data-model.metric] events, allowing you to select events based
 on a set of logical conditions.
 
 <!--
@@ -41,7 +41,7 @@ on a set of logical conditions.
 [transforms.my_transform_id]
   # General
   type = "filter" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
 
   # Condition
   condition.type = "check_fields" # optional, default
@@ -59,7 +59,7 @@ on a set of logical conditions.
 [transforms.my_transform_id]
   # General
   type = "filter" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
 
   # Condition
   condition.type = "check_fields" # optional, default

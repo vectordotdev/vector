@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-04-22"
 component_title: "GeoIP"
-description: "The Vector [`geoip`](#geoip) transform accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases."
+description: "The Vector [`geoip`](#geoip) transform accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases."
 event_types: ["log"]
 function_category: "enrich"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+geoip%22
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector [`geoip`](#geoip) transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to enrich
 events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city
 databases.
 
@@ -40,7 +40,7 @@ databases.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "geoip" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   database = "/path/to/GeoLite2-City.mmdb" # required
   source = "ip_address" # required
   target = "geoip" # optional, default
@@ -52,7 +52,7 @@ databases.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "geoip" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   database = "/path/to/GeoLite2-City.mmdb" # required
   source = "ip_address" # required
   target = "geoip" # optional, default

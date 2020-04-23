@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "Papertrail"
 description: "The Vector `papertrail` sink streams `log` events to Papertrail via Syslog."
@@ -44,7 +44,7 @@ The Vector `papertrail` sink
 [sinks.my_sink_id]
   # General
   type = "papertrail" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "logs.papertrailapp.com:12345" # required
   healthcheck = true # optional, default
 
@@ -59,7 +59,7 @@ The Vector `papertrail` sink
 [sinks.my_sink_id]
   # General
   type = "papertrail" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "logs.papertrailapp.com:12345" # required
   healthcheck = true # optional, default
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-21"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
@@ -44,7 +44,7 @@ The Vector `loki` sink
 [sinks.my_sink_id]
   # General
   type = "loki" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "http://localhost:3100" # required
   healthcheck = true # optional, default
 
@@ -52,7 +52,8 @@ The Vector `loki` sink
   encoding.codec = "json" # optional, default
 
   # Labels
-  labels = {label = "value"} # required
+  labels.key = "value" # example
+  labels.key = "{{ event_field }}" # example
 ```
 
 </TabItem>
@@ -62,7 +63,7 @@ The Vector `loki` sink
 [sinks.my_sink_id]
   # General
   type = "loki" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "http://localhost:3100" # required
   healthcheck = true # optional, default
   remove_label_fields = false # optional, default
@@ -91,7 +92,8 @@ The Vector `loki` sink
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # Labels
-  labels = {label = "value"} # required
+  labels.key = "value" # example
+  labels.key = "{{ event_field }}" # example
 
   # Request
   request.in_flight_limit = 5 # optional, default, requests
@@ -663,7 +665,7 @@ You can read more about tenant id's [here][urls.loki_multi_tenancy]
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"label":"value"}]}
+  examples={[]}
   groups={[]}
   name={"labels"}
   path={null}
@@ -692,7 +694,7 @@ amount of unique label values.
   enumValues={null}
   examples={[{"key":"value"},{"key":"{{ event_field }}"}]}
   groups={[]}
-  name={"`[label-name`"}
+  name={"`[label-name]`"}
   path={"labels"}
   relevantWhen={null}
   required={true}
@@ -702,7 +704,7 @@ amount of unique label values.
   warnings={[]}
   >
 
-#### `[label-name`
+#### `[label-name]`
 
 A key-value pair for labels.
 

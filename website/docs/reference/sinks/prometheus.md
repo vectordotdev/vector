@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` sink exposes `metric` events to Prometheus metrics service."
@@ -51,7 +51,7 @@ The Vector `prometheus` sink
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "prometheus" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   address = "0.0.0.0:9598" # required
   namespace = "service" # required
 ```
@@ -62,7 +62,7 @@ The Vector `prometheus` sink
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "prometheus" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   address = "0.0.0.0:9598" # required
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # optional, default, seconds
   flush_period_secs = 60 # optional, default, seconds

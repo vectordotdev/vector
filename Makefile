@@ -48,7 +48,7 @@ check-markdown: ## Check Markdown style
 check-generate: ## Checks for pending `make generate` changes
 	@scripts/run.sh checker scripts/check-generate.sh
 
-check-examples: ## Validates the config examples
+check-examples: ## Validates the config examples
 	@cargo run -q -- validate --topology --deny-warnings ./config/examples/*.toml
 
 check-version: ## Checks that the version in Cargo.toml is up-to-date

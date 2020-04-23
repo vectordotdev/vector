@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Metrics"
 description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
@@ -44,7 +44,7 @@ The Vector `influxdb_metrics` sink
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com" # required
   namespace = "service" # required
   database = "vector-database" # required
@@ -66,7 +66,7 @@ The Vector `influxdb_metrics` sink
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com" # required
   namespace = "service" # required
   database = "vector-database" # required
@@ -101,7 +101,7 @@ The Vector `influxdb_metrics` sink
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
   namespace = "service" # required
   bucket = "vector-bucket" # required
@@ -119,7 +119,7 @@ The Vector `influxdb_metrics` sink
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
   namespace = "service" # required
   bucket = "vector-bucket" # required

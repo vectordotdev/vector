@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
@@ -44,7 +44,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "gcp_stackdriver_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 ```
@@ -56,7 +56,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
 [sinks.my_sink_id]
   # General
   type = "gcp_stackdriver_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   billing_account_id = "012345-6789AB-CDEF01" # optional, no default
   credentials_path = "/path/to/credentials.json" # optional, no default
   folder_id = "My Folder" # optional, no default
@@ -448,14 +448,13 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
 
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Stackdriver Logging API. If this is unset, Vector
-checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
-filename.
+checks the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) environment variable for a filename.
 
 If no filename is named, Vector will attempt to fetch an instance service
 account for the compute instance the program is running on. If Vector is not
 running on a GCE instance, you must define a credentials file as above.
 
-
+ See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -1079,7 +1078,7 @@ you understand the risks of not verifying the remote hostname.
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Stackdriver Logging API.
 
-
+ See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -1112,6 +1111,20 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
+
+### GCP Authentication
+
+GCP offers a [variety of authentication methods][urls.gcp_authentication] and
+Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
+and will find credentials in the following order:
+
+1. If the [`credentials_path`](#credentials_path) option is set.
+1. If the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) envrionment variable is set.
+1. Finally, Vector will check for an [instance service account][urls.gcp_authentication_service_account].
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
 
 ### Health Checks
 
@@ -1166,6 +1179,10 @@ options.
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
+[docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
+[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
+[urls.gcp_authentication_service_account]: https://cloud.google.com/docs/authentication/production#obtaining_and_providing_service_account_credentials_manually
 [urls.gcp_folders]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
 [urls.gcp_projects]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
 [urls.gcp_resources]: https://cloud.google.com/monitoring/api/resources
