@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-21"
+last_modified_on: "2020-04-22"
 $schema: "/.meta/.schemas/guides.json"
 title: Managing Schemas in Vector
 description: Learn how to manage log schemas with Vector.
@@ -279,7 +279,13 @@ The [`coercer`][docs.transforms.coercer] transform is the correct tool for this 
   types.date = "timestamp|%F"
 ```
 
-### Example: Coercing between date formats
+You can also use this transform as a lightweight schema by specifying `drop_unspecified = true`, empowering it to drop
+fields you've not specified.
+
+Adding `drop_unspecified = true` to the above would mean any log coming out of the `correct_source_types` would only
+have a `count` and `date` field. Coercer? More like enforcer.
+
+### Example: Coercing into a specific format
 
 There are a lot of ways to represent time. In the US folks tend to use `MM/DD/YYYY` or the (more reasonable)
 `YYYY/MM/DD` which Canada and China like. In the EU, South America, and Africa they prefer `DD/MM/YYYY`. Like personal
