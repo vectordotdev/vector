@@ -61,6 +61,7 @@ scopes:
   - splunk provider
   - yandex provider
   - datadog provider
+  - azure provider
   - elastic provider
   - gcp provider
   - honeycomb provider

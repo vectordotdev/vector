@@ -24,7 +24,7 @@ function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
 requirements = {}
-service_providers = ["AWS", "Elastic"]
+service_providers = ["AWS", "Azure", "Elastic", "GCP"]
 write_to_description = """\
 [Elasticsearch][urls.elasticsearch] via the [`_bulk` API \
 endpoint][urls.elasticsearch_bulk]\

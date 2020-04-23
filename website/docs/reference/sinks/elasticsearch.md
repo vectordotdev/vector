@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-04-23"
 delivery_guarantee: "at_least_once"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
@@ -1275,6 +1275,20 @@ will be replaced before being evaluated.
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
 
+### GCP Authentication
+
+GCP offers a [variety of authentication methods][urls.gcp_authentication] and
+Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
+and will find credentials in the following order:
+
+1. If the `credentials_path` option is set.
+1. If the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
+1. Finally, Vector will check for an [instance service account][urls.gcp_authentication_service_account].
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
+
 ### Health Checks
 
 Health checks ensure that the downstream service is accessible and ready to
@@ -1359,6 +1373,9 @@ You can learn more about the complete syntax in the
 [urls.elasticsearch_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 [urls.elasticsearch_id_field]: https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-id-field.html
 [urls.elasticsearch_id_performance]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
+[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
+[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
+[urls.gcp_authentication_service_account]: https://cloud.google.com/docs/authentication/production#obtaining_and_providing_service_account_credentials_manually
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
 [urls.openssl]: https://www.openssl.org/
