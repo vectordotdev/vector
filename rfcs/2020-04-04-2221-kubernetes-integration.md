@@ -280,6 +280,17 @@ following formats:
 
 We have to support both formats.
 
+#### Automatic partial events merging
+
+Kubernetes uses two log file formats, and both split log messages that are too
+long into multiple log records.
+
+It makes sense to automatically merge the log records that were split back
+together, similarly to how we do in the `docker` source.
+
+We will implement automatic partial event merging and enable it by default,
+while allowing users to opt-out of it if they need to.
+
 ### Helm vs raw YAML files
 
 We consider both raw YAML files and Helm Chart officially supported installation
