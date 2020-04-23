@@ -191,7 +191,7 @@ impl Sink for TcpSink {
                 //
                 // If this returns `WouldBlock` we know the connection is still
                 // valid and the write will most likely succeed.
-                match conn.read(&mut [0u8; 0]) {
+                match conn.read(&mut [0u8; 1]) {
                     Err(error) if error.kind() != ErrorKind::WouldBlock => {
                         emit!(TcpConnectionDisconnected { error });
                         self.state = TcpSinkState::Disconnected;
