@@ -30,7 +30,7 @@
 //       part of it's own (yet to be written) `encode() -> Vec<u8>` function.
 
 use crate::{
-    event::{PathIter, Value},
+    event::{PathComponent, PathIter, Value},
     Event, Result,
 };
 use serde::de::{MapAccess, Visitor};
@@ -51,8 +51,9 @@ use string_cache::DefaultAtom as Atom;
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfig<E> {
     pub(crate) codec: E,
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     #[serde(default)]
-    pub(crate) only_fields: Option<Vec<String>>,
+    pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
     #[serde(default)]
     pub(crate) except_fields: Option<Vec<Atom>>,
     #[serde(default)]
@@ -63,7 +64,8 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
     fn codec(&self) -> &E {
         &self.codec
     }
-    fn only_fields(&self) -> &Option<Vec<String>> {
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
         &self.only_fields
     }
     fn except_fields(&self) -> &Option<Vec<Atom>> {
@@ -92,7 +94,8 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(crate) only_fields: Option<Vec<String>>,
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
     #[serde(
         default,
@@ -111,7 +114,8 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
     fn codec(&self) -> &E {
         &self.codec
     }
-    fn only_fields(&self) -> &Option<Vec<String>> {
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
         &self.only_fields
     }
     fn except_fields(&self) -> &Option<Vec<Atom>> {
@@ -149,7 +153,8 @@ pub trait EncodingConfiguration<E> {
     // Required Accessors
 
     fn codec(&self) -> &E;
-    fn only_fields(&self) -> &Option<Vec<String>>;
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>>;
     fn except_fields(&self) -> &Option<Vec<Atom>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
@@ -162,17 +167,11 @@ pub trait EncodingConfiguration<E> {
                         .filter(|field| {
                             let field_path = PathIter::new(field).collect::<Vec<_>>();
                             !only_fields.iter().any(|only| {
-                                if only == field {
-                                    true // fastpath
+                                // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+                                if field_path.starts_with(&only[..]) {
+                                    true
                                 } else {
-                                    // TODO: This is a hack for #2407, #2410 should fix this fully.
-                                    // This is *slow*.
-                                    let only_path = PathIter::new(only);
-                                    if field_path.starts_with(&only_path.collect::<Vec<_>>()[..]) {
-                                        true
-                                    } else {
-                                        false
-                                    }
+                                    false
                                 }
                             })
                         })
@@ -234,10 +233,10 @@ pub trait EncodingConfiguration<E> {
         if let (Some(only_fields), Some(except_fields)) =
             (&self.only_fields(), &self.except_fields())
         {
-            if only_fields
-                .iter()
-                .any(|f| except_fields.contains(&Atom::from(f.as_str())))
-            {
+            if except_fields.iter().any(|f| {
+                let path_iter = PathIter::new(f).collect::<Vec<_>>();
+                only_fields.iter().any(|v| v == &path_iter)
+            }) {
                 Err("`except_fields` and `only_fields` should be mutually exclusive.")?;
             }
         }
@@ -362,7 +361,13 @@ where
 
         let concrete = Self {
             codec: inner.codec,
-            only_fields: inner.only_fields,
+            // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+            only_fields: inner.only_fields.map(|fields| {
+                fields
+                    .iter()
+                    .map(|only| PathIter::new(only).collect())
+                    .collect()
+            }),
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
         };
@@ -431,7 +436,13 @@ where
 
         let concrete = Self {
             codec: inner.codec,
-            only_fields: inner.only_fields,
+            // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+            only_fields: inner.only_fields.map(|fields| {
+                fields
+                    .iter()
+                    .map(|only| PathIter::new(only).collect())
+                    .collect()
+            }),
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
         };
@@ -461,6 +472,12 @@ mod tests {
     const TOML_SIMPLE_STRING: &str = r#"
         encoding = "Snoot"
     "#;
+
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    fn as_path_components(a: &str) -> Vec<PathComponent> {
+        PathIter::new(a).collect()
+    }
+
     #[test]
     fn config_string() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRING).unwrap();
@@ -479,7 +496,10 @@ mod tests {
         config.encoding.validate().unwrap();
         assert_eq!(config.encoding.codec, TestEncoding::Snoot);
         assert_eq!(config.encoding.except_fields, Some(vec!["Doop".into()]));
-        assert_eq!(config.encoding.only_fields, Some(vec!["Boop".into()]));
+        assert_eq!(
+            config.encoding.only_fields,
+            Some(vec![as_path_components("Boop")])
+        );
     }
 
     const TOML_EXCLUSIVITY_VIOLATION: &str = r#"
