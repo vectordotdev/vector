@@ -34490,7 +34490,9 @@ module.exports = {
       ],
       "service_providers": [
         "AWS",
-        "Elastic"
+        "Azure",
+        "Elastic",
+        "GCP"
       ],
       "short_description": "Batches log events to Elasticsearch via the `_bulk` API endpoint.",
       "status": "prod-ready",

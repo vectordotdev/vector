@@ -212,6 +212,9 @@
 - name: "provider: datadog"
   description: Anything Datadog related
   color: ff9f43
+- name: "provider: azure"
+  description: Anything Azure related
+  color: ff9f43
 - name: "provider: elastic"
   description: Anything Elastic related
   color: ff9f43
