@@ -212,7 +212,7 @@ mod test {
 
                         res = conn.read(&mut buf) => {
                             let n = res.unwrap();
-                            
+
                            if  n == 0 {
                                break;
                            } else {
@@ -231,7 +231,7 @@ mod test {
         // Loop and check for 10 events, we should always get 10 events. Once,
         // we have 10 events we can tell the server to shutdown to simulate the
         // remote shutting down on an idle connection.
-       for _ in 0..100 {
+        for _ in 0..100 {
             let amnt = counter.load(Ordering::SeqCst);
 
             if amnt == 10 {
@@ -241,7 +241,6 @@ mod test {
 
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
-
 
         // Send another 10 events
         let (_, events) = random_lines_with_stream(10, 10);
