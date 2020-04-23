@@ -351,44 +351,6 @@ support at Vector code (a dedicated `kubernetes` source), while a perfectly
 valid sidecar configuration can be implemented with just a simple `file` source.
 This is another reason why we don't pay as much attention to sidecar model.
 
-#### Container probes
-
-Kubernetes allows configuring a number of [`Probe`s][k8s_api_probe] on
-[`Container`][k8s_api_container], and taking action based on those probes.
-See the [documentation](k8s_docs_pod_lifecycle_container_probes) to learn more.
-
-- `readinessProbe`
-
-  Periodic probe of container service readiness. Container will be removed from
-  service endpoints if the probe fails.
-
-- `livenessProbe`
-
-  Periodic probe of container liveness. Container will be restarted if the probe
-  fails.
-
-- `startupProbe`
-
-  Startup probe indicates that the container has successfully initialized. If
-  specified, no other probes are executed until this completes successfully. If
-  this probe fails, the container will be restarted, just as if the
-  `livenessProbe` failed.
-
-Vector should implement proper support for all of those one way or another at
-the code level.
-
-- `startupProbe` can be tight to the initial topology healthcheck - i.e. we
-  consider it failed until the initial topology health check is complete, and
-  consider it ok at any moment after that;
-
-- `livenessProbe` should probably be tied to the async executor threadpool
-  responsiveness - i.e. if we can handle an HTTP request in a special liveness
-  server we expose in Vector - consider the probe ok, else something's very
-  wrong, and we should consider the probe failed;
-
-- `readinessProbe` is the most tricky one; it is unclear what the semantics
-  makes sense there.
-
 ### Deployment configuration
 
 It is important that provide a well-thought deployment configuration for the
@@ -565,6 +527,44 @@ other security-related measures. See [here](#deployment-hardening).
 - `runtimeClassName` - we'll be using this value in tests to validate that
   Vector works with non-standard runtime; we shouldn't set it in our default
   YAMLs, nor set it at Helm by default;
+
+#### Container probes
+
+Kubernetes allows configuring a number of [`Probe`s][k8s_api_probe] on
+[`Container`][k8s_api_container], and taking action based on those probes.
+See the [documentation](k8s_docs_pod_lifecycle_container_probes) to learn more.
+
+- `readinessProbe`
+
+  Periodic probe of container service readiness. Container will be removed from
+  service endpoints if the probe fails.
+
+- `livenessProbe`
+
+  Periodic probe of container liveness. Container will be restarted if the probe
+  fails.
+
+- `startupProbe`
+
+  Startup probe indicates that the container has successfully initialized. If
+  specified, no other probes are executed until this completes successfully. If
+  this probe fails, the container will be restarted, just as if the
+  `livenessProbe` failed.
+
+Vector should implement proper support for all of those one way or another at
+the code level.
+
+- `startupProbe` can be tight to the initial topology healthcheck - i.e. we
+  consider it failed until the initial topology health check is complete, and
+  consider it ok at any moment after that;
+
+- `livenessProbe` should probably be tied to the async executor threadpool
+  responsiveness - i.e. if we can handle an HTTP request in a special liveness
+  server we expose in Vector - consider the probe ok, else something's very
+  wrong, and we should consider the probe failed;
+
+- `readinessProbe` is the most tricky one; it is unclear what the semantics
+  makes sense there.
 
 ### Annotating events with metadata from Kubernetes
 
