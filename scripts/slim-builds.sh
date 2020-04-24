@@ -12,11 +12,13 @@ set -euo pipefail
 #
 
 mkdir -p .cargo/
+
 cat <<-EOF >> ./.cargo/config
 # focus on fast, lean builds
 [build]
 incremental = false
 EOF
+
 cat <<-EOF >> ./Cargo.toml
 # focus on fast, lean builds
 [profile.dev]
