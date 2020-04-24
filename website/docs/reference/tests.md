@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-24"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
@@ -48,14 +48,14 @@ vector test /etc/vector/*.toml
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
 [[tests]]
-  # General
-  name = "foo test" # required
-
   # Inputs
   [[tests.inputs]]
     insert_at = "foo" # required
     type = "raw" # required
     value = "some message contents" # required, required when type = "raw"
+
+  # General
+  name = "foo test" # required
 
   # Outputs
   [[tests.outputs]]
@@ -80,10 +80,6 @@ vector test /etc/vector/*.toml
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
 [[tests]]
-  # General
-  name = "foo test" # required
-  no_outputs_from = ["foo"] # required
-
   # Inputs
   [[tests.inputs]]
     # General
@@ -108,6 +104,10 @@ vector test /etc/vector/*.toml
     metric.tags.host = "foohost" # example
     metric.tags.region = "us-east-1" # example
 
+  # General
+  name = "foo test" # required
+  no_outputs_from = ["foo"] # required
+
   # Outputs
   [[tests.outputs]]
     # Conditions
@@ -131,54 +131,6 @@ vector test /etc/vector/*.toml
 For more information about unit tests check out [this guide][guides.advanced.unit-testing].
 
 <Fields filters={true}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["foo test"]}
-  groups={[]}
-  name={"name"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### name
-
-A unique identifier for this test.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["foo"]]}
-  groups={[]}
-  name={"no_outputs_from"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-### no_outputs_from
-
-A list of transforms that must NOT output events in order for the test to pass.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -222,54 +174,6 @@ A table that defines a unit test input event.
 
 The name of a transform, the input event will be delivered to this transform in
 order to begin the test.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"raw":"Creates a log event where the message contents are specified in the field 'value'.","log":"Creates a log event where log fields are specified in the table 'log_fields'.","metric":"Creates a metric event, where its type and fields are specified in the table 'metric'."}}
-  examples={["raw","log","metric"]}
-  groups={[]}
-  name={"type"}
-  path={"inputs"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The event type.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["some message contents"]}
-  groups={[]}
-  name={"value"}
-  path={"inputs"}
-  relevantWhen={{"type":"raw"}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### value
-
-Specifies the log message field contents when the input type is 'raw'.
 
 
 
@@ -425,6 +329,56 @@ The bucket/distribution the metric is a part of.
   common={true}
   defaultValue={null}
   enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"tags"}
+  path={"inputs.metric"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### tags
+
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].
+
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"host":"foohost"},{"region":"us-east-1"}]}
+  groups={[]}
+  name={"`[tag-name]`"}
+  path={"inputs.metric.tags"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+###### `[tag-name]`
+
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].
+
+
+
+
+</Field>
+</Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
   examples={["2019-11-01T21:15:47.443232Z"]}
   groups={[]}
   name={"timestamp"}
@@ -493,37 +447,17 @@ Amount to increment/decrement or gauge.
 
 
 </Field>
+</Fields>
+
+</Field>
 <Field
   common={true}
   defaultValue={null}
-  enumValues={null}
-  examples={[]}
+  enumValues={{"raw":"Creates a log event where the message contents are specified in the field 'value'.","log":"Creates a log event where log fields are specified in the table 'log_fields'.","metric":"Creates a metric event, where its type and fields are specified in the table 'metric'."}}
+  examples={["raw","log","metric"]}
   groups={[]}
-  name={"tags"}
-  path={"inputs.metric"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-##### tags
-
-Key/value pairs representing [metric tags][docs.data-model.metric#tags].
-
-
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"host":"foohost"},{"region":"us-east-1"}]}
-  groups={[]}
-  name={"`[tag-name]`"}
-  path={"inputs.metric.tags"}
+  name={"type"}
+  path={"inputs"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -532,9 +466,33 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
   warnings={[]}
   >
 
-###### `[tag-name]`
+#### type
 
-Key/value pairs representing [metric tags][docs.data-model.metric#tags].
+The event type.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["some message contents"]}
+  groups={[]}
+  name={"value"}
+  path={"inputs"}
+  relevantWhen={{"type":"raw"}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### value
+
+Specifies the log message field contents when the input type is 'raw'.
 
 
 
@@ -543,10 +501,52 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 </Fields>
 
 </Field>
-</Fields>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["foo test"]}
+  groups={[]}
+  name={"name"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### name
+
+A unique identifier for this test.
+
+
+
 
 </Field>
-</Fields>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["foo"]]}
+  groups={[]}
+  name={"no_outputs_from"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### no_outputs_from
+
+A list of transforms that must NOT output events in order for the test to pass.
+
+
+
 
 </Field>
 <Field

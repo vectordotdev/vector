@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-04-24"
 delivery_guarantee: "at_least_once"
 component_title: "Datadog Metrics"
 description: "The Vector `datadog_metrics` sink batches `metric` events to Datadog's metrics service using HTTP API."
@@ -81,6 +81,30 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 
 <Fields filters={true}>
 <Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${DATADOG_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  groups={[]}
+  name={"api_key"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### api_key
+
+Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -152,30 +176,6 @@ The maximum age of a batch before it is flushed.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${DATADOG_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
-  groups={[]}
-  name={"api_key"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### api_key
-
-Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
-
-
-
 
 </Field>
 <Field

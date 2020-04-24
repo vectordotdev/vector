@@ -34046,7 +34046,7 @@ module.exports = {
     "aws_cloudwatch_logs": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"aws_cloudwatch_logs\" # required\n  inputs = [\"in\"] # required\n  group_name = \"group-name\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"{{ host }}\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"json\" # required\n\n  # General\n  group_name = \"group-name\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"{{ host }}\" # required\n  type = \"aws_cloudwatch_logs\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Amazon CloudWatch is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in form of logs and metrics from a single platform.",
@@ -34088,7 +34088,7 @@ module.exports = {
     "aws_cloudwatch_metrics": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"aws_cloudwatch_metrics\" # required\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\""
+        "toml": "[sinks.out]\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  type = \"aws_cloudwatch_metrics\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Amazon CloudWatch is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in form of logs and metrics from a single platform.",
@@ -34129,7 +34129,7 @@ module.exports = {
     "aws_kinesis_firehose": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"aws_kinesis_firehose\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"my-stream\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"json\" # required\n\n  # General\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"my-stream\" # required\n  type = \"aws_kinesis_firehose\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Amazon Kinesis Data Firehose is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk.",
@@ -34170,7 +34170,7 @@ module.exports = {
     "aws_kinesis_streams": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"aws_kinesis_streams\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"my-stream\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"json\" # required\n\n  # General\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"my-stream\" # required\n  type = \"aws_kinesis_streams\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Amazon Kinesis Data Streams is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data.",
@@ -34211,7 +34211,7 @@ module.exports = {
     "aws_s3": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"aws_s3\" # required\n  inputs = [\"in\"] # required\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
+        "toml": "[sinks.out]\n  # General\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  type = \"aws_s3\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Amazon Simple Storage Service (Amazon S3) is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data.",
@@ -34254,7 +34254,7 @@ module.exports = {
     "blackhole": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"blackhole\" # required\n  inputs = [\"in\"] # required\n  print_amount = 1000 # required"
+        "toml": "[sinks.out]\n  inputs = [\"in\"] # required\n  print_amount = 1000 # required\n  type = \"blackhole\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": null,
@@ -34295,7 +34295,7 @@ module.exports = {
     "clickhouse": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"clickhouse\" # required\n  inputs = [\"in\"] # required\n  host = \"http://localhost:8123\" # required\n  table = \"mytable\" # required"
+        "toml": "[sinks.out]\n  host = \"http://localhost:8123\" # required\n  inputs = [\"in\"] # required\n  table = \"mytable\" # required\n  type = \"clickhouse\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": null,
@@ -34337,7 +34337,7 @@ module.exports = {
     "console": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"console\" # required\n  inputs = [\"in\"] # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"json\" # required\n\n  # General\n  inputs = [\"in\"] # required\n  type = \"console\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": null,
@@ -34378,7 +34378,7 @@ module.exports = {
     "datadog_logs": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"datadog_logs\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${DATADOG_API_KEY_ENV_VAR}\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # General\n  api_key = \"${DATADOG_API_KEY_ENV_VAR}\" # required\n  inputs = [\"in\"] # required\n  type = \"datadog_logs\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Datadog is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform.",
@@ -34420,7 +34420,7 @@ module.exports = {
     "datadog_metrics": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"datadog_metrics\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${DATADOG_API_KEY}\" # required\n  namespace = \"service\" # required"
+        "toml": "[sinks.out]\n  api_key = \"${DATADOG_API_KEY}\" # required\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required\n  type = \"datadog_metrics\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Datadog is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform.",
@@ -34461,7 +34461,7 @@ module.exports = {
     "elasticsearch": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"elasticsearch\" # required\n  inputs = [\"in\"] # required"
+        "toml": "[sinks.out]\n  inputs = [\"in\"] # required\n  type = \"elasticsearch\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Elasticsearch is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch.",
@@ -34506,7 +34506,7 @@ module.exports = {
     "file": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"file\" # required\n  inputs = [\"in\"] # required\n  path = \"vector-%Y-%m-%d.log\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
+        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"ndjson\" # required\n\n  # General\n  inputs = [\"in\"] # required\n  path = \"vector-%Y-%m-%d.log\" # required\n  type = \"file\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": null,
@@ -34545,7 +34545,7 @@ module.exports = {
     "gcp_cloud_storage": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"gcp_cloud_storage\" # required\n  inputs = [\"in\"] # required\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
+        "toml": "[sinks.out]\n  # General\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  inputs = [\"in\"] # required\n  type = \"gcp_cloud_storage\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Google Cloud Storage is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. This makes it a prime candidate for log data.",
@@ -34591,7 +34591,7 @@ module.exports = {
     "gcp_pubsub": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"gcp_pubsub\" # required\n  inputs = [\"in\"] # required\n  project = \"vector-123456\" # required\n  topic = \"this-is-a-topic\" # required"
+        "toml": "[sinks.out]\n  inputs = [\"in\"] # required\n  project = \"vector-123456\" # required\n  topic = \"this-is-a-topic\" # required\n  type = \"gcp_pubsub\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "GCP Pub/Sub is a fully-managed real-time messaging service that allows you to send and receive messages between independent applications on the Google Cloud Platform.",
@@ -34633,7 +34633,7 @@ module.exports = {
     "gcp_stackdriver_logs": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"gcp_stackdriver_logs\" # required\n  inputs = [\"in\"] # required\n  log_id = \"vector-logs\" # required\n  project_id = \"vector-123456\" # required"
+        "toml": "[sinks.out]\n  inputs = [\"in\"] # required\n  log_id = \"vector-logs\" # required\n  project_id = \"vector-123456\" # required\n  type = \"gcp_stackdriver_logs\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Stackdriver is Google Cloud's embedded observability suite designed to monitor, troubleshoot, and improve cloud infrastructure, software, and application performance. Stackdriver enables you to efficiently build and run workloads, keeping applications performant and available.",
@@ -34675,7 +34675,7 @@ module.exports = {
     "honeycomb": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"honeycomb\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${HONEYCOMB_API_KEY}\" # required\n  dataset = \"my-honeycomb-dataset\" # required"
+        "toml": "[sinks.out]\n  api_key = \"${HONEYCOMB_API_KEY}\" # required\n  dataset = \"my-honeycomb-dataset\" # required\n  inputs = [\"in\"] # required\n  type = \"honeycomb\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Honeycomb provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together.",
@@ -34716,7 +34716,7 @@ module.exports = {
     "http": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"http\" # required\n  inputs = [\"in\"] # required\n  uri = \"https://10.22.212.22:9000/endpoint\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"json\" # required\n\n  # General\n  inputs = [\"in\"] # required\n  type = \"http\" # required\n  uri = \"https://10.22.212.22:9000/endpoint\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": null,
@@ -34758,7 +34758,7 @@ module.exports = {
     "humio_logs": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"humio_logs\" # required\n  inputs = [\"in\"] # required\n  token = \"${HUMIO_TOKEN}\" # required"
+        "toml": "[sinks.out]\n  inputs = [\"in\"] # required\n  token = \"${HUMIO_TOKEN}\" # required\n  type = \"humio_logs\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Humio is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data.",
@@ -34799,7 +34799,7 @@ module.exports = {
     "influxdb_metrics": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"influxdb_metrics\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"http://localhost:8086/\" # required\n  namespace = \"service\" # required\n  bucket = \"vector-bucket\" # required\n  database = \"vector-database\" # required\n\n  # Auth\n  org = \"my-org\" # required\n  token = \"${INFLUXDB_TOKEN}\" # required"
+        "toml": "[sinks.out]\n  # General\n  bucket = \"vector-bucket\" # required\n  database = \"vector-database\" # required\n  endpoint = \"http://localhost:8086/\" # required\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required\n  type = \"influxdb_metrics\" # required\n\n  # Auth\n  org = \"my-org\" # required\n  token = \"${INFLUXDB_TOKEN}\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "InfluxDB is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics.",
@@ -34840,7 +34840,7 @@ module.exports = {
     "kafka": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"kafka\" # required\n  inputs = [\"in\"] # required\n  bootstrap_servers = \"10.14.22.123:9092,10.14.23.332:9092\" # required\n  key_field = \"user_id\" # required\n  topic = \"topic-1234\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # General\n  bootstrap_servers = \"10.14.22.123:9092,10.14.23.332:9092\" # required\n  inputs = [\"in\"] # required\n  key_field = \"user_id\" # required\n  topic = \"topic-1234\" # required\n  type = \"kafka\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Apache Kafka is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.",
@@ -34883,7 +34883,7 @@ module.exports = {
     "logdna": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"logdna\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${LOGDNA_API_KEY}\" # required\n  hostname = \"${HOSTNAME}\" # required"
+        "toml": "[sinks.out]\n  api_key = \"${LOGDNA_API_KEY}\" # required\n  hostname = \"${HOSTNAME}\" # required\n  inputs = [\"in\"] # required\n  type = \"logdna\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "LogDNA is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface.",
@@ -34924,7 +34924,7 @@ module.exports = {
     "loki": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"loki\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"http://localhost:3100\" # required\n\n  # Labels\n  labels.key = \"value\" # example\n  labels.key = \"{{ event_field }}\" # example"
+        "toml": "[sinks.out]\n  # General\n  endpoint = \"http://localhost:3100\" # required\n  inputs = [\"in\"] # required\n  type = \"loki\" # required\n\n  # Labels\n  labels.key = \"value\" # example\n  labels.key = \"{{ event_field }}\" # example"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Loki is a horizontally-scalable, highly-available, multi-tenant log aggregation system inspired by Prometheus. It is designed to be very cost effective and easy to operate. It does not index the contents of the logs, but rather a set of labels for each log stream.",
@@ -34966,7 +34966,7 @@ module.exports = {
     "new_relic_logs": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"new_relic_logs\" # required\n  inputs = [\"in\"] # required"
+        "toml": "[sinks.out]\n  inputs = [\"in\"] # required\n  type = \"new_relic_logs\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "New Relic is a San Francisco, California-based technology company which develops cloud-based software to help website and application owners track the performances of their services.",
@@ -35007,7 +35007,7 @@ module.exports = {
     "papertrail": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"papertrail\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"logs.papertrailapp.com:12345\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"json\" # required\n\n  # General\n  endpoint = \"logs.papertrailapp.com:12345\" # required\n  inputs = [\"in\"] # required\n  type = \"papertrail\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Papertrail is a web-based log aggregation application used by developers and IT team to search and view logs in real time.",
@@ -35048,7 +35048,7 @@ module.exports = {
     "prometheus": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"prometheus\" # required\n  inputs = [\"in\"] # required\n  address = \"0.0.0.0:9598\" # required\n  namespace = \"service\" # required"
+        "toml": "[sinks.out]\n  address = \"0.0.0.0:9598\" # required\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required\n  type = \"prometheus\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": "Prometheus is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points.",
@@ -35087,7 +35087,7 @@ module.exports = {
     "pulsar": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"pulsar\" # required\n  inputs = [\"in\"] # required\n  address = \"127.0.0.1:6650\" # required\n  topic = \"topic-1234\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # General\n  address = \"127.0.0.1:6650\" # required\n  inputs = [\"in\"] # required\n  topic = \"topic-1234\" # required\n  type = \"pulsar\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Pulsar is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data.",
@@ -35127,7 +35127,7 @@ module.exports = {
     "sematext_logs": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"sematext_logs\" # required\n  inputs = [\"in\"] # required\n  token = \"${SEMATEXT_TOKEN}\" # required"
+        "toml": "[sinks.out]\n  inputs = [\"in\"] # required\n  token = \"${SEMATEXT_TOKEN}\" # required\n  type = \"sematext_logs\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Sematext is a hosted monitoring platform based on Elasticsearch. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time.",
@@ -35168,7 +35168,7 @@ module.exports = {
     "socket": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"socket\" # required\n  inputs = [\"in\"] # required\n  address = \"92.12.333.224:5000\" # required, required when mode = \"tcp\" or mode = \"udp\"\n  mode = \"tcp\" # required\n  path = \"/path/to/socket\" # required, required when mode = \"unix\"\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # General\n  address = \"92.12.333.224:5000\" # required, required when mode = \"tcp\" or mode = \"udp\"\n  inputs = [\"in\"] # required\n  mode = \"tcp\" # required\n  path = \"/path/to/socket\" # required, required when mode = \"unix\"\n  type = \"socket\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": null,
@@ -35207,7 +35207,7 @@ module.exports = {
     "splunk_hec": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"splunk_hec\" # required\n  inputs = [\"in\"] # required\n  host = \"http://my-splunk-host.com\" # required\n  token = \"${SPLUNK_HEC_TOKEN}\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"json\" # required\n\n  # General\n  host = \"http://my-splunk-host.com\" # required\n  inputs = [\"in\"] # required\n  token = \"${SPLUNK_HEC_TOKEN}\" # required\n  type = \"splunk_hec\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "The Splunk HTTP Event Collector (HEC) is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.",
@@ -35249,7 +35249,7 @@ module.exports = {
     "statsd": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"statsd\" # required\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required"
+        "toml": "[sinks.out]\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required\n  type = \"statsd\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": "StatsD is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by Etsy in Node.",
@@ -35288,7 +35288,7 @@ module.exports = {
     "vector": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"vector\" # required\n  inputs = [\"in\"] # required\n  address = \"92.12.333.224:5000\" # required"
+        "toml": "[sinks.out]\n  address = \"92.12.333.224:5000\" # required\n  inputs = [\"in\"] # required\n  type = \"vector\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": null,
@@ -35371,7 +35371,7 @@ module.exports = {
     "file": {
       "beta": false,
       "config_examples": {
-        "toml": "[sources.in]\n  type = \"file\" # required\n  include = [\"/var/log/nginx/*.log\"] # required"
+        "toml": "[sources.in]\n  include = [\"/var/log/nginx/*.log\"] # required\n  type = \"file\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": null,
@@ -35413,7 +35413,7 @@ module.exports = {
     "generator": {
       "beta": false,
       "config_examples": {
-        "toml": "[sources.in]\n  type = \"generator\" # required\n  lines = [\"Line 1\", \"Line 2\"] # required"
+        "toml": "[sources.in]\n  lines = [\"Line 1\", \"Line 2\"] # required\n  type = \"generator\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": null,
@@ -35451,7 +35451,7 @@ module.exports = {
     "http": {
       "beta": true,
       "config_examples": {
-        "toml": "[sources.in]\n  type = \"http\" # required\n  address = \"0.0.0.0:80\" # required"
+        "toml": "[sources.in]\n  address = \"0.0.0.0:80\" # required\n  type = \"http\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": null,
@@ -35531,7 +35531,7 @@ module.exports = {
     "kafka": {
       "beta": true,
       "config_examples": {
-        "toml": "[sources.in]\n  type = \"kafka\" # required\n  bootstrap_servers = \"10.14.22.123:9092,10.14.23.332:9092\" # required\n  group_id = \"consumer-group-name\" # required\n  topics = [\"^(prefix1|prefix2)-.+\", \"topic-1\", \"topic-2\"] # required"
+        "toml": "[sources.in]\n  bootstrap_servers = \"10.14.22.123:9092,10.14.23.332:9092\" # required\n  group_id = \"consumer-group-name\" # required\n  topics = [\"^(prefix1|prefix2)-.+\", \"topic-1\", \"topic-2\"] # required\n  type = \"kafka\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Apache Kafka is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.",
@@ -35572,7 +35572,7 @@ module.exports = {
     "logplex": {
       "beta": true,
       "config_examples": {
-        "toml": "[sources.in]\n  type = \"logplex\" # required\n  address = \"0.0.0.0:80\" # required"
+        "toml": "[sources.in]\n  address = \"0.0.0.0:80\" # required\n  type = \"logplex\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Heroku’s Logplex router is responsible for collating and distributing the log entries generated by Heroku apps and other components of the Heroku platform. It makes these entries available through the Logplex public API and the Heroku command-line tool.",
@@ -35611,7 +35611,7 @@ module.exports = {
     "prometheus": {
       "beta": true,
       "config_examples": {
-        "toml": "[sources.in]\n  type = \"prometheus\" # required\n  hosts = [\"http://localhost:9090\"] # required"
+        "toml": "[sources.in]\n  hosts = [\"http://localhost:9090\"] # required\n  type = \"prometheus\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Prometheus is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points.",
@@ -35651,7 +35651,7 @@ module.exports = {
     "socket": {
       "beta": false,
       "config_examples": {
-        "toml": "[sources.in]\n  type = \"socket\" # required\n  address = \"0.0.0.0:9000\" # required, required when mode = \"tcp\" or mode = \"udp\"\n  mode = \"tcp\" # required\n  path = \"/path/to/socket\" # required, required when mode = \"unix\""
+        "toml": "[sources.in]\n  address = \"0.0.0.0:9000\" # required, required when mode = \"tcp\" or mode = \"udp\"\n  mode = \"tcp\" # required\n  path = \"/path/to/socket\" # required, required when mode = \"unix\"\n  type = \"socket\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": null,
@@ -35730,7 +35730,7 @@ module.exports = {
     "statsd": {
       "beta": false,
       "config_examples": {
-        "toml": "[sources.in]\n  type = \"statsd\" # required\n  address = \"127.0.0.1:8126\" # required"
+        "toml": "[sources.in]\n  address = \"127.0.0.1:8126\" # required\n  type = \"statsd\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": "StatsD is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by Etsy in Node.",
@@ -35808,7 +35808,7 @@ module.exports = {
     "syslog": {
       "beta": false,
       "config_examples": {
-        "toml": "[sources.in]\n  type = \"syslog\" # required\n  address = \"0.0.0.0:514\" # required, required when mode = \"tcp\" or mode = \"udp\"\n  mode = \"tcp\" # required\n  path = \"/path/to/socket\" # required, required when mode = \"unix\""
+        "toml": "[sources.in]\n  address = \"0.0.0.0:514\" # required, required when mode = \"tcp\" or mode = \"udp\"\n  mode = \"tcp\" # required\n  path = \"/path/to/socket\" # required, required when mode = \"unix\"\n  type = \"syslog\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": "Syslog stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is primarily used to collect various device logs from several different machines in a central location for monitoring and review.",
@@ -35847,7 +35847,7 @@ module.exports = {
     "vector": {
       "beta": true,
       "config_examples": {
-        "toml": "[sources.in]\n  type = \"vector\" # required\n  address = \"0.0.0.0:9000\" # required"
+        "toml": "[sources.in]\n  address = \"0.0.0.0:9000\" # required\n  type = \"vector\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": null,
@@ -35969,7 +35969,7 @@ module.exports = {
     "add_fields": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  type = \"add_fields\" # required\n  inputs = [\"in\"] # required\n\n  # Fields\n  fields.string_field = \"string value\" # example\n  fields.env_var_field = \"${ENV_VAR}\" # example\n  fields.templated_field = \"{{ my_other_field }}\" # example\n  fields.int_field = 1 # example\n  fields.float_field = 1.2 # example\n  fields.bool_field = true # example\n  fields.timestamp_field = 1979-05-27T00:32:00Z # example\n  fields.parent.child_field = \"child_value\" # example\n  fields.list_field = [\"first\", \"second\", \"third\"] # example"
+        "toml": "[transforms.out]\n  # Fields\n  fields.string_field = \"string value\" # example\n  fields.env_var_field = \"${ENV_VAR}\" # example\n  fields.templated_field = \"{{ my_other_field }}\" # example\n  fields.int_field = 1 # example\n  fields.float_field = 1.2 # example\n  fields.bool_field = true # example\n  fields.timestamp_field = 1979-05-27T00:32:00Z # example\n  fields.parent.child_field = \"child_value\" # example\n  fields.list_field = [\"first\", \"second\", \"third\"] # example\n\n  # General\n  inputs = [\"in\"] # required\n  type = \"add_fields\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36006,7 +36006,7 @@ module.exports = {
     "add_tags": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  type = \"add_tags\" # required\n  inputs = [\"in\"] # required\n\n  # Tags\n  tags.static_tag = \"my value\" # example\n  tags.env_tag = \"${ENV_VAR}\" # example"
+        "toml": "[transforms.out]\n  # General\n  inputs = [\"in\"] # required\n  type = \"add_tags\" # required\n\n  # Tags\n  tags.static_tag = \"my value\" # example\n  tags.env_tag = \"${ENV_VAR}\" # example"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36043,7 +36043,7 @@ module.exports = {
     "ansi_stripper": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"ansi_stripper\" # required\n  inputs = [\"in\"] # required"
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  type = \"ansi_stripper\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36080,7 +36080,7 @@ module.exports = {
     "aws_ec2_metadata": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"aws_ec2_metadata\" # required\n  inputs = [\"in\"] # required"
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  type = \"aws_ec2_metadata\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36117,7 +36117,7 @@ module.exports = {
     "coercer": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"coercer\" # required\n  inputs = [\"in\"] # required"
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  type = \"coercer\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36154,7 +36154,7 @@ module.exports = {
     "concat": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"concat\" # required\n  inputs = [\"in\"] # required\n  items = [\"first[..3]\", \"second[-5..]\", \"third[3..6]\"] # required\n  target = \"root_field_name\" # required"
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  items = [\"first[..3]\", \"second[-5..]\", \"third[3..6]\"] # required\n  target = \"root_field_name\" # required\n  type = \"concat\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36191,7 +36191,7 @@ module.exports = {
     "dedupe": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  type = \"dedupe\" # required\n  inputs = [\"in\"] # required\n\n  # Fields"
+        "toml": "[transforms.out]\n  # Fields\n\n  # General\n  inputs = [\"in\"] # required\n  type = \"dedupe\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36228,7 +36228,7 @@ module.exports = {
     "filter": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  type = \"filter\" # required\n  inputs = [\"in\"] # required\n\n  # Condition"
+        "toml": "[transforms.out]\n  # Condition\n\n  # General\n  inputs = [\"in\"] # required\n  type = \"filter\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36268,7 +36268,7 @@ module.exports = {
     "geoip": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"geoip\" # required\n  inputs = [\"in\"] # required\n  database = \"/path/to/GeoLite2-City.mmdb\" # required\n  source = \"ip_address\" # required"
+        "toml": "[transforms.out]\n  database = \"/path/to/GeoLite2-City.mmdb\" # required\n  inputs = [\"in\"] # required\n  source = \"ip_address\" # required\n  type = \"geoip\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36305,7 +36305,7 @@ module.exports = {
     "grok_parser": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"grok_parser\" # required\n  inputs = [\"in\"] # required\n  pattern = \"%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}\" # required"
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  pattern = \"%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}\" # required\n  type = \"grok_parser\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36342,7 +36342,7 @@ module.exports = {
     "json_parser": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"json_parser\" # required\n  inputs = [\"in\"] # required\n  drop_invalid = true # required"
+        "toml": "[transforms.out]\n  drop_invalid = true # required\n  inputs = [\"in\"] # required\n  type = \"json_parser\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36379,7 +36379,7 @@ module.exports = {
     "log_to_metric": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  type = \"log_to_metric\" # required\n  inputs = [\"in\"] # required\n\n  # Metrics\n  metrics.field = \"duration\" # required\n  metrics.name = \"duration_total\" # required\n  metrics.type = \"counter\" # required"
+        "toml": "[transforms.out]\n  # General\n  inputs = [\"in\"] # required\n  type = \"log_to_metric\" # required\n\n  # Metrics\n  metrics.field = \"duration\" # required\n  metrics.name = \"duration_total\" # required\n  metrics.type = \"counter\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36417,7 +36417,7 @@ module.exports = {
     "logfmt_parser": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"logfmt_parser\" # required\n  inputs = [\"in\"] # required"
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  type = \"logfmt_parser\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36454,7 +36454,7 @@ module.exports = {
     "lua": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  type = \"lua\" # required\n  inputs = [\"in\"] # required\n  version = \"2\" # required\n\n  # Hooks\n  hooks.process = \"\"\"\n  function (event, emit)\n    event.log.field = \"value\" -- set value of a field\n    event.log.another_field = nil -- remove field\n    event.log.first, event.log.second = nil, event.log.first -- rename field\n\n    -- Very important! Emit the processed event.\n    emit(event)\n  end\n  \"\"\""
+        "toml": "[transforms.out]\n  # Hooks\n  hooks.process = \"\"\"\n  function (event, emit)\n    event.log.field = \"value\" -- set value of a field\n    event.log.another_field = nil -- remove field\n    event.log.first, event.log.second = nil, event.log.first -- rename field\n\n    -- Very important! Emit the processed event.\n    emit(event)\n  end\n  \"\"\"\n\n  # General\n  inputs = [\"in\"] # required\n  type = \"lua\" # required\n  version = \"2\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36494,7 +36494,7 @@ module.exports = {
     "merge": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"merge\" # required\n  inputs = [\"in\"] # required"
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  type = \"merge\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36531,7 +36531,7 @@ module.exports = {
     "regex_parser": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"regex_parser\" # required\n  inputs = [\"in\"] # required\n  regex = \"^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$\" # required"
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  regex = \"^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$\" # required\n  type = \"regex_parser\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36568,7 +36568,7 @@ module.exports = {
     "remove_fields": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"remove_fields\" # required\n  inputs = [\"in\"] # required\n  fields = [\"field1\", \"field2\", \"parent.child\"] # required"
+        "toml": "[transforms.out]\n  fields = [\"field1\", \"field2\", \"parent.child\"] # required\n  inputs = [\"in\"] # required\n  type = \"remove_fields\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36605,7 +36605,7 @@ module.exports = {
     "remove_tags": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"remove_tags\" # required\n  inputs = [\"in\"] # required\n  tags = [\"tag1\", \"tag2\"] # required"
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  tags = [\"tag1\", \"tag2\"] # required\n  type = \"remove_tags\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36642,7 +36642,7 @@ module.exports = {
     "rename_fields": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  type = \"rename_fields\" # required\n  inputs = [\"in\"] # required\n\n  # Fields\n  fields.old_field_name = \"new_field_name\" # example\n  fields.parent.old_child_name = \"parent.new_child_name\" # example"
+        "toml": "[transforms.out]\n  # Fields\n  fields.old_field_name = \"new_field_name\" # example\n  fields.parent.old_child_name = \"parent.new_child_name\" # example\n\n  # General\n  inputs = [\"in\"] # required\n  type = \"rename_fields\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36679,7 +36679,7 @@ module.exports = {
     "sampler": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"sampler\" # required\n  inputs = [\"in\"] # required\n  rate = 10 # required"
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  rate = 10 # required\n  type = \"sampler\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36716,7 +36716,7 @@ module.exports = {
     "split": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"split\" # required\n  inputs = [\"in\"] # required\n  field_names = [\"timestamp\", \"level\", \"message\", \"parent.child\"] # required"
+        "toml": "[transforms.out]\n  field_names = [\"timestamp\", \"level\", \"message\", \"parent.child\"] # required\n  inputs = [\"in\"] # required\n  type = \"split\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36753,7 +36753,7 @@ module.exports = {
     "swimlanes": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  type = \"swimlanes\" # required\n  inputs = [\"in\"] # required\n\n  # Lanes\n  [transforms.out.lanes.`[swimlane-id]`]"
+        "toml": "[transforms.out]\n  # General\n  inputs = [\"in\"] # required\n  type = \"swimlanes\" # required\n\n  # Lanes\n  [transforms.out.lanes.`[swimlane-id]`]"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36790,7 +36790,7 @@ module.exports = {
     "tag_cardinality_limit": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"tag_cardinality_limit\" # required\n  inputs = [\"in\"] # required\n  mode = \"exact\" # required"
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  mode = \"exact\" # required\n  type = \"tag_cardinality_limit\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -36827,7 +36827,7 @@ module.exports = {
     "tokenizer": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"tokenizer\" # required\n  inputs = [\"in\"] # required\n  field_names = [\"timestamp\", \"level\", \"message\", \"parent.child\"] # required"
+        "toml": "[transforms.out]\n  field_names = [\"timestamp\", \"level\", \"message\", \"parent.child\"] # required\n  inputs = [\"in\"] # required\n  type = \"tokenizer\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
