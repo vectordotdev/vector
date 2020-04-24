@@ -1273,6 +1273,29 @@ To sum up: if it works - it works, if it doesn't - we'll take care of it later.
 > If you're reading this and want to use Vector with Windows - please let us
 > know.
 
+#### Potential Windows-specific Issues
+
+Windows has it's own specifics. We can learn from the past experience of other
+implementations to avoid the problems they encounter.
+
+- https://github.com/fluent/fluent-bit/issues/2027
+
+  This issue is on what seems to be a resource management problem with files on
+  Windows - their implementation doesn't let go of the log file in time when the
+  container (along with it's log files) is about to be removed.
+  This is a non-issue in a typical linux deployment because it's not the path at
+  the filesystem, but the inode that FD bind to. On Windows it's the other way.
+
+  There's actually a workaround for that: it's possible request Windows to allow
+  deletion of the opened file - by specifying the `FILE_SHARE_DELETE` flag at
+  [`CreateFileA`](https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea)
+  call.
+
+  See more details:
+
+  - https://stackoverflow.com/questions/3202329/will-we-ever-be-able-to-delete-an-open-file-in-windows
+  - https://boostgsoc13.github.io/boost.afio/doc/html/afio/FAQ/deleting_open_files.html
+
 ### Security
 
 There are different aspects of security. In this RFC we're going to focus on
