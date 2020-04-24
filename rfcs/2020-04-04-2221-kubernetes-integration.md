@@ -110,8 +110,6 @@ The following diagram demonstrates how this works:
     kubectl apply --namespace vector -f https://packages.timber.io/vector/latest/kubernetes/vector-namespaced.yaml
     ```
 
-    - _See [outstanding questions 3, 4, 5, 6, and 7](#outstanding-questions)._
-
     That's it!
 
 #### Deploy using Helm
