@@ -9,9 +9,6 @@ license-file = "LICENSE"
 readme = "README.md"
 publish = false
 
-[profile.bench]
-debug = true
-
 [package.metadata.deb]
 maintainer-scripts = "distribution/debian/scripts/"
 conf-files = ["/etc/vector/vector.toml"]
@@ -413,6 +410,9 @@ disable-resolv-conf = []
 [[bench]]
 name = "bench"
 harness = false
+
+[profile.bench]
+debug = true
 
 [profile.release]
 lto = true
