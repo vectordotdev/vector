@@ -3,9 +3,9 @@ name: checklist
 on: [pull_request]
 
 jobs:
-  checklist:
+  check:
     runs-on: ubuntu-latest
-    name: checklist
+    name: check
     steps:
       - name: Checkout
         uses: actions/checkout@v1

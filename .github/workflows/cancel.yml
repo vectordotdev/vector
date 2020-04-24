@@ -3,8 +3,7 @@ name: cancel
 on: [push]
 
 jobs:
-  cancel:
-    name: "cancel previous workflow runs"
+  previous-workflows:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
