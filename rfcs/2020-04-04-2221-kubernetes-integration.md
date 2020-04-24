@@ -321,10 +321,10 @@ Everything we need to do to achieve this is outlined at the
 [The Chart Repository Guide].
 
 We can use a tool like [ChartMuseum] to manage our repo. Alternatively, we can
-use a bare HTTP server, like AWS S3 or Github Pages. A tool like like
-[ChartMuseum] has the benefit of doing some things for us. It can use S3
-for storage, and offers a convenient [helm plugin][helm_push] to release charts,
-so the release process should be very simple.
+use a bare HTTP server, like AWS S3 or Github Pages.
+[ChartMuseum] has the benefit of doing some things for us. It can use S3 for
+storage, and offers a convenient [helm plugin][helm_push] to release charts, so
+the release process should be very simple.
 
 From the user experience perspective, it would be cool if we expose our chart
 repo at `https://charts.vector.dev` - short and easy to remember or even guess.
