@@ -5072,6 +5072,7 @@ dependencies = [
  "rusoto_logs",
  "rusoto_s3",
  "rusoto_sts",
+ "schannel",
  "seahash",
  "serde",
  "serde_json",

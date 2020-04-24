@@ -169,13 +169,36 @@ impl TlsSettings {
             context
                 .set_verify_cert_store(store.build())
                 .context(SetVerifyCert)?;
+        } else {
+            #[cfg(windows)]
+            load_windows_certs(context).unwrap();
         }
+
         Ok(())
     }
 
     pub fn apply_connect_configuration(&self, connection: &mut ConnectConfiguration) {
         connection.set_verify_hostname(self.verify_hostname);
     }
+}
+
+/// Load the system default certs from `schannel` this should be in place
+/// of openssl-probe on linux.
+#[cfg(windows)]
+fn load_windows_certs(builder: &mut SslContextBuilder) -> Result<()> {
+    let mut store = X509StoreBuilder::new().context(NewStoreBuilder)?;
+
+    let current_user_store = schannel::cert_store::CertStore::open_current_user("ROOT").unwrap();
+
+    for cert in current_user_store.certs() {
+        let cert = cert.to_der().to_vec();
+        let cert = X509::from_der(&cert[..]).unwrap();
+        store.add_cert(cert).unwrap();
+    }
+
+    builder.set_verify_cert_store(store.build()).unwrap();
+
+    Ok(())
 }
 
 impl Debug for TlsSettings {
@@ -190,6 +213,11 @@ impl Debug for TlsSettings {
 pub type MaybeTlsSettings = MaybeTls<(), TlsSettings>;
 
 impl MaybeTlsSettings {
+    pub fn enable_client() -> Result<Self> {
+        let tls = TlsSettings::from_options_base(&None, false)?;
+        Ok(Self::Tls(tls))
+    }
+
     /// Generate an optional settings struct from the given optional
     /// configuration reference. If `config` is `None`, TLS is
     /// disabled. The `for_server` parameter indicates the options

@@ -1,6 +1,6 @@
 #![cfg(feature = "rusoto_core")]
 
-use crate::{dns::Resolver, sinks::util};
+use crate::{dns::Resolver, sinks::util, tls::MaybeTlsSettings};
 use futures01::{
     future::{self, Future, FutureResult},
     Async, Poll, Stream,
@@ -27,7 +27,8 @@ use tower::Service;
 pub type Client = HttpClient<util::http::HttpClient<RusotoBody>>;
 
 pub fn client(resolver: Resolver) -> crate::Result<Client> {
-    let client = util::http::HttpClient::new(resolver, None)?;
+    let settings = MaybeTlsSettings::enable_client()?;
+    let client = util::http::HttpClient::new(resolver, settings)?;
     Ok(HttpClient { client })
 }
 
