@@ -1049,7 +1049,7 @@ Let's outline the requirements on the properties of the solution:
   we employ should allow third-parties to bring their own resources. Things that
   are local in essence (like `minikube`) should just work. There shouldn't be a
   situation where one can't run tests in `minikube` because cloud parts aren't
-  available. We already have a similar constraints at the Vector Test Harness.
+  available. We already have similar constraints at the Vector Test Harness.
 
 - We need the required efforts to managements the solution to be low, and the
   price to be relatively small. This means that the solution has to be simple.
@@ -1314,7 +1314,7 @@ Kubernetes specific aspects.
 Securing in Kubernetes environment plays a major role, and the more we do to
 ensure our code and deployment recommendations are safe - the better. Big
 deployments often have dedicated security teams that will be doing what we do
-on their own - just to double check, but the majority of our people out there
+on their own - just to double-check, but the majority of our people out there
 don't have enough resources to dedicate enough attention to the security
 aspects. This is why implementing security measures in our integration is
 important.
