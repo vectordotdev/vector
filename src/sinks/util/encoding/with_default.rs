@@ -1,4 +1,7 @@
-use crate::sinks::util::encoding::{EncodingConfig, EncodingConfiguration, TimestampFormat};
+use crate::{
+    event::{PathComponent, PathIter},
+    sinks::util::encoding::{EncodingConfig, EncodingConfiguration, TimestampFormat},
+};
 use serde::{
     de::{self, DeserializeOwned, Deserializer, IntoDeserializer, MapAccess, Visitor},
     Deserialize, Serialize,
@@ -14,7 +17,6 @@ use string_cache::DefaultAtom as Atom;
 /// This structure **does** assume that there is a default format. Consider
 /// `EncodingConfig<E>` instead if `E: !Default`.
 #[derive(Serialize, Debug, Eq, PartialEq, Clone, Default)]
-#[allow(dead_code)] // Required for `make check-component-features
 pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
     /// The format of the encoding.
     // TODO: This is currently sink specific.
@@ -22,32 +24,34 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(super) codec: E,
+    pub(crate) codec: E,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(super) only_fields: Option<Vec<String>>,
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(super) except_fields: Option<Vec<Atom>>,
+    pub(crate) except_fields: Option<Vec<Atom>>,
     /// Format for outgoing timestamps.
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(super) timestamp_format: Option<TimestampFormat>,
+    pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 
 impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefault<E> {
     fn codec(&self) -> &E {
         &self.codec
     }
-    fn only_fields(&self) -> &Option<Vec<String>> {
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
         &self.only_fields
     }
     fn except_fields(&self) -> &Option<Vec<Atom>> {
@@ -55,22 +59,6 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
     }
     fn timestamp_format(&self) -> &Option<TimestampFormat> {
         &self.timestamp_format
-    }
-    fn set_codec(&mut self, codec: E) -> &mut Self {
-        self.codec = codec;
-        self
-    }
-    fn set_only_fields(&mut self, fields: Option<Vec<String>>) -> &mut Self {
-        self.only_fields = fields;
-        self
-    }
-    fn set_except_fields(&mut self, fields: Option<Vec<Atom>>) -> &mut Self {
-        self.except_fields = fields;
-        self
-    }
-    fn set_timestamp_format(&mut self, format: Option<TimestampFormat>) -> &mut Self {
-        self.timestamp_format = format;
-        self
     }
 }
 
@@ -127,7 +115,7 @@ where
 impl<E: Default + PartialEq> From<E> for EncodingConfigWithDefault<E> {
     fn from(codec: E) -> Self {
         Self {
-            codec,
+            codec: codec,
             only_fields: Default::default(),
             except_fields: Default::default(),
             timestamp_format: Default::default(),
@@ -192,7 +180,13 @@ where
 
         let concrete = Self {
             codec: inner.codec,
-            only_fields: inner.only_fields,
+            // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+            only_fields: inner.only_fields.map(|fields| {
+                fields
+                    .iter()
+                    .map(|only| PathIter::new(only).collect())
+                    .collect()
+            }),
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
         };

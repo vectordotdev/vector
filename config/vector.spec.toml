@@ -108,14 +108,6 @@ dns_servers = ["0.0.0.0:53"]
 
 # Ingests data through the Docker engine daemon and outputs `log` events.
 [sources.docker]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "docker"
-  type = "docker"
-
   # Setting this to `false` will disable the automatic merging of partial events.
   #
   # * optional
@@ -159,19 +151,19 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   partial_event_marker_field = "_partial"
 
-# Ingests data through one or more local files and outputs `log` events.
-[sources.file]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "file"
-  type = "file"
+  # * must be: "docker"
+  type = "docker"
+
+# Ingests data through one or more local files and outputs `log` events.
+[sources.file]
+  #
+  # General
+  #
 
   # The directory used to persist file checkpoint positions. By default, the
   # global `data_dir` option is used. Please make sure the Vector project has
@@ -232,6 +224,14 @@ dns_servers = ["0.0.0.0:53"]
   start_at_beginning = false
   start_at_beginning = true
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "file"
+  type = "file"
+
   #
   # Context
   #
@@ -256,16 +256,6 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [sources.file.fingerprinting]
-    # The strategy used to uniquely identify files. This is important for
-    # checkpointing when file rotation is used.
-    #
-    # * optional
-    # * default: "checksum"
-    # * type: string
-    # * enum: "checksum" or "device_and_inode"
-    strategy = "checksum"
-    strategy = "device_and_inode"
-
     # The number of bytes read off the head of the file to generate a unique
     # fingerprint.
     #
@@ -286,47 +276,15 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when strategy = "checksum"
     ignored_header_bytes = 0
 
-  #
-  # Multiline
-  #
-
-  [sources.file.multiline]
-    # Start regex pattern to look for as a beginning of the message.
+    # The strategy used to uniquely identify files. This is important for
+    # checkpointing when file rotation is used.
     #
-    # * required
+    # * optional
+    # * default: "checksum"
     # * type: string
-    start_pattern = "^[^\\s]"
-    start_pattern = "\\\\$"
-    start_pattern = "^(INFO|ERROR) "
-    start_pattern = "[^;]$"
-
-    # Mode of operation, specifies how the `condition_pattern` is interpreted.
-    #
-    # * required
-    # * type: string
-    # * enum: "continue_through", "continue_past", "halt_before", and "halt_with"
-    mode = "continue_through"
-    mode = "continue_past"
-    mode = "halt_before"
-    mode = "halt_with"
-
-    # Condition regex pattern to look for. Exact behavior is configured via `mode`.
-    #
-    # * required
-    # * type: string
-    condition_pattern = "^[\\s]+"
-    condition_pattern = "\\\\$"
-    condition_pattern = "^(INFO|ERROR) "
-    condition_pattern = ";$"
-
-    # The maximum time to wait for the continuation. Once this timeout is reached,
-    # the buffered message is guaraneed to be flushed, even if incomplete.
-    #
-    # * required
-    # * type: int
-    # * unit: milliseconds
-    timeout_ms = 1000
-    timeout_ms = 600000
+    # * enum: "checksum" or "device_and_inode"
+    strategy = "checksum"
+    strategy = "device_and_inode"
 
   #
   # Priority
@@ -351,16 +309,50 @@ dns_servers = ["0.0.0.0:53"]
   oldest_first = false
   oldest_first = true
 
+  #
+  # Multiline
+  #
+
+  [sources.file.multiline]
+    # Condition regex pattern to look for. Exact behavior is configured via `mode`.
+    #
+    # * required
+    # * type: string
+    condition_pattern = "^[\\s]+"
+    condition_pattern = "\\\\$"
+    condition_pattern = "^(INFO|ERROR) "
+    condition_pattern = ";$"
+
+    # Mode of operation, specifies how the `condition_pattern` is interpreted.
+    #
+    # * required
+    # * type: string
+    # * enum: "continue_through", "continue_past", "halt_before", and "halt_with"
+    mode = "continue_through"
+    mode = "continue_past"
+    mode = "halt_before"
+    mode = "halt_with"
+
+    # Start regex pattern to look for as a beginning of the message.
+    #
+    # * required
+    # * type: string
+    start_pattern = "^[^\\s]"
+    start_pattern = "\\\\$"
+    start_pattern = "^(INFO|ERROR) "
+    start_pattern = "[^;]$"
+
+    # The maximum time to wait for the continuation. Once this timeout is reached,
+    # the buffered message is guaraneed to be flushed, even if incomplete.
+    #
+    # * required
+    # * type: int
+    # * unit: milliseconds
+    timeout_ms = 1000
+    timeout_ms = 600000
+
 # Ingests data through an internal data generator and outputs `log` events.
 [sources.generator]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "generator"
-  type = "generator"
-
   # The amount of time, in seconds, to pause between each batch of output lines.
   # If not set, there will be no delay.
   #
@@ -390,19 +382,19 @@ dns_servers = ["0.0.0.0:53"]
   sequence = false
   sequence = true
 
-# Ingests data through the HTTP protocol and outputs `log` events.
-[sources.http]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "http"
-  type = "http"
+  # * must be: "generator"
+  type = "generator"
+
+# Ingests data through the HTTP protocol and outputs `log` events.
+[sources.http]
+  #
+  # General
+  #
 
   # The address to listen for connections on
   #
@@ -431,6 +423,14 @@ dns_servers = ["0.0.0.0:53"]
   # * no default
   # * type: [string]
   headers = ["User-Agent", "X-My-Custom-Header"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "http"
+  type = "http"
 
   #
   # TLS
@@ -492,14 +492,6 @@ dns_servers = ["0.0.0.0:53"]
 
 # Ingests data through Systemd's Journald utility and outputs `log` events.
 [sources.journald]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "journald"
-  type = "journald"
-
   # The systemd journal is read in batches, and a checkpoint is set at the end of
   # each batch. This option limits the size of the batch.
   #
@@ -533,6 +525,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   journalctl_path = "/usr/local/bin/journalctl"
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "journald"
+  type = "journald"
+
   # The list of units names to monitor. If empty or not present, all units are
   # accepted. Unit names lacking a `"."` will have `".service"` appended to make
   # them a valid service unit name.
@@ -547,14 +547,6 @@ dns_servers = ["0.0.0.0:53"]
   #
   # General
   #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "kafka"
-  type = "kafka"
 
   # If offsets for consumer group do not exist, set them using this strategy.
   # librdkafka documentation for `auto.offset.reset` option for explanation.
@@ -627,6 +619,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "kafka"
+  type = "kafka"
+
   #
   # Advanced
   #
@@ -646,14 +646,6 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [sources.kafka.tls]
-    # Enable TLS during connections to the remote.
-    #
-    # * optional
-    # * default: false
-    # * type: bool
-    enabled = false
-    enabled = true
-
     # Absolute path to an additional CA certificate file, in DER or PEM format
     # (X.509).
     #
@@ -670,6 +662,14 @@ dns_servers = ["0.0.0.0:53"]
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_path` is set.
@@ -694,6 +694,12 @@ dns_servers = ["0.0.0.0:53"]
   # General
   #
 
+  # The address to accept connections on. The address _must_ include a port.
+  #
+  # * required
+  # * type: string
+  address = "0.0.0.0:80"
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -701,12 +707,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   # * must be: "logplex"
   type = "logplex"
-
-  # The address to accept connections on. The address _must_ include a port.
-  #
-  # * required
-  # * type: string
-  address = "0.0.0.0:80"
 
   #
   # TLS
@@ -768,14 +768,6 @@ dns_servers = ["0.0.0.0:53"]
 
 # Ingests data through the Prometheus text exposition format and outputs `metric` events.
 [sources.prometheus]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "prometheus"
-  type = "prometheus"
-
   # Host addresses to scrape metrics from.
   #
   # * required
@@ -790,19 +782,19 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: seconds
   scrape_interval_secs = 15
 
-# Ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs `log` events.
-[sources.socket]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "socket"
-  type = "socket"
+  # * must be: "prometheus"
+  type = "prometheus"
+
+# Ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs `log` events.
+[sources.socket]
+  #
+  # General
+  #
 
   # The address to listen for connections on, or `systemd#N` to use the Nth
   # socket passed by systemd socket activation. If an address is used it _must_
@@ -847,6 +839,14 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: seconds
   # * relevant when mode = "tcp"
   shutdown_timeout_secs = 30
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "socket"
+  type = "socket"
 
   #
   # Context
@@ -930,14 +930,6 @@ dns_servers = ["0.0.0.0:53"]
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "splunk_hec"
-  type = "splunk_hec"
-
   # The address to accept connections on.
   #
   # * optional
@@ -954,6 +946,14 @@ dns_servers = ["0.0.0.0:53"]
   # * no default
   # * type: string
   token = "A94A8FE5CCB19BA61C4C08"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "splunk_hec"
+  type = "splunk_hec"
 
   #
   # TLS
@@ -1015,6 +1015,12 @@ dns_servers = ["0.0.0.0:53"]
 
 # Ingests data through the StatsD UDP protocol and outputs `metric` events.
 [sources.statsd]
+  # UDP socket address to bind to.
+  #
+  # * required
+  # * type: string
+  address = "127.0.0.1:8126"
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -1023,34 +1029,8 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "statsd"
   type = "statsd"
 
-  # UDP socket address to bind to.
-  #
-  # * required
-  # * type: string
-  address = "127.0.0.1:8126"
-
 # Ingests data through standard input (STDIN) and outputs `log` events.
 [sources.stdin]
-  #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "stdin"
-  type = "stdin"
-
-  # The maxiumum bytes size of a message before it is discarded.
-  #
-  # * optional
-  # * default: 102400
-  # * type: int
-  # * unit: bytes
-  max_length = 102400
-
   #
   # Context
   #
@@ -1063,19 +1043,31 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   host_key = "host"
 
-# Ingests data through the Syslog protocol and outputs `log` events.
-[sources.syslog]
   #
   # General
   #
+
+  # The maxiumum bytes size of a message before it is discarded.
+  #
+  # * optional
+  # * default: 102400
+  # * type: int
+  # * unit: bytes
+  max_length = 102400
 
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "syslog"
-  type = "syslog"
+  # * must be: "stdin"
+  type = "stdin"
+
+# Ingests data through the Syslog protocol and outputs `log` events.
+[sources.syslog]
+  #
+  # General
+  #
 
   # The TCP or UDP address to listen for connections on, or "systemd#N" to use
   # the Nth socket passed by systemd socket activation.
@@ -1110,6 +1102,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   # * required when mode = "unix"
   path = "/path/to/socket"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "syslog"
+  type = "syslog"
 
   #
   # Context
@@ -1187,14 +1187,6 @@ dns_servers = ["0.0.0.0:53"]
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "vector"
-  type = "vector"
-
   # The TCP address to listen for connections on, or `systemd#N to use the Nth
   # socket passed by systemd socket activation. If an address is used it _must_
   # include a port.
@@ -1212,6 +1204,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: int
   # * unit: seconds
   shutdown_timeout_secs = 30
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "vector"
+  type = "vector"
 
   #
   # TLS
@@ -1280,24 +1280,6 @@ dns_servers = ["0.0.0.0:53"]
 # Accepts and outputs `log` events, allowing you to add one or more log fields.
 [transforms.add_fields]
   #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "add_fields"
-  type = "add_fields"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  #
   # Fields
   #
 
@@ -1317,11 +1299,35 @@ dns_servers = ["0.0.0.0:53"]
     parent = {child_field = "child_value"}
     list_field = ["first", "second", "third"]
 
+  #
+  # General
+  #
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "add_fields"
+  type = "add_fields"
+
 # Accepts and outputs `metric` events, allowing you to add one or more metric tags.
 [transforms.add_tags]
   #
   # General
   #
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
 
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1330,12 +1336,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   # * must be: "add_tags"
   type = "add_tags"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
 
   #
   # Tags
@@ -1352,20 +1352,6 @@ dns_servers = ["0.0.0.0:53"]
 
 # Accepts and outputs `log` events, allowing you to strips ANSI escape sequences from the specified field.
 [transforms.ansi_stripper]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "ansi_stripper"
-  type = "ansi_stripper"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # The target field to strip ANSI escape sequences from.
   #
   # * optional
@@ -1375,22 +1361,22 @@ dns_servers = ["0.0.0.0:53"]
   field = "parent.child"
   field = "array[0]"
 
-# Accepts and outputs `log` events, allowing you to enrich logs with AWS EC2 instance metadata.
-[transforms.aws_ec2_metadata]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "aws_ec2_metadata"
-  type = "aws_ec2_metadata"
-
   # A list of upstream source or transform IDs. See configuration for more info.
   #
   # * required
   # * type: [string]
   inputs = ["my-source-or-transform-id"]
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "ansi_stripper"
+  type = "ansi_stripper"
+
+# Accepts and outputs `log` events, allowing you to enrich logs with AWS EC2 instance metadata.
+[transforms.aws_ec2_metadata]
   # A list of fields to include in each event.
   #
   # * optional
@@ -1404,6 +1390,12 @@ dns_servers = ["0.0.0.0:53"]
   # * default: "http://169.254.169.254"
   # * type: string
   host = "http://169.254.169.254"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
 
   # Prepend a namespace to each field's key.
   #
@@ -1419,25 +1411,19 @@ dns_servers = ["0.0.0.0:53"]
   # * type: int
   refresh_interval_secs = 10
 
-# Accepts and outputs `log` events, allowing you to coerce log fields into fixed types.
-[transforms.coercer]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "coercer"
-  type = "coercer"
+  # * must be: "aws_ec2_metadata"
+  type = "aws_ec2_metadata"
 
-  # A list of upstream source or transform IDs. See configuration for more info.
+# Accepts and outputs `log` events, allowing you to coerce log fields into fixed types.
+[transforms.coercer]
   #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
+  # General
+  #
 
   # Set to `true` to drop all fields that are not specified in the `types` table.
   # Make sure both `message` and `timestamp` are specified in the `types` table
@@ -1449,6 +1435,20 @@ dns_servers = ["0.0.0.0:53"]
   # * type: bool
   drop_unspecified = false
   drop_unspecified = true
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "coercer"
+  type = "coercer"
 
   #
   # Types
@@ -1472,14 +1472,6 @@ dns_servers = ["0.0.0.0:53"]
 
 # Accepts and outputs `log` events, allowing you to concat (substrings) of other fields to a new one.
 [transforms.concat]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "concat"
-  type = "concat"
-
   # A list of upstream source or transform IDs. See configuration for more info.
   #
   # * required
@@ -1511,26 +1503,16 @@ dns_servers = ["0.0.0.0:53"]
   target = "parent.child"
   target = "array[0]"
 
-# Accepts and outputs `log` events, allowing you to prevent duplicate Events from being outputted by using an LRU cache.
-[transforms.dedupe]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "dedupe"
-  type = "dedupe"
+  # * must be: "concat"
+  type = "concat"
 
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
+# Accepts and outputs `log` events, allowing you to prevent duplicate Events from being outputted by using an LRU cache.
+[transforms.dedupe]
   #
   # Cache
   #
@@ -1565,19 +1547,9 @@ dns_servers = ["0.0.0.0:53"]
     # * type: [string]
     match = ["field1", "parent.child_field"]
 
-# Accepts and outputs `log` and `metric` events, allowing you to select events based on a set of logical conditions.
-[transforms.filter]
   #
   # General
   #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "filter"
-  type = "filter"
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
@@ -1585,6 +1557,16 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-or-transform-id"]
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "dedupe"
+  type = "dedupe"
+
+# Accepts and outputs `log` and `metric` events, allowing you to select events based on a set of logical conditions.
+[transforms.filter]
   #
   # Condition
   #
@@ -1660,15 +1642,9 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "environment.starts_with" = "staging-"
 
-# Accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
-[transforms.geoip]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
   #
-  # * required
-  # * type: string
-  # * must be: "geoip"
-  type = "geoip"
+  # General
+  #
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
@@ -1676,6 +1652,16 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-or-transform-id"]
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "filter"
+  type = "filter"
+
+# Accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+[transforms.geoip]
   # Path to the MaxMind GeoIP2 or GeoLite2 binary city database file
   # (`GeoLite2-City.mmdb`). Other databases, such as the the country database are
   # not supported.
@@ -1683,6 +1669,12 @@ dns_servers = ["0.0.0.0:53"]
   # * required
   # * type: string
   database = "/path/to/GeoLite2-City.mmdb"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
 
   # The field name that contains the IP address. This field should contain a
   # valid IPv4 or IPv6 address.
@@ -1703,25 +1695,19 @@ dns_servers = ["0.0.0.0:53"]
   target = "geoip"
   target = "parent.child"
 
-# Accepts and outputs `log` events, allowing you to parse a log field value with Grok.
-[transforms.grok_parser]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "grok_parser"
-  type = "grok_parser"
+  # * must be: "geoip"
+  type = "geoip"
 
-  # A list of upstream source or transform IDs. See configuration for more info.
+# Accepts and outputs `log` events, allowing you to parse a log field value with Grok.
+[transforms.grok_parser]
   #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
+  # General
+  #
 
   # If `true` will drop the specified `field` after parsing.
   #
@@ -1740,11 +1726,25 @@ dns_servers = ["0.0.0.0:53"]
   field = "parent.child"
   field = "array[0]"
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # The Grok pattern
   #
   # * required
   # * type: string
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "grok_parser"
+  type = "grok_parser"
 
   #
   # Types
@@ -1768,20 +1768,6 @@ dns_servers = ["0.0.0.0:53"]
 
 # Accepts and outputs `log` events, allowing you to parse a log field value as JSON.
 [transforms.json_parser]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "json_parser"
-  type = "json_parser"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # If the specified `field` should be dropped (removed) after parsing. If
   # parsing fails, the field will not be removed, irrespective of this setting.
   #
@@ -1807,6 +1793,12 @@ dns_servers = ["0.0.0.0:53"]
   field = "parent.child"
   field = "array[0]"
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # If `target_field` is set and the log contains a field of the same name as the
   # target, it will only be overwritten if this is set to `true`.
   #
@@ -1826,11 +1818,25 @@ dns_servers = ["0.0.0.0:53"]
   target_field = "root_field"
   target_field = "parent.child"
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "json_parser"
+  type = "json_parser"
+
 # Accepts `log` events, but outputs `metric` events, allowing you to convert logs into one or more metrics.
 [transforms.log_to_metric]
   #
   # General
   #
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
 
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1839,12 +1845,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   # * must be: "log_to_metric"
   type = "log_to_metric"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
 
   #
   # Metrics
@@ -1903,20 +1903,6 @@ dns_servers = ["0.0.0.0:53"]
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "logfmt_parser"
-  type = "logfmt_parser"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # If the specified `field` should be dropped (removed) after parsing.
   #
   # * optional
@@ -1933,6 +1919,20 @@ dns_servers = ["0.0.0.0:53"]
   field = "message"
   field = "parent.child"
   field = "array[0]"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "logfmt_parser"
+  type = "logfmt_parser"
 
   #
   # Types
@@ -1956,41 +1956,6 @@ dns_servers = ["0.0.0.0:53"]
 
 # Accepts and outputs `log` and `metric` events, allowing you to transform events with a full embedded Lua engine.
 [transforms.lua]
-  #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "lua"
-  type = "lua"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # Transform API version. Specifying this version ensures that Vector does not
-  # break backward compatibility.
-  #
-  # * required
-  # * type: string
-  # * must be: "2"
-  version = "2"
-
-  # A list of directories to search when loading a Lua file via the `require`
-  # function. If not specified, the modules are looked up in the directories of
-  # Vector's configs.
-  #
-  # * optional
-  # * no default
-  # * type: [string]
-  search_dirs = ["/etc/vector/lua"]
-
   #
   # Hooks
   #
@@ -2033,25 +1998,39 @@ dns_servers = ["0.0.0.0:53"]
     shutdown = "shutdown"
 
   #
-  # Timers
+  # General
   #
 
-  [[transforms.lua.timers]]
-    # Defines a handler function which is executed periodially at
-    # `interval_seconds`. It can produce new events using `emit` function.
-    #
-    # * required
-    # * type: string
-    handler = "timer_handler"
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
 
-    # Defines the interval at which the timer handler would be executed.
-    #
-    # * required
-    # * type: integer
-    # * unit: seconds
-    interval_seconds = 1
-    interval_seconds = 10
-    interval_seconds = 30
+  # A list of directories to search when loading a Lua file via the `require`
+  # function. If not specified, the modules are looked up in the directories of
+  # Vector's configs.
+  #
+  # * optional
+  # * no default
+  # * type: [string]
+  search_dirs = ["/etc/vector/lua"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "lua"
+  type = "lua"
+
+  # Transform API version. Specifying this version ensures that Vector does not
+  # break backward compatibility.
+  #
+  # * required
+  # * type: string
+  # * must be: "2"
+  version = "2"
 
   #
   # Source Code
@@ -2096,16 +2075,29 @@ end
 require('custom_module')
 """
 
+  #
+  # Timers
+  #
+
+  [[transforms.lua.timers]]
+    # Defines a handler function which is executed periodially at
+    # `interval_seconds`. It can produce new events using `emit` function.
+    #
+    # * required
+    # * type: string
+    handler = "timer_handler"
+
+    # Defines the interval at which the timer handler would be executed.
+    #
+    # * required
+    # * type: integer
+    # * unit: seconds
+    interval_seconds = 1
+    interval_seconds = 10
+    interval_seconds = 30
+
 # Accepts and outputs `log` events, allowing you to merge partial log events into a single event.
 [transforms.merge]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "merge"
-  type = "merge"
-
   # A list of upstream source or transform IDs. See configuration for more info.
   #
   # * required
@@ -2145,25 +2137,19 @@ require('custom_module')
   stream_discriminant_fields = ["host"]
   stream_discriminant_fields = ["host", "parent.child"]
 
-# Accepts and outputs `log` events, allowing you to parse a log field's value with a Regular Expression.
-[transforms.regex_parser]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "regex_parser"
-  type = "regex_parser"
+  # * must be: "merge"
+  type = "merge"
 
-  # A list of upstream source or transform IDs. See configuration for more info.
+# Accepts and outputs `log` events, allowing you to parse a log field's value with a Regular Expression.
+[transforms.regex_parser]
   #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
+  # General
+  #
 
   # If the specified `field` should be dropped (removed) after parsing.
   #
@@ -2180,6 +2166,12 @@ require('custom_module')
   # * type: string
   field = "message"
   field = "parent.child"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
 
   # If `target_field` is set and the log contains a field of the same name as the
   # target, it will only be overwritten if this is set to `true`.
@@ -2206,6 +2198,14 @@ require('custom_module')
   target_field = "root_field"
   target_field = "parent.child"
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "regex_parser"
+  type = "regex_parser"
+
   #
   # Types
   #
@@ -2228,20 +2228,6 @@ require('custom_module')
 
 # Accepts and outputs `log` events, allowing you to remove one or more log fields.
 [transforms.remove_fields]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "remove_fields"
-  type = "remove_fields"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # If set to `true`, after removing fields, remove any parent objects that are
   # now empty.
   #
@@ -2257,16 +2243,22 @@ require('custom_module')
   # * type: [string]
   fields = ["field1", "field2", "parent.child"]
 
-# Accepts and outputs `metric` events, allowing you to remove one or more metric tags.
-[transforms.remove_tags]
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "remove_tags"
-  type = "remove_tags"
+  # * must be: "remove_fields"
+  type = "remove_fields"
 
+# Accepts and outputs `metric` events, allowing you to remove one or more metric tags.
+[transforms.remove_tags]
   # A list of upstream source or transform IDs. See configuration for more info.
   #
   # * required
@@ -2279,25 +2271,19 @@ require('custom_module')
   # * type: [string]
   tags = ["tag1", "tag2"]
 
-# Accepts and outputs `log` events, allowing you to rename one or more log fields.
-[transforms.rename_fields]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "rename_fields"
-  type = "rename_fields"
+  # * must be: "remove_tags"
+  type = "remove_tags"
 
-  # A list of upstream source or transform IDs. See configuration for more info.
+# Accepts and outputs `log` events, allowing you to rename one or more log fields.
+[transforms.rename_fields]
   #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
+  # General
+  #
 
   # If set to `true`, after renaming fields, remove any parent objects of the old
   # field that are now empty.
@@ -2307,6 +2293,20 @@ require('custom_module')
   # * type: bool
   drop_empty = false
   drop_empty = true
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "rename_fields"
+  type = "rename_fields"
 
   #
   # Fields
@@ -2322,14 +2322,6 @@ require('custom_module')
 
 # Accepts and outputs `log` events, allowing you to sample events with a configurable rate.
 [transforms.sampler]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "sampler"
-  type = "sampler"
-
   # A list of upstream source or transform IDs. See configuration for more info.
   #
   # * required
@@ -2361,25 +2353,19 @@ require('custom_module')
   # * type: int
   rate = 10
 
-# Accepts and outputs `log` events, allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names.
-[transforms.split]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "split"
-  type = "split"
+  # * must be: "sampler"
+  type = "sampler"
 
-  # A list of upstream source or transform IDs. See configuration for more info.
+# Accepts and outputs `log` events, allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names.
+[transforms.split]
   #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
+  # General
+  #
 
   # If `true` the `field` will be dropped after parsing.
   #
@@ -2403,6 +2389,12 @@ require('custom_module')
   # * type: [string]
   field_names = ["timestamp", "level", "message", "parent.child"]
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # The separator to split the field on. If no separator is given, it will split
   # on all whitespace. 'Whitespace' is defined according to the terms of the
   # Unicode Derived Core Property `White_Space`.
@@ -2411,6 +2403,14 @@ require('custom_module')
   # * default: "[whitespace]"
   # * type: [string]
   separator = ","
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "split"
+  type = "split"
 
   #
   # Types
@@ -2438,6 +2438,12 @@ require('custom_module')
   # General
   #
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -2445,12 +2451,6 @@ require('custom_module')
   # * type: string
   # * must be: "swimlanes"
   type = "swimlanes"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
 
   #
   # Lanes
@@ -2530,20 +2530,6 @@ require('custom_module')
 
 # Accepts and outputs `metric` events, allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.
 [transforms.tag_cardinality_limit]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "tag_cardinality_limit"
-  type = "tag_cardinality_limit"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # The size of the cache in bytes to use to detect duplicate tags. The bigger
   # the cache the less likely it is to have a 'false positive' or a case where we
   # allow a new value for tag even after we have reached the configured limits.
@@ -2554,6 +2540,12 @@ require('custom_module')
   # * unit: bytes
   # * relevant when mode = "probabilistic"
   cache_size_per_tag = 5120000
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
 
   # Controls what should happen when a metric comes in with a tag that would
   # exceed the configured limit on cardinality.
@@ -2574,6 +2566,14 @@ require('custom_module')
   mode = "exact"
   mode = "probabilistic"
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "tag_cardinality_limit"
+  type = "tag_cardinality_limit"
+
   # How many distinct values to accept for any given key.
   #
   # * optional
@@ -2586,20 +2586,6 @@ require('custom_module')
   #
   # General
   #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "tokenizer"
-  type = "tokenizer"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
 
   # If `true` the `field` will be dropped after parsing.
   #
@@ -2622,6 +2608,20 @@ require('custom_module')
   # * required
   # * type: [string]
   field_names = ["timestamp", "level", "message", "parent.child"]
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "tokenizer"
+  type = "tokenizer"
 
   #
   # Types
@@ -2654,20 +2654,6 @@ require('custom_module')
   #
   # General
   #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "aws_cloudwatch_logs"
-  type = "aws_cloudwatch_logs"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
 
   # The ARN of an IAM role to assume at startup.
   #
@@ -2718,6 +2704,12 @@ require('custom_module')
   healthcheck = true
   healthcheck = false
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # The AWS region of the target service. If `endpoint` is provided it will
   # override this value since the endpoint includes the region.
   #
@@ -2733,6 +2725,14 @@ require('custom_module')
   stream_name = "{{ host }}"
   stream_name = "%Y-%m-%d"
   stream_name = "stream-name"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "aws_cloudwatch_logs"
+  type = "aws_cloudwatch_logs"
 
   #
   # Batch
@@ -2760,15 +2760,6 @@ require('custom_module')
   #
 
   [sinks.aws_cloudwatch_logs.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -2785,6 +2776,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -2902,20 +2902,6 @@ require('custom_module')
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "aws_cloudwatch_metrics"
-  type = "aws_cloudwatch_metrics"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # The ARN of an IAM role to assume at startup.
   #
   # * optional
@@ -2940,6 +2926,12 @@ require('custom_module')
   healthcheck = true
   healthcheck = false
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # A namespace that will isolate different metrics from each other.
   #
   # * required
@@ -2953,6 +2945,14 @@ require('custom_module')
   # * type: string
   # * required when endpoint = ""
   region = "us-east-1"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "aws_cloudwatch_metrics"
+  type = "aws_cloudwatch_metrics"
 
   #
   # Batch
@@ -2981,20 +2981,6 @@ require('custom_module')
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "aws_kinesis_firehose"
-  type = "aws_kinesis_firehose"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # The ARN of an IAM role to assume at startup.
   #
   # * optional
@@ -3019,6 +3005,12 @@ require('custom_module')
   healthcheck = true
   healthcheck = false
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # The AWS region of the target service. If `endpoint` is provided it will
   # override this value since the endpoint includes the region.
   #
@@ -3032,6 +3024,14 @@ require('custom_module')
   # * required
   # * type: string
   stream_name = "my-stream"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "aws_kinesis_firehose"
+  type = "aws_kinesis_firehose"
 
   #
   # Batch
@@ -3059,15 +3059,6 @@ require('custom_module')
   #
 
   [sinks.aws_kinesis_firehose.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -3084,6 +3075,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -3201,20 +3201,6 @@ require('custom_module')
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "aws_kinesis_streams"
-  type = "aws_kinesis_streams"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # The ARN of an IAM role to assume at startup.
   #
   # * optional
@@ -3230,6 +3216,12 @@ require('custom_module')
   # * type: string
   # * relevant when region = ""
   endpoint = "127.0.0.0:5000/path/to/service"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
 
   # The log field used as the Kinesis record's partition key value.
   #
@@ -3251,6 +3243,14 @@ require('custom_module')
   # * required
   # * type: string
   stream_name = "my-stream"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "aws_kinesis_streams"
+  type = "aws_kinesis_streams"
 
   #
   # Batch
@@ -3278,15 +3278,6 @@ require('custom_module')
   #
 
   [sinks.aws_kinesis_streams.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -3303,6 +3294,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -3417,70 +3417,6 @@ require('custom_module')
 # Batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint.
 [sinks.aws_s3]
   #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "aws_s3"
-  type = "aws_s3"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # The ARN of an IAM role to assume at startup.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  assume_role = "arn:aws:iam::123456789098:role/my_role"
-
-  # The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
-  #
-  # * required
-  # * type: string
-  bucket = "my-bucket"
-
-  # The compression mechanism to use.
-  #
-  # * required
-  # * type: string
-  # * enum: "gzip" or "none"
-  compression = "gzip"
-  compression = "none"
-
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * required
-  # * type: string
-  # * required when endpoint = ""
-  region = "us-east-1"
-
-  #
   # ACL
   #
 
@@ -3536,6 +3472,70 @@ require('custom_module')
   grant_write_acp = "http://acs.amazonaws.com/groups/global/AllUsers"
 
   #
+  # General
+  #
+
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
+  #
+  # * required
+  # * type: string
+  bucket = "my-bucket"
+
+  # The compression mechanism to use.
+  #
+  # * required
+  # * type: string
+  # * enum: "gzip" or "none"
+  compression = "gzip"
+  compression = "none"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * required
+  # * type: string
+  # * required when endpoint = ""
+  region = "us-east-1"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "aws_s3"
+  type = "aws_s3"
+
+  #
   # Batch
   #
 
@@ -3561,15 +3561,6 @@ require('custom_module')
   #
 
   [sinks.aws_s3.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -3586,6 +3577,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -3631,42 +3631,6 @@ require('custom_module')
     # * enum: "rfc3339" or "unix"
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
-
-  #
-  # Encryption
-  #
-
-  # The server-side encryption algorithm used when storing these objects.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * enum: "AES256" or "aws:kms"
-  server_side_encryption = "AES256"
-  server_side_encryption = "aws:kms"
-
-  # If `server_side_encryption` has the value `"aws.kms"`, this specifies the ID
-  # of the AWS Key Management Service (AWS KMS) symmetrical customer managed
-  # customer master key (CMK) that will used for the created objects. If not
-  # specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when server_side_encryption = "aws:kms"
-  ssekms_key_id = "abcd1234"
-
-  #
-  # Metadata
-  #
-
-  [sinks.aws_s3.tags]
-    # A custom tag to be added to the created objects.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    Tag1 = "Value1"
 
   #
   # Naming
@@ -3774,6 +3738,30 @@ require('custom_module')
     timeout_secs = 30
 
   #
+  # Encryption
+  #
+
+  # The server-side encryption algorithm used when storing these objects.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "AES256" or "aws:kms"
+  server_side_encryption = "AES256"
+  server_side_encryption = "aws:kms"
+
+  # If `server_side_encryption` has the value `"aws.kms"`, this specifies the ID
+  # of the AWS Key Management Service (AWS KMS) symmetrical customer managed
+  # customer master key (CMK) that will used for the created objects. If not
+  # specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when server_side_encryption = "aws:kms"
+  ssekms_key_id = "abcd1234"
+
+  #
   # Storage
   #
 
@@ -3792,16 +3780,20 @@ require('custom_module')
   storage_class = "GLACIER"
   storage_class = "DEEP_ARCHIVE"
 
+  #
+  # Metadata
+  #
+
+  [sinks.aws_s3.tags]
+    # A custom tag to be added to the created objects.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    Tag1 = "Value1"
+
 # Streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
 [sinks.blackhole]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "blackhole"
-  type = "blackhole"
-
   # A list of upstream source or transform IDs. See configuration for more info.
   #
   # * required
@@ -3815,65 +3807,21 @@ require('custom_module')
   # * type: int
   print_amount = 1000
 
-# Batches `log` events to Clickhouse via the `HTTP` Interface.
-[sinks.clickhouse]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "clickhouse"
-  type = "clickhouse"
+  # * must be: "blackhole"
+  type = "blackhole"
 
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # The database that contains the stable that data will be inserted into.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  database = "mydatabase"
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # The host url of the Clickhouse server.
-  #
-  # * required
-  # * type: string
-  host = "http://localhost:8123"
-
-  # The table that data will be inserted into.
-  #
-  # * required
-  # * type: string
-  table = "mytable"
-
+# Batches `log` events to Clickhouse via the `HTTP` Interface.
+[sinks.clickhouse]
   #
   # Auth
   #
 
   [sinks.clickhouse.auth]
-    # The authentication strategy to use.
-    #
-    # * required
-    # * type: string
-    # * must be: "basic"
-    strategy = "basic"
-
     # The basic authentication password.
     #
     # * required
@@ -3881,6 +3829,13 @@ require('custom_module')
     # * required when strategy = "basic"
     password = "${CLICKHOUSE_PASSWORD}"
     password = "password"
+
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * must be: "basic"
+    strategy = "basic"
 
     # The basic authentication user name.
     #
@@ -3916,15 +3871,6 @@ require('custom_module')
   #
 
   [sinks.clickhouse.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -3942,6 +3888,15 @@ require('custom_module')
     # * required when type = "disk"
     max_size = 104900000
 
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The behavior when the buffer becomes full.
     #
     # * optional
@@ -3950,6 +3905,65 @@ require('custom_module')
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # requests
+  #
+
+  # The compression strategy used to compress the encoded event data before
+  # outputting.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
+
+  #
+  # General
+  #
+
+  # The database that contains the stable that data will be inserted into.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  database = "mydatabase"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # The host url of the Clickhouse server.
+  #
+  # * required
+  # * type: string
+  host = "http://localhost:8123"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The table that data will be inserted into.
+  #
+  # * required
+  # * type: string
+  table = "mytable"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "clickhouse"
+  type = "clickhouse"
 
   #
   # Encoding
@@ -4045,20 +4059,6 @@ require('custom_module')
     timeout_secs = 30
 
   #
-  # requests
-  #
-
-  # The compression strategy used to compress the encoded event data before
-  # outputting.
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
-
-  #
   # TLS
   #
 
@@ -4119,33 +4119,6 @@ require('custom_module')
 # Streams `log` and `metric` events to standard output streams, such as STDOUT and STDERR.
 [sinks.console]
   #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "console"
-  type = "console"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # The standard stream to write to.
-  #
-  # * optional
-  # * default: "stdout"
-  # * type: string
-  # * enum: "stdout" or "stderr"
-  target = "stdout"
-  target = "stderr"
-
-  #
   # Encoding
   #
 
@@ -4181,25 +4154,38 @@ require('custom_module')
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
 
-# Streams `log` events to Datadog's logs via the TCP endpoint.
-[sinks.datadog_logs]
   #
   # General
   #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "datadog_logs"
-  type = "datadog_logs"
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
   # * required
   # * type: [string]
   inputs = ["my-source-or-transform-id"]
+
+  # The standard stream to write to.
+  #
+  # * optional
+  # * default: "stdout"
+  # * type: string
+  # * enum: "stdout" or "stderr"
+  target = "stdout"
+  target = "stderr"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "console"
+  type = "console"
+
+# Streams `log` events to Datadog's logs via the TCP endpoint.
+[sinks.datadog_logs]
+  #
+  # General
+  #
 
   # Datadog API key
   #
@@ -4224,20 +4210,25 @@ require('custom_module')
   healthcheck = true
   healthcheck = false
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "datadog_logs"
+  type = "datadog_logs"
+
   #
   # Buffer
   #
 
   [sinks.datadog_logs.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -4254,6 +4245,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -4305,14 +4305,6 @@ require('custom_module')
   #
 
   [sinks.datadog_logs.tls]
-    # Enable TLS during connections to the remote.
-    #
-    # * optional
-    # * default: false
-    # * type: bool
-    enabled = false
-    enabled = true
-
     # Absolute path to an additional CA certificate file, in DER or PEM format
     # (X.509).
     #
@@ -4329,6 +4321,14 @@ require('custom_module')
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_path` is set.
@@ -4372,20 +4372,6 @@ require('custom_module')
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "datadog_metrics"
-  type = "datadog_metrics"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # Datadog API key
   #
   # * required
@@ -4409,11 +4395,25 @@ require('custom_module')
   host = "https://api.datadoghq.com"
   host = "https://api.datadoghq.eu"
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # A prefix that will be added to all metric names.
   #
   # * required
   # * type: string
   namespace = "service"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "datadog_metrics"
+  type = "datadog_metrics"
 
   #
   # Batch
@@ -4504,22 +4504,98 @@ require('custom_module')
 # Batches `log` events to Elasticsearch via the `_bulk` API endpoint.
 [sinks.elasticsearch]
   #
+  # Auth
+  #
+
+  [sinks.elasticsearch.auth]
+    # The basic authentication password.
+    #
+    # * required
+    # * type: string
+    # * required when strategy = "basic"
+    password = "${ELASTICSEARCH_PASSWORD}"
+    password = "password"
+
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * enum: "aws" or "basic"
+    strategy = "aws"
+    strategy = "basic"
+
+    # The basic authentication user name.
+    #
+    # * required
+    # * type: string
+    # * required when strategy = "basic"
+    user = "${ELASTICSEARCH_USERNAME}"
+    user = "username"
+
+  #
+  # Batch
+  #
+
+  [sinks.elasticsearch.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * optional
+    # * default: 10490000
+    # * type: int
+    # * unit: bytes
+    max_size = 10490000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Buffer
+  #
+
+  [sinks.elasticsearch.buffer]
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
   # General
   #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "elasticsearch"
-  type = "elasticsearch"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
 
   # The compression mechanism to use.
   #
@@ -4574,95 +4650,19 @@ require('custom_module')
   index = "application-{{ application_id }}-%Y-%m-%d"
   index = "vector-%Y-%m-%d"
 
+  # A list of upstream source or transform IDs. See configuration for more info.
   #
-  # Auth
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
   #
-
-  [sinks.elasticsearch.auth]
-    # The authentication strategy to use.
-    #
-    # * required
-    # * type: string
-    # * enum: "aws" or "basic"
-    strategy = "aws"
-    strategy = "basic"
-
-    # The basic authentication password.
-    #
-    # * required
-    # * type: string
-    # * required when strategy = "basic"
-    password = "${ELASTICSEARCH_PASSWORD}"
-    password = "password"
-
-    # The basic authentication user name.
-    #
-    # * required
-    # * type: string
-    # * required when strategy = "basic"
-    user = "${ELASTICSEARCH_USERNAME}"
-    user = "username"
-
-  #
-  # Batch
-  #
-
-  [sinks.elasticsearch.batch]
-    # The maximum size of a batch, in bytes, before it is flushed.
-    #
-    # * optional
-    # * default: 10490000
-    # * type: int
-    # * unit: bytes
-    max_size = 10490000
-
-    # The maximum age of a batch before it is flushed.
-    #
-    # * optional
-    # * default: 1
-    # * type: int
-    # * unit: seconds
-    timeout_secs = 1
-
-  #
-  # Buffer
-  #
-
-  [sinks.elasticsearch.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * required when type = "disk"
-    max_size = 104900000
-
-    # The behavior when the buffer becomes full.
-    #
-    # * optional
-    # * default: "block"
-    # * type: string
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
+  # * required
+  # * type: string
+  # * must be: "elasticsearch"
+  type = "elasticsearch"
 
   #
   # Encoding
@@ -4841,47 +4841,6 @@ require('custom_module')
 # Streams `log` events to a file.
 [sinks.file]
   #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "file"
-  type = "file"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # The amount of time a file can be idle  and stay open. After not receiving any
-  # events for this timeout, the file will be flushed and closed.
-  #
-  # * optional
-  # * default: "30"
-  # * type: int
-  idle_timeout_secs = "30"
-
-  # File name to write events to.
-  #
-  # * required
-  # * type: string
-  path = "vector-%Y-%m-%d.log"
-  path = "application-{{ application_id }}-%Y-%m-%d.log"
-
-  #
   # Encoding
   #
 
@@ -4917,25 +4876,111 @@ require('custom_module')
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
 
-# Batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface.
-[sinks.gcp_cloud_storage]
   #
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
+  # Enables/disables the sink healthcheck upon start.
   #
-  # * required
-  # * type: string
-  # * must be: "gcp_cloud_storage"
-  type = "gcp_cloud_storage"
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # The amount of time a file can be idle  and stay open. After not receiving any
+  # events for this timeout, the file will be flushed and closed.
+  #
+  # * optional
+  # * default: "30"
+  # * type: int
+  idle_timeout_secs = "30"
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
   # * required
   # * type: [string]
   inputs = ["my-source-or-transform-id"]
+
+  # File name to write events to.
+  #
+  # * required
+  # * type: string
+  path = "vector-%Y-%m-%d.log"
+  path = "application-{{ application_id }}-%Y-%m-%d.log"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "file"
+  type = "file"
+
+# Batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface.
+[sinks.gcp_cloud_storage]
+  #
+  # Object Attributes
+  #
+
+  # Predefined ACL to apply to the created objects. For more information, see
+  # Predefined ACLs. If this is not set, GCS will apply a default ACL when the
+  # object is created.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "authenticatedRead", "bucketOwnerFullControl", "bucketOwnerRead", "private", "projectPrivate", and "publicRead"
+  acl = "authenticatedRead"
+  acl = "bucketOwnerFullControl"
+  acl = "bucketOwnerRead"
+  acl = "private"
+  acl = "projectPrivate"
+  acl = "publicRead"
+
+  # The set of metadata `key:value` pairs for the created objects. See the GCS
+  # custom metadata documentation for more details.
+  #
+  # * optional
+  # * no default
+  # * type: string
+
+  # The storage class for the created objects. See the GCP storage classes for
+  # more details.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "STANDARD", "NEARLINE", "COLDLINE", and "ARCHIVE"
+  storage_class = "STANDARD"
+  storage_class = "NEARLINE"
+  storage_class = "COLDLINE"
+  storage_class = "ARCHIVE"
+
+  #
+  # Batch
+  #
+
+  [sinks.gcp_cloud_storage.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * optional
+    # * default: 10485760
+    # * type: int
+    # * unit: bytes
+    max_size = 10485760
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 300
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 300
+
+  #
+  # General
+  #
 
   # The GCS bucket name.
   #
@@ -4972,41 +5017,25 @@ require('custom_module')
   healthcheck = true
   healthcheck = false
 
+  # A list of upstream source or transform IDs. See configuration for more info.
   #
-  # Batch
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
   #
-
-  [sinks.gcp_cloud_storage.batch]
-    # The maximum size of a batch, in bytes, before it is flushed.
-    #
-    # * optional
-    # * default: 10485760
-    # * type: int
-    # * unit: bytes
-    max_size = 10485760
-
-    # The maximum age of a batch before it is flushed.
-    #
-    # * optional
-    # * default: 300
-    # * type: int
-    # * unit: seconds
-    timeout_secs = 300
+  # * required
+  # * type: string
+  # * must be: "gcp_cloud_storage"
+  type = "gcp_cloud_storage"
 
   #
   # Buffer
   #
 
   [sinks.gcp_cloud_storage.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -5023,6 +5052,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -5068,44 +5106,6 @@ require('custom_module')
     # * enum: "rfc3339" or "unix"
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
-
-  #
-  # Object Attributes
-  #
-
-  # Predefined ACL to apply to the created objects. For more information, see
-  # Predefined ACLs. If this is not set, GCS will apply a default ACL when the
-  # object is created.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * enum: "authenticatedRead", "bucketOwnerFullControl", "bucketOwnerRead", "private", "projectPrivate", and "publicRead"
-  acl = "authenticatedRead"
-  acl = "bucketOwnerFullControl"
-  acl = "bucketOwnerRead"
-  acl = "private"
-  acl = "projectPrivate"
-  acl = "publicRead"
-
-  # The set of metadata `key:value` pairs for the created objects. See the GCS
-  # custom metadata documentation for more details.
-  #
-  # * optional
-  # * no default
-  # * type: string
-
-  # The storage class for the created objects. See the GCP storage classes for
-  # more details.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * enum: "STANDARD", "NEARLINE", "COLDLINE", and "ARCHIVE"
-  storage_class = "STANDARD"
-  storage_class = "NEARLINE"
-  storage_class = "COLDLINE"
-  storage_class = "ARCHIVE"
 
   #
   # Object Names
@@ -5276,20 +5276,6 @@ require('custom_module')
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "gcp_pubsub"
-  type = "gcp_pubsub"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # A Google Cloud API key used to authenticate access the pubsub project and
   # topic. Either this or `credentials_path` must be set.
   #
@@ -5321,6 +5307,12 @@ require('custom_module')
   healthcheck = true
   healthcheck = false
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # The project name to which to publish logs.
   #
   # * required
@@ -5332,6 +5324,14 @@ require('custom_module')
   # * required
   # * type: string
   topic = "this-is-a-topic"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "gcp_pubsub"
+  type = "gcp_pubsub"
 
   #
   # Batch
@@ -5359,15 +5359,6 @@ require('custom_module')
   #
 
   [sinks.gcp_pubsub.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -5384,6 +5375,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -5548,22 +5548,29 @@ require('custom_module')
 # Batches `log` events to Google Cloud Platform's Stackdriver Logging service via the REST Interface.
 [sinks.gcp_stackdriver_logs]
   #
+  # Batch
+  #
+
+  [sinks.gcp_stackdriver_logs.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * optional
+    # * default: 5242880
+    # * type: int
+    # * unit: bytes
+    max_size = 5242880
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
   # General
   #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "gcp_stackdriver_logs"
-  type = "gcp_stackdriver_logs"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
 
   # The billing account ID to which to publish logs.
   #
@@ -5608,6 +5615,12 @@ require('custom_module')
   healthcheck = true
   healthcheck = false
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # The log ID to which to publish logs. This is a name you create to identify
   # this log stream.
   #
@@ -5636,41 +5649,19 @@ require('custom_module')
   # * type: string
   project_id = "vector-123456"
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
   #
-  # Batch
-  #
-
-  [sinks.gcp_stackdriver_logs.batch]
-    # The maximum size of a batch, in bytes, before it is flushed.
-    #
-    # * optional
-    # * default: 5242880
-    # * type: int
-    # * unit: bytes
-    max_size = 5242880
-
-    # The maximum age of a batch before it is flushed.
-    #
-    # * optional
-    # * default: 1
-    # * type: int
-    # * unit: seconds
-    timeout_secs = 1
+  # * required
+  # * type: string
+  # * must be: "gcp_stackdriver_logs"
+  type = "gcp_stackdriver_logs"
 
   #
   # Buffer
   #
 
   [sinks.gcp_stackdriver_logs.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -5687,6 +5678,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -5882,20 +5882,6 @@ require('custom_module')
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "honeycomb"
-  type = "honeycomb"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # The team key that will be used to authenticate against Honeycomb.
   #
   # * required
@@ -5916,6 +5902,20 @@ require('custom_module')
   # * type: bool
   healthcheck = true
   healthcheck = false
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "honeycomb"
+  type = "honeycomb"
 
   #
   # Batch
@@ -5943,15 +5943,6 @@ require('custom_module')
   #
 
   [sinks.honeycomb.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -5968,6 +5959,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -6046,67 +6046,10 @@ require('custom_module')
 # Batches `log` events to a generic HTTP endpoint.
 [sinks.http]
   #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "http"
-  type = "http"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # The compression strategy used to compress the encoded event data before
-  # outputting.
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # A URI that Vector can request in order to determine the service health.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  healthcheck_uri = "https://10.22.212.22:9000/_health"
-
-  # The full URI to make HTTP requests to. This should include the protocol and
-  # host, but can also include the port, path, and any other valid part of a URI.
-  #
-  # * required
-  # * type: string
-  uri = "https://10.22.212.22:9000/endpoint"
-
-  #
   # Auth
   #
 
   [sinks.http.auth]
-    # The authentication strategy to use.
-    #
-    # * required
-    # * type: string
-    # * must be: "basic"
-    strategy = "basic"
-
     # The basic authentication password.
     #
     # * required
@@ -6114,6 +6057,13 @@ require('custom_module')
     # * required when strategy = "basic"
     password = "${HTTP_PASSWORD}"
     password = "password"
+
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * must be: "basic"
+    strategy = "basic"
 
     # The basic authentication user name.
     #
@@ -6149,15 +6099,6 @@ require('custom_module')
   #
 
   [sinks.http.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -6175,6 +6116,15 @@ require('custom_module')
     # * required when type = "disk"
     max_size = 104900000
 
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The behavior when the buffer becomes full.
     #
     # * optional
@@ -6183,6 +6133,56 @@ require('custom_module')
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # General
+  #
+
+  # The compression strategy used to compress the encoded event data before
+  # outputting.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # A URI that Vector can request in order to determine the service health.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  healthcheck_uri = "https://10.22.212.22:9000/_health"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "http"
+  type = "http"
+
+  # The full URI to make HTTP requests to. This should include the protocol and
+  # host, but can also include the port, path, and any other valid part of a URI.
+  #
+  # * required
+  # * type: string
+  uri = "https://10.22.212.22:9000/endpoint"
 
   #
   # Encoding
@@ -6359,46 +6359,6 @@ require('custom_module')
 # Batches `log` events to Humio via the HEC API.
 [sinks.humio_logs]
   #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "humio_logs"
-  type = "humio_logs"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # The optional host to send Humio logs to.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  host = "http://myhumiohost.com"
-
-  # Your Humio ingestion token.
-  #
-  # * required
-  # * type: string
-  token = "${HUMIO_TOKEN}"
-  token = "A94A8FE5CCB19BA61C4C08"
-
-  #
   # Batch
   #
 
@@ -6424,15 +6384,6 @@ require('custom_module')
   #
 
   [sinks.humio_logs.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -6449,6 +6400,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -6494,6 +6454,46 @@ require('custom_module')
     # * enum: "rfc3339" or "unix"
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
+
+  #
+  # General
+  #
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # The optional host to send Humio logs to.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  host = "http://myhumiohost.com"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # Your Humio ingestion token.
+  #
+  # * required
+  # * type: string
+  token = "${HUMIO_TOKEN}"
+  token = "A94A8FE5CCB19BA61C4C08"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "humio_logs"
+  type = "humio_logs"
 
   #
   # Request
@@ -6563,36 +6563,29 @@ require('custom_module')
 # Batches `metric` events to InfluxDB using v1 or v2 HTTP API.
 [sinks.influxdb_metrics]
   #
+  # Batch
+  #
+
+  [sinks.influxdb_metrics.batch]
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 20
+    # * type: int
+    # * unit: events
+    max_events = 20
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
   # General
   #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "influxdb_metrics"
-  type = "influxdb_metrics"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # InfluxDB endpoint to send metrics to.
-  #
-  # * required
-  # * type: string
-  endpoint = "http://localhost:8086/"
-  endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com"
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
-
-  # A prefix that will be added to all metric names.
-  #
-  # * required
-  # * type: string
-  namespace = "service"
 
   # The destination bucket for writes into InfluxDB 2.
   #
@@ -6608,6 +6601,14 @@ require('custom_module')
   database = "vector-database"
   database = "iot-store"
 
+  # InfluxDB endpoint to send metrics to.
+  #
+  # * required
+  # * type: string
+  endpoint = "http://localhost:8086/"
+  endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com"
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -6615,6 +6616,48 @@ require('custom_module')
   # * type: bool
   healthcheck = true
   healthcheck = false
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # A prefix that will be added to all metric names.
+  #
+  # * required
+  # * type: string
+  namespace = "service"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "influxdb_metrics"
+  type = "influxdb_metrics"
+
+  #
+  # Persistence
+  #
+
+  # Sets the write consistency for the point for InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  consistency = "any"
+  consistency = "one"
+  consistency = "quorum"
+  consistency = "all"
+
+  # Sets the target retention policy for the write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  retention_policy_name = "autogen"
+  retention_policy_name = "one_day_only"
 
   #
   # Auth
@@ -6651,49 +6694,6 @@ require('custom_module')
   # * type: string
   username = "todd"
   username = "vector-source"
-
-  #
-  # Batch
-  #
-
-  [sinks.influxdb_metrics.batch]
-    # The maximum size of a batch, in events, before it is flushed.
-    #
-    # * optional
-    # * default: 20
-    # * type: int
-    # * unit: events
-    max_events = 20
-
-    # The maximum age of a batch before it is flushed.
-    #
-    # * optional
-    # * default: 1
-    # * type: int
-    # * unit: seconds
-    timeout_secs = 1
-
-  #
-  # Persistence
-  #
-
-  # Sets the write consistency for the point for InfluxDB 1.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  consistency = "any"
-  consistency = "one"
-  consistency = "quorum"
-  consistency = "all"
-
-  # Sets the target retention policy for the write into InfluxDB 1.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  retention_policy_name = "autogen"
-  retention_policy_name = "one_day_only"
 
   #
   # Request
@@ -6766,20 +6766,6 @@ require('custom_module')
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "kafka"
-  type = "kafka"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # A comma-separated list of host and port pairs that are the addresses of the
   # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
   # initially to bootstrap itself.
@@ -6807,6 +6793,12 @@ require('custom_module')
   # * type: bool
   healthcheck = true
   healthcheck = false
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
 
   # The log field name to use for the topic key. If unspecified, the key will be
   # randomly generated. If the field does not exist on the log, a blank value
@@ -6838,34 +6830,19 @@ require('custom_module')
   # * type: string
   topic = "topic-1234"
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
   #
-  # Advanced
-  #
-
-  [sinks.kafka.librdkafka_options]
-    # The options and their values. Accepts `string` values.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    "client.id" = "${ENV_VAR}"
-    "fetch.error.backoff.ms" = "1000"
-    "socket.send.buffer.bytes" = "100"
+  # * required
+  # * type: string
+  # * must be: "kafka"
+  type = "kafka"
 
   #
   # Buffer
   #
 
   [sinks.kafka.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -6882,6 +6859,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -6929,18 +6915,24 @@ require('custom_module')
     timestamp_format = "unix"
 
   #
+  # Advanced
+  #
+
+  [sinks.kafka.librdkafka_options]
+    # The options and their values. Accepts `string` values.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    "client.id" = "${ENV_VAR}"
+    "fetch.error.backoff.ms" = "1000"
+    "socket.send.buffer.bytes" = "100"
+
+  #
   # TLS
   #
 
   [sinks.kafka.tls]
-    # Enable TLS during connections to the remote.
-    #
-    # * optional
-    # * default: false
-    # * type: bool
-    enabled = false
-    enabled = true
-
     # Absolute path to an additional CA certificate file, in DER or PEM format
     # (X.509).
     #
@@ -6957,6 +6949,14 @@ require('custom_module')
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_path` is set.
@@ -6980,20 +6980,6 @@ require('custom_module')
   #
   # General
   #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "logdna"
-  type = "logdna"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
 
   # The Ingestion API key.
   #
@@ -7034,6 +7020,12 @@ require('custom_module')
   hostname = "${HOSTNAME}"
   hostname = "my-local-machine"
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # The IP address that will be attached to each batch of events.
   #
   # * optional
@@ -7054,6 +7046,14 @@ require('custom_module')
   # * no default
   # * type: [string]
   tags = ["tag1", "tag2"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "logdna"
+  type = "logdna"
 
   #
   # Batch
@@ -7081,15 +7081,6 @@ require('custom_module')
   #
 
   [sinks.logdna.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -7106,6 +7097,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -7212,79 +7212,10 @@ require('custom_module')
 # Batches `log` events to Loki.
 [sinks.loki]
   #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "loki"
-  type = "loki"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # The endpoint used to ship logs to.
-  #
-  # * required
-  # * type: string
-  endpoint = "http://localhost:3100"
-  endpoint = "http://127.0.0.1:8080"
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # If this is set to `true` then when labels are collected from events those
-  # fields will also get removed from the event.
-  #
-  # * optional
-  # * default: false
-  # * type: bool
-  remove_label_fields = false
-  remove_label_fields = true
-
-  # If this is set to `true` then the timestamp will be removed from the event.
-  # This is useful because Loki uses the timestamp to index the event.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  remove_timestamp = true
-  remove_timestamp = false
-
-  # The tenant id that will be sent with every request, by default this is not
-  # required since a proxy should set this header. When running Loki locally a
-  # tenant id is not required either.
-  #
-  # You can read more about tenant id's here
-  #
-  # * optional
-  # * no default
-  # * type: string
-  tenant_id = "some_tenant_id"
-
-  #
   # Auth
   #
 
   [sinks.loki.auth]
-    # The authentication strategy to use.
-    #
-    # * required
-    # * type: string
-    # * must be: "basic"
-    strategy = "basic"
-
     # The basic authentication password. If using GrafanaLab's hosted Loki then
     # this must be set to your `instanceId`.
     #
@@ -7293,6 +7224,13 @@ require('custom_module')
     # * required when strategy = "basic"
     password = "${LOKI_PASSWORD}"
     password = "password"
+
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * must be: "basic"
+    strategy = "basic"
 
     # The basic authentication user name. If using GrafanaLab's hosted Loki then
     # this must be set to your Grafana.com api key.
@@ -7329,15 +7267,6 @@ require('custom_module')
   #
 
   [sinks.loki.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -7354,6 +7283,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -7400,6 +7338,68 @@ require('custom_module')
     # * enum: "rfc3339" or "unix"
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
+
+  #
+  # General
+  #
+
+  # The endpoint used to ship logs to.
+  #
+  # * required
+  # * type: string
+  endpoint = "http://localhost:3100"
+  endpoint = "http://127.0.0.1:8080"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # If this is set to `true` then when labels are collected from events those
+  # fields will also get removed from the event.
+  #
+  # * optional
+  # * default: false
+  # * type: bool
+  remove_label_fields = false
+  remove_label_fields = true
+
+  # If this is set to `true` then the timestamp will be removed from the event.
+  # This is useful because Loki uses the timestamp to index the event.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  remove_timestamp = true
+  remove_timestamp = false
+
+  # The tenant id that will be sent with every request, by default this is not
+  # required since a proxy should set this header. When running Loki locally a
+  # tenant id is not required either.
+  #
+  # You can read more about tenant id's here
+  #
+  # * optional
+  # * no default
+  # * type: string
+  tenant_id = "some_tenant_id"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "loki"
+  type = "loki"
 
   #
   # Labels
@@ -7539,57 +7539,6 @@ require('custom_module')
 # Batches `log` events to New Relic's log service via their log API.
 [sinks.new_relic_logs]
   #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "new_relic_logs"
-  type = "new_relic_logs"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # Your New Relic insert key (if applicable).
-  #
-  # * optional
-  # * no default
-  # * type: string
-  insert_key = "xxxx"
-  insert_key = "${NEW_RELIC_INSERT_KEY}"
-
-  # Your New Relic license key (if applicable).
-  #
-  # * optional
-  # * no default
-  # * type: string
-  license_key = "xxxx"
-  license_key = "${NEW_RELIC_LICENSE_KEY}"
-
-  # The API region to send logs to.
-  #
-  # * optional
-  # * default: "us"
-  # * type: string
-  # * enum: "us" or "eu"
-  region = "us"
-  region = "eu"
-
-  #
   # Batch
   #
 
@@ -7615,15 +7564,6 @@ require('custom_module')
   #
 
   [sinks.new_relic_logs.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -7640,6 +7580,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -7685,6 +7634,57 @@ require('custom_module')
     # * enum: "rfc3339" or "unix"
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
+
+  #
+  # General
+  #
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # Your New Relic insert key (if applicable).
+  #
+  # * optional
+  # * no default
+  # * type: string
+  insert_key = "xxxx"
+  insert_key = "${NEW_RELIC_INSERT_KEY}"
+
+  # Your New Relic license key (if applicable).
+  #
+  # * optional
+  # * no default
+  # * type: string
+  license_key = "xxxx"
+  license_key = "${NEW_RELIC_LICENSE_KEY}"
+
+  # The API region to send logs to.
+  #
+  # * optional
+  # * default: "us"
+  # * type: string
+  # * enum: "us" or "eu"
+  region = "us"
+  region = "eu"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "new_relic_logs"
+  type = "new_relic_logs"
 
   #
   # Request
@@ -7754,51 +7754,10 @@ require('custom_module')
 # Streams `log` events to Papertrail via Syslog.
 [sinks.papertrail]
   #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "papertrail"
-  type = "papertrail"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # The endpoint to stream logs to.
-  #
-  # * required
-  # * type: string
-  endpoint = "logs.papertrailapp.com:12345"
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  #
   # Buffer
   #
 
   [sinks.papertrail.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -7815,6 +7774,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -7861,15 +7829,23 @@ require('custom_module')
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
 
-# Exposes `metric` events to Prometheus metrics service.
-[sinks.prometheus]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
+  #
+  # General
+  #
+
+  # The endpoint to stream logs to.
   #
   # * required
   # * type: string
-  # * must be: "prometheus"
-  type = "prometheus"
+  endpoint = "logs.papertrailapp.com:12345"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
@@ -7877,6 +7853,16 @@ require('custom_module')
   # * type: [string]
   inputs = ["my-source-or-transform-id"]
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "papertrail"
+  type = "papertrail"
+
+# Exposes `metric` events to Prometheus metrics service.
+[sinks.prometheus]
   # The address to expose for scraping.
   #
   # * required
@@ -7899,6 +7885,12 @@ require('custom_module')
   # * unit: seconds
   flush_period_secs = 60
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # A prefix that will be added to all metric names.
   # It should follow Prometheus naming conventions.
   #
@@ -7906,25 +7898,19 @@ require('custom_module')
   # * type: string
   namespace = "service"
 
-# Streams `log` events to Apache Pulsar via the Pulsar protocol.
-[sinks.pulsar]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "pulsar"
-  type = "pulsar"
+  # * must be: "prometheus"
+  type = "prometheus"
 
-  # A list of upstream source or transform IDs. See configuration for more info.
+# Streams `log` events to Apache Pulsar via the Pulsar protocol.
+[sinks.pulsar]
   #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
+  # General
+  #
 
   # A host and port pair that the pulsar client should connect to.
   #
@@ -7940,11 +7926,25 @@ require('custom_module')
   healthcheck = true
   healthcheck = false
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # The Pulsar topic name to write events to.
   #
   # * required
   # * type: string
   topic = "topic-1234"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "pulsar"
+  type = "pulsar"
 
   #
   # Auth
@@ -8006,57 +8006,6 @@ require('custom_module')
 # Batches `log` events to Sematext via the Elasticsearch API.
 [sinks.sematext_logs]
   #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "sematext_logs"
-  type = "sematext_logs"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # The host that will be used to send logs to. This option is required if
-  # `region` is not set.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  host = "http://127.0.0.1"
-  host = "http://example.com"
-
-  # The region destination to send logs to. This option is required if `host` is
-  # not set.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  region = "na"
-  region = "eu"
-
-  # The token that will be used to write to Sematext.
-  #
-  # * required
-  # * type: string
-  token = "${SEMATEXT_TOKEN}"
-  token = "some-sematext-token"
-
-  #
   # Batch
   #
 
@@ -8082,15 +8031,6 @@ require('custom_module')
   #
 
   [sinks.sematext_logs.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -8107,6 +8047,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -8144,6 +8093,57 @@ require('custom_module')
     # * enum: "rfc3339" or "unix"
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
+
+  #
+  # General
+  #
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # The host that will be used to send logs to. This option is required if
+  # `region` is not set.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  host = "http://127.0.0.1"
+  host = "http://example.com"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The region destination to send logs to. This option is required if `host` is
+  # not set.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  region = "na"
+  region = "eu"
+
+  # The token that will be used to write to Sematext.
+  #
+  # * required
+  # * type: string
+  token = "${SEMATEXT_TOKEN}"
+  token = "some-sematext-token"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "sematext_logs"
+  type = "sematext_logs"
 
   #
   # Request
@@ -8216,20 +8216,6 @@ require('custom_module')
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "socket"
-  type = "socket"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # The address to connect to. The address _must_ include a port.
   #
   # * required
@@ -8244,6 +8230,12 @@ require('custom_module')
   # * type: bool
   healthcheck = true
   healthcheck = false
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
 
   # The type of socket to use.
   #
@@ -8261,20 +8253,19 @@ require('custom_module')
   # * required when mode = "unix"
   path = "/path/to/socket"
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "socket"
+  type = "socket"
+
   #
   # Buffer
   #
 
   [sinks.socket.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -8291,6 +8282,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -8342,14 +8342,6 @@ require('custom_module')
   #
 
   [sinks.socket.tls]
-    # Enable TLS during connections to the remote.
-    #
-    # * optional
-    # * default: false
-    # * type: bool
-    enabled = false
-    enabled = true
-
     # Absolute path to an additional CA certificate file, in DER or PEM format
     # (X.509).
     #
@@ -8366,6 +8358,14 @@ require('custom_module')
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_path` is set.
@@ -8406,69 +8406,6 @@ require('custom_module')
 # Batches `log` events to a Splunk's HTTP Event Collector.
 [sinks.splunk_hec]
   #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "splunk_hec"
-  type = "splunk_hec"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # Your Splunk HEC host.
-  #
-  # * required
-  # * type: string
-  host = "http://my-splunk-host.com"
-
-  # The name of the log field to be used as the hostname sent to Splunk HEC. This
-  # overrides the global `host_key` option.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  host_key = "hostname"
-
-  # The name of the index where send the events to. If not specified, the default
-  # index is used.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  index = "custom_index"
-
-  # Fields to be added to Splunk index.
-  #
-  # * optional
-  # * no default
-  # * type: [string]
-  # * relevant when encoding = "json"
-  indexed_fields = ["field1", "field2"]
-
-  # Your Splunk HEC token.
-  #
-  # * required
-  # * type: string
-  token = "${SPLUNK_HEC_TOKEN}"
-  token = "A94A8FE5CCB19BA61C4C08"
-
-  #
   # Batch
   #
 
@@ -8494,15 +8431,6 @@ require('custom_module')
   #
 
   [sinks.splunk_hec.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -8519,6 +8447,15 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -8564,6 +8501,69 @@ require('custom_module')
     # * enum: "rfc3339" or "unix"
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
+
+  #
+  # General
+  #
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # Your Splunk HEC host.
+  #
+  # * required
+  # * type: string
+  host = "http://my-splunk-host.com"
+
+  # The name of the log field to be used as the hostname sent to Splunk HEC. This
+  # overrides the global `host_key` option.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  host_key = "hostname"
+
+  # The name of the index where send the events to. If not specified, the default
+  # index is used.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  index = "custom_index"
+
+  # Fields to be added to Splunk index.
+  #
+  # * optional
+  # * no default
+  # * type: [string]
+  # * relevant when encoding = "json"
+  indexed_fields = ["field1", "field2"]
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # Your Splunk HEC token.
+  #
+  # * required
+  # * type: string
+  token = "${SPLUNK_HEC_TOKEN}"
+  token = "A94A8FE5CCB19BA61C4C08"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "splunk_hec"
+  type = "splunk_hec"
 
   #
   # Request
@@ -8690,20 +8690,6 @@ require('custom_module')
 
 # Streams `metric` events to StatsD metrics service.
 [sinks.statsd]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "statsd"
-  type = "statsd"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # The UDP socket address to send stats to.
   #
   # * optional
@@ -8719,31 +8705,31 @@ require('custom_module')
   healthcheck = true
   healthcheck = false
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # A prefix that will be added to all metric names.
   #
   # * required
   # * type: string
   namespace = "service"
 
-# Streams `log` and `metric` events to another downstream `vector` source.
-[sinks.vector]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "vector"
-  type = "vector"
+  # * must be: "statsd"
+  type = "statsd"
 
-  # A list of upstream source or transform IDs. See configuration for more info.
+# Streams `log` and `metric` events to another downstream `vector` source.
+[sinks.vector]
   #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
+  # General
+  #
 
   # The downstream Vector address to connect to. The address _must_ include a
   # port.
@@ -8760,20 +8746,25 @@ require('custom_module')
   healthcheck = true
   healthcheck = false
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "vector"
+  type = "vector"
+
   #
   # Buffer
   #
 
   [sinks.vector.buffer]
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -8791,6 +8782,15 @@ require('custom_module')
     # * required when type = "disk"
     max_size = 104900000
 
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The behavior when the buffer becomes full.
     #
     # * optional
@@ -8805,14 +8805,6 @@ require('custom_module')
   #
 
   [sinks.vector.tls]
-    # Enable TLS during connections to the remote.
-    #
-    # * optional
-    # * default: false
-    # * type: bool
-    enabled = false
-    enabled = true
-
     # Absolute path to an additional CA certificate file, in DER or PEM format
     # (X.509).
     #
@@ -8829,6 +8821,14 @@ require('custom_module')
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_path` is set.

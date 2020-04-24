@@ -1,5 +1,8 @@
-use crate::sinks::util::encoding::{
-    with_default::EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat,
+use crate::{
+    event::{PathComponent, PathIter},
+    sinks::util::encoding::{
+        with_default::EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat,
+    },
 };
 use serde::{
     de::{self, DeserializeOwned, IntoDeserializer, MapAccess, Visitor},
@@ -18,20 +21,22 @@ use string_cache::DefaultAtom as Atom;
 #[derive(Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfig<E> {
-    pub(super) codec: E,
+    pub(crate) codec: E,
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     #[serde(default)]
-    pub(super) only_fields: Option<Vec<String>>,
+    pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
     #[serde(default)]
-    pub(super) except_fields: Option<Vec<Atom>>,
+    pub(crate) except_fields: Option<Vec<Atom>>,
     #[serde(default)]
-    pub(super) timestamp_format: Option<TimestampFormat>,
+    pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 
 impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
     fn codec(&self) -> &E {
         &self.codec
     }
-    fn only_fields(&self) -> &Option<Vec<String>> {
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
         &self.only_fields
     }
     fn except_fields(&self) -> &Option<Vec<Atom>> {
@@ -39,22 +44,6 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
     }
     fn timestamp_format(&self) -> &Option<TimestampFormat> {
         &self.timestamp_format
-    }
-    fn set_codec(&mut self, codec: E) -> &mut Self {
-        self.codec = codec;
-        self
-    }
-    fn set_only_fields(&mut self, fields: Option<Vec<String>>) -> &mut Self {
-        self.only_fields = fields;
-        self
-    }
-    fn set_except_fields(&mut self, fields: Option<Vec<Atom>>) -> &mut Self {
-        self.except_fields = fields;
-        self
-    }
-    fn set_timestamp_format(&mut self, format: Option<TimestampFormat>) -> &mut Self {
-        self.timestamp_format = format;
-        self
     }
 }
 
@@ -138,7 +127,13 @@ where
 
         let concrete = Self {
             codec: inner.codec,
-            only_fields: inner.only_fields,
+            // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+            only_fields: inner.only_fields.map(|fields| {
+                fields
+                    .iter()
+                    .map(|only| PathIter::new(only).collect())
+                    .collect()
+            }),
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
         };

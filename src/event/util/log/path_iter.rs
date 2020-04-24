@@ -1,12 +1,13 @@
 use lazy_static::lazy_static;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::{mem, str::Chars};
 
 lazy_static! {
     static ref FAST_RE: Regex = Regex::new(r"\A\w+(\.\w+)*\z").unwrap();
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum PathComponent {
     /// For example, in "a.b[0].c[2]" the keys are "a", "b", and "c".
     Key(String),
