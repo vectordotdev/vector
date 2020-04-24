@@ -1431,6 +1431,7 @@ See [motivation](#motivation).
    permissions is to be determined at YAML files design stage - after we
    complete the implementation. It's really trivial to determine from a set of
    API calls used.
+   See the [Deployment Hardening](#deployment-hardening) section.
 1. ~~What is `updateStrategy` ... `RollingUpdate`? This is not included in
    [our daemonset][vector_daemonset] or in [any of Fluentbit's config
    files][fluentbit_installation]. But it is included in both [Fluentd's
