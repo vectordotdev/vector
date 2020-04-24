@@ -92,6 +92,19 @@ The algorithm used to control the limit will follow the AIMD framework:
 
 ```rust
 impl Service<Request> for ConcurrencyLimit {
+    fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        match self.limit.permit.poll_acquire(cx, &self.limit.semaphore) {
+            Ready(()) => (),
+            NotReady => {
+                emit!(ConcurrencyLimited);
+                return NotReady;
+            }
+            Err(err) => return Err(err),
+        }
+
+        Poll::Ready(ready!(self.inner.poll_ready(cx)))
+    }
+
     fn call(&mut self, request: Request) -> Self::Future {
         let future = self.inner.call(request);
         ...
@@ -162,10 +175,8 @@ Vector operators need to be able to observe the behavior of this
 algorithm to ensure that it is operating as desired. To this end, the
 mechanism will expose the following data:
 
-* a rate-limited event logged every time a remote service explicitly
-  limits the request rate:
-  
-  `Requests throttled by remote service, concurrency reduced.`
+* a counter metric recording every time a request is limited due to the
+  current concurrency limit,
 
 * a histogram metric recording the observed RTTs,
 
