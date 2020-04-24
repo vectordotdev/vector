@@ -1490,12 +1490,11 @@ See [motivation](#motivation).
         and [issue#1635].
   - [ ] Ensure we are testing all supported minor versions. See
         [issue#2223].
-- [ ] Audit and improve the `kubernetes` source.
-  - [ ] Handle the log recursion problem where Vector ingests it's own logs.
-        See [issue#2218] and [issue#2171].
-  - [ ] Audit the `file` source strategy. See [issue#2199] and [issue#1910].
-    - [ ] Merge split logs. See [pr#2134].
-- [ ] Audit and improve the `kubernetes_pod_matadata` transform.
+- [ ] Rework the `kubernetes` source.
+  - [ ] Merge the `kubernetes` source with the `kubernetes_pod_matadata`
+        transform.
+  - [ ] Implement origin filtering.
+  - [ ] Merge split logs [pr#2134].
   - [ ] Use the `log_schema.kubernetes_key` setting. See [issue#1867].
 - [ ] Add a way to load optional config files (i.e. load config file if it
       exists, and ignore it if it doesn't). Required to elegantly load multiple
@@ -1545,11 +1544,9 @@ See [motivation](#motivation).
 [issue#1635]: https://github.com/timberio/vector/issues/1635
 [issue#1816]: https://github.com/timberio/vector/issues/1867
 [issue#1867]: https://github.com/timberio/vector/issues/1867
-[issue#1910]: https://github.com/timberio/vector/issues/1910
 [issue#2170]: https://github.com/timberio/vector/issues/2170
 [issue#2171]: https://github.com/timberio/vector/issues/2171
 [issue#2193]: https://github.com/timberio/vector/issues/2193
-[issue#2199]: https://github.com/timberio/vector/issues/2199
 [issue#2216]: https://github.com/timberio/vector/issues/2216
 [issue#2218]: https://github.com/timberio/vector/issues/2218
 [issue#2223]: https://github.com/timberio/vector/issues/2223
