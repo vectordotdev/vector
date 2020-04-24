@@ -1378,6 +1378,12 @@ hardened by default.
   aware of the possible configuration options. At Helm Charts we should allow
   configuring arbitrary permissions via values (while providing sane defaults).
 
+  We can optionally support non-[RBAC][k8s_docs_rbac] clusters in the Helm
+  Chart.
+  In the real world, the non-RBAC clusters should be very rare, since RBAC has
+  been recommended for a very long time, and it's the default for the fresh
+  `kubeadm` installations. It's probably not a major concern.
+
 #### Securing secrets
 
 Vector sometimes needs access to secrets, like AWS API access tokens and so on.
