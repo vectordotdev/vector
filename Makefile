@@ -89,6 +89,9 @@ export ARTICLE ?= true
 sign-blog: ## Sign newly added blog articles using GPG
 	@scripts/sign-blog.sh
 
+slim-builds: ## Updates the Cargo config to product disk optimized builds, useful for CI
+	@scripts/slim-builds.sh
+
 test: ## Spins up Docker resources and runs _every_ test
 	@cargo test --no-default-features --features ${DEFAULT_FEATURES} --all --features docker --no-run
 	@docker-compose up -d test-runtime-deps
@@ -96,6 +99,48 @@ test: ## Spins up Docker resources and runs _every_ test
 
 test-behavior: ## Runs behavioral tests
 	@cargo run --no-default-features --features ${DEFAULT_FEATURES} -- test tests/behavior/**/*.toml
+
+test-integration-aws: ## Runs Clickhouse integration tests
+	@docker-compose up -d localstack mockwatchlogs ec2_metadata minio
+	@cargo test --no-default-features --features cloudwatch-logs-integration-tests,cloudwatch-metrics-integration-tests,ec2-metadata-integration-tests,firehose-integration-tests,kinesis-integration-tests,s3-integration-tests
+
+test-integration-clickhouse: ## Runs Clickhouse integration tests
+	@docker-compose up -d clickhouse
+	@cargo test --no-default-features --features clickhouse-integration-tests
+
+test-integration-docker: ## Runs Docker integration tests
+	@cargo test --no-default-features --features docker-integration-tests
+
+test-integration-elasticsearch: ## Runs Elasticsearch integration tests
+	@docker-compose up -d elasticsearch elasticsearch-tls localstack
+	@cargo test --no-default-features --features es-integration-tests
+
+test-integration-gcp: ## Runs GCP integration tests
+	@docker-compose up -d gcloud-pubsub
+	@cargo test --no-default-features --features gcp-pubsub-integration-tests, gcs-integration-tests
+
+test-integration-influxdb: ## Runs Kafka integration tests
+	@docker-compose up -d influxdb_v1 influxdb_v2
+	@cargo test --no-default-features --features influxdb-integration-tests
+
+test-integration-kafka: ## Runs Kafka integration tests
+	@docker-compose up -d kafka
+	@cargo test --no-default-features --features kafka-integration-tests
+
+test-integration-kubernetes: ## Runs Kubernetes integration tests
+	@docker-compose up -d kafka
+	@cargo test --no-default-features --features kafka-integration-tests
+
+test-integration-pulsar: ## Runs Kafka integration tests
+	@docker-compose up -d pulsar
+	@cargo test --no-default-features --features pulsar-integration-tests
+
+test-integration-splunk: ## Runs Kafka integration tests
+	@docker-compose up -d splunk
+	@cargo test --no-default-features --features splunk-integration-tests
+
+test-unit: ## Runs unit tests that do not require network dependencies
+	@cargo test --no-run --target $TARGET
 
 ##@ Releasing
 
