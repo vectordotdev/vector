@@ -759,6 +759,23 @@ reading logs files into events and then filtering them out.
 
 This is also a perfectly valid way of filtering out logs of Vector itself.
 
+##### Filtering by namespaces annotations
+
+There is a [demand](https://github.com/fluent/fluent-bit/issues/1140) for
+filtering by namespace via namespace annotations. This is an additional concern
+to filtering by just the `Pod` object data that was already described above.
+
+The idea is that all `Pod`s belong to [`Namespace`s][k8s_api_namespace] ([docs][k8s_docs_namespaces]), and users want to be able
+to annotate the `Namespace` itself for exclusion, effectively excluding all the
+`Pod` belonging to it from collection.
+
+To support this, we'll have to maintain the list of excluded `Namespace`s, and
+filter `Pod`s against that list.
+
+Listing the `Namespace`s can be done via the
+[corresponding API][k8s_api_namespace_list] in a similar manner to how we do it
+for `Pod`s. Came concerns regarding caching and load limiting apply.
+
 #### Filtering based on event fields after annotation
 
 This is an alternative approach to the previous implementation.
@@ -1562,6 +1579,8 @@ See [motivation](#motivation).
 [k8s_api_deployment]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#deployment-v1-apps
 [k8s_api_event]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#event-v1-core
 [k8s_api_host_path_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#hostpathvolumesource-v1-core
+[k8s_api_namespace_list]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#list-namespace-v1-core
+[k8s_api_namespace]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#namespace-v1-core
 [k8s_api_network_policy]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#networkpolicy-v1-networking-k8s-io
 [k8s_api_pod_list_all_namespaces]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#list-all-namespaces-pod-v1-core
 [k8s_api_pod_read]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#read-pod-v1-core
@@ -1584,6 +1603,7 @@ See [motivation](#motivation).
 [k8s_docs_audit]: https://kubernetes.io/docs/tasks/debug-application-cluster/audit/
 [k8s_docs_crds]: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/
 [k8s_docs_daemon_set]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
+[k8s_docs_namespaces]: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
 [k8s_docs_node]: https://kubernetes.io/docs/concepts/architecture/nodes/
 [k8s_docs_operator]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
 [k8s_docs_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
