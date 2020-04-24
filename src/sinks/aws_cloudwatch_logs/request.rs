@@ -214,7 +214,7 @@ impl Client {
                     .enumerate()
                     .find(|e| e.1.timestamp >= limit)
                     .map(|(at, _)| at)
-                    .map(|at| log_events.drain(..at).collect::<Vec<_>>())
+                    .map(|at| log_events.drain(at..).collect::<Vec<_>>())
             });
 
         let request = PutLogEventsRequest {
