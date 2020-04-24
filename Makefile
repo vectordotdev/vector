@@ -35,38 +35,41 @@ build: ## Build the project in release mode
 
 check: check-code check-fmt check-generate check-examples
 
+check-blog: ## Checks that all blog articles are signed by their authors
+	@scripts/run.sh checker scripts/check-blog-signatures.rb
+
 check-code: ## Checks code for compilation errors (only default features)
 	@scripts/run.sh checker cargo check --all --all-targets --features docker,kubernetes
+
+check-component-features: ## Checks that all component are behind corresponding features
+	@scripts/run.sh checker-component-features scripts/check-component-features.sh
+
+check-examples: ## Validates the config examples
+	@cargo run -q -- validate --topology --deny-warnings ./config/examples/*.toml
 
 check-fmt: ## Checks code formatting correctness
 	@scripts/run.sh checker scripts/check-style.sh
 	@scripts/run.sh checker cargo fmt -- --check
 
-check-markdown: ## Check Markdown style
-	@scripts/run.sh checker-markdown markdownlint .
-
 check-generate: ## Checks for pending `make generate` changes
 	@scripts/run.sh checker scripts/check-generate.sh
 
-check-examples: ## Validates the config examples
-	@cargo run -q -- validate --topology --deny-warnings ./config/examples/*.toml
+check-markdown: ## Check Markdown style
+	@scripts/run.sh checker-markdown markdownlint .
 
 check-version: ## Checks that the version in Cargo.toml is up-to-date
 	@scripts/run.sh checker scripts/check-version.rb
 
-check-blog: ## Checks that all blog articles are signed by their authors
-	@scripts/run.sh checker scripts/check-blog-signatures.rb
-
-check-component-features: ## Checks that all component are behind corresponding features
-	@scripts/run.sh checker-component-features scripts/check-component-features.sh
-
-export CHECK_URLS ?= true
-generate: ## Generates files across the repo using the data in /.meta
-	@scripts/run.sh checker scripts/generate.rb
+clean: ## Remove build artifacts
+	@cargo clean
 
 fmt: ## Format code
 	@scripts/check-style.sh --fix
 	@cargo fmt
+
+export CHECK_URLS ?= true
+generate: ## Generates files across the repo using the data in /.meta
+	@scripts/run.sh checker scripts/generate.rb
 
 release: ## Release a new Vector version
 	@$(MAKE) release-prepare
@@ -86,16 +89,60 @@ export ARTICLE ?= true
 sign-blog: ## Sign newly added blog articles using GPG
 	@scripts/sign-blog.sh
 
-test: ## Spins up Docker resources and runs _every_ test
-	@cargo test --no-default-features --features ${DEFAULT_FEATURES} --all --features docker --no-run
-	@docker-compose up -d test-runtime-deps
-	@cargo test --no-default-features --features ${DEFAULT_FEATURES} --all --features docker -- --test-threads 4
+slim-builds: ## Updates the Cargo config to product disk optimized builds, useful for CI
+	@scripts/slim-builds.sh
+
+test: test-behavior test-integration test-unit
 
 test-behavior: ## Runs behavioral tests
 	@cargo run --no-default-features --features ${DEFAULT_FEATURES} -- test tests/behavior/**/*.toml
 
-clean: ## Remove build artifacts
-	@cargo clean
+test-integration:
+	@cargo test --no-default-features --features ${DEFAULT_FEATURES} --all --features docker --no-run
+	@docker-compose up -d test-runtime-deps
+	@cargo test --no-default-features --features ${DEFAULT_FEATURES} --all --features docker -- --test-threads 4
+
+test-integration-aws: ## Runs Clickhouse integration tests
+	@docker-compose up -d localstack mockwatchlogs ec2_metadata minio
+	@cargo test --no-default-features --features cloudwatch-logs-integration-tests,cloudwatch-metrics-integration-tests,ec2-metadata-integration-tests,firehose-integration-tests,kinesis-integration-tests,s3-integration-tests
+
+test-integration-clickhouse: ## Runs Clickhouse integration tests
+	@docker-compose up -d clickhouse
+	@cargo test --no-default-features --features clickhouse-integration-tests
+
+test-integration-docker: ## Runs Docker integration tests
+	@cargo test --no-default-features --features docker-integration-tests
+
+test-integration-elasticsearch: ## Runs Elasticsearch integration tests
+	@docker-compose up -d elasticsearch elasticsearch-tls localstack
+	@cargo test --no-default-features --features es-integration-tests
+
+test-integration-gcp: ## Runs GCP integration tests
+	@docker-compose up -d gcloud-pubsub
+	@cargo test --no-default-features --features gcp-pubsub-integration-tests, gcs-integration-tests
+
+test-integration-influxdb: ## Runs Kafka integration tests
+	@docker-compose up -d influxdb_v1 influxdb_v2
+	@cargo test --no-default-features --features influxdb-integration-tests
+
+test-integration-kafka: ## Runs Kafka integration tests
+	@docker-compose up -d kafka
+	@cargo test --no-default-features --features kafka-integration-tests
+
+test-integration-kubernetes: ## Runs Kubernetes integration tests
+	@docker-compose up -d kafka
+	@cargo test --no-default-features --features kafka-integration-tests
+
+test-integration-pulsar: ## Runs Kafka integration tests
+	@docker-compose up -d pulsar
+	@cargo test --no-default-features --features pulsar-integration-tests
+
+test-integration-splunk: ## Runs Kafka integration tests
+	@docker-compose up -d splunk
+	@cargo test --no-default-features --features splunk-integration-tests
+
+test-unit: ## Runs unit tests that do not require network dependencies
+	@cargo test --no-run --target ${TARGET}
 
 ##@ Releasing
 
