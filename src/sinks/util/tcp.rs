@@ -184,7 +184,7 @@ impl Sink for TcpSink {
                 };
 
                 // Test if the remote has issued a disconnect by calling read(2)
-                // with a 0 sized buffer.
+                // with a 1 sized buffer.
                 //
                 // This can return a proper disconnect error or `Ok(0)`
                 // which means the pipe is broken and we should try to reconnect.

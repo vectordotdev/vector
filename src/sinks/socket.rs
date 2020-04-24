@@ -94,6 +94,11 @@ mod test {
     use futures01::Sink;
     use serde_json::Value;
     use std::net::UdpSocket;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+    use tokio::{io::AsyncReadExt, net::TcpListener};
 
     #[test]
     fn udp_message() {
@@ -181,19 +186,12 @@ mod test {
         let context = SinkContext::new_test(rt.executor());
         let (sink, _healthcheck) = config.build(context).unwrap();
 
-        use std::sync::{
-            atomic::{AtomicUsize, Ordering},
-            Arc,
-        };
-
         let close = Arc::new(tokio::sync::Notify::new());
         let counter = Arc::new(AtomicUsize::new(0));
 
         let close1 = close.clone();
         let counter1 = counter.clone();
         let jh = rt.spawn_handle(async move {
-            use tokio::{io::AsyncReadExt, net::TcpListener};
-
             let mut listener = TcpListener::bind(&addr).await.unwrap();
 
             // Only accept two connections after the second connection is done
