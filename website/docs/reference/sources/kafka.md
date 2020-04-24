@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-08"
+last_modified_on: "2020-04-24"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -79,9 +79,9 @@ ingests data through [Kafka][urls.kafka] and outputs
   librdkafka_options."socket.send.buffer.bytes" = "100" # example
 
   # TLS
-  tls.enabled = false # optional, default
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
   tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
 ```
@@ -90,57 +90,6 @@ ingests data through [Kafka][urls.kafka] and outputs
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"librdkafka_options"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### librdkafka_options
-
-Advanced options. See [librdkafka documentation][urls.librdkafka_config] for
-details.
-
-
-
-<Fields filters={false}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"},{"socket.send.buffer.bytes":"100"}]}
-  groups={[]}
-  name={"`[field-name]`"}
-  path={"librdkafka_options"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### `[field-name]`
-
-The options and their values. Accepts `string` values.
-
-
-
-
-</Field>
-</Fields>
-
-</Field>
 <Field
   common={false}
   defaultValue={"largest"}
@@ -269,6 +218,57 @@ field would not be added to the log event.
 </Field>
 <Field
   common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"librdkafka_options"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### librdkafka_options
+
+Advanced options. See [librdkafka documentation][urls.librdkafka_config] for
+details.
+
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"},{"socket.send.buffer.bytes":"100"}]}
+  groups={[]}
+  name={"`[field-name]`"}
+  path={"librdkafka_options"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[field-name]`
+
+The options and their values. Accepts `string` values.
+
+
+
+
+</Field>
+</Fields>
+
+</Field>
+<Field
+  common={false}
   defaultValue={10000}
   enumValues={null}
   examples={[5000,10000]}
@@ -316,31 +316,6 @@ Default timeout for network requests.
 
 </Field>
 <Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["^(prefix1|prefix2)-.+","topic-1","topic-2"]]}
-  groups={[]}
-  name={"topics"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-### topics
-
-The Kafka topics names to read events from. Regex is supported if the topic
-begins with `^`.
-
-
-
-
-</Field>
-<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -363,30 +338,6 @@ Configures the TLS options for connections from this sink.
 
 
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={false}
-  enumValues={null}
-  examples={[false,true]}
-  groups={[]}
-  name={"enabled"}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### enabled
-
-Enable TLS during connections to the remote.
-
-
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -433,6 +384,30 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 Absolute path to a certificate file used to identify this connection, in DER or
 PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 `key_path` must also be set.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"enabled"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### enabled
+
+Enable TLS during connections to the remote.
 
 
 
@@ -489,6 +464,31 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["^(prefix1|prefix2)-.+","topic-1","topic-2"]]}
+  groups={[]}
+  name={"topics"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### topics
+
+The Kafka topics names to read events from. Regex is supported if the topic
+begins with `^`.
+
+
+
 
 </Field>
 </Fields>

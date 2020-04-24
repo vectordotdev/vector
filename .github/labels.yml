@@ -212,6 +212,9 @@
 - name: "provider: datadog"
   description: Anything Datadog related
   color: ff9f43
+- name: "provider: azure"
+  description: Anything Azure related
+  color: ff9f43
 - name: "provider: elastic"
   description: Anything Elastic related
   color: ff9f43
@@ -252,6 +255,9 @@
   color: ff9ff3
 - name: "source: file"
   description: Anything `file` source realted
+  color: ff9ff3
+- name: "source: generator"
+  description: Anything `generator` source realted
   color: ff9ff3
 - name: "source: http"
   description: Anything `http` source realted

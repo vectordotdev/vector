@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "at_least_once"
 component_title: "File"
 description: "The Vector `file` sink streams `log` events to a file."
@@ -42,7 +42,7 @@ The Vector `file` sink
 [sinks.my_sink_id]
   # General
   type = "file" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   healthcheck = true # optional, default
   path = "vector-%Y-%m-%d.log" # required
 
@@ -57,7 +57,7 @@ The Vector `file` sink
 [sinks.my_sink_id]
   # General
   type = "file" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   healthcheck = true # optional, default
   idle_timeout_secs = "30" # optional, default
   path = "vector-%Y-%m-%d.log" # required

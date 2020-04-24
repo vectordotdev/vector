@@ -45,6 +45,7 @@
 /src/sources/docker.rs @LucioFranco
 /src/sources/file/mod.rs @LucioFranco
 /src/sources/file/line_agg.rs @MOZGIII
+/src/sources/generator.rs @bruceg
 /src/sources/journald.rs @bruceg
 /src/sources/kafka.rs @a-rodin
 /src/sources/stdin.rs @bruceg

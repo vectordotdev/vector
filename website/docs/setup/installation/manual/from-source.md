@@ -398,6 +398,7 @@ features one has to pass a comma-separated list of component features.
 |:------|:------------|
 | `sources-docker` | Enables building of [`docker` source][docs.sources.docker].  Requires `unix` feature to be also enabled for support of Unix domain sockets.  |
 | `sources-file` | Enables building of [`file` source][docs.sources.file].  |
+| `sources-generator` | Enables building of [`generator` source][docs.sources.generator].  |
 | `sources-http` | Enables building of [`http` source][docs.sources.http].  |
 | `sources-journald` | Enables building of [`journald` source][docs.sources.journald].  |
 | `sources-kafka` | Enables building of [`kafka` source][docs.sources.kafka].  Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled.  |
@@ -508,6 +509,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sinks.vector]: /docs/reference/sinks/vector/
 [docs.sources.docker]: /docs/reference/sources/docker/
 [docs.sources.file]: /docs/reference/sources/file/
+[docs.sources.generator]: /docs/reference/sources/generator/
 [docs.sources.http]: /docs/reference/sources/http/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources.kafka]: /docs/reference/sources/kafka/

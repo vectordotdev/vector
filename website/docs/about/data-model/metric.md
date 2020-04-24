@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-24"
 title: Metric Event
 description: A detailed guide on Vector's internal metric data model.
 ---
@@ -639,56 +639,6 @@ The metric name.
 
 </Field>
 <Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"host":"my.host.com"}]}
-  groups={[]}
-  name={"tags"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"map"}
-  unit={null}
-  warnings={[]}
-  >
-
-### tags
-
-Tags that add additional metadata or context to the metric. These are simple
-key/value pairs in `string` format and cannot be nested.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["2019-11-01T21:15:47+00:00"]}
-  groups={[]}
-  name={"timestamp"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"timestamp"}
-  unit={null}
-  warnings={[]}
-  >
-
-### timestamp
-
-The metric timestamp, representing when the metric was created/ingested within
-Vector.
-
-
-
-
-</Field>
-<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -736,6 +686,56 @@ The list of unique values.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"host":"my.host.com"}]}
+  groups={[]}
+  name={"tags"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"map"}
+  unit={null}
+  warnings={[]}
+  >
+
+### tags
+
+Tags that add additional metadata or context to the metric. These are simple
+key/value pairs in `string` format and cannot be nested.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
+  name={"timestamp"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"timestamp"}
+  unit={null}
+  warnings={[]}
+  >
+
+### timestamp
+
+The metric timestamp, representing when the metric was created/ingested within
+Vector.
+
+
+
 
 </Field>
 </Fields>

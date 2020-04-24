@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-12"
+last_modified_on: "2020-04-24"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Logs"
 description: "The Vector `aws_cloudwatch_logs` sink batches `log` events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint."
@@ -46,7 +46,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 [sinks.my_sink_id]
   # General
   type = "aws_cloudwatch_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   create_missing_group = true # optional, default
   create_missing_stream = true # optional, default
   group_name = "group-name" # required
@@ -65,7 +65,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 [sinks.my_sink_id]
   # General
   type = "aws_cloudwatch_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   create_missing_group = true # optional, default
   create_missing_stream = true # optional, default
@@ -80,9 +80,9 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -105,6 +105,30 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+
+ See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -204,30 +228,6 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
-<Field
-  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -275,6 +275,30 @@ The maximum size of the buffer on the disk.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
@@ -299,6 +323,57 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"create_missing_group"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### create_missing_group
+
+Dynamically create a [log group][urls.aws_cloudwatch_logs_group_name] if it
+does not already exist. This will ignore [`create_missing_stream`](#create_missing_stream) directly after
+creating the group and will create the first stream.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"create_missing_stream"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### create_missing_stream
+
+Dynamically create a [log stream][urls.aws_cloudwatch_logs_stream_name] if it
+does not already exist.
+
+
+
 
 </Field>
 <Field
@@ -427,81 +502,6 @@ How to format event timestamps.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["arn:aws:iam::123456789098:role/my_role"]}
-  groups={[]}
-  name={"assume_role"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### assume_role
-
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
- See [AWS Authentication](#aws-authentication) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"create_missing_group"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### create_missing_group
-
-Dynamically create a [log group][urls.aws_cloudwatch_logs_group_name] if it
-does not already exist. This will ignore [`create_missing_stream`](#create_missing_stream) directly after
-creating the group and will create the first stream.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"create_missing_stream"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### create_missing_stream
-
-Dynamically create a [log stream][urls.aws_cloudwatch_logs_stream_name] if it
-does not already exist.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={["127.0.0.0:5000/path/to/service"]}
   groups={[]}
   name={"endpoint"}
@@ -594,31 +594,6 @@ The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpo
 provided it will override this value since the endpoint includes the region.
 
 
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["{{ host }}","%Y-%m-%d","stream-name"]}
-  groups={[]}
-  name={"stream_name"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={true}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### stream_name
-
-The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target
-CloudWatch Logs stream.
-
- See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.
 
 
 </Field>
@@ -822,6 +797,31 @@ duplicate data downstream.
 </Fields>
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["{{ host }}","%Y-%m-%d","stream-name"]}
+  groups={[]}
+  name={"stream_name"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={true}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### stream_name
+
+The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target
+CloudWatch Logs stream.
+
+ See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.
+
+
+</Field>
 </Fields>
 
 ## Env Vars
@@ -918,7 +918,7 @@ X-Amz-Target: Logs_20140328.PutLogEvents
 
 Vector checks for AWS credentials in the following order:
 
-1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+1. Environment variables [`AWS_ACCESS_KEY_ID`](#aws_access_key_id) and [`AWS_SECRET_ACCESS_KEY`](#aws_secret_access_key).
 2. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
 3. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
 4. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
