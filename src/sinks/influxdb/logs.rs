@@ -1,6 +1,5 @@
 use crate::{
     buffers::Acker,
-    emit,
     event::{self, Event},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };

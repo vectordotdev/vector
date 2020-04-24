@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-23"
+last_modified_on: "2020-04-24"
 delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Logs"
 description: "The Vector `influxdb_logs` sink batches `log` events to InfluxDB using v1 or v2 HTTP API."
@@ -71,6 +71,7 @@ The Vector `influxdb_logs` sink
   endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com" # required
   namespace = "service" # required
   database = "vector-database" # required
+  fields_as_tags = ["field1", "parent.child_field"] # optional, no default
   healthcheck = true # optional, default
 
   # Auth
@@ -82,9 +83,9 @@ The Vector `influxdb_logs` sink
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -135,6 +136,7 @@ The Vector `influxdb_logs` sink
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
   namespace = "service" # required
   bucket = "vector-bucket" # required
+  fields_as_tags = ["field1", "parent.child_field"] # optional, no default
   healthcheck = true # optional, default
 
   # Auth
@@ -146,9 +148,9 @@ The Vector `influxdb_logs` sink
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -170,152 +172,6 @@ The Vector `influxdb_logs` sink
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["http://localhost:8086/","https://us-west-2-1.aws.cloud1.influxdata.com","https://us-west-2-1.aws.cloud2.influxdata.com"]}
-  groups={["v1","v2"]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### endpoint
-
-InfluxDB endpoint to send metrics to.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["service"]}
-  groups={["v1","v2"]}
-  name={"namespace"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### namespace
-
-A prefix that will be added to all metric names.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["my-org","33f2cff0a28e5b63"]}
-  groups={["v2"]}
-  name={"org"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### org
-
-Specifies the destination organization for writes into InfluxDB 2.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${INFLUXDB_PASSWORD}","influxdb4ever"]}
-  groups={["v1"]}
-  name={"password"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### password
-
-Sets the password for authentication if you’ve enabled authentication for the
-write into InfluxDB 1.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${INFLUXDB_TOKEN}","ef8d5de700e7989468166c40fc8a0ccd"]}
-  groups={["v2"]}
-  name={"token"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### token
-
-[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["todd","vector-source"]}
-  groups={["v1"]}
-  name={"username"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### username
-
-Sets the username for authentication if you’ve enabled authentication for the
-write into InfluxDB 1.
-
-
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -391,6 +247,30 @@ The maximum age of a batch before it is flushed.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["vector-bucket","4d2225e4d3d49f75"]}
+  groups={["v2"]}
+  name={"bucket"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### bucket
+
+The destination bucket for writes into InfluxDB 2.
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -413,30 +293,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={["v1","v2"]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -486,6 +342,30 @@ The maximum size of the buffer on the disk.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={["v1","v2"]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
@@ -510,6 +390,54 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["any","one","quorum","all"]}
+  groups={["v1"]}
+  name={"consistency"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### consistency
+
+Sets the write consistency for the point for InfluxDB 1.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["vector-database","iot-store"]}
+  groups={["v1"]}
+  name={"database"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### database
+
+Sets the target database for the write into InfluxDB 1.
+
+
+
 
 </Field>
 <Field
@@ -614,9 +542,9 @@ How to format event timestamps.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["vector-bucket","4d2225e4d3d49f75"]}
-  groups={["v2"]}
-  name={"bucket"}
+  examples={["http://localhost:8086/","https://us-west-2-1.aws.cloud1.influxdata.com","https://us-west-2-1.aws.cloud2.influxdata.com"]}
+  groups={["v1","v2"]}
+  name={"endpoint"}
   path={null}
   relevantWhen={null}
   required={true}
@@ -626,48 +554,24 @@ How to format event timestamps.
   warnings={[]}
   >
 
-### bucket
+### endpoint
 
-The destination bucket for writes into InfluxDB 2.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["vector-database","iot-store"]}
-  groups={["v1"]}
-  name={"database"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### database
-
-Sets the target database for the write into InfluxDB 1.
+InfluxDB endpoint to send metrics to.
 
 
 
 
 </Field>
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[["field1","parent.child_field"]]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"fields_as_tags"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"[string]"}
   unit={null}
@@ -676,10 +580,10 @@ Sets the target database for the write into InfluxDB 1.
 
 ### fields_as_tags
 
-A set of fields that will be attached to each batch of events as a tag. These
-values are also templateable to allow events to provide dynamic label values.
-Note: If the set of tag values has high cardinality this can cause also
-increase cardinality in InfluxDB.
+A set of additional fields that will be attached to each LineProtocol as a tag.
+These values are also templateable to allow events to provide dynamic label
+values. Note: If the set of tag values has high cardinality this also increase
+cardinality in InfluxDB.
 
 
 
@@ -713,21 +617,21 @@ Enables/disables the sink healthcheck upon start.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["any","one","quorum","all"]}
-  groups={["v1"]}
-  name={"consistency"}
+  examples={["service"]}
+  groups={["v1","v2"]}
+  name={"namespace"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
   warnings={[]}
   >
 
-### consistency
+### namespace
 
-Sets the write consistency for the point for InfluxDB 1.
+A prefix that will be added to all metric names.
 
 
 
@@ -737,9 +641,33 @@ Sets the write consistency for the point for InfluxDB 1.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["autogen","one_day_only"]}
+  examples={["my-org","33f2cff0a28e5b63"]}
+  groups={["v2"]}
+  name={"org"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### org
+
+Specifies the destination organization for writes into InfluxDB 2.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${INFLUXDB_PASSWORD}","influxdb4ever"]}
   groups={["v1"]}
-  name={"retention_policy_name"}
+  name={"password"}
   path={null}
   relevantWhen={null}
   required={false}
@@ -749,9 +677,10 @@ Sets the write consistency for the point for InfluxDB 1.
   warnings={[]}
   >
 
-### retention_policy_name
+### password
 
-Sets the target retention policy for the write into InfluxDB 1.
+Sets the password for authentication if you’ve enabled authentication for the
+write into InfluxDB 1.
 
 
 
@@ -955,6 +884,79 @@ duplicate data downstream.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["autogen","one_day_only"]}
+  groups={["v1"]}
+  name={"retention_policy_name"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### retention_policy_name
+
+Sets the target retention policy for the write into InfluxDB 1.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${INFLUXDB_TOKEN}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  groups={["v2"]}
+  name={"token"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### token
+
+[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["todd","vector-source"]}
+  groups={["v1"]}
+  name={"username"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### username
+
+Sets the username for authentication if you’ve enabled authentication for the
+write into InfluxDB 1.
+
+
+
 
 </Field>
 </Fields>

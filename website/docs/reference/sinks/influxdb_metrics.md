@@ -8,7 +8,7 @@ function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+influxdb_metrics%22
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "influxdb_metrics|[\"metric\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sinks/influxdb_metrics.rs
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/influxdb/metrics.rs
 status: "beta"
 title: "InfluxDB Metrics Sink"
 unsupported_operating_systems: []
