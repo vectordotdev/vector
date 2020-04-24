@@ -159,17 +159,21 @@ impl HttpSink for DatadogSink {
 
         http::Request::get(self.uri.clone())
             .header("Content-Type", "application/json")
+            .header("DD-API-KEY", self.config.api_key.clone())
             .body(body)
             .unwrap()
     }
 }
 
 fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result<super::Healthcheck> {
-    let uri = format!("{}/api/v1/validate?api_key={}", config.host, config.api_key)
+    let uri = format!("{}/api/v1/validate", config.host)
         .parse::<Uri>()
         .context(super::UriParseError)?;
 
-    let request = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let request = http::Request::get(uri)
+        .header("DD-API-KEY", config.api_key)
+        .body(hyper::Body::empty())
+        .unwrap();
 
     let mut client = HttpClient::new(resolver, None)?;
 
