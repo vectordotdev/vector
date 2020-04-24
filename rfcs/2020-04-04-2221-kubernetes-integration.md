@@ -762,7 +762,7 @@ The `vector.dev/exclude: "true"`
 `annotation` at the `PodTemplateSpec` is intended to let Vector know that it
 shouldn't collect logs from the relevant `Pod`s.
 
-Upon picking us a new log file for processing, Vector is intended to read the
+Upon picking up a new log file for processing, Vector is intended to read the
 `Pod` object, see the `vector.dev/exclude: "true"` annotation and ignore the
 log file altogether. This should save take much less resources compared to
 reading logs files into events and then filtering them out.
