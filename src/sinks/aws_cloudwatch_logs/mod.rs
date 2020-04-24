@@ -759,10 +759,13 @@ mod integration_tests {
     use crate::{
         region::RegionOrEndpoint,
         runtime::Runtime,
-        test_util::{random_lines_with_stream, random_string},
+        test_util::{random_lines, random_lines_with_stream, random_string},
         topology::config::{SinkConfig, SinkContext},
     };
-    use futures01::{stream::Stream, Sink};
+    use futures01::{
+        stream::{self, Stream},
+        Sink,
+    };
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
@@ -895,6 +898,86 @@ mod integration_tests {
         let first = input_lines.remove(0);
         input_lines.push(first);
         assert_eq!(output_lines, input_lines);
+    }
+
+    #[test]
+    fn cloudwatch_insert_out_of_range_timestamp() {
+        let mut rt = Runtime::single_threaded().unwrap();
+        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+
+        let stream_name = gen_name();
+
+        let region = Region::Custom {
+            name: "localstack".into(),
+            endpoint: "http://localhost:6000".into(),
+        };
+        ensure_group(region.clone());
+
+        let config = CloudwatchLogsSinkConfig {
+            stream_name: stream_name.clone().into(),
+            group_name: GROUP_NAME.into(),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            encoding: Encoding::Text.into(),
+            create_missing_group: None,
+            create_missing_stream: None,
+            batch: Default::default(),
+            request: Default::default(),
+            assume_role: None,
+        };
+
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+
+        let now = chrono::Utc::now();
+
+        let mut input_lines = random_lines(100);
+        let mut events = Vec::new();
+        let mut lines = Vec::new();
+
+        let mut add_event = |offset: chrono::Duration| {
+            let line = input_lines.next().unwrap();
+            let mut event = Event::from(line.clone());
+            event
+                .as_mut_log()
+                .insert(event::log_schema().timestamp_key(), now + offset);
+            events.push(event);
+            line
+        };
+
+        // ------------------ past
+        add_event(Duration::days(-15));
+        // ------------------ 14 day limit
+        lines.push(add_event(Duration::days(-13)));
+        lines.push(add_event(Duration::days(-1)));
+        // ------------------ now
+        lines.push(add_event(Duration::zero()));
+        // ------------------ future
+        lines.push(add_event(Duration::hours(1)));
+        lines.push(add_event(Duration::minutes(110)));
+        // ------------------ 2h limit
+        add_event(Duration::minutes(125));
+
+        let pump = sink.send_all(stream::iter_ok(events));
+        let (sink, _) = rt.block_on(pump).unwrap();
+        // drop the sink so it closes all its connections
+        drop(sink);
+
+        let mut request = GetLogEventsRequest::default();
+        request.log_stream_name = stream_name.clone().into();
+        request.log_group_name = GROUP_NAME.into();
+        request.start_time = Some((now - Duration::days(30)).timestamp_millis());
+
+        let client = create_client(region, None, resolver).unwrap();
+
+        let response = rt.block_on(client.get_log_events(request)).unwrap();
+
+        let events = response.events.unwrap();
+
+        let output_lines = events
+            .into_iter()
+            .map(|e| e.message.unwrap())
+            .collect::<Vec<_>>();
+
+        assert_eq!(output_lines, lines);
     }
 
     #[test]
