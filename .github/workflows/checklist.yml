@@ -1,4 +1,5 @@
-name: pr-checklist
+name: checklist
+
 on: [pull_request]
 
 jobs:
