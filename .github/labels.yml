@@ -26,6 +26,9 @@
 - name: "domain: platforms"
   description: Anything platforms related
   color: 212f3e
+- name: "domain: privacy"
+  description: Anything privacy related
+  color: 212f3e
 - name: "domain: security"
   description: Anything security related
   color: 212f3e
