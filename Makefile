@@ -92,13 +92,15 @@ sign-blog: ## Sign newly added blog articles using GPG
 slim-builds: ## Updates the Cargo config to product disk optimized builds, useful for CI
 	@scripts/slim-builds.sh
 
-test: ## Spins up Docker resources and runs _every_ test
-	@cargo test --no-default-features --features ${DEFAULT_FEATURES} --all --features docker --no-run
-	@docker-compose up -d test-runtime-deps
-	@cargo test --no-default-features --features ${DEFAULT_FEATURES} --all --features docker -- --test-threads 4
+test: test-behavior test-integration test-unit
 
 test-behavior: ## Runs behavioral tests
 	@cargo run --no-default-features --features ${DEFAULT_FEATURES} -- test tests/behavior/**/*.toml
+
+test-integration:
+	@cargo test --no-default-features --features ${DEFAULT_FEATURES} --all --features docker --no-run
+	@docker-compose up -d test-runtime-deps
+	@cargo test --no-default-features --features ${DEFAULT_FEATURES} --all --features docker -- --test-threads 4
 
 test-integration-aws: ## Runs Clickhouse integration tests
 	@docker-compose up -d localstack mockwatchlogs ec2_metadata minio
