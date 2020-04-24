@@ -1418,26 +1418,11 @@ See [motivation](#motivation).
 
 ### From Ben
 
-1. ~~What is the minimal Kubernetes version that we want to support. See
-   [this comment][kubernetes_version_comment].~~
-   See the [Minimal supported Kubernetes version][anchor_minimal_supported_kubernetes_version]
-   section.
 1. ~~What is the best to avoid Vector from ingesting it's own logs? I'm assuming
    that my [`kubectl` tutorial][anchor_tutorial_kubectl] handles this with
    namespaces?
    We'd just need to configure Vector to exclude this namespace?~~
    See the [Origin filtering][anchor_origin_filtering] section.
-1. ~~I've seen two different installation strategies. For example, Fluentd offers
-   a [single daemonset configuration file][fluentd_daemonset] while Fluentbit
-   offers [four separate configuration files][fluentbit_installation]
-   (`service-account.yaml`, `role.yaml`, `role-binding.yaml`, `configmap.yaml`).
-   Which approach is better? Why are they different?~~
-   See the
-   [Strategy on YAML file grouping][anchor_strategy_on_yaml_file_grouping]
-   section.
-1. ~~Should we prefer `kubectl create ...` or `kubectl apply ...`? The examples
-   in the [prior art](#prior-art) section use both.~~
-   See [Helm vs raw YAML files][anchor_helm_vs_raw_yaml_files] section.
 1. ~~From what I understand, Vector requires the Kubernetes `watch` verb in order
    to receive updates to k8s cluster changes. This is required for the
    `kubernetes_pod_metadata` transform. Yet, Fluentbit [requires the `get`,
@@ -1447,31 +1432,6 @@ See [motivation](#motivation).
    complete the implementation. It's really trivial to determine from a set of
    API calls used.
    See the [Deployment Hardening](#deployment-hardening) section.
-1. ~~What is `updateStrategy` ... `RollingUpdate`? This is not included in
-   [our daemonset][vector_daemonset] or in [any of Fluentbit's config
-   files][fluentbit_installation]. But it is included in both [Fluentd's
-   daemonset][fluentd_daemonset] and [LogDNA's daemonset][logdna_daemonset].~~
-   `RollingUpdate` is the default value for
-   [`updateStrategy`][k8s_api_daemon_set_update_strategy] of the
-   [`DaemonSet`][k8s_api_daemon_set]. The only alternative is `OnDelete`.
-   `RollingUpdate` makes more sense for us to use as the default, more info on
-   this is available at the [docs][k8s_docs_rolling_update].
-1. ~~I've also noticed `resources` declarations in some of these config files.
-   For example [LogDNA's daemonset][logdna_daemonset]. I assume this is limiting
-   resources. Do we want to consider this?~~
-   See the [Resource Limits][anchor_resource_limits] section of this RFC.
-1. ~~What the hell is going on with [Honeycomb's integration
-   strategy][honeycomb integration]? :) It seems like the whole "Heapster"
-   pipeline is specifically for system events, but Heapster is deprecated?
-   This leads me to my next question...~~
-   Heapster is indeed outdated, as well as Honeycomb integration guide.
-   Kubernetes now solves it's internal autoscaling pipelines needs with
-   [`metrics-server`][metrics-server] - a similar idea yet much more lightweight
-   implementation.
-1. ~~How are we collecting Kubernetes system events? Is that outside of the
-   scope of this RFC? And why does this take an entirely different path?
-   (ref [issue#1293])~~
-   See the [Other data gathering][anchor_other_data_gathering] section.
 1. What are some of the details that set Vector's Kubernetes integration apart?
    This is for marketing purposes and also helps us "raise the bar".
 
