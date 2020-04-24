@@ -312,6 +312,16 @@ work without tweaking with as much cluster setups as possible.
 We should support both `kubectl create` and `kubectl apply` flows.
 `kubectl apply` is generally more limiting than `kubectl create`.
 
+We can derive our YAML files from the Helm Charts to fold to a single source of
+truth for the configuration. To do that we'd need a `values.yaml`, suitable
+for rendering the Helm Chart template into a set of YAML files, and a script
+combine/regroup/reformat the rendered templates for better usability.
+
+Alternatively, we can hand-write the YAML files. This has the benefit of making
+them more user-friendly. It's unclear if this is provides a real value compared
+to deriving them from Helm Charts - since the ultimate user-friendly way is to
+use Helm Charts.
+
 ### Helm Chart Repository
 
 We should not just maintain a Helm Chart, we also should offer Helm repo to make
