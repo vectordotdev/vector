@@ -150,7 +150,7 @@ class Field
     if !wildcard? && other.wildcard?
       -1
     else
-      [sort || 99, "#{category}#{name}".downcase] <=> [other.sort || 99, "#{other.category}#{other.name}".downcase]
+      name.downcase <=> other.name.downcase
     end
   end
 
@@ -191,6 +191,10 @@ class Field
     OBJECT_TYPES.any? do |object_type|
       type == "[#{object_type}]"
     end
+  end
+
+  def config_sort_obj
+    @config_sort_obj ||= [sort || 99, "#{category}#{name}".downcase]
   end
 
   def object_of_object?

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-04-24"
 delivery_guarantee: "at_least_once"
 component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
@@ -71,8 +71,8 @@ The Vector `loki` sink
   tenant_id = "some_tenant_id" # optional, no default
 
   # Auth
-  auth.strategy = "basic" # required
   auth.password = "${LOKI_PASSWORD}" # required, required when strategy = "basic"
+  auth.strategy = "basic" # required
   auth.user = "${LOKI_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
@@ -80,9 +80,9 @@ The Vector `loki` sink
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -143,30 +143,6 @@ Options for the authentication strategy.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
-  examples={["basic"]}
-  groups={[]}
-  name={"strategy"}
-  path={"auth"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### strategy
-
-The authentication strategy to use.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
   enumValues={null}
   examples={["${LOKI_PASSWORD}","password"]}
   groups={[]}
@@ -184,6 +160,30 @@ The authentication strategy to use.
 
 The basic authentication password. If using GrafanaLab's hosted Loki then this
 must be set to your `instanceId`.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
+  examples={["basic"]}
+  groups={[]}
+  name={"strategy"}
+  path={"auth"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### strategy
+
+The authentication strategy to use.
 
 
 
@@ -316,30 +316,6 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
-<Field
-  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -383,6 +359,30 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 The maximum size of the buffer on the disk.
 
  See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
 
 
 </Field>
@@ -584,84 +584,6 @@ Enables/disables the sink healthcheck upon start.
 
 </Field>
 <Field
-  common={false}
-  defaultValue={false}
-  enumValues={null}
-  examples={[false,true]}
-  groups={[]}
-  name={"remove_label_fields"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### remove_label_fields
-
-If this is set to `true` then when labels are collected from events those
-fields will also get removed from the event.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"remove_timestamp"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### remove_timestamp
-
-If this is set to `true` then the timestamp will be removed from the event.
-This is useful because Loki uses the timestamp to index the event.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["some_tenant_id"]}
-  groups={[]}
-  name={"tenant_id"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### tenant_id
-
-The tenant id that will be sent with every request, by default this is not
-required since a proxy should set this header. When running Loki locally a
-tenant id is not required either.
-
-You can read more about tenant id's [here][urls.loki_multi_tenancy]
-
-
-
-
-</Field>
-<Field
   common={true}
   defaultValue={null}
   enumValues={null}
@@ -713,6 +635,56 @@ A key-value pair for labels.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"remove_label_fields"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### remove_label_fields
+
+If this is set to `true` then when labels are collected from events those
+fields will also get removed from the event.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"remove_timestamp"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### remove_timestamp
+
+If this is set to `true` then the timestamp will be removed from the event.
+This is useful because Loki uses the timestamp to index the event.
+
+
+
 
 </Field>
 <Field
@@ -913,6 +885,34 @@ duplicate data downstream.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["some_tenant_id"]}
+  groups={[]}
+  name={"tenant_id"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### tenant_id
+
+The tenant id that will be sent with every request, by default this is not
+required since a proxy should set this header. When running Loki locally a
+tenant id is not required either.
+
+You can read more about tenant id's [here][urls.loki_multi_tenancy]
+
+
+
 
 </Field>
 <Field

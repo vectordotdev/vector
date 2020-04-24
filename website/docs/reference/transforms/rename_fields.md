@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-04-24"
 component_title: "Rename Fields"
 description: "The Vector `rename_fields` transform accepts and outputs `log` events, allowing you to rename one or more log fields."
 event_types: ["log"]
@@ -68,6 +68,31 @@ one or more log fields.
 
 <Fields filters={true}>
 <Field
+  common={false}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"drop_empty"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### drop_empty
+
+If set to `true`, after renaming fields, remove any parent objects of the old
+field that are now empty.
+
+
+
+
+</Field>
+<Field
   common={true}
   defaultValue={null}
   enumValues={null}
@@ -115,31 +140,6 @@ Old-key/New-key pair reprsenting the key to be moved.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={false}
-  defaultValue={false}
-  enumValues={null}
-  examples={[false,true]}
-  groups={[]}
-  name={"drop_empty"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### drop_empty
-
-If set to `true`, after renaming fields, remove any parent objects of the old
-field that are now empty.
-
-
-
 
 </Field>
 </Fields>

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-04-24"
 delivery_guarantee: "best_effort"
 component_title: "Syslog"
 description: "The Vector `syslog` source ingests data through the Syslog protocol and outputs `log` events."
@@ -85,6 +85,31 @@ ingests data through the [Syslog protocol][urls.syslog_5424] and outputs
 
 <Fields filters={true}>
 <Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["0.0.0.0:514","systemd","systemd#2"]}
+  groups={[]}
+  name={"address"}
+  path={null}
+  relevantWhen={{"mode":["tcp","udp"]}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### address
+
+The TCP or UDP address to listen for connections on, or "systemd#N" to use the
+Nth socket passed by systemd socket activation.
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={"host"}
   enumValues={null}
@@ -107,31 +132,6 @@ be globally set via the [global [`host_key`](#host_key)
 option][docs.reference.global-options#host_key].
 
  See [Context](#context) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["0.0.0.0:514","systemd","systemd#2"]}
-  groups={[]}
-  name={"address"}
-  path={null}
-  relevantWhen={{"mode":["tcp","udp"]}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### address
-
-The TCP or UDP address to listen for connections on, or "systemd#N" to use the
-Nth socket passed by systemd socket activation.
-
-
 
 
 </Field>
