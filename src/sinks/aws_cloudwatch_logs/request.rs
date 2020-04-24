@@ -1,4 +1,5 @@
 use super::CloudwatchError;
+use chrono::Duration;
 use futures01::{sync::oneshot, try_ready, Async, Future, Poll};
 use rusoto_core::{RusotoError, RusotoFuture};
 use rusoto_logs::{
@@ -48,8 +49,9 @@ impl CloudwatchFuture {
         };
 
         let (state, events) = if let Some(token) = token {
-            let state = State::Put(client.put_logs(Some(token), events));
-            (state, None)
+            let (request, events) = client.put_logs(Some(token), events);
+            let state = State::Put(request);
+            (state, events)
         } else {
             let state = State::DescribeStream(client.describe_stream());
             (state, Some(events))
@@ -112,7 +114,9 @@ impl Future for CloudwatchFuture {
                         let token = stream.upload_sequence_token;
 
                         info!(message = "putting logs.", ?token);
-                        self.state = State::Put(self.client.put_logs(token, events));
+                        let (request, events) = self.client.put_logs(token, events);
+                        self.state = State::Put(request);
+                        self.events = events;
                     } else if self.create_missing_stream {
                         info!("provided stream does not exist; creating a new one.");
                         self.state = State::CreateStream(self.client.create_log_stream());
@@ -169,15 +173,22 @@ impl Future for CloudwatchFuture {
 
                     let next_token = res.next_sequence_token;
 
-                    info!(message = "putting logs was successful.", ?next_token);
+                    if let Some(events) = self.events.take() {
+                        info!(message = "putting logs.", ?next_token);
+                        let (request, events) = self.client.put_logs(next_token, events);
+                        self.state = State::Put(request);
+                        self.events = events;
+                    } else {
+                        info!(message = "putting logs was successful.", ?next_token);
 
-                    self.token_tx
-                        .take()
-                        .expect("Put was polled twice.")
-                        .send(next_token)
-                        .expect("CloudwatchLogsSvc was dropped unexpectedly");
+                        self.token_tx
+                            .take()
+                            .expect("Put was polled after finishing.")
+                            .send(next_token)
+                            .expect("CloudwatchLogsSvc was dropped unexpectedly");
 
-                    return Ok(().into());
+                        return Ok(().into());
+                    }
                 }
             }
         }
@@ -189,9 +200,22 @@ impl Client {
         &self,
         sequence_token: Option<String>,
         mut log_events: Vec<InputLogEvent>,
-    ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
-        // Sort by timestamp
-        log_events.sort_by_key(|e| e.timestamp);
+    ) -> (
+        RusotoFuture<PutLogEventsResponse, PutLogEventsError>,
+        Option<Vec<InputLogEvent>>,
+    ) {
+        // We will only send events that happened in the 24h window since the oldest event.
+        let remainder = log_events
+            .first()
+            .map(|oldest| oldest.timestamp + Duration::days(1).num_milliseconds())
+            .and_then(|limit| {
+                log_events
+                    .iter()
+                    .enumerate()
+                    .find(|e| e.1.timestamp >= limit)
+                    .map(|(at, _)| at)
+                    .map(|at| log_events.drain(..at).collect::<Vec<_>>())
+            });
 
         let request = PutLogEventsRequest {
             log_events,
@@ -200,7 +224,7 @@ impl Client {
             log_stream_name: self.stream_name.clone(),
         };
 
-        self.client.put_log_events(request)
+        (self.client.put_log_events(request), remainder)
     }
 
     pub fn describe_stream(
