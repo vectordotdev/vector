@@ -126,24 +126,26 @@ where
                         if sender.send(Bytes::from(line)).is_err() {
                             // There are no active receivers.
                             // Try to stop.
-                            match CRITICAL_SECTION.lock() {
-                                Ok(mut guard) => {
-                                    if sender.receiver_count() > 0 {
-                                        // It's fine to not try sending line since it came from
-                                        // before this new receiver has shown up.
-                                        continue;
-                                    }
-                                    guard.take();
-                                }
-                                Err(_) => error!(message = "CRITICAL_SECTION poisoned."),
+                            let mut guard =
+                                CRITICAL_SECTION.lock().expect("CRITICAL_SECTION poisoned");
+                            if sender.receiver_count() > 0 {
+                                // A new new receiver has shown up.
+
+                                // It's fine not to resend the line since it came from
+                                // before this new receiver has shown up.
+                                continue;
                             }
-                            break;
+                            guard.take();
+                            return;
                         }
                     }
                 }
             }
 
-            info!("Stopped capturing STDIN.");
+            CRITICAL_SECTION
+                .lock()
+                .expect("CRITICAL_SECTION poisoned")
+                .take();
         });
 
         receiver
@@ -205,6 +207,7 @@ mod tests {
 
     #[test]
     fn stdin_decodes_line() {
+        crate::test_util::trace_init();
         let (tx, mut rx) = mpsc::channel(10);
         let config = StdinConfig::default();
         let buf = Cursor::new(String::from("hello world\nhello world again"));
