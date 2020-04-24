@@ -142,7 +142,7 @@ test-integration-splunk: ## Runs Kafka integration tests
 	@cargo test --no-default-features --features splunk-integration-tests
 
 test-unit: ## Runs unit tests that do not require network dependencies
-	@cargo test --no-run --target $TARGET
+	@cargo test --no-run --target ${TARGET}
 
 ##@ Releasing
 
