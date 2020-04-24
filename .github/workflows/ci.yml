@@ -96,12 +96,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: cloudwatch-logs-integration-tests,cloudwatch-metrics-integration-tests,ec2-metadata-integration-tests,firehose-integration-tests,kinesis-integration-tests,s3-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d localstack mockwatchlogs ec2_metadata minio
       - run: make slim-builds
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make test-integration-aws
 
   test-integration-clickhouse:
     runs-on: ubuntu-latest
@@ -112,12 +110,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: clickhouse-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d clickhouse
       - run: make slim-builds
-      - run: cargo test --no-default-features  --features $FEATURES
+      - run: make test-integration-clickhouse
 
   test-integration-docker:
     runs-on: ubuntu-latest
@@ -128,11 +124,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: docker-integration-tests
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make test-integration-docker
 
   test-integration-elasticsearch:
     runs-on: ubuntu-latest
@@ -143,12 +138,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: es-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d elasticsearch elasticsearch-tls localstack
       - run: make slim-builds
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make test-integration-elasticsearch
 
   test-integration-gcp:
     runs-on: ubuntu-latest
@@ -159,12 +152,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: gcp-pubsub-integration-tests, gcs-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d gcloud-pubsub
       - run: make slim-builds
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make test-integration-gcp
 
   test-integration-influxdb:
     runs-on: ubuntu-latest
@@ -175,12 +166,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: influxdb-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d influxdb_v1 influxdb_v2
       - run: make slim-builds
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make test-integration-influxdb
 
   test-integration-kafka:
     runs-on: ubuntu-latest
@@ -191,12 +180,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: kafka-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d kafka
       - run: make slim-builds
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make test-integration-kafka
 
   test-integration-pulsar:
     runs-on: ubuntu-latest
@@ -207,12 +194,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: pulsar-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d pulsar
       - run: make slim-builds
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make test-integration-pulsar
 
   test-integration-splunk:
     runs-on: ubuntu-latest
@@ -223,12 +208,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: splunk-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d splunk
       - run: make slim-builds
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make test-integration-splunk
 
   test-unit:
     runs-on: ubuntu-latest
