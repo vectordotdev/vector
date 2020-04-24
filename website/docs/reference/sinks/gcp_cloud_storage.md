@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-04-24"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
@@ -51,8 +51,8 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   healthcheck = true # optional, default
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.type = "memory" # optional, default
 
   # Encoding
   encoding.codec = "ndjson" # required
@@ -79,9 +79,9 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   batch.timeout_secs = 300 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -123,6 +123,32 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={{"authenticatedRead":"Gives the bucket or object owner OWNER permission, and gives all authenticated Google account holders READER permission.","bucketOwnerFullControl":"Gives the object and bucket owners OWNER permission.","bucketOwnerRead":"Gives the object owner OWNER permission, and gives the bucket owner READER permission.","private":"Gives the bucket or object owner OWNER permission for a bucket or object.","projectPrivate":"Gives permission to the project team based on their roles. Anyone who is part of the team has READER permission. Project owners and project editors have OWNER permission. This the default.","publicRead":"Gives the bucket or object owner OWNER permission, and gives all users, both authenticated and anonymous, READER permission. When you apply this to an object, anyone on the Internet can read the object without authenticating."}}
+  examples={["authenticatedRead","bucketOwnerFullControl","bucketOwnerRead","private","projectPrivate","publicRead"]}
+  groups={[]}
+  name={"acl"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### acl
+
+Predefined ACL to apply to the created objects. For more information, see
+[Predefined ACLs][urls.gcs_predefined_acl]. If this is not set, GCS will apply
+a default ACL when the object is created.
+
+ See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
+
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -198,6 +224,30 @@ The maximum age of a batch before it is flushed.
 
 </Field>
 <Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["my-bucket"]}
+  groups={[]}
+  name={"bucket"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### bucket
+
+The GCS bucket name.
+
+
+
+
+</Field>
+<Field
   common={true}
   defaultValue={null}
   enumValues={null}
@@ -220,30 +270,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -293,6 +319,30 @@ The maximum size of the buffer on the disk.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
@@ -317,6 +367,60 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
+  examples={["gzip","none"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+The compression mechanism to use.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/credentials.json"]}
+  groups={[]}
+  name={"credentials_path"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### credentials_path
+
+The filename for a Google Cloud service account credentials JSON file used to
+authenticate access to the Cloud Storage API. If this is unset, Vector checks
+the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) environment variable for a filename.
+
+If no filename is named, Vector will attempt to fetch an instance service
+account for the compute instance the program is running on. If Vector is not
+running on a GCE instance, you must define a credentials file as above.
+
+ See [GCP Authentication](#gcp-authentication) for more info.
+
 
 </Field>
 <Field
@@ -443,210 +547,6 @@ How to format event timestamps.
 </Field>
 <Field
   common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["my-bucket"]}
-  groups={[]}
-  name={"bucket"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### bucket
-
-The GCS bucket name.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
-  examples={["gzip","none"]}
-  groups={[]}
-  name={"compression"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### compression
-
-The compression mechanism to use.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/path/to/credentials.json"]}
-  groups={[]}
-  name={"credentials_path"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### credentials_path
-
-The filename for a Google Cloud service account credentials JSON file used to
-authenticate access to the Cloud Storage API. If this is unset, Vector checks
-the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) environment variable for a filename.
-
-If no filename is named, Vector will attempt to fetch an instance service
-account for the compute instance the program is running on. If Vector is not
-running on a GCE instance, you must define a credentials file as above.
-
- See [GCP Authentication](#gcp-authentication) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start.
-
- See [Health Checks](#health-checks) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={{"authenticatedRead":"Gives the bucket or object owner OWNER permission, and gives all authenticated Google account holders READER permission.","bucketOwnerFullControl":"Gives the object and bucket owners OWNER permission.","bucketOwnerRead":"Gives the object owner OWNER permission, and gives the bucket owner READER permission.","private":"Gives the bucket or object owner OWNER permission for a bucket or object.","projectPrivate":"Gives permission to the project team based on their roles. Anyone who is part of the team has READER permission. Project owners and project editors have OWNER permission. This the default.","publicRead":"Gives the bucket or object owner OWNER permission, and gives all users, both authenticated and anonymous, READER permission. When you apply this to an object, anyone on the Internet can read the object without authenticating."}}
-  examples={["authenticatedRead","bucketOwnerFullControl","bucketOwnerRead","private","projectPrivate","publicRead"]}
-  groups={[]}
-  name={"acl"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### acl
-
-Predefined ACL to apply to the created objects. For more information, see
-[Predefined ACLs][urls.gcs_predefined_acl]. If this is not set, GCS will apply
-a default ACL when the object is created.
-
- See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"metadata"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### metadata
-
-The set of metadata `key:value` pairs for the created objects. See the [GCS
-custom metadata][urls.gcs_custom_metadata] documentation for more details.
-
-
-
-<Fields filters={false}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"Key1":"Value1"}]}
-  groups={[]}
-  name={"`[key-name]`"}
-  path={"metadata"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### `[key-name]`
-
-A custom metadata item to be added to the created objects.
-
-
-
-
-</Field>
-</Fields>
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={{"STANDARD":"Standard Storage is best for data that is frequently accessed and/or stored for only brief periods of time. This is the default.","NEARLINE":"Nearline Storage is a low-cost, highly durable storage service for storing infrequently accessed data.","COLDLINE":"Coldline Storage is a very-low-cost, highly durable storage service for storing infrequently accessed data.","ARCHIVE":"Archive Storage is the lowest-cost, highly durable storage service for data archiving, online backup, and disaster recovery."}}
-  examples={["STANDARD","NEARLINE","COLDLINE","ARCHIVE"]}
-  groups={[]}
-  name={"storage_class"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### storage_class
-
-The storage class for the created objects. See [the GCP storage
-classes][urls.gcs_storage_classes] for more details.
-
- See [Storage class](#storage-class) for more info.
-
-
-</Field>
-<Field
-  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -721,6 +621,30 @@ specifiers][urls.strptime_specifiers] are supported.
 </Field>
 <Field
   common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"healthcheck"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### healthcheck
+
+Enables/disables the sink healthcheck upon start.
+
+ See [Health Checks](#health-checks) for more info.
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={"date=%F/"}
   enumValues={null}
   examples={["date=%F/","date=%F/hour=%H/","year=%Y/month=%m/day=%d/","application_id={{ application_id }}/date=%F/"]}
@@ -743,6 +667,57 @@ to be the root GCS "folder".
 
  See [Object naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"metadata"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### metadata
+
+The set of metadata `key:value` pairs for the created objects. See the [GCS
+custom metadata][urls.gcs_custom_metadata] documentation for more details.
+
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"Key1":"Value1"}]}
+  groups={[]}
+  name={"`[key-name]`"}
+  path={"metadata"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[key-name]`
+
+A custom metadata item to be added to the created objects.
+
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -943,6 +918,31 @@ duplicate data downstream.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={{"STANDARD":"Standard Storage is best for data that is frequently accessed and/or stored for only brief periods of time. This is the default.","NEARLINE":"Nearline Storage is a low-cost, highly durable storage service for storing infrequently accessed data.","COLDLINE":"Coldline Storage is a very-low-cost, highly durable storage service for storing infrequently accessed data.","ARCHIVE":"Archive Storage is the lowest-cost, highly durable storage service for data archiving, online backup, and disaster recovery."}}
+  examples={["STANDARD","NEARLINE","COLDLINE","ARCHIVE"]}
+  groups={[]}
+  name={"storage_class"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### storage_class
+
+The storage class for the created objects. See [the GCP storage
+classes][urls.gcs_storage_classes] for more details.
+
+ See [Storage class](#storage-class) for more info.
+
 
 </Field>
 <Field

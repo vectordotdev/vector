@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-24"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` source ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events."
@@ -98,33 +98,6 @@ events.
 ### address
 
 The address to accept connections on.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["A94A8FE5CCB19BA61C4C08"]}
-  groups={[]}
-  name={"token"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### token
-
-If supplied, incoming requests must supply this token in the `Authorization`
-header, just as a client would if it was communicating with the Splunk HEC
-endpoint directly. If _not_ supplied, the `Authorization` header will be
-ignored and requests will not be authenticated.
 
 
 
@@ -306,6 +279,33 @@ will not request a certificate from the client.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["A94A8FE5CCB19BA61C4C08"]}
+  groups={[]}
+  name={"token"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### token
+
+If supplied, incoming requests must supply this token in the `Authorization`
+header, just as a client would if it was communicating with the Splunk HEC
+endpoint directly. If _not_ supplied, the `Authorization` header will be
+ignored and requests will not be authenticated.
+
+
+
 
 </Field>
 </Fields>

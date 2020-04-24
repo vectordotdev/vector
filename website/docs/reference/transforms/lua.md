@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-04-24"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events, allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
@@ -144,57 +144,6 @@ with a full embedded [Lua][urls.lua] engine.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"2":"Lua transform API version 2"}}
-  examples={["2"]}
-  groups={["simple","inline","module"]}
-  name={"version"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### version
-
-Transform API version. Specifying this version ensures that Vector does not
-break backward compatibility.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["/etc/vector/lua"]]}
-  groups={["module"]}
-  name={"search_dirs"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-### search_dirs
-
-A list of directories to search when loading a Lua file via the `require`
-function. If not specified, the modules are looked up in the directories of
-Vector's configs.
-
- See [Search Directories](#search-directories) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
   enumValues={null}
   examples={[]}
   groups={["simple","inline","module"]}
@@ -297,6 +246,56 @@ using `emit` function.
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={[["/etc/vector/lua"]]}
+  groups={["module"]}
+  name={"search_dirs"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### search_dirs
+
+A list of directories to search when loading a Lua file via the `require`
+function. If not specified, the modules are looked up in the directories of
+Vector's configs.
+
+ See [Search Directories](#search-directories) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["function init()\n  count = 0\nend\n\nfunction process()\n  count = count + 1\nend\n\nfunction timer_handler(emit)\n  emit(make_counter(counter))\n  counter = 0\nend\n\nfunction shutdown(emit)\n  emit(make_counter(counter))\nend\n\nfunction make_counter(value)\n  return metric = {\n    name = \"event_counter\",\n    kind = \"incremental\",\n    timestamp = os.date(\"!*t\"),\n    counter = {\n      value = value\n    }\n  }\nend","-- external file with hooks and timers defined\nrequire('custom_module')"]}
+  groups={["inline","module"]}
+  name={"source"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### source
+
+The source which is evaluated when the transform is created.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={[[{"interval_seconds":5,"handler":"timer_handler"}],[{"interval_seconds":5,"handler":"timer_handler"}]]}
   groups={["inline","module"]}
   name={"timers"}
@@ -369,24 +368,25 @@ Defines the interval at which the timer handler would be executed.
 
 </Field>
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
-  enumValues={null}
-  examples={["function init()\n  count = 0\nend\n\nfunction process()\n  count = count + 1\nend\n\nfunction timer_handler(emit)\n  emit(make_counter(counter))\n  counter = 0\nend\n\nfunction shutdown(emit)\n  emit(make_counter(counter))\nend\n\nfunction make_counter(value)\n  return metric = {\n    name = \"event_counter\",\n    kind = \"incremental\",\n    timestamp = os.date(\"!*t\"),\n    counter = {\n      value = value\n    }\n  }\nend","-- external file with hooks and timers defined\nrequire('custom_module')"]}
-  groups={["inline","module"]}
-  name={"source"}
+  enumValues={{"2":"Lua transform API version 2"}}
+  examples={["2"]}
+  groups={["simple","inline","module"]}
+  name={"version"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
   warnings={[]}
   >
 
-### source
+### version
 
-The source which is evaluated when the transform is created.
+Transform API version. Specifying this version ensures that Vector does not
+break backward compatibility.
 
 
 

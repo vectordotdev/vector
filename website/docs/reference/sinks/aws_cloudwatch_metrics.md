@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-04-24"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
@@ -77,6 +77,30 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+
+ See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={[]}
   groups={[]}
   name={"batch"}
@@ -145,30 +169,6 @@ The maximum age of a batch before it is flushed.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["arn:aws:iam::123456789098:role/my_role"]}
-  groups={[]}
-  name={"assume_role"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### assume_role
-
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
- See [AWS Authentication](#aws-authentication) for more info.
-
 
 </Field>
 <Field

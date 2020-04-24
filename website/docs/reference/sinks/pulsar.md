@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-04-24"
 delivery_guarantee: "at_least_once"
 component_title: "Apache Pulsar"
 description: "The Vector `pulsar` sink streams `log` events to Apache Pulsar via the Pulsar protocol."
@@ -79,6 +79,30 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["127.0.0.1:6650"]}
+  groups={[]}
+  name={"address"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### address
+
+A host and port pair that the pulsar client should connect to.
+
+
+
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -273,30 +297,6 @@ How to format event timestamps.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["127.0.0.1:6650"]}
-  groups={[]}
-  name={"address"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### address
-
-A host and port pair that the pulsar client should connect to.
-
-
-
 
 </Field>
 <Field

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-23"
+last_modified_on: "2020-04-24"
 delivery_guarantee: "at_least_once"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
@@ -76,8 +76,8 @@ endpoint][urls.elasticsearch_bulk].
   index = "vector-%F" # optional, default
 
   # Auth
-  auth.strategy = "aws" # required
   auth.password = "${ELASTICSEARCH_PASSWORD}" # required, required when strategy = "basic"
+  auth.strategy = "aws" # required
   auth.user = "${ELASTICSEARCH_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
@@ -85,9 +85,9 @@ endpoint][urls.elasticsearch_bulk].
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -150,30 +150,6 @@ Options for the authentication strategy.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"aws":"Authentication strategy used for [AWS' hosted Elasticsearch service][urls.aws_elasticsearch].","basic":"The [basic authentication strategy][urls.basic_auth]."}}
-  examples={["aws","basic"]}
-  groups={[]}
-  name={"strategy"}
-  path={"auth"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### strategy
-
-The authentication strategy to use.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
   enumValues={null}
   examples={["${ELASTICSEARCH_PASSWORD}","password"]}
   groups={[]}
@@ -190,6 +166,30 @@ The authentication strategy to use.
 #### password
 
 The basic authentication password.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"aws":"Authentication strategy used for [AWS' hosted Elasticsearch service][urls.aws_elasticsearch].","basic":"The [basic authentication strategy][urls.basic_auth]."}}
+  examples={["aws","basic"]}
+  groups={[]}
+  name={"strategy"}
+  path={"auth"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### strategy
+
+The authentication strategy to use.
 
 
 
@@ -321,30 +321,6 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
-<Field
-  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -392,6 +368,30 @@ The maximum size of the buffer on the disk.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
@@ -416,6 +416,56 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
+  examples={["gzip","none"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[{"visibility_level":"component","text":"AWS hosted Elasticsearch is unable to use compression","option_name":"compression"}]}
+  >
+
+### compression
+
+The compression mechanism to use.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"_doc"}
+  enumValues={null}
+  examples={["_doc"]}
+  groups={[]}
+  name={"doc_type"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### doc_type
+
+The [`doc_type`](#doc_type) for your index data. This is only relevant for Elasticsearch <=
+6.X. If you are using >= 7.0 you do not need to set this option since
+Elasticsearch has removed it.
+
+
+
 
 </Field>
 <Field
@@ -517,53 +567,53 @@ How to format event timestamps.
 
 </Field>
 <Field
-  common={true}
-  defaultValue={"none"}
-  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
-  examples={["gzip","none"]}
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
   groups={[]}
-  name={"compression"}
+  name={"headers"}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"string"}
+  type={"table"}
   unit={null}
-  warnings={[{"visibility_level":"component","text":"AWS hosted Elasticsearch is unable to use compression","option_name":"compression"}]}
+  warnings={[]}
   >
 
-### compression
+### headers
 
-The compression mechanism to use.
-
-
+Options for custom headers.
 
 
-</Field>
+
+<Fields filters={false}>
 <Field
-  common={false}
-  defaultValue={"_doc"}
+  common={true}
+  defaultValue={null}
   enumValues={null}
-  examples={["_doc"]}
+  examples={[{"Authorization":"${ELASTICSEARCH_TOKEN}"},{"X-Powered-By":"Vector"}]}
   groups={[]}
-  name={"doc_type"}
-  path={null}
+  name={"`[header-name]`"}
+  path={"headers"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
   warnings={[]}
   >
 
-### doc_type
+#### `[header-name]`
 
-The [`doc_type`](#doc_type) for your index data. This is only relevant for Elasticsearch <=
-6.X. If you are using >= 7.0 you do not need to set this option since
-Elasticsearch has removed it.
+A custom header to be added to each outgoing Elasticsearch request.
 
 
 
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -665,56 +715,6 @@ Index name to write events to.
 
  See [Document Conflicts](#document-conflicts) and [Template Syntax](#template-syntax) for more info.
 
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"headers"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### headers
-
-Options for custom headers.
-
-
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"Authorization":"${ELASTICSEARCH_TOKEN}"},{"X-Powered-By":"Vector"}]}
-  groups={[]}
-  name={"`[header-name]`"}
-  path={"headers"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### `[header-name]`
-
-A custom header to be added to each outgoing Elasticsearch request.
-
-
-
-
-</Field>
-</Fields>
 
 </Field>
 <Field
