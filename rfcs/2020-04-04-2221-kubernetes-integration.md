@@ -1510,8 +1510,8 @@ See [motivation](#motivation).
       exists, and ignore it if it doesn't). Required to elegantly load multiple
       files so that we can split the configuration.
 - [ ] Add `kubernetes` source reference documentation.
-- [ ] Prepare YAML deployment config.
 - [ ] Prepare Heml Chart.
+- [ ] Prepare YAML deployment config.
 - [ ] Prepare Heml Chart Repository.
 - [ ] Integrate kubernetes configuration snapshotting into the release process.
 - [ ] Add Kubernetes setup/integration guide.
