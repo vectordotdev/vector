@@ -323,7 +323,6 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
             // Acceptable range of Event timestamps.
             let age_range = (now - Duration::days(14) + buffer_time).timestamp_millis()
                 ..(now + Duration::hours(2) - buffer_time).timestamp_millis();
-            // TODO: 4. point and retention period of the log group.
 
             let mut events = req
                 .into_iter()

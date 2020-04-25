@@ -174,7 +174,7 @@ impl Future for CloudwatchFuture {
                     let next_token = res.next_sequence_token;
 
                     if let Some(events) = self.events.take() {
-                        info!(message = "putting logs.", ?next_token);
+                        debug!(message = "putting logs.", ?next_token);
                         let (request, events) = self.client.put_logs(next_token, events);
                         self.state = State::Put(request);
                         self.events = events;
@@ -205,16 +205,33 @@ impl Client {
         Option<Vec<InputLogEvent>>,
     ) {
         // We will only send events that happened in the 24h window since the oldest event.
+        // Relies on log_events being sorted by timestamp in ascending order.
         let remainder = log_events
             .first()
-            .map(|oldest| oldest.timestamp + Duration::days(1).num_milliseconds())
+            // -1 is for safe measure.
+            .map(|oldest| oldest.timestamp + Duration::days(1).num_milliseconds() - 1)
             .and_then(|limit| {
+                // Fast path.
+                // In most cases the difference between oldest and newest event
+                // is less than 24h.
                 log_events
-                    .iter()
-                    .enumerate()
-                    .find(|e| e.1.timestamp >= limit)
-                    .map(|(at, _)| at)
-                    .map(|at| log_events.drain(at..).collect::<Vec<_>>())
+                    .last()
+                    .filter(|newest| newest.timestamp > limit)
+                    .map(|_| limit)
+            })
+            .map(|limit| {
+                // At this point we know that an event older than the limit exists.
+                //
+                // We will find none or one of the events with timestamp==limit.
+                // In the case of more events with limit, we can just split them
+                // at found event, and send those before at with this request, and
+                // those after at with the next request.
+                let at = log_events
+                    .binary_search_by_key(&limit, |e| e.timestamp)
+                    .unwrap_or_else(|at| at);
+
+                // Can't be empty
+                log_events.drain(at..).collect()
             });
 
         let request = PutLogEventsRequest {
