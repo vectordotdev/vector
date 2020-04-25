@@ -15,7 +15,7 @@ use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, value::Value as JsonValue};
+use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use string_cache::DefaultAtom as Atom;
 use tower::Service;
@@ -116,6 +116,7 @@ impl HttpSink for HecSinkConfig {
         let mut event = event.into_log();
 
         let host = event.get(&self.host_key).cloned();
+
         let timestamp = if let Some(Value::Timestamp(ts)) =
             event.remove(&event::log_schema().timestamp_key())
         {
@@ -123,15 +124,28 @@ impl HttpSink for HecSinkConfig {
         } else {
             chrono::Utc::now().timestamp_nanos()
         };
+
         let sourcetype = event.get(&event::log_schema().source_type_key()).cloned();
 
-        let mut body = match self.encoding.codec() {
-            Encoding::Json => event_to_json(event, &self.indexed_fields, timestamp),
-            Encoding::Text => json!({
-                "event": event.get(&event::log_schema().message_key()).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
-                "time": timestamp,
-            }),
+        let fields = self
+            .indexed_fields
+            .iter()
+            .filter_map(|field| event.get(field).map(|value| (field, value.clone())))
+            .collect::<LogEvent>();
+
+        let event = match self.encoding.codec() {
+            Encoding::Json => json!(event),
+            Encoding::Text => json!(event
+                .get(&event::log_schema().message_key())
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_else(|| "".into())),
         };
+
+        let mut body = json!({
+            "event": event,
+            "fields": fields,
+            "time": timestamp
+        });
 
         if let Some(host) = host {
             let host = host.to_string_lossy();
@@ -225,19 +239,6 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
         Some(_) => Ok(()),
         None => Err(Box::new(BuildError::UriMissingScheme)),
     }
-}
-
-fn event_to_json(event: LogEvent, indexed_fields: &[Atom], timestamp: i64) -> JsonValue {
-    let fields = indexed_fields
-        .iter()
-        .filter_map(|field| event.get(field).map(|value| (field, value.clone())))
-        .collect::<LogEvent>();
-
-    json!({
-        "fields": fields,
-        "event": event,
-        "time": timestamp
-    })
 }
 
 #[cfg(test)]
