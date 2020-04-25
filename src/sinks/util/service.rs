@@ -352,6 +352,8 @@ impl fmt::Display for Elapsed {
 
 impl error::Error for Elapsed {}
 
+// rustc issue: https://github.com/rust-lang/rust/issues/71259
+#[cfg(feature = "disabled")]
 #[cfg(test)]
 mod tests {
     use super::*;

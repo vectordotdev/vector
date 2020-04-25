@@ -29,7 +29,10 @@
 //       `Encoder` that defines some `encode` function which this config then calls internally as
 //       part of it's own (yet to be written) `encode() -> Vec<u8>` function.
 
-use crate::{event::Value, Event, Result};
+use crate::{
+    event::{PathComponent, PathIter, Value},
+    Event, Result,
+};
 use serde::de::{MapAccess, Visitor};
 use serde::{
     de::{self, DeserializeOwned, Deserializer, IntoDeserializer},
@@ -48,8 +51,9 @@ use string_cache::DefaultAtom as Atom;
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfig<E> {
     pub(crate) codec: E,
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     #[serde(default)]
-    pub(crate) only_fields: Option<Vec<String>>,
+    pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
     #[serde(default)]
     pub(crate) except_fields: Option<Vec<Atom>>,
     #[serde(default)]
@@ -60,7 +64,8 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
     fn codec(&self) -> &E {
         &self.codec
     }
-    fn only_fields(&self) -> &Option<Vec<String>> {
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
         &self.only_fields
     }
     fn except_fields(&self) -> &Option<Vec<Atom>> {
@@ -89,7 +94,8 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(crate) only_fields: Option<Vec<String>>,
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
     #[serde(
         default,
@@ -108,7 +114,8 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
     fn codec(&self) -> &E {
         &self.codec
     }
-    fn only_fields(&self) -> &Option<Vec<String>> {
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
         &self.only_fields
     }
     fn except_fields(&self) -> &Option<Vec<Atom>> {
@@ -146,7 +153,8 @@ pub trait EncodingConfiguration<E> {
     // Required Accessors
 
     fn codec(&self) -> &E;
-    fn only_fields(&self) -> &Option<Vec<String>>;
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>>;
     fn except_fields(&self) -> &Option<Vec<Atom>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
@@ -156,7 +164,17 @@ pub trait EncodingConfiguration<E> {
                 Event::Log(log_event) => {
                     let to_remove = log_event
                         .keys()
-                        .filter(|f| !only_fields.contains(f))
+                        .filter(|field| {
+                            let field_path = PathIter::new(field).collect::<Vec<_>>();
+                            !only_fields.iter().any(|only| {
+                                // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+                                if field_path.starts_with(&only[..]) {
+                                    true
+                                } else {
+                                    false
+                                }
+                            })
+                        })
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
                         log_event.remove(&Atom::from(removal));
@@ -215,10 +233,10 @@ pub trait EncodingConfiguration<E> {
         if let (Some(only_fields), Some(except_fields)) =
             (&self.only_fields(), &self.except_fields())
         {
-            if only_fields
-                .iter()
-                .any(|f| except_fields.contains(&Atom::from(f.as_str())))
-            {
+            if except_fields.iter().any(|f| {
+                let path_iter = PathIter::new(f).collect::<Vec<_>>();
+                only_fields.iter().any(|v| v == &path_iter)
+            }) {
                 Err("`except_fields` and `only_fields` should be mutually exclusive.")?;
             }
         }
@@ -343,7 +361,13 @@ where
 
         let concrete = Self {
             codec: inner.codec,
-            only_fields: inner.only_fields,
+            // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+            only_fields: inner.only_fields.map(|fields| {
+                fields
+                    .iter()
+                    .map(|only| PathIter::new(only).collect())
+                    .collect()
+            }),
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
         };
@@ -412,7 +436,13 @@ where
 
         let concrete = Self {
             codec: inner.codec,
-            only_fields: inner.only_fields,
+            // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+            only_fields: inner.only_fields.map(|fields| {
+                fields
+                    .iter()
+                    .map(|only| PathIter::new(only).collect())
+                    .collect()
+            }),
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
         };
@@ -439,9 +469,15 @@ mod tests {
         encoding: EncodingConfig<TestEncoding>,
     }
 
-    const TOML_SIMPLE_STRING: &str = "
-        encoding = \"Snoot\"
-    ";
+    const TOML_SIMPLE_STRING: &str = r#"
+        encoding = "Snoot"
+    "#;
+
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    fn as_path_components(a: &str) -> Vec<PathComponent> {
+        PathIter::new(a).collect()
+    }
+
     #[test]
     fn config_string() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRING).unwrap();
@@ -449,35 +485,38 @@ mod tests {
         assert_eq!(config.encoding.codec, TestEncoding::Snoot);
     }
 
-    const TOML_SIMPLE_STRUCT: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.except_fields = [\"Doop\"]
-        encoding.only_fields = [\"Boop\"]
-    ";
+    const TOML_SIMPLE_STRUCT: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.except_fields = ["Doop"]
+        encoding.only_fields = ["Boop"]
+    "#;
     #[test]
     fn config_struct() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRUCT).unwrap();
         config.encoding.validate().unwrap();
         assert_eq!(config.encoding.codec, TestEncoding::Snoot);
         assert_eq!(config.encoding.except_fields, Some(vec!["Doop".into()]));
-        assert_eq!(config.encoding.only_fields, Some(vec!["Boop".into()]));
+        assert_eq!(
+            config.encoding.only_fields,
+            Some(vec![as_path_components("Boop")])
+        );
     }
 
-    const TOML_EXCLUSIVITY_VIOLATION: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.except_fields = [\"Doop\"]
-        encoding.only_fields = [\"Doop\"]
-    ";
+    const TOML_EXCLUSIVITY_VIOLATION: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.except_fields = ["Doop"]
+        encoding.only_fields = ["Doop"]
+    "#;
     #[test]
     fn exclusivity_violation() {
         let config: std::result::Result<TestConfig, _> = toml::from_str(TOML_EXCLUSIVITY_VIOLATION);
         assert!(config.is_err())
     }
 
-    const TOML_EXCEPT_FIELD: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.except_fields = [\"Doop\"]
-    ";
+    const TOML_EXCEPT_FIELD: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.except_fields = ["a.b.c", "b", "c[0].y"]
+    "#;
     #[test]
     fn test_except() {
         let config: TestConfig = toml::from_str(TOML_EXCEPT_FIELD).unwrap();
@@ -485,18 +524,29 @@ mod tests {
         let mut event = Event::new_empty_log();
         {
             let log = event.as_mut_log();
-            log.insert("Doop", 1);
-            log.insert("Beep", 1);
+            log.insert("a", 1);
+            log.insert("a.b", 1);
+            log.insert("a.b.c", 1);
+            log.insert("a.b.d", 1);
+            log.insert("b[0]", 1);
+            log.insert("b[1].x", 1);
+            log.insert("c[0].x", 1);
+            log.insert("c[0].y", 1);
         }
         config.encoding.apply_rules(&mut event);
-        assert!(!event.as_mut_log().contains(&Atom::from("Doop")));
-        assert!(event.as_mut_log().contains(&Atom::from("Beep")));
+        assert!(!event.as_mut_log().contains(&Atom::from("a.b.c")));
+        assert!(!event.as_mut_log().contains(&Atom::from("b")));
+        assert!(!event.as_mut_log().contains(&Atom::from("b[1].x")));
+        assert!(!event.as_mut_log().contains(&Atom::from("c[0].y")));
+
+        assert!(event.as_mut_log().contains(&Atom::from("a.b.d")));
+        assert!(event.as_mut_log().contains(&Atom::from("c[0].x")));
     }
 
-    const TOML_ONLY_FIELD: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.only_fields = [\"Doop\"]
-    ";
+    const TOML_ONLY_FIELD: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.only_fields = ["a.b.c", "b", "c[0].y"]
+    "#;
     #[test]
     fn test_only() {
         let config: TestConfig = toml::from_str(TOML_ONLY_FIELD).unwrap();
@@ -504,18 +554,29 @@ mod tests {
         let mut event = Event::new_empty_log();
         {
             let log = event.as_mut_log();
-            log.insert("Doop", 1);
-            log.insert("Beep", 1);
+            log.insert("a", 1);
+            log.insert("a.b", 1);
+            log.insert("a.b.c", 1);
+            log.insert("a.b.d", 1);
+            log.insert("b[0]", 1);
+            log.insert("b[1].x", 1);
+            log.insert("c[0].x", 1);
+            log.insert("c[0].y", 1);
         }
         config.encoding.apply_rules(&mut event);
-        assert!(event.as_mut_log().contains(&Atom::from("Doop")));
-        assert!(!event.as_mut_log().contains(&Atom::from("Beep")));
+        assert!(event.as_mut_log().contains(&Atom::from("a.b.c")));
+        assert!(event.as_mut_log().contains(&Atom::from("b")));
+        assert!(event.as_mut_log().contains(&Atom::from("b[1].x")));
+        assert!(event.as_mut_log().contains(&Atom::from("c[0].y")));
+
+        assert!(!event.as_mut_log().contains(&Atom::from("a.b.d")));
+        assert!(!event.as_mut_log().contains(&Atom::from("c[0].x")));
     }
 
-    const TOML_TIMESTAMP_FORMAT: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.timestamp_format = \"unix\"
-    ";
+    const TOML_TIMESTAMP_FORMAT: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.timestamp_format = "unix"
+    "#;
     #[test]
     fn test_timestamp() {
         let config: TestConfig = toml::from_str(TOML_TIMESTAMP_FORMAT).unwrap();

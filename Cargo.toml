@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.9.0"
+version = "0.10.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -75,7 +75,7 @@ rusoto_sts = { version = "0.41.0", optional = true }
 
 # Tower
 tower = "0.1.1"
-tower03 = { package = "tower", version = "0.3" }
+tower03 = { package = "tower", version = "0.3", git = "https://github.com/tower-rs/tower", features = ["limit", "retry", "timeout", "util"] }
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }
@@ -159,6 +159,7 @@ lru = "0.4.3"
 k8s-openapi = { version = "0.5.1", features = ["v1_15"], optional = true }
 bloom = "0.3.2"
 pulsar = { version = "0.3.0", optional = true }
+task-compat = "0.1"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
@@ -178,9 +179,9 @@ walkdir = "2.2.7"
 elastic_responses = "0.20"
 matches = "0.1.8"
 pretty_assertions = "0.6.1"
-proptest = "0.9"
 tokio01-test = "0.1.1"
-tower-test = "0.1"
+tower-test03 = { package = "tower-test", version = "0.3" }
+tower-test01 = { package = "tower-test", version = "0.1" }
 kube = { version = "0.16.1", features = ["openapi"] }
 serde_yaml = "0.8.9"
 trust-dns-server = "0.17.0"
@@ -188,6 +189,7 @@ trust-dns = "0.17.0"
 trust-dns-proto = "0.8.0"
 dirs = "2.0.2"
 tokio-test = "0.2"
+tokio = { version = "0.2", features = ["test-util"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -216,6 +218,7 @@ leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
 sources = [
   "sources-docker",
   "sources-file",
+  "sources-generator",
   "sources-http",
   "sources-internal_metrics",
   "sources-journald",
@@ -231,21 +234,22 @@ sources = [
   "sources-tls",
   "sources-vector",
 ]
-sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-docker = ["shiplift"]
 sources-file = ["bytesize"]
+sources-generator = []
+sources-http = ["warp", "sources-tls"]
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["owning_ref"]
 sources-kubernetes = ["sources-file", "transforms-json_parser", "transforms-regex_parser"]
 sources-logplex = ["warp", "sources-tls"]
 sources-prometheus = []
-sources-http = ["warp", "sources-tls"]
 sources-socket = ["bytesize", "listenfd", "tokio-uds", "sources-tls"]
 sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
 sources-statsd = []
 sources-stdin = ["bytesize"]
 sources-syslog = ["sources-socket", "syslog_loose"]
+sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-vector = ["sources-socket"]
 
 # Transforms
@@ -413,3 +417,6 @@ harness = false
 [profile.release]
 lto = true
 codegen-units = 1
+
+[patch.'https://github.com/tower-rs/tower']
+tower-layer = "0.3"

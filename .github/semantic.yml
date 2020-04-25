@@ -25,6 +25,7 @@ scopes:
   - observability
   - operations
   - platforms
+  - privacy
   - security
   - sinks
   - sources
@@ -61,6 +62,7 @@ scopes:
   - splunk provider
   - yandex provider
   - datadog provider
+  - azure provider
   - elastic provider
   - gcp provider
   - honeycomb provider
@@ -75,6 +77,7 @@ scopes:
   # sources
   - docker source
   - file source
+  - generator source
   - http source
   - journald source
   - kafka source

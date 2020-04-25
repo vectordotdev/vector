@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-24"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` source ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs `log` events."
@@ -138,32 +138,6 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 
 <Fields filters={true}>
 <Field
-  common={false}
-  defaultValue={"host"}
-  enumValues={null}
-  examples={["host"]}
-  groups={["tcp","udp","unix"]}
-  name={"host_key"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### host_key
-
-The key name added to each event representing the current host. This can also
-be globally set via the [global [`host_key`](#host_key)
-option][docs.reference.global-options#host_key].
-
- See [Context](#context) for more info.
-
-
-</Field>
-<Field
   common={true}
   defaultValue={null}
   enumValues={null}
@@ -186,6 +160,32 @@ passed by systemd socket activation. If an address is used it _must_ include a
 port.
 
 
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"host"}
+  enumValues={null}
+  examples={["host"]}
+  groups={["tcp","udp","unix"]}
+  name={"host_key"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### host_key
+
+The key name added to each event representing the current host. This can also
+be globally set via the [global [`host_key`](#host_key)
+option][docs.reference.global-options#host_key].
+
+ See [Context](#context) for more info.
 
 
 </Field>

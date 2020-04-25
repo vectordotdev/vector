@@ -34,12 +34,8 @@ jobs:
       - uses: actions/checkout@v1
       - uses: EmbarkStudios/cargo-deny-action@v0
         with:
-          command: "check advisories"
-  test-behavior:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: "cd tests && make test-behavior"
+          command: check advisories
+
   check-component-features:
     runs-on: ubuntu-latest
     env:
@@ -48,37 +44,50 @@ jobs:
       - uses: actions/checkout@v1
       - run: sudo apt install -y python3-pip python3-setuptools python3-wheel
       - run: sudo python3 -m pip install remarshal
-      - run: "make check-component-features"
+      - run: make check-component-features
+
   check-code:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: "make check-code"
+      - run: make check-code
         env:
           PASS_RUSTFLAGS: "-D warnings"
+
   check-fmt:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: "make check-fmt"
+      - run: make check-fmt
         env:
           PASS_RUSTFLAGS: "-D warnings"
+
   check-generate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: "make check-fmt"
+      - run: make check-generate
+
   check-version:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: "make check-version"
+      - run: make check-version
+
   check-blog:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: "make check-blog"
-  test-stable:
+      - run: make check-blog
+
+  test-behavior:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make slim-builds
+      - run: make test-behavior
+
+  test-integration-aws:
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -89,28 +98,10 @@ jobs:
       USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
-      - run: |
-          mkdir -p .cargo/
-          cat <<-EOF >> ./.cargo/config
-            # focus on fast, lean builds
-            [build]
-            incremental = false
-          EOF
-          cat <<-EOF >> ./Cargo.toml
-            # focus on fast, lean builds
-            [profile.dev]
-            debug = false
-            opt-level = "s" # Binary size
-            lto = false # Don't LTO on CI
-          EOF
-      - run: cargo test --no-run --target $TARGET
-      - name: Save vector
-        uses: actions/upload-artifact@v1
-        with:
-          name: binary
-          path: ./target/x86_64-unknown-linux-gnu/debug/vector
+      - run: make slim-builds
+      - run: make test-integration-aws
 
-  clickhouse-integration-tests:
+  test-integration-clickhouse:
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -119,13 +110,12 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: clickhouse-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d clickhouse
-      - run: cargo test --no-default-features  --features $FEATURES
+      - run: make slim-builds
+      - run: make test-integration-clickhouse
 
-  aws-integration-tests:
+  test-integration-docker:
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -134,13 +124,12 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: cloudwatch-logs-integration-tests,cloudwatch-metrics-integration-tests,ec2-metadata-integration-tests,firehose-integration-tests,kinesis-integration-tests,s3-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d localstack mockwatchlogs ec2_metadata minio
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make slim-builds
+      - run: make test-integration-docker
 
-  docker-integration-tests:
+  test-integration-elasticsearch:
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -149,12 +138,12 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: docker-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make slim-builds
+      - run: make test-integration-elasticsearch
 
-  es-integration-tests:
+  test-integration-gcp:
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -163,13 +152,12 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: es-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d elasticsearch elasticsearch-tls localstack
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make slim-builds
+      - run: make test-integration-gcp
 
-  gcp-integration-tests:
+  test-integration-influxdb:
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -178,13 +166,12 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: gcp-pubsub-integration-tests, gcs-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d gcloud-pubsub
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make slim-builds
+      - run: make test-integration-influxdb
 
-  kafka-integration-tests:
+  test-integration-kafka:
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -193,13 +180,12 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: kafka-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d kafka
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make slim-builds
+      - run: make test-integration-kafka
 
-  influxdb-integration-tests:
+  test-integration-pulsar:
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -208,13 +194,12 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: influxdb-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d influxdb_v1 influxdb_v2
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make slim-builds
+      - run: make test-integration-pulsar
 
-  splunk-integration-tests:
+  test-integration-splunk:
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -223,13 +208,12 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: splunk-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d splunk
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make slim-builds
+      - run: make test-integration-splunk
 
-  pulsar-integration-tests:
+  test-unit:
     runs-on: ubuntu-latest
     env:
       RUST_BACKTRACE: full
@@ -238,14 +222,13 @@ jobs:
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-gnu
       USE_CONTAINER: none
-      FEATURES: pulsar-integration-tests
     steps:
       - uses: actions/checkout@v1
-      - run: docker-compose up -d pulsar
-      - run: cargo test --no-default-features --features $FEATURES
+      - run: make slim-builds
+      - run: make test-unit
 
-## Kubernetes
-# Build exectuables in parallel, and then tests on different Kubernetes versions in parallel.
+  ## Kubernetes
+  # Build exectuables in parallel, and then tests on different Kubernetes versions in parallel.
 
   # Builds vector executable that will be tested.
   build-vector-kubernetes:
@@ -277,7 +260,7 @@ jobs:
 
   # Uses two previosuly builded vector executables to do testing.
   test-kubernetes:
-    needs: [build-vector-kubernetes,build-test-vector-kubernetes]
+    needs: [build-vector-kubernetes, build-test-vector-kubernetes]
     runs-on: ubuntu-latest
     strategy:
       matrix:
