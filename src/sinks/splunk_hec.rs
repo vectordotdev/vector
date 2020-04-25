@@ -250,9 +250,16 @@ mod tests {
     use std::collections::BTreeMap;
 
     #[derive(Deserialize, Debug)]
-    struct HecEvent {
+    struct HecEventJson {
         time: i64,
         event: BTreeMap<String, String>,
+        fields: BTreeMap<String, String>,
+    }
+
+    #[derive(Deserialize, Debug)]
+    struct HecEventText {
+        time: i64,
+        event: String,
         fields: BTreeMap<String, String>,
     }
 
@@ -266,6 +273,7 @@ mod tests {
             host = "test.com"
             token = "alksjdfo"
             host_key = "host"
+            indexed_fields = ["key"]
 
             [encoding]
             codec = "json"
@@ -275,7 +283,7 @@ mod tests {
 
         let bytes = config.encode_event(event).unwrap();
 
-        let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
+        let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
 
         let event = &hec_event.event;
         let kv = event.get(&"key".to_string()).unwrap();
@@ -288,6 +296,41 @@ mod tests {
         assert!(event
             .get(&event::log_schema().timestamp_key().to_string())
             .is_none());
+
+        assert_eq!(
+            hec_event.fields.get("key").map(|s| s.as_str()),
+            Some("value")
+        );
+    }
+
+    #[test]
+    fn splunk_encode_event_text() {
+        let mut event = Event::from("hello world");
+        event.as_mut_log().insert("key", "value");
+
+        let (config, _, _) = crate::sinks::util::test::load_sink::<HecSinkConfig>(
+            r#"
+            host = "test.com"
+            token = "alksjdfo"
+            host_key = "host"
+            indexed_fields = ["key"]
+
+            [encoding]
+            codec = "text"
+        "#,
+        )
+        .unwrap();
+
+        let bytes = config.encode_event(event).unwrap();
+
+        let hec_event = serde_json::from_slice::<HecEventText>(&bytes[..]).unwrap();
+
+        assert_eq!(hec_event.event.as_str(), "hello world");
+
+        assert_eq!(
+            hec_event.fields.get("key").map(|s| s.as_str()),
+            Some("value")
+        );
     }
 
     #[test]
