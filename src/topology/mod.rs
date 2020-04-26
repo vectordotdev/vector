@@ -690,7 +690,7 @@ mod tests {
 
         new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
-        topology.reload_config_and_respawn(new_config, &mut rt, false);
+        let _ = topology.reload_config_and_respawn(new_config, &mut rt, false);
 
         assert_eq!(
             topology.config.global.data_dir,
@@ -737,7 +737,9 @@ mod reload_tests {
 
         let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
 
-        assert!(topology.reload_config_and_respawn(new_config, &mut rt, false));
+        assert!(topology
+            .reload_config_and_respawn(new_config, &mut rt, false)
+            .unwrap());
     }
 
     #[test]
@@ -771,7 +773,9 @@ mod reload_tests {
 
         let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
 
-        assert!(!topology.reload_config_and_respawn(new_config, &mut rt, false));
+        assert!(!topology
+            .reload_config_and_respawn(new_config, &mut rt, false)
+            .unwrap());
     }
 
     #[test]
@@ -793,6 +797,8 @@ mod reload_tests {
 
         let (mut topology, _crash) = topology::start(old_config.clone(), &mut rt, false).unwrap();
 
-        assert!(topology.reload_config_and_respawn(old_config, &mut rt, false));
+        assert!(topology
+            .reload_config_and_respawn(old_config, &mut rt, false)
+            .unwrap());
     }
 }
