@@ -72,6 +72,9 @@ test-integration-kafka: ## Runs Kafka integration tests
 test-integration-kubernetes: ## Runs Kubernetes integration tests
 	$(RUN) test-integration-kubernetes
 
+test-integration-loki: ## Runs Loki integration tests
+	$(RUN) test-integration-loki
+
 test-integration-pulsar: ## Runs Kafka integration tests
 	$(RUN) test-integration-pulsar
 

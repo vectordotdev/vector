@@ -92,6 +92,13 @@ jobs:
       - run: make slim-builds
       - run: cd tests && make test-integration-kafka
 
+  integration-loki:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make slim-builds
+      - run: cd tests && make test-integration-loki
+
   integration-pulsar:
     runs-on: ubuntu-latest
     steps:
