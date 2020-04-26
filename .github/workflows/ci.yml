@@ -36,58 +36,6 @@ env:
   USE_CONTAINER: none
 
 jobs:
-  cargo-deny:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - uses: EmbarkStudios/cargo-deny-action@v0
-        with:
-          command: check advisories
-
-  check-component-features:
-    runs-on: ubuntu-latest
-    env:
-      USE_CONTAINER: none
-    steps:
-      - uses: actions/checkout@v1
-      - run: sudo apt install -y python3-pip python3-setuptools python3-wheel
-      - run: sudo python3 -m pip install remarshal
-      - run: make check-component-features
-
-  check-code:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-code
-        env:
-          PASS_RUSTFLAGS: "-D warnings"
-
-  check-fmt:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-fmt
-        env:
-          PASS_RUSTFLAGS: "-D warnings"
-
-  check-generate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-generate
-
-  check-version:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-version
-
-  check-blog:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-blog
-
   test-behavior:
     runs-on: ubuntu-latest
     steps:
