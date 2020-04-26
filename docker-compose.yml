@@ -553,6 +553,7 @@ services:
     depends_on:
       - elasticsearch
       - elasticsearch-tls
+      - localstack
 
   dependencies-gcp:
     image: ubuntu:18.04
