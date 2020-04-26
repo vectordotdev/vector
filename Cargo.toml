@@ -384,7 +384,7 @@ docker = [
   "splunk-integration-tests",
 ]
 
-aws-integration-tests = ["sinks-aws_cloudwatch_logs", "aws_cloudwatch_metrics", "transforms-aws_ec2_metadata", "sinks-aws_kinesis_firehose", "sinks-aws_kinesis_streams", "sinks-elasticsearch", "sinks-aws_s3"]
+aws-integration-tests = ["sinks-aws_cloudwatch_logs", "sinks-aws_cloudwatch_metrics", "sinks-elasticsearch", "sinks-aws_kinesis_firehose", "sinks-aws_kinesis_streams", "sinks-aws_s3" "transforms-aws_ec2_metadata"]
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
