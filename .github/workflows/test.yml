@@ -1,11 +1,11 @@
-name: ci
+name: test
 
 on:
   push:
     branches:
       - master
     paths:
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/test.yml"
       - "lib/*s"
       - "proto/**"
       - "src/**"
@@ -17,7 +17,7 @@ on:
 
   pull_request:
     paths:
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/test.yml"
       - "lib/*s"
       - "proto/**"
       - "src/**"
@@ -27,205 +27,91 @@ on:
       - "docker-compose.yml"
       - "rust-toolchain"
 
+env:
+  AWS_ACCESS_KEY_ID: fake-aws-key
+  AWS_SECRET_ACCESS_KEY: fake-aws-key
+  RUST_BACKTRACE: full
+  TARGET: x86_64-unknown-linux-gnu
+  TEST_LOG: debug
+  USE_CONTAINER: none
+
 jobs:
-  cargo-deny:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - uses: EmbarkStudios/cargo-deny-action@v0
-        with:
-          command: check advisories
-
-  check-component-features:
-    runs-on: ubuntu-latest
-    env:
-      USE_CONTAINER: none
-    steps:
-      - uses: actions/checkout@v1
-      - run: sudo apt install -y python3-pip python3-setuptools python3-wheel
-      - run: sudo python3 -m pip install remarshal
-      - run: make check-component-features
-
-  check-code:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-code
-        env:
-          PASS_RUSTFLAGS: "-D warnings"
-
-  check-fmt:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-fmt
-        env:
-          PASS_RUSTFLAGS: "-D warnings"
-
-  check-generate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-generate
-
-  check-version:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-version
-
-  check-blog:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-blog
-
-  test-behavior:
+  behavior:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
       - run: make test-behavior
 
-  test-integration-aws:
+  integration-aws:
     runs-on: ubuntu-latest
-    env:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-gnu
-      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
-      - run: make test-integration-aws
+      - run: cd tests && make test-integration-aws
 
-  test-integration-clickhouse:
+  integration-clickhouse:
     runs-on: ubuntu-latest
-    env:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-gnu
-      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
-      - run: make test-integration-clickhouse
+      - run: cd tests && make test-integration-clickhouse
 
-  test-integration-docker:
+  integration-docker:
     runs-on: ubuntu-latest
-    env:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-gnu
-      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
-      - run: make test-integration-docker
+      - run: cd tests && make test-integration-docker
 
-  test-integration-elasticsearch:
+  integration-elasticsearch:
     runs-on: ubuntu-latest
-    env:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-gnu
-      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
-      - run: make test-integration-elasticsearch
+      - run: cd tests && make test-integration-elasticsearch
 
-  test-integration-gcp:
+  integration-gcp:
     runs-on: ubuntu-latest
-    env:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-gnu
-      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
-      - run: make test-integration-gcp
+      - run: cd tests && make test-integration-gcp
 
-  test-integration-influxdb:
+  integration-influxdb:
     runs-on: ubuntu-latest
-    env:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-gnu
-      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
-      - run: make test-integration-influxdb
+      - run: cd tests && make test-integration-influxdb
 
-  test-integration-kafka:
+  integration-kafka:
     runs-on: ubuntu-latest
-    env:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-gnu
-      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
-      - run: make test-integration-kafka
+      - run: cd tests && make test-integration-kafka
 
-  test-integration-pulsar:
+  integration-pulsar:
     runs-on: ubuntu-latest
-    env:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-gnu
-      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
-      - run: make test-integration-pulsar
+      - run: cd tests && make test-integration-pulsar
 
-  test-integration-splunk:
+  integration-splunk:
     runs-on: ubuntu-latest
-    env:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-gnu
-      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
-      - run: make test-integration-splunk
+      - run: cd tests && make test-integration-splunk
 
-  test-unit:
+  unit:
     runs-on: ubuntu-latest
-    env:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-gnu
-      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
-      - run: make test-unit
+      - run: cd tests && make test-unit
 
   ## Kubernetes
   # Build exectuables in parallel, and then tests on different Kubernetes versions in parallel.
@@ -259,7 +145,7 @@ jobs:
           path: ./target/debug/deps/vector-test
 
   # Uses two previosuly builded vector executables to do testing.
-  test-kubernetes:
+  kubernetes:
     needs: [build-vector-kubernetes, build-test-vector-kubernetes]
     runs-on: ubuntu-latest
     strategy:

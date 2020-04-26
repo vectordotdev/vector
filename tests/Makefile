@@ -40,17 +40,49 @@ build-aarch64-unknown-linux-musl: load-qemu-binfmt ## build the project for the 
 bench: build ## run benchmarks
 	$(RUN) bench
 
-test: build ## run tests which do not require additional services to be present
-	$(RUN) test
+test: test-behavior test-integration test-unit ## Runs all tests, unit, bheaviorial, and integration.
 
-test-behavior: build ## run behaviorial tests
+test-behavior: build ## Runs behaviorial tests
 	$(RUN) test-behavior
 
-test-integration: build ## run tests which use Docker
+test-integration: ## Runs all integration tests
 	$(RUN) test-integration
 
-test-kubernetes: build-x86_64-unknown-linux-musl ## run tests for Kubernetes
-	$(RUN) test-kubernetes
+test-integration-aws: ## Runs Clickhouse integration tests
+	$(RUN) test-integration-aws
+
+test-integration-clickhouse: ## Runs Clickhouse integration tests
+	$(RUN) test-integration-clickhouse
+
+test-integration-docker: ## Runs Docker integration tests
+	$(RUN) test-integration-docker
+
+test-integration-elasticsearch: ## Runs Elasticsearch integration tests
+	$(RUN) test-integration-elasticsearch
+
+test-integration-gcp: ## Runs GCP integration tests
+	$(RUN) test-integration-gcp
+
+test-integration-influxdb: ## Runs Kafka integration tests
+	$(RUN) test-integration-influxdb
+
+test-integration-kafka: ## Runs Kafka integration tests
+	$(RUN) test-integration-kafka
+
+test-integration-kubernetes: ## Runs Kubernetes integration tests
+	$(RUN) test-integration-kubernetes
+
+test-integration-pulsar: ## Runs Kafka integration tests
+	$(RUN) test-integration-pulsar
+
+test-integration-splunk: ## Runs Kafka integration tests
+	$(RUN) test-integration-splunk
+
+test-integration-kubernetes: build-x86_64-unknown-linux-musl ## Runs Kubernetes integration tests
+	$(RUN) test-integration-kubernetes
+
+test-unit: ## Runs unit tests, tests which do not require additional services to be present
+	$(RUN) test-unit
 
 ##@ Checking
 

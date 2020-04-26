@@ -1,6 +1,9 @@
 version: "3"
 services:
-  # jobs
+  #
+  # Jobs
+  #
+
   build-x86_64-unknown-linux-musl:
     build:
       context: .
@@ -420,7 +423,7 @@ services:
     privileged: true
     command: dpkg-reconfigure qemu-user-binfmt
 
-  test:
+  test-unit:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
@@ -453,10 +456,32 @@ services:
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      - test-runtime-deps
+      - dependencies-all
     network_mode: host
     working_dir: $PWD
     command: cargo test --all --no-default-features --features default-musl,docker,kubernetes --target x86_64-unknown-linux-musl -- --test-threads 4
+
+  test-integration-aws:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+    environment:
+      CARGO_TERM_COLOR: always
+      AWS_ACCESS_KEY_ID: dummy
+      AWS_SECRET_ACCESS_KEY: dummy
+      TEST_LOG: debug
+      RUST_BACKTRACE: full
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - dependencies-aws
+    network_mode: host
+    working_dir: $PWD
+    command: cargo test --all --no-default-features --features default-musl,cloudwatch-logs-integration-tests,cloudwatch-metrics-integration-tests,ec2-metadata-integration-tests,firehose-integration-tests,kinesis-integration-tests,s3-integration-tests --target x86_64-unknown-linux-musl
 
   test-behavior:
     image: ubuntu:18.04
@@ -489,28 +514,88 @@ services:
     working_dir: $PWD
     command: ["sh", "-ec", "./scripts/kubernetes-test.sh"]
 
-  # test dependencies
+  #
+  # Dependencies
+  #
 
-  # dummy service which runs all dependencies
-  test-runtime-deps:
+  dependencies-all:
     image: ubuntu:18.04
     command: sleep infinity
     depends_on:
+      - dependencies-aws
+      - dependencies-clickhouse
+      - dependencies-elasticsearch
+      - dependencies-gcp
+      - dependencies-influxdb
+      - dependencies-kafka
+      - dependencies-loki
+      - dependencies-pulsar
+      - dependencies-splunk
+
+  dependencies-aws:
+    image: ubuntu:18.04
+    command: sleep infinity
+    depends_on:
+      - ec2_metadata
       - localstack
       - minio
       - mockwatchlogs
-      - zookeeper
-      - kafka
-      - splunk
-      - pulsar
+
+  dependencies-clickhouse:
+    image: ubuntu:18.04
+    command: sleep infinity
+    depends_on:
+      - clickhouse
+
+  dependencies-elasticsearch:
+    image: ubuntu:18.04
+    command: sleep infinity
+    depends_on:
       - elasticsearch
       - elasticsearch-tls
-      - clickhouse
-      - ec2_metadata
+      - localstack
+
+  dependencies-gcp:
+    image: ubuntu:18.04
+    command: sleep infinity
+    depends_on:
       - gcloud-pubsub
-      - loki
+
+  dependencies-influxdb:
+    image: ubuntu:18.04
+    command: sleep infinity
+    depends_on:
       - influxdb_v1
       - influxdb_v2
+
+  dependencies-kafka:
+    image: ubuntu:18.04
+    command: sleep infinity
+    depends_on:
+      - kafka
+      - zookeeper
+
+  dependencies-loki:
+    image: ubuntu:18.04
+    command: sleep infinity
+    depends_on:
+      - loki
+
+  dependencies-pulsar:
+    image: ubuntu:18.04
+    command: sleep infinity
+    depends_on:
+      - pulsar
+
+  dependencies-splunk:
+    image: ubuntu:18.04
+    command: sleep infinity
+    depends_on:
+      - splunk
+
+  #
+  # Services
+  #
 
   localstack:
     image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
