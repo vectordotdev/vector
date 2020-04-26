@@ -1,6 +1,8 @@
 .PHONY: help
 .DEFAULT_GOAL := help
-RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/../scripts/docker-compose-run.sh)
+RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/../scripts/run2.sh)
+
+export USE_CONTAINER ?= docker
 
 help:
 	@echo "                                      __   __  __"
