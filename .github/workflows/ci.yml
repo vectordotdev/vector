@@ -89,17 +89,10 @@ jobs:
 
   test-integration-aws:
     runs-on: ubuntu-latest
-    env:
-      RUST_BACKTRACE: full
-      TEST_LOG: debug
-      AWS_ACCESS_KEY_ID: fake-aws-key
-      AWS_SECRET_ACCESS_KEY: fake-aws-key
-      TARGET: x86_64-unknown-linux-gnu
-      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
-      - run: make test-integration-aws
+      - run: cd tests && make test-integration-aws
 
   test-integration-clickhouse:
     runs-on: ubuntu-latest
