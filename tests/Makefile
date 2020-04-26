@@ -132,7 +132,7 @@ build-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## buil
 build-archive-armv7-unknown-linux-musleabihf: build-armv7-unknown-linux-musleabihf ## build the armv7 archive
 	$(RUN) build-archive-armv7-unknown-linux-musleabihf
 
-build-archive-aarch6-unknown-linux-musl: build-aarch64-unknown-linux-musl ## build the aarch64 archive
+build-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## build the aarch64 archive
 	$(RUN) build-archive-aarch64-unknown-linux-musl
 
 package-deb: ## build the x86_64 deb package
