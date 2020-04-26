@@ -8,4 +8,4 @@
 
 set -euo pipefail
 
-cargo test --no-default-features --target ${TARGET}
+cargo test --all --no-default-features --target ${TARGET}
