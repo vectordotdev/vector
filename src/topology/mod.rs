@@ -49,12 +49,14 @@ pub fn start(
     rt: &mut runtime::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
-    validate(&config, rt.executor())
-        .and_then(|pieces| start_validated(config, pieces, rt, require_healthy))
+    let diff = ConfigDiff::inital(&config);
+    validate(&config, &diff, rt.executor())
+        .and_then(|pieces| start_validated(config, diff, pieces, rt, require_healthy))
 }
 
 pub fn start_validated(
     config: Config,
+    diff: ConfigDiff,
     mut pieces: Pieces,
     rt: &mut runtime::Runtime,
     require_healthy: bool,
@@ -71,8 +73,6 @@ pub fn start_validated(
         abort_tx,
     };
 
-    let diff = ConfigDiff::new(&running_topology.config, &config);
-
     if !running_topology.run_healthchecks(&diff, &mut pieces, rt, require_healthy) {
         return None;
     }
@@ -82,8 +82,8 @@ pub fn start_validated(
     Some((running_topology, abort_rx))
 }
 
-pub fn validate(config: &Config, exec: runtime::TaskExecutor) -> Option<Pieces> {
-    match builder::build_pieces(config, exec) {
+pub fn validate(config: &Config, diff: &ConfigDiff, exec: runtime::TaskExecutor) -> Option<Pieces> {
+    match builder::build_pieces(config, diff, exec) {
         Err(errors) => {
             for error in errors {
                 error!("Configuration error: {}", error);
@@ -95,23 +95,6 @@ pub fn validate(config: &Config, exec: runtime::TaskExecutor) -> Option<Pieces> 
                 warn!("Configuration warning: {}", warning);
             }
             Some(new_pieces)
-        }
-    }
-}
-
-pub fn check(config: &Config) -> bool {
-    match builder::check(config) {
-        Err(errors) => {
-            for error in errors {
-                error!("Configuration error: {}", error);
-            }
-            false
-        }
-        Ok(warnings) => {
-            for warning in warnings {
-                warn!("Configuration warning: {}", warning);
-            }
-            true
         }
     }
 }
@@ -226,39 +209,41 @@ impl RunningTopology {
             return false;
         }
 
-        if check(&new_config) {
-            let diff = ConfigDiff::new(&self.config, &new_config);
-
-            // Checks passed so let's shutdown the difference.
-            self.shutdown_diff(&diff, rt);
-
-            // Now let's actually build the new pieces.
-            if let Some(mut new_pieces) = validate(&new_config, rt.executor()) {
-                if self.run_healthchecks(&diff, &mut new_pieces, rt, require_healthy) {
-                    self.start_diff(&diff, new_pieces, rt);
-                    self.config = new_config;
-                    // We have succesfully changed to new config.
-                    return true;
-                }
+        if let Err(errors) = builder::check(&new_config) {
+            for error in errors {
+                error!("Configuration error: {}", error);
             }
-
-            // We need to rebuild the removed.
-            let mut diff = diff;
-            diff.flip();
-            if let Some(mut new_pieces) = validate(&self.config, rt.executor()) {
-                if self.run_healthchecks(&diff, &mut new_pieces, rt, require_healthy) {
-                    self.start_diff(&diff, new_pieces, rt);
-                    // We have succesfully returned to old config.
-                    return false;
-                }
-            }
-
-            // We failed in rebuilding old state.
-            // We should exit the program.
-            unimplemented!();
+            return false;
         }
 
-        false
+        let diff = ConfigDiff::new(&self.config, &new_config);
+
+        // Checks passed so let's shutdown the difference.
+        self.shutdown_diff(&diff, rt);
+
+        // Now let's actually build the new pieces.
+        if let Some(mut new_pieces) = validate(&new_config, &diff, rt.executor()) {
+            if self.run_healthchecks(&diff, &mut new_pieces, rt, require_healthy) {
+                self.start_diff(&diff, new_pieces, rt);
+                self.config = new_config;
+                // We have succesfully changed to new config.
+                return true;
+            }
+        }
+
+        // We need to rebuild the removed.
+        info!("Rebuilding old configuration.");
+        let diff = diff.flip();
+        if let Some(mut new_pieces) = validate(&self.config, &diff, rt.executor()) {
+            if self.run_healthchecks(&diff, &mut new_pieces, rt, require_healthy) {
+                self.start_diff(&diff, new_pieces, rt);
+                // We have succesfully returned to old config.
+                return false;
+            }
+        }
+        // We failed in rebuilding the old state.
+        // We should exit the program.
+        unimplemented!();
     }
 
     fn run_healthchecks(
@@ -581,13 +566,17 @@ impl RunningTopology {
     }
 }
 
-struct ConfigDiff {
+pub struct ConfigDiff {
     sources: Difference,
     transforms: Difference,
     sinks: Difference,
 }
 
 impl ConfigDiff {
+    pub fn inital(initial: &Config) -> Self {
+        Self::new(&Config::empty(), initial)
+    }
+
     fn new(old: &Config, new: &Config) -> Self {
         ConfigDiff {
             sources: Difference::new(&old.sources, &new.sources),
@@ -597,10 +586,11 @@ impl ConfigDiff {
     }
 
     /// Swaps removed with added in Differences.
-    fn flip(&mut self) {
+    fn flip(mut self) -> Self {
         self.sources.flip();
         self.transforms.flip();
         self.sinks.flip();
+        self
     }
 }
 
@@ -639,6 +629,11 @@ impl Difference {
             to_change,
             to_add,
         }
+    }
+
+    /// True if name is present in new config and either not in the old one or is different.
+    fn contains_new(&self, name: &str) -> bool {
+        self.to_add.contains(name) || self.to_change.contains(name)
     }
 
     fn flip(&mut self) {

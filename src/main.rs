@@ -275,7 +275,8 @@ fn main() {
         info!("Dry run enabled, exiting after config validation.");
     }
 
-    let pieces = topology::validate(&config, rt.executor()).unwrap_or_else(|| {
+    let diff = topology::ConfigDiff::inital(&config);
+    let pieces = topology::validate(&config, &diff, rt.executor()).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 
@@ -284,7 +285,7 @@ fn main() {
         std::process::exit(exitcode::OK);
     }
 
-    let result = topology::start_validated(config, pieces, &mut rt, opts.require_healthy);
+    let result = topology::start_validated(config, diff, pieces, &mut rt, opts.require_healthy);
     let (topology, mut graceful_crash) = result.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
