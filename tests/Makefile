@@ -45,7 +45,7 @@ test: test-behavior test-integration test-unit ## Runs all tests, unit, bheavior
 test-behavior: build ## Runs behaviorial tests
 	$(RUN) test-behavior
 
-test-integration: build ## Runs all integration tests
+test-integration: ## Runs all integration tests
 	$(RUN) test-integration
 
 test-integration-aws: ## Runs Clickhouse integration tests
@@ -81,7 +81,7 @@ test-integration-splunk: ## Runs Kafka integration tests
 test-integration-kubernetes: build-x86_64-unknown-linux-musl ## Runs Kubernetes integration tests
 	$(RUN) test-integration-kubernetes
 
-test-unit: build ## Runs unit tests, tests which do not require additional services to be present
+test-unit: ## Runs unit tests, tests which do not require additional services to be present
 	$(RUN) test-unit
 
 ##@ Checking
