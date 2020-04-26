@@ -71,11 +71,14 @@ pub fn start_validated(
         abort_tx,
     };
 
-    if !running_topology.run_healthchecks(&config, &mut pieces, rt, require_healthy) {
+    let diff = ConfigDiff::new(&running_topology.config, &config);
+
+    if !running_topology.run_healthchecks(&diff, &mut pieces, rt, require_healthy) {
         return None;
     }
+    running_topology.start_diff(&diff, pieces, rt);
+    running_topology.config = config;
 
-    running_topology.spawn_all(config, pieces, rt);
     Some((running_topology, abort_rx))
 }
 
@@ -92,6 +95,23 @@ pub fn validate(config: &Config, exec: runtime::TaskExecutor) -> Option<Pieces> 
                 warn!("Configuration warning: {}", warning);
             }
             Some(new_pieces)
+        }
+    }
+}
+
+pub fn check(config: &Config) -> bool {
+    match builder::check(config) {
+        Err(errors) => {
+            for error in errors {
+                error!("Configuration error: {}", error);
+            }
+            false
+        }
+        Ok(warnings) => {
+            for warning in warnings {
+                warn!("Configuration warning: {}", warning);
+            }
+            true
         }
     }
 }
@@ -206,31 +226,49 @@ impl RunningTopology {
             return false;
         }
 
-        match validate(&new_config, rt.executor()) {
-            Some(mut new_pieces) => {
-                if !self.run_healthchecks(&new_config, &mut new_pieces, rt, require_healthy) {
-                    return false;
-                }
+        if check(&new_config) {
+            let diff = ConfigDiff::new(&self.config, &new_config);
 
-                self.spawn_all(new_config, new_pieces, rt);
-                true
+            // Checks passed so let's shutdown the difference.
+            self.shutdown_diff(&diff, rt);
+
+            // Now let's actually build the new pieces.
+            if let Some(mut new_pieces) = validate(&new_config, rt.executor()) {
+                if self.run_healthchecks(&diff, &mut new_pieces, rt, require_healthy) {
+                    self.start_diff(&diff, new_pieces, rt);
+                    self.config = new_config;
+                    // We have succesfully changed to new config.
+                    return true;
+                }
             }
 
-            None => false,
+            // We need to rebuild the removed.
+            let mut diff = diff;
+            diff.flip();
+            if let Some(mut new_pieces) = validate(&self.config, rt.executor()) {
+                if self.run_healthchecks(&diff, &mut new_pieces, rt, require_healthy) {
+                    self.start_diff(&diff, new_pieces, rt);
+                    // We have succesfully returned to old config.
+                    return false;
+                }
+            }
+
+            // We failed in rebuilding old state.
+            // We should exit the program.
+            unimplemented!();
         }
+
+        false
     }
 
     fn run_healthchecks(
         &mut self,
-        new_config: &Config,
+        diff: &ConfigDiff,
         pieces: &mut Pieces,
         rt: &mut runtime::Runtime,
         require_healthy: bool,
     ) -> bool {
-        let (_, sinks_to_change, sinks_to_add) =
-            to_remove_change_add(&self.config.sinks, &new_config.sinks);
-
-        let healthchecks = (&sinks_to_change | &sinks_to_add)
+        let healthchecks = (&diff.sinks.to_change | &diff.sinks.to_add)
             .into_iter()
             .map(|name| pieces.healthchecks.remove(&name).unwrap())
             .collect::<Vec<_>>();
@@ -256,10 +294,9 @@ impl RunningTopology {
         }
     }
 
-    fn spawn_all(&mut self, new_config: Config, mut new_pieces: Pieces, rt: &mut runtime::Runtime) {
+    /// Shutdowns removed and replaced pieces of topology.
+    fn shutdown_diff(&mut self, diff: &ConfigDiff, rt: &mut runtime::Runtime) {
         // Sources
-        let (sources_to_remove, sources_to_change, sources_to_add) =
-            to_remove_change_add(&self.config.sources, &new_config.sources);
 
         // First pass to tell the sources to shut down.
         let mut source_shutdown_complete_futures = Vec::new();
@@ -268,12 +305,12 @@ impl RunningTopology {
 
         // Only log that we are waiting for shutdown if we are actually removing
         // sources.
-        if !sources_to_remove.is_empty() {
+        if !diff.sources.to_remove.is_empty() {
             info!("Waiting for up to 3 seconds for sources to finish shutting down");
         }
 
         let deadline = Instant::now() + Duration::from_secs(3);
-        for name in &sources_to_remove {
+        for name in &diff.sources.to_remove {
             info!("Removing source {:?}", name);
 
             self.tasks.remove(name).unwrap().forget();
@@ -282,9 +319,7 @@ impl RunningTopology {
             source_shutdown_complete_futures
                 .push(self.shutdown_coordinator.shutdown_source(name, deadline));
         }
-        for name in &sources_to_change {
-            info!("Rebuilding source {:?}", name);
-
+        for name in &diff.sources.to_change {
             self.remove_outputs(name);
             source_shutdown_complete_futures
                 .push(self.shutdown_coordinator.shutdown_source(name, deadline));
@@ -300,18 +335,45 @@ impl RunningTopology {
         rt.block_on(future::join_all(source_shutdown_complete_futures))
             .unwrap();
 
-        // Second pass now that all sources have shut down for final cleanup and spawning
-        // new versions of sources as needed.
-        for name in &sources_to_remove {
+        // Second pass now that all sources have shut down for final cleanup.
+        for name in &diff.sources.to_remove {
             self.source_tasks.remove(name).wait().unwrap();
         }
-        for name in &sources_to_change {
+        for name in &diff.sources.to_change {
             self.source_tasks.remove(name).wait().unwrap();
+        }
+
+        // Transforms
+        for name in &diff.transforms.to_remove {
+            info!("Removing transform {:?}", name);
+
+            self.tasks.remove(name).unwrap().forget();
+
+            self.remove_inputs(&name);
+            self.remove_outputs(&name);
+        }
+
+        // Sinks
+        for name in &diff.sinks.to_remove {
+            info!("Removing sink {:?}", name);
+
+            self.tasks.remove(name).unwrap().forget();
+
+            self.remove_inputs(&name);
+        }
+    }
+
+    /// Starts new and replacing pieces of topology.
+    fn start_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces, rt: &mut runtime::Runtime) {
+        // Sources
+        for name in &diff.sources.to_change {
+            info!("Rebuilding source {:?}", name);
+
             self.setup_outputs(name, &mut new_pieces);
             self.spawn_source(name, &mut new_pieces, rt);
         }
 
-        for name in sources_to_add {
+        for name in &diff.sources.to_add {
             info!("Starting source {:?}", name);
 
             self.setup_outputs(&name, &mut new_pieces);
@@ -319,35 +381,24 @@ impl RunningTopology {
         }
 
         // Transforms
-        let (transforms_to_remove, transforms_to_change, transforms_to_add) =
-            to_remove_change_add(&self.config.transforms, &new_config.transforms);
-
-        for name in transforms_to_remove {
-            info!("Removing transform {:?}", name);
-
-            self.tasks.remove(&name).unwrap().forget();
-
-            self.remove_inputs(&name);
-            self.remove_outputs(&name);
-        }
 
         // Make sure all transform outputs are set up before another transform might try use
         // it as an input
-        for name in &transforms_to_change {
+        for name in &diff.transforms.to_change {
             self.setup_outputs(&name, &mut new_pieces);
         }
-        for name in &transforms_to_add {
+        for name in &diff.transforms.to_add {
             self.setup_outputs(&name, &mut new_pieces);
         }
 
-        for name in transforms_to_change {
+        for name in &diff.transforms.to_change {
             info!("Rebuilding transform {:?}", name);
 
             self.replace_inputs(&name, &mut new_pieces);
             self.spawn_transform(&name, &mut new_pieces, rt);
         }
 
-        for name in transforms_to_add {
+        for name in &diff.transforms.to_add {
             info!("Starting transform {:?}", name);
 
             self.setup_inputs(&name, &mut new_pieces);
@@ -355,32 +406,19 @@ impl RunningTopology {
         }
 
         // Sinks
-        let (sinks_to_remove, sinks_to_change, sinks_to_add) =
-            to_remove_change_add(&self.config.sinks, &new_config.sinks);
-
-        for name in sinks_to_remove {
-            info!("Removing sink {:?}", name);
-
-            self.tasks.remove(&name).unwrap().forget();
-
-            self.remove_inputs(&name);
-        }
-
-        for name in sinks_to_change {
+        for name in &diff.sinks.to_change {
             info!("Rebuilding sink {:?}", name);
 
             self.spawn_sink(&name, &mut new_pieces, rt);
             self.replace_inputs(&name, &mut new_pieces);
         }
 
-        for name in sinks_to_add {
+        for name in &diff.sinks.to_add {
             info!("Starting sink {:?}", name);
 
             self.setup_inputs(&name, &mut new_pieces);
             self.spawn_sink(&name, &mut new_pieces, rt);
         }
-
-        self.config = new_config;
     }
 
     fn spawn_sink(
@@ -543,33 +581,69 @@ impl RunningTopology {
     }
 }
 
-fn to_remove_change_add<C>(
-    old: &IndexMap<String, C>,
-    new: &IndexMap<String, C>,
-) -> (HashSet<String>, HashSet<String>, HashSet<String>)
-where
-    C: serde::Serialize + serde::Deserialize<'static>,
-{
-    let old_names = old.keys().cloned().collect::<HashSet<_>>();
-    let new_names = new.keys().cloned().collect::<HashSet<_>>();
+struct ConfigDiff {
+    sources: Difference,
+    transforms: Difference,
+    sinks: Difference,
+}
 
-    let to_change = old_names
-        .intersection(&new_names)
-        .filter(|&n| {
-            // This is a hack around the issue of comparing two
-            // trait objects. Json is used here over toml since
-            // toml does not support serializing `None`.
-            let old_json = serde_json::to_vec(&old[n]).unwrap();
-            let new_json = serde_json::to_vec(&new[n]).unwrap();
-            old_json != new_json
-        })
-        .cloned()
-        .collect::<HashSet<_>>();
+impl ConfigDiff {
+    fn new(old: &Config, new: &Config) -> Self {
+        ConfigDiff {
+            sources: Difference::new(&old.sources, &new.sources),
+            transforms: Difference::new(&old.transforms, &new.transforms),
+            sinks: Difference::new(&old.sinks, &new.sinks),
+        }
+    }
 
-    let to_remove = &old_names - &new_names;
-    let to_add = &new_names - &old_names;
+    /// Swaps removed with added in Differences.
+    fn flip(&mut self) {
+        self.sources.flip();
+        self.transforms.flip();
+        self.sinks.flip();
+    }
+}
 
-    (to_remove, to_change, to_add)
+struct Difference {
+    to_remove: HashSet<String>,
+    to_change: HashSet<String>,
+    to_add: HashSet<String>,
+}
+
+impl Difference {
+    fn new<C>(old: &IndexMap<String, C>, new: &IndexMap<String, C>) -> Self
+    where
+        C: serde::Serialize + serde::Deserialize<'static>,
+    {
+        let old_names = old.keys().cloned().collect::<HashSet<_>>();
+        let new_names = new.keys().cloned().collect::<HashSet<_>>();
+
+        let to_change = old_names
+            .intersection(&new_names)
+            .filter(|&n| {
+                // This is a hack around the issue of comparing two
+                // trait objects. Json is used here over toml since
+                // toml does not support serializing `None`.
+                let old_json = serde_json::to_vec(&old[n]).unwrap();
+                let new_json = serde_json::to_vec(&new[n]).unwrap();
+                old_json != new_json
+            })
+            .cloned()
+            .collect::<HashSet<_>>();
+
+        let to_remove = &old_names - &new_names;
+        let to_add = &new_names - &old_names;
+
+        Self {
+            to_remove,
+            to_change,
+            to_add,
+        }
+    }
+
+    fn flip(&mut self) {
+        std::mem::swap(&mut self.to_remove, &mut self.to_add);
+    }
 }
 
 fn handle_errors(
