@@ -275,7 +275,7 @@ fn main() {
         info!("Dry run enabled, exiting after config validation.");
     }
 
-    let diff = topology::ConfigDiff::inital(&config);
+    let diff = topology::ConfigDiff::initial(&config);
     let pieces = topology::validate(&config, &diff, rt.executor()).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });

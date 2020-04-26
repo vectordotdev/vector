@@ -49,7 +49,7 @@ pub fn start(
     rt: &mut runtime::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
-    let diff = ConfigDiff::inital(&config);
+    let diff = ConfigDiff::initial(&config);
     validate(&config, &diff, rt.executor())
         .and_then(|pieces| start_validated(config, diff, pieces, rt, require_healthy))
 }
@@ -576,7 +576,7 @@ pub struct ConfigDiff {
 }
 
 impl ConfigDiff {
-    pub fn inital(initial: &Config) -> Self {
+    pub fn initial(initial: &Config) -> Self {
         Self::new(&Config::empty(), initial)
     }
 
