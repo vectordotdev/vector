@@ -91,10 +91,10 @@ package-all: build-archive-all package-deb-all package-rpm-all ## package everyt
 
 build-archive: build-archive-x86_64-unknown-linux-musl ## default target, build the x86_64 archives
 
-build-archive-all: build-archive-x86_64-x86_64-unknown-linux-musl build-archive-armv7-unknown-linux-musleabihf build-archive-aarch64-unknown-linux-musl ## build all archives
+build-archive-all: build-archive-x86_64-unknown-linux-musl build-archive-armv7-unknown-linux-musleabihf build-archive-aarch64-unknown-linux-musl ## build all archives
 
-build-archive-x86_64-unknown-linux-musl: build-x86_64-x86_64-unknown-linux-musl ## build the x86_64 archive
-	$(RUN) build-archive-x86_64-x86_64-unknown-linux-musl
+build-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## build the x86_64 archive
+	$(RUN) build-archive-x86_64-unknown-linux-musl
 
 build-archive-armv7-unknown-linux-musleabihf: build-armv7-unknown-linux-musleabihf ## build the armv7 archive
 	$(RUN) build-archive-armv7-unknown-linux-musleabihf
