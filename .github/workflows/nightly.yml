@@ -2,7 +2,9 @@ name: nightly
 
 on:
   schedule:
-    - cron:  "0 14 * * *"
+    - cron: "0 14 * * *"
+
+  pull_request: {}
 
 env:
   CHANNEL: nightly
@@ -13,10 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: "Build archive and package"
-        run: |
-          ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive package-deb
         env:
           PASS_FEATURES: "default-musl"
+        run: cd tests && make package-deb-x86_64
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-x86_64-unknown-linux-musl.tar.gz"
@@ -31,11 +32,10 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: "Build archive and package"
-        run: |
-          ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build-archive package-deb
         env:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default-musl"
+        run: cd tests && make package-deb-aarch64
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-aarch64-unknown-linux-musl.tar.gz"
@@ -50,11 +50,10 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: "Build archive and package"
-        run: |
-          ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build-archive package-deb
         env:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default-musl"
+        run: cd tests && make package-deb-armv7
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-armv7-unknown-linux-musleabihf.tar.gz"
@@ -69,11 +68,12 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: "Build archive"
-        run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          make build-archive
         env:
           TARGET: "x86_64-apple-darwin"
+          USE_CONTAINER: none
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cd tests && make build-archive
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-x86_64-apple-darwin.tar.gz"
@@ -85,12 +85,12 @@ jobs:
       - uses: actions/checkout@v1
       - name: "Download Perl"
         shell: bash
-        run: |
-          curl -sSf http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
-          echo "$SHA256SUM perl-installer.msi" | sha256sum --check --status
         env:
           VERSION: "5.30.0.1"
           SHA256SUM: "459de13a284a4c83213208c9caa1c372c81136b6e863a3f13d42f631048e0b12" # we need to verify checksum because strawberryperl.com doesn't support HTTPS
+        run: |
+          curl -sSf http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
+          echo "$SHA256SUM perl-installer.msi" | sha256sum --check --status
       - name: "Install Perl"
         shell: cmd # msiexec fails when called from bash
         run: |
@@ -98,10 +98,10 @@ jobs:
           del perl-installer.msi
       - name: "Download CMake"
         shell: bash
-        run: |
-          curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
         env:
           VERSION: "3.15.5"
+        run: |
+          curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
       - name: "Install CMake"
         shell: cmd # msiexec fails when called from bash
         run: |
@@ -117,6 +117,8 @@ jobs:
           rm wix-binaries.zip
       - name: "Build archive"
         shell: bash
+        env:
+          USE_CONTAINER: none
         run: |
           export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
           export RUSTFLAGS=-Ctarget-feature=+crt-static
@@ -125,9 +127,7 @@ jobs:
           export STRIP="false"
           export RUST_LTO=""
           export TARGET="x86_64-pc-windows-msvc"
-
-          ./scripts/build-archive.sh
-          ls -lha target/artifacts
+          cd tests && make build-archive
       - name: "Build package"
         shell: bash
         run: |
@@ -174,14 +174,15 @@ jobs:
         with:
           name: vector-armhf.deb
           path: target/artifacts
-      - run: |
+      - env:
+          DOCKER_USERNAME: "${{ secrets.CI_DOCKER_USERNAME }}"
+          DOCKER_PASSWORD: "${{ secrets.CI_DOCKER_PASSWORD }}"
+          PLATFORM: "linux/amd64,linux/arm64,linux/arm"
+        run: |
           ./scripts/upgrade-docker.sh
+          cd tests
           export VERSION=$(make version)
           make release-docker
-        env:
-          DOCKER_USERNAME: '${{ secrets.CI_DOCKER_USERNAME }}'
-          DOCKER_PASSWORD: '${{ secrets.CI_DOCKER_PASSWORD }}'
-          PLATFORM: "linux/amd64,linux/arm64,linux/arm"
 
   release-s3:
     runs-on: ubuntu-latest
@@ -229,7 +230,7 @@ jobs:
         with:
           name: vector-x64.msi
           path: target/artifacts
-      - run: make release-s3
-        env:
-          AWS_ACCESS_KEY_ID: '${{ secrets.CI_AWS_ACCESS_KEY_ID }}'
-          AWS_SECRET_ACCESS_KEY: '${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}'
+      - env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
+        run: cd tests && make release-s3
