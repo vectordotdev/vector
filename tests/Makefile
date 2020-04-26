@@ -20,18 +20,18 @@ all: check build-all package-all test-docker test-behavior verify ## run all tes
 
 ##@ Building
 
-build: build-x86_64 ## default target, build the project in debug mode
+build: build-x86_64-unknown-linux-musl ## default target, build the project in debug mode
 
-build-all: build-x86_64 build-armv7 build-aarch64 ## build the project in debug mode for all platforms
+build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## build the project in debug mode for all platforms
 
-build-x86_64: ## build the project for the x86_64 architecture
-	$(RUN) build-x86_64
+build-x86_64-unknown-linux-musl: ## build the project for the x86_64 architecture
+	$(RUN) build-x86_64-unknown-linux-musl
 
-build-armv7: load-qemu-binfmt ## build the project for the armv7 architecture
-	$(RUN) build-armv7
+build-armv7-unknown-linux-musleabihf: load-qemu-binfmt ## build the project for the armv7 architecture
+	$(RUN) build-armv7-unknown-linux-musleabihf
 
-build-aarch64: load-qemu-binfmt ## build the project for the aarch64 architecture
-	$(RUN) build-aarch64
+build-aarch64-unknown-linux-musl: load-qemu-binfmt ## build the project for the aarch64 architecture
+	$(RUN) build-aarch64-unknown-linux-musl
 
 ##@ Developing
 
@@ -44,10 +44,10 @@ test: build ## run tests which do not require additional services to be present
 test-behavior: build ## run behaviorial tests
 	$(RUN) test-behavior
 
-test-docker: build ## run tests which use Docker
-	$(RUN) test-docker
+test-integration: build ## run tests which use Docker
+	$(RUN) test-integration
 
-test-kubernetes: build-x86_64 ## run tests for Kubernetes
+test-kubernetes: build-x86_64-unknown-linux-musl ## run tests for Kubernetes
 	$(RUN) test-kubernetes
 
 ##@ Checking
@@ -89,18 +89,18 @@ package: build-archive package-deb package-rpm ## default target, package x86_84
 
 package-all: build-archive-all package-deb-all package-rpm-all ## package everything
 
-build-archive: build-archive-x86_64 ## default target, build the x86_64 archives
+build-archive: build-archive-x86_64-unknown-linux-musl ## default target, build the x86_64 archives
 
-build-archive-all: build-archive-x86_64 build-archive-armv7 build-archive-aarch64 ## build all archives
+build-archive-all: build-archive-x86_64-unknown-linux-musl build-archive-armv7-unknown-linux-musleabihf build-archive-aarch64-unknown-linux-musl ## build all archives
 
-build-archive-x86_64: build-x86_64 ## build the x86_64 archive
-	$(RUN) build-archive-x86_64
+build-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## build the x86_64 archive
+	$(RUN) build-archive-x86_64-unknown-linux-musl
 
-build-archive-armv7: build-armv7 ## build the armv7 archive
-	$(RUN) build-archive-armv7
+build-archive-armv7-unknown-linux-musleabihf: build-armv7-unknown-linux-musleabihf ## build the armv7 archive
+	$(RUN) build-archive-armv7-unknown-linux-musleabihf
 
-build-archive-aarch64: build-aarch64 ## build the aarch64 archive
-	$(RUN) build-archive-aarch64
+build-archive-aarch6-unknown-linux-musl: build-aarch64-unknown-linux-musl ## build the aarch64 archive
+	$(RUN) build-archive-aarch64-unknown-linux-musl
 
 package-deb: package-deb-x86_64 ## default target, build the x86_64 deb package
 

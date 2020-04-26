@@ -1,604 +1,628 @@
 version: "3"
 services:
-    # jobs
-    build-x86_64:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
-      environment:
-        CARGO_TERM_COLOR: always
-      volumes:
-        - $PWD:$PWD
-        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
-      working_dir: $PWD
-      command: cargo build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
+  # jobs
+  build-x86_64-unknown-linux-musl:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+    environment:
+      CARGO_TERM_COLOR: always
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    command: cargo build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
-    build-armv7:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
-      environment:
-        CARGO_TERM_COLOR: always
-      volumes:
-        - $PWD:$PWD
-        - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
-        - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
-        - ./target/armv7-unknown-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
-      working_dir: $PWD
-      command: cargo build --no-default-features --features default-musl --target armv7-unknown-linux-musleabihf
+  build-armv7-unknown-linux-musleabihf:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
+    environment:
+      CARGO_TERM_COLOR: always
+    volumes:
+      - $PWD:$PWD
+      - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
+      - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
+      - ./target/armv7-unknown-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    command: cargo build --no-default-features --features default-musl --target armv7-unknown-linux-musleabihf
 
-    build-aarch64:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
-      environment:
-        CARGO_TERM_COLOR: always
-      volumes:
-        - $PWD:$PWD
-        - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-        - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-        - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
-      working_dir: $PWD
-      command: cargo build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
+  build-aarch64-unknown-linux-musl:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
+    environment:
+      CARGO_TERM_COLOR: always
+    volumes:
+      - $PWD:$PWD
+      - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    command: cargo build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
 
-    bench:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
-      environment:
-        CARGO_TERM_COLOR: always
-      volumes:
-        - $PWD:$PWD
-        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
-      working_dir: $PWD
-      command: cargo bench --all --no-default-features --features default-musl --target x86_64-unknown-linux-musl
+  bench:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+    environment:
+      CARGO_TERM_COLOR: always
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    command: cargo bench --all --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
-    generate:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/checker/Dockerfile
-      environment:
-        CHECK_URLS: "false"
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      user: $USER
-      command: ./scripts/generate.rb
+  generate:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/checker/Dockerfile
+    environment:
+      CHECK_URLS: "false"
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: ./scripts/generate.rb
 
-    check-code:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/checker/Dockerfile
-      environment:
-        RUSTFLAGS: "-D warnings"
-        CARGO_TERM_COLOR: always
-      volumes:
-        - $PWD:$PWD
-        - ./target/cargo/registry:/root/.cargo/registry
-        - ./target/cargo/git:/root/.cargo/git
-        - ./target/rustup/tmp:/root/.rustup/tmp
-      working_dir: $PWD
-      command: cargo check --all --all-targets
+  check-code:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/checker/Dockerfile
+    environment:
+      RUSTFLAGS: "-D warnings"
+      CARGO_TERM_COLOR: always
+    volumes:
+      - $PWD:$PWD
+      - ./target/cargo/registry:/root/.cargo/registry
+      - ./target/cargo/git:/root/.cargo/git
+      - ./target/rustup/tmp:/root/.rustup/tmp
+    working_dir: $PWD
+    command: cargo check --all --all-targets
 
-    check-component-features:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/checker-component-features/Dockerfile
-      environment:
-        RUSTFLAGS: "-D warnings"
-        CARGO_TERM_COLOR: always
-      volumes:
-        - $PWD:$PWD
-        - ./target/cargo/registry:/root/.cargo/registry
-        - ./target/cargo/git:/root/.cargo/git
-        - ./target/rustup/tmp:/root/.rustup/tmp
-      working_dir: $PWD
-      command: ./scripts/check-component-features.sh
+  check-component-features:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/checker-component-features/Dockerfile
+    environment:
+      RUSTFLAGS: "-D warnings"
+      CARGO_TERM_COLOR: always
+    volumes:
+      - $PWD:$PWD
+      - ./target/cargo/registry:/root/.cargo/registry
+      - ./target/cargo/git:/root/.cargo/git
+      - ./target/rustup/tmp:/root/.rustup/tmp
+    working_dir: $PWD
+    command: ./scripts/check-component-features.sh
 
-    check-fmt:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/checker/Dockerfile
-      environment:
-        CARGO_TERM_COLOR: always
-      volumes:
-        - $PWD:$PWD
-        - ./target/cargo/registry:/root/.cargo/registry
-        - ./target/cargo/git:/root/.cargo/git
-        - ./target/rustup/tmp:/root/.rustup/tmp
-      working_dir: $PWD
-      command: cargo fmt -- --check
+  check-fmt:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/checker/Dockerfile
+    environment:
+      CARGO_TERM_COLOR: always
+    volumes:
+      - $PWD:$PWD
+      - ./target/cargo/registry:/root/.cargo/registry
+      - ./target/cargo/git:/root/.cargo/git
+      - ./target/rustup/tmp:/root/.rustup/tmp
+    working_dir: $PWD
+    command: cargo fmt -- --check
 
-    check-style:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/checker/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      user: $USER
-      command: ./scripts/check-style.sh
+  check-style:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/checker/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: ./scripts/check-style.sh
 
-    check-markdown:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/checker-markdown/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      user: $USER
-      command: markdownlint .
+  check-markdown:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/checker-markdown/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: markdownlint .
 
-    check-generate:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/checker/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      user: $USER
-      command: ./scripts/check-generate.sh
+  check-generate:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/checker/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: ./scripts/check-generate.sh
 
-    check-version:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/checker/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      user: $USER
-      command: ./scripts/check-version.rb
+  check-version:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/checker/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: ./scripts/check-version.rb
 
-    check-examples:
-      image: ubuntu:18.04
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      user: $USER
-      command: ["sh", "-ec", "./target/x86_64-unknown-linux-musl/debug/vector validate --topology --deny-warnings ./config/examples/*.toml"]
+  check-examples:
+    image: ubuntu:18.04
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command:
+      [
+        "sh",
+        "-ec",
+        "./target/x86_64-unknown-linux-musl/debug/vector validate --topology --deny-warnings ./config/examples/*.toml",
+      ]
 
-    check-blog:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/checker/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ./scripts/check-blog-signatures.rb
+  check-blog:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/checker/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: ./scripts/check-blog-signatures.rb
 
-    build-archive-x86_64:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
-      environment:
-        TARGET: x86_64-unknown-linux-musl
-        FEATURES: default-musl
-        CARGO_TERM_COLOR: always
-      volumes:
-        - $PWD:$PWD
-        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
-      working_dir: $PWD
-      command: ./scripts/build-archive.sh
+  build-archive-x86_64-unknown-linux-musl:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+    environment:
+      TARGET: x86_64-unknown-linux-musl
+      FEATURES: default-musl
+      CARGO_TERM_COLOR: always
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    command: ./scripts/build-archive.sh
 
-    build-archive-armv7:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
-      environment:
-        TARGET: armv7-unknown-linux-musleabihf
-        FEATURES: default-musl
-        CARGO_TERM_COLOR: always
-      volumes:
-        - $PWD:$PWD
-        - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
-        - ./target/armv7-unknwon-linux-musleabihf/cargo/git:/opt/rust/cargo/git
-        - ./target/armv7-unknwon-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
-      working_dir: $PWD
-      command: ./scripts/build-archive.sh
+  build-archive-armv7-unknown-linux-musleabihf:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
+    environment:
+      TARGET: armv7-unknown-linux-musleabihf
+      FEATURES: default-musl
+      CARGO_TERM_COLOR: always
+    volumes:
+      - $PWD:$PWD
+      - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
+      - ./target/armv7-unknwon-linux-musleabihf/cargo/git:/opt/rust/cargo/git
+      - ./target/armv7-unknwon-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    command: ./scripts/build-archive.sh
 
-    build-archive-aarch64:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
-      environment:
-        TARGET: aarch64-unknown-linux-musl
-        FEATURES: default-musl
-        CARGO_TERM_COLOR: always
-      volumes:
-        - $PWD:$PWD
-        - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-        - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-        - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
-      working_dir: $PWD
-      command: ./scripts/build-archive.sh
+  build-archive-aarch64-unknown-linux-musl:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
+    environment:
+      TARGET: aarch64-unknown-linux-musl
+      FEATURES: default-musl
+      CARGO_TERM_COLOR: always
+    volumes:
+      - $PWD:$PWD
+      - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    command: ./scripts/build-archive.sh
 
-    package-deb-x86_64:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
-      environment:
-        TARGET: x86_64-unknown-linux-musl
-      volumes:
-        - $PWD:$PWD
-        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
-      working_dir: $PWD
-      command: ./scripts/package-deb.sh
+  package-deb-x86_64-unknown-linux-musl:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+    environment:
+      TARGET: x86_64-unknown-linux-musl
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    command: ./scripts/package-deb.sh
 
-    package-deb-armv7:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
-      environment:
-        TARGET: armv7-unknown-linux-musleabihf
-      volumes:
-        - $PWD:$PWD
-        - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
-        - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
-        - ./target/armv7-unknown-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
-      working_dir: $PWD
-      command: ./scripts/package-deb.sh
+  package-deb-armv7-unknown-linux-musleabihf:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
+    environment:
+      TARGET: armv7-unknown-linux-musleabihf
+    volumes:
+      - $PWD:$PWD
+      - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
+      - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
+      - ./target/armv7-unknown-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    command: ./scripts/package-deb.sh
 
-    package-deb-aarch64:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
-      environment:
-        TARGET: aarch64-unknown-linux-musl
-      volumes:
-        - $PWD:$PWD
-        - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-        - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-        - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
-      working_dir: $PWD
-      command: ./scripts/package-deb.sh
+  package-deb-aarch64-aarch64-unknown-linux-musl:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
+    environment:
+      TARGET: aarch64-unknown-linux-musl
+    volumes:
+      - $PWD:$PWD
+      - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    command: ./scripts/package-deb.sh
 
-    package-rpm-x86_64:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
-      environment:
-        TARGET: x86_64-unknown-linux-musl
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ./scripts/package-rpm.sh
+  package-rpm-x86_64:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
+    environment:
+      TARGET: x86_64-unknown-linux-musl
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: ./scripts/package-rpm.sh
 
-    package-rpm-armv7:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
-      environment:
-        TARGET: armv7-unknown-linux-musleabihf
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ./scripts/package-rpm.sh
+  package-rpm-armv7:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
+    environment:
+      TARGET: armv7-unknown-linux-musleabihf
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: ./scripts/package-rpm.sh
 
-    package-rpm-aarch64:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
-      environment:
-        TARGET: aarch64-unknown-linux-musl
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ./scripts/package-rpm.sh
+  package-rpm-aarch64:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
+    environment:
+      TARGET: aarch64-unknown-linux-musl
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: ./scripts/package-rpm.sh
 
-    verify-rpm-amazonlinux-1:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/verifier-amazonlinux-1/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ["sh", "-ec", "rpm -i target/artifacts/*-x86_64.rpm && vector --version"]
+  verify-rpm-amazonlinux-1:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/verifier-amazonlinux-1/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command:
+      ["sh", "-ec", "rpm -i target/artifacts/*-x86_64.rpm && vector --version"]
 
-    verify-rpm-amazonlinux-2:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/verifier-amazonlinux-2/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ["sh", "-ec", "rpm -i target/artifacts/*-x86_64.rpm && vector --version"]
+  verify-rpm-amazonlinux-2:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/verifier-amazonlinux-2/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command:
+      ["sh", "-ec", "rpm -i target/artifacts/*-x86_64.rpm && vector --version"]
 
-    verify-rpm-centos-7:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/verifier-centos-7/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ["sh", "-ec", "rpm -i target/artifacts/*-x86_64.rpm && vector --version"]
+  verify-rpm-centos-7:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/verifier-centos-7/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command:
+      ["sh", "-ec", "rpm -i target/artifacts/*-x86_64.rpm && vector --version"]
 
-    verify-deb-artifact-on-deb-8:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/verifier-deb-8/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
+  verify-deb-artifact-on-deb-8:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/verifier-deb-8/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command:
+      ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
-    verify-deb-artifact-on-deb-9:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/verifier-deb-9/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
+  verify-deb-artifact-on-deb-9:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/verifier-deb-9/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command:
+      ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
-    verify-deb-artifact-on-deb-10:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/verifier-deb-10/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
+  verify-deb-artifact-on-deb-10:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/verifier-deb-10/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command:
+      ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
-    verify-deb-artifact-on-ubuntu-16-04:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/verifier-ubuntu-16-04/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
+  verify-deb-artifact-on-ubuntu-16-04:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/verifier-ubuntu-16-04/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command:
+      ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
-    verify-deb-artifact-on-ubuntu-18-04:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/verifier-ubuntu-18-04/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
+  verify-deb-artifact-on-ubuntu-18-04:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/verifier-ubuntu-18-04/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command:
+      ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
-    verify-deb-artifact-on-ubuntu-19-04:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/verifier-ubuntu-19-04/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
+  verify-deb-artifact-on-ubuntu-19-04:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/verifier-ubuntu-19-04/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command:
+      ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
-    verify-nixos:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/verifier-nixos/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ["sh", "-ec", "./scripts/verify-nix.sh && vector --version"]
+  verify-nixos:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/verifier-nixos/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: ["sh", "-ec", "./scripts/verify-nix.sh && vector --version"]
 
-    target-graph:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/target-graph/Dockerfile
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      entrypoint: ./scripts/target-graph.sh
+  target-graph:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/target-graph/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    entrypoint: ./scripts/target-graph.sh
 
-    clean:
-      image: ubuntu:18.04
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ["sh", "-ec", "rm -rf target"]
+  clean:
+    image: ubuntu:18.04
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: ["sh", "-ec", "rm -rf target"]
 
-    load-qemu-binfmt:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/loader-qemu-binfmt/Dockerfile
-      privileged: true
-      command: dpkg-reconfigure qemu-user-binfmt
+  load-qemu-binfmt:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/loader-qemu-binfmt/Dockerfile
+    privileged: true
+    command: dpkg-reconfigure qemu-user-binfmt
 
-    test:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
-      environment:
-        CARGO_TERM_COLOR: always
-        TEST_LOG: debug
-        RUST_BACKTRACE: full
-      volumes:
-        - $PWD:$PWD
-        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
-      working_dir: $PWD
-      command: cargo test --no-default-features --features default-musl --target x86_64-unknown-linux-musl
+  test:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+    environment:
+      CARGO_TERM_COLOR: always
+      TEST_LOG: debug
+      RUST_BACKTRACE: full
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    command: cargo test --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
-    test-docker:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
-      environment:
-        CARGO_TERM_COLOR: always
-        AWS_ACCESS_KEY_ID: dummy
-        AWS_SECRET_ACCESS_KEY: dummy
-        TEST_LOG: debug
-        RUST_BACKTRACE: full
-      volumes:
-        - $PWD:$PWD
-        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
-        - /var/run/docker.sock:/var/run/docker.sock
-      depends_on:
-        - test-runtime-deps
-      network_mode: host
-      working_dir: $PWD
-      command: cargo test --all --no-default-features --features default-musl,docker,kubernetes --target x86_64-unknown-linux-musl -- --test-threads 4
+  test-integration:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+    environment:
+      CARGO_TERM_COLOR: always
+      AWS_ACCESS_KEY_ID: dummy
+      AWS_SECRET_ACCESS_KEY: dummy
+      TEST_LOG: debug
+      RUST_BACKTRACE: full
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - test-runtime-deps
+    network_mode: host
+    working_dir: $PWD
+    command: cargo test --all --no-default-features --features default-musl,docker,kubernetes --target x86_64-unknown-linux-musl -- --test-threads 4
 
-    test-behavior:
-      image: ubuntu:18.04
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      user: $USER
-      command: ["sh", "-c", "./target/x86_64-unknown-linux-musl/debug/vector test tests/behavior/**/*.toml"]
+  test-behavior:
+    image: ubuntu:18.04
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command:
+      [
+        "sh",
+        "-c",
+        "./target/x86_64-unknown-linux-musl/debug/vector test tests/behavior/**/*.toml",
+      ]
 
-    test-kubernetes:
-      build:
-        context: .
-        dockerfile: scripts/ci-docker-images/builder-kubernetes/Dockerfile
-      environment:
-        CARGO_TERM_COLOR: always
-        RUST_BACKTRACE: full
-        TEST_LOG: debug
-      volumes:
-        - $PWD:$PWD
-        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
-        - /var/run/docker.sock:/var/run/docker.sock
-      network_mode: host
-      working_dir: $PWD
-      command: ["sh", "-ec", "./scripts/kubernetes-test.sh"]
+  test-kubernetes:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-kubernetes/Dockerfile
+    environment:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: full
+      TEST_LOG: debug
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+      - /var/run/docker.sock:/var/run/docker.sock
+    network_mode: host
+    working_dir: $PWD
+    command: ["sh", "-ec", "./scripts/kubernetes-test.sh"]
 
-    # test dependencies
+  # test dependencies
 
-    # dummy service which runs all dependencies
-    test-runtime-deps:
-      image: ubuntu:18.04
-      command: sleep infinity
-      depends_on:
-        - localstack
-        - minio
-        - mockwatchlogs
-        - zookeeper
-        - kafka
-        - splunk
-        - pulsar
-        - elasticsearch
-        - elasticsearch-tls
-        - clickhouse
-        - ec2_metadata
-        - gcloud-pubsub
-        - loki
-        - influxdb_v1
-        - influxdb_v2
+  # dummy service which runs all dependencies
+  test-runtime-deps:
+    image: ubuntu:18.04
+    command: sleep infinity
+    depends_on:
+      - localstack
+      - minio
+      - mockwatchlogs
+      - zookeeper
+      - kafka
+      - splunk
+      - pulsar
+      - elasticsearch
+      - elasticsearch-tls
+      - clickhouse
+      - ec2_metadata
+      - gcloud-pubsub
+      - loki
+      - influxdb_v1
+      - influxdb_v2
 
-    localstack:
-      image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
-      ports:
-        - "4568:4568"
-        - "4582:4582"
-        - "4571:4571"
-        - "4573:4573"
-      environment:
-        SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571,firehose:4573
-    minio:
-      image: minio/minio
-      ports:
-        - "9000:9000"
-      environment:
-        MINIO_ACCESS_KEY: "test-access-key"
-        MINIO_SECRET_KEY: "test-secret-key"
-      command: server /tmp
-    mockwatchlogs:
-      image: luciofranco/mockwatchlogs:latest
-      ports:
-        - "6000:6000"
-      environment:
-        RUST_LOG: trace
-    zookeeper:
-      image: wurstmeister/zookeeper
-      ports:
-        - "2181:2181"
-    kafka:
-      image: wurstmeister/kafka
-      ports:
-        - "9091-9093:9091-9093"
-      environment:
-        KAFKA_BROKER_ID: 1
-        KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-        KAFKA_LISTENERS: PLAINTEXT://:9092,SSL://:9091
-        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,SSL://localhost:9091
-        KAFKA_SSL_KEYSTORE_LOCATION: /certs/localhost.p12
-        KAFKA_SSL_KEYSTORE_PASSWORD: NOPASS
-        KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/localhost.p12
-        KAFKA_SSL_TRUSTSTORE_PASSWORD: NOPASS
-        KAFKA_SSL_KEY_PASSWORD: NOPASS
-        KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: none
-      volumes:
-        - ./tests/data/localhost.p12:/certs/localhost.p12:ro
-    pulsar:
-      image: apachepulsar/pulsar
-      command: bin/pulsar standalone
-      ports:
-        - "6650:6650"
-    splunk:
-      image: timberio/splunk-hec-test:latest
-      ports:
-        - "8088:8088"
-        - "8000:8000"
-        - "8089:8089"
-      entrypoint: ["sh", "-c", "./bin/splunk add index custom_index && ./bin/splunk set minfreemb 5 && ./entrypoint.sh"]
-    elasticsearch:
-      image: elasticsearch:6.6.2
-      ports:
-        - "9200:9200"
-        - "9300:9300"
-      environment:
-        - discovery.type=single-node
-    elasticsearch-tls:
-      image: elasticsearch:6.6.2
-      ports:
-        - "9201:9200"
-        - "9301:9300"
-      environment:
-        - discovery.type=single-node
-        - xpack.security.enabled=true
-        - xpack.security.http.ssl.enabled=true
-        - xpack.security.transport.ssl.enabled=true
-        - xpack.ssl.certificate=certs/localhost.crt
-        - xpack.ssl.key=certs/localhost.key
-      volumes:
-        - ./tests/data:/usr/share/elasticsearch/config/certs:ro
-    clickhouse:
-      image: yandex/clickhouse-server:19
-      ports:
-        - "8123:8123"
-    ec2_metadata:
-      image: timberiodev/mock-ec2-metadata:latest
-      ports:
-        - "8111:8111"
-    gcloud-pubsub:
-      image: messagebird/gcloud-pubsub-emulator
-      ports:
-        - 8681-8682:8681-8682
-      environment:
-        - PUBSUB_PROJECT1=testproject,topic1:subscription1
-    loki:
-      image: grafana/loki:master-89263b0-amd64
-      ports:
-        - "3100:3100"
-      command: -config.file=/etc/loki/loki-config.yaml
-      volumes:
-          - ./tests/data:/etc/loki
-    influxdb_v1:
-      image: influxdb:1.7
-      ports:
-        - "8086:8086"
-      environment:
-        - INFLUXDB_REPORTING_DISABLED=true
-    influxdb_v2:
-      image: quay.io/influxdb/influxdb:2.0.0-beta
-      ports:
-        - "9999:9999"
-      command: influxd --reporting-disabled
+  localstack:
+    image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+    ports:
+      - "4568:4568"
+      - "4582:4582"
+      - "4571:4571"
+      - "4573:4573"
+    environment:
+      SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571,firehose:4573
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+    environment:
+      MINIO_ACCESS_KEY: "test-access-key"
+      MINIO_SECRET_KEY: "test-secret-key"
+    command: server /tmp
+  mockwatchlogs:
+    image: luciofranco/mockwatchlogs:latest
+    ports:
+      - "6000:6000"
+    environment:
+      RUST_LOG: trace
+  zookeeper:
+    image: wurstmeister/zookeeper
+    ports:
+      - "2181:2181"
+  kafka:
+    image: wurstmeister/kafka
+    ports:
+      - "9091-9093:9091-9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://:9092,SSL://:9091
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,SSL://localhost:9091
+      KAFKA_SSL_KEYSTORE_LOCATION: /certs/localhost.p12
+      KAFKA_SSL_KEYSTORE_PASSWORD: NOPASS
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/localhost.p12
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: NOPASS
+      KAFKA_SSL_KEY_PASSWORD: NOPASS
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: none
+    volumes:
+      - ./tests/data/localhost.p12:/certs/localhost.p12:ro
+  pulsar:
+    image: apachepulsar/pulsar
+    command: bin/pulsar standalone
+    ports:
+      - "6650:6650"
+  splunk:
+    image: timberio/splunk-hec-test:latest
+    ports:
+      - "8088:8088"
+      - "8000:8000"
+      - "8089:8089"
+    entrypoint:
+      [
+        "sh",
+        "-c",
+        "./bin/splunk add index custom_index && ./bin/splunk set minfreemb 5 && ./entrypoint.sh",
+      ]
+  elasticsearch:
+    image: elasticsearch:6.6.2
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+  elasticsearch-tls:
+    image: elasticsearch:6.6.2
+    ports:
+      - "9201:9200"
+      - "9301:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.ssl.certificate=certs/localhost.crt
+      - xpack.ssl.key=certs/localhost.key
+    volumes:
+      - ./tests/data:/usr/share/elasticsearch/config/certs:ro
+  clickhouse:
+    image: yandex/clickhouse-server:19
+    ports:
+      - "8123:8123"
+  ec2_metadata:
+    image: timberiodev/mock-ec2-metadata:latest
+    ports:
+      - "8111:8111"
+  gcloud-pubsub:
+    image: messagebird/gcloud-pubsub-emulator
+    ports:
+      - 8681-8682:8681-8682
+    environment:
+      - PUBSUB_PROJECT1=testproject,topic1:subscription1
+  loki:
+    image: grafana/loki:master-89263b0-amd64
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ./tests/data:/etc/loki
+  influxdb_v1:
+    image: influxdb:1.7
+    ports:
+      - "8086:8086"
+    environment:
+      - INFLUXDB_REPORTING_DISABLED=true
+  influxdb_v2:
+    image: quay.io/influxdb/influxdb:2.0.0-beta
+    ports:
+      - "9999:9999"
+    command: influxd --reporting-disabled
