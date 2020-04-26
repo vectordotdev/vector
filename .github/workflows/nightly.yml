@@ -73,6 +73,9 @@ jobs:
           USE_CONTAINER: none
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
+          realpath() {
+            [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
+          }
           cd tests && make build-archive
       - uses: actions/upload-artifact@v1
         with:
