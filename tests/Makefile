@@ -82,7 +82,7 @@ test-integration-kubernetes: build-x86_64-unknown-linux-musl ## Runs Kubernetes 
 	$(RUN) test-integration-kubernetes
 
 test-unit: build ## Runs unit tests, tests which do not require additional services to be present
-	$(RUN) unit-test
+	$(RUN) test-unit
 
 ##@ Checking
 
