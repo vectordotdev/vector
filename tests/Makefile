@@ -1,176 +1,186 @@
+.PHONY: help
+.DEFAULT_GOAL := help
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/../scripts/docker-compose-run.sh)
 
-# run all tests, checks, and verifications
-all: check build-all package-all test-docker test-behavior verify
+help:
+	@echo "                                      __   __  __"
+	@echo "                                      \ \ / / / /"
+	@echo "                                       \ V / / / "
+	@echo "                                        \_/  \/  "
+	@echo ""
+	@echo "                                      V E C T O R"
+	@echo ""
+	@echo "---------------------------------------------------------------------------------------"
+	@echo ""
+	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-# default target, build the project in debug mode
-build: build-x86_64
+##@ Default
 
-# build the project in debug mode for all platforms
-build-all: build-x86_64 build-armv7 build-aarch64
+all: check build-all package-all test-docker test-behavior verify ## run all tests, checks, and verifications
 
-build-x86_64:
+##@ Building
+
+build: build-x86_64 ## default target, build the project in debug mode
+
+build-all: build-x86_64 build-armv7 build-aarch64 ## build the project in debug mode for all platforms
+
+build-x86_64: ## build the project for the x86_64 architecture
 	$(RUN) build-x86_64
 
-build-armv7: load-qemu-binfmt
+build-armv7: load-qemu-binfmt ## build the project for the armv7 architecture
 	$(RUN) build-armv7
 
-build-aarch64: load-qemu-binfmt
+build-aarch64: load-qemu-binfmt ## build the project for the aarch64 architecture
 	$(RUN) build-aarch64
 
-# run benchmarks
-bench: build
+##@ Developing
+
+bench: build ## run benchmarks
 	$(RUN) bench
 
-# run tests which do not require additional services to be present
-test: build
+test: build ## run tests which do not require additional services to be present
 	$(RUN) test
 
-# run behaviorial tests
-test-behavior: build
+test-behavior: build ## run behaviorial tests
 	$(RUN) test-behavior
 
-# run tests which use Docker
-test-docker: build
+test-docker: build ## run tests which use Docker
 	$(RUN) test-docker
 
-# run tests for Kubernetes
-test-kubernetes: build-x86_64
+test-kubernetes: build-x86_64 ## run tests for Kubernetes
 	$(RUN) test-kubernetes
 
-# checks
+##@ Checking
 
-check: check-code check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features
+check: check-all ## default target, check everything
 
-check-code:
+check-all: check-code check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features ## check everything
+
+check-code: ## check code
 	$(RUN) check-code
 
-check-component-features:
+check-component-features: ## check that all component features are setup properly
 	$(RUN) check-component-features
 
-check-fmt:
+check-fmt: ## check that all files are formatted properly
 	$(RUN) check-fmt
 
-check-style:
+check-style: ## check that all files are styled properly
 	$(RUN) check-style
 
-check-markdown:
+check-markdown: ## check that markdown is styled properly
 	$(RUN) check-markdown
 
-check-generate:
+check-generate: ## check that no files are pending generation
 	$(RUN) check-generate
 
-check-version:
+check-version: ## check that Vector's version is correct accounting for recent changes
 	$(RUN) check-version
 
-check-examples: build
+check-examples: build ## check that the config/exmaples files are valid
 	$(RUN) check-examples
 
-check-blog:
+check-blog: ## check that all blog posts are signed and valid
 	$(RUN) check-blog
 
-# generate
-generate:
-	$(RUN) generate
+##@ Packaging
 
-# packaging
+package: build-archive package-deb package-rpm ## default target, package x86_84
 
-package: build-archive package-deb package-rpm
-package-all: build-archive-all package-deb-all package-rpm-all
+package-all: build-archive-all package-deb-all package-rpm-all ## package everything
 
-# .tar.gz archive
-build-archive: build-archive-x86_64
-build-archive-all: build-archive-x86_64 build-archive-armv7 build-archive-aarch64
+build-archive: build-archive-x86_64 ## default target, build the x86_64 archives
 
-build-archive-x86_64: build-x86_64
+build-archive-all: build-archive-x86_64 build-archive-armv7 build-archive-aarch64 ## build all archives
+
+build-archive-x86_64: build-x86_64 ## build the x86_64 archive
 	$(RUN) build-archive-x86_64
 
-build-archive-armv7: build-armv7
+build-archive-armv7: build-armv7 ## build the armv7 archive
 	$(RUN) build-archive-armv7
 
-build-archive-aarch64: build-aarch64
+build-archive-aarch64: build-aarch64 ## build the aarch64 archive
 	$(RUN) build-archive-aarch64
 
-# .deb package
-package-deb: package-deb-x86_64
-package-deb-all: package-deb-x86_64 package-deb-armv7 package-deb-aarch64
+package-deb: package-deb-x86_64 ## default target, build the x86_64 deb package
 
-package-deb-x86_64: build-archive-x86_64
+package-deb-all: package-deb-x86_64 package-deb-armv7 package-deb-aarch64 ## build all deb packages
+
+package-deb-x86_64: build-archive-x86_64 ## build the x86_64 deb package
 	$(RUN) package-deb-x86_64
 
-package-deb-armv7: build-archive-armv7
+package-deb-armv7: build-archive-armv7 ## build the armv7 deb package
 	$(RUN) package-deb-armv7
 
-package-deb-aarch64: build-archive-aarch64
+package-deb-aarch64: build-archive-aarch64  ## build the aarch64 deb package
 	$(RUN) package-deb-aarch64
 
-# .rpm package
-package-rpm: package-rpm-x86_64
-package-rpm-all: package-rpm-x86_64 package-rpm-armv7 package-rpm-aarch64
+package-rpm: package-rpm-x86_64 ## default target, build the x86_64 rpm package
 
-package-rpm-x86_64: build-archive-x86_64
+package-rpm-all: package-rpm-x86_64 package-rpm-armv7 package-rpm-aarch64 ## build all rpm packages
+
+package-rpm-x86_64: build-archive-x86_64 ## build the x86_64 rpm package
 	$(RUN) package-rpm-x86_64
 
-package-rpm-armv7: build-archive-armv7
+package-rpm-armv7: build-archive-armv7 ## build the armv7 rpm package
 	$(RUN) package-rpm-armv7
 
-package-rpm-aarch64: build-archive-aarch64
+package-rpm-aarch64: build-archive-aarch64 ## build the aarch64 rpm package
 	$(RUN) package-rpm-aarch64
 
-# verifications
-verify: verify-rpm verify-deb
+##@ Verifying
 
-# verify RPM packages
-verify-rpm: verify-rpm-amazonlinux-1 verify-rpm-amazonlinux-2 verify-rpm-centos-7
+verify: verify-rpm verify-deb ## default target, verify all packages
 
-verify-rpm-amazonlinux-1: package-rpm
+verify-rpm: verify-rpm-amazonlinux-1 verify-rpm-amazonlinux-2 verify-rpm-centos-7 ## verify all rpm packages
+
+verify-rpm-amazonlinux-1: package-rpm ## verify the rpm package on Amazon Linux 1
 	$(RUN) verify-rpm-amazonlinux-1
 
-verify-rpm-amazonlinux-2: package-rpm
+verify-rpm-amazonlinux-2: package-rpm ## verify the rpm package on Amazon Linux 2
 	$(RUN) verify-rpm-amazonlinux-2
 
-verify-rpm-centos-7: package-rpm
+verify-rpm-centos-7: package-rpm ## verify the rpm package on CentOS 7
 	$(RUN) verify-rpm-centos-7
 
-# verify DEB packages
-verify-deb: verify-deb-artifact-on-deb-8 verify-deb-artifact-on-deb-9 verify-deb-artifact-on-deb-10 verify-deb-artifact-on-ubuntu-16-04 verify-deb-artifact-on-ubuntu-18-04 verify-deb-artifact-on-ubuntu-19-04
+verify-deb: verify-deb-artifact-on-deb-8 verify-deb-artifact-on-deb-9 verify-deb-artifact-on-deb-10 verify-deb-artifact-on-ubuntu-16-04 verify-deb-artifact-on-ubuntu-18-04 verify-deb-artifact-on-ubuntu-19-04 ## verify all deb packages
 
-verify-deb-artifact-on-deb-8: package-deb
+verify-deb-artifact-on-deb-8: package-deb ## verify the deb package on Debian 8
 	$(RUN) verify-deb-artifact-on-deb-8
 
-verify-deb-artifact-on-deb-9: package-deb
+verify-deb-artifact-on-deb-9: package-deb ## verify the deb package on Debian 9
 	$(RUN) verify-deb-artifact-on-deb-9
 
-verify-deb-artifact-on-deb-10: package-deb
+verify-deb-artifact-on-deb-10: package-deb ## verify the deb package on Debian 10
 	$(RUN) verify-deb-artifact-on-deb-10
 
-verify-deb-artifact-on-ubuntu-16-04: package-deb
+verify-deb-artifact-on-ubuntu-16-04: package-deb ## verify the deb package on Ubuntu 16.04
 	$(RUN) verify-deb-artifact-on-ubuntu-16-04
 
-verify-deb-artifact-on-ubuntu-18-04: package-deb
+verify-deb-artifact-on-ubuntu-18-04: package-deb ## verify the deb package on Ubuntu 18.04
 	$(RUN) verify-deb-artifact-on-ubuntu-18-04
 
-verify-deb-artifact-on-ubuntu-19-04: package-deb
+verify-deb-artifact-on-ubuntu-19-04: package-deb ## verify the deb package on Ubuntu 19.04
 	$(RUN) verify-deb-artifact-on-ubuntu-19-04
 
-# verify that Vector can be built on NixOS
-verify-nixos:
+verify-nixos:  ## verify that Vector can be built on NixOS
 	$(RUN) verify-nixos
 
-# miscellaneous
+##@ Website
 
-# display dependencies between targets in this Makefile
-target-graph:
+generate:  ## Generates files across the repo using the data in /.meta
+	$(RUN) generate
+
+##@ Utility
+
+target-graph: ## display dependencies between targets in this Makefile
 	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST))))/.. && docker-compose run --rm target-graph $(TARGET)
 
-# clean everything
-clean:
+clean: ## clean everything
 	$(RUN) clean
 
-# create target directory owned by the current user
-init-target-dir:
+init-target-dir: ## create target directory owned by the current user
 	$(RUN) init-target-dir
 
-# load `binfmt-misc` kernel module which required to use `qemu-user`
-load-qemu-binfmt:
+load-qemu-binfmt: ## load `binfmt-misc` kernel module which required to use `qemu-user`
 	$(RUN) load-qemu-binfmt
