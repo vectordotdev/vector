@@ -399,6 +399,7 @@ gcp-pubsub-integration-tests = ["sinks-gcp"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
 influxdb-integration-tests = ["sinks-influxdb_metrics"]
 kafka-integration-tests = ["sinks-kafka"]
+loki-integration-tests = ["sinks-loki"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 
