@@ -466,7 +466,7 @@ enum Ec2MetadataError {
 }
 
 #[cfg(test)]
-#[cfg(feature = "ec2-metadata-integration-tests")]
+#[cfg(feature = "aws-ec2-metadata-integration-tests")]
 mod tests {
     use super::*;
     use crate::{event::Event, test_util::runtime};
