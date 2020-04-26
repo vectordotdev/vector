@@ -193,27 +193,28 @@ impl RunningTopology {
             .map(|_| ())
     }
 
+    /// On Error, topology is in invalid state.
     pub fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
         rt: &mut runtime::Runtime,
         require_healthy: bool,
-    ) -> bool {
+    ) -> Result<bool, ()> {
         if self.config.global.data_dir != new_config.global.data_dir {
             error!("data_dir cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.global.data_dir);
-            return false;
+            return Ok(false);
         }
 
         if self.config.global.dns_servers != new_config.global.dns_servers {
             error!("dns_servers cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.global.dns_servers);
-            return false;
+            return Ok(false);
         }
 
         if let Err(errors) = builder::check(&new_config) {
             for error in errors {
                 error!("Configuration error: {}", error);
             }
-            return false;
+            return Ok(false);
         }
 
         let diff = ConfigDiff::new(&self.config, &new_config);
@@ -227,7 +228,7 @@ impl RunningTopology {
                 self.start_diff(&diff, new_pieces, rt);
                 self.config = new_config;
                 // We have succesfully changed to new config.
-                return true;
+                return Ok(true);
             }
         }
 
@@ -238,12 +239,14 @@ impl RunningTopology {
             if self.run_healthchecks(&diff, &mut new_pieces, rt, require_healthy) {
                 self.start_diff(&diff, new_pieces, rt);
                 // We have succesfully returned to old config.
-                return false;
+                return Ok(false);
             }
         }
+
         // We failed in rebuilding the old state.
-        // We should exit the program.
-        unimplemented!();
+        error!("Failed in rebuilding the old configuration.");
+
+        Err(())
     }
 
     fn run_healthchecks(

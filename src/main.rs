@@ -334,10 +334,11 @@ fn main() {
             trace!("Parsing config");
             let config = handle_config_errors(config);
             if let Some(config) = config {
-                let success =
-                    topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy);
-                if !success {
-                    error!("Reload was not successful.");
+                match topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy) {
+                    Ok(true) => (),
+                    Ok(false) => error!("Reload was not successful."),
+                    // Trigger graceful shutdown for what remains of the topology
+                    Err(()) => break SIGINT,
                 }
             } else {
                 error!("Reload aborted.");
