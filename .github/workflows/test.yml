@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/test.yml"
       - "lib/*s"
       - "proto/**"
       - "src/**"
@@ -17,7 +17,7 @@ on:
 
   pull_request:
     paths:
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/test.yml"
       - "lib/*s"
       - "proto/**"
       - "src/**"
