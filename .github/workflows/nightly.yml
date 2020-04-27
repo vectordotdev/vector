@@ -142,6 +142,40 @@ jobs:
           name: "vector-x64.msi"
           path: "./target/artifacts/vector-x64.msi"
 
+  package-rpm-all:
+    runs-on: ubuntu-latest
+    needs:
+      - package-archive-x86_64-unknown-linux-musl-and-deb
+      - package-archive-aarch64-unknown-linux-musl-and-deb
+      - pachakge-archive-armv7-unknown-linux-musleabihf-and-deb
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-x86_64-unknown-linux-musl.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-aarch64-unknown-linux-musl.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-armv7-unknown-linux-musleabihf.tar.gz
+          path: target/artifacts
+      - run: make package-rpm-all
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-x86_64.rpm"
+          path: "./target/artifacts/vector-x86_64.rpm"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-armv7hl.rpm"
+          path: "./target/artifacts/vector-armv7hl.rpm"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-aarch64.rpm"
+          path: "./target/artifacts/vector-aarch64.rpm"
+
   release-docker:
     runs-on: ubuntu-latest
     needs:
@@ -192,6 +226,7 @@ jobs:
       - pachakge-archive-armv7-unknown-linux-musleabihf-and-deb
       - package-archive-x86_64-apple-darwin
       - package-archive-x86_64-pc-windows-msvc-and-msi
+      - package-rpm-all
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v1
@@ -229,6 +264,18 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-x64.msi
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-x86_64.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-armv7hl.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-aarch64.rpm
           path: target/artifacts
       - env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
