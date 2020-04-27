@@ -93,6 +93,7 @@ cd $_old_dir
 # Move to the artifacts dir
 #
 
+artifacts_dir="target/artifacts"
 mkdir -p $artifacts_dir
 mv -v $target_dir/vector-$TARGET.$ARCHIVE_TYPE $artifacts_dir
 echo "Moved $target_dir/vector-$TARGET.$ARCHIVE_TYPE to $artifacts_dir"

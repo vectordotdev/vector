@@ -45,8 +45,6 @@ echo "Features: $FEATURES"
 # Setup directories
 #
 
-artifacts_dir="target/artifacts"
-
 if [ -z "$NATIVE_BUILD" ]; then
   target_dir="target/$TARGET"
 else
