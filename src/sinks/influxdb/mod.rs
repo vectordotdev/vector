@@ -21,6 +21,10 @@ pub enum Field {
     Float(f64),
     /// unsigned integer
     UnsignedInt(u32),
+    /// integer
+    Int(i64),
+    /// boolean
+    Bool(bool),
 }
 
 #[derive(Debug, Snafu)]
@@ -234,6 +238,13 @@ fn encode_fields(fields: HashMap<String, Field>, output: &mut String) {
                 output.push_str(&i.to_string());
                 output.push('u');
             }
+            Field::Int(i) => {
+                output.push_str(&i.to_string());
+                output.push('i');
+            }
+            Field::Bool(b) => {
+                output.push_str(&b.to_string());
+            }
         };
         output.push(',');
     }
@@ -328,6 +339,24 @@ pub mod test_util {
                 format!("Fields: {} has to have: {}", value, field)
             )
         }
+    }
+
+    // ns.requests,metric_type=distribution,normal_tag=value,true_tag=true avg=1.875,count=8,max=3,median=2,min=1,quantile_0.95=3,sum=15 1542182950000000011
+    //
+    // =>
+    //
+    // ns.requests
+    // metric_type=distribution,normal_tag=value,true_tag=true
+    // avg=1.875,count=8,max=3,median=2,min=1,quantile_0.95=3,sum=15
+    // 1542182950000000011
+    //
+    pub(crate) fn split_line_protocol(line_protocol: &str) -> (&str, &str, String, &str) {
+        let mut split = line_protocol.splitn(2, ',').collect::<Vec<&str>>();
+        let measurement = split[0];
+
+        split = split[1].splitn(3, ' ').collect::<Vec<&str>>();
+
+        return (measurement, split[0], split[1].to_string(), split[2]);
     }
 
     pub(crate) fn onboarding_v2() {
@@ -524,6 +553,9 @@ mod tests {
             ),
             ("field_float".to_owned(), Field::Float(123.45)),
             ("field_unsigned_int".to_owned(), Field::UnsignedInt(657)),
+            ("field_int".to_owned(), Field::Int(657646)),
+            ("field_bool_true".to_owned(), Field::Bool(true)),
+            ("field_bool_false".to_owned(), Field::Bool(false)),
             ("escape key".to_owned(), Field::Float(10.0)),
         ]
         .into_iter()
@@ -539,6 +571,9 @@ mod tests {
                 "field_string=\"string value\"",
                 "field_string_escape=\"string\\\\val\\\"ue\"",
                 "field_unsigned_int=657u",
+                "field_int=657646i",
+                "field_bool_true=true",
+                "field_bool_false=false",
             ]
             .to_vec(),
         )

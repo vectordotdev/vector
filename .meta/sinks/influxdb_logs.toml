@@ -159,14 +159,13 @@ required = true
 sort = 1
 description = "A prefix that will be added to all metric names."
 
-[sinks.influxdb_logs.options.fields_as_tags]
+[sinks.influxdb_logs.options.tags]
 type = "[string]"
-examples = [["field1", "parent.child_field"]]
 groups = ["v1", "v2"]
+examples = [["field1", "parent.child_field"]]
 required = false
 description = """\
-A set of additional fields that will be attached to each LineProtocol as a tag. These values \
-are also templateable to allow events to provide dynamic label values. \
+A set of additional fields that will be attached to each LineProtocol as a tag. \
 
 Note: If the set of tag values has high cardinality this also \
 increase cardinality in InfluxDB.\

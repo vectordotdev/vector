@@ -6688,16 +6688,6 @@ require('custom_module')
   endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com"
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
 
-  # A set of additional fields that will be attached to each LineProtocol as a
-  # tag. These values are also templateable to allow events to provide dynamic
-  # label values. Note: If the set of tag values has high cardinality this also
-  # increase cardinality in InfluxDB.
-  #
-  # * optional
-  # * no default
-  # * type: [string]
-  fields_as_tags = ["field1", "parent.child_field"]
-
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -6717,6 +6707,15 @@ require('custom_module')
   # * required
   # * type: string
   namespace = "service"
+
+  # A set of additional fields that will be attached to each LineProtocol as a
+  # tag. Note: If the set of tag values has high cardinality this also increase
+  # cardinality in InfluxDB.
+  #
+  # * optional
+  # * no default
+  # * type: [string]
+  tags = ["field1", "parent.child_field"]
 
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.

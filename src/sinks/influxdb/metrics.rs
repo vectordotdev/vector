@@ -284,7 +284,7 @@ fn to_fields(value: f64) -> HashMap<String, Field> {
 mod tests {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
-    use crate::sinks::influxdb::test_util::{assert_fields, tags, ts};
+    use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, tags, ts};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -574,24 +574,6 @@ mod tests {
 
         let line_protocols = encode_events(events, "ns");
         assert_eq!(line_protocols.len(), 0);
-    }
-
-    // ns.requests,metric_type=distribution,normal_tag=value,true_tag=true avg=1.875,count=8,max=3,median=2,min=1,quantile_0.95=3,sum=15 1542182950000000011
-    //
-    // =>
-    //
-    // ns.requests
-    // metric_type=distribution,normal_tag=value,true_tag=true
-    // avg=1.875,count=8,max=3,median=2,min=1,quantile_0.95=3,sum=15
-    // 1542182950000000011
-    //
-    fn split_line_protocol(line_protocol: &str) -> (&str, &str, String, &str) {
-        let mut split = line_protocol.splitn(2, ',').collect::<Vec<&str>>();
-        let measurement = split[0];
-
-        split = split[1].splitn(3, ' ').collect::<Vec<&str>>();
-
-        return (measurement, split[0], split[1].to_string(), split[2]);
     }
 }
 

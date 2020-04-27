@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-24"
+last_modified_on: "2020-04-27"
 delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Logs"
 description: "The Vector `influxdb_logs` sink batches `log` events to InfluxDB using v1 or v2 HTTP API."
@@ -71,8 +71,8 @@ The Vector `influxdb_logs` sink
   endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com" # required
   namespace = "service" # required
   database = "vector-database" # required
-  fields_as_tags = ["field1", "parent.child_field"] # optional, no default
   healthcheck = true # optional, default
+  tags = ["field1", "parent.child_field"] # optional, no default
 
   # Auth
   password = "${INFLUXDB_PASSWORD}" # optional, no default
@@ -136,8 +136,8 @@ The Vector `influxdb_logs` sink
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
   namespace = "service" # required
   bucket = "vector-bucket" # required
-  fields_as_tags = ["field1", "parent.child_field"] # optional, no default
   healthcheck = true # optional, default
+  tags = ["field1", "parent.child_field"] # optional, no default
 
   # Auth
   org = "my-org" # required
@@ -563,33 +563,6 @@ InfluxDB endpoint to send metrics to.
 
 </Field>
 <Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["field1","parent.child_field"]]}
-  groups={["v1","v2"]}
-  name={"fields_as_tags"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-### fields_as_tags
-
-A set of additional fields that will be attached to each LineProtocol as a tag.
-These values are also templateable to allow events to provide dynamic label
-values. Note: If the set of tag values has high cardinality this also increase
-cardinality in InfluxDB.
-
-
-
-
-</Field>
-<Field
   common={true}
   defaultValue={true}
   enumValues={null}
@@ -905,6 +878,32 @@ duplicate data downstream.
 ### retention_policy_name
 
 Sets the target retention policy for the write into InfluxDB 1.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["field1","parent.child_field"]]}
+  groups={["v1","v2"]}
+  name={"tags"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### tags
+
+A set of additional fields that will be attached to each LineProtocol as a tag.
+Note: If the set of tag values has high cardinality this also increase
+cardinality in InfluxDB.
 
 
 
