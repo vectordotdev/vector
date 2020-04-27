@@ -11,9 +11,11 @@
 # ENV VARS
 #
 #   $ARCHIVE_TYPE - archive type, either "tar.gz" or "zip"
+#   $NATIVE_BUILD - whether to pass the --target flag when building via cargo
 #   $TARGET - a target triple. ex: x86_64-apple-darwin
 
 ARCHIVE_TYPE=${ARCHIVE_TYPE:-tar.gz}
+NATIVE_BUILD=${NATIVE_BUILD:-}
 
 set -eu
 
@@ -24,6 +26,12 @@ echo "Target: $TARGET"
 #
 # Build the archive directory
 #
+
+if [ -z "$NATIVE_BUILD" ]; then
+  target_dir="target/$TARGET"
+else
+  target_dir="target"
+fi
 
 archive_dir_name="vector-$TARGET"
 archive_dir="$target_dir/$archive_dir_name"
