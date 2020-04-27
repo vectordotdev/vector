@@ -1,6 +1,6 @@
 .PHONY: help
 .DEFAULT_GOAL := help
-RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/../scripts/run2.sh)
+RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/run.sh)
 
 export USE_CONTAINER ?= docker
 
