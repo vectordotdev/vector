@@ -115,7 +115,7 @@ impl SinkConfig for DatadogConfig {
         let batch = self.batch.unwrap_or(20, 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let uri = format!("{}/api/v1/series?api_key={}", self.host, self.api_key)
+        let uri = format!("{}/api/v1/series", self.host)
             .parse::<Uri>()
             .context(super::UriParseError)?;
         let timestamp = Utc::now().timestamp();
