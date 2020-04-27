@@ -408,6 +408,15 @@ amounts of data that take a very long time to process. Using `-F99` works well
 when your input data is large enough to take a minute or more to process, but
 feel free to adjust both input size and sampling frequency for your setup.
 
+It's worth noting that this is not the normal way to profile programs with
+`perf`. Usually you would simply run something like `perf record my_program` and
+not have to worry about PIDs and such. We differ from this because we're only
+interested in data about what Vector is doing while under load. Running it
+directly under `perf` would collect data for the entire lifetime of the process,
+including startup, shutdown, and idle time. By telling `perf` to collect data
+only while the load generation command is running we get a more focused dataset
+and don't have to worry about timing different commands in quick succession.
+
 You'll now find a `perf.data` file in your current directory with all of the
 information that was collected. There are different ways to process this, but
 one of the most useful is to create
