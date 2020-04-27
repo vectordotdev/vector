@@ -50,7 +50,7 @@ build-aarch64-unknown-linux-musl: load-qemu-binfmt ## build the project for the 
 bench: build ## run benchmarks
 	$(RUN) bench
 
-test: test-behavior test-integration test-unit ## Runs all tests, unit, bheaviorial, and integration.
+test: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
 
 test-behavior: build ## Runs behaviorial tests
 	$(RUN) test-behavior
