@@ -412,9 +412,13 @@ disable-resolv-conf = []
 name = "bench"
 harness = false
 
-[profile.release]
-lto = true
-codegen-units = 1
+[[bench]]
+name = "buffering"
+harness = false
+
+[[bench]]
+name = "isolated_buffering"
+harness = false
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
