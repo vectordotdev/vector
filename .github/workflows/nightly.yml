@@ -43,7 +43,7 @@ jobs:
           name: "vector-arm64.deb"
           path: "./target/artifacts/vector-arm64.deb"
 
-  pachakge-archive-armv7-unknown-linux-musleabihf-and-deb:
+  package-archive-armv7-unknown-linux-musleabihf-and-deb:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -181,7 +181,7 @@ jobs:
     needs:
       - package-archive-x86_64-unknown-linux-musl-and-deb
       - package-archive-aarch64-unknown-linux-musl-and-deb
-      - pachakge-archive-armv7-unknown-linux-musleabihf-and-deb
+      - package-archive-armv7-unknown-linux-musleabihf-and-deb
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v1
@@ -223,7 +223,7 @@ jobs:
     needs:
       - package-archive-x86_64-unknown-linux-musl-and-deb
       - package-archive-aarch64-unknown-linux-musl-and-deb
-      - pachakge-archive-armv7-unknown-linux-musleabihf-and-deb
+      - package-archive-armv7-unknown-linux-musleabihf-and-deb
       - package-archive-x86_64-apple-darwin
       - package-archive-x86_64-pc-windows-msvc-and-msi
       - package-rpm-all
