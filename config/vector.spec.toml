@@ -6429,8 +6429,9 @@ require('custom_module')
     # * optional
     # * default: "json"
     # * type: string
-    # * must be: "json" (if supplied)
+    # * enum: "json" or "text"
     codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
