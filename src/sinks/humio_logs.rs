@@ -34,11 +34,15 @@ inventory::submit! {
 pub enum Encoding {
     #[derivative(Default)]
     Json,
+    Text,
 }
 
 impl Into<splunk_hec::Encoding> for Encoding {
     fn into(self) -> splunk_hec::Encoding {
-        splunk_hec::Encoding::Json
+        match self {
+            Encoding::Json => splunk_hec::Encoding::Json,
+            Encoding::Text => splunk_hec::Encoding::Text,
+        }
     }
 }
 
