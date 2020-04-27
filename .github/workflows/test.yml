@@ -40,78 +40,67 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: make slim-builds
       - run: make test-behavior
 
   integration-aws:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: make slim-builds
-      - run: cd tests && make test-integration-aws
+      - run: make test-integration-aws
 
   integration-clickhouse:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: make slim-builds
-      - run: cd tests && make test-integration-clickhouse
+      - run: make test-integration-clickhouse
 
   integration-docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: make slim-builds
-      - run: cd tests && make test-integration-docker
+      - run: make test-integration-docker
 
   integration-elasticsearch:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: make slim-builds
-      - run: cd tests && make test-integration-elasticsearch
+      - run: make test-integration-elasticsearch
 
   integration-gcp:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: make slim-builds
-      - run: cd tests && make test-integration-gcp
+      - run: make test-integration-gcp
 
   integration-influxdb:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: make slim-builds
-      - run: cd tests && make test-integration-influxdb
+      - run: make test-integration-influxdb
 
   integration-kafka:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: make slim-builds
-      - run: cd tests && make test-integration-kafka
+      - run: make test-integration-kafka
 
   integration-loki:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: make slim-builds
-      - run: cd tests && make test-integration-loki
+      - run: make test-integration-loki
 
   integration-pulsar:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: make slim-builds
-      - run: cd tests && make test-integration-pulsar
+      - run: make test-integration-pulsar
 
   integration-splunk:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: make slim-builds
-      - run: cd tests && make test-integration-splunk
+      - run: make test-integration-splunk
 
   unit:
     runs-on: ubuntu-latest

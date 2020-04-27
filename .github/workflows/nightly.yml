@@ -15,7 +15,7 @@ jobs:
       - name: "Build archive and package"
         env:
           PASS_FEATURES: "default-musl"
-        run: cd tests && make package-deb-x86_64
+        run: make package-deb-x86_64
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-x86_64-unknown-linux-musl.tar.gz"
@@ -33,7 +33,7 @@ jobs:
         env:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default-musl"
-        run: cd tests && make package-deb-aarch64
+        run: make package-deb-aarch64
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-aarch64-unknown-linux-musl.tar.gz"
@@ -51,7 +51,7 @@ jobs:
         env:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default-musl"
-        run: cd tests && make package-deb-armv7
+        run: make package-deb-armv7
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-armv7-unknown-linux-musleabihf.tar.gz"
@@ -73,7 +73,7 @@ jobs:
           USE_CONTAINER: none
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          cd tests && make package-archive
+          make package-archive
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-x86_64-apple-darwin.tar.gz"
@@ -127,7 +127,7 @@ jobs:
           export STRIP="false"
           export RUST_LTO=""
           export TARGET="x86_64-pc-windows-msvc"
-          cd tests && make package-archive
+          make package-archive
       - name: "Build package"
         shell: bash
         run: |
@@ -181,7 +181,6 @@ jobs:
           USE_CONTAINER: none
         run: |
           ./scripts/upgrade-docker.sh
-          cd tests
           export VERSION=$(make version)
           make release-docker
 
@@ -235,4 +234,4 @@ jobs:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
           USE_CONTAINER: none
-        run: cd tests && make release-s3
+        run: make release-s3

@@ -4,15 +4,21 @@
 #
 # SUMMARY
 #
-#   A simple script that runs commands in a container environment based
+#   A simple script that runs a make target in a container environment based
 #   on the presence of the `USE_CONTAINER` environment variable.
 #
-#   This helps to reduce the friction running various `make`
-#   commands. For example, the `make generate` command requires Ruby and
-#   other dependencies to be installed. Routing this command through a
-#   container images removes this.
+#   This helps to reduce friction for first-time contributors, since running
+#   basic commands through containers ensures they work. It is recommended
+#   that frequent contributors setup local environments to improve the speed
+#   of commands they are running frequently. This can be achieved by setting
+#   USE_CONTAINER to none:
+#
+#       export USE_CONTAINER=none
+#
 
 set -eou pipefail
+
+cd $(dirname $0)/..
 
 case "$USE_CONTAINER" in
   docker | podman)
@@ -21,7 +27,7 @@ case "$USE_CONTAINER" in
     echo "  make ... USE_CONTAINER=none"
     echo ""
 
-    scripts/docker-run.sh "$@"
+    scripts/docker-compose-run.sh "$1"
     ;;
 
   *)
@@ -31,5 +37,18 @@ case "$USE_CONTAINER" in
     echo "  make ... USE_CONTAINER=podman"
     echo ""
 
-    ${@:2}
+    FILE=$(find ./scripts -name "${1}.*")
+
+    if [ -z "$FILE" ]; then
+        echo "Local invocation failed. Script not found!"
+        echo ""
+        echo "    scripts/${1}.*"
+        echo ""
+        echo "To run the ${1} target locally you must place a script in the"
+        echo "/scripts folder that can be executed. Otherwise, you can use the"
+        echo "service defined in /docker-compose.yml."
+        exit 1
+    fi
+    
+    ${FILE}
 esac

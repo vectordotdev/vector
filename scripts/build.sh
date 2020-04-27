@@ -17,9 +17,10 @@
 # Env vars
 #
 
-NATIVE_BUILD=${NATIVE_BUILD:-}
+NATIVE_BUILD=${NATIVE_BUILD:-true}
 STRIP=${STRIP:-}
 FEATURES=${FEATURES:-}
+TARGET=${TARGET:-}
 
 if [ -z "$FEATURES" ]; then
     FEATURES="default"
