@@ -96,6 +96,6 @@ fi
 # Strip the output binary
 #
 
-if [ "$STRIP" == "false" ]; then
+if [ "$STRIP" == "true" ]; then
   strip $binary_path
 fi
