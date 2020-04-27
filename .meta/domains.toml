@@ -23,6 +23,9 @@ name = "operations"
 name = "platforms"
 
 [[domains]]
+name = "privacy"
+
+[[domains]]
 name = "security"
 
 [[domains]]

@@ -506,7 +506,7 @@ mod tests {
     }
 }
 
-#[cfg(feature = "s3-integration-tests")]
+#[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
     use super::*;

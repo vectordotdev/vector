@@ -25,6 +25,7 @@ scopes:
   - observability
   - operations
   - platforms
+  - privacy
   - security
   - sinks
   - sources

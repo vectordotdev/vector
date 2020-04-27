@@ -255,7 +255,7 @@ mod tests {
     }
 }
 
-#[cfg(feature = "firehose-integration-tests")]
+#[cfg(feature = "aws-kinesis-firehose-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
     use super::*;

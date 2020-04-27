@@ -34,12 +34,14 @@ inventory::submit! {
 pub enum Encoding {
     #[derivative(Default)]
     Json,
+    Text,
 }
 
 impl From<Encoding> for splunk_hec::Encoding {
     fn from(v: Encoding) -> Self {
         match v {
             Encoding::Json => splunk_hec::Encoding::Json,
+            Encoding::Text => splunk_hec::Encoding::Text,
         }
     }
 }
@@ -47,6 +49,9 @@ impl From<Encoding> for splunk_hec::Encoding {
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        if self.encoding.codec != Encoding::Json {
+            error!("Using an unsupported encoding for Humio");
+        }
         let host = self.host.clone().unwrap_or_else(|| HOST.to_string());
 
         HecSinkConfig {
