@@ -15,14 +15,18 @@ VERSION="${VERSION:-"$(scripts/version.sh)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 PUSH="${PUSH:-}"
 PLATFORM="${PLATFORM:-}"
+REPO="${REPO:-"timberio/vector"}"
 
 #
 # Functions
 #
 
 build() {
-  BASE="$1"
-  VERSION="$2"
+  local BASE="$1"
+  local VERSION="$2"
+
+  local TAG="$REPO:$VERSION-$BASE"
+  local DOCKERFILE="distribution/docker/$BASE/Dockerfile"
 
   if [ -n "$PLATFORM" ]; then
     export DOCKER_CLI_EXPERIMENTAL=enabled
@@ -33,17 +37,17 @@ build() {
 
     docker buildx build \
       --platform="$PLATFORM" \
-      --tag "timberio/vector:$VERSION-$BASE" \
+      --tag "$TAG" \
       target/artifacts \
-      -f "distribution/docker/$BASE/Dockerfile" ${PUSH:+--push}
+      -f "$DOCKERFILE" ${PUSH:+--push}
   else
     docker build \
-      --tag "timberio/vector:$VERSION-$BASE" \
+      --tag "$TAG" \
       target/artifacts \
-      -f "distribution/docker/$BASE/Dockerfile"
+      -f "$DOCKERFILE"
 
     if [ -n "$PUSH" ]; then
-      docker push "timberio/vector:$VERSION-$BASE"
+      docker push "$TAG"
     fi
   fi
 }
@@ -52,7 +56,7 @@ build() {
 # Build
 #
 
-echo "Building timberio/vector:* Docker images"
+echo "Building $REPO:* Docker images"
 
 if [[ "$CHANNEL" == "latest" ]]; then
   VERSION_EXACT="$VERSION"
@@ -70,4 +74,6 @@ elif [[ "$CHANNEL" == "nightly" ]]; then
     build alpine "$VERSION_TAG"
     build debian "$VERSION_TAG"
   done
+elif [[ "$CHANNEL" == "test" ]]; then
+  build "${BASE:-"alpine"}" "${TAG:-"test"}"
 fi
