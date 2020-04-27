@@ -158,7 +158,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - build-x86_64-unknown-linux-musl-packages
-      - build-arm64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-musl-packages
       - build-armv7-unknown-linux-musl-packages
     steps:
       - uses: actions/checkout@v1
@@ -200,7 +200,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - build-x86_64-unknown-linux-musl-packages
-      - build-arm64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-musl-packages
       - build-armv7-unknown-linux-musl-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
