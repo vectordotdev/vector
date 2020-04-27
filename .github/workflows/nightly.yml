@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: "0 14 * * *"
 
+  pull_request: {}
+
 env:
   CHANNEL: nightly
 
@@ -71,6 +73,7 @@ jobs:
         env:
           TARGET: "x86_64-apple-darwin"
           USE_CONTAINER: none
+          NATIVE_BUILD: true
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           make package-archive
@@ -117,8 +120,6 @@ jobs:
           rm wix-binaries.zip
       - name: "Build archive"
         shell: bash
-        env:
-          USE_CONTAINER: none
         run: |
           export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
           export RUSTFLAGS=-Ctarget-feature=+crt-static
@@ -127,6 +128,8 @@ jobs:
           export STRIP="false"
           export RUST_LTO=""
           export TARGET="x86_64-pc-windows-msvc"
+          export NATIVE_BUILD="true"
+          export USE_CONTAINER="none"
           make package-archive
       - name: "Build package"
         shell: bash
