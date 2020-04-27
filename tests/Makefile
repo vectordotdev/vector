@@ -119,34 +119,34 @@ check-blog: ## check that all blog posts are signed and valid
 
 ##@ Packaging
 
-package-all: build-archive-all package-deb-all package-rpm-all ## package everything
+package-all: package-archive-all package-deb-all package-rpm-all ## package everything
 
-build-archive: ## build the Vector archive
-	$(RUN) build-archive
+package-archive: ## package the Vector archive
+	$(RUN) package-archive
 
-build-archive-all: build-archive-x86_64-unknown-linux-musl build-archive-armv7-unknown-linux-musleabihf build-archive-aarch64-unknown-linux-musl ## build all archives
+package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-armv7-unknown-linux-musleabihf package-archive-aarch64-unknown-linux-musl ## package all archives
 
-build-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## build the x86_64 archive
-	$(RUN) build-archive-x86_64-unknown-linux-musl
+package-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## package the x86_64 archive
+	$(RUN) package-archive-x86_64-unknown-linux-musl
 
-build-archive-armv7-unknown-linux-musleabihf: build-armv7-unknown-linux-musleabihf ## build the armv7 archive
-	$(RUN) build-archive-armv7-unknown-linux-musleabihf
+package-archive-armv7-unknown-linux-musleabihf: build-armv7-unknown-linux-musleabihf ## package the armv7 archive
+	$(RUN) package-archive-armv7-unknown-linux-musleabihf
 
-build-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## build the aarch64 archive
-	$(RUN) build-archive-aarch64-unknown-linux-musl
+package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## package the aarch64 archive
+	$(RUN) package-archive-aarch64-unknown-linux-musl
 
 package-deb: ## build the x86_64 deb package
 	$(RUN) package-deb
 
 package-deb-all: package-deb-x86_64 package-deb-armv7 package-deb-aarch64 ## build all deb packages
 
-package-deb-x86_64: build-archive-x86_64-unknown-linux-musl ## build the x86_64 deb package
+package-deb-x86_64: package-archive-x86_64-unknown-linux-musl ## build the x86_64 deb package
 	$(RUN) package-deb-x86_64
 
-package-deb-armv7: build-archive-armv7-unknown-linux-musleabihf ## build the armv7 deb package
+package-deb-armv7: package-archive-armv7-unknown-linux-musleabihf ## build the armv7 deb package
 	$(RUN) package-deb-armv7
 
-package-deb-aarch64: build-archive-aarch64-unknown-linux-musl  ## build the aarch64 deb package
+package-deb-aarch64: package-archive-aarch64-unknown-linux-musl  ## build the aarch64 deb package
 	$(RUN) package-deb-aarch64
 
 package-rpm: ## default target, build the x86_64 rpm package
@@ -154,13 +154,13 @@ package-rpm: ## default target, build the x86_64 rpm package
 
 package-rpm-all: package-rpm-x86_64 package-rpm-armv7 package-rpm-aarch64 ## build all rpm packages
 
-package-rpm-x86_64: build-archive-x86_64-unknown-linux-musl ## build the x86_64 rpm package
+package-rpm-x86_64: package-archive-x86_64-unknown-linux-musl ## build the x86_64 rpm package
 	$(RUN) package-rpm-x86_64
 
-package-rpm-armv7: build-archive-armv7-unknown-linux-musleabihf ## build the armv7 rpm package
+package-rpm-armv7: package-archive-armv7-unknown-linux-musleabihf ## build the armv7 rpm package
 	$(RUN) package-rpm-armv7
 
-package-rpm-aarch64: build-archive-aarch64-unknown-linux-musl ## build the aarch64 rpm package
+package-rpm-aarch64: package-archive-aarch64-unknown-linux-musl ## build the aarch64 rpm package
 	$(RUN) package-rpm-aarch64
 
 ##@ Releasing
