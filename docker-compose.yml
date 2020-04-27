@@ -9,6 +9,8 @@ services:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
     environment:
+      TARGET: x86_64-unknown-linux-musl
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -16,13 +18,15 @@ services:
       - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
-    command: cargo build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
+    command: scripts/build.sh
 
   build-armv7-unknown-linux-musleabihf:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
     environment:
+      TARGET: armv7-unknown-linux-musleabihf
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -30,13 +34,15 @@ services:
       - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
       - ./target/armv7-unknown-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
-    command: cargo build --no-default-features --features default-musl --target armv7-unknown-linux-musleabihf
+    command: scripts/build.sh
 
   build-aarch64-unknown-linux-musl:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
     environment:
+      TARGET: aarch64-unknown-linux-musl
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -44,7 +50,7 @@ services:
       - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
-    command: cargo build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
+    command: scripts/build.sh
 
   bench:
     build:
@@ -178,7 +184,7 @@ services:
     working_dir: $PWD
     command: ./scripts/check-blog-signatures.rb
 
-  build-archive-x86_64-unknown-linux-musl:
+  package-archive-x86_64-unknown-linux-musl:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
@@ -192,9 +198,9 @@ services:
       - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
-    command: ./scripts/build-archive.sh
+    command: ./scripts/package-archive.sh
 
-  build-archive-armv7-unknown-linux-musleabihf:
+  package-archive-armv7-unknown-linux-musleabihf:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
@@ -208,9 +214,9 @@ services:
       - ./target/armv7-unknwon-linux-musleabihf/cargo/git:/opt/rust/cargo/git
       - ./target/armv7-unknwon-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
-    command: ./scripts/build-archive.sh
+    command: ./scripts/package-archive.sh
 
-  build-archive-aarch64-unknown-linux-musl:
+  package-archive-aarch64-unknown-linux-musl:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
@@ -224,9 +230,9 @@ services:
       - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
-    command: ./scripts/build-archive.sh
+    command: ./scripts/package-archive.sh
 
-  package-deb-x86_64-unknown-linux-musl:
+  package-deb-x86_64:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
@@ -240,7 +246,7 @@ services:
     working_dir: $PWD
     command: ./scripts/package-deb.sh
 
-  package-deb-armv7-unknown-linux-musleabihf:
+  package-deb-armv7:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
@@ -254,7 +260,7 @@ services:
     working_dir: $PWD
     command: ./scripts/package-deb.sh
 
-  package-deb-aarch64-aarch64-unknown-linux-musl:
+  package-deb-aarch64:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile

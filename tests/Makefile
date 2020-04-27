@@ -22,7 +22,8 @@ all: check build-all package-all test-docker test-behavior verify ## run all tes
 
 ##@ Building
 
-build: build-x86_64-unknown-linux-musl ## default target, build the project in debug mode
+build: ## build a project binary
+	$(RUN) build
 
 build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## build the project in debug mode for all platforms
 
@@ -122,48 +123,72 @@ check-blog: ## check that all blog posts are signed and valid
 
 ##@ Packaging
 
-package: build-archive package-deb package-rpm ## default target, package x86_84
+package-all: package-archive-all package-deb-all package-rpm-all ## package everything
 
-package-all: build-archive-all package-deb-all package-rpm-all ## package everything
+package-archive: build ## package the Vector archive
+	$(RUN) package-archive
 
-build-archive: build-archive-x86_64-unknown-linux-musl ## default target, build the x86_64 archives
+package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-armv7-unknown-linux-musleabihf package-archive-aarch64-unknown-linux-musl ## package all archives
 
-build-archive-all: build-archive-x86_64-unknown-linux-musl build-archive-armv7-unknown-linux-musleabihf build-archive-aarch64-unknown-linux-musl ## build all archives
+package-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## package the x86_64 archive
+	$(RUN) package-archive-x86_64-unknown-linux-musl
 
-build-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## build the x86_64 archive
-	$(RUN) build-archive-x86_64-unknown-linux-musl
+package-archive-armv7-unknown-linux-musleabihf: build-armv7-unknown-linux-musleabihf ## package the armv7 archive
+	$(RUN) package-archive-armv7-unknown-linux-musleabihf
 
-build-archive-armv7-unknown-linux-musleabihf: build-armv7-unknown-linux-musleabihf ## build the armv7 archive
-	$(RUN) build-archive-armv7-unknown-linux-musleabihf
+package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## package the aarch64 archive
+	$(RUN) package-archive-aarch64-unknown-linux-musl
 
-build-archive-aarch6-unknown-linux-musl: build-aarch64-unknown-linux-musl ## build the aarch64 archive
-	$(RUN) build-archive-aarch64-unknown-linux-musl
-
-package-deb: package-deb-x86_64 ## default target, build the x86_64 deb package
+package-deb: ## build the x86_64 deb package
+	$(RUN) package-deb
 
 package-deb-all: package-deb-x86_64 package-deb-armv7 package-deb-aarch64 ## build all deb packages
 
-package-deb-x86_64: build-archive-x86_64 ## build the x86_64 deb package
+package-deb-x86_64: package-archive-x86_64-unknown-linux-musl ## build the x86_64 deb package
 	$(RUN) package-deb-x86_64
 
-package-deb-armv7: build-archive-armv7 ## build the armv7 deb package
+package-deb-armv7: package-archive-armv7-unknown-linux-musleabihf ## build the armv7 deb package
 	$(RUN) package-deb-armv7
 
-package-deb-aarch64: build-archive-aarch64  ## build the aarch64 deb package
+package-deb-aarch64: package-archive-aarch64-unknown-linux-musl  ## build the aarch64 deb package
 	$(RUN) package-deb-aarch64
 
-package-rpm: package-rpm-x86_64 ## default target, build the x86_64 rpm package
+package-rpm: ## default target, build the x86_64 rpm package
+	$(RUN) package-rpm
 
 package-rpm-all: package-rpm-x86_64 package-rpm-armv7 package-rpm-aarch64 ## build all rpm packages
 
-package-rpm-x86_64: build-archive-x86_64 ## build the x86_64 rpm package
+package-rpm-x86_64: package-archive-x86_64-unknown-linux-musl ## build the x86_64 rpm package
 	$(RUN) package-rpm-x86_64
 
-package-rpm-armv7: build-archive-armv7 ## build the armv7 rpm package
+package-rpm-armv7: package-archive-armv7-unknown-linux-musleabihf ## build the armv7 rpm package
 	$(RUN) package-rpm-armv7
 
-package-rpm-aarch64: build-archive-aarch64 ## build the aarch64 rpm package
+package-rpm-aarch64: package-archive-aarch64-unknown-linux-musl ## build the aarch64 rpm package
 	$(RUN) package-rpm-aarch64
+
+##@ Releasing
+
+release-commit: ## Commits release changes
+	$(RUN) release-commit
+
+release-docker: ## Release to Docker Hub
+	$(RUN) release-docker
+
+release-github: ## Release to Github
+	$(RUN) release-github
+
+release-homebrew: ## Release to timberio Homebrew tap
+	$(RUN) release-homebrew
+
+release-prepare: ## Prepares the release with metadata and highlights
+	$(RUN) release-prepare
+
+release-rollback:
+	$(RUN) release-rollback
+
+release-s3: ## Release artifacts to S3
+	$(RUN) release-s3
 
 ##@ Verifying
 
@@ -171,33 +196,33 @@ verify: verify-rpm verify-deb ## default target, verify all packages
 
 verify-rpm: verify-rpm-amazonlinux-1 verify-rpm-amazonlinux-2 verify-rpm-centos-7 ## verify all rpm packages
 
-verify-rpm-amazonlinux-1: package-rpm ## verify the rpm package on Amazon Linux 1
+verify-rpm-amazonlinux-1: package-rpm-x86_64 ## verify the rpm package on Amazon Linux 1
 	$(RUN) verify-rpm-amazonlinux-1
 
-verify-rpm-amazonlinux-2: package-rpm ## verify the rpm package on Amazon Linux 2
+verify-rpm-amazonlinux-2: package-rpm-x86_64 ## verify the rpm package on Amazon Linux 2
 	$(RUN) verify-rpm-amazonlinux-2
 
-verify-rpm-centos-7: package-rpm ## verify the rpm package on CentOS 7
+verify-rpm-centos-7: package-rpm-x86_64 ## verify the rpm package on CentOS 7
 	$(RUN) verify-rpm-centos-7
 
 verify-deb: verify-deb-artifact-on-deb-8 verify-deb-artifact-on-deb-9 verify-deb-artifact-on-deb-10 verify-deb-artifact-on-ubuntu-16-04 verify-deb-artifact-on-ubuntu-18-04 verify-deb-artifact-on-ubuntu-19-04 ## verify all deb packages
 
-verify-deb-artifact-on-deb-8: package-deb ## verify the deb package on Debian 8
+verify-deb-artifact-on-deb-8: package-deb-x86_64 ## verify the deb package on Debian 8
 	$(RUN) verify-deb-artifact-on-deb-8
 
-verify-deb-artifact-on-deb-9: package-deb ## verify the deb package on Debian 9
+verify-deb-artifact-on-deb-9: package-deb-x86_64 ## verify the deb package on Debian 9
 	$(RUN) verify-deb-artifact-on-deb-9
 
-verify-deb-artifact-on-deb-10: package-deb ## verify the deb package on Debian 10
+verify-deb-artifact-on-deb-10: package-deb-x86_64 ## verify the deb package on Debian 10
 	$(RUN) verify-deb-artifact-on-deb-10
 
-verify-deb-artifact-on-ubuntu-16-04: package-deb ## verify the deb package on Ubuntu 16.04
+verify-deb-artifact-on-ubuntu-16-04: package-deb-x86_64 ## verify the deb package on Ubuntu 16.04
 	$(RUN) verify-deb-artifact-on-ubuntu-16-04
 
-verify-deb-artifact-on-ubuntu-18-04: package-deb ## verify the deb package on Ubuntu 18.04
+verify-deb-artifact-on-ubuntu-18-04: package-deb-x86_64 ## verify the deb package on Ubuntu 18.04
 	$(RUN) verify-deb-artifact-on-ubuntu-18-04
 
-verify-deb-artifact-on-ubuntu-19-04: package-deb ## verify the deb package on Ubuntu 19.04
+verify-deb-artifact-on-ubuntu-19-04: package-deb-x86_64 ## verify the deb package on Ubuntu 19.04
 	$(RUN) verify-deb-artifact-on-ubuntu-19-04
 
 verify-nixos:  ## verify that Vector can be built on NixOS
