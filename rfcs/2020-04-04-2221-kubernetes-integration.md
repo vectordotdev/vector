@@ -316,7 +316,7 @@ Log file format can vary per container runtime, and we have to support all the
 formats that Kubernetes itself supports.
 
 Generally, most Kubernetes setups will put the logs at the `kubelet`-configured
-locations in a .
+locations in a `/var/log` directory on the host.
 
 There is [official documentation][k8s_log_path_location_docs] at Kubernetes
 project regarding logging. I had a misconception that it specifies reading these
