@@ -79,9 +79,6 @@ test-integration-influxdb: ## Runs Kafka integration tests
 test-integration-kafka: ## Runs Kafka integration tests
 	$(RUN) test-integration-kafka
 
-test-integration-kubernetes: ## Runs Kubernetes integration tests
-	$(RUN) test-integration-kubernetes
-
 test-integration-loki: ## Runs Loki integration tests
 	$(RUN) test-integration-loki
 
@@ -90,9 +87,6 @@ test-integration-pulsar: ## Runs Kafka integration tests
 
 test-integration-splunk: ## Runs Kafka integration tests
 	$(RUN) test-integration-splunk
-
-test-integration-kubernetes: build-x86_64-unknown-linux-musl ## Runs Kubernetes integration tests
-	$(RUN) test-integration-kubernetes
 
 test-unit: ## Runs unit tests, tests which do not require additional services to be present
 	$(RUN) test-unit
