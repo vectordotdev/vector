@@ -10,7 +10,7 @@ env:
   CHANNEL: nightly
 
 jobs:
-  build-x86_64-unknown-linux-musl-archive-and-deb-package:
+  package-archive-x86_64-unknown-linux-musl-and-deb:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -27,7 +27,7 @@ jobs:
           name: "vector-amd64.deb"
           path: "./target/artifacts/vector-amd64.deb"
 
-  build-aarch64-unknown-linux-musl-archive-and-deb-package:
+  package-archive-aarch64-unknown-linux-musl-and-deb:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -45,7 +45,7 @@ jobs:
           name: "vector-arm64.deb"
           path: "./target/artifacts/vector-arm64.deb"
 
-  build-armv7-unknown-linux-musleabihf-archive-and-deb-package:
+  pachakge-archive-armv7-unknown-linux-musleabihf-and-deb:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -63,7 +63,7 @@ jobs:
           name: "vector-armhf.deb"
           path: "./target/artifacts/vector-armhf.deb"
 
-  build-x86_64-apple-darwin-archive:
+  package-archive-x86_64-apple-darwin:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
@@ -75,13 +75,13 @@ jobs:
           USE_CONTAINER: none
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          cd tests && make build-archive
+          cd tests && make package-archive
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-x86_64-apple-darwin.tar.gz"
           path: "./target/artifacts/vector-x86_64-apple-darwin.tar.gz"
 
-  build-x86_64-pc-windows-msvc-archive-and-msi-package:
+  package-archive-x86_64-pc-windows-msvc-and-msi:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v1
@@ -129,7 +129,7 @@ jobs:
           export STRIP="false"
           export RUST_LTO=""
           export TARGET="x86_64-pc-windows-msvc"
-          cd tests && make build-archive
+          cd tests && make package-archive
       - name: "Build package"
         shell: bash
         run: |
@@ -147,9 +147,9 @@ jobs:
   release-docker:
     runs-on: ubuntu-latest
     needs:
-      - build-x86_64-unknown-linux-musl-archive-and-deb-package
-      - build-aarch64-unknown-linux-musl-archive-and-deb-package
-      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
+      - package-archive-x86_64-unknown-linux-musl-and-deb
+      - package-archive-aarch64-unknown-linux-musl-and-deb
+      - pachakge-archive-armv7-unknown-linux-musleabihf-and-deb
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v1
@@ -189,11 +189,11 @@ jobs:
   release-s3:
     runs-on: ubuntu-latest
     needs:
-      - build-x86_64-unknown-linux-musl-archive-and-deb-package
-      - build-aarch64-unknown-linux-musl-archive-and-deb-package
-      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
-      - build-x86_64-apple-darwin-archive
-      - build-x86_64-pc-windows-msvc-archive-and-msi-package
+      - package-archive-x86_64-unknown-linux-musl-and-deb
+      - package-archive-aarch64-unknown-linux-musl-and-deb
+      - pachakge-archive-armv7-unknown-linux-musleabihf-and-deb
+      - package-archive-x86_64-apple-darwin
+      - package-archive-x86_64-pc-windows-msvc-and-msi
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v1
