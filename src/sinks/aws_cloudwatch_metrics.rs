@@ -429,7 +429,7 @@ mod tests {
     }
 }
 
-#[cfg(feature = "cloudwatch-metrics-integration-tests")]
+#[cfg(feature = "aws-cloudwatch-metrics-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
     use super::*;

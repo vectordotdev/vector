@@ -318,7 +318,7 @@ mod tests {
     }
 }
 
-#[cfg(feature = "kinesis-integration-tests")]
+#[cfg(feature = "aws-kinesis-streams-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
     use super::*;

@@ -9,4 +9,4 @@
 set -euo pipefail
 
 docker-compose up -d dependencies-gcp
-cargo test --no-default-features --features gcp-pubsub-integration-tests, gcs-integration-tests
+cargo test --no-default-features --features gcp-integration-tests

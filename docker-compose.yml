@@ -481,7 +481,7 @@ services:
       - dependencies-aws
     network_mode: host
     working_dir: $PWD
-    command: cargo test --all --no-default-features --features default-musl,cloudwatch-logs-integration-tests,cloudwatch-metrics-integration-tests,ec2-metadata-integration-tests,firehose-integration-tests,kinesis-integration-tests,s3-integration-tests --target x86_64-unknown-linux-musl
+    command: cargo test --all --no-default-features --features default-musl,aws-integration-tests --target x86_64-unknown-linux-musl
 
   test-behavior:
     image: ubuntu:18.04

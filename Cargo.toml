@@ -373,37 +373,34 @@ nightly = []
 
 # Testing-related features
 docker = [
+  "aws-integration-tests",
   "clickhouse-integration-tests",
-  "cloudwatch-logs-integration-tests",
-  "cloudwatch-metrics-integration-tests",
   "docker-integration-tests",
-  "ec2-metadata-integration-tests",
   "es-integration-tests",
-  "firehose-integration-tests",
-  "gcp-pubsub-integration-tests",
-  "gcs-integration-tests",
-  "kafka-integration-tests",
-  "kinesis-integration-tests",
-  "s3-integration-tests",
+  "gcp-integration-tests",
   "influxdb-integration-tests",
-  "splunk-integration-tests",
+  "kafka-integration-tests",
   "pulsar-integration-tests",
+  "splunk-integration-tests",
 ]
+
+aws-integration-tests = ["sinks-aws_cloudwatch_logs", "sinks-aws_cloudwatch_metrics", "sinks-elasticsearch", "sinks-aws_kinesis_firehose", "sinks-aws_kinesis_streams", "sinks-aws_s3", "transforms-aws_ec2_metadata"]
+aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
+aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
+aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
+aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-elasticsearch"]
+aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
+aws-s3-integration-tests = ["sinks-aws_s3"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 docker-integration-tests = ["sources-docker", "unix"]
-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
 es-integration-tests = ["sinks-elasticsearch"]
-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-elasticsearch"]
+gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp"]
-gcs-integration-tests = ["sinks-gcp"]
+gcp-cloud-storage-integration-tests = ["sinks-gcp"]
 influxdb-integration-tests = ["sinks-influxdb_metrics"]
 kafka-integration-tests = ["sinks-kafka"]
-kinesis-integration-tests = ["sinks-aws_kinesis_streams"]
 loki-integration-tests = ["sinks-loki"]
 pulsar-integration-tests = ["sinks-pulsar"]
-s3-integration-tests = ["sinks-aws_s3"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 
 kubernetes = ["kubernetes-integration-tests"]
