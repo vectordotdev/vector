@@ -226,7 +226,7 @@ services:
     working_dir: $PWD
     command: ./scripts/build-archive.sh
 
-  package-deb-x86_64-unknown-linux-musl:
+  package-deb-x86_64:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
@@ -240,7 +240,7 @@ services:
     working_dir: $PWD
     command: ./scripts/package-deb.sh
 
-  package-deb-armv7-unknown-linux-musleabihf:
+  package-deb-armv7:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
@@ -254,7 +254,7 @@ services:
     working_dir: $PWD
     command: ./scripts/package-deb.sh
 
-  package-deb-aarch64-aarch64-unknown-linux-musl:
+  package-deb-aarch64:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
