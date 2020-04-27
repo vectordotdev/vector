@@ -551,7 +551,7 @@ We can offer some simple "typical custom configurations" at our documentation as
 an example:
 
 - with a sink to push data to our Alloy;
-- with a cluster-agnosic `elasticsearch` sink;
+- with a cluster-agnostic `elasticsearch` sink;
 - for AWS clusters, with a `cloudwatch` sink;
 - etc...
 
