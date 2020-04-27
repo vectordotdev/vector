@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@1.0.0
-      - run: "cd tests && make check-markdown"
+      - run: make check-markdown
 
   pull-request:
     runs-on: ubuntu-latest
