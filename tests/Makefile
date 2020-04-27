@@ -22,7 +22,8 @@ all: check build-all package-all test-docker test-behavior verify ## run all tes
 
 ##@ Building
 
-build: build-x86_64-unknown-linux-musl ## default target, build the project in debug mode
+build: ## build a project binary
+	$(RUN) build
 
 build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## build the project in debug mode for all platforms
 
@@ -121,7 +122,7 @@ check-blog: ## check that all blog posts are signed and valid
 
 package-all: package-archive-all package-deb-all package-rpm-all ## package everything
 
-package-archive: ## package the Vector archive
+package-archive: build ## package the Vector archive
 	$(RUN) package-archive
 
 package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-armv7-unknown-linux-musleabihf package-archive-aarch64-unknown-linux-musl ## package all archives
