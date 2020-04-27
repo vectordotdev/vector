@@ -534,11 +534,20 @@ fn topology_healthcheck_not_run_on_unchanged_reload() {
 #[test]
 fn topology_healthcheck_run_for_changes_on_reload() {
     let mut rt = runtime();
-    let config = basic_config();
-    let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+
     let mut config = Config::empty();
-    config.add_source("in1", source().1);
+    // We can't just drop the sender side since that will close the source.
+    let (_ch0, src) = source();
+    config.add_source("in1", src);
+    config.add_sink("out1", &["in1"], sink(10).1);
+    let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+
+    let mut config = Config::empty();
+    // We can't just drop the sender side since that will close the source.
+    let (_ch1, src) = source();
+    config.add_source("in1", src);
     config.add_sink("out2", &["in1"], sink_failing_healthcheck(10).1);
+
     assert!(
         topology
             .reload_config_and_respawn(config, &mut rt, true)
