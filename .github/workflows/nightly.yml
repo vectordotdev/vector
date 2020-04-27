@@ -180,6 +180,7 @@ jobs:
           DOCKER_USERNAME: "${{ secrets.CI_DOCKER_USERNAME }}"
           DOCKER_PASSWORD: "${{ secrets.CI_DOCKER_PASSWORD }}"
           PLATFORM: "linux/amd64,linux/arm64,linux/arm"
+          USE_CONTAINER: none
         run: |
           ./scripts/upgrade-docker.sh
           cd tests
@@ -235,4 +236,5 @@ jobs:
       - env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
+          USE_CONTAINER: none
         run: cd tests && make release-s3
