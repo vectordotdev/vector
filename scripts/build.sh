@@ -46,7 +46,7 @@ echo "Features: $FEATURES"
 # Setup directories
 #
 
-if [ -z "$NATIVE_BUILD" ]; then
+if [ "$NATIVE_BUILD" != "true" ]; then
   target_dir="target/$TARGET"
 else
   target_dir="target"
@@ -58,7 +58,7 @@ fi
 
 build_flags="--release"
 
-if [ -z "$NATIVE_BUILD" ]; then
+if [ "$NATIVE_BUILD" != "true" ]; then
   build_flags="$build_flags --target $TARGET"
 fi
 
