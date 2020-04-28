@@ -8,6 +8,7 @@ on:
       - ".github/workflows/code.yml"
       - "lib/*s"
       - "proto/**"
+      - "scripts/**"
       - "src/**"
       - "tests/**"
       - "Cargo.lock"
@@ -21,6 +22,7 @@ on:
       - ".github/workflows/code.yml"
       - "lib/*s"
       - "proto/**"
+      - "scripts/**"
       - "src/**"
       - "tests/**"
       - "Cargo.lock"
@@ -78,6 +80,12 @@ jobs:
   #     - uses: actions/checkout@v1
   #     - run: sudo gem install git
   #     - run: make check-version
+
+  check-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-scripts
 
   check-windows:
     runs-on: windows-latest

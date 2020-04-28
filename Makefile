@@ -95,7 +95,7 @@ test-unit: ## Runs unit tests, tests which do not require additional services to
 
 check: check-all ## Default target, check everything
 
-check-all: check-code check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features ## Check everything
+check-all: check-code check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
 
 check-code: ## Check code
 	$(RUN) check-code
@@ -123,6 +123,9 @@ check-examples: build ## Check that the config/exmaples files are valid
 
 check-blog: ## Check that all blog posts are signed and valid
 	$(RUN) check-blog
+
+check-scripts: ## Check that scipts do not have common mistakes
+	$(RUN) check-scripts
 
 ##@ Packaging
 
