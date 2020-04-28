@@ -129,12 +129,12 @@ impl SinkConfig for ElasticSearchConfig {
 #[derive(Debug)]
 pub struct ElasticSearchCommon {
     pub base_url: String,
+    bulk_uri: Uri,
     authorization: Option<String>,
     credentials: Option<AwsCredentials>,
     index: Template,
     doc_type: String,
     tls_settings: TlsSettings,
-    path_and_query: String,
     config: ElasticSearchConfig,
     compression: Compression,
     region: Region,
@@ -195,13 +195,15 @@ impl HttpSink for ElasticSearchCommon {
     }
 
     fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
-        let uri = format!("{}{}", self.base_url, self.path_and_query)
-            .parse::<Uri>()
-            .unwrap();
-        let mut builder = Request::post(&uri);
+        let mut builder = Request::post(&self.bulk_uri);
 
         if let Some(credentials) = &self.credentials {
-            let mut request = signed_request("POST", &self.region, &uri, Some(&self.query_params));
+            let mut request = signed_request(
+                "POST",
+                &self.region,
+                &self.bulk_uri,
+                Some(&self.query_params),
+            );
 
             request.add_header("Content-Type", "application/x-ndjson");
 
@@ -349,18 +351,19 @@ impl ElasticSearchCommon {
         for (p, v) in &query_params {
             query.append_pair(&p[..], &v[..]);
         }
-        let path_and_query = format!("/_bulk?{}", query.finish());
+        let bulk_url = format!("{}/_bulk?{}", base_url, query.finish());
+        let bulk_uri = bulk_url.parse::<Uri>().unwrap();
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
         let config = config.clone();
 
         Ok(Self {
             base_url,
+            bulk_uri,
             authorization,
             credentials,
             index,
             doc_type,
-            path_and_query,
             tls_settings,
             config,
             compression,
