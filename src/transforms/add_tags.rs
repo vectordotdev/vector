@@ -82,8 +82,8 @@ mod tests {
         transforms::Transform,
     };
     use indexmap::IndexMap;
-    use string_cache::DefaultAtom as Atom;
     use std::collections::BTreeMap;
+    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn add_tags() {
@@ -123,9 +123,9 @@ mod tests {
             value: MetricValue::Gauge { value: 10.0 },
         });
 
-        let map: IndexMap<Atom, String> = vec![
-            (Atom::from("region"), "overridden".into()),
-        ].into_iter().collect();
+        let map: IndexMap<Atom, String> = vec![(Atom::from("region"), "overridden".into())]
+            .into_iter()
+            .collect();
 
         let mut transform = AddTags::new(map, false);
 

@@ -55,7 +55,7 @@ impl TransformConfig for AddFieldsConfig {
                 .all_fields()
                 .map(|(k, v)| (k.into(), v.into()))
                 .collect(),
-            self.r#override
+            self.r#override,
         )))
     }
 
@@ -80,7 +80,10 @@ impl AddFields {
             flatten_field(k.into(), v, &mut new_fields);
         }
 
-        AddFields { fields: new_fields, r#override }
+        AddFields {
+            fields: new_fields,
+            r#override,
+        }
     }
 }
 
@@ -110,7 +113,7 @@ impl Transform for AddFields {
                             rate_limit_secs = 30,
                         )
                     }
-                },
+                }
                 false => {
                     if event.as_mut_log().contains(&key) {
                         debug!(
@@ -230,7 +233,6 @@ mod tests {
 
         assert_eq!(new_event, event);
     }
-
 
     #[test]
     fn add_fields_preseves_types() {
