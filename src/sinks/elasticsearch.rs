@@ -138,6 +138,7 @@ pub struct ElasticSearchCommon {
     config: ElasticSearchConfig,
     compression: Compression,
     region: Region,
+    query_params: HashMap<String, String>,
 }
 
 #[derive(Debug, Snafu)]
@@ -200,7 +201,7 @@ impl HttpSink for ElasticSearchCommon {
         let mut builder = Request::post(&uri);
 
         if let Some(credentials) = &self.credentials {
-            let mut request = signed_request("POST", &self.region, &uri);
+            let mut request = signed_request("POST", &self.region, &uri, Some(&self.query_params));
 
             request.add_header("Content-Type", "application/x-ndjson");
 
@@ -341,14 +342,14 @@ impl ElasticSearchCommon {
 
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let path = format!("/_bulk?timeout={}s", request.timeout.as_secs());
-        let mut path_query = url::form_urlencoded::Serializer::new(path);
-        if let Some(ref query) = config.query {
-            for (p, v) in query {
-                path_query.append_pair(&p[..], &v[..]);
-            }
+        let mut query_params = config.query.clone().unwrap_or_default();
+        query_params.insert("timeout".into(), format!("{}s", request.timeout.as_secs()));
+
+        let mut query = url::form_urlencoded::Serializer::new(String::new());
+        for (p, v) in &query_params {
+            query.append_pair(&p[..], &v[..]);
         }
-        let path_and_query = path_query.finish();
+        let path_and_query = format!("/_bulk?{}", query.finish());
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
         let config = config.clone();
@@ -364,6 +365,7 @@ impl ElasticSearchCommon {
             config,
             compression,
             region,
+            query_params,
         })
     }
 }
@@ -381,7 +383,8 @@ fn healthcheck(
             }
         }
         Some(credentials) => {
-            let mut signer = signed_request("GET", &common.region, builder.uri_ref().unwrap());
+            let mut signer =
+                signed_request("GET", &common.region, builder.uri_ref().unwrap(), None);
             finish_signer(&mut signer, &credentials, &mut builder);
         }
     }
@@ -398,8 +401,19 @@ fn healthcheck(
     ))
 }
 
-fn signed_request(method: &str, region: &Region, uri: &Uri) -> SignedRequest {
-    SignedRequest::new(method, "es", &region, uri.path())
+fn signed_request(
+    method: &str,
+    region: &Region,
+    uri: &Uri,
+    params: Option<&HashMap<String, String>>,
+) -> SignedRequest {
+    let mut request = SignedRequest::new(method, "es", &region, uri.path());
+    if let Some(params) = params {
+        for (key, value) in params {
+            request.add_param(key, value);
+        }
+    }
+    request
 }
 
 fn finish_signer(
