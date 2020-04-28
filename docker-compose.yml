@@ -70,6 +70,7 @@ services:
       - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: cargo bench --all --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
   generate:
@@ -97,6 +98,7 @@ services:
       - ./target/cargo/git:/root/.cargo/git
       - ./target/rustup/tmp:/root/.rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: cargo check --all --all-targets
 
   check-component-features:
@@ -112,6 +114,7 @@ services:
       - ./target/cargo/git:/root/.cargo/git
       - ./target/rustup/tmp:/root/.rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: ./scripts/check-component-features.sh
 
   check-fmt:
@@ -126,6 +129,7 @@ services:
       - ./target/cargo/git:/root/.cargo/git
       - ./target/rustup/tmp:/root/.rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: cargo fmt -- --check
 
   check-style:
@@ -188,6 +192,7 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
+    user: $USER
     command: ./scripts/check-blog-signatures.rb
 
   package-archive-x86_64-unknown-linux-musl:
@@ -432,6 +437,7 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
+    user: $USER
     entrypoint: ./scripts/target-graph.sh
 
   clean:
@@ -439,6 +445,7 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
+    user: $USER
     command: ["sh", "-ec", "rm -rf target"]
 
   load-qemu-binfmt:
@@ -462,6 +469,7 @@ services:
       - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: cargo test --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
   test-integration:
@@ -484,6 +492,7 @@ services:
       - dependencies-all
     network_mode: host
     working_dir: $PWD
+    user: $USER
     command: cargo test --all --no-default-features --features default-musl,docker --target x86_64-unknown-linux-musl -- --test-threads 4
 
   test-integration-aws:
@@ -506,6 +515,7 @@ services:
       - dependencies-aws
     network_mode: host
     working_dir: $PWD
+    user: $USER
     command: cargo test --all --no-default-features --features default-musl,aws-integration-tests --target x86_64-unknown-linux-musl
 
   test-behavior:
