@@ -1,7 +1,7 @@
 use crate::event::Value;
 use crate::sinks::influxdb::{
-    encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, Field,
-    InfluxDB1Settings, InfluxDB2Settings, influxdb_settings,
+    encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
+    Field, InfluxDB1Settings, InfluxDB2Settings,
 };
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
@@ -11,7 +11,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::Sink;
-use http::{Request, Method};
+use http::{Method, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
@@ -141,7 +141,8 @@ impl HttpSink for InfluxDBLogsConfig {
         let settings = influxdb_settings(
             self.influxdb1_settings.clone(),
             self.influxdb2_settings.clone(),
-        ).unwrap();
+        )
+        .unwrap();
 
         let endpoint = self.endpoint.clone();
         let token = settings.token();
@@ -172,14 +173,14 @@ impl Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{self, Event};
+    use crate::event::Event;
     use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, ts};
     use crate::sinks::util::http::HttpSink;
-    use crate::test_util;
     use crate::sinks::util::test::build_test_server;
-    use futures01::{Sink, Stream};
+    use crate::test_util;
     use chrono::offset::TimeZone;
     use chrono::Utc;
+    use futures01::{Sink, Stream};
 
     #[test]
     fn test_config_without_tags() {
@@ -316,7 +317,7 @@ mod tests {
             database = "my-database"
         "#,
         )
-            .unwrap();
+        .unwrap();
 
         // Make sure we can build the config
         let _ = config.build(cx.clone()).unwrap();
@@ -332,17 +333,20 @@ mod tests {
         let (rx, _trigger, server) = build_test_server(&addr);
         rt.spawn(server);
 
-        let lines = std::iter::repeat(()).map(move |_| "message_value").take(5).collect::<Vec<_>>();
+        let lines = std::iter::repeat(())
+            .map(move |_| "message_value")
+            .take(5)
+            .collect::<Vec<_>>();
         let mut events = Vec::new();
 
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
             let mut event = Event::from(line.to_string());
-            event.as_mut_log().insert(format!("key{}", i), format!("value{}", i));
+            event
+                .as_mut_log()
+                .insert(format!("key{}", i), format!("value{}", i));
 
-            let timestamp = Utc
-                .ymd(1970, 01, 01)
-                .and_hms_nano(0, 0, (i as u32) + 1, 0);
+            let timestamp = Utc.ymd(1970, 01, 01).and_hms_nano(0, 0, (i as u32) + 1, 0);
             event.as_mut_log().insert("timestamp", timestamp);
 
             events.push(event);
@@ -376,7 +380,7 @@ mod tests {
             token = "my-token"
         "#,
         )
-            .unwrap();
+        .unwrap();
 
         // Make sure we can build the config
         let _ = config.build(cx.clone()).unwrap();
@@ -392,17 +396,20 @@ mod tests {
         let (rx, _trigger, server) = build_test_server(&addr);
         rt.spawn(server);
 
-        let lines = std::iter::repeat(()).map(move |_| "message_value").take(5).collect::<Vec<_>>();
+        let lines = std::iter::repeat(())
+            .map(move |_| "message_value")
+            .take(5)
+            .collect::<Vec<_>>();
         let mut events = Vec::new();
 
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
             let mut event = Event::from(line.to_string());
-            event.as_mut_log().insert(format!("key{}", i), format!("value{}", i));
+            event
+                .as_mut_log()
+                .insert(format!("key{}", i), format!("value{}", i));
 
-            let timestamp = Utc
-                .ymd(1970, 01, 01)
-                .and_hms_nano(0, 0, (i as u32) + 1, 0);
+            let timestamp = Utc.ymd(1970, 01, 01).and_hms_nano(0, 0, (i as u32) + 1, 0);
             event.as_mut_log().insert("timestamp", timestamp);
 
             events.push(event);
@@ -431,7 +438,14 @@ mod tests {
         let line_protocol = split_line_protocol(value.unwrap());
         assert_eq!("ns.vector", line_protocol.0);
         assert_eq!("metric_type=logs", line_protocol.1);
-        assert_fields(line_protocol.2.to_string(), [&*format!("key{}=\"value{}\"", i, i), "message=\"message_value\""].to_vec());
+        assert_fields(
+            line_protocol.2.to_string(),
+            [
+                &*format!("key{}=\"value{}\"", i, i),
+                "message=\"message_value\"",
+            ]
+            .to_vec(),
+        );
 
         assert_eq!(format!("{}", (i + 1) * 1000000000), line_protocol.3);
     }
