@@ -164,6 +164,26 @@ jobs:
       - uses: actions/checkout@v1
       - run: make test-integration-splunk
 
+  integration-kubernetes:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        kubernetes:
+          - v1.18.2
+          - v1.17.5
+          - v1.16.9
+          - v1.15.11
+          - v1.14.10
+    steps:
+      - name: Setup Minikube
+        uses: manusa/actions-setup-minikube@v1.0.2
+        with:
+          minikube version: 'v1.9.2'
+          kubernetes version: '${{ matrix.kubernetes }}'
+          github token: '${{ secrets.GITHUB_TOKEN }}'
+      - uses: actions/checkout@v1
+      - run: make test-integration-kubernetes
+
   test-unit:
     runs-on: ubuntu-latest
     steps:
