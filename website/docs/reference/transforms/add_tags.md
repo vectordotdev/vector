@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-04-28"
 component_title: "Add Tags"
 description: "The Vector `add_tags` transform accepts and outputs `metric` events, allowing you to add one or more metric tags."
 event_types: ["metric"]
@@ -41,6 +41,7 @@ add one or more metric tags.
   # General
   type = "add_tags" # required
   inputs = ["my-source-or-transform-id"] # required
+  override = true # optional, no default
 
   # Tags
   tags.static_tag = "my value" # example
@@ -55,6 +56,7 @@ add one or more metric tags.
   # General
   type = "add_tags" # required
   inputs = ["my-source-or-transform-id"] # required
+  override = true # optional, no default
 
   # Tags
   tags.static_tag = "my value" # example
@@ -65,6 +67,31 @@ add one or more metric tags.
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"override"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### override
+
+By default, fields will be overridden. Set this to `false` to avoid overwriting
+values.
+
+
+
+
+</Field>
 <Field
   common={true}
   defaultValue={null}

@@ -19,6 +19,14 @@ A table of key/value pairs representing the tags to be added to the \
 metric.\
 """
 
+[transforms.add_tags.options.override]
+type = "bool"
+common = true
+required = false
+description = """\
+By default, fields will be overridden. Set this to `false` to avoid overwriting values.
+"""
+
 [transforms.add_tags.options.tags.children."`[tag-name]`"]
 type = "string"
 required = true
