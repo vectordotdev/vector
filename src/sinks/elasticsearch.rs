@@ -3,6 +3,7 @@ use crate::{
     emit,
     event::Event,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
+    region::region_from_endpoint,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
@@ -136,6 +137,7 @@ pub struct ElasticSearchCommon {
     path_and_query: String,
     config: ElasticSearchConfig,
     compression: Compression,
+    region: Region,
 }
 
 #[derive(Debug, Snafu)]
@@ -198,7 +200,7 @@ impl HttpSink for ElasticSearchCommon {
         let mut builder = Request::post(&uri);
 
         if let Some(credentials) = &self.credentials {
-            let mut request = signed_request("POST", &uri);
+            let mut request = signed_request("POST", &self.region, &uri);
 
             request.add_header("Content-Type", "application/x-ndjson");
 
@@ -291,6 +293,7 @@ impl ElasticSearchCommon {
         };
 
         let base_url = config.host.clone();
+        let region = region_from_endpoint(&config.host)?;
 
         // Test the configured host, but ignore the result
         let uri = format!("{}/_test", &config.host);
@@ -360,6 +363,7 @@ impl ElasticSearchCommon {
             tls_settings,
             config,
             compression,
+            region,
         })
     }
 }
@@ -377,7 +381,7 @@ fn healthcheck(
             }
         }
         Some(credentials) => {
-            let mut signer = signed_request("GET", builder.uri_ref().unwrap());
+            let mut signer = signed_request("GET", &common.region, builder.uri_ref().unwrap());
             finish_signer(&mut signer, &credentials, &mut builder);
         }
     }
@@ -394,11 +398,7 @@ fn healthcheck(
     ))
 }
 
-fn signed_request(method: &str, uri: &Uri) -> SignedRequest {
-    let region = Region::Custom {
-        name: "custom".into(),
-        endpoint: uri.to_string(),
-    };
+fn signed_request(method: &str, region: &Region, uri: &Uri) -> SignedRequest {
     SignedRequest::new(method, "es", &region, uri.path())
 }
 
