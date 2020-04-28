@@ -41,7 +41,7 @@ add one or more metric tags.
   # General
   type = "add_tags" # required
   inputs = ["my-source-or-transform-id"] # required
-  override = true # optional, no default
+  override = true # optional, default
 
   # Tags
   tags.static_tag = "my value" # example
@@ -56,7 +56,7 @@ add one or more metric tags.
   # General
   type = "add_tags" # required
   inputs = ["my-source-or-transform-id"] # required
-  override = true # optional, no default
+  override = true # optional, default
 
   # Tags
   tags.static_tag = "my value" # example
@@ -69,7 +69,7 @@ add one or more metric tags.
 <Fields filters={true}>
 <Field
   common={true}
-  defaultValue={null}
+  defaultValue={true}
   enumValues={null}
   examples={[true,false]}
   groups={[]}
@@ -101,7 +101,7 @@ values.
   name={"tags"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}

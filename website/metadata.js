@@ -36006,7 +36006,7 @@ module.exports = {
     "add_tags": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  inputs = [\"in\"] # required\n  type = \"add_tags\" # required\n\n  # Tags\n  tags.static_tag = \"my value\" # example\n  tags.env_tag = \"${ENV_VAR}\" # example"
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  type = \"add_tags\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
