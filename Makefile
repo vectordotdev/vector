@@ -23,7 +23,7 @@ help:
 	@echo ""
 	@echo "---------------------------------------------------------------------------------------"
 	@echo ""
-	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Default
 
@@ -31,23 +31,23 @@ all: check build-all package-all test-docker test-behavior verify ## Run all tes
 
 ##@ Building
 
-build: ## Build a project binary
+build: ## Build the project natively in release mode
 	$(RUN) build
 
-build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in debug mode for all platforms
+build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
-build-x86_64-unknown-linux-musl: ## Build the project for the x86_64 architecture
+build-x86_64-unknown-linux-musl: ## Build the project in release mode for the x86_64 architecture
 	$(RUN) build-x86_64-unknown-linux-musl
 
-build-armv7-unknown-linux-musleabihf: load-qemu-binfmt ## Build the project for the armv7 architecture
+build-armv7-unknown-linux-musleabihf: load-qemu-binfmt ## Build the project in release mode for the armv7 architecture
 	$(RUN) build-armv7-unknown-linux-musleabihf
 
-build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build the project for the aarch64 architecture
+build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build the project in release mode for the aarch64 architecture
 	$(RUN) build-aarch64-unknown-linux-musl
 
 ##@ Developing
 
-bench: build ## Run benchmarks
+bench: build ## Run benchmarks in /benches
 	$(RUN) bench
 
 test: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
