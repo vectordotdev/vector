@@ -1,7 +1,7 @@
 use crate::event::Value;
 use crate::sinks::influxdb::{
     encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, Field,
-    InfluxDB1Settings, InfluxDB2Settings,
+    InfluxDB1Settings, InfluxDB2Settings, influxdb_settings,
 };
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
@@ -11,7 +11,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::Sink;
-use http::Request;
+use http::{Request, Method};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
@@ -133,15 +133,27 @@ impl HttpSink for InfluxDBLogsConfig {
             timestamp,
             &mut output,
         );
-        // remove last '\n'
-        output.pop();
 
         Some(output.into_bytes())
     }
 
     fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
-        let mut builder = Request::builder();
+        let settings = influxdb_settings(
+            self.influxdb1_settings.clone(),
+            self.influxdb2_settings.clone(),
+        ).unwrap();
 
+        let endpoint = self.endpoint.clone();
+        let token = settings.token();
+
+        let uri = settings.write_uri(endpoint).unwrap();
+
+        let mut builder = Request::builder();
+        builder.method(Method::POST);
+        builder.uri(uri.clone());
+
+        builder.header("Content-Type", "text/plain");
+        builder.header("Authorization", format!("Token {}", token));
         builder.body(events).unwrap()
     }
 }
@@ -163,6 +175,11 @@ mod tests {
     use crate::event::{self, Event};
     use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, ts};
     use crate::sinks::util::http::HttpSink;
+    use crate::test_util;
+    use crate::sinks::util::test::build_test_server;
+    use futures01::{Sink, Stream};
+    use chrono::offset::TimeZone;
+    use chrono::Utc;
 
     #[test]
     fn test_config_without_tags() {
@@ -221,7 +238,7 @@ mod tests {
             .to_vec(),
         );
 
-        assert_eq!("1542182950000000011", line_protocol.3);
+        assert_eq!("1542182950000000011\n", line_protocol.3);
     }
 
     #[test]
@@ -253,7 +270,7 @@ mod tests {
             ["value=100i", "message=\"hello\""].to_vec(),
         );
 
-        assert_eq!("1542182950000000011", line_protocol.3);
+        assert_eq!("1542182950000000011\n", line_protocol.3);
     }
 
     #[test]
@@ -287,6 +304,135 @@ mod tests {
         );
         assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
 
-        assert_eq!("1542182950000000011", line_protocol.3);
+        assert_eq!("1542182950000000011\n", line_protocol.3);
+    }
+
+    #[test]
+    fn smoke_v1() {
+        let (mut config, cx, mut rt) = crate::sinks::util::test::load_sink::<InfluxDBLogsConfig>(
+            r#"
+            namespace = "ns"
+            endpoint = "http://localhost:9999"
+            database = "my-database"
+        "#,
+        )
+            .unwrap();
+
+        // Make sure we can build the config
+        let _ = config.build(cx.clone()).unwrap();
+
+        let addr = test_util::next_addr();
+        // Swap out the host so we can force send it
+        // to our local server
+        let host = format!("http://{}", addr);
+        config.endpoint = host;
+
+        let (sink, _) = config.build(cx).unwrap();
+
+        let (rx, _trigger, server) = build_test_server(&addr);
+        rt.spawn(server);
+
+        let lines = std::iter::repeat(()).map(move |_| "message_value").take(5).collect::<Vec<_>>();
+        let mut events = Vec::new();
+
+        // Create 5 events with custom field
+        for (i, line) in lines.iter().enumerate() {
+            let mut event = Event::from(line.to_string());
+            event.as_mut_log().insert(format!("key{}", i), format!("value{}", i));
+
+            let timestamp = Utc
+                .ymd(1970, 01, 01)
+                .and_hms_nano(0, 0, (i as u32) + 1, 0);
+            event.as_mut_log().insert("timestamp", timestamp);
+
+            events.push(event);
+        }
+
+        let pump = sink.send_all(futures01::stream::iter_ok(events));
+        let _ = rt.block_on(pump).unwrap();
+
+        let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
+
+        let request = &output[0].0;
+        let query = request.uri.query().unwrap();
+        assert!(query.contains("db=my-database"));
+        assert!(query.contains("precision=ns"));
+
+        let body = std::str::from_utf8(&output[0].1[..]).unwrap();
+        let mut lines = body.lines();
+
+        assert_eq!(5, lines.clone().count());
+        assert_line_protocol(0, lines.next());
+    }
+
+    #[test]
+    fn smoke_v2() {
+        let (mut config, cx, mut rt) = crate::sinks::util::test::load_sink::<InfluxDBLogsConfig>(
+            r#"
+            namespace = "ns"
+            endpoint = "http://localhost:9999"
+            bucket = "my-bucket"
+            org = "my-org"
+            token = "my-token"
+        "#,
+        )
+            .unwrap();
+
+        // Make sure we can build the config
+        let _ = config.build(cx.clone()).unwrap();
+
+        let addr = test_util::next_addr();
+        // Swap out the host so we can force send it
+        // to our local server
+        let host = format!("http://{}", addr);
+        config.endpoint = host;
+
+        let (sink, _) = config.build(cx).unwrap();
+
+        let (rx, _trigger, server) = build_test_server(&addr);
+        rt.spawn(server);
+
+        let lines = std::iter::repeat(()).map(move |_| "message_value").take(5).collect::<Vec<_>>();
+        let mut events = Vec::new();
+
+        // Create 5 events with custom field
+        for (i, line) in lines.iter().enumerate() {
+            let mut event = Event::from(line.to_string());
+            event.as_mut_log().insert(format!("key{}", i), format!("value{}", i));
+
+            let timestamp = Utc
+                .ymd(1970, 01, 01)
+                .and_hms_nano(0, 0, (i as u32) + 1, 0);
+            event.as_mut_log().insert("timestamp", timestamp);
+
+            events.push(event);
+        }
+
+        let pump = sink.send_all(futures01::stream::iter_ok(events));
+        let _ = rt.block_on(pump).unwrap();
+
+        let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
+
+        let request = &output[0].0;
+        let query = request.uri.query().unwrap();
+        assert!(query.contains("org=my-org"));
+        assert!(query.contains("bucket=my-bucket"));
+        assert!(query.contains("precision=ns"));
+
+        let body = std::str::from_utf8(&output[0].1[..]).unwrap();
+        let mut lines = body.lines();
+
+        assert_eq!(5, lines.clone().count());
+        assert_line_protocol(0, lines.next());
+    }
+
+    fn assert_line_protocol(i: i64, value: Option<&str>) {
+        //ns.vector,metric_type=logs key0="value0",message="message_value" 1000000000
+        let line_protocol = split_line_protocol(value.unwrap());
+        assert_eq!("ns.vector", line_protocol.0);
+        assert_eq!("metric_type=logs", line_protocol.1);
+        assert_fields(line_protocol.2.to_string(), [&*format!("key{}=\"value{}\"", i, i), "message=\"message_value\""].to_vec());
+
+        assert_eq!(format!("{}", (i + 1) * 1000000000), line_protocol.3);
     }
 }
