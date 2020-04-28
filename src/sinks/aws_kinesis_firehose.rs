@@ -213,7 +213,7 @@ fn create_client(
 fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Record> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
-    let data = match encoding.codec {
+    let data = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
 
         Encoding::Text => log

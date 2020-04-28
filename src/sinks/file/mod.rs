@@ -209,7 +209,7 @@ async fn open_file(path: impl AsRef<std::path::Path>) -> std::io::Result<File> {
 pub fn encode_event(encoding: &EncodingConfigWithDefault<Encoding>, mut event: Event) -> Vec<u8> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
-    match encoding.codec {
+    match encoding.codec() {
         Encoding::Ndjson => serde_json::to_vec(&log).expect("Unable to encode event as JSON."),
         Encoding::Text => log
             .get(&event::log_schema().message_key())
