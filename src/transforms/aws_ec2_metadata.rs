@@ -1,13 +1,14 @@
 use super::Transform;
 use crate::{
     event::Event,
+    sinks::util::http::HttpClient,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
 use futures01::Stream;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
-use hyper::{client::connect::HttpConnector, Body, Client};
+use hyper::Body;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::RandomState, HashSet};
 use std::time::{Duration, Instant};
@@ -128,9 +129,12 @@ impl TransformConfig for Ec2Metadata {
             .map(|v| v.into_iter().map(Atom::from).collect())
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
+        let http_client = HttpClient::new(cx.resolver(), None)?;
+
         cx.executor().spawn_std(
             async move {
-                let mut client = MetadataClient::new(host, keys, write, refresh_interval, fields);
+                let mut client =
+                    MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
 
                 client.run().await;
             }
@@ -169,7 +173,7 @@ impl Transform for Ec2MetadataTransform {
 }
 
 struct MetadataClient {
-    client: Client<HttpConnector, Body>,
+    client: HttpClient<Body>,
     host: Uri,
     token: Option<(Bytes, Instant)>,
     keys: Keys,
@@ -193,6 +197,7 @@ struct IdentityDocument {
 
 impl MetadataClient {
     pub fn new(
+        client: HttpClient<Body>,
         host: Uri,
         keys: Keys,
         state: WriteHandle,
@@ -200,7 +205,7 @@ impl MetadataClient {
         fields: Vec<Atom>,
     ) -> Self {
         Self {
-            client: Client::new(),
+            client,
             host,
             token: None,
             keys,
@@ -247,7 +252,7 @@ impl MetadataClient {
             .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
             .body(Body::empty())?;
 
-        let res = self.client.request(req).compat().await?;
+        let res = self.client.send(req).await?;
 
         if res.status() != StatusCode::OK {
             return Err(Ec2MetadataError::UnableToFetchToken.into());
@@ -273,7 +278,7 @@ impl MetadataClient {
             .header(TOKEN_HEADER.clone(), token)
             .body(Body::empty())?;
 
-        let res = self.client.request(req).compat().await?;
+        let res = self.client.send(req).await?;
 
         if res.status() != StatusCode::OK {
             warn!(message="Identity document request failed.", status = %res.status());
@@ -305,7 +310,7 @@ impl MetadataClient {
             .header(TOKEN_HEADER.clone(), token)
             .body(Body::empty())?;
 
-        let res = self.client.request(req).compat().await?;
+        let res = self.client.send(req).await?;
 
         if StatusCode::OK != res.status() {
             warn!(message="Metadata request failed.", status = %res.status());
