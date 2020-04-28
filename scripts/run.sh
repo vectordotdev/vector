@@ -54,6 +54,6 @@ case "$USE_CONTAINER" in
         echo "service defined in /docker-compose.yml."
         exit 1
     fi
-    
+
     ${FILE}
 esac
