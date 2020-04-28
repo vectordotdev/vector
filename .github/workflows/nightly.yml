@@ -4,8 +4,6 @@ on:
   schedule:
     - cron: "0 14 * * *"
 
-  pull_request: {}
-
 env:
   CHANNEL: nightly
 
