@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-27"
+last_modified_on: "2020-04-28"
 delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Logs"
 description: "The Vector `influxdb_logs` sink batches `log` events to InfluxDB using v1 or v2 HTTP API."
@@ -905,7 +905,7 @@ A set of additional fields that will be attached to each LineProtocol as a tag.
 Note: If the set of tag values has high cardinality this also increase
 cardinality in InfluxDB.
 
-
+ See [Mapping Log Event into Line Protocol](#mapping-log-event-into-line-protocol) for more info.
 
 
 </Field>
@@ -1010,6 +1010,45 @@ vector --config /etc/vector/vector.toml --require-healthy
 If you'd like to disable health checks for this sink you can set the
 `healthcheck` option to `false`.
 
+### Mapping Log Event into Line Protocol
+
+InfluxDB uses [line protocol][urls.influxdb_line_protocol] to write data points. It is a text-based format that provides the measurement, tag set, field set, and timestamp of a data point.
+
+A `Log Event` event contains an arbitrary set of fields (key/value pairs) that describe the event.
+
+The following matrix outlines how Log Event fields are mapped into InfluxDB Line Protocol:
+
+| Field         | Line Protocol     |                                                                                                                                                 |
+|---------------|-------------------|
+| host          | tag               |
+| message       | field             |
+| source_type   | tag               |
+| timestamp     | timestamp         |
+| [custom-key]  | field             |
+
+The default behaviour could be overridden by a [`tags`](#tags) configuration.
+
+#### Mapping example
+
+The following example shows how is `Log Event` mapped into `Line Protocol`:
+
+##### Log Event
+
+```js
+{
+  "host": "my.host.com",
+  "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
+  "timestamp": "2019-11-01T21:15:47+00:00",
+  "custom_field": "custom_value"
+}
+```
+
+##### Line Protocol
+
+```influxdb_line_protocol
+ns.vector,host=my.host.com,metric_type=logs custom_field="custom_value",message="<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar" 1572642947000000000
+```
+
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
@@ -1040,4 +1079,5 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [urls.influxdb_authentication_token]: https://v2.docs.influxdata.com/v2.0/security/tokens/
 [urls.influxdb_http_api_v1]: https://docs.influxdata.com/influxdb/latest/tools/api/#write-http-endpoint
 [urls.influxdb_http_api_v2]: https://v2.docs.influxdata.com/v2.0/api/#tag/Write
+[urls.influxdb_line_protocol]: https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
 [urls.new_influxdb_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+influxdb_logs
