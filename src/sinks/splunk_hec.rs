@@ -15,7 +15,7 @@ use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, value::Value as JsonValue};
+use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use string_cache::DefaultAtom as Atom;
 use tower::Service;
@@ -116,6 +116,7 @@ impl HttpSink for HecSinkConfig {
         let mut event = event.into_log();
 
         let host = event.get(&self.host_key).cloned();
+
         let timestamp = if let Some(Value::Timestamp(ts)) =
             event.remove(&event::log_schema().timestamp_key())
         {
@@ -123,15 +124,28 @@ impl HttpSink for HecSinkConfig {
         } else {
             chrono::Utc::now().timestamp_nanos()
         };
+
         let sourcetype = event.get(&event::log_schema().source_type_key()).cloned();
 
-        let mut body = match self.encoding.codec() {
-            Encoding::Json => event_to_json(event, &self.indexed_fields, timestamp),
-            Encoding::Text => json!({
-                "event": event.get(&event::log_schema().message_key()).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
-                "time": timestamp,
-            }),
+        let fields = self
+            .indexed_fields
+            .iter()
+            .filter_map(|field| event.get(field).map(|value| (field, value.clone())))
+            .collect::<LogEvent>();
+
+        let event = match self.encoding.codec() {
+            Encoding::Json => json!(event),
+            Encoding::Text => json!(event
+                .get(&event::log_schema().message_key())
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_else(|| "".into())),
         };
+
+        let mut body = json!({
+            "event": event,
+            "fields": fields,
+            "time": timestamp
+        });
 
         if let Some(host) = host {
             let host = host.to_string_lossy();
@@ -227,19 +241,6 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
     }
 }
 
-fn event_to_json(event: LogEvent, indexed_fields: &[Atom], timestamp: i64) -> JsonValue {
-    let fields = indexed_fields
-        .iter()
-        .filter_map(|field| event.get(field).map(|value| (field, value.clone())))
-        .collect::<LogEvent>();
-
-    json!({
-        "fields": fields,
-        "event": event,
-        "time": timestamp
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249,9 +250,16 @@ mod tests {
     use std::collections::BTreeMap;
 
     #[derive(Deserialize, Debug)]
-    struct HecEvent {
+    struct HecEventJson {
         time: i64,
         event: BTreeMap<String, String>,
+        fields: BTreeMap<String, String>,
+    }
+
+    #[derive(Deserialize, Debug)]
+    struct HecEventText {
+        time: i64,
+        event: String,
         fields: BTreeMap<String, String>,
     }
 
@@ -265,6 +273,7 @@ mod tests {
             host = "test.com"
             token = "alksjdfo"
             host_key = "host"
+            indexed_fields = ["key"]
 
             [encoding]
             codec = "json"
@@ -274,7 +283,7 @@ mod tests {
 
         let bytes = config.encode_event(event).unwrap();
 
-        let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
+        let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
 
         let event = &hec_event.event;
         let kv = event.get(&"key".to_string()).unwrap();
@@ -287,6 +296,41 @@ mod tests {
         assert!(event
             .get(&event::log_schema().timestamp_key().to_string())
             .is_none());
+
+        assert_eq!(
+            hec_event.fields.get("key").map(|s| s.as_str()),
+            Some("value")
+        );
+    }
+
+    #[test]
+    fn splunk_encode_event_text() {
+        let mut event = Event::from("hello world");
+        event.as_mut_log().insert("key", "value");
+
+        let (config, _, _) = crate::sinks::util::test::load_sink::<HecSinkConfig>(
+            r#"
+            host = "test.com"
+            token = "alksjdfo"
+            host_key = "host"
+            indexed_fields = ["key"]
+
+            [encoding]
+            codec = "text"
+        "#,
+        )
+        .unwrap();
+
+        let bytes = config.encode_event(event).unwrap();
+
+        let hec_event = serde_json::from_slice::<HecEventText>(&bytes[..]).unwrap();
+
+        assert_eq!(hec_event.event.as_str(), "hello world");
+
+        assert_eq!(
+            hec_event.fields.get("key").map(|s| s.as_str()),
+            Some("value")
+        );
     }
 
     #[test]
