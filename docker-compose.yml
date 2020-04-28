@@ -297,6 +297,7 @@ services:
       dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
     environment:
       TARGET: armv7-unknown-linux-musleabihf
+      ARCH: armv7hl
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
