@@ -112,7 +112,18 @@ impl TransformConfig for Ec2Metadata {
     fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let (read, write) = evmap::new();
 
-        let keys = Keys::new(&self.namespace);
+        // Check if the namespace is set to `""` which should mean that we do
+        // not want a prefixed namespace.
+        let namespace = self.namespace.clone().and_then(|namespace| {
+            if namespace == "" {
+                None
+            } else {
+                Some(namespace)
+            }
+        });
+
+        let keys = Keys::new(&namespace);
+
         let host = self
             .host
             .clone()
@@ -589,5 +600,29 @@ mod tests {
             log.get(&"ec2.metadata.public-ipv4".into()),
             Some(&"192.1.1.1".into())
         );
+
+        // Set an empty namespace to ensure we don't prepend one.
+        let config = Ec2Metadata {
+            host: Some(HOST.clone()),
+            namespace: Some("".into()),
+            ..Default::default()
+        };
+        let mut transform = config
+            .build(TransformContext::new_test(rt.executor()))
+            .unwrap();
+
+        // We need to sleep to let the background task fetch the data.
+        std::thread::sleep(std::time::Duration::from_secs(1));
+
+        let event = Event::new_empty_log();
+
+        let event = transform.transform(event).unwrap();
+        let log = event.as_log();
+
+        assert_eq!(
+            log.get(&"availability-zone".into()),
+            Some(&"ww-region-1a".into())
+        );
+        assert_eq!(log.get(&"public-ipv4".into()), Some(&"192.1.1.1".into()));
     }
 }
