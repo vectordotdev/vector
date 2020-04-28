@@ -305,6 +305,7 @@ fn encode_uri(
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 pub mod test_util {
     use super::*;
     use chrono::offset::TimeZone;
