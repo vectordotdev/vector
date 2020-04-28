@@ -1,4 +1,11 @@
 #!/bin/bash
+
+# package-msi.sh
+#
+# SUMMARY
+#
+#   Creates a .msi package for Windows.
+
 set -exuo pipefail
 
 rm -rf target/msi-x64

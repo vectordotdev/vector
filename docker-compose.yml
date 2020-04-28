@@ -9,6 +9,7 @@ services:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
     environment:
+      NATIVE_BUILD: "false"
       TARGET: x86_64-unknown-linux-musl
       FEATURES: default-musl
       CARGO_TERM_COLOR: always
@@ -25,6 +26,7 @@ services:
       context: .
       dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
     environment:
+      NATIVE_BUILD: "false"
       TARGET: armv7-unknown-linux-musleabihf
       FEATURES: default-musl
       CARGO_TERM_COLOR: always
@@ -41,6 +43,7 @@ services:
       context: .
       dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
     environment:
+      NATIVE_BUILD: "false"
       TARGET: aarch64-unknown-linux-musl
       FEATURES: default-musl
       CARGO_TERM_COLOR: always
@@ -189,6 +192,7 @@ services:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
     environment:
+      NATIVE_BUILD: "false"
       TARGET: x86_64-unknown-linux-musl
       FEATURES: default-musl
       CARGO_TERM_COLOR: always
@@ -205,6 +209,7 @@ services:
       context: .
       dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
     environment:
+      NATIVE_BUILD: "false"
       TARGET: armv7-unknown-linux-musleabihf
       FEATURES: default-musl
       CARGO_TERM_COLOR: always
@@ -221,6 +226,7 @@ services:
       context: .
       dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
     environment:
+      NATIVE_BUILD: "false"
       TARGET: aarch64-unknown-linux-musl
       FEATURES: default-musl
       CARGO_TERM_COLOR: always
@@ -291,6 +297,7 @@ services:
       dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
     environment:
       TARGET: armv7-unknown-linux-musleabihf
+      ARCH: armv7hl
     volumes:
       - $PWD:$PWD
     working_dir: $PWD

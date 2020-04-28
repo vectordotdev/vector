@@ -8,14 +8,13 @@ env:
   CHANNEL: nightly
 
 jobs:
-  package-archive-x86_64-unknown-linux-musl-and-deb:
+  build-x86_64-unknown-linux-musl-packages:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - name: "Build archive and package"
-        env:
+      - env:
           PASS_FEATURES: "default-musl"
-        run: make package-deb-x86_64
+        run: make package-x86_64-unknown-linux-musl-all
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-x86_64-unknown-linux-musl.tar.gz"
@@ -24,16 +23,19 @@ jobs:
         with:
           name: "vector-amd64.deb"
           path: "./target/artifacts/vector-amd64.deb"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-x86_64.rpm"
+          path: "./target/artifacts/vector-x86_64.rpm"
 
-  package-archive-aarch64-unknown-linux-musl-and-deb:
+  build-aarch64-unknown-linux-musl-packages:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - name: "Build archive and package"
-        env:
+      - env:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default-musl"
-        run: make package-deb-aarch64
+        run: make package-aarch64-unknown-linux-musl-all
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-aarch64-unknown-linux-musl.tar.gz"
@@ -42,16 +44,19 @@ jobs:
         with:
           name: "vector-arm64.deb"
           path: "./target/artifacts/vector-arm64.deb"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-aarch64.rpm"
+          path: "./target/artifacts/vector-aarch64.rpm"
 
-  package-archive-armv7-unknown-linux-musleabihf-and-deb:
+  build-armv7-unknown-linux-musleabihf-packages:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - name: "Build archive and package"
-        env:
+      - env:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default-musl"
-        run: make package-deb-armv7
+        run: make package-armv7-unknown-linux-musleabihf-all
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-armv7-unknown-linux-musleabihf.tar.gz"
@@ -60,8 +65,12 @@ jobs:
         with:
           name: "vector-armhf.deb"
           path: "./target/artifacts/vector-armhf.deb"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-armv7hl.rpm"
+          path: "./target/artifacts/vector-armv7hl.rpm"
 
-  package-archive-x86_64-apple-darwin:
+  build-x86_64-apple-darwin-packages:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
@@ -71,6 +80,7 @@ jobs:
         env:
           TARGET: "x86_64-apple-darwin"
           USE_CONTAINER: none
+          NATIVE_BUILD: true
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           make package-archive
@@ -79,7 +89,7 @@ jobs:
           name: "vector-x86_64-apple-darwin.tar.gz"
           path: "./target/artifacts/vector-x86_64-apple-darwin.tar.gz"
 
-  package-archive-x86_64-pc-windows-msvc-and-msi:
+  build-x86_64-pc-windows-msvc-packages:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v1
@@ -117,8 +127,6 @@ jobs:
           rm wix-binaries.zip
       - name: "Build archive"
         shell: bash
-        env:
-          USE_CONTAINER: none
         run: |
           export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
           export RUSTFLAGS=-Ctarget-feature=+crt-static
@@ -127,6 +135,8 @@ jobs:
           export STRIP="false"
           export RUST_LTO=""
           export TARGET="x86_64-pc-windows-msvc"
+          export NATIVE_BUILD="true"
+          export USE_CONTAINER="none"
           make package-archive
       - name: "Build package"
         shell: bash
@@ -142,46 +152,12 @@ jobs:
           name: "vector-x64.msi"
           path: "./target/artifacts/vector-x64.msi"
 
-  package-rpm-all:
-    runs-on: ubuntu-latest
-    needs:
-      - package-archive-x86_64-unknown-linux-musl-and-deb
-      - package-archive-aarch64-unknown-linux-musl-and-deb
-      - pachakge-archive-armv7-unknown-linux-musleabihf-and-deb
-    steps:
-      - uses: actions/checkout@v1
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-x86_64-unknown-linux-musl.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-aarch64-unknown-linux-musl.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armv7-unknown-linux-musleabihf.tar.gz
-          path: target/artifacts
-      - run: make package-rpm-all
-      - uses: actions/upload-artifact@v1
-        with:
-          name: "vector-x86_64.rpm"
-          path: "./target/artifacts/vector-x86_64.rpm"
-      - uses: actions/upload-artifact@v1
-        with:
-          name: "vector-armv7hl.rpm"
-          path: "./target/artifacts/vector-armv7hl.rpm"
-      - uses: actions/upload-artifact@v1
-        with:
-          name: "vector-aarch64.rpm"
-          path: "./target/artifacts/vector-aarch64.rpm"
-
   release-docker:
     runs-on: ubuntu-latest
     needs:
-      - package-archive-x86_64-unknown-linux-musl-and-deb
-      - package-archive-aarch64-unknown-linux-musl-and-deb
-      - package-archive-armv7-unknown-linux-musleabihf-and-deb
+      - build-x86_64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-musl-packages
+      - build-armv7-unknown-linux-musleabihf-packages
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v1
@@ -221,12 +197,11 @@ jobs:
   release-s3:
     runs-on: ubuntu-latest
     needs:
-      - package-archive-x86_64-unknown-linux-musl-and-deb
-      - package-archive-aarch64-unknown-linux-musl-and-deb
-      - package-archive-armv7-unknown-linux-musleabihf-and-deb
-      - package-archive-x86_64-apple-darwin
-      - package-archive-x86_64-pc-windows-msvc-and-msi
-      - package-rpm-all
+      - build-x86_64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-musl-packages
+      - build-armv7-unknown-linux-musleabihf-packages
+      - build-x86_64-apple-darwin-packages
+      - build-x86_64-pc-windows-msvc-packages
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v1
