@@ -19,7 +19,7 @@ A table of key/value pairs representing the tags to be added to the \
 metric.\
 """
 
-[transforms.add_tags.options.override]
+[transforms.add_tags.options.overwrite]
 type = "bool"
 common = true
 required = false

@@ -13,12 +13,12 @@ use string_cache::DefaultAtom as Atom;
 pub struct AddTagsConfig {
     pub tags: IndexMap<Atom, String>,
     #[serde(default = "crate::serde::default_true")]
-    pub r#override: bool,
+    pub overwrite: bool,
 }
 
 pub struct AddTags {
     tags: IndexMap<Atom, String>,
-    r#override: bool,
+    overwrite: bool,
 }
 
 inventory::submit! {
@@ -28,7 +28,7 @@ inventory::submit! {
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(AddTags::new(self.tags.clone(), self.r#override)))
+        Ok(Box::new(AddTags::new(self.tags.clone(), self.overwrite)))
     }
 
     fn input_type(&self) -> DataType {
@@ -45,8 +45,8 @@ impl TransformConfig for AddTagsConfig {
 }
 
 impl AddTags {
-    pub fn new(tags: IndexMap<Atom, String>, r#override: bool) -> Self {
-        AddTags { tags, r#override }
+    pub fn new(tags: IndexMap<Atom, String>, overwrite: bool) -> Self {
+        AddTags { tags, overwrite }
     }
 }
 
@@ -61,7 +61,7 @@ impl Transform for AddTags {
 
             for (name, value) in &self.tags {
                 let map = tags.as_mut().unwrap(); // initialized earlier
-                if self.r#override {
+                if self.overwrite {
                     map.insert(name.to_string(), value.to_string());
                 } else {
                     map.entry(name.to_string()).or_insert(value.to_string());

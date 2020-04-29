@@ -16,7 +16,7 @@ use toml::value::Value as TomlValue;
 pub struct AddFieldsConfig {
     pub fields: Fields<TomlValue>,
     #[serde(default = "crate::serde::default_true")]
-    pub r#override: bool,
+    pub overwrite: bool,
 }
 
 #[derive(Clone)]
@@ -39,7 +39,7 @@ impl From<Value> for TemplateOrValue {
 
 pub struct AddFields {
     fields: IndexMap<Atom, TemplateOrValue>,
-    r#override: bool,
+    overwrite: bool,
 }
 
 inventory::submit! {
@@ -55,7 +55,7 @@ impl TransformConfig for AddFieldsConfig {
                 .all_fields()
                 .map(|(k, v)| (k.into(), v.into()))
                 .collect(),
-            self.r#override,
+            self.overwrite,
         )))
     }
 
@@ -73,7 +73,7 @@ impl TransformConfig for AddFieldsConfig {
 }
 
 impl AddFields {
-    pub fn new(fields: IndexMap<Atom, TomlValue>, r#override: bool) -> Self {
+    pub fn new(fields: IndexMap<Atom, TomlValue>, overwrite: bool) -> Self {
         let mut new_fields = IndexMap::new();
 
         for (k, v) in fields {
@@ -82,7 +82,7 @@ impl AddFields {
 
         AddFields {
             fields: new_fields,
-            r#override,
+            overwrite,
         }
     }
 }
@@ -104,7 +104,7 @@ impl Transform for AddFields {
                 .into(),
                 TemplateOrValue::Value(v) => v,
             };
-            match self.r#override {
+            match self.overwrite {
                 true => {
                     if let Some(_) = event.as_mut_log().insert(&key, value) {
                         debug!(
@@ -220,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn add_fields_override() {
+    fn add_fields_overwrite() {
         let mut event = Event::from("");
         event.as_mut_log().insert("some_key", "some_message");
 

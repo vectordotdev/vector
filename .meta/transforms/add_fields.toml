@@ -19,7 +19,7 @@ A table of key/value pairs representing the keys to be added to the \
 event.\
 """
 
-[transforms.add_fields.options.override]
+[transforms.add_fields.options.overwrite]
 type = "bool"
 common = true
 required = false
