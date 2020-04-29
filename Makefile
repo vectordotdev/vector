@@ -100,11 +100,11 @@ build-test-foreign-modules: $(TEST_FOREIGN_MODULES) ### Builds engine test modul
 
 .ONESHELL:
 $(TEST_FOREIGN_MODULES): ensure-has-wasm-toolchain ### Build the target test module
-	cd $(patsubst target/wasm/wasi/release/%.wasm, tests/data/foreign_modules/%, $@)
+	cd $(patsubst target/wasm-wasi/release/%.wasm, tests/data/foreign_modules/%, $@)
 	cargo build --target wasm32-wasi --release
 
 test-foreign-modules: build-test-foreign-modules  ### Run engine tests.
-	cargo test foreign_modules -- --nocapture
+	cargo test foreign_modules --no-default-features --features ${DEFAULT_FEATURES} -- --nocapture
 
 ##@ Checking
 

@@ -12,7 +12,7 @@ use lucetc::Bindings;
 use lucetc::{Lucetc, LucetcOpts};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tracing::{instrument, Level};
+use tracing::{Level};
 use serde::{Deserialize, Serialize};
 
 mod context;
@@ -21,6 +21,7 @@ use context::ForeignModuleContext;
 use foreign_modules::Registration;
 use std::fmt::Debug;
 use util::GuestPointer;
+use crate::internal_events;
 
 pub use foreign_modules::{
     Role,
@@ -79,10 +80,7 @@ impl WasmModuleConfig {
 }
 
 /// Compiles a WASM module located at `input` and writes an optimized shared object to `output`.
-#[instrument]
 fn compile(input: impl AsRef<Path> + Debug, output: impl AsRef<Path> + Debug) -> Result<()> {
-    event!(Level::INFO, "begin");
-
     let mut bindings = lucet_wasi::bindings();
     bindings.extend(&Bindings::from_str(include_str!("hostcall/bindings.json"))?)?;
     let ret = Lucetc::new(input)
@@ -107,7 +105,6 @@ pub struct WasmModule {
 
 impl WasmModule {
     /// Build the WASM instance from a given config.
-    #[instrument]
     pub fn build(config: impl Into<WasmModuleConfig> + Debug) -> Result<Self> {
         event!(Level::TRACE, "instantiating");
         let config = config.into();
@@ -116,8 +113,13 @@ impl WasmModule {
             .join(config.path.file_stem().ok_or("Must load files")?)
             .with_extension("so");
 
+        // Prepwork
         fs::create_dir_all(&config.artifact_cache)?;
+        lucet_wasi::export_wasi_funcs();
+
+        let compilation_event = internal_events::WasmCompilation::begin(config.role);
         compile(&config.path, &output_file)?;
+        compilation_event.complete();
 
         // load the compiled Lucet module
         let module = DlModule::load(&output_file).unwrap();
@@ -154,7 +156,6 @@ impl WasmModule {
         Ok(wasm_module)
     }
 
-    #[instrument]
     pub fn process(&mut self, event: Event) -> Result<Option<Event>> {
         event!(Level::TRACE, "processing");
 
@@ -173,7 +174,6 @@ impl WasmModule {
         Ok(out)
     }
 
-    #[instrument]
     pub fn shutdown(&mut self) -> Result<()> {
         event!(Level::TRACE, "shutting down");
 
