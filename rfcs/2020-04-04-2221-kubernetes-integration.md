@@ -156,28 +156,21 @@ The following diagram demonstrates how this works:
 
     ...insert selector to select any of Vector's sinks...
 
-    ```bash
-    cat <<-CONFIG > vector-configmap.yaml
-    apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: vector-config
-      labels:
-        k8s-app: vector
-    data:
-      vector.toml: |
-        # Docs: https://vector.dev/docs/
-        # Container logs are available from "kubernetes" input.
+    ```shell
+    cat <<-CONFIG > vector.toml
+    # Docs: https://vector.dev/docs/
+    # Container logs are available from "kubernetes" input.
 
-        # Send data to one or more sinks!
-        [sinks.aws_s3]
-          type = "aws_s3"
-          inputs = ["kubernetes"]
-          bucket = "my-bucket"
-          compression = "gzip"
-          region = "us-east-1"
-          key_prefix = "date=%F/"
+    # Send data to one or more sinks!
+    [sinks.aws_s3]
+      type = "aws_s3"
+      inputs = ["kubernetes"]
+      bucket = "my-bucket"
+      compression = "gzip"
+      region = "us-east-1"
+      key_prefix = "date=%F/"
     CONFIG
+    kubectl create secret generic vector-config --from-file=vector.toml=vector.toml
     ```
 
 2.  Deploy Vector!
