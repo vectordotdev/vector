@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-04-29"
 $schema: "/.meta/.schemas/guides.json"
 title: Deploying Vector
 description: How to deploy Vector to your target environment
@@ -430,7 +430,7 @@ brew services start vector
     <CodeExplanation>
 
     * The `--file` flag ensures that you're installing the latest stable version
-      of Vector (0.9.0).
+      of Vector (0.9.1).
     * The `--attr` improves installation speed.
 
     </CodeExplanation>

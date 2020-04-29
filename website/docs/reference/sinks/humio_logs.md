@@ -1,13 +1,13 @@
 ---
-last_modified_on: "2020-04-27"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "at_least_once"
 component_title: "Humio Logs"
 description: "The Vector `humio_logs` sink batches `log` events to Humio via the HEC API."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+humio_logs%22
-operating_systems: ["Linux", "MacOS", "Windows"]
-sidebar_label: 'humio_logs|["log"]'
+operating_systems: ["Linux","MacOS","Windows"]
+sidebar_label: "humio_logs|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/humio_logs.rs
 status: "beta"
 title: "Humio Logs Sink"
@@ -35,9 +35,9 @@ The Vector `humio_logs` sink
 ## Configuration
 
 <Tabs
-block={true}
-defaultValue="common"
-values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 <TabItem value="common">
 
 ```toml title="vector.toml"
@@ -114,6 +114,8 @@ values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanc
 
 Configures the sink batching behavior.
 
+
+
 <Fields filters={false}>
 <Field
   common={true}
@@ -135,7 +137,8 @@ Configures the sink batching behavior.
 
 The maximum size of a batch, in bytes, before it is flushed.
 
-See [Buffers & Batches](#buffers--batches) for more info.
+ See [Buffers & Batches](#buffers--batches) for more info.
+
 
 </Field>
 <Field
@@ -158,7 +161,8 @@ See [Buffers & Batches](#buffers--batches) for more info.
 
 The maximum age of a batch before it is flushed.
 
-See [Buffers & Batches](#buffers--batches) for more info.
+ See [Buffers & Batches](#buffers--batches) for more info.
+
 
 </Field>
 </Fields>
@@ -184,6 +188,8 @@ See [Buffers & Batches](#buffers--batches) for more info.
 
 Configures the sink specific buffer behavior.
 
+
+
 <Fields filters={false}>
 <Field
   common={true}
@@ -204,6 +210,9 @@ Configures the sink specific buffer behavior.
 #### type
 
 The buffer's type and storage mechanism.
+
+
+
 
 </Field>
 <Field
@@ -226,6 +235,9 @@ The buffer's type and storage mechanism.
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
 
+
+
+
 </Field>
 <Field
   common={false}
@@ -247,7 +259,8 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 The maximum size of the buffer on the disk.
 
-See [Buffers & Batches](#buffers--batches) for more info.
+ See [Buffers & Batches](#buffers--batches) for more info.
+
 
 </Field>
 <Field
@@ -269,6 +282,9 @@ See [Buffers & Batches](#buffers--batches) for more info.
 #### when_full
 
 The behavior when the buffer becomes full.
+
+
+
 
 </Field>
 </Fields>
@@ -294,6 +310,8 @@ The behavior when the buffer becomes full.
 
 Configures the encoding specific sink behavior.
 
+
+
 <Fields filters={false}>
 <Field
   common={true}
@@ -314,6 +332,9 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
+
+
+
 
 </Field>
 <Field
@@ -336,6 +357,9 @@ The encoding codec used to serialize the events before outputting.
 
 Prevent the sink from encoding the specified labels.
 
+
+
+
 </Field>
 <Field
   common={false}
@@ -357,6 +381,9 @@ Prevent the sink from encoding the specified labels.
 
 Limit the sink to only encoding the specified labels.
 
+
+
+
 </Field>
 <Field
   common={false}
@@ -377,6 +404,9 @@ Limit the sink to only encoding the specified labels.
 #### timestamp_format
 
 How to format event timestamps.
+
+
+
 
 </Field>
 </Fields>
@@ -402,7 +432,8 @@ How to format event timestamps.
 
 Enables/disables the sink healthcheck upon start.
 
-See [Health Checks](#health-checks) for more info.
+ See [Health Checks](#health-checks) for more info.
+
 
 </Field>
 <Field
@@ -425,6 +456,9 @@ See [Health Checks](#health-checks) for more info.
 
 The optional host to send Humio logs to.
 
+
+
+
 </Field>
 <Field
   common={true}
@@ -445,6 +479,9 @@ The optional host to send Humio logs to.
 ### token
 
 Your Humio ingestion token.
+
+
+
 
 </Field>
 <Field
@@ -467,6 +504,8 @@ Your Humio ingestion token.
 
 Configures the sink request behavior.
 
+
+
 <Fields filters={false}>
 <Field
   common={true}
@@ -488,7 +527,8 @@ Configures the sink request behavior.
 
 The maximum number of in-flight requests allowed at any given time.
 
-See [Rate Limits](#rate-limits) for more info.
+ See [Rate Limits](#rate-limits) for more info.
+
 
 </Field>
 <Field
@@ -511,7 +551,8 @@ See [Rate Limits](#rate-limits) for more info.
 
 The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
 
-See [Rate Limits](#rate-limits) for more info.
+ See [Rate Limits](#rate-limits) for more info.
+
 
 </Field>
 <Field
@@ -535,7 +576,8 @@ See [Rate Limits](#rate-limits) for more info.
 The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
 time window.
 
-See [Rate Limits](#rate-limits) for more info.
+ See [Rate Limits](#rate-limits) for more info.
+
 
 </Field>
 <Field
@@ -558,7 +600,8 @@ See [Rate Limits](#rate-limits) for more info.
 
 The maximum number of retries to make for failed requests.
 
-See [Retry Policy](#retry-policy) for more info.
+ See [Retry Policy](#retry-policy) for more info.
+
 
 </Field>
 <Field
@@ -583,6 +626,9 @@ The amount of time to wait before attempting the first retry for a failed
 request. Once, the first retry has failed the fibonacci sequence will be used
 to select future backoffs.
 
+
+
+
 </Field>
 <Field
   common={false}
@@ -603,6 +649,9 @@ to select future backoffs.
 #### retry_max_duration_secs
 
 The maximum amount of time, in seconds, to wait between retries.
+
+
+
 
 </Field>
 <Field
@@ -628,7 +677,8 @@ recommended that you do not lower value below the service's internal timeout,
 as this could create orphaned requests, pile on retries, and result in
 duplicate data downstream.
 
-See [Buffers & Batches](#buffers--batches) for more info.
+ See [Buffers & Batches](#buffers--batches) for more info.
+
 
 </Field>
 </Fields>
@@ -648,12 +698,12 @@ differently, instead of treating them as global concepts, Vector treats them
 as sink specific concepts. This isolates sinks, ensuring services disruptions
 are contained and [delivery guarantees][docs.guarantees] are honored.
 
-_Batches_ are flushed when 1 of 2 conditions are met:
+*Batches* are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured [`timeout_secs`](#timeout_secs).
 2. The batch size meets or exceeds the configured [`max_size`](#max_size).
 
-_Buffers_ are controlled via the [`buffer.*`](#buffer) options.
+*Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
 ### Environment Variables
 
@@ -689,7 +739,7 @@ If you'd like to disable health checks for this sink you can set the
 
 1. Register for a free account at [Humio.com](https://www.humio.com/getting-started)
 
-2. Get your Ingest token following these [docs](https://docs.humio.com/ingesting-data/ingest-tokens/).
+2. Get your Ingest token following these  [docs](https://docs.humio.com/ingesting-data/ingest-tokens/).
 
 ### Rate Limits
 
@@ -711,6 +761,7 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

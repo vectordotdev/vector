@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-20"
+last_modified_on: "2020-04-29"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
@@ -70,7 +70,7 @@ The following steps should be used to compile Vector directly on Linux based sys
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.0)', value: 'latest'},
+        { label: 'Latest (0.9.1)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -158,7 +158,7 @@ operating systems.
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.0)', value: 'latest'},
+        { label: 'Latest (0.9.1)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -166,7 +166,7 @@ operating systems.
 
     ```bat
     git clone https://github.com/timberio/vector
-    git checkout v0.9.0
+    git checkout v0.9.1
     cd vector
     ```
 
@@ -217,7 +217,7 @@ Building steps:
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.0)', value: 'latest'},
+        { label: 'Latest (0.9.1)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
