@@ -160,6 +160,12 @@ k8s-openapi = { version = "0.5.1", features = ["v1_15"], optional = true }
 bloom = "0.3.2"
 pulsar = { version = "0.3.0", optional = true }
 
+[target.'cfg(windows)'.dependencies]
+schannel = "0.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "0.4"
+
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
 nix = "0.16.1"
