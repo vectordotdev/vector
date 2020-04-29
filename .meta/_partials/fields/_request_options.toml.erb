@@ -1,4 +1,5 @@
 <%- groups ||= [] -%>
+<%- retry_attempts ||= 18446744073709551615 %>
 [<%= namespace %>.request]
 type = "table"
 category = "Request"
@@ -34,7 +35,10 @@ type = "int"
 common = false
 default = <%= retry_attempts %>
 groups = <%= groups.to_toml %>
-description = "The maximum number of retries to make for failed requests."
+description = """\
+The maximum number of retries to make for failed requests. The default, \
+for all intents and purposes, represents an infinite number of retries.\
+"""
 
 [<%= namespace %>.request.children.retry_initial_backoff_secs]
 type = "int"

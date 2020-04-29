@@ -48,23 +48,7 @@ class Metadata
   class << self
     def load!(meta_dir, docs_root, guides_root, pages_root)
       metadata = load_metadata!(meta_dir)
-      errors = metadata.validate_schema
-
-      if errors.any?
-        Printer.error!(
-          <<~EOF
-          The resulting hash from the `/.meta/**/*.toml` files failed
-          validation against the following schema:
-
-              /.meta/schema/meta.json
-
-          The errors include:
-
-              * #{errors[0..50].join("\n*    ")}
-          EOF
-        )
-      end
-
+      validate_schema!(metadata)
       new(metadata, docs_root, guides_root, pages_root)
     end
 
@@ -73,24 +57,28 @@ class Metadata
         metadata = {}
 
         contents =
-          Dir.glob("#{meta_dir}/**/[^_]*.{toml,toml.erb}").collect do |file|
-            begin
-              Template.render(file)
-            rescue Exception => e
-              Printer.error!(
-                <<~EOF
-                The follow metadata file failed to load:
+          Dir.glob("#{meta_dir}/**/[^_]*.{toml,toml.erb}").
+            sort.
+            unshift("#{meta_dir}/root.toml"). # move to the front
+            uniq.
+            collect do |file|
+              begin
+                Template.render(file)
+              rescue Exception => e
+                Printer.error!(
+                  <<~EOF
+                  The follow metadata file failed to load:
 
-                  #{file}
+                    #{file}
 
-                The error received was:
+                  The error received was:
 
-                  #{e.message}
-                  #{e.backtrace.join("\n  ")}
-                EOF
-              )
+                    #{e.message}
+                    #{e.backtrace.join("\n  ")}
+                  EOF
+                )
+              end
             end
-          end
 
         content = contents.join("\n")
         TomlRB.parse(content)

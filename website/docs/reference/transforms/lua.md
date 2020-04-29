@@ -351,7 +351,7 @@ It can produce new events using `emit` function.
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={"integer"}
+  type={"int"}
   unit={"seconds"}
   warnings={[]}
   >

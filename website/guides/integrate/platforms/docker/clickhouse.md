@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-29"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Docker to Clickhouse"
 description: "A simple guide to send logs from Docker to Clickhouse in just a few minutes."
@@ -41,6 +41,10 @@ your observability strategy.
 
 [Docker][urls.docker] is an open platform for developing, shipping, and running
 applications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.
+
+### What is Clickhouse?
+
+[ClickHouse][urls.clickhouse] is an open-source column-oriented database management system that manages extremely large volumes of data, including non-aggregated data, in a stable and sustainable manner and allows generating custom data reports in real time. The system is linearly scalable and can be scaled up to store and process trillions of rows and petabytes of data. This makes it an best-in-class storage for logs and metrics data.
 
 ## Strategy
 

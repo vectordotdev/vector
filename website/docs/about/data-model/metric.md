@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-24"
+last_modified_on: "2020-04-29"
 title: Metric Event
 description: A detailed guide on Vector's internal metric data model.
 ---
