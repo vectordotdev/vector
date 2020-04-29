@@ -1593,6 +1593,18 @@ See [motivation](#motivation).
 - Integrate kubernetes configuration snapshotting into the release process.
 - Add Kubernetes setup/integration guide.
 - Release `0.10.0` and announce.
+- Prepare additional guides and blog posts.
+  - Vector deployment for Kubernetes Cluster Operators.
+  - Vector deployment as a sidecar.
+- Revisit this RFC - see what we can focus on next.
+- Start the RFC of the Vector performance properies bulletin.
+  To include things like:
+  - Establish continius data gathering of performance characteristics of
+    the bare Vector event pipeline (i.e. raw speed) and the impact of adding
+    each of it's components - sources, transforms, sinks - and their
+    combinations.
+  - Prepare the format (and, if possible, automate the release of) Vector
+    performance bulletin.
 
 [anchor_collecting_kubernetes_events]: #exposing-kubernetes-event-s-k8s-api-event-as-vector-events
 [anchor_file_locations]: #file-locations
