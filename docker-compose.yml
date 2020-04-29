@@ -19,6 +19,7 @@ services:
       - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: scripts/build.sh
 
   build-armv7-unknown-linux-musleabihf:
@@ -36,6 +37,7 @@ services:
       - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
       - ./target/armv7-unknown-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: scripts/build.sh
 
   build-aarch64-unknown-linux-musl:
@@ -53,6 +55,7 @@ services:
       - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: scripts/build.sh
 
   bench:
@@ -67,6 +70,7 @@ services:
       - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: cargo bench --all --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
   generate:
@@ -90,10 +94,11 @@ services:
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
-      - ./target/cargo/registry:/root/.cargo/registry
-      - ./target/cargo/git:/root/.cargo/git
-      - ./target/rustup/tmp:/root/.rustup/tmp
+      - ./target/cargo/registry:/opt/rust/cargo/registry
+      - ./target/cargo/git:/opt/rust/cargo/git
+      - ./target/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: cargo check --all --all-targets
 
   check-component-features:
@@ -105,10 +110,11 @@ services:
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
-      - ./target/cargo/registry:/root/.cargo/registry
-      - ./target/cargo/git:/root/.cargo/git
-      - ./target/rustup/tmp:/root/.rustup/tmp
+      - ./target/cargo/registry:/opt/rust/cargo/registry
+      - ./target/cargo/git:/opt/rust/cargo/git
+      - ./target/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: ./scripts/check-component-features.sh
 
   check-fmt:
@@ -119,10 +125,11 @@ services:
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
-      - ./target/cargo/registry:/root/.cargo/registry
-      - ./target/cargo/git:/root/.cargo/git
-      - ./target/rustup/tmp:/root/.rustup/tmp
+      - ./target/cargo/registry:/opt/rust/cargo/registry
+      - ./target/cargo/git:/opt/rust/cargo/git
+      - ./target/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: cargo fmt -- --check
 
   check-style:
@@ -185,6 +192,7 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
+    user: $USER
     command: ./scripts/check-blog-signatures.rb
 
   package-archive-x86_64-unknown-linux-musl:
@@ -202,6 +210,7 @@ services:
       - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: ./scripts/package-archive.sh
 
   package-archive-armv7-unknown-linux-musleabihf:
@@ -219,6 +228,7 @@ services:
       - ./target/armv7-unknwon-linux-musleabihf/cargo/git:/opt/rust/cargo/git
       - ./target/armv7-unknwon-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: ./scripts/package-archive.sh
 
   package-archive-aarch64-unknown-linux-musl:
@@ -236,6 +246,7 @@ services:
       - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: ./scripts/package-archive.sh
 
   package-deb-x86_64:
@@ -250,6 +261,7 @@ services:
       - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: ./scripts/package-deb.sh
 
   package-deb-armv7:
@@ -264,6 +276,7 @@ services:
       - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
       - ./target/armv7-unknown-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: ./scripts/package-deb.sh
 
   package-deb-aarch64:
@@ -278,6 +291,7 @@ services:
       - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: ./scripts/package-deb.sh
 
   package-rpm-x86_64:
@@ -289,6 +303,7 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
+    user: $USER
     command: ./scripts/package-rpm.sh
 
   package-rpm-armv7:
@@ -301,6 +316,7 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
+    user: $USER
     command: ./scripts/package-rpm.sh
 
   package-rpm-aarch64:
@@ -312,6 +328,7 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
+    user: $USER
     command: ./scripts/package-rpm.sh
 
   verify-rpm-amazonlinux-1:
@@ -420,6 +437,7 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
+    user: $USER
     entrypoint: ./scripts/target-graph.sh
 
   clean:
@@ -427,6 +445,7 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
+    user: $USER
     command: ["sh", "-ec", "rm -rf target"]
 
   load-qemu-binfmt:
@@ -450,6 +469,7 @@ services:
       - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
+    user: $USER
     command: cargo test --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
   test-integration:
@@ -472,6 +492,7 @@ services:
       - dependencies-all
     network_mode: host
     working_dir: $PWD
+    user: $USER
     command: cargo test --all --no-default-features --features default-musl,docker --target x86_64-unknown-linux-musl -- --test-threads 4
 
   test-integration-aws:
@@ -494,6 +515,7 @@ services:
       - dependencies-aws
     network_mode: host
     working_dir: $PWD
+    user: $USER
     command: cargo test --all --no-default-features --features default-musl,aws-integration-tests --target x86_64-unknown-linux-musl
 
   test-behavior:

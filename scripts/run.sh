@@ -20,6 +20,11 @@ set -eou pipefail
 
 cd $(dirname $0)/..
 
+# A workaround to prevent docker from creating directories at `./target` as
+# root.
+# Ran unconditionally for consistency between docker and bare execution.
+scripts/prepare-target-dir.sh
+
 case "$USE_CONTAINER" in
   docker | podman)
     echo "Executing within $USE_CONTAINER. To disable set USE_CONTAINER to none"
@@ -49,6 +54,6 @@ case "$USE_CONTAINER" in
         echo "service defined in /docker-compose.yml."
         exit 1
     fi
-    
+
     ${FILE}
 esac

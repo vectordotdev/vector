@@ -8,8 +8,11 @@ RUN apt-get update && \
 
 # Install Rust
 COPY rust-toolchain /tmp/
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain $(cat /tmp/rust-toolchain)
-ENV PATH="$PATH:/root/.cargo/bin"
+ARG RUST_PREFIX="/opt/rust"
+ENV RUSTUP_HOME="$RUST_PREFIX/rustup"
+ENV CARGO_HOME="$RUST_PREFIX/cargo"
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain "$(cat /tmp/rust-toolchain)"
+ENV PATH="$RUSTUP_HOME/bin:$CARGO_HOME/bin:$PATH"
 RUN rustup component add rustfmt
 
 # Install Ruby dependencies
