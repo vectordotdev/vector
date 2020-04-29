@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-24"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Kinesis Firehose"
 description: "The Vector `aws_kinesis_firehose` sink batches `log` events to Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint."

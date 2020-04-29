@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-17"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "at_least_once"
 component_title: "Generator"
 description: "The Vector `generator` source ingests data through an internal data generator and outputs `log` events."

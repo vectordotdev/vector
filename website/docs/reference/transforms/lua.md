@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-24"
+last_modified_on: "2020-04-29"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events, allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]

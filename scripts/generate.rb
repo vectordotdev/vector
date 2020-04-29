@@ -341,8 +341,9 @@ metadata.components.each do |component|
 end
 
 erb_paths =
-  Dir.glob("#{ROOT_DIR}/**/*.erb", File::FNM_DOTMATCH).
+  Dir.glob("#{ROOT_DIR}/**/[^_]*.erb", File::FNM_DOTMATCH).
   to_a.
+  filter { |path| !path.start_with?("#{META_ROOT}/") }.
   filter { |path| !path.start_with?("#{ROOT_DIR}/scripts") }.
   filter { |path| !path.start_with?("#{ROOT_DIR}/distribution/nix") }
 

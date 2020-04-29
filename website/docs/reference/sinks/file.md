@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "at_least_once"
 component_title: "File"
 description: "The Vector `file` sink streams `log` events to a file."

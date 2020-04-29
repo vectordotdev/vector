@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-24"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "best_effort"
 component_title: "Vector"
 description: "The Vector `vector` sink streams `log` and `metric` events to another downstream `vector` source."

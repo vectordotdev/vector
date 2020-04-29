@@ -33,6 +33,11 @@ class Metadata
       end
 
       full_path = path.start_with?("/") ? path : "#{META_ROOT}/#{path}"
+
+      if !File.exists?(full_path) && File.exists?("#{full_path}.erb")
+        full_path = "#{full_path}.erb"
+      end
+
       body = File.read(full_path)
       renderer = ERB.new(body, nil, '-')
 
@@ -68,7 +73,7 @@ class Metadata
         metadata = {}
 
         contents =
-          Dir.glob("#{meta_dir}/**/[^_]*.toml").collect do |file|
+          Dir.glob("#{meta_dir}/**/[^_]*.{toml,toml.erb}").collect do |file|
             begin
               Template.render(file)
             rescue Exception => e
