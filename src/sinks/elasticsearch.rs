@@ -3,6 +3,7 @@ use crate::{
     emit,
     event::Event,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
+    region::region_from_endpoint,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
@@ -128,14 +129,16 @@ impl SinkConfig for ElasticSearchConfig {
 #[derive(Debug)]
 pub struct ElasticSearchCommon {
     pub base_url: String,
+    bulk_uri: Uri,
     authorization: Option<String>,
     credentials: Option<AwsCredentials>,
     index: Template,
     doc_type: String,
     tls_settings: TlsSettings,
-    path_and_query: String,
     config: ElasticSearchConfig,
     compression: Compression,
+    region: Region,
+    query_params: HashMap<String, String>,
 }
 
 #[derive(Debug, Snafu)]
@@ -192,13 +195,10 @@ impl HttpSink for ElasticSearchCommon {
     }
 
     fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
-        let uri = format!("{}{}", self.base_url, self.path_and_query)
-            .parse::<Uri>()
-            .unwrap();
-        let mut builder = Request::post(&uri);
+        let mut builder = Request::post(&self.bulk_uri);
 
         if let Some(credentials) = &self.credentials {
-            let mut request = signed_request("POST", &uri);
+            let mut request = self.signed_request("POST", &self.bulk_uri, true);
 
             request.add_header("Content-Type", "application/x-ndjson");
 
@@ -291,6 +291,7 @@ impl ElasticSearchCommon {
         };
 
         let base_url = config.host.clone();
+        let region = region_from_endpoint(&config.host)?;
 
         // Test the configured host, but ignore the result
         let uri = format!("{}/_test", &config.host);
@@ -338,29 +339,42 @@ impl ElasticSearchCommon {
 
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let path = format!("/_bulk?timeout={}s", request.timeout.as_secs());
-        let mut path_query = url::form_urlencoded::Serializer::new(path);
-        if let Some(ref query) = config.query {
-            for (p, v) in query {
-                path_query.append_pair(&p[..], &v[..]);
-            }
+        let mut query_params = config.query.clone().unwrap_or_default();
+        query_params.insert("timeout".into(), format!("{}s", request.timeout.as_secs()));
+
+        let mut query = url::form_urlencoded::Serializer::new(String::new());
+        for (p, v) in &query_params {
+            query.append_pair(&p[..], &v[..]);
         }
-        let path_and_query = path_query.finish();
+        let bulk_url = format!("{}/_bulk?{}", base_url, query.finish());
+        let bulk_uri = bulk_url.parse::<Uri>().unwrap();
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
         let config = config.clone();
 
         Ok(Self {
             base_url,
+            bulk_uri,
             authorization,
             credentials,
             index,
             doc_type,
-            path_and_query,
             tls_settings,
             config,
             compression,
+            region,
+            query_params,
         })
+    }
+
+    fn signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
+        let mut request = SignedRequest::new(method, "es", &self.region, uri.path());
+        if use_params {
+            for (key, value) in &self.query_params {
+                request.add_param(key, value);
+            }
+        }
+        request
     }
 }
 
@@ -377,7 +391,7 @@ fn healthcheck(
             }
         }
         Some(credentials) => {
-            let mut signer = signed_request("GET", builder.uri_ref().unwrap());
+            let mut signer = common.signed_request("GET", builder.uri_ref().unwrap(), false);
             finish_signer(&mut signer, &credentials, &mut builder);
         }
     }
@@ -392,14 +406,6 @@ fn healthcheck(
                 status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
             }),
     ))
-}
-
-fn signed_request(method: &str, uri: &Uri) -> SignedRequest {
-    let region = Region::Custom {
-        name: "custom".into(),
-        endpoint: uri.to_string(),
-    };
-    SignedRequest::new(method, "es", &region, uri.path())
 }
 
 fn finish_signer(
