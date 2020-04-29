@@ -1569,32 +1569,32 @@ See [motivation](#motivation).
 
 ## Plan Of Attack
 
-- [x] Agree on minimal Kubernetes version. (1.14)
-- [x] Agree on a list of Kubernetes cluster flavors we want to test against.
-- [ ] Setup a proper testing suite for k8s.
-  - [ ] Local testing via `make test-integration-kubernetes`.
-    - [ ] Ability to "bring your own cluster". See [issue#2170].
-  - [ ] Add `make test-integration-kubernetes` to the `ci.yaml` workflow.
-    - [ ] Ensure these tests are stable. See [issue#2193], [issue#2216],
-          and [issue#1635].
-    - [ ] Ensure we are testing all supported minor versions. See
-          [issue#2223].
-  - [ ] Run `make test-integration-kubernetes` against AWS' EKS platform in
-        Vector's Github actions.
-- [ ] Finalize the `kubernetes` source.
-  - [ ] Audit the code and ensure the base is high-quality and correct.
-  - [ ] Merge in the `kubernetes_pod_matadata` transform.
-  - [ ] Implement origin filtering.
-  - [ ] Merge split logs [pr#2134].
-  - [ ] Use the `log_schema.kubernetes_key` setting for context fields.
-        See [issue#1867].
-- [ ] Add `kubernetes` source reference documentation.
-- [ ] Prepare Heml Chart.
-- [ ] Prepare YAML deployment config.
-- [ ] Prepare Heml Chart Repository.
-- [ ] Integrate kubernetes configuration snapshotting into the release process.
-- [ ] Add Kubernetes setup/integration guide.
-- [ ] Release `0.10.0` and announce.
+- Agree on minimal Kubernetes version. (1.14)
+- Agree on a list of Kubernetes cluster flavors we want to test against.
+- Setup a proper testing suite for k8s.
+  - Local testing via `make test-integration-kubernetes`.
+    - Ability to "bring your own cluster". See [issue#2170].
+  - Add `make test-integration-kubernetes` to the `ci.yaml` workflow.
+    - Ensure these tests are stable. See [issue#2193], [issue#2216],
+      and [issue#1635].
+    - Ensure we are testing all supported minor versions. See
+      [issue#2223].
+  - Run `make test-integration-kubernetes` against AWS' EKS platform in
+    Vector's Github actions.
+- Finalize the `kubernetes` source.
+  - Audit the code and ensure the base is high-quality and correct.
+  - Merge in the `kubernetes_pod_matadata` transform.
+  - Implement origin filtering.
+  - Merge split logs [pr#2134].
+  - Use the `log_schema.kubernetes_key` setting for context fields.
+    See [issue#1867].
+- Add `kubernetes` source reference documentation.
+- Prepare Heml Chart.
+- Prepare YAML deployment config.
+- Prepare Heml Chart Repository.
+- Integrate kubernetes configuration snapshotting into the release process.
+- Add Kubernetes setup/integration guide.
+- Release `0.10.0` and announce.
 
 [anchor_collecting_kubernetes_events]: #exposing-kubernetes-event-s-k8s-api-event-as-vector-events
 [anchor_file_locations]: #file-locations
