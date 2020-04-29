@@ -4,6 +4,9 @@ pub use compilation::WasmCompilation;
 mod hostcall;
 pub use hostcall::Hostcall;
 
+mod event_processing;
+pub use event_processing::EventProcessing;
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum State {
     Beginning,

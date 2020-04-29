@@ -5,8 +5,8 @@ use super::State;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[must_use]
 pub struct Hostcall {
-    pub call: &'static str,
-    pub role: Role,
+    call: &'static str,
+    role: Role,
     state: State,
 }
 

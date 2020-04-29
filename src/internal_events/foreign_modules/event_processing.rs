@@ -4,12 +4,12 @@ use super::State;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[must_use]
-pub struct WasmCompilation {
+pub struct EventProcessing {
     role: Role,
     state: State,
 }
 
-impl WasmCompilation {
+impl EventProcessing {
     pub fn begin(role: Role) -> Self {
         let me = Self {
             state: State::Beginning,
@@ -26,17 +26,17 @@ impl WasmCompilation {
     }
 }
 
-impl InternalEvent for WasmCompilation {
+impl InternalEvent for EventProcessing {
     fn emit_logs(&self) {
         debug!(
-            message = "WASM Compilation via `lucet`",
+            message = "WASM Event Processing",
             state = self.state.as_const_str(),
             role = self.role.as_const_str(),
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("wasm_compilation", 1,
+        counter!("wasm_event_processing", 1,
             "component_kind" => self.role.as_const_str(),
             "component_type" => "wasm",
             "state" => self.state.as_const_str(),

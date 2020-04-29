@@ -115,11 +115,11 @@ impl WasmModule {
 
         // Prepwork
         fs::create_dir_all(&config.artifact_cache)?;
-        lucet_wasi::export_wasi_funcs();
+        hostcall::ensure_linked();
 
-        let compilation_event = internal_events::WasmCompilation::begin(config.role);
+        let internal_event_compilation = internal_events::WasmCompilation::begin(config.role);
         compile(&config.path, &output_file)?;
-        compilation_event.complete();
+        internal_event_compilation.complete();
 
         // load the compiled Lucet module
         let module = DlModule::load(&output_file).unwrap();
@@ -157,7 +157,7 @@ impl WasmModule {
     }
 
     pub fn process(&mut self, event: Event) -> Result<Option<Event>> {
-        event!(Level::TRACE, "processing");
+        let internal_event_processing = internal_events::EventProcessing::begin(self.role);
 
         let engine_context = ForeignModuleContext::new(event);
         self.instance.insert_embed_ctx(engine_context);
@@ -170,7 +170,7 @@ impl WasmModule {
             .ok_or("Could not retrieve context after processing.")?;
         let ForeignModuleContext { event: out } = engine_context;
 
-        event!(Level::TRACE, "processed");
+        internal_event_processing.complete();
         Ok(out)
     }
 

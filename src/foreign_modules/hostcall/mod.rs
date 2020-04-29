@@ -11,7 +11,6 @@ use std::ffi::{CStr, CString};
 use std::io::Write;
 use std::os::raw::c_char;
 use std::str::FromStr;
-use tracing::{event, Level};
 use crate::{internal_events, foreign_modules::Role};
 
 #[lucet_hostcall]
@@ -33,7 +32,6 @@ pub unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> us
             let serialized_cstring = CString::new(serialized_value).unwrap();
             let serialized_bytes = serialized_cstring.into_bytes_with_nul();
             let len = serialized_bytes.len();
-            event!(Level::TRACE, "hinting length {:#?}", len);
             len
         }
     };
@@ -94,4 +92,23 @@ pub unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *cons
     event.as_mut_log().insert(key_str, value_val);
 
     internal_event.complete();
+}
+
+static HOSTCALL_API_INIT: std::sync::Once = std::sync::Once::new();
+
+/// Call this if you're having trouble with `lucet_*` symbols not being exported.
+///
+/// This is pretty hackish; we will hopefully be able to avoid this altogether once [this
+/// issue](https://github.com/rust-lang/rust/issues/58037) is addressed.
+#[no_mangle]
+#[doc(hidden)]
+pub extern "C" fn ensure_linked() {
+    use std::ptr::read_volatile;
+    HOSTCALL_API_INIT.call_once(|| unsafe {
+        read_volatile(hint_field_length as *const extern "C" fn());
+        read_volatile(get as *const extern "C" fn());
+        read_volatile(insert as *const extern "C" fn());
+        lucet_wasi::export_wasi_funcs();
+        lucet_runtime::lucet_internal_ensure_linked();
+    });
 }
