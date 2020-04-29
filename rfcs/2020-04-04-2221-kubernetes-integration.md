@@ -1569,8 +1569,6 @@ See [motivation](#motivation).
 
 ## Plan Of Attack
 
-- Agree on minimal Kubernetes version. (1.14)
-- Agree on a list of Kubernetes cluster flavors we want to test against.
 - Setup a proper testing suite for k8s.
   - Local testing via `make test-integration-kubernetes`.
     - Ability to "bring your own cluster". See [issue#2170].
