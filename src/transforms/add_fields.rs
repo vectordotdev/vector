@@ -104,26 +104,23 @@ impl Transform for AddFields {
                 .into(),
                 TemplateOrValue::Value(v) => v,
             };
-            match self.overwrite {
-                true => {
-                    if let Some(_) = event.as_mut_log().insert(&key, value) {
-                        debug!(
-                            message = "Field overwritten",
-                            field = key.as_ref(),
-                            rate_limit_secs = 30,
-                        )
-                    }
+            if self.overwrite {
+                if let Some(_) = event.as_mut_log().insert(&key, value) {
+                    debug!(
+                        message = "Field overwritten",
+                        field = key.as_ref(),
+                        rate_limit_secs = 30,
+                    )
                 }
-                false => {
-                    if event.as_mut_log().contains(&key) {
-                        debug!(
-                            message = "Field not overwritten",
-                            field = key.as_ref(),
-                            rate_limit_secs = 30,
-                        )
-                    } else {
-                        event.as_mut_log().insert(key, value);
-                    }
+            } else {
+                if event.as_mut_log().contains(&key) {
+                    debug!(
+                        message = "Field not overwritten",
+                        field = key.as_ref(),
+                        rate_limit_secs = 30,
+                    )
+                } else {
+                    event.as_mut_log().insert(key, value);
                 }
             }
         }
