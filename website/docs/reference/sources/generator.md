@@ -123,7 +123,7 @@ The number of times to repeat outputting the [`lines`](#lines).
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={["int"]}
+  type={"[string]"}
   unit={null}
   warnings={[]}
   >

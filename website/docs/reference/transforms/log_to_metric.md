@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-24"
+last_modified_on: "2020-04-29"
 component_title: "Log to Metric"
 description: "The Vector `log_to_metric` transform accepts `log` events, but outputs [`metric`](#metric) events, allowing you to convert logs into one or more metrics."
 event_types: ["log","metric"]

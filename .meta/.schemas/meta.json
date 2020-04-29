@@ -3,7 +3,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Vector Metadata Schema",
   "type": "object",
-  "required": [ "sinks" ],
+  "required": ["sinks"],
   "properties": {
     "sinks": {
       "type": "object",
@@ -38,6 +38,31 @@
     }
   },
   "definitions": {
+    "event_fields": {
+      "type": "object",
+      "description": "Information about fields that this transform adds to events.",
+      "additionalProperties": false,
+      "properties": {
+        "log": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fields": {
+              "$ref": "#/definitions/fields"
+            }
+          }
+        },
+        "metric": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fields": {
+              "$ref": "#/definitions/fields"
+            }
+          }
+        }
+      }
+    },
     "event_types": {
       "type": "array",
       "description": "A list of allowed Vector event types.",
@@ -62,15 +87,6 @@
             "type": "string",
             "description": "The output label. This will be used in the tab name if multiple output examples are provided."
           }
-        }
-      }
-    },
-    "fields": {
-      "type": "object",
-      "description": "An object of fields keyed by the field's name.",
-      "patternProperties": {
-        "^[a-z0-9_]+$": {
-          "$ref": "#/definitions/field"
         }
       }
     },
@@ -110,7 +126,6 @@
           }
         },
         "examples": {
-          "type": "array",
           "description": "An array of example values used for documentation purposes."
         },
         "field_path_notation": {
@@ -147,10 +162,7 @@
         "toml_display": {
           "type": "string",
           "description": "How to display this option in TOML examples.",
-          "enum": [
-            "normal",
-            "inline"
-          ]
+          "enum": ["normal", "inline"]
         },
         "type": {
           "type": "string",
@@ -195,15 +207,10 @@
     },
     "fields": {
       "type": "object",
-      "description": "Information about any fields that the component adds to events.",
-      "additionalProperties": false,
-      "properties": {
-        "fields": {
-          "$ref": "#/definitions/fields"
-        },
-        "global_log_schema_key": {
-          "type": "string",
-          "descripttion": "If these fields are inserted under a global log schema key, what is the name of that key?"
+      "description": "An object of fields keyed by the field's name.",
+      "patternProperties": {
+        "^[a-z0-9_]+$": {
+          "$ref": "#/definitions/field"
         }
       }
     },
@@ -295,6 +302,32 @@
         }
       }
     },
+    "service_providers": {
+      "type": "array",
+      "description": "A list of providers that offer this service.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "AWS",
+          "Azure",
+          "Confluent",
+          "Datadog",
+          "Elastic",
+          "GCP",
+          "Grafana",
+          "Heroku",
+          "Honeycomb",
+          "Humio",
+          "InfluxData",
+          "LogDNA",
+          "New Relic",
+          "Papertrail",
+          "Sematext",
+          "Splunk",
+          "Yandex"
+        ]
+      }
+    },
     "sink": {
       "type": "object",
       "description": "A component that outputs/sends data from Vector.",
@@ -352,10 +385,7 @@
         "function_category": {
           "type": "string",
           "description": "The function category the sink serves. Used for filtering.",
-          "enum": [
-            "test",
-            "transmit"
-          ]
+          "enum": ["test", "transmit"]
         },
         "healthcheck": {
           "type": "boolean",
@@ -395,21 +425,8 @@
           "description": "The name of the underlying service that this component integrates with."
         },
         "service_providers": {
-          "type": "array",
-          "description": "A list of providers that offer this service.",
-          "items": {
-            "type": "string",
-            "enum": [
-              "AWS",
-              "Confluent",
-              "Datadog",
-              "Elastic",
-              "GCP",
-              "InfluxData",
-              "New Relic",
-              "Splunk"
-            ]
-          }
+          "$ref": "#/definitions/service_providers",
+          "description": "Any service providers that offer this service."
         },
         "title": {
           "type": "string",
@@ -477,25 +494,13 @@
           }
         },
         "fields": {
-          "type": "object",
-          "description": "Information about any fields this source adds to events.",
-          "additionalProperties": false,
-          "properties": {
-            "log": {
-              "$ref": "#/definitions/fields"
-            },
-            "metric": {
-              "$ref": "#/definitions/fields"
-            }
-          }
+          "$ref": "#/definitions/event_fields",
+          "description": "Information about field that this source adds to events."
         },
         "function_category": {
           "type": "string",
           "description": "The source's function category, used for filtering.",
-          "enum": [
-            "collect",
-            "receive"
-          ]
+          "enum": ["collect", "receive", "test"]
         },
         "noun": {
           "type": "string",
@@ -524,6 +529,10 @@
         "service_name": {
           "type": "string",
           "description": "The name of the underlying service that this component integrates with."
+        },
+        "service_providers": {
+          "$ref": "#/definitions/service_providers",
+          "description": "Any service providers that offer this service."
         },
         "strategies": {
           "type": "array",
@@ -603,17 +612,8 @@
           "description": "Simple examples demonstrating how to use this transform."
         },
         "fields": {
-          "type": "object",
-          "description": "Information about fields that this transform adds to events.",
-          "additionalProperties": false,
-          "properties": {
-            "log": {
-              "$ref": "#/definitions/fields"
-            },
-            "metric": {
-              "$ref": "#/definitions/fields"
-            }
-          }
+          "$ref": "#/definitions/event_fields",
+          "description": "Information about field that this transform adds to events."
         },
         "function_category": {
           "type": "string",

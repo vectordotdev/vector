@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-29"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Journald to Clickhouse"
 description: "A simple guide to send logs from Journald to Clickhouse in just a few minutes."
@@ -40,6 +40,10 @@ your observability strategy.
 ### What is Journald?
 
 [Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduce with [Systemd][urls.systemd] to help system administrator collect, access, and route log data.
+
+### What is Clickhouse?
+
+[ClickHouse][urls.clickhouse] is an open-source column-oriented database management system that manages extremely large volumes of data, including non-aggregated data, in a stable and sustainable manner and allows generating custom data reports in real time. The system is linearly scalable and can be scaled up to store and process trillions of rows and petabytes of data. This makes it an best-in-class storage for logs and metrics data.
 
 ## Strategy
 

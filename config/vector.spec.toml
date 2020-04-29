@@ -371,7 +371,7 @@ dns_servers = ["0.0.0.0:53"]
   # The list of lines to output.
   #
   # * required
-  # * type: ["int"]
+  # * type: [string]
   lines = ["Line 1", "Line 2"]
 
   # If `true`, each output line will start with an increasing sequence number.
@@ -2090,7 +2090,7 @@ require('custom_module')
     # Defines the interval at which the timer handler would be executed.
     #
     # * required
-    # * type: integer
+    # * type: int
     # * unit: seconds
     interval_seconds = 1
     interval_seconds = 10
@@ -2860,7 +2860,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 5
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -3159,7 +3160,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 5
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -3378,7 +3380,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 5
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -3701,7 +3704,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 250
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -4022,7 +4026,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 5
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -4465,7 +4470,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 5
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -4744,7 +4750,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 5
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -5176,7 +5183,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 1000
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -5451,7 +5459,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 100
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -5754,7 +5763,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 1000
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -6007,7 +6017,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 5
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -6262,7 +6273,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 1000
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -6525,7 +6537,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 10
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -6725,7 +6738,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 5
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -7174,7 +7188,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 5
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -7443,7 +7458,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 5
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -7716,7 +7732,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 100
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -8175,7 +8192,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 5
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
@@ -8595,7 +8613,8 @@ require('custom_module')
     # * type: int
     rate_limit_num = 10
 
-    # The maximum number of retries to make for failed requests.
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
     #
     # * optional
     # * default: 18446744073709551615
