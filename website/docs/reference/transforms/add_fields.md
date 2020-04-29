@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-28"
+last_modified_on: "2020-04-29"
 component_title: "Add Fields"
 description: "The Vector `add_fields` transform accepts and outputs `log` events, allowing you to add one or more log fields."
 event_types: ["log"]
@@ -41,7 +41,7 @@ one or more log fields.
   # General
   type = "add_fields" # required
   inputs = ["my-source-or-transform-id"] # required
-  override = true # optional, default
+  overwrite = true # optional, default
 
   # Fields
   fields.string_field = "string value" # example
@@ -63,7 +63,7 @@ one or more log fields.
   # General
   type = "add_fields" # required
   inputs = ["my-source-or-transform-id"] # required
-  override = true # optional, default
+  overwrite = true # optional, default
 
   # Fields
   fields.string_field = "string value" # example
@@ -138,7 +138,7 @@ types][docs.configuration#types]. Use `.` for adding nested fields.
   enumValues={null}
   examples={[true,false]}
   groups={[]}
-  name={"override"}
+  name={"overwrite"}
   path={null}
   relevantWhen={null}
   required={false}
@@ -148,7 +148,7 @@ types][docs.configuration#types]. Use `.` for adding nested fields.
   warnings={[]}
   >
 
-### override
+### overwrite
 
 By default, fields will be overridden. Set this to `false` to avoid overwriting
 values.

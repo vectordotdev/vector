@@ -1315,8 +1315,8 @@ dns_servers = ["0.0.0.0:53"]
   # * optional
   # * default: true
   # * type: bool
-  override = true
-  override = false
+  overwrite = true
+  overwrite = false
 
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1344,8 +1344,8 @@ dns_servers = ["0.0.0.0:53"]
   # * optional
   # * default: true
   # * type: bool
-  override = true
-  override = false
+  overwrite = true
+  overwrite = false
 
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
