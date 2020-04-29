@@ -32,7 +32,7 @@ all: check build-all package-all test-docker test-behavior verify ## Run all tes
 ##@ Building
 
 build: ## Build the project natively in release mode
-	$(RUN) build
+	@scripts/build.sh
 
 build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
