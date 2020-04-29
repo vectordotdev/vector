@@ -169,13 +169,104 @@ impl TlsSettings {
             context
                 .set_verify_cert_store(store.build())
                 .context(SetVerifyCert)?;
+        } else {
+            debug!("Fetching system root certs.");
+
+            #[cfg(windows)]
+            load_windows_certs(context).unwrap();
+
+            #[cfg(target_os = "macos")]
+            load_mac_certs(context).unwrap();
         }
+
         Ok(())
     }
 
     pub fn apply_connect_configuration(&self, connection: &mut ConnectConfiguration) {
         connection.set_verify_hostname(self.verify_hostname);
     }
+}
+
+/// === System Specific Root Cert ===
+///
+/// Most of this code is borrowed from https://github.com/ctz/rustls-native-certs
+
+/// Load the system default certs from `schannel` this should be in place
+/// of openssl-probe on linux.
+#[cfg(windows)]
+fn load_windows_certs(builder: &mut SslContextBuilder) -> Result<()> {
+    use super::Schannel;
+
+    let mut store = X509StoreBuilder::new().context(NewStoreBuilder)?;
+
+    let current_user_store =
+        schannel::cert_store::CertStore::open_current_user("ROOT").context(Schannel)?;
+
+    for cert in current_user_store.certs() {
+        let cert = cert.to_der().to_vec();
+        let cert = X509::from_der(&cert[..]).context(X509ParseError)?;
+        store.add_cert(cert).context(AddCertToStore)?;
+    }
+
+    builder
+        .set_verify_cert_store(store.build())
+        .context(SetVerifyCert)?;
+
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn load_mac_certs(builder: &mut SslContextBuilder) -> Result<()> {
+    use super::SecurityFramework;
+    use security_framework::trust_settings::{Domain, TrustSettings, TrustSettingsForCertificate};
+    use std::collections::HashMap;
+
+    // The various domains are designed to interact like this:
+    //
+    // "Per-user Trust Settings override locally administered
+    //  Trust Settings, which in turn override the System Trust
+    //  Settings."
+    //
+    // So we collect the certificates in this order; as a map of
+    // their DER encoding to what we'll do with them.  We don't
+    // overwrite existing elements, which mean User settings
+    // trump Admin trump System, as desired.
+
+    let mut store = X509StoreBuilder::new().context(NewStoreBuilder)?;
+    let mut all_certs = HashMap::new();
+
+    for domain in &[Domain::User, Domain::Admin, Domain::System] {
+        let ts = TrustSettings::new(*domain);
+
+        for cert in ts.iter().context(SecurityFramework)? {
+            // If there are no specific trust settings, the default
+            // is to trust the certificate as a root cert.  Weird API but OK.
+            // The docs say:
+            //
+            // "Note that an empty Trust Settings array means "always trust this cert,
+            //  with a resulting kSecTrustSettingsResult of kSecTrustSettingsResultTrustRoot".
+            let trusted = ts
+                .tls_trust_settings_for_certificate(&cert)
+                .context(SecurityFramework)?
+                .unwrap_or(TrustSettingsForCertificate::TrustRoot);
+
+            all_certs.entry(cert.to_der()).or_insert(trusted);
+        }
+    }
+
+    for (cert, trusted) in all_certs {
+        if matches!(
+            trusted,
+            TrustSettingsForCertificate::TrustRoot | TrustSettingsForCertificate::TrustAsRoot
+        ) {
+            let cert = X509::from_der(&cert[..]).unwrap();
+            store.add_cert(cert).unwrap();
+        }
+    }
+
+    builder.set_verify_cert_store(store.build()).unwrap();
+
+    Ok(())
 }
 
 impl Debug for TlsSettings {
@@ -190,6 +281,11 @@ impl Debug for TlsSettings {
 pub type MaybeTlsSettings = MaybeTls<(), TlsSettings>;
 
 impl MaybeTlsSettings {
+    pub fn enable_client() -> Result<Self> {
+        let tls = TlsSettings::from_options_base(&None, false)?;
+        Ok(Self::Tls(tls))
+    }
+
     /// Generate an optional settings struct from the given optional
     /// configuration reference. If `config` is `None`, TLS is
     /// disabled. The `for_server` parameter indicates the options
