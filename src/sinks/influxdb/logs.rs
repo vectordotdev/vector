@@ -275,6 +275,53 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_nested_fields() {
+        let mut event = Event::new_empty_log();
+
+        event.as_mut_log().insert("a", 1);
+        event.as_mut_log().insert("nested.field", "2");
+        event.as_mut_log().insert("nested.bool", true);
+        event
+            .as_mut_log()
+            .insert("nested.array[0]", "example-value");
+        event
+            .as_mut_log()
+            .insert("nested.array[2]", "another-value");
+        event.as_mut_log().insert("nested.array[3]", 15);
+
+        let (config, _, _) = crate::sinks::util::test::load_sink::<InfluxDBLogsConfig>(
+            r#"
+            namespace = "ns"
+            endpoint = "http://localhost:9999"
+            bucket = "my-bucket"
+            org = "my-org"
+            token = "my-token"
+        "#,
+        )
+        .unwrap();
+
+        let bytes = config.encode_event(event.clone()).unwrap();
+        let string = std::str::from_utf8(&bytes).unwrap();
+
+        let line_protocol = split_line_protocol(&string);
+        assert_eq!("ns.vector", line_protocol.0);
+        assert_eq!("metric_type=logs", line_protocol.1);
+        assert_fields(
+            line_protocol.2.to_string(),
+            [
+                "a=1i",
+                "nested.array[0]=\"example-value\"",
+                "nested.array[1]=\"<null>\"",
+                "nested.array[2]=\"another-value\"",
+                "nested.array[3]=15i",
+                "nested.bool=true",
+                "nested.field=\"2\"",
+            ]
+            .to_vec(),
+        );
+    }
+
+    #[test]
     fn test_add_tag() {
         let mut event = Event::from("hello");
         event.as_mut_log().insert("source_type", "file");
