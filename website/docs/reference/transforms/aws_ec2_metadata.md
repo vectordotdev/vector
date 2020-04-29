@@ -126,7 +126,7 @@ Override the default EC2 Metadata host.
   common={true}
   defaultValue={""}
   enumValues={null}
-  examples={[""]}
+  examples={["","ec2","aws.ec2"]}
   groups={[]}
   name={"namespace"}
   path={null}

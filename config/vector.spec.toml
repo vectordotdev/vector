@@ -1403,6 +1403,8 @@ dns_servers = ["0.0.0.0:53"]
   # * default: ""
   # * type: string
   namespace = ""
+  namespace = "ec2"
+  namespace = "aws.ec2"
 
   # The interval in seconds at which the EC2 Metadata api will be called.
   #
