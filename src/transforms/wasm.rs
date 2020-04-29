@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::Event,
-    foreign_modules::{WasmModule, WasmModuleConfig},
+    foreign_modules::{Role, WasmModule, WasmModuleConfig},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -15,7 +15,7 @@ pub struct WasmConfig {
 
 impl Into<WasmModuleConfig> for WasmConfig {
     fn into(self) -> WasmModuleConfig {
-        WasmModuleConfig::new(self.module, "cache")
+        WasmModuleConfig::new(Role::Transform, self.module)
     }
 }
 

@@ -4,7 +4,6 @@
 //! our foreign module support exist in the `foreign_modules` crate.
 //!
 //! **Note:** This code is experimental.
-//!
 
 use crate::{Event, Result};
 use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Region};
@@ -20,13 +19,16 @@ mod context;
 mod util;
 use context::ForeignModuleContext;
 use foreign_modules::Registration;
-use foreign_modules::Role;
 use std::fmt::Debug;
 use util::GuestPointer;
 
+pub use foreign_modules::{
+    Role,
+}; // This is kind of bad practice, but it's very convienent.
+
 pub mod hostcall; // Pub is required for lucet.
 
-mod defaults {
+pub mod defaults {
     pub(super) const ARTIFACT_CACHE: &str = "cache";
     pub(super) const HEAP_MEMORY_SIZE: usize = 16 * 64 * 1024 * 10; // 10MB
 }
@@ -37,11 +39,11 @@ mod defaults {
 #[derive(Derivative, Clone, Debug, Deserialize, Serialize)]
 #[derivative(Default)]
 pub struct WasmModuleConfig {
-    /// The path to the module's `wasm` file.
-    pub path: PathBuf,
     /// The role which the module will play.
     #[derivative(Default(value = "Role::Transform"))]
     pub role: Role,
+    /// The path to the module's `wasm` file.
+    pub path: PathBuf,
     /// The cache location where an optimized `so` file shall be placed.
     #[derivative(Default(value = "defaults::ARTIFACT_CACHE.into()"))]
     pub artifact_cache: PathBuf,
@@ -53,17 +55,25 @@ pub struct WasmModuleConfig {
 }
 
 impl WasmModuleConfig {
-    pub fn new(path: impl Into<PathBuf>, artifact_cache: impl Into<PathBuf>) -> Self {
+    /// Build a new configuration with the required options set.
+    pub fn new(role: Role, path: impl Into<PathBuf>) -> Self {
         Self {
+            role,
             path: path.into(),
-            artifact_cache: artifact_cache.into(),
+            artifact_cache: defaults::ARTIFACT_CACHE.into(),
             max_heap_memory_size: defaults::HEAP_MEMORY_SIZE,
-            role: Role::Transform,
         }
     }
 
+    /// Set the maximum heap size of the transform to the given value. See `defaults::HEAP_MEMORY_SIZE`.
     pub fn set_max_heap_memory_size(&mut self, max_heap_memory_size: usize) -> &mut Self {
         self.max_heap_memory_size = max_heap_memory_size;
+        self
+    }
+
+    /// Set the maximum heap size of the transform to the given value. See `defaults::HEAP_MEMORY_SIZE`.
+    pub fn set_artifact_cache(&mut self, artifact_cache: impl Into<PathBuf>) -> &mut Self {
+        self.artifact_cache = artifact_cache.into();
         self
     }
 }
@@ -194,8 +204,8 @@ fn protobuf() -> Result<()> {
 
     // Run the test.
     let mut module = WasmModule::build(WasmModuleConfig::new(
+        Role::Transform,
         "target/wasm32-wasi/release/protobuf.wasm",
-        "cache",
     ))?;
     let out = module.process(event.clone())?;
     module.shutdown()?;

@@ -35,6 +35,9 @@ where
 #[repr(C)]
 pub struct Registration {
     /// The role of the module.
+    /// 
+    /// The host will also define this, and the registration will fail if they differ in types.
+    /// This is a simple two-way handshake safety procedure to ensure modules get used in the right place.
     role: Role,
     /// If this module requires WASI.
     ///

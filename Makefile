@@ -95,7 +95,7 @@ test-behavior: ## Runs behavioral tests
 	@cargo run --no-default-features --features ${DEFAULT_FEATURES} -- test tests/behavior/**/*.toml
 
 ensure-has-wasm-toolchain: ### Configures a wasm toolchain for test artifact building, if required
-	rustup target add wasm32-wasi --toolchain nightly
+	rustup target add wasm32-wasi
 
 TEST_FOREIGN_MODULES := $(patsubst test-data/foreign_modules/%, target/wasm-wasi/release/%.wasm, $(wildcard test-data/foreign_modules/*))
 build-test-foreign-modules: $(TEST_FOREIGN_MODULES) ### Builds engine test modules, if required
@@ -103,7 +103,7 @@ build-test-foreign-modules: $(TEST_FOREIGN_MODULES) ### Builds engine test modul
 .ONESHELL:
 $(TEST_FOREIGN_MODULES): ensure-has-wasm-toolchain ### Build the target test module
 	cd $(patsubst target/wasm-wasi/release/%.wasm, test-data/foreign_modules/%, $@)
-	cargo +nightly build --target wasm32-wasi --release
+	cargo build --target wasm32-wasi --release
 
 test-foreign-modules: build-test-foreign-modules  ### Run engine tests.
 	cargo test foreign_modules -- --nocapture
