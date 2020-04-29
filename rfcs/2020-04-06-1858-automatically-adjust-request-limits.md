@@ -185,11 +185,63 @@ mechanism will expose the following data:
 * a counter metric recording every time a request is limited due to the
   current concurrency limit,
 
+```rust
+impl InternalEvent for ConcurrencyLimited {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Request limited due to current concurrency limit.",
+            concurrency = %self.concurrency,
+            component = %self.component,
+            rate_limit_secs = 5,
+        );
+    }
+    fn emit_metrics(&self) {
+        counter!("concurrency_limit_reached", 1,
+            "component_kind" => "sink",
+            "component_type" => self.component,
+        );
+    }
+}
+```
+
 * a histogram metric recording the observed RTTs,
+
+```rust
+impl InternalEvent for ObservedRTT {
+    fn emit_metrics(&self) {
+        timing!("observed_rtt", self.rtt,
+            "component_kind" => "sink",
+            "component_type" => self.component,
+        );
+    }
+}
+```
 
 * a histogram metric recording the effective concurrency limit, and
 
+```rust
+impl InternalEvent for ConcurrencyLimit {
+    fn emit_metrics(&self) {
+        value!("concurrency_limit", self.concurrency,
+            "component_kind" => "sink",
+            "component_type" => self.component,
+        );
+    }
+}
+```
+
 * a histogram metric recording the actual concurrent requests in flight.
+
+```rust
+impl InternalEvent for ConcurrencyActual {
+    fn emit_metrics(&self) {
+        value!("concurrency_actual", self.concurrency,
+            "component_kind" => "sink",
+            "component_type" => self.component,
+        );
+    }
+}
+```
 
 ## Prior Art
 
