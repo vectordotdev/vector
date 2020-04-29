@@ -683,6 +683,9 @@ perform log filtering. So, if we'll be obtaining pod metadata at the
 `kubernetes` source, we might as well enhance the event right there. This would
 render `kubernetes_pod_metadata` useless, as there would be no use case for
 it that wouldn't be covered by `kubernetes` source.
+Of course, `kubernetes_pod_metadata` would still make sense if used not in
+conjunction with `kubernetes` source - which is the case, for instance, in a
+sidecar deployment - where `file` source is used directly with in-pod logs file.
 
 What parts of metadata we inject into events should be configurable, but we can
 and want to offer sane defaults here.
