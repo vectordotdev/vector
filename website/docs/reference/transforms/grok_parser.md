@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-04-29"
 component_title: "Grok Parser"
 description: "The Vector `grok_parser` transform accepts and outputs `log` events, allowing you to parse a log field value with Grok."
 event_types: ["log"]

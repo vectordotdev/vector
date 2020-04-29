@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-24"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` source ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs `log` events."

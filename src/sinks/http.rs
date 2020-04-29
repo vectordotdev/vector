@@ -153,7 +153,7 @@ impl HttpSink for HttpSinkConfig {
         self.encoding.apply_rules(&mut event);
         let event = event.into_log();
 
-        let body = match &self.encoding.codec {
+        let body = match &self.encoding.codec() {
             Encoding::Text => {
                 if let Some(v) = event.get(&event::log_schema().message_key()) {
                     let mut b = v.to_string_lossy().into_bytes();
@@ -201,7 +201,7 @@ impl HttpSink for HttpSinkConfig {
         let uri: Uri = self.uri.clone().into();
         builder.uri(uri);
 
-        match self.encoding.codec {
+        match self.encoding.codec() {
             Encoding::Text => builder.header("Content-Type", "text/plain"),
             Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
             Encoding::Json => {

@@ -241,7 +241,7 @@ fn encode_event(
     };
 
     let log = event.into_log();
-    let data = match encoding.codec {
+    let data = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
         Encoding::Text => log
             .get(&event::log_schema().message_key())

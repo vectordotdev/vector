@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "best_effort"
 component_title: "Vector"
 description: "The Vector `vector` source ingests data through another upstream `vector` sink and outputs `log` and `metric` events."

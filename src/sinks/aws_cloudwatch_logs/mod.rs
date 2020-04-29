@@ -269,7 +269,7 @@ impl CloudwatchLogsSvc {
                 chrono::Utc::now().timestamp_millis()
             };
 
-        match self.encoding.codec {
+        match self.encoding.codec() {
             Encoding::Json => {
                 let message = serde_json::to_string(&log).unwrap();
                 InputLogEvent { message, timestamp }

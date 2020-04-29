@@ -5,6 +5,7 @@ use rusoto_core::{region::ParseRegionError, Region};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(default)]
@@ -47,13 +48,7 @@ impl TryFrom<&RegionOrEndpoint> for Region {
     fn try_from(r: &RegionOrEndpoint) -> Result<Self, Self::Error> {
         match (&r.region, &r.endpoint) {
             (Some(region), None) => region.parse().context(RegionParseError),
-            (None, Some(endpoint)) => endpoint
-                .parse::<Uri>()
-                .map(|_| Region::Custom {
-                    name: "custom".into(),
-                    endpoint: endpoint.into(),
-                })
-                .context(EndpointParseError),
+            (None, Some(endpoint)) => region_from_endpoint(endpoint),
             (Some(_), Some(_)) => Err(ParseError::BothRegionAndEndpoint),
             (None, None) => Err(ParseError::MissingRegionAndEndpoint),
         }
@@ -65,6 +60,34 @@ impl TryFrom<RegionOrEndpoint> for Region {
     fn try_from(r: RegionOrEndpoint) -> Result<Self, Self::Error> {
         Region::try_from(&r)
     }
+}
+
+/// Translate an endpoint URL into a Region
+pub fn region_from_endpoint(endpoint: &str) -> Result<Region, ParseError> {
+    let uri = endpoint.parse::<Uri>().context(EndpointParseError)?;
+    let name = region_name_from_host(uri.host().unwrap_or(""));
+
+    // Reconstitute the endpoint from the URI, but strip off all path components
+    let pq_len = uri
+        .path_and_query()
+        .map(|pq| pq.as_str().len())
+        .unwrap_or(1);
+    let endpoint = uri.to_string();
+    let endpoint = endpoint[..endpoint.len() - pq_len].to_string();
+
+    Ok(Region::Custom { name, endpoint })
+}
+
+/// Translate a hostname into a custom region name
+fn region_name_from_host(host: &str) -> String {
+    // Find the first part of the domain name that matches a known region
+    for part in host.split('.') {
+        if let Ok(region) = Region::from_str(part) {
+            return region.name().into();
+        }
+    }
+    // Couldn't find a valid region, use the default
+    "custom".into()
 }
 
 #[cfg(test)]
@@ -100,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn region_custom_name_endpoint() {
+    fn custom_name_endpoint_localhost() {
         let config: Config = toml::from_str(
             r#"
         [inner]
@@ -133,5 +156,43 @@ mod tests {
             Err(ParseError::MissingRegionAndEndpoint) => {}
             other => panic!("assertion failed, wrong result {:?}", other),
         }
+    }
+
+    #[test]
+    fn region_from_endpoint_localhost() {
+        assert_eq!(
+            region_from_endpoint("http://localhost:9000").unwrap(),
+            Region::Custom {
+                name: "custom".into(),
+                endpoint: "http://localhost:9000".into()
+            }
+        );
+    }
+
+    #[test]
+    fn region_from_endpoint_standard_region() {
+        assert_eq!(
+            region_from_endpoint(
+                "https://this-is-a-test-5dec2c2qbgsuekvsecuylqu.us-west-2.es.amazonaws.com"
+            )
+            .unwrap(),
+            Region::Custom {
+                name: "us-west-2".into(),
+                endpoint:
+                    "https://this-is-a-test-5dec2c2qbgsuekvsecuylqu.us-west-2.es.amazonaws.com"
+                        .into()
+            }
+        );
+    }
+
+    #[test]
+    fn region_from_endpoint_strips_path_query() {
+        assert_eq!(
+            region_from_endpoint("http://localhost:9000/path?query").unwrap(),
+            Region::Custom {
+                name: "custom".into(),
+                endpoint: "http://localhost:9000".into()
+            }
+        );
     }
 }

@@ -60,7 +60,7 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
     encoding.apply_rules(&mut event);
     let log = event.into_log();
 
-    let b = match encoding.codec {
+    let b = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log),
         Encoding::Text => {
             let bytes = log

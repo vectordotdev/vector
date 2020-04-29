@@ -96,9 +96,6 @@ order to retrieve Kubernetes metadata.\
 # output
 #
 
-[transforms.kubernetes_pod_metadata.fields.log]
-global_log_schema_key = "kubernetes"
-
 [transforms.kubernetes_pod_metadata.fields.log.fields.name]
 type = "string"
 examples = ["nginx"]

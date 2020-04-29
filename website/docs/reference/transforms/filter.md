@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-04-29"
 component_title: "Filter"
 description: "The Vector `filter` transform accepts and outputs `log` and `metric` events, allowing you to select events based on a set of logical conditions."
 event_types: ["log","metric"]

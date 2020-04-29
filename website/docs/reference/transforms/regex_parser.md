@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-04-29"
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events, allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]

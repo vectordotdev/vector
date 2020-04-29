@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-24"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "at_least_once"
 component_title: "Datadog Logs"
 description: "The Vector `datadog_logs` sink streams `log` events to Datadog's logs via the TCP endpoint."
