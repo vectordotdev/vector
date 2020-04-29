@@ -1,4 +1,4 @@
-.PHONY: help
+.PHONY: $(MAKECMDGOALS) all
 .DEFAULT_GOAL := help
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/run.sh)
 
