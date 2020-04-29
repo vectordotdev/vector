@@ -188,6 +188,7 @@ jobs:
       - run: make test-integration-kubernetes
         env:
           CONTAINER_IMAGE_REPO: ${{ secrets.K8S_INTEGRATION_CI_DOCKER_REPO }}
+          PACKAGE_DEB_USE_CONTAINER: docker
 
   test-unit:
     runs-on: ubuntu-latest
