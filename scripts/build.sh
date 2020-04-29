@@ -8,21 +8,21 @@
 #
 # ENV VARS
 #
-#   $ABORT          abort if the Vector binary already exists (default "false")
+#   $OVERWRITE      overwrite Vector binary even if it already exists (default "true")
 #   $CHANNEL        the release channel for the build, "nighly" or "stable" (default `scripts/util/release-channel.sh`)
 #   $FEATURES       a list of Vector features to include when building (default "default")
 #   $NATIVE_BUILD   whether to pass the --target flag when building via cargo (default "true")
-#   $STRIP          whether or not to strip the binary (default "false")
+#   $KEEP_SYMBOLS   whether to keep the any debug symbols in the binaries or not (default "true")
 #   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
 
 #
 # Env Vars
 #
 
-ABORT=${ABORT:-false}
+OVERWRITE=${OVERWRITE:-true}
 FEATURES=${FEATURES:-}
 NATIVE_BUILD=${NATIVE_BUILD:-true}
-STRIP=${STRIP:-false}
+KEEP_SYMBOLS=${KEEP_SYMBOLS:-true}
 TARGET=${TARGET:-}
 
 if [ -z "$FEATURES" ]; then
@@ -50,7 +50,7 @@ binary_path="$target_dir/release/vector"
 # Abort early if possible
 #
 
-if [ -f "$binary_path" ] && [ "$ABORT" == "true" ]; then
+if [ -f "$binary_path" ] && [ "$OVERWRITE" == "false" ]; then
   echo "Vector binary already exists at:"
   echo ""
   echo "    $binary_path"
@@ -67,10 +67,10 @@ fi
 set -eu
 
 echo "Building Vector binary"
-echo "ABORT: $ABORT"
+echo "OVERWRITE: $OVERWRITE"
 echo "FEATURES: $FEATURES"
 echo "NATIVE_BUILD: $NATIVE_BUILD"
-echo "STRIP: $STRIP"
+echo "KEEP_SYMBOLS: $KEEP_SYMBOLS"
 echo "TARGET: $TARGET"
 echo "Binary path: $binary_path"
 
@@ -96,6 +96,6 @@ fi
 # Strip the output binary
 #
 
-if [ "$STRIP" == "true" ]; then
+if [ "$KEEP_SYMBOLS" == "false" ]; then
   strip $binary_path
 fi

@@ -10,7 +10,7 @@
 #
 # ENV VARS
 #
-#   $ABORT          abort if the archive already exists (default "false")
+#   $OVERWRITE      overwrite Vector binary even if it already exists (default "true")
 #   $ARCHIVE_TYPE   archive type, either "tar.gz" or "zip" (default "tar.gz")
 #   $NATIVE_BUILD   whether the binary was built natively or with a --target (default "true")
 #   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
@@ -19,7 +19,7 @@
 # Env Vars
 #
 
-ABORT=${ABORT:-false}
+OVERWRITE=${OVERWRITE:-true}
 ARCHIVE_TYPE=${ARCHIVE_TYPE:-tar.gz}
 NATIVE_BUILD=${NATIVE_BUILD:-true}
 
@@ -42,7 +42,7 @@ artifacts_dir="target/artifacts"
 # Abort if possible
 #
 
-if [ -f "$artifacts_dir/$archive_name" ] && [ "$ABORT" == "true" ]; then
+if [ -f "$artifacts_dir/$archive_name" ] && [ "$OVERWRITE" == "false" ]; then
   echo "Archive already exists at:"
   echo ""
   echo "    $artifacts_dir/$archive_name"
@@ -59,7 +59,7 @@ fi
 set -eu
 
 echo "Packaging the Vector archive"
-echo "ABORT: $ABORT"
+echo "OVERWRITE: $OVERWRITE"
 echo "ARCHIVE_TYPE: $ARCHIVE_TYPE"
 echo "NATIVE_BUILD: $NATIVE_BUILD"
 echo "TARGET: $TARGET"
