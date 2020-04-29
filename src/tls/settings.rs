@@ -217,8 +217,8 @@ fn load_windows_certs(builder: &mut SslContextBuilder) -> Result<()> {
 
 #[cfg(target_os = "macos")]
 fn load_mac_certs(builder: &mut SslContextBuilder) -> Result<()> {
-    use security_framework::trust_settings::{Domain, TrustSettings, TrustSettingsForCertificate};
     use super::SecurityFramework;
+    use security_framework::trust_settings::{Domain, TrustSettings, TrustSettingsForCertificate};
     use std::collections::HashMap;
 
     // The various domains are designed to interact like this:
