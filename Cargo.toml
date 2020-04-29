@@ -1,6 +1,10 @@
 [package]
 name = "vector"
+<<<<<<< HEAD
 version = "0.10.0"
+=======
+version = "0.9.1"
+>>>>>>> 0ee662e37... chore: Prepare v0.9.1 release
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"

@@ -3744,1045 +3744,25 @@ module.exports = {
     "title": "How We Test Vector"
   },
   "latest_release": {
-    "codename": "The Homestretch",
+    "codename": "",
     "commits": [
       {
-        "author": "Kruno Tomola Fabro",
+        "author": "Lucio Franco",
         "breaking_change": false,
-        "date": "2020-02-25 21:55:37 +0000",
-        "deletions_count": 1,
-        "description": "Allow setting individual `log_schema.*` options",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 11,
-        "message": "enhancement(config): Allow setting individual `log_schema.*` options (#1923)",
-        "pr_number": 1923,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "config"
-          }
-        ],
-        "sha": "177bd7de7e38a24c4a6092c85b8f5eb9d0f5386f",
-        "type": "enhancement"
-      },
-      {
-        "author": "Ashley Jeffs",
-        "breaking_change": false,
-        "date": "2020-02-26 10:31:46 +0000",
-        "deletions_count": 78,
-        "description": "Restructure getting started guide",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 198,
-        "message": "docs: Restructure getting started guide (#1854)",
-        "pr_number": 1854,
-        "scopes": [
-
-        ],
-        "sha": "12cc1ca32d56853a99ff6916dcca49466e881dc4",
-        "type": "docs"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-02-26 14:07:37 +0000",
-        "deletions_count": 0,
-        "description": "Add behavior test for the `merge` transform",
-        "files_count": 1,
+        "date": "2020-04-22 14:37:44 +0000",
+        "deletions_count": 4,
+        "description": "Support millisecond and nanosecond timestamps",
+        "files_count": 2,
         "highlight_permalink": null,
         "insertions_count": 71,
-        "message": "chore(testing): Add behavior test for the `merge` transform (#1820)",
-        "pr_number": 1820,
+        "message": "fix(splunk_hec source, splunk_hec sink): Support millisecond and nanosecond timestamps (#2382)",
+        "pr_number": 2382,
         "scopes": [
-          {
-            "component": {
-            },
-            "name": "testing"
-          }
-        ],
-        "sha": "fb4bab3b95e6e5eecb7a1a4a5838c76b519f1edb",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-02-26 08:43:47 +0000",
-        "deletions_count": 50,
-        "description": "Add TLS support to socket, syslog, and vector sources",
-        "files_count": 18,
-        "highlight_permalink": null,
-        "insertions_count": 890,
-        "message": "enhancement(socket source, syslog source, vector source): Add TLS support to socket, syslog, and vector sources (#1892)",
-        "pr_number": 1892,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "socket source"
-          },
-          {
-            "component": {
-            },
-            "name": "syslog source"
-          },
-          {
-            "component": {
-            },
-            "name": "vector source"
-          }
-        ],
-        "sha": "33d529feb01e37e98bec3761604a1ca125b3c3df",
-        "type": "enhancement"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-02-26 18:00:02 +0000",
-        "deletions_count": 662,
-        "description": "Replace `flatten`/`unflatten` by native nesting",
-        "files_count": 35,
-        "highlight_permalink": null,
-        "insertions_count": 1083,
-        "message": "chore: Replace `flatten`/`unflatten` by native nesting (#1902)",
-        "pr_number": 1902,
-        "scopes": [
-
-        ],
-        "sha": "38864efa4152a1f44154431bf250ddf1c67b91c6",
-        "type": "chore"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-02-26 19:09:59 +0000",
-        "deletions_count": 33,
-        "description": "Upgrade rdkafka to 0.23.1",
-        "files_count": 4,
-        "highlight_permalink": null,
-        "insertions_count": 94,
-        "message": "chore: Upgrade rdkafka to 0.23.1 (#1928)",
-        "pr_number": 1928,
-        "scopes": [
-
-        ],
-        "sha": "d610ee18801f7306be49841b93ccc02aac926d75",
-        "type": "chore"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-02-26 20:08:19 +0000",
-        "deletions_count": 14,
-        "description": "Upgrade lib/file-source to futures 0.3",
-        "files_count": 4,
-        "highlight_permalink": null,
-        "insertions_count": 14,
-        "message": "chore: Upgrade lib/file-source to futures 0.3 (#1934)",
-        "pr_number": 1934,
-        "scopes": [
-
-        ],
-        "sha": "271bcbd13d81e728b814d1273784147e5647a2b5",
-        "type": "chore"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-02-26 20:35:49 +0000",
-        "deletions_count": 229,
-        "description": "Rename futures to futures01",
-        "files_count": 87,
-        "highlight_permalink": null,
-        "insertions_count": 231,
-        "message": "chore(dependencies): Rename futures to futures01 (#1933)",
-        "pr_number": 1933,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "dependencies"
-          }
-        ],
-        "sha": "0b92159518732a27837ca1142884ab9a7d34de84",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-02-26 12:07:44 +0000",
-        "deletions_count": 114,
-        "description": "Rewrite to use HttpSink and JsonArrayBuffer",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 81,
-        "message": "chore(gcp_pubsub sink): Rewrite to use HttpSink and JsonArrayBuffer (#1925)",
-        "pr_number": 1925,
-        "scopes": [
-          {
-            "component": {
-              "name": "gcp_pubsub",
-              "type": "sink"
-            },
-            "name": "gcp_pubsub sink"
-          }
-        ],
-        "sha": "45b88d47ea8f01605d8e2e5ba7cf8f011f637853",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-02-26 15:01:18 +0000",
-        "deletions_count": 8,
-        "description": "Allow transforms to implement `Stream`",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 24,
-        "message": "chore(topology): Allow transforms to implement `Stream` (#1938)",
-        "pr_number": 1938,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "topology"
-          }
-        ],
-        "sha": "6b5a5e238f266286227695b488a4266f1fd73bba",
-        "type": "chore"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-02-26 19:48:41 +0000",
-        "deletions_count": 72,
-        "description": "Improve Vector README to clarify purpose and position",
-        "files_count": 7,
-        "highlight_permalink": null,
-        "insertions_count": 216,
-        "message": "docs: Improve Vector README to clarify purpose and position (#1943)",
-        "pr_number": 1943,
-        "scopes": [
-
-        ],
-        "sha": "5df7c74c6206ddc33afe3c1840e62258bae9baf2",
-        "type": "docs"
-      },
-      {
-        "author": "Ashley Jeffs",
-        "breaking_change": false,
-        "date": "2020-02-27 11:32:48 +0000",
-        "deletions_count": 0,
-        "description": "Add advanced configs guide",
-        "files_count": 4,
-        "highlight_permalink": null,
-        "insertions_count": 182,
-        "message": "docs: Add advanced configs guide (#1774)",
-        "pr_number": 1774,
-        "scopes": [
-
-        ],
-        "sha": "c9a4fcfe9f9e3e042497a94259dc492dd62b3eef",
-        "type": "docs"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-02-27 11:51:30 +0000",
-        "deletions_count": 2,
-        "description": "Add docs for NixOS",
-        "files_count": 14,
-        "highlight_permalink": "/highlights/2020-02-27-nixos-support/",
-        "insertions_count": 323,
-        "message": "docs: Add docs for NixOS (#1946)",
-        "pr_number": 1946,
-        "scopes": [
-
-        ],
-        "sha": "b6d197a5b959ce45cd8a4c952c360bfa1c6c22c0",
-        "type": "docs"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-02-28 09:27:46 +0000",
-        "deletions_count": 22,
-        "description": "Increase test logs size",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 27,
-        "message": "chore(tests): Increase test logs size (#1949)",
-        "pr_number": 1949,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "tests"
-          }
-        ],
-        "sha": "5e02ace8c08e9eb703b63908ada9a7663f686faa",
-        "type": "chore"
-      },
-      {
-        "author": "Ashley Jeffs",
-        "breaking_change": false,
-        "date": "2020-02-28 08:35:00 +0000",
-        "deletions_count": 41,
-        "description": "Default to `check_fields` condition when specifying conditions",
-        "files_count": 18,
-        "highlight_permalink": null,
-        "insertions_count": 30,
-        "message": "enhancement(config): Default to `check_fields` condition when specifying conditions (#1947)",
-        "pr_number": 1947,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "config"
-          }
-        ],
-        "sha": "1fca6dcd0cd7f94785448128eb2f06d9dccc0bd4",
-        "type": "enhancement"
-      },
-      {
-        "author": "Ashley Jeffs",
-        "breaking_change": false,
-        "date": "2020-02-28 10:47:04 +0000",
-        "deletions_count": 15,
-        "description": "Add `is_log` and `is_metric` conditions",
-        "files_count": 8,
-        "highlight_permalink": null,
-        "insertions_count": 177,
-        "message": "enhancement(config): Add `is_log` and `is_metric` conditions (#1950)",
-        "pr_number": 1950,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "config"
-          }
-        ],
-        "sha": "5ecbc2843ce8f61553943837782e296031b025e1",
-        "type": "enhancement"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-02-28 10:30:59 +0000",
-        "deletions_count": 14,
-        "description": "Add `--log-format` CLI option",
-        "files_count": 4,
-        "highlight_permalink": null,
-        "insertions_count": 60,
-        "message": "feat(cli): Add `--log-format` CLI option (#1908)",
-        "pr_number": 1908,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "cli"
-          }
-        ],
-        "sha": "a2b1ef7479c3b49b9734be9dd0f9438ad343a478",
-        "type": "feat"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-02-28 19:01:49 +0000",
-        "deletions_count": 71,
-        "description": "Create feature flags for all components enabling custom Vector builds",
-        "files_count": 32,
-        "highlight_permalink": "/highlights/2020-02-28-custom-vector-builds/",
-        "insertions_count": 619,
-        "message": "enhancement(operations): Create feature flags for all components enabling custom Vector builds (#1924)",
-        "pr_number": 1924,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "f07a3d22c9bba01612cc330abaff928df7dce8b2",
-        "type": "enhancement"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-02-28 20:48:55 +0000",
-        "deletions_count": 0,
-        "description": "Add TEST_LOG to test-stable CI job",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 5,
-        "message": "chore(operations): Add TEST_LOG to test-stable CI job (#1937)",
-        "pr_number": 1937,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "fdae428c4b8aca0c748ba20ff08478062d327a4b",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-02-28 13:03:15 +0000",
-        "deletions_count": 2,
-        "description": "Check kube and docker code",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 2,
-        "message": "chore(operations): Check kube and docker code (#1914)",
-        "pr_number": 1914,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "e4c83635166e777e53e4813448258c7fbcd6820a",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-02-28 21:55:08 +0000",
-        "deletions_count": 1,
-        "description": "Upgrade to Rust 1.41.1",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(dependencies): Upgrade to Rust 1.41.1 (#1958)",
-        "pr_number": 1958,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "dependencies"
-          }
-        ],
-        "sha": "560fd106fc9a60c12ddf2c32e31ad4f2031ff1f5",
-        "type": "chore"
-      },
-      {
-        "author": "gedkins",
-        "breaking_change": false,
-        "date": "2020-03-02 18:34:25 +0000",
-        "deletions_count": 5,
-        "description": "Initial `http` source implementation",
-        "files_count": 16,
-        "highlight_permalink": null,
-        "insertions_count": 887,
-        "message": "feat(new source): Initial `http` source implementation (#1650)",
-        "pr_number": 1650,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "new source"
-          }
-        ],
-        "sha": "1944ae977dd4143004434589ce4f27cb2714cbaf",
-        "type": "feat"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-03 13:24:09 +0000",
-        "deletions_count": 3,
-        "description": "Remove Google Analytics",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 0,
-        "message": "chore(website): Remove Google Analytics (#1976)",
-        "pr_number": 1976,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "website"
-          }
-        ],
-        "sha": "e3cf8a7ef7712b054e0e37ca2caaa8e7933678ff",
-        "type": "chore"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-03 14:16:28 +0000",
-        "deletions_count": 4,
-        "description": "Add Privacy Policy",
-        "files_count": 8,
-        "highlight_permalink": null,
-        "insertions_count": 95,
-        "message": "chore: Add Privacy Policy (#1977)",
-        "pr_number": 1977,
-        "scopes": [
-
-        ],
-        "sha": "9d6c7e3288e013aedd672c7832b46e1291ea01ec",
-        "type": "chore"
-      },
-      {
-        "author": "Ashley Jeffs",
-        "breaking_change": false,
-        "date": "2020-03-04 09:14:00 +0000",
-        "deletions_count": 12,
-        "description": "Add `--fragment` flag to `generate` subcmd",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 40,
-        "message": "enhancement(cli): Add `--fragment` flag to `generate` subcmd (#1956)",
-        "pr_number": 1956,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "cli"
-          }
-        ],
-        "sha": "8d93004cf95163695eb83778090c18369f7c3bf0",
-        "type": "enhancement"
-      },
-      {
-        "author": "Ashley Jeffs",
-        "breaking_change": false,
-        "date": "2020-03-04 09:14:51 +0000",
-        "deletions_count": 12,
-        "description": "Allow names in `generate` subcmd expression",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 65,
-        "message": "enhancement(cli): Allow names in `generate` subcmd expression (#1955)",
-        "pr_number": 1955,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "cli"
-          }
-        ],
-        "sha": "f81b205a82976e46a2dfe7e3f4422ae1563f51d7",
-        "type": "enhancement"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-04 15:53:57 +0000",
-        "deletions_count": 0,
-        "description": "Add `check-component-features` target to the main Makefile",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 3,
-        "message": "chore: Add `check-component-features` target to the main Makefile (#1981)",
-        "pr_number": 1981,
-        "scopes": [
-
-        ],
-        "sha": "f5663be4b0d90809ef9d73dc18d26844d82f500e",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-04 11:09:59 +0000",
-        "deletions_count": 196,
-        "description": "Add TLS support",
-        "files_count": 15,
-        "highlight_permalink": null,
-        "insertions_count": 731,
-        "message": "enhancement(logplex source, splunk_hec source): Add TLS support (#1968)",
-        "pr_number": 1968,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "logplex source"
-          },
           {
             "component": {
             },
             "name": "splunk_hec source"
-          }
-        ],
-        "sha": "b22e4d39a60b3e35e605d1f3997c32e14886853d",
-        "type": "enhancement"
-      },
-      {
-        "author": "Ana Hobden",
-        "breaking_change": false,
-        "date": "2020-03-04 18:36:16 +0000",
-        "deletions_count": 652,
-        "description": "Add new `encoding.only_fields` and `encoding.except_fields` options",
-        "files_count": 72,
-        "highlight_permalink": "/highlights/2020-03-04-encoding-only-fields-except-fields/",
-        "insertions_count": 4148,
-        "message": "enhancement(sinks): Add new `encoding.only_fields` and `encoding.except_fields` options (#1915)",
-        "pr_number": 1915,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "sinks"
-          }
-        ],
-        "sha": "23968607e2382561e94b0f5f56b634bf02b046bd",
-        "type": "enhancement"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-05 12:48:59 +0000",
-        "deletions_count": 21,
-        "description": "Add RFC process",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 140,
-        "message": "chore: Add RFC process (#1961)",
-        "pr_number": 1961,
-        "scopes": [
-
-        ],
-        "sha": "af7756389127cf51acdab175f67c573af6ef921d",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-06 10:40:32 +0000",
-        "deletions_count": 374,
-        "description": "Move all TLS support over to openssl",
-        "files_count": 36,
-        "highlight_permalink": null,
-        "insertions_count": 776,
-        "message": "enhancement(networking): Move all TLS support over to openssl (#1986)",
-        "pr_number": 1986,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "networking"
-          }
-        ],
-        "sha": "9f793a7fc929a346ae726fce19efd7279b6f241e",
-        "type": "enhancement"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-07 00:49:04 +0000",
-        "deletions_count": 8,
-        "description": "Describe dot notation in the docs",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 69,
-        "message": "docs: Describe dot notation in the docs (#1996)",
-        "pr_number": 1996,
-        "scopes": [
-
-        ],
-        "sha": "179801c8c09c06dd0759291815aca21a1ca794c5",
-        "type": "docs"
-      },
-      {
-        "author": "Ashley Jeffs",
-        "breaking_change": false,
-        "date": "2020-03-09 15:35:03 +0000",
-        "deletions_count": 4,
-        "description": "Add `contains` and `prefix` predicates",
-        "files_count": 5,
-        "highlight_permalink": "/highlights/2020-04-01-more-condition-predicates/",
-        "insertions_count": 295,
-        "message": "enhancement(config): Add `contains` and `prefix` predicates (#1997)",
-        "pr_number": 1997,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "config"
-          }
-        ],
-        "sha": "3beb67e10c355af2d7bb69bba2fc1b56ac11aa85",
-        "type": "enhancement"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-09 13:49:27 +0000",
-        "deletions_count": 2841,
-        "description": "Update examples to use inline TOML",
-        "files_count": 158,
-        "highlight_permalink": null,
-        "insertions_count": 3362,
-        "message": "docs: Update examples to use inline TOML (#2004)",
-        "pr_number": 2004,
-        "scopes": [
-
-        ],
-        "sha": "50a171b19ccb86a8f3559975e154033a627e8c3f",
-        "type": "docs"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-09 12:21:42 +0000",
-        "deletions_count": 87,
-        "description": "Add support for compression",
-        "files_count": 14,
-        "highlight_permalink": "/highlights/2020-03-09-kafka-sink-compression/",
-        "insertions_count": 172,
-        "message": "feat(kafka sink): Add support for compression (#1969)",
-        "pr_number": 1969,
-        "scopes": [
-          {
-            "component": {
-              "name": "kafka",
-              "type": "sink"
-            },
-            "name": "kafka sink"
-          }
-        ],
-        "sha": "eeffdb08cad3f0956a8ff6079aeb5a57ebf5220c",
-        "type": "feat"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-09 17:57:39 +0000",
-        "deletions_count": 1882,
-        "description": "Cleanup field requirements",
-        "files_count": 98,
-        "highlight_permalink": null,
-        "insertions_count": 1908,
-        "message": "docs: Cleanup field requirements (#2013)",
-        "pr_number": 2013,
-        "scopes": [
-
-        ],
-        "sha": "c86708675d1356fcbc512ec15174bf12d842c121",
-        "type": "docs"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-09 21:07:19 +0000",
-        "deletions_count": 221,
-        "description": "Fix examples and clarify nested behavior",
-        "files_count": 31,
-        "highlight_permalink": null,
-        "insertions_count": 485,
-        "message": "docs(rename_fields transform): Fix examples and clarify nested behavior (#1905)",
-        "pr_number": 1905,
-        "scopes": [
-          {
-            "component": {
-              "name": "rename_fields",
-              "type": "transform"
-            },
-            "name": "rename_fields transform"
-          }
-        ],
-        "sha": "33c6345b1026021b5a94b932c42f20c97c66e8d8",
-        "type": "docs"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-10 10:18:26 +0000",
-        "deletions_count": 0,
-        "description": "Pull fresh containers on test",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(operations): Pull fresh containers on test (#2019)",
-        "pr_number": 2019,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "303ab5362eec135a5858c3caaa4f43f8f048a1b1",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-10 19:30:09 +0000",
-        "deletions_count": 0,
-        "description": "Fix race condition in test",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 7,
-        "message": "chore(statsd sink): Fix race condition in test (#2026)",
-        "pr_number": 2026,
-        "scopes": [
-          {
-            "component": {
-              "name": "statsd",
-              "type": "sink"
-            },
-            "name": "statsd sink"
-          }
-        ],
-        "sha": "aa523b00977c89a44d7cbb17e7e7d0bf3e179c1a",
-        "type": "chore"
-      },
-      {
-        "author": "Bill",
-        "breaking_change": false,
-        "date": "2020-03-10 22:10:08 +0000",
-        "deletions_count": 52,
-        "description": "Refactor to use util/HttpSource",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 70,
-        "message": "chore(logplex source): Refactor to use util/HttpSource (#2014)",
-        "pr_number": 2014,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "logplex source"
-          }
-        ],
-        "sha": "0eb5023fc3136d97fad0353ff74fc865b24be96e",
-        "type": "chore"
-      },
-      {
-        "author": "Spencer T Brody",
-        "breaking_change": false,
-        "date": "2020-03-10 20:44:45 +0000",
-        "deletions_count": 2,
-        "description": "Initial `dedupe` transform implementation",
-        "files_count": 15,
-        "highlight_permalink": "/highlights/2020-03-10-dedupe-transform/",
-        "insertions_count": 1108,
-        "message": "feat(new transform): Initial `dedupe` transform implementation (#1848)",
-        "pr_number": 1848,
-        "scopes": [
-          {
-            "component": {
-              "name": "new",
-              "type": "transform"
-            },
-            "name": "new transform"
-          }
-        ],
-        "sha": "532c048e8cbced42b2699b6120f0981eff73c58e",
-        "type": "feat"
-      },
-      {
-        "author": "Spencer T Brody",
-        "breaking_change": false,
-        "date": "2020-03-10 21:53:22 +0000",
-        "deletions_count": 2,
-        "description": "Initial 'tag_cardinality_limit' transform implementation",
-        "files_count": 14,
-        "highlight_permalink": "/highlights/2020-03-11-tag-cardinality-limit-transform/",
-        "insertions_count": 1066,
-        "message": "feat(new transform): Initial 'tag_cardinality_limit' transform implementation (#1959)",
-        "pr_number": 1959,
-        "scopes": [
-          {
-            "component": {
-              "name": "new",
-              "type": "transform"
-            },
-            "name": "new transform"
-          }
-        ],
-        "sha": "b2d303d0f8c004dd0d9437c35f11eb9554bf4093",
-        "type": "feat"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-11 11:47:26 +0000",
-        "deletions_count": 6,
-        "description": "Reshuffle timeout in test",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 8,
-        "message": "chore(statsd sink): Reshuffle timeout in test (#2035)",
-        "pr_number": 2035,
-        "scopes": [
-          {
-            "component": {
-              "name": "statsd",
-              "type": "sink"
-            },
-            "name": "statsd sink"
-          }
-        ],
-        "sha": "dec0430fddf2a6603dc4d6fc08b2f45e7ccaa974",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-11 12:13:28 +0000",
-        "deletions_count": 333,
-        "description": "Refactor internal http client",
-        "files_count": 18,
-        "highlight_permalink": null,
-        "insertions_count": 490,
-        "message": "chore(networking): Refactor internal http client (#2029)",
-        "pr_number": 2029,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "networking"
-          }
-        ],
-        "sha": "0d9c2c98b8dfcb24ee08c0d0e536238208fe44dd",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-11 10:44:28 +0000",
-        "deletions_count": 13,
-        "description": "Add support for TLS",
-        "files_count": 5,
-        "highlight_permalink": "/highlights/2020-03-11-vector-sink-tls/",
-        "insertions_count": 322,
-        "message": "enhancement(vector sink): Add support for TLS (#2025)",
-        "pr_number": 2025,
-        "scopes": [
-          {
-            "component": {
-              "name": "vector",
-              "type": "sink"
-            },
-            "name": "vector sink"
-          }
-        ],
-        "sha": "6be3986d8d451f6630a679cd180d7434f706d66a",
-        "type": "enhancement"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-11 20:38:22 +0000",
-        "deletions_count": 0,
-        "description": "Add PR checklist",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 29,
-        "message": "chore: Add PR checklist (#2010)",
-        "pr_number": 2010,
-        "scopes": [
-
-        ],
-        "sha": "8e4986d21497a0dcc2ad87e517df6a50feb23086",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-12 11:38:53 +0000",
-        "deletions_count": 1,
-        "description": "Initial `papertrail` sink implementation",
-        "files_count": 15,
-        "highlight_permalink": "/highlights/2020-03-12-papertrail-sink/",
-        "insertions_count": 773,
-        "message": "feat(new sink): Initial `papertrail` sink implementation (#1835)",
-        "pr_number": 1835,
-        "scopes": [
-          {
-            "component": {
-              "name": "new",
-              "type": "sink"
-            },
-            "name": "new sink"
-          }
-        ],
-        "sha": "1de3f2f2900c63390cde2a81a28c51ff6652ab7c",
-        "type": "feat"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-12 11:52:29 +0000",
-        "deletions_count": 1,
-        "description": "Upgrade to rustc `1.42.0`",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(operations): Upgrade to rustc `1.42.0` (#2043)",
-        "pr_number": 2043,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "f12df1571869a4014c39eff4b413555c0a54e05d",
-        "type": "chore"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-12 13:42:55 +0000",
-        "deletions_count": 1191,
-        "description": "Add markdown linting",
-        "files_count": 136,
-        "highlight_permalink": null,
-        "insertions_count": 4009,
-        "message": "chore: Add markdown linting (#2020)",
-        "pr_number": 2020,
-        "scopes": [
-
-        ],
-        "sha": "9e5e20f1c7667d1a890e7effcb83ebf86881dd62",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-12 14:02:30 +0000",
-        "deletions_count": 1,
-        "description": "Add `timeout` query parameter",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 2,
-        "message": "enhancement(elasticsearch sink): Add `timeout` query parameter (#2038)",
-        "pr_number": 2038,
-        "scopes": [
-          {
-            "component": {
-              "name": "elasticsearch",
-              "type": "sink"
-            },
-            "name": "elasticsearch sink"
-          }
-        ],
-        "sha": "31ee4126f750b1cd182baeab70fde05d88c139d9",
-        "type": "enhancement"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": true,
-        "date": "2020-03-12 14:03:30 +0000",
-        "deletions_count": 9,
-        "description": "Rename `host_field` to `host_key`",
-        "files_count": 4,
-        "highlight_permalink": "/highlights/2020-03-12-rename-host_field-to-host_key/",
-        "insertions_count": 53,
-        "message": "chore(splunk_hec sink)!: Rename `host_field` to `host_key` (#2037)",
-        "pr_number": 2037,
-        "scopes": [
+          },
           {
             "component": {
               "name": "splunk_hec",
@@ -4791,470 +3771,20 @@ module.exports = {
             "name": "splunk_hec sink"
           }
         ],
-        "sha": "4d5f36e2f9816b42591dc6f0fba4baa1f6f82d6f",
-        "type": "chore"
+        "sha": "4d76e751febd778887a7432263f77369895cd093",
+        "type": "fix"
       },
       {
         "author": "Bruce Guenter",
         "breaking_change": false,
-        "date": "2020-03-12 14:43:28 +0000",
-        "deletions_count": 5,
-        "description": "Fix the papertrail docs",
+        "date": "2020-04-22 15:13:54 +0000",
+        "deletions_count": 4,
+        "description": "Handle missing source timestamp",
         "files_count": 1,
         "highlight_permalink": null,
-        "insertions_count": 32,
-        "message": "docs(papertrail sink): Fix the papertrail docs (#2051)",
-        "pr_number": 2051,
-        "scopes": [
-          {
-            "component": {
-              "name": "papertrail",
-              "type": "sink"
-            },
-            "name": "papertrail sink"
-          }
-        ],
-        "sha": "73ad2d1195fc14665cb3df2abe62fa9eb3c53112",
-        "type": "docs"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-12 16:44:31 +0000",
-        "deletions_count": 1,
-        "description": "Check lockfile over cargo.toml",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(operations): Check lockfile over cargo.toml (#2050)",
-        "pr_number": 2050,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "3f33a2d7943f483fc1806c26247c339fbec89fc6",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-12 17:41:38 +0000",
-        "deletions_count": 1,
-        "description": "Re-run doc generation",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 5,
-        "message": "chore(docs): Re-run doc generation (#2052)",
-        "pr_number": 2052,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "docs"
-          }
-        ],
-        "sha": "18986f2af9eca178d422dc8eab7e66672c2a5337",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-13 18:03:36 +0000",
-        "deletions_count": 0,
-        "description": "Add `target` directory to `.markdownlintignore`",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore: Add `target` directory to `.markdownlintignore` (#2054)",
-        "pr_number": 2054,
-        "scopes": [
-
-        ],
-        "sha": "23f9fa7cfa3621765b6ddcfb690cd0d2e1182bae",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-13 09:44:02 +0000",
-        "deletions_count": 16,
-        "description": "Add new `key_field` option",
-        "files_count": 6,
-        "highlight_permalink": null,
-        "insertions_count": 112,
-        "message": "enhancement(sampler transform): Add new `key_field` option (#2039)",
-        "pr_number": 2039,
-        "scopes": [
-          {
-            "component": {
-              "name": "sampler",
-              "type": "transform"
-            },
-            "name": "sampler transform"
-          }
-        ],
-        "sha": "122778d90ffb7644e6811543696c845a1fb0417d",
-        "type": "enhancement"
-      },
-      {
-        "author": "Yuriy Vasiyarov",
-        "breaking_change": false,
-        "date": "2020-03-13 22:03:09 +0000",
-        "deletions_count": 22,
-        "description": "Fix for \"download source code\" step in install from source",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 10,
-        "message": "docs: Fix for \"download source code\" step in install from source (#2027)",
-        "pr_number": 2027,
-        "scopes": [
-
-        ],
-        "sha": "034790b921a763b2f78b1b220e415ca560fc0622",
-        "type": "docs"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-13 21:10:42 +0000",
-        "deletions_count": 14,
-        "description": "Improve syslog source example",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 92,
-        "message": "docs: Improve syslog source example (#2059)",
-        "pr_number": 2059,
-        "scopes": [
-
-        ],
-        "sha": "ffdbacb509d9057c74bbea0ae446f3fd7433a319",
-        "type": "docs"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-14 14:27:59 +0000",
-        "deletions_count": 1,
-        "description": "Fix `check-component-features` test",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(testing): Fix `check-component-features` test (#2061)",
-        "pr_number": 2061,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "testing"
-          }
-        ],
-        "sha": "f3f8567876192202e60c5ac377b98b76a04aba49",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-14 10:37:35 +0000",
-        "deletions_count": 1,
-        "description": "Initial `honeycomb` sink implementation",
-        "files_count": 14,
-        "highlight_permalink": "/highlights/2020-04-17-new-sinks/",
-        "insertions_count": 1102,
-        "message": "feat(new sink): Initial `honeycomb` sink implementation (#1847)",
-        "pr_number": 1847,
-        "scopes": [
-          {
-            "component": {
-              "name": "new",
-              "type": "sink"
-            },
-            "name": "new sink"
-          }
-        ],
-        "sha": "163e001ca0a9de48da31ffd1e4013fb13e6027e3",
-        "type": "feat"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-03-16 10:24:29 +0000",
-        "deletions_count": 15,
-        "description": "Force `symlink` re-evaluation when detecting a changed Vector config",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 67,
-        "message": "fix(config): Force `symlink` re-evaluation when detecting a changed Vector config (#2034)",
-        "pr_number": 2034,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "config"
-          }
-        ],
-        "sha": "e4104549ee1c0bd56e3978adf458dfdd5c7c6506",
-        "type": "fix"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-16 15:12:43 +0000",
-        "deletions_count": 38,
-        "description": "Add `version` configuration option",
-        "files_count": 9,
-        "highlight_permalink": null,
-        "insertions_count": 755,
-        "message": "enhancement(lua transform): Add `version` configuration option (#2056)",
-        "pr_number": 2056,
-        "scopes": [
-          {
-            "component": {
-              "name": "lua",
-              "type": "transform"
-            },
-            "name": "lua transform"
-          }
-        ],
-        "sha": "874c0c079538ce39c8259e1ca477fab49d3acddd",
-        "type": "enhancement"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-16 11:46:51 +0000",
-        "deletions_count": 290,
-        "description": "Part 1 of `HttpSink` refactor",
-        "files_count": 5,
-        "highlight_permalink": null,
-        "insertions_count": 286,
-        "message": "chore(sinks): Part 1 of `HttpSink` refactor (#2072)",
-        "pr_number": 2072,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "sinks"
-          }
-        ],
-        "sha": "606dedbb689c9480c3724df92040edf5217d1b8d",
-        "type": "chore"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-16 12:23:29 +0000",
-        "deletions_count": 0,
-        "description": "Ensure white-space dooes not break parsing",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 19,
-        "message": "chore(json_parser transform): Ensure white-space dooes not break parsing (#2060)",
-        "pr_number": 2060,
-        "scopes": [
-          {
-            "component": {
-              "name": "json_parser",
-              "type": "transform"
-            },
-            "name": "json_parser transform"
-          }
-        ],
-        "sha": "21405209c288ef78fe91ccdb4948b972b5d23b5a",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-16 20:00:01 +0000",
-        "deletions_count": 7,
-        "description": "Fix insertion to arrays in field path notation",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 35,
-        "message": "fix(transforms): Fix insertion to arrays in field path notation (#2062)",
-        "pr_number": 2062,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "transforms"
-          }
-        ],
-        "sha": "b237576ceb416a58ec85e8eaefc1b075ef7d1a52",
-        "type": "fix"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-03-16 20:17:20 +0000",
-        "deletions_count": 0,
-        "description": "Support nested fields and arrays",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 90,
-        "message": "fix(merge transform): Support nested fields and arrays (#1936)",
-        "pr_number": 1936,
-        "scopes": [
-          {
-            "component": {
-              "name": "merge",
-              "type": "transform"
-            },
-            "name": "merge transform"
-          }
-        ],
-        "sha": "7ecec0efc404a326f93d315df07d49632d1bd752",
-        "type": "fix"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-17 00:30:16 +0000",
-        "deletions_count": 9,
-        "description": "Update tagline",
-        "files_count": 7,
-        "highlight_permalink": null,
-        "insertions_count": 9,
-        "message": "chore: Update tagline (#2079)",
-        "pr_number": 2079,
-        "scopes": [
-
-        ],
-        "sha": "e598e1f5cfa35171da0873e36e65e462f8260701",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-17 14:48:09 +0000",
-        "deletions_count": 0,
-        "description": "RFC #1999 - 2020-03-06 - API extensions for `lua` transform",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 702,
-        "message": "chore: RFC #1999 - 2020-03-06 - API extensions for `lua` transform (#2000)",
-        "pr_number": 2000,
-        "scopes": [
-
-        ],
-        "sha": "c8a5e4f3631a9f483cfcfcb2f25c0d3de6480feb",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-17 17:01:59 +0000",
-        "deletions_count": 0,
-        "description": "Support escaping in the field path notation",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 22,
-        "message": "enhancement(config): Support escaping in the field path notation (#2081)",
-        "pr_number": 2081,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "config"
-          }
-        ],
-        "sha": "7dacc02c954d55810e1cfed00e76745f23747f69",
-        "type": "enhancement"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-17 17:13:48 +0000",
-        "deletions_count": 5,
-        "description": "Upgrade `regex` dependency",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 5,
-        "message": "chore(dependencies): Upgrade `regex` dependency (#2083)",
-        "pr_number": 2083,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "dependencies"
-          }
-        ],
-        "sha": "45a5cf7b96f39327f5a511d546518dbcb05eba7a",
-        "type": "chore"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-17 10:23:35 +0000",
-        "deletions_count": 522,
-        "description": "Consolidate \"Configuration\" and \"Options\" sections",
-        "files_count": 133,
-        "highlight_permalink": null,
-        "insertions_count": 301,
-        "message": "docs: Consolidate \"Configuration\" and \"Options\" sections (#2085)",
-        "pr_number": 2085,
-        "scopes": [
-
-        ],
-        "sha": "d93c7240ecbcf0b338df60182c8909ab79d1367c",
-        "type": "docs"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-17 10:26:05 +0000",
-        "deletions_count": 89,
-        "description": "Upgrade dependencies",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 94,
-        "message": "chore(website): Upgrade dependencies (#2086)",
-        "pr_number": 2086,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "website"
-          }
-        ],
-        "sha": "b9483a9edbb7633ce6b6de2af427b48bef71dee6",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-17 11:28:55 +0000",
-        "deletions_count": 212,
-        "description": "Part 2 of `HttpSink` refactor",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 228,
-        "message": "chore(sinks): Part 2 of `HttpSink` refactor (#2075)",
-        "pr_number": 2075,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "sinks"
-          }
-        ],
-        "sha": "dd55d9d51e2d3b5b12ac63cadd30613b946afa05",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-17 09:34:09 +0000",
-        "deletions_count": 22,
-        "description": "Fix handling of message array data",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 67,
-        "message": "fix(journald source): Fix handling of message array data (#2053)",
-        "pr_number": 2053,
+        "insertions_count": 30,
+        "message": "fix(journald source): Handle missing source timestamp (#2387)",
+        "pr_number": 2387,
         "scopes": [
           {
             "component": {
@@ -5262,477 +3792,20 @@ module.exports = {
             "name": "journald source"
           }
         ],
-        "sha": "07c42a100ca147aef93fa72fdddaca4a2dafd51c",
+        "sha": "b1c8421357502e1eca123e98787e7071109620f4",
         "type": "fix"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-17 19:46:47 +0000",
-        "deletions_count": 2,
-        "description": "Use `--release` Cargo flag in `make build`",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 2,
-        "message": "chore(setup): Use `--release` Cargo flag in `make build` (#2087)",
-        "pr_number": 2087,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "setup"
-          }
-        ],
-        "sha": "ff7b0fb416878ec40b163d2e2ee5aaf5464e3f15",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-18 16:23:11 +0000",
-        "deletions_count": 1,
-        "description": "Pin tag for `loki` Docker image",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(testing): Pin tag for `loki` Docker image (#2091)",
-        "pr_number": 2091,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "testing"
-          }
-        ],
-        "sha": "56bad9d02543fa0861df5262afcb59b09f12580c",
-        "type": "chore"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-03-19 02:02:55 +0000",
-        "deletions_count": 71,
-        "description": "Switch to `tokio-compat` to start the transition to our new async runtime",
-        "files_count": 9,
-        "highlight_permalink": null,
-        "insertions_count": 117,
-        "message": "chore: Switch to `tokio-compat` to start the transition to our new async runtime (#1922)",
-        "pr_number": 1922,
-        "scopes": [
-
-        ],
-        "sha": "ccd3cf7f08fdad22ca5cbdacf4647e29b4b83798",
-        "type": "chore"
-      },
-      {
-        "author": "Spencer T Brody",
-        "breaking_change": false,
-        "date": "2020-03-18 16:39:41 +0000",
-        "deletions_count": 68,
-        "description": "Refactor source shutdown and make it two-phase",
-        "files_count": 27,
-        "highlight_permalink": "/highlights/2020-04-20-improved-shutdown/",
-        "insertions_count": 875,
-        "message": "chore(topology): Refactor source shutdown and make it two-phase (#1994)",
-        "pr_number": 1994,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "topology"
-          }
-        ],
-        "sha": "e596cc1046496640ef6e4e38b58d5cb93cea5760",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-19 18:12:52 +0000",
-        "deletions_count": 0,
-        "description": "Add `*_flat` methods for log events",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 38,
-        "message": "chore: Add `*_flat` methods for log events (#2082)",
-        "pr_number": 2082,
-        "scopes": [
-
-        ],
-        "sha": "b8f144527bda15e98e4e91d42d8ab6306169af85",
-        "type": "chore"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-03-19 19:50:46 +0000",
-        "deletions_count": 478,
-        "description": "Upgrade file sink for tokio-compat",
-        "files_count": 12,
-        "highlight_permalink": null,
-        "insertions_count": 620,
-        "message": "chore(file sink): Upgrade file sink for tokio-compat (#1988)",
-        "pr_number": 1988,
-        "scopes": [
-          {
-            "component": {
-              "name": "file",
-              "type": "sink"
-            },
-            "name": "file sink"
-          }
-        ],
-        "sha": "9716e0bbf8d401e53fbb08492f8fa27611a8d889",
-        "type": "chore"
       },
       {
         "author": "Ana Hobden",
         "breaking_change": false,
-        "date": "2020-03-19 10:41:35 +0000",
-        "deletions_count": 50,
-        "description": "Allow native TOML tables",
+        "date": "2020-04-23 15:27:26 +0000",
+        "deletions_count": 49,
+        "description": "`enoding.only_fields` should properly handle parent keys",
         "files_count": 3,
         "highlight_permalink": null,
-        "insertions_count": 54,
-        "message": "enhancement(add_fields transform): Allow native TOML tables (#2068)",
-        "pr_number": 2068,
-        "scopes": [
-          {
-            "component": {
-              "name": "add_fields",
-              "type": "transform"
-            },
-            "name": "add_fields transform"
-          }
-        ],
-        "sha": "ba2ae6b9352c7499c6858a0257e3f8dd01bb522c",
-        "type": "enhancement"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-03-19 22:40:58 +0000",
-        "deletions_count": 1,
-        "description": "Correct doctest at src/stream.rs",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore: Correct doctest at src/stream.rs (#2097)",
-        "pr_number": 2097,
-        "scopes": [
-
-        ],
-        "sha": "99bb140b345e7a1a51dfb2b3596cd9897c7721d2",
-        "type": "chore"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-03-19 23:30:59 +0000",
-        "deletions_count": 34,
-        "description": "Upgrade console sink for tokio 0.2",
-        "files_count": 8,
-        "highlight_permalink": null,
-        "insertions_count": 75,
-        "message": "chore(console sink): Upgrade console sink for tokio 0.2 (#2096)",
-        "pr_number": 2096,
-        "scopes": [
-          {
-            "component": {
-              "name": "console",
-              "type": "sink"
-            },
-            "name": "console sink"
-          }
-        ],
-        "sha": "07343ac9d7ad06e9704e5a12b8d96c873a300162",
-        "type": "chore"
-      },
-      {
-        "author": "Evan Cameron",
-        "breaking_change": false,
-        "date": "2020-03-19 23:13:15 +0000",
-        "deletions_count": 1,
-        "description": "Initial `pulsar` sink implementation",
-        "files_count": 17,
-        "highlight_permalink": "/highlights/2020-03-14-honeycomb-sink/",
-        "insertions_count": 914,
-        "message": "feat(new sink): Initial `pulsar` sink implementation (#1665)",
-        "pr_number": 1665,
-        "scopes": [
-          {
-            "component": {
-              "name": "new",
-              "type": "sink"
-            },
-            "name": "new sink"
-          }
-        ],
-        "sha": "c8b47b3230a4b790d8cda0e47265771666581f98",
-        "type": "feat"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-03-20 20:39:37 +0000",
-        "deletions_count": 2,
-        "description": "Correct Cargo.lock",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 2,
-        "message": "chore: Correct Cargo.lock (#2105)",
-        "pr_number": 2105,
-        "scopes": [
-
-        ],
-        "sha": "c800c2c9b166dc78ade84dc22c152c1d0a0fff76",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-20 11:56:59 +0000",
-        "deletions_count": 48,
-        "description": "Add new `drop_empty` option to drop empty objects automatically",
-        "files_count": 11,
-        "highlight_permalink": null,
-        "insertions_count": 321,
-        "message": "enhancement(remove_fields transform, rename_fields transform): Add new `drop_empty` option to drop empty objects automatically (#2077)",
-        "pr_number": 2077,
-        "scopes": [
-          {
-            "component": {
-              "name": "remove_fields",
-              "type": "transform"
-            },
-            "name": "remove_fields transform"
-          },
-          {
-            "component": {
-              "name": "rename_fields",
-              "type": "transform"
-            },
-            "name": "rename_fields transform"
-          }
-        ],
-        "sha": "14c0a632ae09ce22cc3818c5f5ad9f09023571dc",
-        "type": "enhancement"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-20 21:33:38 +0000",
-        "deletions_count": 4,
-        "description": "Fix `x86_64-pc-windows-msvc` build",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 6,
-        "message": "chore(operations): Fix `x86_64-pc-windows-msvc` build (#2103)",
-        "pr_number": 2103,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "9d6be3193dfbb9624d9549137802a7abdde8c40a",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-20 21:40:09 +0000",
-        "deletions_count": 22,
-        "description": "Name the time specifiers as `strftime` in the templating docs",
-        "files_count": 15,
-        "highlight_permalink": null,
-        "insertions_count": 22,
-        "message": "docs: Name the time specifiers as `strftime` in the templating docs (#2107)",
-        "pr_number": 2107,
-        "scopes": [
-
-        ],
-        "sha": "1d6928c28bbe0ca929bb00ff98d83dcdd3cf650c",
-        "type": "docs"
-      },
-      {
-        "author": "Spencer T Brody",
-        "breaking_change": false,
-        "date": "2020-03-20 14:15:26 +0000",
-        "deletions_count": 157,
-        "description": "Make RunningTopology::stop() signal all sources to shut down using the new ShutdownCoordinator (1091)",
-        "files_count": 6,
-        "highlight_permalink": null,
-        "insertions_count": 255,
-        "message": "chore(topology): Make RunningTopology::stop() signal all sources to shut down using the new ShutdownCoordinator (1091) (#2098)",
-        "pr_number": 2098,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "topology"
-          }
-        ],
-        "sha": "838a80bd486e2112f05725d4306dc68b8e5a70c3",
-        "type": "chore"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-03-23 20:02:15 +0000",
-        "deletions_count": 298,
-        "description": "Racy buffering tests correction",
-        "files_count": 5,
-        "highlight_permalink": null,
-        "insertions_count": 439,
-        "message": "chore: Racy buffering tests correction (#2106)",
-        "pr_number": 2106,
-        "scopes": [
-
-        ],
-        "sha": "2675d77241d7c9d5f6b7203a7d4f95ca0a925991",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-23 13:50:48 +0000",
-        "deletions_count": 7,
-        "description": "Initial `datadog_logs` sink implementation",
-        "files_count": 16,
-        "highlight_permalink": "/highlights/2020-03-23-datadog-logs-sink/",
-        "insertions_count": 1082,
-        "message": "feat(new sink): Initial `datadog_logs` sink implementation (#1832)",
-        "pr_number": 1832,
-        "scopes": [
-          {
-            "component": {
-              "name": "new",
-              "type": "sink"
-            },
-            "name": "new sink"
-          }
-        ],
-        "sha": "3e881bfa2dc6959928aedc0e64e576b86ed8f4b0",
-        "type": "feat"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-23 14:05:42 +0000",
-        "deletions_count": 0,
-        "description": "Add test harness GH action",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 142,
-        "message": "chore(operations): Add test harness GH action (#2028)",
-        "pr_number": 2028,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "ce7bdbaf7155c74f1a4f2e9fd5d50d2c3a92899f",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-23 13:21:20 +0000",
-        "deletions_count": 473,
-        "description": "TLS reorganization",
-        "files_count": 17,
-        "highlight_permalink": null,
-        "insertions_count": 586,
-        "message": "chore: TLS reorganization (#2101)",
-        "pr_number": 2101,
-        "scopes": [
-
-        ],
-        "sha": "9be091bc2497b9df5af948d6d13ed952fe454477",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": true,
-        "date": "2020-03-23 14:53:16 +0000",
-        "deletions_count": 55,
-        "description": "Rename `gcp_stackdriver_logging` sink to `gcp_stackdriver_logs`",
-        "files_count": 12,
-        "highlight_permalink": "/highlights/2020-03-23-rename-gcp_stackdriver_logging-sink-to-gcp_stackdriver_logs/",
-        "insertions_count": 55,
-        "message": "fix(gcp_stackdrive_logging sink)!: Rename `gcp_stackdriver_logging` sink to `gcp_stackdriver_logs` (#2121)",
-        "pr_number": 2121,
-        "scopes": [
-          {
-            "component": {
-              "name": "gcp_stackdrive_logging",
-              "type": "sink"
-            },
-            "name": "gcp_stackdrive_logging sink"
-          }
-        ],
-        "sha": "f1bb0c65d5230ea03905cf3741fa11f3ec281b47",
-        "type": "fix"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-24 16:28:51 +0000",
-        "deletions_count": 130,
-        "description": "Support metric events in version 2",
-        "files_count": 11,
-        "highlight_permalink": null,
-        "insertions_count": 1254,
-        "message": "enhancement(lua transform): Support metric events in version 2 (#2095)",
-        "pr_number": 2095,
-        "scopes": [
-          {
-            "component": {
-              "name": "lua",
-              "type": "transform"
-            },
-            "name": "lua transform"
-          }
-        ],
-        "sha": "ff4a6dccefc16f56910d49b996f797ef75de1759",
-        "type": "enhancement"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-24 10:25:29 +0000",
-        "deletions_count": 47,
-        "description": "Revert \"Use MaybeTlsListener in TcpSource\"",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 62,
-        "message": "chore(networking): Revert \"Use MaybeTlsListener in TcpSource\" (#2129)",
-        "pr_number": 2129,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "networking"
-          }
-        ],
-        "sha": "0088ebd712f97906bbf6894f0165385cf59a535b",
-        "type": "chore"
-      },
-      {
-        "author": "Ana Hobden",
-        "breaking_change": false,
-        "date": "2020-03-24 13:40:29 +0000",
-        "deletions_count": 65,
-        "description": "Make LogSchema more optional",
-        "files_count": 15,
-        "highlight_permalink": null,
-        "insertions_count": 92,
-        "message": "enhancement(config): Make LogSchema more optional (#2113)",
-        "pr_number": 2113,
+        "insertions_count": 110,
+        "message": "fix(config): `enoding.only_fields` should properly handle parent keys (#2413)",
+        "pr_number": 2413,
         "scopes": [
           {
             "component": {
@@ -5740,83 +3813,66 @@ module.exports = {
             "name": "config"
           }
         ],
-        "sha": "6edfbc9e7b498bdade9e52d5462b260f50f83792",
+        "sha": "fc2c77b643e02b86a99cff4c914df06060a49d52",
+        "type": "fix"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2020-04-27 13:31:51 +0000",
+        "deletions_count": 74,
+        "description": "add text encoding",
+        "files_count": 4,
+        "highlight_permalink": null,
+        "insertions_count": 28,
+        "message": "enhancement(humio_logs sink): add text encoding (#2468)",
+        "pr_number": 2468,
+        "scopes": [
+          {
+            "component": {
+              "name": "humio_logs",
+              "type": "sink"
+            },
+            "name": "humio_logs sink"
+          }
+        ],
+        "sha": "48a6d142e9a8ff441d3379cecba7272152b74a72",
         "type": "enhancement"
       },
       {
         "author": "Lucio Franco",
         "breaking_change": false,
-        "date": "2020-03-24 17:11:33 +0000",
-        "deletions_count": 7,
-        "description": "Add `User-agent` header to all outgoing HTTP requests",
+        "date": "2020-04-27 20:05:10 +0000",
+        "deletions_count": 3,
+        "description": "Use header auth",
         "files_count": 1,
         "highlight_permalink": null,
-        "insertions_count": 11,
-        "message": "enhancement(networking): Add `User-agent` header to all outgoing HTTP requests (#2130)",
-        "pr_number": 2130,
+        "insertions_count": 7,
+        "message": "fix(datadog_metrics sink): Use header auth (#2443)",
+        "pr_number": 2443,
         "scopes": [
           {
             "component": {
+              "name": "datadog_metrics",
+              "type": "sink"
             },
-            "name": "networking"
+            "name": "datadog_metrics sink"
           }
         ],
-        "sha": "25e76f7e0590fa23d4efd17483949f5df80ca83b",
-        "type": "enhancement"
+        "sha": "47bf9f74903162a02f40cd7113c37cfec6bb4303",
+        "type": "fix"
       },
       {
-        "author": "MOZGIII",
+        "author": "Kruno Tomola Fabro",
         "breaking_change": false,
-        "date": "2020-03-25 01:59:52 +0000",
-        "deletions_count": 78,
-        "description": "Rename tokio -> tokio01 and tokio02 -> tokio",
-        "files_count": 50,
-        "highlight_permalink": null,
-        "insertions_count": 76,
-        "message": "chore(dependencies): Rename tokio -> tokio01 and tokio02 -> tokio (#2131)",
-        "pr_number": 2131,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "dependencies"
-          }
-        ],
-        "sha": "2121b7dfa3cdaa342e8a7dbcafb8e3531c36f875",
-        "type": "chore"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-24 21:08:00 +0000",
-        "deletions_count": 6,
-        "description": "Relax PR check list to only fire on important changes",
+        "date": "2020-04-28 19:08:02 +0000",
+        "deletions_count": 22,
+        "description": "Add indexed fields in `text` encoding",
         "files_count": 1,
         "highlight_permalink": null,
-        "insertions_count": 0,
-        "message": "chore(operations): Relax PR check list to only fire on important changes (#2136)",
-        "pr_number": 2136,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "2671cb5f82a89cea1c9d081c3051aa7123017a85",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-25 16:31:59 +0000",
-        "deletions_count": 7,
-        "description": "Add new `index` option to specify custom Splunk indexes",
-        "files_count": 5,
-        "highlight_permalink": null,
-        "insertions_count": 100,
-        "message": "enhancement(splunk_hec sink): Add new `index` option to specify custom Splunk indexes (#2127)",
-        "pr_number": 2127,
+        "insertions_count": 67,
+        "message": "fix(splunk_hec sink): Add indexed fields in `text` encoding (#2448)",
+        "pr_number": 2448,
         "scopes": [
           {
             "component": {
@@ -5826,1311 +3882,20 @@ module.exports = {
             "name": "splunk_hec sink"
           }
         ],
-        "sha": "fe2e12ce89bc69657851a7a8f4dfeb3b4d334dc8",
-        "type": "enhancement"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-25 20:07:09 +0000",
-        "deletions_count": 2,
-        "description": "Update `bumpalo` dependency in `Cargo.lock`",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 2,
-        "message": "chore(dependencies): Update `bumpalo` dependency in `Cargo.lock` (#2141)",
-        "pr_number": 2141,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "dependencies"
-          }
-        ],
-        "sha": "7ab9df34cdc8e7d0d6155bfbbd58aff61cfaad64",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-25 12:46:54 +0000",
-        "deletions_count": 136,
-        "description": "Fix handling of incoming TLS connections",
-        "files_count": 7,
-        "highlight_permalink": null,
-        "insertions_count": 205,
-        "message": "chore(networking): Fix handling of incoming TLS connections (#2146)",
-        "pr_number": 2146,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "networking"
-          }
-        ],
-        "sha": "6443f9c7a6b376d662a2a59b59c433209c9eb872",
-        "type": "chore"
-      },
-      {
-        "author": "Ana Hobden",
-        "breaking_change": false,
-        "date": "2020-03-25 12:31:40 +0000",
-        "deletions_count": 42,
-        "description": "The `add_fields`, `remove_fields`, and `rename_fields` now produce a debug log when a field is replaced or non-existent",
-        "files_count": 17,
-        "highlight_permalink": null,
-        "insertions_count": 102,
-        "message": "enhancement(observability): The `add_fields`, `remove_fields`, and `rename_fields` now produce a debug log when a field is replaced or non-existent (#2148)",
-        "pr_number": 2148,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "observability"
-          }
-        ],
-        "sha": "113bb800937be0f240b92fe95396a9740e7fbb15",
-        "type": "enhancement"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-25 20:18:54 +0000",
-        "deletions_count": 53,
-        "description": "Simplify domains for labels, etc",
-        "files_count": 4,
-        "highlight_permalink": null,
-        "insertions_count": 17,
-        "message": "chore: Simplify domains for labels, etc (#2152)",
-        "pr_number": 2152,
-        "scopes": [
-
-        ],
-        "sha": "fc19c12027ebaf97764b5538c04e52974381b574",
-        "type": "chore"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-03-26 17:42:42 +0000",
-        "deletions_count": 2,
-        "description": "Upstream github-script action at test harness workflow",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 2,
-        "message": "chore: Upstream github-script action at test harness workflow (#2157)",
-        "pr_number": 2157,
-        "scopes": [
-
-        ],
-        "sha": "0a5eccd17973dba291423ae3e151706aa82e1e7e",
-        "type": "chore"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-03-26 21:09:49 +0000",
-        "deletions_count": 1,
-        "description": "Switch to upstream repo-permission-check-action",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(operations): Switch to upstream repo-permission-check-action (#2158)",
-        "pr_number": 2158,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "a8ed1f7aa62266bd051c120d5f06cd4c105f8709",
-        "type": "chore"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-03-27 00:13:46 +0000",
-        "deletions_count": 38,
-        "description": "Add LogEvent::new",
-        "files_count": 6,
-        "highlight_permalink": null,
-        "insertions_count": 34,
-        "message": "chore: Add LogEvent::new (#2154)",
-        "pr_number": 2154,
-        "scopes": [
-
-        ],
-        "sha": "16c714e190f9711810194bf9fd3f48c5730aec2f",
-        "type": "chore"
+        "sha": "332e9711c7a7c414a0ee83257d172c9b79f1244b",
+        "type": "fix"
       },
       {
         "author": "Lucio Franco",
         "breaking_change": false,
-        "date": "2020-03-27 12:26:47 +0000",
-        "deletions_count": 14,
-        "description": "Increase default rate limit to allow for higher throughput",
-        "files_count": 4,
-        "highlight_permalink": null,
-        "insertions_count": 14,
-        "message": "enhancement(aws_s3 sink): Increase default rate limit to allow for higher throughput (#2161)",
-        "pr_number": 2161,
-        "scopes": [
-          {
-            "component": {
-              "name": "aws_s3",
-              "type": "sink"
-            },
-            "name": "aws_s3 sink"
-          }
-        ],
-        "sha": "3cb486531d49e1702ea6bbf20c619c3d3476201a",
-        "type": "enhancement"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-27 10:49:02 +0000",
-        "deletions_count": 40,
-        "description": "Add support for UDP mode",
-        "files_count": 8,
-        "highlight_permalink": null,
-        "insertions_count": 304,
-        "message": "enhancement(socket sink): Add support for UDP mode (#2162)",
-        "pr_number": 2162,
-        "scopes": [
-          {
-            "component": {
-              "name": "socket",
-              "type": "sink"
-            },
-            "name": "socket sink"
-          }
-        ],
-        "sha": "068f289ffca61e5631237760c88deaf90ca0ab24",
-        "type": "enhancement"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-27 15:58:49 +0000",
-        "deletions_count": 118,
-        "description": "Remove package managers from install script",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 5,
-        "message": "chore: Remove package managers from install script (#2165)",
-        "pr_number": 2165,
-        "scopes": [
-
-        ],
-        "sha": "53ae00b610a526050a6f90121d91c3b100a386f7",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-27 22:59:40 +0000",
-        "deletions_count": 0,
-        "description": "Support ARM architectures in the install script",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 6,
-        "message": "chore: Support ARM architectures in the install script (#2167)",
-        "pr_number": 2167,
-        "scopes": [
-
-        ],
-        "sha": "de932f7f2a345923476bbaef1cbd44d91ce06870",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-28 19:08:04 +0000",
-        "deletions_count": 5,
-        "description": "Make config on the main page pass `vector validate`",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 6,
-        "message": "docs: Make config on the main page pass `vector validate` (#2168)",
-        "pr_number": 2168,
-        "scopes": [
-
-        ],
-        "sha": "f2f9b269d9f9dfe9b1d2af60821711c4c101cdd9",
-        "type": "docs"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-28 20:32:11 +0000",
-        "deletions_count": 1,
-        "description": "Disable duplicated version output in `make version`",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 0,
-        "message": "chore: Disable duplicated version output in `make version` (#2169)",
-        "pr_number": 2169,
-        "scopes": [
-
-        ],
-        "sha": "49cac24a70f5530507bf50d977edbcecc9df2c4f",
-        "type": "chore"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-03-29 19:52:23 +0000",
+        "date": "2020-04-28 14:04:02 +0000",
         "deletions_count": 8,
-        "description": "Enable Kubernetes tests",
-        "files_count": 9,
-        "highlight_permalink": null,
-        "insertions_count": 215,
-        "message": "chore(tests): Enable Kubernetes tests (#1970)",
-        "pr_number": 1970,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "tests"
-          }
-        ],
-        "sha": "402e8c3ae0af6bbafa18aea729d684bca78f61cd",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-03-30 16:56:55 +0000",
-        "deletions_count": 2,
-        "description": "Use `UTC` instead of `Europe/London` in ClickHouse tests",
+        "description": "Treat empty namespaces as not set",
         "files_count": 1,
         "highlight_permalink": null,
-        "insertions_count": 2,
-        "message": "chore(tests): Use `UTC` instead of `Europe/London` in ClickHouse tests (#2178)",
-        "pr_number": 2178,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "tests"
-          }
-        ],
-        "sha": "686919a34b89a295185ce5326855eb2534cd523c",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-03-30 10:20:08 +0000",
-        "deletions_count": 9,
-        "description": "Add support for `tls.verify_hostname` in HTTP based sinks",
-        "files_count": 15,
-        "highlight_permalink": null,
-        "insertions_count": 251,
-        "message": "enhancement(networking): Add support for `tls.verify_hostname` in HTTP based sinks (#2164)",
-        "pr_number": 2164,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "networking"
-          }
-        ],
-        "sha": "9b5dd8b48ae4ce4930cac0328cd11ad48ad89e57",
-        "type": "enhancement"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-30 10:46:59 +0000",
-        "deletions_count": 0,
-        "description": "Add `have: *` labels",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 112,
-        "message": "chore: Add `have: *` labels (#2179)",
-        "pr_number": 2179,
-        "scopes": [
-
-        ],
-        "sha": "8ac0fdebcbacf04a6bf72a3314f414520ef306b2",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-30 11:17:11 +0000",
-        "deletions_count": 21,
-        "description": "Rename `prefix` condition predicate to `starts_with`",
-        "files_count": 5,
-        "highlight_permalink": null,
-        "insertions_count": 71,
-        "message": "enhancement(config): Rename `prefix` condition predicate to `starts_with` (#2181)",
-        "pr_number": 2181,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "config"
-          }
-        ],
-        "sha": "7b2ff837cf550f3721b8b187432d9e33229d7ea1",
-        "type": "enhancement"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-31 09:05:05 +0000",
-        "deletions_count": 0,
-        "description": "Add new `ends_with` condition predicate",
-        "files_count": 5,
-        "highlight_permalink": "/highlights/2020-04-01-more-condition-predicates/",
-        "insertions_count": 150,
-        "message": "enhancement(config): Add new `ends_with` condition predicate (#2183)",
-        "pr_number": 2183,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "config"
-          }
-        ],
-        "sha": "e06aff56ac8cd7f041795262a812b74552bb96c7",
-        "type": "enhancement"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-03-31 13:33:44 +0000",
-        "deletions_count": 6156,
-        "description": "Add new guides section",
-        "files_count": 1118,
-        "highlight_permalink": null,
-        "insertions_count": 74832,
-        "message": "chore(website): Add new guides section (#2132)",
-        "pr_number": 2132,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "website"
-          }
-        ],
-        "sha": "9b2d89572e54988a339c51bb26a47fb6205286e2",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-31 17:27:41 +0000",
-        "deletions_count": 44,
-        "description": "Check for and log partial ingestion failures",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 180,
-        "message": "feat(elasticsearch sink): Check for and log partial ingestion failures (#2185)",
-        "pr_number": 2185,
-        "scopes": [
-          {
-            "component": {
-              "name": "elasticsearch",
-              "type": "sink"
-            },
-            "name": "elasticsearch sink"
-          }
-        ],
-        "sha": "1525ef63c32884069ddb782e1397cbb6892dc0b9",
-        "type": "feat"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-03-31 18:08:24 +0000",
-        "deletions_count": 22,
-        "description": "Initial `filter` transform implementation",
-        "files_count": 21,
-        "highlight_permalink": "/highlights/2020-03-31-filter-transform/",
-        "insertions_count": 686,
-        "message": "feat(new transform): Initial `filter` transform implementation (#2088)",
-        "pr_number": 2088,
-        "scopes": [
-          {
-            "component": {
-              "name": "new",
-              "type": "transform"
-            },
-            "name": "new transform"
-          }
-        ],
-        "sha": "2463e1330237d98e0f111c796724423010b6b222",
-        "type": "feat"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-04-01 08:26:38 +0000",
-        "deletions_count": 326,
-        "description": "Deprecate in favor of the new `filter` transform",
-        "files_count": 13,
-        "highlight_permalink": null,
-        "insertions_count": 12,
-        "message": "enhancement(field_filter transform): Deprecate in favor of the new `filter` transform (#2195)",
-        "pr_number": 2195,
-        "scopes": [
-          {
-            "component": {
-              "name": "field_filter",
-              "type": "transform"
-            },
-            "name": "field_filter transform"
-          }
-        ],
-        "sha": "ef86f521a4cf3dc63ae33902e3a43fb2e30c261d",
-        "type": "enhancement"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-04-01 10:29:17 +0000",
-        "deletions_count": 2029,
-        "description": "Update to Docusaurus 2.0.0-alpha.49",
-        "files_count": 443,
-        "highlight_permalink": null,
-        "insertions_count": 1681,
-        "message": "chore(website): Update to Docusaurus 2.0.0-alpha.49 (#2196)",
-        "pr_number": 2196,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "website"
-          }
-        ],
-        "sha": "a73222e591eabf3e95a0467712bcdaf2855fae99",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-01 13:15:20 +0000",
-        "deletions_count": 1245,
-        "description": "Refactor internal sinks and simplify",
-        "files_count": 38,
-        "highlight_permalink": null,
-        "insertions_count": 1748,
-        "message": "chore(sinks): Refactor internal sinks and simplify (#2111)",
-        "pr_number": 2111,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "sinks"
-          }
-        ],
-        "sha": "a2ea56c9cb152d458a14f562ada6c04f126b3ebc",
-        "type": "chore"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-01 19:41:57 +0000",
-        "deletions_count": 2696,
-        "description": "Inital `kubernetes_pod_metadata` transform implementation",
-        "files_count": 109,
-        "highlight_permalink": null,
-        "insertions_count": 2229,
-        "message": "feat(new transform): Inital `kubernetes_pod_metadata` transform implementation (#1888)",
-        "pr_number": 1888,
-        "scopes": [
-          {
-            "component": {
-              "name": "new",
-              "type": "transform"
-            },
-            "name": "new transform"
-          }
-        ],
-        "sha": "9add2cbe5357167393c4c8bb0b73a1377d58acda",
-        "type": "feat"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-04-01 14:24:12 +0000",
-        "deletions_count": 4,
-        "description": "Add new `regex` condition predicate",
-        "files_count": 8,
-        "highlight_permalink": "/highlights/2020-04-01-more-condition-predicates/",
-        "insertions_count": 223,
-        "message": "enhancement(config): Add new `regex` condition predicate (#2198)",
-        "pr_number": 2198,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "config"
-          }
-        ],
-        "sha": "9b8ba8edf4f857e0305eb1157bb0a6e8fe56490e",
-        "type": "enhancement"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-04-01 14:25:13 +0000",
-        "deletions_count": 0,
-        "description": "Warn that old `field_filter` transform is deprecated",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 4,
-        "message": "enhancement(observability): Warn that old `field_filter` transform is deprecated (#2197)",
-        "pr_number": 2197,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "observability"
-          }
-        ],
-        "sha": "029c0bf6cd0359f08bc7cef99eb4ca6502a52252",
-        "type": "enhancement"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-04-01 14:37:04 +0000",
-        "deletions_count": 79,
-        "description": "Add new `target_field` option",
-        "files_count": 5,
-        "highlight_permalink": null,
-        "insertions_count": 289,
-        "message": "enhancement(regex_parser transform): Add new `target_field` option (#2023)",
-        "pr_number": 2023,
-        "scopes": [
-          {
-            "component": {
-              "name": "regex_parser",
-              "type": "transform"
-            },
-            "name": "regex_parser transform"
-          }
-        ],
-        "sha": "ddd54782d5eeac8f91c7841a3cb29d66ab169e95",
-        "type": "enhancement"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-04-02 00:13:22 +0000",
-        "deletions_count": 1,
-        "description": "Rename map_values_array to array_values_insertion_order test at discriminant",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(testing): Rename map_values_array to array_values_insertion_order test at discriminant (#2140)",
-        "pr_number": 2140,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "testing"
-          }
-        ],
-        "sha": "dd9e328faf7b41269cd87ce45b668c1dcd610f92",
-        "type": "chore"
-      },
-      {
-        "author": "Luke Steensen",
-        "breaking_change": false,
-        "date": "2020-04-01 18:36:57 +0000",
-        "deletions_count": 0,
-        "description": "add event-driven observability rfc",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 275,
-        "message": "chore: add event-driven observability rfc (#2093)",
-        "pr_number": 2093,
-        "scopes": [
-
-        ],
-        "sha": "45f3c09bc8bad8e05429b9c86eab5c34ed8f5928",
-        "type": "chore"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-04-02 09:56:34 +0000",
-        "deletions_count": 2,
-        "description": "Fix `make generate` command",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(website): Fix `make generate` command (#2205)",
-        "pr_number": 2205,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "website"
-          }
-        ],
-        "sha": "f26b0add310476ad58eb80fcb43e240737fdb617",
-        "type": "chore"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-04-02 10:44:15 +0000",
-        "deletions_count": 30,
-        "description": "Add missing `compression` option and…",
-        "files_count": 6,
-        "highlight_permalink": null,
-        "insertions_count": 159,
-        "message": "docs(elasticsearch sink): Add missing `compression` option and… (#2206)",
-        "pr_number": 2206,
-        "scopes": [
-          {
-            "component": {
-              "name": "elasticsearch",
-              "type": "sink"
-            },
-            "name": "elasticsearch sink"
-          }
-        ],
-        "sha": "490f984763c33cf38d0b39545c8354109da22e38",
-        "type": "docs"
-      },
-      {
-        "author": "Ana Hobden",
-        "breaking_change": false,
-        "date": "2020-04-02 11:56:52 +0000",
-        "deletions_count": 4,
-        "description": "Improve Windows Makefile support",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 12,
-        "message": "chore(operations): Improve Windows Makefile support (#2150)",
-        "pr_number": 2150,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "6d17361cadccafb470083cbd54ee84d68129b8ed",
-        "type": "chore"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-04-02 23:26:59 +0000",
-        "deletions_count": 5,
-        "description": "Lift the internal thread limit to enable full concurrency",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 4,
-        "message": "perf: Lift the internal thread limit to enable full concurrency (#2145)",
-        "pr_number": 2145,
-        "scopes": [
-
-        ],
-        "sha": "c38aeb298e47d34cc4b19af290fb8d6b46589c91",
-        "type": "perf"
-      },
-      {
-        "author": "Brad Fritz",
-        "breaking_change": false,
-        "date": "2020-04-02 21:54:54 +0000",
-        "deletions_count": 10,
-        "description": "minor fixes in Loki sink documentation",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 10,
-        "message": "docs: minor fixes in Loki sink documentation (#2211)",
-        "pr_number": 2211,
-        "scopes": [
-
-        ],
-        "sha": "5ec77297736c14b291d7b18bc425cf91fd8629e8",
-        "type": "docs"
-      },
-      {
-        "author": "Brad Fritz",
-        "breaking_change": false,
-        "date": "2020-04-02 22:03:26 +0000",
-        "deletions_count": 38,
-        "description": "fix \"issie\" typo",
-        "files_count": 20,
-        "highlight_permalink": null,
-        "insertions_count": 38,
-        "message": "docs: fix \"issie\" typo (#2212)",
-        "pr_number": 2212,
-        "scopes": [
-
-        ],
-        "sha": "1136cb5af597e10b6387c75451ee477c4aca45d4",
-        "type": "docs"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-04-03 09:27:55 +0000",
-        "deletions_count": 15,
-        "description": "Detect TCP disconnects earlier",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 52,
-        "message": "enhancement(networking): Detect TCP disconnects earlier (#2209)",
-        "pr_number": 2209,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "networking"
-          }
-        ],
-        "sha": "b3450b3be8775a830bac9e734c1bbb37820adf6a",
-        "type": "enhancement"
-      },
-      {
-        "author": "Luke Steensen",
-        "breaking_change": false,
-        "date": "2020-04-03 10:55:15 +0000",
-        "deletions_count": 0,
-        "description": "disable flaky test",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(topology): disable flaky test (#2215)",
-        "pr_number": 2215,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "topology"
-          }
-        ],
-        "sha": "8d110c0a03edb5faf02a8be8854d1a77148daee9",
-        "type": "chore"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-03 20:43:35 +0000",
-        "deletions_count": 2,
-        "description": "Fix disk pressure ",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 2,
-        "message": "fix(tests): Fix disk pressure  (#2217)",
-        "pr_number": 2217,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "tests"
-          }
-        ],
-        "sha": "1d31f2bc76b20cd0da7ebc1b4838e8014078b061",
-        "type": "fix"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-04-05 09:56:35 +0000",
-        "deletions_count": 424,
-        "description": "Fix sitemap URLs and CSS layouts",
-        "files_count": 36,
-        "highlight_permalink": null,
-        "insertions_count": 753,
-        "message": "chore(website): Fix sitemap URLs and CSS layouts (#2229)",
-        "pr_number": 2229,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "website"
-          }
-        ],
-        "sha": "eb60ce21c16514c039e5ffe59edc24c5291ca752",
-        "type": "chore"
-      },
-      {
-        "author": "Brad Fritz",
-        "breaking_change": false,
-        "date": "2020-04-05 11:54:15 +0000",
-        "deletions_count": 1,
-        "description": "RPM for aarch64 was using armv7",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(operations): RPM for aarch64 was using armv7 (#2220)",
-        "pr_number": 2220,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "906d6db0177ecfdb27020d0a85bcf4b65e43ee57",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": true,
-        "date": "2020-04-05 12:28:19 +0000",
-        "deletions_count": 90,
-        "description": "Default `compression` to `none`",
-        "files_count": 154,
-        "highlight_permalink": "/highlights/2020-04-05-default-compression-to-none/",
-        "insertions_count": 1651,
-        "message": "fix(elasticsearch sink)!: Default `compression` to `none` (#2219)",
-        "pr_number": 2219,
-        "scopes": [
-          {
-            "component": {
-              "name": "elasticsearch",
-              "type": "sink"
-            },
-            "name": "elasticsearch sink"
-          }
-        ],
-        "sha": "e0a2451787fcca948cbc27fb0e25482a5ababa96",
-        "type": "fix"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-06 15:06:48 +0000",
-        "deletions_count": 20,
-        "description": "Add field tests",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 135,
-        "message": "chore(kubernetes_pod_metadata transform): Add field tests (#2213)",
-        "pr_number": 2213,
-        "scopes": [
-          {
-            "component": {
-              "name": "kubernetes_pod_metadata",
-              "type": "transform"
-            },
-            "name": "kubernetes_pod_metadata transform"
-          }
-        ],
-        "sha": "30808b5d3bd6b2bde6aed454a61ee36642473262",
-        "type": "chore"
-      },
-      {
-        "author": "Felix",
-        "breaking_change": false,
-        "date": "2020-04-06 20:18:28 +0000",
-        "deletions_count": 15,
-        "description": "Add `-qqq` command line flag to disable logs",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 20,
-        "message": "feat(cli): Add `-qqq` command line flag to disable logs (#2230)",
-        "pr_number": 2230,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "cli"
-          }
-        ],
-        "sha": "22cff2e9b74f60ef5e2e486576e7f695695076b8",
-        "type": "feat"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-06 15:00:24 +0000",
-        "deletions_count": 0,
-        "description": "Add basic module docs",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 8,
-        "message": "chore(topology): Add basic module docs (#2233)",
-        "pr_number": 2233,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "topology"
-          }
-        ],
-        "sha": "23d2ef5229a5a6979c0174e573960d3a1e101392",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-06 15:47:59 +0000",
-        "deletions_count": 1,
-        "description": "Pass `tls` settings to healthcheck",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 2,
-        "message": "fix(loki sink): Pass `tls` settings to healthcheck (#2234)",
-        "pr_number": 2234,
-        "scopes": [
-          {
-            "component": {
-              "name": "loki",
-              "type": "sink"
-            },
-            "name": "loki sink"
-          }
-        ],
-        "sha": "130df3199139bfa84648d235ed34a0c292f2cfa8",
-        "type": "fix"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-06 23:16:43 +0000",
-        "deletions_count": 13,
-        "description": "Don't use `buildx` plugin by default",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 25,
-        "message": "chore(operations): Don't use `buildx` plugin by default (#2239)",
-        "pr_number": 2239,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "6dde571f89638ecc28f5c633415febff0729e198",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-06 16:38:58 +0000",
-        "deletions_count": 54,
-        "description": "Add verify cert notes",
-        "files_count": 31,
-        "highlight_permalink": null,
-        "insertions_count": 216,
-        "message": "docs(security): Add verify cert notes (#2240)",
-        "pr_number": 2240,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "security"
-          }
-        ],
-        "sha": "7d9ebc3d580eff9d12f31563306d0d8bf3285248",
-        "type": "docs"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-07 10:22:18 +0000",
-        "deletions_count": 11,
-        "description": "Pass `tls` settings to healthcheck",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 21,
-        "message": "fix(influxdb_metrics sink): Pass `tls` settings to healthcheck (#2238)",
-        "pr_number": 2238,
-        "scopes": [
-          {
-            "component": {
-              "name": "influxdb_metrics",
-              "type": "sink"
-            },
-            "name": "influxdb_metrics sink"
-          }
-        ],
-        "sha": "5890e2468e1d4c2a48e02c7d5235e9b9f65a29fc",
-        "type": "fix"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-07 18:34:59 +0000",
-        "deletions_count": 4060,
-        "description": "Implement all hooks and timers in version 2 ",
-        "files_count": 85,
-        "highlight_permalink": "/highlights/2020-04-07-lua-transform-version-2/",
-        "insertions_count": 5940,
-        "message": "enhancement(lua transform): Implement all hooks and timers in version 2  (#2126)",
-        "pr_number": 2126,
-        "scopes": [
-          {
-            "component": {
-              "name": "lua",
-              "type": "transform"
-            },
-            "name": "lua transform"
-          }
-        ],
-        "sha": "0d0a8fab60439834e6be155f4c0b616bfd77faec",
-        "type": "enhancement"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-07 20:53:16 +0000",
-        "deletions_count": 13,
-        "description": "Support metric events",
-        "files_count": 6,
-        "highlight_permalink": "/highlights/2020-04-07-vector-to-vector-metrics/",
-        "insertions_count": 28,
-        "message": "enhancement(vector source, vector sink): Support metric events (#2245)",
-        "pr_number": 2245,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "vector source"
-          },
-          {
-            "component": {
-              "name": "vector",
-              "type": "sink"
-            },
-            "name": "vector sink"
-          }
-        ],
-        "sha": "2f803293dbbe793c4a849b344feb5e4ae6d52e1b",
-        "type": "enhancement"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-07 21:48:50 +0000",
-        "deletions_count": 1,
-        "description": "Fix link to the Docker platform on the main page",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(website): Fix link to the Docker platform on the main page (#2249)",
-        "pr_number": 2249,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "website"
-          }
-        ],
-        "sha": "e4c383881b7727289a87327fcd081b1f366952a6",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-07 22:23:19 +0000",
-        "deletions_count": 4,
-        "description": "Document default value for `acl`",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 5,
-        "message": "docs(gcp_cloud_storage sink): Document default value for `acl` (#2252)",
-        "pr_number": 2252,
-        "scopes": [
-          {
-            "component": {
-              "name": "gcp_cloud_storage",
-              "type": "sink"
-            },
-            "name": "gcp_cloud_storage sink"
-          }
-        ],
-        "sha": "11a898c824ca2955c75a4d58e87081bfb4bb2f2e",
-        "type": "docs"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-04-07 15:31:22 +0000",
-        "deletions_count": 525,
-        "description": "Improve `logfmt_parser` docs and examples",
-        "files_count": 25,
-        "highlight_permalink": null,
-        "insertions_count": 834,
-        "message": "docs: Improve `logfmt_parser` docs and examples (#2251)",
-        "pr_number": 2251,
-        "scopes": [
-
-        ],
-        "sha": "230cd45552021ea499d47d6b39f74730dbdc2a40",
-        "type": "docs"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": true,
-        "date": "2020-04-07 22:58:54 +0000",
-        "deletions_count": 232,
-        "description": "Use external tagging for metrics serialization",
-        "files_count": 7,
-        "highlight_permalink": "/highlights/2020-04-07-use-external-tagging-for-metrics-serialization/",
-        "insertions_count": 183,
-        "message": "enhancement(ux)!: Use external tagging for metrics serialization (#2231)",
-        "pr_number": 2231,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "ux"
-          }
-        ],
-        "sha": "febbdfb39546c15a430b808226a03ad5a5bc41ec",
-        "type": "enhancement"
-      },
-      {
-        "author": "MOZGIII",
-        "breaking_change": false,
-        "date": "2020-04-08 17:10:31 +0000",
-        "deletions_count": 1,
-        "description": "Use cat with heredoc instead of echo and quotes",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(website): Use cat with heredoc instead of echo and quotes (#2262)",
-        "pr_number": 2262,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "website"
-          }
-        ],
-        "sha": "a9efeb9c8a45209c0fb64f0d043500a19f41fa7f",
-        "type": "chore"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-08 16:19:14 +0000",
-        "deletions_count": 2,
-        "description": "Add `source_key` and `source_type_key` to…",
-        "files_count": 6,
-        "highlight_permalink": null,
-        "insertions_count": 198,
-        "message": "enhancement(config): Add `source_key` and `source_type_key` to… (#2244)",
-        "pr_number": 2244,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "config"
-          }
-        ],
-        "sha": "f9c4b4ba1282d7cd4cc3b773305e611beac7a99f",
-        "type": "enhancement"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-08 22:52:35 +0000",
-        "deletions_count": 1,
-        "description": "Use kebab case for ACL encoding",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "fix(gcp_cloud_storage sink): Use kebab case for ACL encoding (#2259)",
-        "pr_number": 2259,
-        "scopes": [
-          {
-            "component": {
-              "name": "gcp_cloud_storage",
-              "type": "sink"
-            },
-            "name": "gcp_cloud_storage sink"
-          }
-        ],
-        "sha": "6b7cc0cf1009ecb1c62c7d1458945203a9ea5f48",
-        "type": "fix"
-      },
-      {
-        "author": "Luke Steensen",
-        "breaking_change": false,
-        "date": "2020-04-08 15:23:05 +0000",
-        "deletions_count": 654,
-        "description": "Initial `internal` metrics source implementation",
-        "files_count": 38,
-        "highlight_permalink": null,
-        "insertions_count": 1332,
-        "message": "feat(new source): Initial `internal` metrics source implementation (#1953)",
-        "pr_number": 1953,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "new source"
-          }
-        ],
-        "sha": "5111f3a5b522fa06ca2ddf321e668246a78dc9fa",
-        "type": "feat"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-04-08 16:42:27 +0000",
-        "deletions_count": 15,
-        "description": "Accept metrics as input",
-        "files_count": 6,
-        "highlight_permalink": null,
-        "insertions_count": 34,
-        "message": "enhancement(filter transform): Accept metrics as input (#2267)",
-        "pr_number": 2267,
-        "scopes": [
-          {
-            "component": {
-              "name": "filter",
-              "type": "transform"
-            },
-            "name": "filter transform"
-          }
-        ],
-        "sha": "308351a572c5e881454c6d73b8a9d6c92eac9a9e",
-        "type": "enhancement"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-08 23:54:49 +0000",
-        "deletions_count": 16,
-        "description": "Fix healthchecks",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 13,
-        "message": "fix(aws_kinesis_firehose sink): Fix healthchecks (#2276)",
-        "pr_number": 2276,
-        "scopes": [
-          {
-            "component": {
-              "name": "aws_kinesis_firehose",
-              "type": "sink"
-            },
-            "name": "aws_kinesis_firehose sink"
-          }
-        ],
-        "sha": "04e2bf3abef0af3a9398f6c97f917c3658fd993f",
-        "type": "fix"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-08 18:53:35 +0000",
-        "deletions_count": 48,
-        "description": "Only run required requests based on the supplied `fields`",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 35,
-        "message": "fix(aws_ec2_metadata transform): Only run required requests based on the supplied `fields` (#2265)",
-        "pr_number": 2265,
+        "insertions_count": 48,
+        "message": "fix(aws_ec2_metadata transform): Treat empty namespaces as not set (#2479)",
+        "pr_number": 2479,
         "scopes": [
           {
             "component": {
@@ -7140,268 +3905,43 @@ module.exports = {
             "name": "aws_ec2_metadata transform"
           }
         ],
-        "sha": "162e064e6c57c7b38d010893c041728ba40adb0a",
+        "sha": "fafdc789b26e23075aa6afc1b12622b001f0f5c4",
         "type": "fix"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": true,
-        "date": "2020-04-09 12:40:00 +0000",
-        "deletions_count": 13,
-        "description": "Set `search_dirs` to config dirs by default",
-        "files_count": 7,
-        "highlight_permalink": "/highlights/2020-04-09-set-search_dirs-to-config-dirs-by-default/",
-        "insertions_count": 42,
-        "message": "enhancement(lua transform)!: Set `search_dirs` to config dirs by default (#2274)",
-        "pr_number": 2274,
-        "scopes": [
-          {
-            "component": {
-              "name": "lua",
-              "type": "transform"
-            },
-            "name": "lua transform"
-          }
-        ],
-        "sha": "e9192ad2b2755c3bd1ee59f6b13f255ac4efd8f3",
-        "type": "enhancement"
-      },
-      {
-        "author": "Luke Steensen",
-        "breaking_change": false,
-        "date": "2020-04-09 14:19:17 +0000",
-        "deletions_count": 19,
-        "description": "Add blog post on how we test vector",
-        "files_count": 14,
-        "highlight_permalink": null,
-        "insertions_count": 492,
-        "message": "docs: Add blog post on how we test vector (#1363)",
-        "pr_number": 1363,
-        "scopes": [
-
-        ],
-        "sha": "90f55ff7ae3222c05971482b72c4715d29a83ac9",
-        "type": "docs"
       },
       {
         "author": "Bruce Guenter",
-        "breaking_change": true,
-        "date": "2020-04-09 15:12:30 +0000",
-        "deletions_count": 12,
-        "description": "Make ACL optional",
-        "files_count": 4,
-        "highlight_permalink": "/highlights/2020-04-09-make-acl-optional/",
-        "insertions_count": 18,
-        "message": "enhancement(gcp_cloud_storage sink)!: Make ACL optional (#2283)",
-        "pr_number": 2283,
-        "scopes": [
-          {
-            "component": {
-              "name": "gcp_cloud_storage",
-              "type": "sink"
-            },
-            "name": "gcp_cloud_storage sink"
-          }
-        ],
-        "sha": "0b1ca4efe31e04d2c7c4e61e40112833dc3eb372",
-        "type": "enhancement"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
         "breaking_change": false,
-        "date": "2020-04-10 09:41:25 +0000",
-        "deletions_count": 5,
-        "description": "Add elegant shutdown behavior",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 14,
-        "message": "enhancement(docker source): Add elegant shutdown behavior (#2260)",
-        "pr_number": 2260,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "docker source"
-          }
-        ],
-        "sha": "6d4d3b48b1563ef30f312eb7e2a4ef4f9df84652",
-        "type": "enhancement"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-10 13:13:35 +0000",
-        "deletions_count": 8,
-        "description": "Make `RuntimeTransform` trait available for all transforms",
-        "files_count": 4,
-        "highlight_permalink": null,
-        "insertions_count": 13,
-        "message": "chore(transforms): Make `RuntimeTransform` trait available for all transforms (#2281)",
-        "pr_number": 2281,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "transforms"
-          }
-        ],
-        "sha": "5f78ebb7c3e21f878859b72dff6450c45c7359dc",
-        "type": "chore"
-      },
-      {
-        "author": "Luke Steensen",
-        "breaking_change": false,
-        "date": "2020-04-10 09:01:14 +0000",
-        "deletions_count": 5,
-        "description": "correct typo in testing post",
+        "date": "2020-04-29 11:30:48 +0000",
+        "deletions_count": 31,
+        "description": "Fix handling of standard AWS regions",
         "files_count": 2,
         "highlight_permalink": null,
-        "insertions_count": 5,
-        "message": "fix(website): correct typo in testing post (#2291)",
-        "pr_number": 2291,
+        "insertions_count": 98,
+        "message": "fix(elasticsearch sink): Fix handling of standard AWS regions (#2489)",
+        "pr_number": 2489,
         "scopes": [
           {
             "component": {
-            },
-            "name": "website"
-          }
-        ],
-        "sha": "e0805cc76343a218ed610f84c174a184f39098e8",
-        "type": "fix"
-      },
-      {
-        "author": "Luke Steensen",
-        "breaking_change": false,
-        "date": "2020-04-10 11:02:44 +0000",
-        "deletions_count": 7,
-        "description": "small fixes for testing post",
-        "files_count": 5,
-        "highlight_permalink": null,
-        "insertions_count": 8,
-        "message": "fix(website): small fixes for testing post (#2292)",
-        "pr_number": 2292,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "website"
-          }
-        ],
-        "sha": "eb3e71e53699bbd8de90018c4dc0f803048a4178",
-        "type": "fix"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-10 14:16:16 +0000",
-        "deletions_count": 7,
-        "description": "Run healthcheck in rt context",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 45,
-        "message": "fix(kafka sink): Run healthcheck in rt context (#2288)",
-        "pr_number": 2288,
-        "scopes": [
-          {
-            "component": {
-              "name": "kafka",
+              "name": "elasticsearch",
               "type": "sink"
             },
-            "name": "kafka sink"
+            "name": "elasticsearch sink"
           }
         ],
-        "sha": "a85197d8a1dfeee7b705dd996516510d4dd60431",
+        "sha": "4e55cbb5b4879bcd971787089873cd62f7ddc451",
         "type": "fix"
-      },
-      {
-        "author": "Luke Steensen",
-        "breaking_change": false,
-        "date": "2020-04-10 17:49:22 +0000",
-        "deletions_count": 98,
-        "description": "Start removing Atom from the hot path",
-        "files_count": 17,
-        "highlight_permalink": null,
-        "insertions_count": 92,
-        "message": "perf: Start removing Atom from the hot path (#2295)",
-        "pr_number": 2295,
-        "scopes": [
-
-        ],
-        "sha": "b6e53d52249370e8b5bd4006fca674c3c99b8302",
-        "type": "perf"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-11 02:32:14 +0000",
-        "deletions_count": 1,
-        "description": "Add a CSV parsing guide",
-        "files_count": 8,
-        "highlight_permalink": null,
-        "insertions_count": 588,
-        "message": "docs(lua transform): Add a CSV parsing guide (#2285)",
-        "pr_number": 2285,
-        "scopes": [
-          {
-            "component": {
-              "name": "lua",
-              "type": "transform"
-            },
-            "name": "lua transform"
-          }
-        ],
-        "sha": "9d97e1ea53a24fcba4dda28406a48b642a42db09",
-        "type": "docs"
-      },
-      {
-        "author": "Luke Steensen",
-        "breaking_change": false,
-        "date": "2020-04-11 23:21:27 +0000",
-        "deletions_count": 13,
-        "description": "Add fast path and caching api to event insert",
-        "files_count": 5,
-        "highlight_permalink": null,
-        "insertions_count": 67,
-        "message": "perf: Add fast path and caching api to event insert (#2296)",
-        "pr_number": 2296,
-        "scopes": [
-
-        ],
-        "sha": "b477981125866e6d3467cd12214e5049285c89b4",
-        "type": "perf"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-13 15:26:12 +0000",
-        "deletions_count": 1,
-        "description": "Enable Rust codegen LTO for test harness",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore(tests): Enable Rust codegen LTO for test harness (#2310)",
-        "pr_number": 2310,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "tests"
-          }
-        ],
-        "sha": "bc48a21e95a9802a5cf57326b4be1c383c567e27",
-        "type": "chore"
       },
       {
         "author": "Lucio Franco",
         "breaking_change": false,
-        "date": "2020-04-13 13:26:56 +0000",
-        "deletions_count": 25,
-        "description": "Upgrade http client to hyper 0.13",
-        "files_count": 6,
+        "date": "2020-04-29 13:42:40 +0000",
+        "deletions_count": 11,
+        "description": "Fetch system ca certs via schannel on windows",
+        "files_count": 5,
         "highlight_permalink": null,
-        "insertions_count": 582,
-        "message": "chore(networking): Upgrade http client to hyper 0.13 (#2294)",
-        "pr_number": 2294,
+        "insertions_count": 163,
+        "message": "fix(networking): Fetch system ca certs via schannel on windows (#2444)",
+        "pr_number": 2444,
         "scopes": [
           {
             "component": {
@@ -7409,1128 +3949,72 @@ module.exports = {
             "name": "networking"
           }
         ],
-        "sha": "e4d012df9210a22fe95729f8f98127e8cb050ece",
-        "type": "chore"
-      },
-      {
-        "author": "Ana Hobden",
-        "breaking_change": false,
-        "date": "2020-04-13 14:15:47 +0000",
-        "deletions_count": 1,
-        "description": "Fix Windows metrics",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 0,
-        "message": "chore(operations): Fix Windows metrics (#2309)",
-        "pr_number": 2309,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "23f1781f39d98315106455309a3251aaa88eeff0",
-        "type": "chore"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-14 13:20:55 +0000",
-        "deletions_count": 7,
-        "description": "Add `source_type` field",
-        "files_count": 17,
-        "highlight_permalink": null,
-        "insertions_count": 213,
-        "message": "enhancement(sources): Add `source_type` field (#2298)",
-        "pr_number": 2298,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "sources"
-          }
-        ],
-        "sha": "dfe4620245bffddc066ccfe47a4ab9d70e6d9649",
-        "type": "enhancement"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-14 19:11:17 +0000",
-        "deletions_count": 22,
-        "description": "Add `lto = true` and `codegen-units=1` to `Cargo.toml`",
-        "files_count": 4,
-        "highlight_permalink": null,
-        "insertions_count": 5,
-        "message": "perf: Add `lto = true` and `codegen-units=1` to `Cargo.toml` (#2321)",
-        "pr_number": 2321,
-        "scopes": [
-
-        ],
-        "sha": "fb8ae10f193c1990259500941ddd90f01472063e",
-        "type": "perf"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-14 19:44:31 +0000",
-        "deletions_count": 2,
-        "description": "Sort events by timestamp",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 78,
-        "message": "fix(aws_cloudwatch_logs sink): Sort events by timestamp (#2320)",
-        "pr_number": 2320,
-        "scopes": [
-          {
-            "component": {
-              "name": "aws_cloudwatch_logs",
-              "type": "sink"
-            },
-            "name": "aws_cloudwatch_logs sink"
-          }
-        ],
-        "sha": "e8723f5eda7cbf0986b8f4b45c9ac394ef2b6f3b",
+        "sha": "a8fba10bc739fb5f9b54264bab937700e161f5d5",
         "type": "fix"
       },
       {
-        "author": "Binary Logic",
+        "author": "Evan Cameron",
         "breaking_change": false,
-        "date": "2020-04-14 20:50:16 +0000",
-        "deletions_count": 3485,
-        "description": "Add /highlights section and rework release notes",
-        "files_count": 302,
-        "highlight_permalink": null,
-        "insertions_count": 7552,
-        "message": "chore(website): Add /highlights section and rework release notes (#2317)",
-        "pr_number": 2317,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "website"
-          }
-        ],
-        "sha": "5d7421f07080bfd7e7563ebb326f4b0281d65508",
-        "type": "chore"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-15 06:32:47 +0000",
-        "deletions_count": 16,
-        "description": "Wire ShutdownSignal in `trait HttpSource`",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 15,
-        "message": "chore(sources): Wire ShutdownSignal in `trait HttpSource` (#2290)",
-        "pr_number": 2290,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "sources"
-          }
-        ],
-        "sha": "1b4c0014247e69aec6761e544bfae6cd29f6acae",
-        "type": "chore"
-      },
-      {
-        "author": "Felix",
-        "breaking_change": false,
-        "date": "2020-04-15 06:35:56 +0000",
-        "deletions_count": 23,
-        "description": "Show possible values for `--log-format`, `--color`, and `--format`",
-        "files_count": 4,
-        "highlight_permalink": null,
-        "insertions_count": 47,
-        "message": "enhancement(cli): Show possible values for `--log-format`, `--color`, and `--format` (#2300)",
-        "pr_number": 2300,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "cli"
-          }
-        ],
-        "sha": "b43fdecfed76081b86cf2d04a933787d33bd5455",
-        "type": "enhancement"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-15 07:36:24 +0000",
-        "deletions_count": 2,
-        "description": "Clarify dependencies of the `package-*` job in `make hel…",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 2,
-        "message": "chore: Clarify dependencies of the `package-*` job in `make hel… (#2324)",
-        "pr_number": 2324,
-        "scopes": [
-
-        ],
-        "sha": "6cb49ce04aefe69dfdac6e489001990a31c7343a",
-        "type": "chore"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-15 06:41:11 +0000",
-        "deletions_count": 112,
-        "description": "Remove `log_schema.source_key`",
-        "files_count": 7,
-        "highlight_permalink": null,
-        "insertions_count": 2,
-        "message": "chore(config): Remove `log_schema.source_key` (#2297)",
-        "pr_number": 2297,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "config"
-          }
-        ],
-        "sha": "36892068ca48b470f6a16f35e1a57753074f32ca",
-        "type": "chore"
-      },
-      {
-        "author": "Ana Hobden",
-        "breaking_change": false,
-        "date": "2020-04-14 21:41:47 +0000",
-        "deletions_count": 0,
-        "description": "Add Twitter author tags",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 6,
-        "message": "chore(website): Add Twitter author tags (#2299)",
-        "pr_number": 2299,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "website"
-          }
-        ],
-        "sha": "e2eb9e7da20337e3522e9f4ad5ca9b049e8c26e2",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-15 18:21:52 +0000",
-        "deletions_count": 2,
-        "description": "Improve topology shutdown logs",
+        "date": "2020-04-29 15:29:34 +0000",
+        "deletions_count": 17,
+        "description": "Move healtcheck consumer creation to boxed future",
         "files_count": 1,
         "highlight_permalink": null,
         "insertions_count": 13,
-        "message": "enhancement(topology): Improve topology shutdown logs (#2345)",
-        "pr_number": 2345,
+        "message": "fix(pulsar sink): Move healtcheck consumer creation to boxed future (#2499)",
+        "pr_number": 2499,
         "scopes": [
           {
             "component": {
-            },
-            "name": "topology"
-          }
-        ],
-        "sha": "b152b53e8ec709c0ff9eb64e64d0f8b9a4cb0441",
-        "type": "enhancement"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-15 18:42:27 +0000",
-        "deletions_count": 6,
-        "description": "Reduce credentials fetch timeout",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 13,
-        "message": "fix(sinks): Reduce credentials fetch timeout (#2342)",
-        "pr_number": 2342,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "sinks"
-          }
-        ],
-        "sha": "de0d6f6c4e6c23f4fea460835b22d7ecc175fde4",
-        "type": "fix"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-16 16:29:15 +0000",
-        "deletions_count": 3,
-        "description": "Don't require `isdst`, `wday`, `yday` in timestamps",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "fix(lua transform): Don't require `isdst`, `wday`, `yday` in timestamps (#2335)",
-        "pr_number": 2335,
-        "scopes": [
-          {
-            "component": {
-              "name": "lua",
-              "type": "transform"
-            },
-            "name": "lua transform"
-          }
-        ],
-        "sha": "148abb54c4b62c375369f96e33f8f0bfea620c41",
-        "type": "fix"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-16 09:32:47 +0000",
-        "deletions_count": 3,
-        "description": "Bump `tower-limit 0.1.2`",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 3,
-        "message": "chore(dependencies): Bump `tower-limit 0.1.2` (#2346)",
-        "pr_number": 2346,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "dependencies"
-          }
-        ],
-        "sha": "60385ec2dd58ecbb8d449dea50981dd9afc3f84e",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-16 16:33:15 +0000",
-        "deletions_count": 1,
-        "description": "Use only the filename part of the paths to extract dates",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 1,
-        "message": "chore: Use only the filename part of the paths to extract dates (#2347)",
-        "pr_number": 2347,
-        "scopes": [
-
-        ],
-        "sha": "f14ba50cbd3bad22b3aa5aadd60f83ccf7319ded",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-16 21:56:11 +0000",
-        "deletions_count": 0,
-        "description": "Add a guide about merging multi-line events",
-        "files_count": 5,
-        "highlight_permalink": null,
-        "insertions_count": 1321,
-        "message": "docs(lua transform): Add a guide about merging multi-line events (#2354)",
-        "pr_number": 2354,
-        "scopes": [
-          {
-            "component": {
-              "name": "lua",
-              "type": "transform"
-            },
-            "name": "lua transform"
-          }
-        ],
-        "sha": "19bff5ca961d304744b2586f27ac24e3616a7024",
-        "type": "docs"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-04-17 10:50:47 +0000",
-        "deletions_count": 0,
-        "description": "Add highlights section to contributing",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 50,
-        "message": "docs: Add highlights section to contributing (#2348)",
-        "pr_number": 2348,
-        "scopes": [
-
-        ],
-        "sha": "225bee0537660cfa84d33cedce48e0926c533672",
-        "type": "docs"
-      },
-      {
-        "author": "Erwan D",
-        "breaking_change": false,
-        "date": "2020-04-17 16:55:17 +0000",
-        "deletions_count": 267,
-        "description": "fix typo 'desigend'",
-        "files_count": 134,
-        "highlight_permalink": null,
-        "insertions_count": 267,
-        "message": "docs: fix typo 'desigend' (#2350)",
-        "pr_number": 2350,
-        "scopes": [
-
-        ],
-        "sha": "b94373a614fdfb0a8baf231450d44fb0155b99c6",
-        "type": "docs"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-04-17 17:57:38 +0000",
-        "deletions_count": 7,
-        "description": "Cache paths for parsed fields",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 9,
-        "message": "perf(tokenizer transform): Cache paths for parsed fields (#2325)",
-        "pr_number": 2325,
-        "scopes": [
-          {
-            "component": {
-              "name": "tokenizer",
-              "type": "transform"
-            },
-            "name": "tokenizer transform"
-          }
-        ],
-        "sha": "d77a2f59e7ad18a28d4be90cc3da40e8ca49fe4f",
-        "type": "perf"
-      },
-      {
-        "author": "Ana Hobden",
-        "breaking_change": false,
-        "date": "2020-04-17 11:57:04 +0000",
-        "deletions_count": 5,
-        "description": "Update Ana bio",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 9,
-        "message": "chore(website): Update Ana bio (#2360)",
-        "pr_number": 2360,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "website"
-          }
-        ],
-        "sha": "7c6608df02259778aaa3cc7770d96c6aabd75669",
-        "type": "chore"
-      },
-      {
-        "author": "Ana Hobden",
-        "breaking_change": false,
-        "date": "2020-04-17 12:06:36 +0000",
-        "deletions_count": 120,
-        "description": "Migrate some PR checks to Github Actions from Circle",
-        "files_count": 5,
-        "highlight_permalink": null,
-        "insertions_count": 205,
-        "message": "chore(platforms): Migrate some PR checks to Github Actions from Circle (#2352)",
-        "pr_number": 2352,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "platforms"
-          }
-        ],
-        "sha": "72da605fd619c0321d9c8ffd176680f225ca88d5",
-        "type": "chore"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-04-17 13:47:27 +0000",
-        "deletions_count": 39,
-        "description": "Add support for instance accounts",
-        "files_count": 11,
-        "highlight_permalink": null,
-        "insertions_count": 114,
-        "message": "enhancement(gcp provider): Add support for instance accounts (#2351)",
-        "pr_number": 2351,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "gcp provider"
-          }
-        ],
-        "sha": "6b95f7e17e4af25c689a108cd3fa6941d97d5593",
-        "type": "enhancement"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-18 11:35:30 +0000",
-        "deletions_count": 94,
-        "description": "Wire in new `ShutdownSignal` for improved shutdown",
-        "files_count": 4,
-        "highlight_permalink": null,
-        "insertions_count": 139,
-        "message": "chore(file source): Wire in new `ShutdownSignal` for improved shutdown (#2261)",
-        "pr_number": 2261,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "file source"
-          }
-        ],
-        "sha": "7ea0eed5ee4c24df66efba60403ecf0b5486ebb4",
-        "type": "chore"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-18 10:29:23 +0000",
-        "deletions_count": 2,
-        "description": "Allow creation race of groups and streams",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 26,
-        "message": "fix(aws_cloudwatch_logs sink): Allow creation race of groups and streams (#2355)",
-        "pr_number": 2355,
-        "scopes": [
-          {
-            "component": {
-              "name": "aws_cloudwatch_logs",
+              "name": "pulsar",
               "type": "sink"
             },
-            "name": "aws_cloudwatch_logs sink"
+            "name": "pulsar sink"
           }
         ],
-        "sha": "9c9def9d7d9f6d2319ec31241632f521d8e597d4",
+        "sha": "9082b1808115bac6dd64f310126fb57754ce315e",
         "type": "fix"
       },
       {
-        "author": "Binary Logic",
+        "author": "Slawomir Skowron",
         "breaking_change": false,
-        "date": "2020-04-18 15:47:29 +0000",
-        "deletions_count": 60,
-        "description": "Only run CI workflow when relevant files change",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 65,
-        "message": "chore: Only run CI workflow when relevant files change (#2369)",
-        "pr_number": 2369,
-        "scopes": [
-
-        ],
-        "sha": "f119d617293e81a2f7093dac549cd8ac5c26303f",
-        "type": "chore"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-19 12:48:00 +0000",
-        "deletions_count": 4,
-        "description": "Fix tests",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 14,
-        "message": "chore: Fix tests (#2372)",
-        "pr_number": 2372,
-        "scopes": [
-
-        ],
-        "sha": "32e73588a7e2b3e9fd80f3eb0184339405b044fc",
-        "type": "chore"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-04-19 21:21:23 +0000",
-        "deletions_count": 86,
-        "description": "Add nightly GH action workflow",
-        "files_count": 6,
-        "highlight_permalink": null,
-        "insertions_count": 246,
-        "message": "chore(operations): Add nightly GH action workflow (#2370)",
-        "pr_number": 2370,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "fde51c235f6d3c205a34a768c9df9e3f5e537dd5",
-        "type": "chore"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-04-19 21:37:28 +0000",
-        "deletions_count": 5,
-        "description": "Move /test-data to /tests/data",
-        "files_count": 6,
-        "highlight_permalink": null,
-        "insertions_count": 4,
-        "message": "chore: Move /test-data to /tests/data (#2375)",
-        "pr_number": 2375,
-        "scopes": [
-
-        ],
-        "sha": "c59eedf0943f7b02295c75907fbf3024bd884f11",
-        "type": "chore"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-04-20 12:57:02 +0000",
-        "deletions_count": 1,
-        "description": "Run ci workflow on pull requests only",
+        "date": "2020-04-29 22:26:19 +0000",
+        "deletions_count": 0,
+        "description": "Add `instance-type` field",
         "files_count": 1,
         "highlight_permalink": null,
         "insertions_count": 16,
-        "message": "chore(operations): Run ci workflow on pull requests only (#2378)",
-        "pr_number": 2378,
+        "message": "enhancement(aws_ec2_metadata transform): Add `instance-type` field (#2500)",
+        "pr_number": 2500,
         "scopes": [
           {
             "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "e041007b0849c8de0e1b80272e1875d413a5aad8",
-        "type": "chore"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-20 19:15:22 +0000",
-        "deletions_count": 50,
-        "description": "Wire in new `ShutdownSignal` for improved shutdown",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 22,
-        "message": "enhancement(splunk_hec source): Wire in new `ShutdownSignal` for improved shutdown (#2373)",
-        "pr_number": 2373,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "splunk_hec source"
-          }
-        ],
-        "sha": "8442531f7190e30820be157be21be77bd9c27a15",
-        "type": "enhancement"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-20 19:17:28 +0000",
-        "deletions_count": 52,
-        "description": "Wire in `ShutdownSignal` for improved shutdown",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 57,
-        "message": "enhancement(journald source): Wire in `ShutdownSignal` for improved shutdown (#2364)",
-        "pr_number": 2364,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "journald source"
-          }
-        ],
-        "sha": "806f24664147d71ab866ef156d9f3762bac7992c",
-        "type": "enhancement"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-20 19:20:14 +0000",
-        "deletions_count": 18,
-        "description": "Wire in new `ShutdownSignal` for improved shutdown",
-        "files_count": 7,
-        "highlight_permalink": null,
-        "insertions_count": 50,
-        "message": "enhancement(sources): Wire in new `ShutdownSignal` for improved shutdown (#2365)",
-        "pr_number": 2365,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "sources"
-          }
-        ],
-        "sha": "512cb2ebb3f85997ef5b9966e1b501d531125c35",
-        "type": "enhancement"
-      },
-      {
-        "author": "Ana Hobden",
-        "breaking_change": false,
-        "date": "2020-04-20 10:55:19 +0000",
-        "deletions_count": 12,
-        "description": "Reenable component feature check",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 36,
-        "message": "chore(platforms): Reenable component feature check (#2371)",
-        "pr_number": 2371,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "platforms"
-          }
-        ],
-        "sha": "b7af16744363667c75948cbbf1b197a21f237324",
-        "type": "chore"
-      },
-      {
-        "author": "Joe Schafer",
-        "breaking_change": false,
-        "date": "2020-04-20 13:21:43 +0000",
-        "deletions_count": 9,
-        "description": "support sub-second timestamp resolution",
-        "files_count": 4,
-        "highlight_permalink": null,
-        "insertions_count": 77,
-        "message": "fix(lua transform): support sub-second timestamp resolution (#2333)",
-        "pr_number": 2333,
-        "scopes": [
-          {
-            "component": {
-              "name": "lua",
+              "name": "aws_ec2_metadata",
               "type": "transform"
             },
-            "name": "lua transform"
+            "name": "aws_ec2_metadata transform"
           }
         ],
-        "sha": "ec30c6166b69e2a91514440347abf090a52fd6e9",
-        "type": "fix"
-      },
-      {
-        "author": "Ana Hobden",
-        "breaking_change": false,
-        "date": "2020-04-20 13:29:30 +0000",
-        "deletions_count": 0,
-        "description": "Optimize binaries in `test-stable` CI to reduce binary sizes. This should make it more stable.",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 14,
-        "message": "chore(operations): Optimize binaries in `test-stable` CI to reduce binary sizes. This should make it more stable. (#2380)",
-        "pr_number": 2380,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "74126709debf66fc576a1a064244be98e223a0a6",
-        "type": "chore"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-04-20 16:29:54 +0000",
-        "deletions_count": 16436,
-        "description": "Prepare 0.9.0",
-        "files_count": 119,
-        "highlight_permalink": null,
-        "insertions_count": 27658,
-        "message": "chore: Prepare 0.9.0 (#2353)",
-        "pr_number": 2353,
-        "scopes": [
-
-        ],
-        "sha": "514f8b1ed5596691e4f083657a61ffe935b06b7f",
-        "type": "chore"
+        "sha": "b2bc1b77ac53b412162a845293487586f66b3007",
+        "type": "enhancement"
       }
     ],
-    "compare_url": "https://github.com/timberio/vector/compare/v0.8.2...v0.9.0",
-    "date": "2020-04-17",
-    "deletions_count": 46669,
+    "compare_url": "https://github.com/timberio/vector/compare/v0.9.0...v0.9.1",
+    "date": "2020-04-29",
+    "deletions_count": 223,
     "description": "",
     "highlights": [
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-02-27",
-        "description": "Bringing Vector to NixOS",
-        "hide_on_release_notes": true,
-        "id": "2020-02-27-nixos-support",
-        "path": "website/highlights/2020-02-27-nixos-support.md",
-        "permalink": "/highlights/2020-02-27-nixos-support/",
-        "tags": [
-          "type: new feature",
-          "domain: platforms",
-          "platform: nixos"
-        ],
-        "title": "NixOS Support"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-02-28",
-        "description": "Build Vector with select components",
-        "hide_on_release_notes": false,
-        "id": "2020-02-28-custom-vector-builds",
-        "path": "website/highlights/2020-02-28-custom-vector-builds.md",
-        "permalink": "/highlights/2020-02-28-custom-vector-builds/",
-        "tags": [
-          "type: new feature",
-          "domain: sources",
-          "source: vector"
-        ],
-        "title": "À La Carte Custom Vector Builds"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-04",
-        "description": "Vector now lets you whitelist, blacklist, and format fields when events are encoded",
-        "hide_on_release_notes": false,
-        "id": "2020-03-04-encoding-only-fields-except-fields",
-        "path": "website/highlights/2020-03-04-encoding-only-fields-except-fields.md",
-        "permalink": "/highlights/2020-03-04-encoding-only-fields-except-fields/",
-        "tags": [
-          "type: enhancement",
-          "domain: sinks"
-        ],
-        "title": "New Encoding Options"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-04",
-        "description": "More control over which fields are included when encoding",
-        "hide_on_release_notes": true,
-        "id": "2020-03-04-encoding-whitelist-blacklist",
-        "path": "website/highlights/2020-03-04-encoding-whitelist-blacklist.md",
-        "permalink": "/highlights/2020-03-04-encoding-whitelist-blacklist/",
-        "tags": [
-          "type: new feature",
-          "domain: sinks"
-        ],
-        "title": "Whitelist & Blacklist Fields When Encoding"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-09",
-        "description": "Improve throughput by compressing data before writing it to Kafka",
-        "hide_on_release_notes": true,
-        "id": "2020-03-09-kafka-sink-compression",
-        "path": "website/highlights/2020-03-09-kafka-sink-compression.md",
-        "permalink": "/highlights/2020-03-09-kafka-sink-compression/",
-        "tags": [
-          "type: new feature",
-          "domain: sinks",
-          "sink: kafka"
-        ],
-        "title": "Compression Now Available In The Kafka Sink"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-10",
-        "description": "Shed duplicate logs",
-        "hide_on_release_notes": false,
-        "id": "2020-03-10-dedupe-transform",
-        "path": "website/highlights/2020-03-10-dedupe-transform.md",
-        "permalink": "/highlights/2020-03-10-dedupe-transform/",
-        "tags": [
-          "type: new feature",
-          "domain: sources",
-          "source: vector"
-        ],
-        "title": "New Dedupe Transform"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-11",
-        "description": "Protect downstream metrics storages from runaway metrics tags",
-        "hide_on_release_notes": false,
-        "id": "2020-03-11-tag-cardinality-limit-transform",
-        "path": "website/highlights/2020-03-11-tag-cardinality-limit-transform.md",
-        "permalink": "/highlights/2020-03-11-tag-cardinality-limit-transform/",
-        "tags": [
-          "type: new feature",
-          "domain: transforms",
-          "transform: tag_cardinality_limit"
-        ],
-        "title": "New Tag Cardinality Limit Transform"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-11",
-        "description": "Securely forward data between Vector instances",
-        "hide_on_release_notes": true,
-        "id": "2020-03-11-vector-sink-tls",
-        "path": "website/highlights/2020-03-11-vector-sink-tls.md",
-        "permalink": "/highlights/2020-03-11-vector-sink-tls/",
-        "tags": [
-          "type: new feature",
-          "domain: sources",
-          "source: vector"
-        ],
-        "title": "The Vector Source & Sink Support TLS"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-12",
-        "description": "Sink logs to the Papertrail logging service",
-        "hide_on_release_notes": true,
-        "id": "2020-03-12-papertrail-sink",
-        "path": "website/highlights/2020-03-12-papertrail-sink.md",
-        "permalink": "/highlights/2020-03-12-papertrail-sink/",
-        "tags": [
-          "type: new feature",
-          "domain: sinks",
-          "sink: papertrail"
-        ],
-        "title": "New Papertrail Sink"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-12",
-        "description": "This change ensures that the `host_key` option is consistent across all sources",
-        "hide_on_release_notes": true,
-        "id": "2020-03-12-rename-host_field-to-host_key",
-        "path": "website/highlights/2020-03-12-rename-host_field-to-host_key.md",
-        "permalink": "/highlights/2020-03-12-rename-host_field-to-host_key/",
-        "tags": [
-          "type: breaking change",
-          "domain: sinks",
-          "sink: splunk_hec"
-        ],
-        "title": "The `splunk_hec` source's `host_field` option has been renamed to `host_key`"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-14",
-        "description": "Sink logs to the Honeycomb logging service",
-        "hide_on_release_notes": true,
-        "id": "2020-03-14-honeycomb-sink",
-        "path": "website/highlights/2020-03-14-honeycomb-sink.md",
-        "permalink": "/highlights/2020-03-14-honeycomb-sink/",
-        "tags": [
-          "type: new feature",
-          "domain: sinks",
-          "sink: honeycomb"
-        ],
-        "title": "New Honeycomb Sink"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-19",
-        "description": "Sink logs to the Apache Pulsar service",
-        "hide_on_release_notes": true,
-        "id": "2020-03-19-apache-pulsar-sink",
-        "path": "website/highlights/2020-03-19-apache-pulsar-sink.md",
-        "permalink": "/highlights/2020-03-19-apache-pulsar-sink/",
-        "tags": [
-          "type: new feature",
-          "domain: sinks",
-          "sink: pulsar"
-        ],
-        "title": "New Apache Pulsar Sink"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-23",
-        "description": "Sink logs to the Datadog logging service",
-        "hide_on_release_notes": true,
-        "id": "2020-03-23-datadog-logs-sink",
-        "path": "website/highlights/2020-03-23-datadog-logs-sink.md",
-        "permalink": "/highlights/2020-03-23-datadog-logs-sink/",
-        "tags": [
-          "type: new feature",
-          "domain: sinks",
-          "sink: datadog_logs"
-        ],
-        "title": "New Datadog Logs Sink"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-23",
-        "description": "This brings the sink naming inline with consistent naming pattern",
-        "hide_on_release_notes": false,
-        "id": "2020-03-23-rename-gcp_stackdriver_logging-sink-to-gcp_stackdriver_logs",
-        "path": "website/highlights/2020-03-23-rename-gcp_stackdriver_logging-sink-to-gcp_stackdriver_logs.md",
-        "permalink": "/highlights/2020-03-23-rename-gcp_stackdriver_logging-sink-to-gcp_stackdriver_logs/",
-        "tags": [
-          "type: breaking change",
-          "domain: sinks",
-          "sink: splunk_hec"
-        ],
-        "title": "The `gcp_stackdriver_logging` sink has been renamed to `gcp_stackdriver_logs`"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-31",
-        "description": "Filter and route your logs based on defined conditions",
-        "hide_on_release_notes": false,
-        "id": "2020-03-31-filter-transform",
-        "path": "website/highlights/2020-03-31-filter-transform.md",
-        "permalink": "/highlights/2020-03-31-filter-transform/",
-        "tags": [
-          "type: new feature",
-          "domain: transforms",
-          "transform: filter"
-        ],
-        "title": "New Filter Transform"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-04-01",
-        "description": "More options when filtering and routing events",
-        "hide_on_release_notes": true,
-        "id": "2020-04-01-more-condition-predicates",
-        "path": "website/highlights/2020-04-01-more-condition-predicates.md",
-        "permalink": "/highlights/2020-04-01-more-condition-predicates/",
-        "tags": [
-          "type: enhancement",
-          "domain: config",
-          "domain: transforms",
-          "transform: filter",
-          "transform: swimlanes"
-        ],
-        "title": "More Condition Predicates"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-04-05",
-        "description": "Compression is not supported by all Elasticsearch service providers",
-        "hide_on_release_notes": false,
-        "id": "2020-04-05-default-compression-to-none",
-        "path": "website/highlights/2020-04-05-default-compression-to-none.md",
-        "permalink": "/highlights/2020-04-05-default-compression-to-none/",
-        "tags": [
-          "type: breaking change",
-          "domain: sinks",
-          "sink: elasticsearch"
-        ],
-        "title": "The `elasticsearch` sink `compression` option now defaults to `none`"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-04-07",
-        "description": "The next iteration of our Lua transform.",
-        "hide_on_release_notes": false,
-        "id": "2020-04-07-lua-transform-version-2",
-        "path": "website/highlights/2020-04-07-lua-transform-version-2.md",
-        "permalink": "/highlights/2020-04-07-lua-transform-version-2/",
-        "tags": [
-          "type: enhancement",
-          "domain: sources",
-          "source: vector"
-        ],
-        "title": "Lua Transform v2"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-04-07",
-        "description": "We've improved the way we serialize metrics data",
-        "hide_on_release_notes": true,
-        "id": "2020-04-07-use-external-tagging-for-metrics-serialization",
-        "path": "website/highlights/2020-04-07-use-external-tagging-for-metrics-serialization.md",
-        "permalink": "/highlights/2020-04-07-use-external-tagging-for-metrics-serialization/",
-        "tags": [
-          "type: breaking change"
-        ],
-        "title": "Use external tagging for metrics serialization"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-04-07",
-        "description": "It's not possible to forward metrics between Vector instances",
-        "hide_on_release_notes": true,
-        "id": "2020-04-07-vector-to-vector-metrics",
-        "path": "website/highlights/2020-04-07-vector-to-vector-metrics.md",
-        "permalink": "/highlights/2020-04-07-vector-to-vector-metrics/",
-        "tags": [
-          "type: new feature",
-          "domain: sources",
-          "source: vector"
-        ],
-        "title": "The Vector Source Now Accepts Metrics"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-04-09",
-        "description": "ACL is not always required when creating objects in GCP Cloud Storage",
-        "hide_on_release_notes": false,
-        "id": "2020-04-09-make-acl-optional",
-        "path": "website/highlights/2020-04-09-make-acl-optional.md",
-        "permalink": "/highlights/2020-04-09-make-acl-optional/",
-        "tags": [
-          "type: breaking change",
-          "domain: sinks",
-          "sink: gcp_cloud_storage"
-        ],
-        "title": "ACL is now optional for the Google Cloud Storage sink"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-04-09",
-        "description": "This allows you to place Lua scripts in the same dir as your Vector config",
-        "hide_on_release_notes": true,
-        "id": "2020-04-09-set-search_dirs-to-config-dirs-by-default",
-        "path": "website/highlights/2020-04-09-set-search_dirs-to-config-dirs-by-default.md",
-        "permalink": "/highlights/2020-04-09-set-search_dirs-to-config-dirs-by-default/",
-        "tags": [
-          "type: breaking change",
-          "domain: transforms",
-          "transform: lua"
-        ],
-        "title": "Set the Lua transform `search_dirs` option to Vector's config dir by default"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-04-17",
-        "description": "Papertrail, Honeycomb, Pulsar, and DataDog Logs",
-        "hide_on_release_notes": false,
-        "id": "2020-04-17-new-sinks",
-        "path": "website/highlights/2020-04-17-new-sinks.md",
-        "permalink": "/highlights/2020-04-17-new-sinks/",
-        "tags": [
-          "type: new feature",
-          "domain: sinks"
-        ],
-        "title": "4 New Sinks!"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-04-20",
-        "description": "A faster and more reliable shutdown process",
-        "hide_on_release_notes": false,
-        "id": "2020-04-20-improved-shutdown",
-        "path": "website/highlights/2020-04-20-improved-shutdown.md",
-        "permalink": "/highlights/2020-04-20-improved-shutdown/",
-        "tags": [
-          "type: enhancement",
-          "domain: topology"
-        ],
-        "title": "Improved Shutdown"
-      }
+
     ],
-    "insertions_count": 161198,
-    "last_version": "0.8.2",
-    "permalink": "/releases/0.9.0/",
-    "title": "Vector v0.9.0",
+    "insertions_count": 651,
+    "last_version": "0.9.0",
+    "permalink": "/releases/0.9.1/",
+    "title": "Vector v0.9.1",
     "type": "initial dev",
     "type_url": "https://semver.org/#spec-item-4",
-    "version": "0.9.0",
+    "version": "0.9.1",
     "whats_next": [
-      {
-        "title": "Kubernetes!",
-        "description": "We're doing this integration right. We've been alpha testing with a number of large clusters and we've honed in on a very high-quality approach that reflects the UX Vector is going after. You can learn more in our [Kubernetes Integration RFC][urls.pr_2222]. Feedback is welcome!"
-      },
-      {
-        "title": "WASM Driven Plugin Architecture",
-        "description": "This release included an overhaul of our [`lua` transform][docs.transforms.lua], which represents a big step towards making Vector more flexible. Lua is an excellent language when you need some quick scripting capabilities. But what if you need something more powerful? Like writing your own custom source, transform, or sink? Vector plans to solve this with [WASM][urls.wasm] foreign module support, enabling you to extend Vector in the language of your choice with little performance penalty. ❤️ WASM. Check out the [WASM Foreign Module Support RFC][urls.pr_2341] for more info."
-      },
-      {
-        "title": "Dynamic HTTP Rate-Limiting (AIMD)",
-        "description": "Fiddling with rate-limits is a frustratin endaevor. If you set them too high you risk overwhelming the service; too low and you're unecessarily limiting throughput. And what happens if you deploy a few more Vector instances? Vector is planning to solve this by automatically detecting the optimal rate limits, taking inspiration from TCP congestional control algorithms. Check out the [Dynamic HTTP Rate Limiting RFC][urls.pr_2329]."
-      },
-      {
-        "title": "Vector Observability",
-        "description": "Did you know this release includes a new hidden `internal` source that emits metrics reflecting Vector's own internal state? 👀 We didn't highlight this source because we have not finished instrumenting Vector and we'll be changing the internal schema used.\n\nFun fact, we took an event-driven approach to Vector's internal observability, which we strongly beleive in. We want Vector to be a good example of our own advice. Checkout the [Event-Driven Observability RFC][urls.pr_2093]."
-      }
+
     ]
   },
   "post_tags": [
@@ -34039,6 +29523,280 @@ module.exports = {
           "title": "Vector Observability",
           "description": "Did you know this release includes a new hidden `internal` source that emits metrics reflecting Vector's own internal state? 👀 We didn't highlight this source because we have not finished instrumenting Vector and we'll be changing the internal schema used.\n\nFun fact, we took an event-driven approach to Vector's internal observability, which we strongly beleive in. We want Vector to be a good example of our own advice. Checkout the [Event-Driven Observability RFC][urls.pr_2093]."
         }
+      ]
+    },
+    "0.9.1": {
+      "codename": "",
+      "commits": [
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-04-22 14:37:44 +0000",
+          "deletions_count": 4,
+          "description": "Support millisecond and nanosecond timestamps",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 71,
+          "message": "fix(splunk_hec source, splunk_hec sink): Support millisecond and nanosecond timestamps (#2382)",
+          "pr_number": 2382,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "splunk_hec source"
+            },
+            {
+              "component": {
+                "name": "splunk_hec",
+                "type": "sink"
+              },
+              "name": "splunk_hec sink"
+            }
+          ],
+          "sha": "4d76e751febd778887a7432263f77369895cd093",
+          "type": "fix"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-04-22 15:13:54 +0000",
+          "deletions_count": 4,
+          "description": "Handle missing source timestamp",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 30,
+          "message": "fix(journald source): Handle missing source timestamp (#2387)",
+          "pr_number": 2387,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "journald source"
+            }
+          ],
+          "sha": "b1c8421357502e1eca123e98787e7071109620f4",
+          "type": "fix"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-04-23 15:27:26 +0000",
+          "deletions_count": 49,
+          "description": "`enoding.only_fields` should properly handle parent keys",
+          "files_count": 3,
+          "highlight_permalink": null,
+          "insertions_count": 110,
+          "message": "fix(config): `enoding.only_fields` should properly handle parent keys (#2413)",
+          "pr_number": 2413,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "config"
+            }
+          ],
+          "sha": "fc2c77b643e02b86a99cff4c914df06060a49d52",
+          "type": "fix"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-04-27 13:31:51 +0000",
+          "deletions_count": 74,
+          "description": "add text encoding",
+          "files_count": 4,
+          "highlight_permalink": null,
+          "insertions_count": 28,
+          "message": "enhancement(humio_logs sink): add text encoding (#2468)",
+          "pr_number": 2468,
+          "scopes": [
+            {
+              "component": {
+                "name": "humio_logs",
+                "type": "sink"
+              },
+              "name": "humio_logs sink"
+            }
+          ],
+          "sha": "48a6d142e9a8ff441d3379cecba7272152b74a72",
+          "type": "enhancement"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-04-27 20:05:10 +0000",
+          "deletions_count": 3,
+          "description": "Use header auth",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 7,
+          "message": "fix(datadog_metrics sink): Use header auth (#2443)",
+          "pr_number": 2443,
+          "scopes": [
+            {
+              "component": {
+                "name": "datadog_metrics",
+                "type": "sink"
+              },
+              "name": "datadog_metrics sink"
+            }
+          ],
+          "sha": "47bf9f74903162a02f40cd7113c37cfec6bb4303",
+          "type": "fix"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-04-28 19:08:02 +0000",
+          "deletions_count": 22,
+          "description": "Add indexed fields in `text` encoding",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 67,
+          "message": "fix(splunk_hec sink): Add indexed fields in `text` encoding (#2448)",
+          "pr_number": 2448,
+          "scopes": [
+            {
+              "component": {
+                "name": "splunk_hec",
+                "type": "sink"
+              },
+              "name": "splunk_hec sink"
+            }
+          ],
+          "sha": "332e9711c7a7c414a0ee83257d172c9b79f1244b",
+          "type": "fix"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-04-28 14:04:02 +0000",
+          "deletions_count": 8,
+          "description": "Treat empty namespaces as not set",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 48,
+          "message": "fix(aws_ec2_metadata transform): Treat empty namespaces as not set (#2479)",
+          "pr_number": 2479,
+          "scopes": [
+            {
+              "component": {
+                "name": "aws_ec2_metadata",
+                "type": "transform"
+              },
+              "name": "aws_ec2_metadata transform"
+            }
+          ],
+          "sha": "fafdc789b26e23075aa6afc1b12622b001f0f5c4",
+          "type": "fix"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-04-29 11:30:48 +0000",
+          "deletions_count": 31,
+          "description": "Fix handling of standard AWS regions",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 98,
+          "message": "fix(elasticsearch sink): Fix handling of standard AWS regions (#2489)",
+          "pr_number": 2489,
+          "scopes": [
+            {
+              "component": {
+                "name": "elasticsearch",
+                "type": "sink"
+              },
+              "name": "elasticsearch sink"
+            }
+          ],
+          "sha": "4e55cbb5b4879bcd971787089873cd62f7ddc451",
+          "type": "fix"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-04-29 13:42:40 +0000",
+          "deletions_count": 11,
+          "description": "Fetch system ca certs via schannel on windows",
+          "files_count": 5,
+          "highlight_permalink": null,
+          "insertions_count": 163,
+          "message": "fix(networking): Fetch system ca certs via schannel on windows (#2444)",
+          "pr_number": 2444,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "networking"
+            }
+          ],
+          "sha": "a8fba10bc739fb5f9b54264bab937700e161f5d5",
+          "type": "fix"
+        },
+        {
+          "author": "Evan Cameron",
+          "breaking_change": false,
+          "date": "2020-04-29 15:29:34 +0000",
+          "deletions_count": 17,
+          "description": "Move healtcheck consumer creation to boxed future",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 13,
+          "message": "fix(pulsar sink): Move healtcheck consumer creation to boxed future (#2499)",
+          "pr_number": 2499,
+          "scopes": [
+            {
+              "component": {
+                "name": "pulsar",
+                "type": "sink"
+              },
+              "name": "pulsar sink"
+            }
+          ],
+          "sha": "9082b1808115bac6dd64f310126fb57754ce315e",
+          "type": "fix"
+        },
+        {
+          "author": "Slawomir Skowron",
+          "breaking_change": false,
+          "date": "2020-04-29 22:26:19 +0000",
+          "deletions_count": 0,
+          "description": "Add `instance-type` field",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 16,
+          "message": "enhancement(aws_ec2_metadata transform): Add `instance-type` field (#2500)",
+          "pr_number": 2500,
+          "scopes": [
+            {
+              "component": {
+                "name": "aws_ec2_metadata",
+                "type": "transform"
+              },
+              "name": "aws_ec2_metadata transform"
+            }
+          ],
+          "sha": "b2bc1b77ac53b412162a845293487586f66b3007",
+          "type": "enhancement"
+        }
+      ],
+      "compare_url": "https://github.com/timberio/vector/compare/v0.9.0...v0.9.1",
+      "date": "2020-04-29",
+      "deletions_count": 223,
+      "description": "",
+      "highlights": [
+
+      ],
+      "insertions_count": 651,
+      "last_version": "0.9.0",
+      "permalink": "/releases/0.9.1/",
+      "title": "Vector v0.9.1",
+      "type": "initial dev",
+      "type_url": "https://semver.org/#spec-item-4",
+      "version": "0.9.1",
+      "whats_next": [
+
       ]
     }
   },

@@ -5018,7 +5018,11 @@ checksum = "05c78687fb1a80548ae3250346c3db86a80a7cdd77bda190189f2d0a0987c81a"
 
 [[package]]
 name = "vector"
+<<<<<<< HEAD
 version = "0.10.0"
+=======
+version = "0.9.1"
+>>>>>>> 0ee662e37... chore: Prepare v0.9.1 release
 dependencies = [
  "approx",
  "async-trait",

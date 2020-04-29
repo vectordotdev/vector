@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-04-29"
 title: Install Vector via Nix
 sidebar_label: Nix
 description: Install Vector through the Nix package manager
@@ -77,7 +77,7 @@ The following diagram demonstrates how it works.
     <CodeExplanation>
 
     * The `--file` flag ensures that you're installing the latest stable version
-      of Vector (0.9.0).
+      of Vector (0.9.1).
     * The `--attr` improves installation speed.
 
     </CodeExplanation>
