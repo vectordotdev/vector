@@ -1,6 +1,8 @@
 use crate::{
     dns::Resolver,
+    emit,
     event::Event,
+    internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
@@ -159,11 +161,7 @@ impl HttpSink for ElasticSearchCommon {
             .index
             .render_string(&event)
             .map_err(|missing_keys| {
-                warn!(
-                    message = "Keys do not exist on the event; Dropping event.",
-                    ?missing_keys,
-                    rate_limit_secs = 30,
-                );
+                emit!(ElasticSearchMissingKeys { keys: missing_keys });
             })
             .ok()?;
         info!("inserting into index: {}", index);
@@ -185,6 +183,10 @@ impl HttpSink for ElasticSearchCommon {
 
         serde_json::to_writer(&mut body, &event.into_log()).unwrap();
         body.push(b'\n');
+
+        emit!(ElasticSearchEventReceived {
+            byte_size: body.len()
+        });
 
         Some(body)
     }

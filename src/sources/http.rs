@@ -54,6 +54,14 @@ impl HttpSource for SimpleHttpSource {
     ) -> Result<Vec<Event>, ErrorMessage> {
         decode_body(body, self.encoding)
             .map(|events| add_headers(events, &self.headers, header_map))
+            .map(|mut events| {
+                // Add source type
+                let key = event::log_schema().source_type_key();
+                for event in events.iter_mut() {
+                    event.as_mut_log().try_insert(key, "http");
+                }
+                events
+            })
     }
 }
 
@@ -63,14 +71,14 @@ impl SourceConfig for SimpleHttpConfig {
         &self,
         _: &str,
         _: &GlobalOptions,
-        _shutdown: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let source = SimpleHttpSource {
             encoding: self.encoding,
             headers: self.headers.clone(),
         };
-        source.run(self.address, "", &self.tls, out)
+        source.run(self.address, "", &self.tls, out, shutdown)
     }
 
     fn output_type(&self) -> DataType {
@@ -271,6 +279,7 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log[&event::log_schema().message_key()], "test body".into());
             assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
         }
         {
             let event = events.remove(0);
@@ -280,6 +289,7 @@ mod tests {
                 "test body 2".into()
             );
             assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
         }
     }
 
@@ -299,6 +309,7 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log[&event::log_schema().message_key()], "test body".into());
             assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
         }
         {
             let event = events.remove(0);
@@ -308,6 +319,7 @@ mod tests {
                 "test body 2".into()
             );
             assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
         }
     }
 
@@ -349,12 +361,14 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key")], "value".into());
             assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key2")], "value2".into());
             assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
         }
     }
 
@@ -376,12 +390,14 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key1")], "value1".into());
             assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key2")], "value2".into());
             assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
         }
     }
 
@@ -419,6 +435,7 @@ mod tests {
             );
             assert_eq!(log[&Atom::from("AbsentHeader")], "".into());
             assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
         }
     }
 }

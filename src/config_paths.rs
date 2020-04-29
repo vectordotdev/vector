@@ -1,10 +1,13 @@
 use glob::glob;
 use lazy_static::lazy_static;
+use once_cell::sync::OnceCell;
 use std::path::PathBuf;
 
 lazy_static! {
     pub static ref DEFAULT_CONFIG_PATHS: Vec<PathBuf> = vec!["/etc/vector/vector.toml".into()];
 }
+
+pub static CONFIG_PATHS: OnceCell<Vec<PathBuf>> = OnceCell::new();
 
 /// Expand a list of paths (potentially containing glob patterns) into real
 /// config paths, replacing it with the default paths when empty.

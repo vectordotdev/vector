@@ -18,6 +18,8 @@ pub mod expiring_hash_map;
 #[cfg(feature = "foreign_modules")]
 pub mod foreign_modules;
 pub mod generate;
+#[macro_use]
+pub mod internal_events;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod list;

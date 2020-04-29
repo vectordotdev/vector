@@ -12,15 +12,11 @@
 # event type
 #
 
-- name: "event type: log"
-  description: Anything log event related
+<%- metadata.data_model.types.each do |type| -%>
+- name: "event type: <%= type %>"
+  description: Anything <%= type %> event related
   color: 1cd1a1
-- name: "event type: metric"
-  description: Anything metric event related
-  color: 1cd1a1
-- name: "event type: trace"
-  description: Anything trace event related
-  color: 1cd1a1
+<%- end -%>
 
 #
 # meta
@@ -95,9 +91,9 @@
 # platform
 #
 
-<%- metadata.platforms.each do |platform| -%>
-- name: "platform: <%= platform.name.downcase %>"
-  description: Anything <%= platform.title %> related
+<%- metadata.platform_names.sort.each do |platform| -%>
+- name: "platform: <%= platform.downcase %>"
+  description: Anything <%= platform.downcase %> related
   color: ff9ff3
 <%- end -%>
 

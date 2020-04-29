@@ -20,6 +20,7 @@ use crate::topology::builder::Pieces;
 use crate::buffers;
 use crate::runtime;
 use crate::shutdown::SourceShutdownCoordinator;
+use futures::compat::Future01CompatExt;
 use futures01::{
     future,
     sync::{mpsc, oneshot},
@@ -237,7 +238,10 @@ impl RunningTopology {
 
         info!("Running healthchecks.");
         if require_healthy {
-            let success = rt.block_on(healthchecks);
+            let jh = rt.spawn_handle(healthchecks.compat());
+            let success = rt
+                .block_on_std(jh)
+                .expect("Task panicked or runtime shutdown unexpectedly");
 
             if success.is_ok() {
                 info!("All healthchecks passed.");
@@ -261,7 +265,13 @@ impl RunningTopology {
         let mut source_shutdown_complete_futures = Vec::new();
         // TODO: Once all Sources properly look for the ShutdownSignal, up this time limit to something
         // more like 30-60 seconds.
-        info!("Waiting for up to 3 seconds for sources to finish shutting down");
+
+        // Only log that we are waiting for shutdown if we are actually removing
+        // sources.
+        if !sources_to_remove.is_empty() {
+            info!("Waiting for up to 3 seconds for sources to finish shutting down");
+        }
+
         let deadline = Instant::now() + Duration::from_secs(3);
         for name in &sources_to_remove {
             info!("Removing source {:?}", name);
@@ -281,7 +291,12 @@ impl RunningTopology {
         }
 
         // Wait for the shutdowns to complete
-        info!("Waiting for up to 3 seconds for sources to finish shutting down");
+
+        // Only log message if there are actual futures to check.
+        if !source_shutdown_complete_futures.is_empty() {
+            info!("Waiting for up to 3 seconds for sources to finish shutting down");
+        }
+
         rt.block_on(future::join_all(source_shutdown_complete_futures))
             .unwrap();
 

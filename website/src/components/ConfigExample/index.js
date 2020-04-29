@@ -10,7 +10,7 @@ import _ from 'lodash';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 function Command({format, path, source, sink}) {
-  let command = `echo '\n${source.config_examples.toml}\n\n${sink.config_examples.toml}\n' > ${path}`;
+  let command = `cat <<-VECTORCFG > ${path}\n${source.config_examples.toml}\n\n${sink.config_examples.toml}\nVECTORCFG`;
 
   return (
     <>
@@ -86,7 +86,7 @@ function ConfigExample({compatiableSinks, format, path, sourceName, sinkName}) {
       </>
     );
   } else {
-
+    throw Error('ConfigExample must specify a source or a sink');
   }
 }
 

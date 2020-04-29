@@ -86,6 +86,14 @@ mod test {
                 "os.date('!*t', 1584297428)",
                 Value::Timestamp(Utc.ymd(2020, 3, 15).and_hms(18, 37, 8)),
             ),
+            (
+                "{year=2020, month=3, day=15, hour=18, min=37, sec=8}",
+                Value::Timestamp(Utc.ymd(2020, 3, 15).and_hms(18, 37, 8)),
+            ),
+            (
+                "{year=2020, month=3, day=15, hour=18, min=37, sec=8, nanosec=666666666}",
+                Value::Timestamp(Utc.ymd(2020, 3, 15).and_hms_nano(18, 37, 8, 666666666)),
+            ),
         ];
 
         Lua::new().context(move |ctx| {
@@ -167,12 +175,14 @@ mod test {
                 "#,
             ),
             (
-                Value::Timestamp(Utc.ymd(2020, 3, 15).and_hms(18, 37, 8)),
+                Value::Timestamp(Utc.ymd(2020, 3, 15).and_hms_nano(18, 37, 8, 666666666)),
                 r#"
                 function (value)
                     local expected = os.date("!*t", 1584297428)
+                    expected.nanosec = 666666666
 
                     return os.time(value) == os.time(expected) and
+                        value.nanosec == expected.nanosec and
                         value.yday == expected.yday and
                         value.wday == expected.wday and
                         value.isdst == expected.isdst

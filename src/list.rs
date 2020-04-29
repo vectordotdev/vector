@@ -6,9 +6,7 @@ use structopt::StructOpt;
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
     /// Format the list in an encoding scheme.
-    ///
-    /// Options: `text`, `json`
-    #[structopt(long, default_value = "text")]
+    #[structopt(long, default_value = "text", possible_values = &["text", "json"])]
     format: Format,
 }
 

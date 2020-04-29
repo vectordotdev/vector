@@ -132,7 +132,7 @@ accessible by the downstream service doing the scraping.
 ### Field Notation Syntax
 
 The <%= option_names(component.field_path_notation_options).to_sentence %> options
-support [Vector's field notiation syntax][docs.reference.field-path-notation],
+support [Vector's field notation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
 ```toml title="vector.toml"
@@ -148,7 +148,7 @@ enabling access to root-level, nested, and array field values. For example:
 You can learn more about Vector's field notation in the
 [field notation reference][docs.reference.field-path-notation].
 <%- end -%>
-<%- if component.sink? && component.service_provider?("Google") -%>
+<%- if component.sink? && component.service_provider?("GCP") -%>
 
 ### GCP Authentication
 
@@ -157,8 +157,11 @@ Vector is concerned with the [server to server methods][urls.gcp_authentication_
 and will find credentials in the following order:
 
 1. If the `credentials_path` option is set.
-2. If the `api_key` option is set.
-3. Finally, if the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
+<%- if component.options.respond_to?("api_key") -%>
+1. If the `api_key` option is set.
+<%- end -%>
+1. If the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
+1. Finally, Vector will check for an [instance service account][urls.gcp_authentication_service_account].
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an
 error will be [logged][docs.monitoring#logs].
@@ -290,9 +293,53 @@ You can learn more about the complete syntax in the
 [templating reference][docs.reference.templating].
 <%- end -%>
 <%- if component.options.key?("tls") -%>
+
 ### TLS
 
 Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
 and reliable security. You can enable and adjust TLS behavior via the `tls.*`
 options.
+<%- end -%>
+<%- if component.options.key?("types") -%>
+
+### Value Coercion
+
+Values can be coerced upon extraction via the `types.*` options. This functions
+exactly like the [`coercer` transform][docs.transforms.coercer] except that its
+coupled within this transform for convenience.
+
+#### Timestamps
+
+You can coerce values into timestamps via the `timestamp` type:
+
+```toml title="vector.toml"
+# ...
+types.first_timestamp = "timestamp" # best effort parsing
+types.second_timestamp = "timestamp|%Y-%m-%dT%H:%M:%S%z" # ISO8601
+# ...
+```
+
+As noted above, if you do not specify a specific `strftime` format, Vector
+will make a best effort attempt to parse the timestamp against the following
+common formats:
+
+| Format               | Description                                  |
+|:---------------------|:---------------------------------------------|
+| **Without Timezone** |                                              |
+| `%F %T`              | YYYY-MM-DD HH:MM:SS                          |
+| `%v %T`              | DD-Mmm-YYYY HH:MM:SS                         |
+| `FT%T`               | ISO 8601 / RFC 3339 without TZ               |
+| `m/%d/%Y:%T`         | US common date format                        |
+| `a, %d %b %Y %T`     | RFC 822/2822 without TZ                      |
+| `a %d %b %T %Y`      | `date` command output without TZ             |
+| `A %d %B %T %Y`      | `date` command output without TZ, long names |
+| `a %b %e %T %Y`      | ctime format                                 |
+| **With Timezone**    |                                              |
+| `%+`                 | ISO 8601 / RFC 3339                          |
+| `%a %d %b %T %Z %Y`  | `date` command output                        |
+| `%a %d %b %T %z %Y`  | `date` command output, numeric TZ            |
+| `%a %d %b %T %#z %Y` | `date` command output, numeric TZ            |
+| **UTC Formats**      |                                              |
+| `%s`                 | UNIX timestamp                               |
+| `%FT%TZ`             | ISO 8601 / RFC 3339 UTC                      |
 <%- end -%>

@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-22"
 component_title: "Merge"
-description: "The Vector [`merge`](#merge) transform accepts and outputs `log` events allowing you to merge partial log events into a single event."
+description: "The Vector [`merge`](#merge) transform accepts and outputs `log` events, allowing you to merge partial log events into a single event."
 event_types: ["log"]
 function_category: "aggregate"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+merge%22
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector [`merge`](#merge) transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to merge
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to merge
 partial log events into a single event.
 
 <!--
@@ -39,7 +39,7 @@ partial log events into a single event.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "merge" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   merge_fields = ["message"] # optional, default
   partial_event_marker_field = "_partial" # optional, default
   stream_discriminant_fields = [] # optional, default
@@ -51,7 +51,7 @@ partial log events into a single event.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "merge" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   merge_fields = ["message"] # optional, default
   partial_event_marker_field = "_partial" # optional, default
   stream_discriminant_fields = [] # optional, default
@@ -285,7 +285,7 @@ You can learn more in the
 ### Field Notation Syntax
 
 The [`merge_fields`](#merge_fields), [`partial_event_marker_field`](#partial_event_marker_field), and [`stream_discriminant_fields`](#stream_discriminant_fields) options
-support [Vector's field notiation syntax][docs.reference.field-path-notation],
+support [Vector's field notation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
 ```toml title="vector.toml"
@@ -317,4 +317,4 @@ If you're using this transform for a common use case, please consider
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [docs.sources.file]: /docs/reference/sources/file/
 [urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

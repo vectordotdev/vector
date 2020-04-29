@@ -300,17 +300,14 @@ mod integration_tests {
 
         let table = gen_table();
         let host = String::from("http://localhost:8123");
+        let mut encoding = EncodingConfigWithDefault::default();
+        encoding.timestamp_format = Some(TimestampFormat::Unix);
 
         let config = ClickhouseConfig {
             host: host.clone(),
             table: table.clone(),
             compression: Some(Compression::None),
-            encoding: EncodingConfigWithDefault {
-                timestamp_format: Some(TimestampFormat::Unix),
-                codec: Encoding::Default,
-                except_fields: None,
-                only_fields: None,
-            },
+            encoding,
             batch: BatchBytesConfig {
                 max_size: Some(1),
                 timeout_secs: None,

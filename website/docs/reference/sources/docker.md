@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "best_effort"
 component_title: "Docker"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
@@ -34,7 +34,7 @@ daemon][urls.docker_daemon] and outputs [`log`][docs.data-model.log] events.
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * Docker API `>= 1.24` is required.
 * In order for the Docker API to work properly, the [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this component to work. See the ["Docker Logging Drivers" section][docs.sources.docker#docker-logging-drivers] for more info.
@@ -477,7 +477,7 @@ The UTC timestamp extracted from the Docker log event.
 
 Vector will automatically attempt to connect to the docker daemon for you. If
 the user that Vector is running under can run `docker ps` then Vector will be
-able to connect. Vector will also respect if `DOCKER_HOST` and
+able to connect. Vector will also respect if [`DOCKER_HOST`](#docker_host) and
 `DOCKER_VERIFY_TLS` are set (as well as other Docker environment variables).
 See the [Docker daemon docs][urls.docker_daemon_socket_option].
 

@@ -3,7 +3,7 @@ title = "Papertrail"
 noun = "Papertrail"
 beta = true
 common = false
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 description = """\
 [Papertrail][urls.papertrail] is a web-based log aggregation application used \
 by developers and IT team to search and view logs in real time.\

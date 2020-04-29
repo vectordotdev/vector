@@ -10,6 +10,7 @@ pub fn timestamp_to_table<'a>(ctx: LuaContext<'a>, ts: DateTime<Utc>) -> LuaResu
     table.set("hour", ts.hour())?;
     table.set("min", ts.minute())?;
     table.set("sec", ts.second())?;
+    table.set("nanosec", ts.nanosecond())?;
     table.set("yday", ts.ordinal())?;
     table.set("wday", ts.weekday().number_from_sunday())?;
     table.set("isdst", false)?;
@@ -18,9 +19,7 @@ pub fn timestamp_to_table<'a>(ctx: LuaContext<'a>, ts: DateTime<Utc>) -> LuaResu
 }
 
 pub fn table_is_timestamp<'a>(t: &LuaTable<'a>) -> LuaResult<bool> {
-    for &key in &[
-        "year", "month", "day", "hour", "min", "sec", "wday", "yday", "isdst",
-    ] {
+    for &key in &["year", "month", "day", "hour", "min", "sec"] {
         if !t.contains_key(key)? {
             return Ok(false);
         }
@@ -35,7 +34,8 @@ pub fn table_to_timestamp<'a>(t: LuaTable<'a>) -> LuaResult<DateTime<Utc>> {
     let hour = t.get("hour")?;
     let min = t.get("min")?;
     let sec = t.get("sec")?;
-    Ok(Utc.ymd(year, month, day).and_hms(hour, min, sec))
+    let nano = t.get::<_, Option<u32>>("nanosec")?.unwrap_or(0);
+    Ok(Utc.ymd(year, month, day).and_hms_nano(hour, min, sec, nano))
 }
 
 pub fn table_to_map<'a, K, V>(t: LuaTable<'a>) -> LuaResult<BTreeMap<K, V>>

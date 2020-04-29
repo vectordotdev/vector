@@ -6,18 +6,16 @@ and it should be rare that you have to call these directly.
 
 ## Setup
 
-Make sure you have Ruby installed. A simple way to install this is:
+### Using Docker
+
+All make targets run through Docker by default.
+
+### Without Docker
+
+If you do not wish to use Docker then you'll need to intsall Ruby 2.7 locally.
+Then, when running `make` commands you can disable Docker with with
+`USE_CONTAINER` environment variable:
 
 ```bash
-brew install rbenv
-rbenv install 2.6.3
-rbenv global 2.6.3
+USE_CONTAINER=none make generate
 ```
-
-We also need bundler
-
-```bash
-gem install bundler
-```
-
-These are currently the only requirements.

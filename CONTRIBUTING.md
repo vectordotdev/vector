@@ -9,14 +9,13 @@ expanding into more specifics.
 
 1. [Assumptions](#assumptions)
 1. [Your First Contribution](#your-first-contribution)
-1. [Workflow](#workflow)
+1. [Change Control](#change-control)
    1. [Git Branches](#git-branches)
    1. [Git Commits](#git-commits)
       1. [Style](#style)
       1. [Signing-off](#signing-off)
    1. [Github Pull Requests](#github-pull-requests)
       1. [Title](#title)
-      1. [Single Concern](#single-concern)
       1. [Reviews & Approvals](#reviews--approvals)
       1. [Merge Style](#merge-style)
    1. [CI](#ci)
@@ -27,15 +26,20 @@ expanding into more specifics.
       1. [Makefile](#makefile)
       1. [Code Style](#code-style)
       1. [Feature flags](#feature-flags)
-      1. [Documentation](#documentation)
-      1. [Changelog](#changelog)
-   1. [Dependencies](#dependencies)
+      1. [Dependencies](#dependencies)
    1. [Guidelines](#guidelines)
       1. [Sink Healthchecks](#sink-healthchecks)
    1. [Testing](#testing)
       1. [Sample Logs](#sample-logs)
       1. [Tips and Tricks](#tips-and-tricks)
    1. [Benchmarking](#benchmarking)
+   1. [Profiling](#profiling)
+1. [Humans](#humans)
+   1. [Documentation](#documentation)
+   1. [Changelog](#changelog)
+   1. [Highlights](#highlights)
+      1. [What makes a highlight noteworthy?](#what-makes-a-highlight-noteworthy)
+      1. [How is a highlight different from a blog post?](#how-is-a-highlight-different-from-a-blog-post)
 1. [Security](#security)
 1. [Legal](#legal)
    1. [DCO](#dco)
@@ -68,9 +72,11 @@ expanding into more specifics.
 4. Review the Vector [workflow](#workflow) and [development](#development).
 5. Make your changes.
 6. [Submit the branch as a pull request][urls.submit_pr] to the main Vector
-   repo.
+   repo. A Vector team member should comment and/or review your pull request
+   with a few days. Although, depending on the circumstances, it may take
+   longer.
 
-## Workflow
+## Change Control
 
 ### Git Branches
 
@@ -134,16 +140,6 @@ chore: improve build process
 docs: fix typos
 ```
 
-#### Single Concern
-
-We generally discourage large pull requests that are over 300-500 lines of diff.
-This is usually a sign that the pull request is addressing multiple concerns.
-If you would like to propose a larger change we suggest coming onto our
-[chat channel](https://chat.vector.dev) and discuss it with one of our
-engineers. This way we can talk through the solution and discuss if a change
-that large is even needed! This overall will produce a quicker response to the
-change and likely produce code that aligns better with our process.
-
 #### Reviews & Approvals
 
 All pull requests must be reviewed and approved by at least one Vector team
@@ -180,16 +176,14 @@ updated versions of Vector through various channels.
    ```
 
 2. [Install Docker](https://docs.docker.com/install/). Docker
-   containers are used for mocking Vector's integrations.
-
-3. [Install Ruby](https://www.ruby-lang.org/en/downloads/) and
-   [Bundler 2](https://bundler.io/v2.0/guides/bundler_2_upgrade.html).
-   They are used to build Vector's documentation.
+   containers are used for mocking Vector's integrations and executing Vector's
+   `make` targets.
 
 ### The Basics
 
 #### Directory Structure
 
+* [`/.meta`](/.meta) - Project metadata used to generate documentation.
 * [`/benches`](/benches) - Internal benchmarks.
 * [`/config`](/config) - Public facing Vector config, included in releases.
 * [`/distribution`](/distribution) - Distribution artifacts for various targets.
@@ -240,26 +234,7 @@ cargo test --lib --no-default-features --features sinks-console sinks::console
 In case if the tests are already built and only the component file changed, it
 is around 4 times faster than rebuilding tests with all features.
 
-#### Documentation
-
-Documentation is extremely important to the Vector project. Ideally, all
-contributions that will change or add behavior to Vector should include the
-relevant updates to the documentation website.
-
-The project attempts to make documentation updates as easy as possible, reducing
-most of it down to a few small changes which are outlined in
-[DOCUMENTING.md](/DOCUMENTING.md).
-
-Regardless of whether your changes require documentation updates you should
-always run `make generate` before attempting to merge your commits.
-
-#### Changelog
-
-Developers do not need to maintain the [`Changelog`](/CHANGELOG.md). This is
-automatically generated via the `make release` command. This is made possible
-by the use of [conventional commit](#what-is-conventional-commits) titles.
-
-### Dependencies
+#### Dependencies
 
 Dependencies should be _carefully_ selected and avoided if possible. You can
 see how dependencies are reviewed in the
@@ -380,6 +355,144 @@ run benchmarks via the `make benchmarks` command. In addition, Vector
 maintains a full [test hardness][urls.vector_test_harness] for complex
 end-to-end integration and performance testing.
 
+### Profiling
+
+If you're trying to improve Vector's performance (or understand why your change
+made it worse), profiling is a useful tool for seeing where time is being spent.
+
+While there are a bunch of useful profiling tools, a simple place to get started
+is with Linux's `perf`. Before getting started, you'll likely need to give
+yourself access to collect stats:
+
+```sh
+echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid
+```
+
+You'll also want to edit `Cargo.toml` and make sure that Vector is being built
+with debug symbols in release mode. This ensures that you'll get human-readable
+info in the eventual output:
+
+```toml
+[profile.release]
+debug = true
+```
+
+Then you can start up a release build of Vector with whatever config you're
+interested in profiling.
+
+```sh
+cargo run --release -- --config my_test_config.toml
+```
+
+Once it's started, use the `ps` tool (or equivalent) to make a note of its PID.
+We'll use this to tell `perf` which process we would like it to collect data
+about.
+
+The next step is somewhat dependent on the config you're testing. For this
+example, let's assume you're using a simple TCP-mode socket source listening on
+port 9000. Let's also assume that you have a large file of example input in
+`access.log` (you can use a tool like `flog` to generate this).
+
+With all that prepared, we can send our test input to Vector and collect data
+while it is under load:
+
+```sh
+perf record -F99 --call-graph dwarf -p $VECTOR_PID socat -dd OPEN:access.log TCP:localhost:9000
+```
+
+This instructs `perf` to collect data from our already-running Vector process
+for the duration of the `socat` command. The `-F` argument is the frequency at
+which `perf` should sample the Vector call stack. Higher frequencies will
+collect more data and produce more detailed output, but can produce enormous
+amounts of data that take a very long time to process. Using `-F99` works well
+when your input data is large enough to take a minute or more to process, but
+feel free to adjust both input size and sampling frequency for your setup.
+
+It's worth noting that this is not the normal way to profile programs with
+`perf`. Usually you would simply run something like `perf record my_program` and
+not have to worry about PIDs and such. We differ from this because we're only
+interested in data about what Vector is doing while under load. Running it
+directly under `perf` would collect data for the entire lifetime of the process,
+including startup, shutdown, and idle time. By telling `perf` to collect data
+only while the load generation command is running we get a more focused dataset
+and don't have to worry about timing different commands in quick succession.
+
+You'll now find a `perf.data` file in your current directory with all of the
+information that was collected. There are different ways to process this, but
+one of the most useful is to create
+a [flamegraph](http://www.brendangregg.com/flamegraphs.html). For this we can
+use the `inferno` tool (available via `cargo install`):
+
+```sh
+perf script | inferno-collapse-perf > stacks.folded
+cat stacks.folded | inferno-flamegraph > flamegraph.svg
+```
+
+And that's it! You now have a flamegraph SVG file that can be opened and
+navigated in your favorite web browser.
+
+## Humans
+
+After making your change, you'll want to prepare it for Vector's users
+(mostly humans). This usually entails updating documentation and announcing
+your feature.
+
+### Documentation
+
+Documentation is very important to the Vector project. All contributions that
+alter user-facing behvior MUST include documentation changes. Please see
+[DOCUMENTING.md](/DOCUMENTING.md) for more info.
+
+### Changelog
+
+Developers do not need to maintain the [`Changelog`](/CHANGELOG.md). This is
+automatically generated via the `make release` command. This is made possible
+by the use of [conventional commit](#title) titles.
+
+### Highlights
+
+If your change is noteworthy it should be represented as a
+[highlight](/websites/highlights). Highlights are short announcements that make
+your change known to users. They are similar to
+[AWS' announcements][urls.aws_announcements]. The purpose is three-fold:
+
+1. First, like documentation, communicating features to users is very important.
+   This is usually done in the form of release notes and blog posts. This,
+   unfortunately, means releasing Vector requires a considerable amount of
+   effort. Preparing quality release notes at the 11th hour often results in
+   missed opportuniteis and low quality communication. Front loading this work
+   ensures that we announce the feature while it is fresh in our minds,
+   spreads the workload across the team over time, and promotes quality.
+
+2. Second, providing regular updates to Vector users helps to cultivate a
+   community. Highlights serve as a trigger for this communication. This could
+   be automated or manual. Either way, highlights pose the question in an
+   explicit manner.
+
+3. Finally, some Vector users live on the bleeding edge of Vector changes. They
+   [push it to the limit][urls.push_it_to_the_limit] and appreciate real-time
+   updates. This benefits Vector in that we can get users on a new feature,
+   testing the feature before it is released.
+
+#### What makes a highlight noteworthy?
+
+It should offer meaningful value to users. This is inherently subjective and
+it is impossible to define exact rules for this distinction. But we should be
+cautious not to dillute the meaning of a highlight by producing low values
+highlights.
+
+#### How is a highlight different from a blog post?
+
+Highlights are not blog posts. They are short one, maybe two, paragraph
+announcements. Highlights should allude to, or link to, a blog post if
+relevant.
+
+For example, [this performance increase announcement][urls.performance_highlight]
+is noteworthy, but also deserves an in-depth blog post covering the work that
+resulted in the performance benefit. Notice that the highlight alludes to an
+upcoming blog post. This allows us to communicate a high-value performance
+improvment without being blocked by an in-depth blog post.
+
 ## Security
 
 Please see the [`SECURITY.md` file](/SECURITY.md).
@@ -444,10 +557,13 @@ If you prefer to do this manually:
 https://stackoverflow.com/questions/13043357/git-sign-off-previous-commits
 
 
+[urls.aws_announcements]: https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&wn-featured-announcements.sort-by=item.additionalFields.numericSort&wn-featured-announcements.sort-order=asc
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
 [urls.existing_issues]: https://github.com/timberio/vector/issues
 [urls.fork_repo]: https://help.github.com/en/github/getting-started-with-github/fork-a-repo
 [urls.github_sign_commits]: https://help.github.com/en/github/authenticating-to-github/signing-commits
 [urls.new_issue]: https://github.com/timberio/vector/issues/new
+[urls.push_it_to_the_limit]: https://www.youtube.com/watch?v=ueRzA9GUj9c
+[urls.performance_highlight]: https://vector.dev/highlights/2020-04-11-overall-performance-increase
 [urls.submit_pr]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/

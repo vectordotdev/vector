@@ -3,7 +3,7 @@ title = "Loki"
 noun = "Loki"
 beta = true
 common = true
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 description = """\
 [Loki][urls.loki] is a horizontally-scalable, highly-available, multi-tenant \
 log aggregation system inspired by [Prometheus][urls.prometheus]. It is \
@@ -77,7 +77,6 @@ You can read more about tenant id's [here][urls.loki_multi_tenancy]\
 [sinks.loki.options.labels]
 type = "table"
 required = true
-examples = [{label = "value"}]
 description = """\
 A set of labels that will be attached to each batch of events. These values \
 are also templateable to allow events to provide dynamic label values.\
@@ -87,7 +86,7 @@ performance issues with Loki. To ensure this does not happen one should try \
 to reduce the amount of unique label values.\
 """
 
-[sinks.loki.options.labels.children."`[label-name`"]
+[sinks.loki.options.labels.children."`[label-name]`"]
 type = "string"
 required = true
 templateable = true

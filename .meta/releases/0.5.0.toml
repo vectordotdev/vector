@@ -1,5 +1,6 @@
 [releases."0.5.0"]
-date = 2019-10-09
+date = 2019-10-10
+codename = "Platform Mingling"
 commits = [
 {sha = "89c303748f100c881e6e1cb921e3d64870d89ca3", message = "chore(operations): Update releaser Dockerfile to include Ruby and the necessary gems", author = "Ben Johnson", date = 2019-09-24T12:28:01Z, files_count = 1, insertions_count = 10, deletions_count = 2},
 {sha = "5f251260ede2331a19e20d1319e9484bebd6f890", message = "chore(operations): Add git to musl builder (#923)", author = "Lucio Franco", date = 2019-09-24T14:58:36Z, files_count = 1, insertions_count = 1, deletions_count = 1},

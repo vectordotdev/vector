@@ -5,14 +5,12 @@ use futures01::{future, Future, Stream};
 use std::{
     cmp::max,
     fs::File,
-    net::SocketAddr,
     path::{Path, PathBuf},
 };
 use structopt::{clap::AppSettings, StructOpt};
 #[cfg(unix)]
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
-use tracing_futures::Instrument;
 use vector::{config_paths, event, generate, list, metrics, runtime, topology, trace, unit_test};
 
 #[derive(StructOpt, Debug)]
@@ -42,10 +40,6 @@ struct RootOpts {
     #[structopt(short, long)]
     dry_run: bool,
 
-    /// Serve internal metrics from the given address
-    #[structopt(short, long)]
-    metrics_addr: Option<SocketAddr>,
-
     /// Number of threads to use for processing (default is number of available cores)
     #[structopt(short, long)]
     threads: Option<usize>,
@@ -58,21 +52,19 @@ struct RootOpts {
     #[structopt(short, long, parse(from_occurrences))]
     quiet: u8,
 
-    /// Set the logging format. Options are "text" or "json". Defaults to "text".
-    #[structopt(long)]
-    log_format: Option<LogFormat>,
+    /// Set the logging format
+    #[structopt(long, default_value = "text", possible_values = &["text", "json"])]
+    log_format: LogFormat,
 
     /// Control when ANSI terminal formatting is used.
     ///
     /// By default `vector` will try and detect if `stdout` is a terminal, if it is
     /// ANSI will be enabled. Otherwise it will be disabled. By providing this flag with
     /// the `--color always` option will always enable ANSI terminal formatting. `--color never`
-    /// will disable all ANSI terminal formatting. `--color auto`, the default option, will attempt
+    /// will disable all ANSI terminal formatting. `--color auto` will attempt
     /// to detect it automatically.
-    ///
-    /// Options: `auto`, `always` or `never`
-    #[structopt(long)]
-    color: Option<Color>,
+    #[structopt(long, default_value = "auto", possible_values = &["auto", "always", "never"])]
+    color: Color,
 
     /// Watch for changes in configuration file, and reload accordingly.
     #[structopt(short, long)]
@@ -195,7 +187,7 @@ fn main() {
         },
     };
 
-    let color = match opts.color.clone().unwrap_or(Color::Auto) {
+    let color = match opts.color.clone() {
         #[cfg(unix)]
         Color::Auto => atty::is(atty::Stream::Stdout),
         #[cfg(windows)]
@@ -204,19 +196,14 @@ fn main() {
         Color::Never => false,
     };
 
-    let (metrics_controller, metrics_sink) = metrics::build();
-
-    let json = match &opts.log_format.unwrap_or(LogFormat::Text) {
+    let json = match &opts.log_format {
         LogFormat::Text => false,
         LogFormat::Json => true,
     };
 
-    trace::init(
-        color,
-        json,
-        levels.as_str(),
-        opts.metrics_addr.map(|_| metrics_sink),
-    );
+    trace::init(color, json, levels.as_str());
+
+    metrics::init().expect("metrics initialization failed");
 
     sub_command.map(|s| {
         std::process::exit(match s {
@@ -241,6 +228,9 @@ fn main() {
     });
     config_paths.sort();
     config_paths.dedup();
+    config_paths::CONFIG_PATHS
+        .set(config_paths.clone())
+        .expect("Cannot set global config paths");
 
     if opts.watch_config {
         // Start listening for config changes immediately.
@@ -272,20 +262,6 @@ fn main() {
         let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
         runtime::Runtime::with_thread_count(threads).expect("Unable to create async runtime")
     };
-
-    let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
-
-    if let Some(metrics_addr) = opts.metrics_addr {
-        debug!("Starting metrics server");
-
-        rt.spawn(
-            metrics::serve(&metrics_addr, metrics_controller)
-                .instrument(info_span!("metrics", addr = ?metrics_addr))
-                .select(metrics_tripwire)
-                .map(|_| ())
-                .map_err(|_| ()),
-        );
-    }
 
     info!(
         message = "Vector is starting.",
@@ -372,7 +348,6 @@ fn main() {
 
             info!("Shutting down.");
             let shutdown = topology.stop();
-            metrics_trigger.cancel();
 
             match rt.block_on(shutdown.select2(signals.into_future())) {
                 Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
@@ -408,7 +383,6 @@ fn main() {
 
         info!("Shutting down.");
         let shutdown = topology.stop();
-        metrics_trigger.cancel();
 
         match rt.block_on(shutdown.select2(ctrl_c)) {
             Ok(Either::A(_)) => { /* Graceful shutdown finished */ }

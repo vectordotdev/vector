@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-20"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
@@ -70,7 +70,7 @@ The following steps should be used to compile Vector directly on Linux based sys
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.2)', value: 'latest'},
+        { label: 'Latest (0.9.0)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -78,7 +78,7 @@ The following steps should be used to compile Vector directly on Linux based sys
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.8 | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.9 | \
       tar xzf - -C vector --strip-components=1
     ```
 
@@ -158,7 +158,7 @@ operating systems.
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.2)', value: 'latest'},
+        { label: 'Latest (0.9.0)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -166,7 +166,7 @@ operating systems.
 
     ```bat
     git clone https://github.com/timberio/vector
-    git checkout v0.8.2
+    git checkout v0.9.0
     cd vector
     ```
 
@@ -217,7 +217,7 @@ Building steps:
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.2)', value: 'latest'},
+        { label: 'Latest (0.9.0)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -225,7 +225,7 @@ Building steps:
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.8.X | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.9.X | \
       tar xzf - -C vector --strip-components=1
     ```
 
@@ -384,7 +384,7 @@ features, it is possible to use specific features from the list below:
 | `vendored`      | Forces vendoring of [OpenSSL][urls.openssl] and [ZLib][urls.zlib] dependencies instead of using their versions installed in the system. Requires `perl` as a build dependency.                                                 | <i className="feather icon-check"></i> |
 | `leveldb-plain` | Enables support for [disk buffers][docs.glossary#buffer] using vendored [LevelDB][urls.leveldb].                                                                                                                               | <i className="feather icon-check"></i> |
 | `leveldb-cmake` | The same as `leveldb-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `leveldb-plain`.                                                                          |                                        |
-| `rdkafka-plain` | Enables vendored [librdkafka][urls.lib_rdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka].                                                                 | <i className="feather icon-check"></i> |
+| `rdkafka-plain` | Enables vendored [librdkafka][urls.librdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka].                                                                 | <i className="feather icon-check"></i> |
 | `rdkafka-cmake` | The same as `rdkafka-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `rdkafka-plain`.                                                                          |                                        |
 
 In addition, it is possible to pick only a subset of Vector's components for
@@ -398,6 +398,7 @@ features one has to pass a comma-separated list of component features.
 |:------|:------------|
 | `sources-docker` | Enables building of [`docker` source][docs.sources.docker].  Requires `unix` feature to be also enabled for support of Unix domain sockets.  |
 | `sources-file` | Enables building of [`file` source][docs.sources.file].  |
+| `sources-generator` | Enables building of [`generator` source][docs.sources.generator].  |
 | `sources-http` | Enables building of [`http` source][docs.sources.http].  |
 | `sources-journald` | Enables building of [`journald` source][docs.sources.journald].  |
 | `sources-kafka` | Enables building of [`kafka` source][docs.sources.kafka].  Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled.  |
@@ -420,7 +421,6 @@ features one has to pass a comma-separated list of component features.
 | `transforms-geoip` | Enables building of [`geoip` transform][docs.transforms.geoip].  |
 | `transforms-grok_parser` | Enables building of [`grok_parser` transform][docs.transforms.grok_parser].  |
 | `transforms-json_parser` | Enables building of [`json_parser` transform][docs.transforms.json_parser].  |
-| `transforms-kubernetes_pod_metadata` | Enables building of [`kubernetes_pod_metadata` transform][docs.transforms.kubernetes_pod_metadata].  |
 | `transforms-log_to_metric` | Enables building of [`log_to_metric` transform][docs.transforms.log_to_metric].  |
 | `transforms-logfmt_parser` | Enables building of [`logfmt_parser` transform][docs.transforms.logfmt_parser].  |
 | `transforms-lua` | Enables building of [`lua` transform][docs.transforms.lua].  |
@@ -509,6 +509,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sinks.vector]: /docs/reference/sinks/vector/
 [docs.sources.docker]: /docs/reference/sources/docker/
 [docs.sources.file]: /docs/reference/sources/file/
+[docs.sources.generator]: /docs/reference/sources/generator/
 [docs.sources.http]: /docs/reference/sources/http/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources.kafka]: /docs/reference/sources/kafka/
@@ -531,7 +532,6 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.geoip]: /docs/reference/transforms/geoip/
 [docs.transforms.grok_parser]: /docs/reference/transforms/grok_parser/
 [docs.transforms.json_parser]: /docs/reference/transforms/json_parser/
-[docs.transforms.kubernetes_pod_metadata]: /docs/reference/transforms/kubernetes_pod_metadata/
 [docs.transforms.log_to_metric]: /docs/reference/transforms/log_to_metric/
 [docs.transforms.logfmt_parser]: /docs/reference/transforms/logfmt_parser/
 [docs.transforms.lua]: /docs/reference/transforms/lua/
@@ -547,7 +547,7 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.tokenizer]: /docs/reference/transforms/tokenizer/
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc
 [urls.leveldb]: https://github.com/google/leveldb
-[urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
+[urls.librdkafka]: https://github.com/edenhill/librdkafka
 [urls.openssl]: https://www.openssl.org/
 [urls.perl_windows]: https://www.perl.org/get.html#win32
 [urls.rustup]: https://rustup.rs

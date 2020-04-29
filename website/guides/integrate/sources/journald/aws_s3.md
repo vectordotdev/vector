@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Journald to AWS S3"
 description: "A simple guide to send logs from Journald to AWS S3 in just a few minutes."
@@ -73,27 +73,27 @@ The following diagram demonstrates how it works.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Collect Journald/Systemd logs.
-    <ol>
+    <ul>
       <li>Filter which Systemd units you collect them from.</li>
       <li>Checkpoint your position to ensure data is not lost between restarts.</li>
       <li>Enrich your logs with useful Systemd context.</li>
-    </ol>
+    </ul>
   </li>
   <li>
     Send logs to AWS S3.
-    <ol>
+    <ul>
       <li>Dynamically partition logs across different key prefixes.</li>
       <li>Compress and batch data to reduce storage cost and imrpove throughput.</li>
       <li>Optionally adjust ACL and encryption settings.</li>
       <li>Automatically retry failed requests, with backoff.</li>
       <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
+    </ul>
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 

@@ -13,7 +13,7 @@ to initially to bootstrap itself.\
 type = "table"
 category = "Advanced"
 description = """\
-Advanced options. See [librdkafka documentation][urls.lib_rdkafka_config] for details.
+Advanced options. See [librdkafka documentation][urls.librdkafka_config] for details.
 """
 
 [<%= namespace %>.librdkafka_options.children."`[field-name]`"]

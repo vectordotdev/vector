@@ -219,7 +219,7 @@ class Templates
   def fetch_strategies(strategy_references)
     strategy_references.collect do |reference|
       name = reference.is_a?(Hash) ? reference.name : reference
-      strategy = metadata.installation.strategies.send(name)
+      strategy = metadata.installation.strategies.send(name).clone
       if reference.respond_to?(:source)
         strategy[:source] = reference.source
       end
@@ -275,11 +275,56 @@ class Templates
     render("#{partials_path}/_full_config_spec.toml", binding).strip.gsub(/ *$/, '')
   end
 
+  def highlights(highlights, author: true, colorize: false, group_by: "type", heading_depth: 3, size: nil, tags: true, timeline: true)
+    case group_by
+    when "type"
+      highlights.sort_by!(&:type)
+    when "version"
+      highlights.sort_by!(&:date)
+    else
+      raise ArgumentError.new("Invalid group_by value: #{group_by.inspect}")
+    end
+
+    highlight_maps =
+      highlights.collect do |highlight|
+        {
+          authorGithub: highlight.author_github,
+          dateString: "#{highlight.date}T00:00:00",
+          description: highlight.description,
+          permalink: highlight.permalink,
+          prNumbers: highlight.pr_numbers,
+          release: highlight.release,
+          tags: highlight.tags,
+          title: highlight.title,
+          type: highlight.type
+        }
+      end
+
+    render("#{partials_path}/_highlights.md", binding).strip
+  end
+
   def installation_tutorial(interfaces, strategies, platform: nil, heading_depth: 3, show_deployment_strategy: true)
     render("#{partials_path}/_installation_tutorial.md", binding).strip
   end
 
   def interface_installation_tutorial(interface, sink: nil, source: nil, heading_depth: 3)
+    if !sink && !source
+      raise ArgumentError.new("You must supply at lease a source or sink")
+    end
+
+    # Default to common sources so that the tutorial flows. Otherwise,
+    # the user is not prompted with a Vector configuration example.
+    if source.nil?
+      source =
+        if sink.logs?
+          metadata.sources.file
+        elsif sink.metrics?
+          metadata.sources.statsd
+        else
+          nil
+        end
+    end
+
     render("#{partials_path}/interface_installation_tutorial/_#{interface.name}.md", binding).strip
   end
 
@@ -484,6 +529,18 @@ class Templates
     count != 1 ? "#{count} #{word.pluralize}" : "#{count} #{word}"
   end
 
+  def release_breaking_changes(release, heading_depth: 3)
+    render("#{partials_path}/_release_breaking_changes.md", binding).strip
+  end
+
+  def release_header(release)
+    render("#{partials_path}/_release_header.md", binding).strip
+  end
+
+  def release_highlights(release, heading_depth: 3, tags: true)
+    render("#{partials_path}/_release_highlights.md", binding).strip
+  end
+
   def release_summary(release)
     parts = []
 
@@ -500,6 +557,10 @@ class Templates
     end
 
     parts.join(", ")
+  end
+
+  def release_whats_next(release, heading_depth: 3)
+    render("#{partials_path}/_release_whats_next.md", binding).strip
   end
 
   def render(template_path, template_binding = nil)
@@ -605,11 +666,11 @@ class Templates
   def transform_short_description(transform)
     if transform.input_types == transform.output_types
       strip <<~EOF
-      Accepts and #{outputs_link(transform)} allowing you to #{transform.allow_you_to_description}.
+      Accepts and #{outputs_link(transform)}, allowing you to #{transform.allow_you_to_description}.
       EOF
     else
       strip <<~EOF
-      Accepts #{event_type_links(transform.input_types).to_sentence} events but #{outputs_link(transform)} allowing you to #{transform.allow_you_to_description}.
+      Accepts #{event_type_links(transform.input_types).to_sentence} events, but #{outputs_link(transform)}, allowing you to #{transform.allow_you_to_description}.
       EOF
     end
   end

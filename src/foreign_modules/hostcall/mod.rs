@@ -12,11 +12,13 @@ use std::io::Write;
 use std::os::raw::c_char;
 use std::str::FromStr;
 use tracing::{event, Level};
+use crate::{internal_events, foreign_modules::Role};
 
 #[lucet_hostcall]
 #[no_mangle]
 pub unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> usize {
-    event!(Level::TRACE, "recieved hostcall");
+    let internal_event = internal_events::Hostcall::begin(Role::Transform, "hint_field_length");
+
     let hostcall_context = vmctx.get_embed_ctx_mut::<ForeignModuleContext>();
     let mut heap = vmctx.heap_mut();
     let field_cstr = CStr::from_ptr(heap[key_ptr as usize..].as_mut_ptr() as *mut c_char);
@@ -35,14 +37,16 @@ pub unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> us
             len
         }
     };
-    event!(Level::TRACE, "returning from hostcall");
+
+    internal_event.complete();
     ret
 }
 
 #[lucet_hostcall]
 #[no_mangle]
 pub unsafe fn get(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) -> usize {
-    event!(Level::TRACE, "recieved hostcall");
+    let internal_event = internal_events::Hostcall::begin(Role::Transform, "get");
+
     let hostcall_context = vmctx.get_embed_ctx_mut::<ForeignModuleContext>();
     let mut heap = vmctx.heap_mut();
 
@@ -66,14 +70,14 @@ pub unsafe fn get(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c
         }
     };
 
-    event!(Level::TRACE, "returning from hostcall");
+    internal_event.complete();
     ret
 }
 
 #[lucet_hostcall]
 #[no_mangle]
 pub unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) {
-    event!(Level::TRACE, "recieved hostcall");
+    let internal_event = internal_events::Hostcall::begin(Role::Transform, "insert");
 
     let mut hostcall_context = vmctx.get_embed_ctx_mut::<ForeignModuleContext>();
     let mut heap = vmctx.heap_mut();
@@ -86,13 +90,8 @@ pub unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *cons
     let value_val = serde_json::Value::from_str(value_str).unwrap_or("Broke on value into".into());
 
     let event = hostcall_context.event.as_mut().unwrap();
-    event!(
-        Level::TRACE,
-        "inserting key {:?} with value {:?}",
-        key_str,
-        value_val
-    );
+
     event.as_mut_log().insert(key_str, value_val);
 
-    event!(Level::TRACE, "returning from hostcall");
+    internal_event.complete();
 }

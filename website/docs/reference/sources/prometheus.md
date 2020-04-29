@@ -1,13 +1,12 @@
 ---
-last_modified_on: "2020-04-06"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-04-19"
+delivery_guarantee: "at_least_once"
 component_title: "Prometheus"
 description: "The Vector `prometheus` source ingests data through the Prometheus text exposition format and outputs `metric` events."
 event_types: ["metric"]
 function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+prometheus%22
 operating_systems: ["Linux","MacOS","Windows"]
-posts_path: /blog/tags/source-prometheus
 sidebar_label: "prometheus|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/prometheus
 status: "beta"

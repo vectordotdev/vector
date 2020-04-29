@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-22"
 component_title: "AWS EC2 Metadata"
-description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata."
+description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events, allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
 function_category: "enrich"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+aws_ec2_metadata%22
@@ -18,7 +18,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `aws_ec2_metadata` transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to enrich
 logs with AWS EC2 instance metadata.
 
 <!--
@@ -31,7 +31,7 @@ logs with AWS EC2 instance metadata.
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 
 * [AWS IMDS v2][urls.aws_ec2_instance_metadata] is required. This is available by default on EC2.
@@ -50,7 +50,7 @@ logs with AWS EC2 instance metadata.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "aws_ec2_metadata" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # optional, default
   host = "http://169.254.169.254" # optional, default
   namespace = "" # optional, default
@@ -63,7 +63,7 @@ logs with AWS EC2 instance metadata.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "aws_ec2_metadata" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # optional, default
   host = "http://169.254.169.254" # optional, default
   namespace = "" # optional, default
@@ -498,4 +498,4 @@ You can learn more in the
 [docs.transforms.aws_ec2_metadata#aws-imds-v2]: /docs/reference/transforms/aws_ec2_metadata/#aws-imds-v2
 [urls.aws_ec2_instance_metadata]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
 [urls.aws_imds_v1_security_problems]: https://aws.amazon.com/blogs/security/defense-in-depth-open-firewalls-reverse-proxies-ssrf-vulnerabilities-ec2-instance-metadata-service/
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program
