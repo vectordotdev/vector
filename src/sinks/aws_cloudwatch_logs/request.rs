@@ -1,5 +1,4 @@
 use super::CloudwatchError;
-use chrono::Duration;
 use futures01::{sync::oneshot, try_ready, Async, Future, Poll};
 use rusoto_core::{RusotoError, RusotoFuture};
 use rusoto_logs::{

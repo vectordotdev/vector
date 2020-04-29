@@ -334,6 +334,8 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
             // Sort by timestamp
             events.sort_by_key(|e| e.timestamp);
 
+            info!(message = "Sending events.", events = %events.len());
+
             let mut event_batches = Vec::new();
             if events.is_empty() {
                 event_batches.push(Vec::new());
@@ -371,7 +373,6 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
             let (tx, rx) = oneshot::channel();
             self.token_rx = Some(rx);
 
-            info!(message = "Sending events.", events = %events.len());
             request::CloudwatchFuture::new(
                 self.client.clone(),
                 self.stream_name.clone(),
