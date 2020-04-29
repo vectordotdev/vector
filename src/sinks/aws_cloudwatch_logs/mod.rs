@@ -315,14 +315,10 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
 
     fn call(&mut self, req: Vec<Event>) -> Self::Future {
         if self.token_rx.is_none() {
-            // We need to take into account the flight time from here to aws servers,
-            // so we are reducing timestamp acceptable range from both sides
-            // for this amount.
-            let buffer_time = Duration::minutes(1);
             let now = Utc::now();
             // Acceptable range of Event timestamps.
-            let age_range = (now - Duration::days(14) + buffer_time).timestamp_millis()
-                ..(now + Duration::hours(2) - buffer_time).timestamp_millis();
+            let age_range = (now - Duration::days(14)).timestamp_millis()
+                ..(now + Duration::hours(2)).timestamp_millis();
 
             let mut events = req
                 .into_iter()
