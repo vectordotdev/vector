@@ -23,6 +23,16 @@ cp -av "target/artifacts/." "$td"
 ls $td
 
 #
+# A helper function for verifying a published artifact.
+#
+function verify_artifact() {
+  url=$1
+  filename=$2
+  echo "Verifying $url"
+  cmp <(wget -qO- --retry-on-http-error=404 --wait 10 --tries $VERIFY_RETRIES $url) $filename
+}
+
+#
 # Upload
 #
 
@@ -47,10 +57,17 @@ if [[ "$CHANNEL" == "nightly" ]]; then
     --acl public-read
 
   # Verify that the files exist and can be downloaded
+  echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
   sleep $VERIFY_TIMEOUT
-  cmp <(curl --retry $VERIFY_RETRIES https://packages.timber.io/vector/nightly/$DATE/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
-  cmp <(curl --retry $VERIFY_RETRIES https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
-  cmp <(curl --retry $VERIFY_RETRIES -L https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-gnu.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+  verify_artifact \
+    https://packages.timber.io/vector/nightly/$DATE/vector-x86_64-unknown-linux-musl.tar.gz \
+    $td/vector-x86_64-unknown-linux-musl.tar.gz
+  verify_artifact \
+    https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz \
+    $td/vector-x86_64-unknown-linux-musl.tar.gz
+  verify_artifact \
+    https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-gnu.tar.gz \
+    $td/vector-x86_64-unknown-linux-musl.tar.gz
 elif [[ "$CHANNEL" == "latest" ]]; then
   version_exact=$VERSION
   version_minor_x=$(echo $VERSION | sed 's/\.[0-9]*$/.X/g')
@@ -73,10 +90,15 @@ elif [[ "$CHANNEL" == "latest" ]]; then
 
   # Verify that the files exist and can be downloaded
   sleep $VERIFY_TIMEOUT
+  echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
   for i in $version_exact $version_minor_x $version_major_x latest; do
-    cmp <(curl --retry $VERIFY_RETRIES https://packages.timber.io/vector/$i/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+    verify_artifact \
+      https://packages.timber.io/vector/$i/vector-x86_64-unknown-linux-musl.tar.gz \
+      $td/vector-x86_64-unknown-linux-musl.tar.gz
   done
-  cmp <(curl --retry $VERIFY_RETRIES -L https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-gnu.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+  verify_artifact \
+    https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-gnu.tar.gz --fail \
+    $td/vector-x86_64-unknown-linux-musl.tar.gz
 fi
 
 #
