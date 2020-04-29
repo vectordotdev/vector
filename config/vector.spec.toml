@@ -2863,9 +2863,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -3162,9 +3162,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -3381,9 +3381,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -3704,9 +3704,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -4025,9 +4025,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -4468,9 +4468,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -4747,9 +4747,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -5179,9 +5179,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -5454,9 +5454,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -5757,9 +5757,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -6010,9 +6010,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -6265,9 +6265,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -6528,9 +6528,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -6728,9 +6728,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -7177,9 +7177,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -7446,9 +7446,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -7719,9 +7719,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -8178,9 +8178,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -8598,9 +8598,9 @@ require('custom_module')
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: -1
+    # * default: 18446744073709551615
     # * type: int
-    retry_attempts = -1
+    retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
