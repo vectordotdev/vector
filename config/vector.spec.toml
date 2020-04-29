@@ -1309,6 +1309,15 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-or-transform-id"]
 
+  # By default, fields will be overridden. Set this to `false` to avoid
+  # overwriting values.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  overwrite = true
+  overwrite = false
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -1328,6 +1337,15 @@ dns_servers = ["0.0.0.0:53"]
   # * required
   # * type: [string]
   inputs = ["my-source-or-transform-id"]
+
+  # By default, fields will be overridden. Set this to `false` to avoid
+  # overwriting values.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  overwrite = true
+  overwrite = false
 
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.

@@ -27,7 +27,7 @@ fn add_fields(c: &mut Criterion) {
                 || {
                     let mut map = IndexMap::new();
                     map.insert(key.into(), toml::value::Value::String(value.to_owned()));
-                    transforms::add_fields::AddFields::new(map)
+                    transforms::add_fields::AddFields::new(map, true)
                 },
                 |mut transform| {
                     for _ in 0..num_events {

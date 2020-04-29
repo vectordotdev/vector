@@ -13,10 +13,19 @@ requirements = {}
 [transforms.add_tags.options.tags]
 type = "table"
 common = true
-required = true
+required = false
 description = """\
 A table of key/value pairs representing the tags to be added to the \
 metric.\
+"""
+
+[transforms.add_tags.options.overwrite]
+type = "bool"
+common = true
+required = false
+default = true
+description = """\
+By default, fields will be overridden. Set this to `false` to avoid overwriting values.
 """
 
 [transforms.add_tags.options.tags.children."`[tag-name]`"]

@@ -41,6 +41,7 @@ one or more log fields.
   # General
   type = "add_fields" # required
   inputs = ["my-source-or-transform-id"] # required
+  overwrite = true # optional, default
 
   # Fields
   fields.string_field = "string value" # example
@@ -62,6 +63,7 @@ one or more log fields.
   # General
   type = "add_fields" # required
   inputs = ["my-source-or-transform-id"] # required
+  overwrite = true # optional, default
 
   # Fields
   fields.string_field = "string value" # example
@@ -128,6 +130,31 @@ types][docs.configuration#types]. Use `.` for adding nested fields.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"overwrite"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### overwrite
+
+By default, fields will be overridden. Set this to `false` to avoid overwriting
+values.
+
+
+
 
 </Field>
 </Fields>

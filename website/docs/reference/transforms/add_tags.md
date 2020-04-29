@@ -41,6 +41,7 @@ add one or more metric tags.
   # General
   type = "add_tags" # required
   inputs = ["my-source-or-transform-id"] # required
+  overwrite = true # optional, default
 
   # Tags
   tags.static_tag = "my value" # example
@@ -55,6 +56,7 @@ add one or more metric tags.
   # General
   type = "add_tags" # required
   inputs = ["my-source-or-transform-id"] # required
+  overwrite = true # optional, default
 
   # Tags
   tags.static_tag = "my value" # example
@@ -67,6 +69,31 @@ add one or more metric tags.
 <Fields filters={true}>
 <Field
   common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"overwrite"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### overwrite
+
+By default, fields will be overridden. Set this to `false` to avoid overwriting
+values.
+
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -74,7 +101,7 @@ add one or more metric tags.
   name={"tags"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}
