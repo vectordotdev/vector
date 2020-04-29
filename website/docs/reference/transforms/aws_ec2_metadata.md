@@ -492,6 +492,14 @@ will be replaced before being evaluated.
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
 
+### Guarantees 
+
+The EC2 Metadata transform works on a best effort basis and will only enrich
+events if it currently has valid metadata. This in effect means that if the
+transform is unable to fetch metadata, events will continue to be passed through
+without being enriched. The most common occurance of this will happen at boot
+where the first few events to be passed through the pipeline may not get enriched.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
