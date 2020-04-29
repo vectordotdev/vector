@@ -198,12 +198,7 @@ impl HttpSink for ElasticSearchCommon {
         let mut builder = Request::post(&self.bulk_uri);
 
         if let Some(credentials) = &self.credentials {
-            let mut request = signed_request(
-                "POST",
-                &self.region,
-                &self.bulk_uri,
-                Some(&self.query_params),
-            );
+            let mut request = self.signed_request("POST", &self.bulk_uri, true);
 
             request.add_header("Content-Type", "application/x-ndjson");
 
@@ -371,6 +366,16 @@ impl ElasticSearchCommon {
             query_params,
         })
     }
+
+    fn signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
+        let mut request = SignedRequest::new(method, "es", &self.region, uri.path());
+        if use_params {
+            for (key, value) in &self.query_params {
+                request.add_param(key, value);
+            }
+        }
+        request
+    }
 }
 
 fn healthcheck(
@@ -386,8 +391,7 @@ fn healthcheck(
             }
         }
         Some(credentials) => {
-            let mut signer =
-                signed_request("GET", &common.region, builder.uri_ref().unwrap(), None);
+            let mut signer = common.signed_request("GET", builder.uri_ref().unwrap(), false);
             finish_signer(&mut signer, &credentials, &mut builder);
         }
     }
@@ -402,21 +406,6 @@ fn healthcheck(
                 status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
             }),
     ))
-}
-
-fn signed_request(
-    method: &str,
-    region: &Region,
-    uri: &Uri,
-    params: Option<&HashMap<String, String>>,
-) -> SignedRequest {
-    let mut request = SignedRequest::new(method, "es", &region, uri.path());
-    if let Some(params) = params {
-        for (key, value) in params {
-            request.add_param(key, value);
-        }
-    }
-    request
 }
 
 fn finish_signer(
