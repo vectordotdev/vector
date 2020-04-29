@@ -81,14 +81,14 @@ The algorithm used to control the limit will follow the AIMD framework:
 
 * The current response's RTT is compared to this moving average:
 
-  * If less than or equal to the average, the concurrency will be
-    incremented by one (additive increase) once per RTT, up to a maximum
-    of the in flight limit.
+  * If less than or equal to the average, the concurrency limit will be
+    increased to the current concurrency plus one (additive increase)
+    once per RTT, up to a maximum of the configured in flight limit.
 
-  * If greater than the average, or the result indicated a server
-    failure, the concurrency will be reduced by a factor of one half
-    (multiplicative decrease) once per RTT, down to a minimum of one.
-
+  * If greater than the average, or the result indicated back pressure
+    from the remote server, the concurrency will be reduced by a factor
+    of one half (multiplicative decrease) once per RTT, down to a
+    minimum of one.
 
 ```rust
 impl Service<Request> for ConcurrencyLimit {
@@ -123,19 +123,20 @@ impl Future for ResponseFuture {
                 let rtt = now.duration_since(self.start_time);
                 emit!(RTTMeasurement { rtt: rtt.as_millis() });
 
+                let mut controller = self.controller.lock();
                 if now >= controller.next_update {
-                    let mut controller = self.controller.lock();
                     if rtt > controller.rtt + controller.threshold {
                         // The `+ 1` prevents this from going to zero
-                        controller.concurrency = (controller.concurrency + 1) / 2;
+                        controller.concurrency_limit = (controller.concurrency_limit + 1) / 2;
                     }
-                    else if controller.concurrency < controller.in_flight_limit
+                    else if controller.concurrency_limit < controller.in_flight_limit
                         && rtt <= controller.rtt {
-                        controller.concurrency += 1;
+                        controller.concurrency_limit =
+                            min(controller.current_concurrency, controller.concurrency_limit) + 1;
                     }
-                    controller.next_update = now + controller.average_rtt
+                    controller.next_update = now + controller.measured_rtt.average();
                 }
-                controller.average_rtt.update(rtt);
+                controller.measured_rtt.update(rtt);
 
                 Ready(output)
             }
@@ -168,6 +169,12 @@ conditions:
   / RTT`, peeking over and then briefly dropping down when queries are
   limited. This will keep the delivery rate close to the discovered rate
   limit.
+
+* If the sender experiences a sudden increase in volume of events,
+  Vector will not overload the remote service with concurrent requests.
+  Instead, Vector will use the maximum concurrency previously set, which
+  will be at most one higher than the previously observed limit, and
+  continue to ramp up to the configured maximum from there.
 
 ### Observability
 
