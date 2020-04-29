@@ -3,11 +3,12 @@ use super::util::{SocketListenAddr, TcpSource};
 use crate::sources::util::build_unix_source;
 use crate::{
     event::{self, Event, Value},
+    internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
+    stream::StreamExt,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
-
 use bytes::Bytes;
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
@@ -93,12 +94,13 @@ impl SourceConfig for SyslogConfig {
                 let tls = MaybeTlsSettings::from_config(&tls, true)?;
                 source.run(address, shutdown_secs, tls, shutdown, out)
             }
-            Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
+            Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, shutdown, out)),
             #[cfg(unix)]
             Mode::Unix { path } => Ok(build_unix_source(
                 path,
                 self.max_length,
                 host_key,
+                shutdown,
                 out,
                 event_from_str,
             )),
@@ -143,6 +145,7 @@ pub fn udp(
     addr: SocketAddr,
     _max_length: usize,
     host_key: String,
+    shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
 ) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
@@ -163,6 +166,7 @@ pub fn udp(
             let host_key = host_key.clone();
 
             let lines_in = UdpFramed::new(socket, BytesCodec::new())
+                .take_until(shutdown)
                 .filter_map(move |(bytes, received_from)| {
                     let host_key = host_key.clone();
                     let received_from = received_from.to_string().into();
@@ -171,7 +175,7 @@ pub fn udp(
                         .ok()
                         .and_then(|s| event_from_str(&host_key, Some(received_from), s))
                 })
-                .map_err(|e| error!("error reading line: {:?}", e));
+                .map_err(|error| emit!(SyslogUdpReadError { error }));
 
             lines_in.forward(out).map(|_| info!("finished sending"))
         }),
@@ -198,14 +202,18 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
 fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Option<Event> {
-    trace!(
-        message = "Received line.",
-        bytes = &field::display(line.len())
-    );
+    emit!(SyslogEventReceived {
+        byte_size: line.len()
+    });
 
     let line = line.trim();
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
     let mut event = Event::from(&parsed.msg[..]);
+
+    // Add source type
+    event
+        .as_mut_log()
+        .insert(event::log_schema().source_type_key(), "syslog");
 
     if let Some(host) = &parsed.hostname {
         event.as_mut_log().insert(host_key, host.clone());
@@ -328,6 +336,7 @@ mod test {
                 event::log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
+            expected.insert(event::log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
 
             expected.insert("meta.sequenceId", "1");
@@ -365,6 +374,7 @@ mod test {
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
             expected.insert(event::log_schema().host_key().clone(), "74794bfb6795");
+            expected.insert(event::log_schema().source_type_key().clone(), "syslog");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
             expected.insert("version", 1);
@@ -454,6 +464,7 @@ mod test {
                 chrono::Utc.ymd(2020, 2, 13).and_hms(20, 7, 26),
             );
             expected.insert(event::log_schema().host_key().clone(), "74794bfb6795");
+            expected.insert(event::log_schema().source_type_key().clone(), "syslog");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
             expected.insert("appname", "root");
@@ -481,6 +492,7 @@ mod test {
                 event::log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2020, 2, 13).and_hms(21, 31, 56),
             );
+            expected.insert(event::log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
             expected.insert("severity", "info");
             expected.insert("facility", "local7");
@@ -514,6 +526,7 @@ mod test {
                     .ymd(2019, 2, 13)
                     .and_hms_micro(21, 53, 30, 605_850),
             );
+            expected.insert(event::log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
             expected.insert("severity", "info");
             expected.insert("facility", "local7");

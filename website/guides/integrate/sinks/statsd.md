@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-19"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics to Statsd"
 description: "A simple guide to send metrics to Statsd in just a few minutes."
@@ -70,18 +70,18 @@ The following diagram demonstrates how it works.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Collect your metrics from one or more sources
   </li>
   <li>
     Stream metrics over a StatsD UDP protocol.
-    <ol>
+    <ul>
       <li>Automatically aggregate metrics at the edge for improved performance.</li>
-    </ol>
+    </ul>
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 
@@ -99,7 +99,7 @@ To be clear, here's everything we'll accomplish in this short guide:
 ### Download the Vector `.deb` package
 
 ```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-amd64.deb
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-amd64.deb
 ```
 
 [Looking for a different version?][docs.package_managers.dpkg#versions]
@@ -121,7 +121,7 @@ sudo dpkg -i vector-amd64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={null}
+  sourceName={"statsd"}
   sinkName={"statsd"} />
 
 </li>
@@ -145,7 +145,7 @@ sudo systemctl start vector
 ### Download the Vector `.deb` package
 
 ```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-arm64.deb
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-arm64.deb
 ```
 
 [Looking for a different version?][docs.package_managers.dpkg#versions]
@@ -167,7 +167,7 @@ sudo dpkg -i vector-arm64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={null}
+  sourceName={"statsd"}
   sinkName={"statsd"} />
 
 </li>
@@ -191,7 +191,7 @@ sudo systemctl start vector
 ### Download the Vector `.deb` package
 
 ```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-armhf.deb
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-armhf.deb
 ```
 
 [Looking for a different version?][docs.package_managers.dpkg#versions]
@@ -213,7 +213,7 @@ sudo dpkg -i vector-armhf.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={null}
+  sourceName={"statsd"}
   sinkName={"statsd"} />
 
 </li>

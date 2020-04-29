@@ -103,6 +103,8 @@ module.exports = {
             
               "reference/sources/file",
             
+              "reference/sources/generator",
+            
               "reference/sources/http",
             
               "reference/sources/journald",
@@ -154,8 +156,6 @@ module.exports = {
               "reference/transforms/grok_parser",
             
               "reference/transforms/json_parser",
-            
-              "reference/transforms/kubernetes_pod_metadata",
             
               "reference/transforms/log_to_metric",
             

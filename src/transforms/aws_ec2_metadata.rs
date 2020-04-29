@@ -1,13 +1,14 @@
 use super::Transform;
 use crate::{
     event::Event,
+    sinks::util::http::HttpClient,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
 use futures01::Stream;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
-use hyper::{client::connect::HttpConnector, Body, Client};
+use hyper::Body;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::RandomState, HashSet};
 use std::time::{Duration, Instant};
@@ -111,7 +112,18 @@ impl TransformConfig for Ec2Metadata {
     fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let (read, write) = evmap::new();
 
-        let keys = Keys::new(&self.namespace);
+        // Check if the namespace is set to `""` which should mean that we do
+        // not want a prefixed namespace.
+        let namespace = self.namespace.clone().and_then(|namespace| {
+            if namespace == "" {
+                None
+            } else {
+                Some(namespace)
+            }
+        });
+
+        let keys = Keys::new(&namespace);
+
         let host = self
             .host
             .clone()
@@ -128,9 +140,12 @@ impl TransformConfig for Ec2Metadata {
             .map(|v| v.into_iter().map(Atom::from).collect())
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
+        let http_client = HttpClient::new(cx.resolver(), None)?;
+
         cx.executor().spawn_std(
             async move {
-                let mut client = MetadataClient::new(host, keys, write, refresh_interval, fields);
+                let mut client =
+                    MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
 
                 client.run().await;
             }
@@ -169,7 +184,7 @@ impl Transform for Ec2MetadataTransform {
 }
 
 struct MetadataClient {
-    client: Client<HttpConnector, Body>,
+    client: HttpClient<Body>,
     host: Uri,
     token: Option<(Bytes, Instant)>,
     keys: Keys,
@@ -193,6 +208,7 @@ struct IdentityDocument {
 
 impl MetadataClient {
     pub fn new(
+        client: HttpClient<Body>,
         host: Uri,
         keys: Keys,
         state: WriteHandle,
@@ -200,7 +216,7 @@ impl MetadataClient {
         fields: Vec<Atom>,
     ) -> Self {
         Self {
-            client: Client::new(),
+            client,
             host,
             token: None,
             keys,
@@ -247,7 +263,7 @@ impl MetadataClient {
             .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
             .body(Body::empty())?;
 
-        let res = self.client.request(req).compat().await?;
+        let res = self.client.send(req).await?;
 
         if res.status() != StatusCode::OK {
             return Err(Ec2MetadataError::UnableToFetchToken.into());
@@ -273,7 +289,7 @@ impl MetadataClient {
             .header(TOKEN_HEADER.clone(), token)
             .body(Body::empty())?;
 
-        let res = self.client.request(req).compat().await?;
+        let res = self.client.send(req).await?;
 
         if res.status() != StatusCode::OK {
             warn!(message="Identity document request failed.", status = %res.status());
@@ -305,7 +321,7 @@ impl MetadataClient {
             .header(TOKEN_HEADER.clone(), token)
             .body(Body::empty())?;
 
-        let res = self.client.request(req).compat().await?;
+        let res = self.client.send(req).await?;
 
         if StatusCode::OK != res.status() {
             warn!(message="Metadata request failed.", status = %res.status());
@@ -320,33 +336,6 @@ impl MetadataClient {
     pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
         // Fetch all resources, _then_ add them to the state map.
         let identity_document = self.get_document().await?;
-        let availability_zone = self.get_metadata(&AVAILABILITY_ZONE).await?;
-        let local_hostname = self.get_metadata(&LOCAL_HOSTNAME).await?;
-        let local_ipv4 = self.get_metadata(&LOCAL_IPV4).await?;
-        let public_hostname = self.get_metadata(&PUBLIC_HOSTNAME).await?;
-        let public_ipv4 = self.get_metadata(&PUBLIC_IPV4).await?;
-
-        // Fetch the main mac address and use that to fetch the overall subnet-id and vpc-id.
-        let (subnet_id, vpc_id) = if let Some(mac) = self.get_metadata(&MAC).await? {
-            let mac = String::from_utf8_lossy(&mac[..]);
-
-            let subnet_path = format!(
-                "/latest/meta-data/network/interfaces/macs/{}/subnet-id",
-                mac
-            )
-            .parse()?;
-            let vpc_path =
-                format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac).parse()?;
-
-            let subnet_id = self.get_metadata(&subnet_path).await?;
-            let vpc_id = self.get_metadata(&vpc_path).await?;
-
-            (subnet_id, vpc_id)
-        } else {
-            (None, None)
-        };
-
-        let role_names = self.get_metadata(&ROLE_NAME).await?;
 
         if let Some(document) = identity_document {
             if self.fields.contains(&AMI_ID_KEY) {
@@ -367,56 +356,70 @@ impl MetadataClient {
             }
         }
 
-        if let Some(availability_zone) = availability_zone {
-            if self.fields.contains(&AVAILABILITY_ZONE_KEY) {
+        if self.fields.contains(&AVAILABILITY_ZONE_KEY) {
+            if let Some(availability_zone) = self.get_metadata(&AVAILABILITY_ZONE).await? {
                 self.state
                     .update(self.keys.availability_zone_key.clone(), availability_zone);
             }
         }
 
-        if let Some(local_hostname) = local_hostname {
-            if self.fields.contains(&LOCAL_HOSTNAME_KEY) {
+        if self.fields.contains(&LOCAL_HOSTNAME_KEY) {
+            if let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await? {
                 self.state
                     .update(self.keys.local_hostname_key.clone(), local_hostname);
             }
         }
 
-        if let Some(local_ipv4) = local_ipv4 {
-            if self.fields.contains(&LOCAL_IPV4_KEY) {
+        if self.fields.contains(&LOCAL_IPV4_KEY) {
+            if let Some(local_ipv4) = self.get_metadata(&LOCAL_IPV4).await? {
                 self.state
                     .update(self.keys.local_ipv4_key.clone(), local_ipv4);
             }
         }
 
-        if let Some(public_hostname) = public_hostname {
-            if self.fields.contains(&PUBLIC_HOSTNAME_KEY) {
+        if self.fields.contains(&PUBLIC_HOSTNAME_KEY) {
+            if let Some(public_hostname) = self.get_metadata(&PUBLIC_HOSTNAME).await? {
                 self.state
                     .update(self.keys.public_hostname_key.clone(), public_hostname);
             }
         }
 
-        if let Some(public_ipv4) = public_ipv4 {
-            if self.fields.contains(&PUBLIC_IPV4_KEY) {
+        if self.fields.contains(&PUBLIC_IPV4_KEY) {
+            if let Some(public_ipv4) = self.get_metadata(&PUBLIC_IPV4).await? {
                 self.state
                     .update(self.keys.public_ipv4_key.clone(), public_ipv4);
             }
         }
 
-        if let Some(subnet_id) = subnet_id {
-            if self.fields.contains(&SUBNET_ID_KEY) {
-                self.state
-                    .update(self.keys.subnet_id_key.clone(), subnet_id);
+        if self.fields.contains(&SUBNET_ID_KEY) || self.fields.contains(&VPC_ID_KEY) {
+            if let Some(mac) = self.get_metadata(&MAC).await? {
+                let mac = String::from_utf8_lossy(&mac[..]);
+
+                let subnet_path = format!(
+                    "/latest/meta-data/network/interfaces/macs/{}/subnet-id",
+                    mac
+                )
+                .parse()?;
+                let vpc_path =
+                    format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac).parse()?;
+
+                if self.fields.contains(&SUBNET_ID_KEY) {
+                    if let Some(subnet_id) = self.get_metadata(&subnet_path).await? {
+                        self.state
+                            .update(self.keys.subnet_id_key.clone(), subnet_id);
+                    }
+                }
+
+                if self.fields.contains(&VPC_ID_KEY) {
+                    if let Some(vpc_id) = self.get_metadata(&vpc_path).await? {
+                        self.state.update(self.keys.vpc_id_key.clone(), vpc_id);
+                    }
+                }
             }
         }
 
-        if let Some(vpc_id) = vpc_id {
-            if self.fields.contains(&VPC_ID_KEY) {
-                self.state.update(self.keys.vpc_id_key.clone(), vpc_id);
-            }
-        }
-
-        if let Some(role_names) = role_names {
-            if self.fields.contains(&ROLE_NAME_KEY) {
+        if self.fields.contains(&ROLE_NAME_KEY) {
+            if let Some(role_names) = self.get_metadata(&ROLE_NAME).await? {
                 let role_names = String::from_utf8_lossy(&role_names[..]);
 
                 for (i, role_name) in role_names.lines().enumerate() {
@@ -479,7 +482,7 @@ enum Ec2MetadataError {
 }
 
 #[cfg(test)]
-#[cfg(feature = "ec2-metadata-integration-tests")]
+#[cfg(feature = "aws-ec2-metadata-integration-tests")]
 mod tests {
     use super::*;
     use crate::{event::Event, test_util::runtime};
@@ -597,5 +600,29 @@ mod tests {
             log.get(&"ec2.metadata.public-ipv4".into()),
             Some(&"192.1.1.1".into())
         );
+
+        // Set an empty namespace to ensure we don't prepend one.
+        let config = Ec2Metadata {
+            host: Some(HOST.clone()),
+            namespace: Some("".into()),
+            ..Default::default()
+        };
+        let mut transform = config
+            .build(TransformContext::new_test(rt.executor()))
+            .unwrap();
+
+        // We need to sleep to let the background task fetch the data.
+        std::thread::sleep(std::time::Duration::from_secs(1));
+
+        let event = Event::new_empty_log();
+
+        let event = transform.transform(event).unwrap();
+        let log = event.as_log();
+
+        assert_eq!(
+            log.get(&"availability-zone".into()),
+            Some(&"ww-region-1a".into())
+        );
+        assert_eq!(log.get(&"public-ipv4".into()), Some(&"192.1.1.1".into()));
     }
 }

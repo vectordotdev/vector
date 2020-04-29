@@ -9,9 +9,9 @@
 
 set -eux
 
-CHANNEL=$(scripts/util/release-channel.sh)
-VERSION=$(scripts/version.sh)
-DATE=$(date -u +%Y-%m-%d)
+CHANNEL=${CHANNEL:-$(scripts/util/release-channel.sh)}
+VERSION=${VERSION:-$(scripts/version.sh)}
+DATE=${DATE:-$(date -u +%Y-%m-%d)}
 PUSH=${PUSH:-}
 PLATFORM=${PLATFORM:-}
 

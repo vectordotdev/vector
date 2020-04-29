@@ -10,5 +10,5 @@ miniodat
 sample.log
 target
 node_modules
-test-data/foreign_modules/*/target
+tests/data/foreign_modules/*/target
 cache/

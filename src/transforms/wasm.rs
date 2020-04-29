@@ -97,7 +97,7 @@ mod tests {
             "#,
         )?;
 
-        let input = parse_event_artifact("test-data/foreign_modules/protobuf/demo.json")?;
+        let input = parse_event_artifact("tests/data/foreign_modules/protobuf/demo.json")?;
 
         let mut expected = input.clone();
         expected.as_mut_log().insert(

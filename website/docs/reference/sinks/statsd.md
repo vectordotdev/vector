@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-22"
 delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` sink streams `metric` events to StatsD metrics service."
@@ -42,7 +42,7 @@ The Vector `statsd` sink
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "statsd" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   address = "127.0.0.1:8125" # optional, default
   healthcheck = true # optional, default
   namespace = "service" # required
@@ -54,7 +54,7 @@ The Vector `statsd` sink
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "statsd" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   address = "127.0.0.1:8125" # optional, default
   healthcheck = true # optional, default
   namespace = "service" # required

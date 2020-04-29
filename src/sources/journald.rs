@@ -5,6 +5,11 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use chrono::TimeZone;
+use futures::{
+    compat::Future01CompatExt,
+    executor::block_on,
+    future::{select, Either, FutureExt, TryFutureExt},
+};
 use futures01::{future, sync::mpsc, Future, Sink};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -16,10 +21,9 @@ use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::process::{Child, ChildStdout, Command, Stdio};
-use std::sync::mpsc::{channel, Receiver, RecvTimeoutError};
-use std::thread;
 use std::time;
 use string_cache::DefaultAtom as Atom;
+use tokio::{task::spawn_blocking, time::delay_for};
 use tracing::{dispatcher, field};
 
 const DEFAULT_BATCH_SIZE: usize = 16;
@@ -29,7 +33,8 @@ lazy_static! {
     static ref HOSTNAME: Atom = Atom::from("_HOSTNAME");
     static ref MESSAGE: Atom = Atom::from("MESSAGE");
     static ref SYSTEMD_UNIT: Atom = Atom::from("_SYSTEMD_UNIT");
-    static ref TIMESTAMP: Atom = Atom::from("_SOURCE_REALTIME_TIMESTAMP");
+    static ref SOURCE_TIMESTAMP: Atom = Atom::from("_SOURCE_REALTIME_TIMESTAMP");
+    static ref RECEIVED_TIMESTAMP: Atom = Atom::from("__REALTIME_TIMESTAMP");
     static ref JOURNALCTL: PathBuf = "journalctl".into();
 }
 
@@ -61,7 +66,7 @@ impl SourceConfig for JournaldConfig {
         &self,
         name: &str,
         globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
@@ -84,7 +89,7 @@ impl SourceConfig for JournaldConfig {
         let checkpointer = Checkpointer::new(data_dir)
             .map_err(|err| format!("Unable to open checkpoint file: {}", err))?;
 
-        self.source::<Journalctl>(out, checkpointer, units, batch_size)
+        self.source::<Journalctl>(out, shutdown, checkpointer, units, batch_size)
     }
 
     fn output_type(&self) -> DataType {
@@ -100,6 +105,7 @@ impl JournaldConfig {
     fn source<J>(
         &self,
         out: mpsc::Sender<Event>,
+        shutdown: ShutdownSignal,
         mut checkpointer: Checkpointer,
         units: HashSet<String>,
         batch_size: usize,
@@ -107,8 +113,6 @@ impl JournaldConfig {
     where
         J: JournalSource + Send + 'static,
     {
-        let (shutdown_tx, shutdown_rx) = channel();
-
         let out = out
             .sink_map_err(|_| ())
             .with(|record: Record| future::ok(create_event(record)));
@@ -134,20 +138,18 @@ impl JournaldConfig {
                 journal,
                 units,
                 channel: out,
-                shutdown: shutdown_rx,
+                shutdown,
                 checkpointer,
                 batch_size,
             };
             let span = info_span!("journald-server");
             let dispatcher = dispatcher::get_default(|d| d.clone());
-            thread::spawn(move || {
-                dispatcher::with_default(&dispatcher, || span.in_scope(|| journald_server.run()));
-            });
-
-            // Dropping shutdown_tx is how we signal to the journald server
-            // that it's time to shut down, so it needs to be held onto
-            // until the future we return is dropped.
-            future::empty().inspect(|_| drop(shutdown_tx))
+            spawn_blocking(move || {
+                dispatcher::with_default(&dispatcher, || span.in_scope(|| journald_server.run()))
+            })
+            .boxed()
+            .compat()
+            .map_err(|error| error!(message="Journald server unexpectedly stopped.",%error))
         })))
     }
 }
@@ -162,7 +164,10 @@ fn create_event(record: Record) -> Event {
         log.insert(event::log_schema().host_key().clone(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
-    if let Some(timestamp) = log.get(&TIMESTAMP) {
+    if let Some(timestamp) = log
+        .get(&SOURCE_TIMESTAMP)
+        .or_else(|| log.get(&RECEIVED_TIMESTAMP))
+    {
         if let Value::Bytes(timestamp) = timestamp {
             if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {
                 let timestamp = chrono::Utc.timestamp(
@@ -176,6 +181,9 @@ fn create_event(record: Record) -> Event {
             }
         }
     }
+    // Add source type
+    log.try_insert(event::log_schema().source_type_key(), "journald");
+
     log.into()
 }
 
@@ -239,7 +247,7 @@ struct JournaldServer<J, T> {
     journal: J,
     units: HashSet<String>,
     channel: T,
-    shutdown: Receiver<()>,
+    shutdown: ShutdownSignal,
     checkpointer: Checkpointer,
     batch_size: usize,
 }
@@ -252,6 +260,7 @@ where
     pub fn run(mut self) {
         let timeout = time::Duration::from_millis(500); // arbitrary timeout
         let channel = &mut self.channel;
+        let mut shutdown = self.shutdown.compat();
 
         loop {
             let mut saw_record = false;
@@ -314,10 +323,14 @@ where
             }
 
             if at_end {
-                match self.shutdown.recv_timeout(timeout) {
-                    Ok(()) => unreachable!(), // The sender should never actually send
-                    Err(RecvTimeoutError::Timeout) => {}
-                    Err(RecvTimeoutError::Disconnected) => return,
+                // This works only if run inside tokio context since we are using
+                // tokio's Timer. Outside of such context, this will panic on the first
+                // call. Also since we are using block_on here and wait in the above code,
+                // this should be run in it's own thread. `spawn_blocking` fulfills
+                // all of these requirements.
+                match block_on(select(shutdown, delay_for(timeout))) {
+                    Either::Left((_, _)) => return,
+                    Either::Right((_, future)) => shutdown = future,
                 }
             }
         }
@@ -444,13 +457,14 @@ mod tests {
     use std::io::{self, BufReader, Cursor};
     use std::iter::FromIterator;
     use std::time::Duration;
-    use stream_cancel::Tripwire;
     use tempfile::tempdir;
     use tokio01::util::FutureExt;
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002"}
 {"_SYSTEMD_UNIT":"badunit.service","MESSAGE":[194,191,72,101,108,108,111,63],"__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140003"}
+{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Missing timestamp","__CURSOR":"3","__REALTIME_TIMESTAMP":"1578529839140004"}
+{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Different timestamps","__CURSOR":"4","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004"}
 "#;
 
     struct FakeJournal {
@@ -492,7 +506,7 @@ mod tests {
 
     fn run_journal(units: &[&str], cursor: Option<&str>) -> Vec<Event> {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
-        let (trigger, tripwire) = Tripwire::new();
+        let (trigger, shutdown, _) = ShutdownSignal::new_wired();
         let tempdir = tempdir().unwrap();
         let mut checkpointer =
             Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
@@ -504,10 +518,10 @@ mod tests {
 
         let config = JournaldConfig::default();
         let source = config
-            .source::<FakeJournal>(tx, checkpointer, units, DEFAULT_BATCH_SIZE)
+            .source::<FakeJournal>(tx, shutdown, checkpointer, units, DEFAULT_BATCH_SIZE)
             .expect("Creating journald source failed");
         let mut rt = runtime();
-        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+        rt.spawn(source);
 
         std::thread::sleep(Duration::from_millis(100));
         drop(trigger);
@@ -519,12 +533,18 @@ mod tests {
     #[test]
     fn reads_journal() {
         let received = run_journal(&[], None);
-        assert_eq!(received.len(), 3);
+        assert_eq!(received.len(), 5);
         assert_eq!(
             message(&received[0]),
             Value::Bytes("System Initialization".into())
         );
+        assert_eq!(
+            received[0].as_log()[event::log_schema().source_type_key()],
+            "journald".into()
+        );
+        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140001000));
         assert_eq!(message(&received[1]), Value::Bytes("unit message".into()));
+        assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140002000));
     }
 
     #[test]
@@ -532,13 +552,15 @@ mod tests {
         let received = run_journal(&["unit.service"], None);
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
+        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
     #[test]
     fn handles_checkpoint() {
         let received = run_journal(&[], Some("1"));
-        assert_eq!(received.len(), 2);
+        assert_eq!(received.len(), 4);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
+        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
     #[test]
@@ -548,7 +570,23 @@ mod tests {
         assert_eq!(message(&received[0]), Value::Bytes("¿Hello?".into()));
     }
 
+    #[test]
+    fn handles_missing_timestamp() {
+        let received = run_journal(&["stdout"], None);
+        assert_eq!(received.len(), 2);
+        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140004000));
+        assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140005000));
+    }
+
     fn message(event: &Event) -> Value {
         event.as_log()[&event::log_schema().message_key()].clone()
+    }
+
+    fn timestamp(event: &Event) -> Value {
+        event.as_log()[&event::log_schema().timestamp_key()].clone()
+    }
+
+    fn value_ts(secs: i64, usecs: u32) -> Value {
+        Value::Timestamp(chrono::Utc.timestamp(secs, usecs))
     }
 }

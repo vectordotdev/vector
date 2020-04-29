@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-16"
 title: Deployment Strategies
 description: The various strategies used to deploy Vector across your infrastructure.
 sidebar_label: Strategies
@@ -89,7 +89,7 @@ each service. Typically data is collected by tailing local files via Vector's
 
 
 The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
+separate service. It is designed to receive data from an upstream source and
 fan-out to one or more destinations.
 Typically, upstream sources are other Vector instances sending data via the
 [`vector` sink][docs.sinks.vector], but can be collected through any of Vector's

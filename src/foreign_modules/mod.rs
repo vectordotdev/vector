@@ -191,7 +191,7 @@ fn protobuf() -> Result<()> {
     crate::test_util::trace_init();
 
     // Load in fixtures.
-    let mut test_file = fs::File::open("test-data/foreign_modules/protobuf/demo.pb")?;
+    let mut test_file = fs::File::open("tests/data/foreign_modules/protobuf/demo.pb")?;
     let mut buf = String::new();
     test_file.read_to_string(&mut buf)?;
     let mut event = Event::new_empty_log();
@@ -199,7 +199,7 @@ fn protobuf() -> Result<()> {
 
     // Refresh the test json.
     let event_string = serde_json::to_string(&event.as_log())?;
-    let mut json_fixture = fs::File::create("test-data/foreign_modules/protobuf/demo.json")?;
+    let mut json_fixture = fs::File::create("tests/data/foreign_modules/protobuf/demo.json")?;
     json_fixture.write(event_string.as_bytes())?;
 
     // Run the test.

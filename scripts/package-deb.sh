@@ -5,15 +5,33 @@
 # SUMMARY
 #
 #   Packages a .deb file to be distributed in the APT package manager.
+#
+# ENV VARS
+#
+#   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
 
-set -eu
+#
+# Local vars
+#
 
 project_root=$(pwd)
 archive_name="vector-$TARGET.tar.gz"
 archive_path="target/artifacts/$archive_name"
 absolute_archive_path="$project_root/$archive_path"
 package_version="$($project_root/scripts/version.sh)"
+
+#
+# Header
+#
+
+set -eu
+
 echo "Packaging .deb for $archive_name"
+echo "TARGET: $TARGET"
+
+#
+# Unarchive
+#
 
 # Unarchive the tar since cargo deb wants direct access to the files.
 td=$(mktemp -d)
@@ -24,6 +42,10 @@ mv vector-$TARGET/bin/vector $project_root/target/$TARGET/release
 popd
 rm -rf $td
 
+#
+# Package
+#
+
 # Create short plain-text extended description for the package
 cmark-gfm $project_root/README.md --to commonmark | # expand link aliases
   sed '/^## /Q' | # select text before first header
@@ -33,6 +55,7 @@ cmark-gfm $project_root/README.md --to commonmark | # expand link aliases
 # Create the license file for binary distributions (LICENSE + NOTICE)
 cat LICENSE NOTICE > $project_root/target/debian-license.txt
 
+#
 # Build the deb
 #
 #   --target
@@ -47,5 +70,8 @@ cargo deb --target $TARGET --deb-version $package_version --no-build
 # is consistent with our package naming scheme.
 rename -v 's/vector_([^_]*)_(.*)\.deb/vector-$2\.deb/' target/$TARGET/debian/*.deb
 
+#
 # Move the deb into the artifacts dir
+#
+
 mv -v $(find target/$TARGET/debian/ -name *.deb) target/artifacts

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-11"
 title: Log Event
 description: A detailed guide on Vector's internal log data model.
 ---
@@ -139,6 +139,33 @@ Represents the log message. Change this field name via the [global
 source-level `message_key` option for relevant sources.
 
  See [Changing The Default Schema](#changing-the-default-schema) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["file","socket","http","kubernetes"]}
+  groups={[]}
+  name={"source_type"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### source_type
+
+The official `type` of [Vector's source component][docs.sources] from which the
+log originates. Change this field name via the [global `source_type_key`
+option][docs.reference.global-options#source_type_key] or the source-level
+`source_type_key` option for relevant sources.
+
+
 
 
 </Field>
@@ -300,6 +327,7 @@ Array fields are sequences of values of any type.
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.reference.global-options#message_key]: /docs/reference/global-options/#message_key
+[docs.reference.global-options#source_type_key]: /docs/reference/global-options/#source_type_key
 [docs.reference.transforms.rename_fields]: /docs/reference/transforms/rename_fields/
 [docs.sources]: /docs/reference/sources/
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/

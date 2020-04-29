@@ -1,14 +1,17 @@
 mod interop;
-mod scripted_transform;
 
 use crate::{
+    config_paths::CONFIG_PATHS,
     event::Event,
     topology::config::{DataType, TransformContext},
-    transforms::Transform,
+    transforms::{
+        util::runtime_transform::{RuntimeTransform, Timer},
+        Transform,
+    },
 };
-use scripted_transform::{ScriptedRuntime, Timer};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::path::PathBuf;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -42,12 +45,26 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfig {
-    #[serde(default)]
-    search_dirs: Vec<String>,
+    #[serde(default = "default_config_paths")]
+    search_dirs: Vec<PathBuf>,
     hooks: HooksConfig,
     #[serde(default)]
     timers: Vec<TimerConfig>,
     source: Option<String>,
+}
+
+fn default_config_paths() -> Vec<PathBuf> {
+    match CONFIG_PATHS.get() {
+        Some(config_paths) => config_paths
+            .clone()
+            .into_iter()
+            .map(|mut path_buf| {
+                path_buf.pop();
+                path_buf
+            })
+            .collect(),
+        None => vec![],
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -108,7 +125,7 @@ impl Lua {
         let additional_paths = config
             .search_dirs
             .iter()
-            .map(|d| format!("{}/?.lua", d))
+            .map(|d| format!("{}/?.lua", d.to_string_lossy()))
             .collect::<Vec<_>>()
             .join(";");
 
@@ -223,7 +240,7 @@ where
     })
 }
 
-impl ScriptedRuntime for Lua {
+impl RuntimeTransform for Lua {
     fn hook_process<F>(self: &mut Self, event: Event, emit_fn: F)
     where
         F: FnMut(Event) -> (),

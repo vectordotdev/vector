@@ -8,7 +8,7 @@
   --vector-switcher-active-background: var(--ifm-color-primary);
   --vector-switcher-active-color: var(--ifm-background-color);
 
-  background: var(--ifm-panel-background);
+  background-color: var(--ifm-panel-background-color);
   border: 1px solid var(--ifm-panel-border-color);
   border-radius: var(--ifm-global-radius);
   box-shadow: var(--ifm-panel-box-shadow);
@@ -66,7 +66,7 @@
 }
 
 .performance-tests--switcher .react-select__menu {
-  background: var(--ifm-panel-background-solid);
+  background: var(--ifm-panel-background-color-solid);
   border-radius: var(--ifm-global-radius);
   color: var(--ifm-color-content);
 }
@@ -82,7 +82,7 @@
 }
 
 .performance-tests--switcher .react-select__option--is-focused {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-color-active);
   color: var(--ifm-color-content);
 }
 

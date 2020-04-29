@@ -1,14 +1,20 @@
 use crate::{file_watcher::FileWatcher, FileFingerprint, FilePosition};
 use bytes::Bytes;
-use futures::{executor::block_on, stream, stream::StreamExt, Sink};
+use futures::{
+    executor::block_on,
+    future::{select, Either},
+    stream,
+    stream::StreamExt,
+    Future, Sink,
+};
 use glob::{glob, Pattern};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{self, Read, Seek, Write};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::RecvTimeoutError;
 use std::time;
+use tokio::time::delay_for;
 use tracing::field;
 
 use crate::metadata_ext::PortableFileExt;
@@ -52,7 +58,7 @@ impl FileServer {
     pub fn run(
         self,
         mut chans: impl Sink<(Bytes, String), Error = ()> + Unpin,
-        shutdown: std::sync::mpsc::Receiver<()>,
+        mut shutdown: impl Future + Unpin,
     ) {
         let mut line_buffer = Vec::new();
         let mut fingerprint_buffer = Vec::new();
@@ -282,10 +288,17 @@ impl FileServer {
             }
             let backoff = backoff_cap.saturating_sub(global_bytes_read);
 
-            match shutdown.recv_timeout(time::Duration::from_millis(backoff as u64)) {
-                Ok(()) => unreachable!(), // The sender should never actually send
-                Err(RecvTimeoutError::Timeout) => {}
-                Err(RecvTimeoutError::Disconnected) => return,
+            // This works only if run inside tokio context since we are using
+            // tokio's Timer. Outside of such context, this will panic on the first
+            // call. Also since we are using block_on here and in the above code,
+            // this should be run in it's own thread. `spawn_blocking` fulfills
+            // all of these requirements.
+            match block_on(select(
+                shutdown,
+                delay_for(time::Duration::from_millis(backoff as u64)),
+            )) {
+                Either::Left((_, _)) => return,
+                Either::Right((_, future)) => shutdown = future,
             }
         }
     }

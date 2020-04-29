@@ -1,6 +1,9 @@
-use crate::event::Event;
-use crate::sources::util::build_unix_source;
-use crate::sources::Source;
+use crate::{
+    event::{self, Event},
+    internal_events::UnixSocketEventReceived,
+    shutdown::ShutdownSignal,
+    sources::{util::build_unix_source, Source},
+};
 use bytes::Bytes;
 use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
@@ -34,11 +37,15 @@ impl UnixConfig {
 * Takes a single line of a received message and builds an Event object.
 **/
 fn build_event(host_key: &str, received_from: Option<Bytes>, line: &str) -> Option<Event> {
+    let byte_size = line.len();
     let mut event = Event::from(line);
+    event
+        .as_mut_log()
+        .insert(event::log_schema().source_type_key(), "socket");
     if let Some(host) = received_from {
         event.as_mut_log().insert(host_key, host);
     }
-    trace!(message = "Received one event.", ?event);
+    emit!(UnixSocketEventReceived { byte_size });
     Some(event)
 }
 
@@ -46,7 +53,8 @@ pub fn unix(
     path: PathBuf,
     max_length: usize,
     host_key: String,
+    shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
 ) -> Source {
-    build_unix_source(path, max_length, host_key, out, build_event)
+    build_unix_source(path, max_length, host_key, shutdown, out, build_event)
 }

@@ -102,7 +102,13 @@ impl SourceConfig for SocketConfig {
                     .host_key
                     .clone()
                     .unwrap_or(event::log_schema().host_key().to_string());
-                Ok(unix::unix(config.path, config.max_length, host_key, out))
+                Ok(unix::unix(
+                    config.path,
+                    config.max_length,
+                    host_key,
+                    shutdown,
+                    out,
+                ))
             }
         }
     }
@@ -174,6 +180,34 @@ mod test {
         assert_eq!(
             event.as_log()[&event::log_schema().host_key()],
             "127.0.0.1".into()
+        );
+    }
+
+    #[test]
+    fn tcp_it_includes_source_type() {
+        let (tx, rx) = mpsc::channel(1);
+
+        let addr = next_addr();
+
+        let server = SocketConfig::from(TcpConfig::new(addr.into()))
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
+            .unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
+        rt.spawn(server);
+        wait_for_tcp(addr);
+
+        rt.block_on(send_lines(addr, vec!["test".to_owned()].into_iter()))
+            .unwrap();
+
+        let event = rx.wait().next().unwrap().unwrap();
+        assert_eq!(
+            event.as_log()[event::log_schema().source_type_key()],
+            "socket".into()
         );
     }
 
@@ -500,6 +534,21 @@ mod test {
     }
 
     #[test]
+    fn udp_it_includes_source_type() {
+        let (tx, rx) = mpsc::channel(2);
+
+        let (address, mut rt) = init_udp(tx);
+
+        let _ = send_lines_udp(address, vec!["test".to_string()]);
+        let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
+
+        assert_eq!(
+            events[0].as_log()[event::log_schema().source_type_key()],
+            "socket".into()
+        );
+    }
+
+    #[test]
     fn udp_shutdown_simple() {
         let (tx, rx) = mpsc::channel(2);
         let source_name = "udp_shutdown_simple";
@@ -632,6 +681,10 @@ mod test {
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
             "test".into()
+        );
+        assert_eq!(
+            events[0].as_log()[event::log_schema().source_type_key()],
+            "socket".into()
         );
     }
 

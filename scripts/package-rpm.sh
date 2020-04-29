@@ -5,13 +5,32 @@
 # SUMMARY
 #
 #   Packages a .rpm file to be distributed in the YUM package manager.
+#
+# ENV VARS
+#
+#   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
 
-set -eu
+#
+# Local vars
+#
 
 project_root=$(pwd)
 archive_name="vector-$TARGET.tar.gz"
 archive_path="target/artifacts/$archive_name"
 package_version="$($project_root/scripts/version.sh)"
+
+#
+# Header
+#
+
+set -eu
+
+echo "Packaging .rpm for $archive_name"
+echo "TARGET: $TARGET"
+
+#
+# Package
+#
 
 # RPM has a concept of releases, but we do not need this so every
 # release is 1.
@@ -42,6 +61,9 @@ cp -av $archive_path "/root/rpmbuild/SOURCES/vector-$ARCH.tar.gz"
 # Perform the build.
 rpmbuild --target "$ARCH-redhat-linux" --define "_arch $ARCH" -ba distribution/rpm/vector.spec
 
+#
 # Move the RPM into the artifacts dir
+#
+
 ls "/root/rpmbuild/RPMS/$ARCH"
 mv -v "/root/rpmbuild/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-$ARCH.rpm"

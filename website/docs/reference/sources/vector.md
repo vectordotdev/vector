@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-07"
 delivery_guarantee: "best_effort"
 component_title: "Vector"
 description: "The Vector `vector` source ingests data through another upstream `vector` sink and outputs `log` and `metric` events."
@@ -35,7 +35,7 @@ events.
 
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * This component exposes a configured port. You must ensure your network allows access to this port.
 
@@ -308,12 +308,6 @@ will not request a certificate from the client.
 </Field>
 </Fields>
 
-## Output
-
-The `vector` source is a pass-through source and is intended to accept data
-from an upstream [`vector` sink][docs.sinks.vector]. Datta is not changed or
-augmented.
-
 ## How It Works
 
 ### Encoding
@@ -328,6 +322,7 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
+
 ### Message Acking
 
 Currently, Vector does not perform any application level message acknowledgement. While rare, this means the individual message could be lost.
@@ -341,7 +336,7 @@ Upstream Vector instances forward data to downstream Vector instances via the TC
 ### TLS
 
 Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
-and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
 options.
 
 

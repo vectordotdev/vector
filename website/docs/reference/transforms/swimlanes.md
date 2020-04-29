@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-22"
 component_title: "Swimlanes"
-description: "The Vector `swimlanes` transform accepts and outputs `log` events allowing you to route events across parallel streams using logical filters."
+description: "The Vector `swimlanes` transform accepts and outputs `log` events, allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
 function_category: "route"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+swimlanes%22
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `swimlanes` transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to route
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to route
 events across parallel streams using logical filters.
 
 <!--
@@ -40,7 +40,7 @@ events across parallel streams using logical filters.
 [transforms.my_transform_id]
   # General
   type = "swimlanes" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
 
   # Lanes
   [transforms.my_transform_id.lanes.`[swimlane-id]`]
@@ -59,7 +59,7 @@ events across parallel streams using logical filters.
 [transforms.my_transform_id]
   # General
   type = "swimlanes" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
 
   # Lanes
   [transforms.my_transform_id.lanes.`[swimlane-id]`]
@@ -434,4 +434,4 @@ You can learn more in the
 [docs.data-model.log]: /docs/about/data-model/log/
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

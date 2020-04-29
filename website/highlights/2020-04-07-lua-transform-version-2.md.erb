@@ -1,0 +1,41 @@
+---
+last_modified_on: "2020-03-31"
+$schema: "/.meta/.schemas/highlights.json"
+title: "Lua Transform v2"
+description: "The next iteration of our Lua transform."
+author_github: "https://github.com/binarylogic"
+pr_numbers: [2126]
+release: "0.9.0"
+hide_on_release_notes: false
+tags: ["type: enhancement", "domain: sources", "source: vector"]
+---
+
+v2 of our [`lua` transform][docs.transforms.lua] has been released! This is a
+complete overhaul that provides a new and improved API, better data processing
+ergonomics, and faster processing. Specific improvements include:
+
+1. Events are [represented as Lua tables][docs.transforms.lua#representation-of-events] with proper type conversion.
+2. Introduction of [hooks][docs.transforms.lua#hooks] to maintain global state.
+3. Introduction of [timers][docs.transforms.lua#timers] to facilitate timed flushing. Useful for aggregations.
+4. The ability to accept and work with metric events in addition to log events.
+
+This raises the bar in terms of capabilities, which is important! Lua is often
+used as an escape hatch when Vector's native transforms are not expressive
+enough.
+
+<Alert type="info">
+
+Did you know we're also [working on a WASM integration][urls.pr_2006] 👀
+
+</Alert>
+
+## Get Started
+
+<Jump to="[[[docs.transforms.lua]]]" leftIcon="book">Docs: Lua Transform</Jump>
+<Jump to="[[[guides.custom-aggregations-with-lua]]]" leftIcon="book-open">Guide: Custom aggregations with Lua</Jump>
+<Jump to="[[[guides.parsing-csv-logs-with-lua]]]" leftIcon="book-open">Guide: Parsing CSV logs with Lua</Jump>
+<Jump to="[[[guides.merge-multiline-logs-with-lua]]]" leftIcon="book-open">Guide: Merge multi-line logs with Lua</Jump>
+
+And for the curious:
+
+<Jump to="[[[urls.vector_lua_rfc]]]" leftIcon="book">Vector's Lua RFC</Jump>

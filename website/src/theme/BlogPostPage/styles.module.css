@@ -7,29 +7,15 @@
   padding: calc( var(--ifm-spacing-vertical) * 2 ) 0 calc( var(--ifm-spacing-vertical) * 3 ) 0;
   text-align: center;
 }
+
 @media (max-width: 480px) {
   .header {
     padding: calc( var(--ifm-spacing-vertical) * 2 ) 0;
   }
+
   .header h1 {
     font-size: 2em !important;
   }
-}
-
-.headerContainer h1 {
-  margin-top: calc( var(--ifm-spacing-vertical) * 1 );
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
-}
-
-.headerTags {
-  background: rgba( var(--ifm-background-color-rgb), 0.8 );
-  display: inline-block;
-  line-height: 1;
-}
-
-.mailingListTitle {
-  font-size: 1.5em;
-  font-weight: 600;
 }
 
 html[data-theme='dark'] .headerBackground {

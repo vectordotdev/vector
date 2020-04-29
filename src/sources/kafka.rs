@@ -1,7 +1,8 @@
 use crate::{
-    event::Event,
+    event::{self, Event},
     kafka::{KafkaCompression, KafkaTlsConfig},
     shutdown::ShutdownSignal,
+    stream::StreamExt,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
@@ -17,6 +18,7 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::HashMap, sync::Arc};
+use tokio::task::block_in_place;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -79,10 +81,10 @@ impl SourceConfig for KafkaSourceConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        kafka_source(self.clone(), out)
+        kafka_source(self.clone(), shutdown, out)
     }
 
     fn output_type(&self) -> DataType {
@@ -96,6 +98,7 @@ impl SourceConfig for KafkaSourceConfig {
 
 fn kafka_source(
     config: KafkaSourceConfig,
+    shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
 ) -> crate::Result<super::Source> {
     let consumer = Arc::new(create_consumer(config.clone())?);
@@ -104,13 +107,14 @@ fn kafka_source(
 
         // See https://github.com/fede1024/rust-rdkafka/issues/85#issuecomment-439141656
         let stream = OwnedConsumerStream {
-            upstream: OwningHandle::new_with_fn(consumer, |c| {
+            upstream: OwningHandle::new_with_fn(consumer.clone(), |c| {
                 let cf = unsafe { &*c };
                 Box::new(Compat::new(cf.start()))
             }),
         };
 
         stream
+            .take_until(shutdown.map(move |_| block_in_place(|| consumer.stop())))
             .then(move |message| {
                 match message {
                     Err(e) => Err(error!(message = "Error reading message from Kafka", error = ?e)),
@@ -124,6 +128,11 @@ fn kafka_source(
                         };
                         let mut event = Event::from(payload);
 
+                        // Add source type
+                        event
+                            .as_mut_log()
+                            .insert(event::log_schema().source_type_key(), "kafka");
+
                         if let Some(key_field) = &config.key_field {
                             match msg.key_view::<[u8]>() {
                                 None => (),
@@ -135,6 +144,7 @@ fn kafka_source(
                                 }
                             }
                         }
+
                         consumer_ref.store_offset(&msg).map_err(
                             |e| error!(message = "Cannot store offset for the message", error = ?e),
                         )?;
@@ -203,6 +213,7 @@ impl Stream for OwnedConsumerStream {
 #[cfg(test)]
 mod test {
     use super::{kafka_source, KafkaSourceConfig};
+    use crate::shutdown::ShutdownSignal;
     use futures01::sync::mpsc;
 
     fn make_config() -> KafkaSourceConfig {
@@ -223,7 +234,7 @@ mod test {
     #[test]
     fn kafka_source_create_ok() {
         let config = make_config();
-        assert!(kafka_source(config, mpsc::channel(1).0).is_ok());
+        assert!(kafka_source(config, ShutdownSignal::noop(), mpsc::channel(1).0).is_ok());
     }
 
     #[test]
@@ -232,7 +243,7 @@ mod test {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
             ..make_config()
         };
-        assert!(kafka_source(config, mpsc::channel(1).0).is_err());
+        assert!(kafka_source(config, ShutdownSignal::noop(), mpsc::channel(1).0).is_err());
     }
 }
 
@@ -242,6 +253,7 @@ mod integration_test {
     use super::{kafka_source, KafkaSourceConfig};
     use crate::{
         event,
+        shutdown::ShutdownSignal,
         test_util::{collect_n, random_string, runtime},
     };
     use futures::compat::Compat;
@@ -295,7 +307,7 @@ mod integration_test {
             .unwrap();
         println!("Receiving event...");
         let (tx, rx) = mpsc::channel(1);
-        rt.spawn(kafka_source(config, tx).unwrap());
+        rt.spawn(kafka_source(config, ShutdownSignal::noop(), tx).unwrap());
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -304,6 +316,10 @@ mod integration_test {
         assert_eq!(
             events[0].as_log()[&Atom::from("message_key")],
             "my key".into()
+        );
+        assert_eq!(
+            events[0].as_log()[event::log_schema().source_type_key()],
+            "kafka".into()
         );
     }
 }

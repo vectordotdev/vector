@@ -1,4 +1,4 @@
-use super::{Atom, Value};
+use super::Value;
 use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map, BTreeMap},
@@ -8,20 +8,20 @@ use std::{
 /// Iterates over all paths in form "a.b[0].c[1]" in alphabetical order
 /// and their corresponding values.
 pub fn all_fields<'a>(
-    fields: &'a BTreeMap<Atom, Value>,
-) -> impl Iterator<Item = (Atom, &'a Value)> + Serialize {
+    fields: &'a BTreeMap<String, Value>,
+) -> impl Iterator<Item = (String, &'a Value)> + Serialize {
     FieldsIter::new(fields)
 }
 
 #[derive(Clone)]
 enum LeafIter<'a> {
-    Map(btree_map::Iter<'a, Atom, Value>),
+    Map(btree_map::Iter<'a, String, Value>),
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
 
 #[derive(Clone)]
 enum PathComponent<'a> {
-    Key(&'a Atom),
+    Key(&'a String),
     Index(usize),
 }
 
@@ -35,7 +35,7 @@ struct FieldsIter<'a> {
 }
 
 impl<'a> FieldsIter<'a> {
-    fn new(fields: &'a BTreeMap<Atom, Value>) -> FieldsIter<'a> {
+    fn new(fields: &'a BTreeMap<String, Value>) -> FieldsIter<'a> {
         FieldsIter {
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],
@@ -63,12 +63,12 @@ impl<'a> FieldsIter<'a> {
         self.path.pop();
     }
 
-    fn make_path(&mut self, component: PathComponent<'a>) -> Atom {
+    fn make_path(&mut self, component: PathComponent<'a>) -> String {
         let mut res = String::new();
         let mut path_iter = self.path.iter().chain(iter::once(&component)).peekable();
         loop {
             match path_iter.next() {
-                None => return Atom::from(res),
+                None => return String::from(res),
                 Some(PathComponent::Key(key)) => res.push_str(&key),
                 Some(PathComponent::Index(index)) => res.push_str(&format!("[{}]", index)),
             }
@@ -80,7 +80,7 @@ impl<'a> FieldsIter<'a> {
 }
 
 impl<'a> Iterator for FieldsIter<'a> {
-    type Item = (Atom, &'a Value);
+    type Item = (String, &'a Value);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {

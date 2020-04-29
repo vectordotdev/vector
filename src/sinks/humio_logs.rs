@@ -34,11 +34,15 @@ inventory::submit! {
 pub enum Encoding {
     #[derivative(Default)]
     Json,
+    Text,
 }
 
-impl Into<splunk_hec::Encoding> for Encoding {
-    fn into(self) -> splunk_hec::Encoding {
-        splunk_hec::Encoding::Json
+impl From<Encoding> for splunk_hec::Encoding {
+    fn from(v: Encoding) -> Self {
+        match v {
+            Encoding::Json => splunk_hec::Encoding::Json,
+            Encoding::Text => splunk_hec::Encoding::Text,
+        }
     }
 }
 
@@ -53,12 +57,7 @@ impl SinkConfig for HumioLogsConfig {
         HecSinkConfig {
             token: self.token.clone(),
             host,
-            encoding: EncodingConfigWithDefault {
-                codec: self.encoding.codec.clone().into(),
-                only_fields: self.encoding.only_fields.clone(),
-                except_fields: self.encoding.except_fields.clone(),
-                timestamp_format: self.encoding.timestamp_format.clone(),
-            },
+            encoding: self.encoding.clone().transmute(),
             batch: self.batch.clone(),
             request: self.request.clone(),
             ..Default::default()

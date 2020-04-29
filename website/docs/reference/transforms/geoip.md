@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-22"
 component_title: "GeoIP"
-description: "The Vector [`geoip`](#geoip) transform accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases."
+description: "The Vector [`geoip`](#geoip) transform accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases."
 event_types: ["log"]
 function_category: "enrich"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+geoip%22
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector [`geoip`](#geoip) transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to enrich
 events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city
 databases.
 
@@ -40,7 +40,7 @@ databases.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "geoip" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   database = "/path/to/GeoLite2-City.mmdb" # required
   source = "ip_address" # required
   target = "geoip" # optional, default
@@ -52,7 +52,7 @@ databases.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "geoip" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   database = "/path/to/GeoLite2-City.mmdb" # required
   source = "ip_address" # required
   target = "geoip" # optional, default
@@ -378,7 +378,7 @@ You can learn more in the
 ### Field Notation Syntax
 
 The [`source`](#source) and [`target`](#target) options
-support [Vector's field notiation syntax][docs.reference.field-path-notation],
+support [Vector's field notation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
 ```toml title="vector.toml"
@@ -401,4 +401,4 @@ You can learn more about Vector's field notation in the
 [urls.iana_time_zone_format]: https://en.wikipedia.org/wiki/Tz_database#Names_of_time_zones
 [urls.iana_time_zones]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [urls.iso3166-2]: https://en.wikipedia.org/wiki/ISO_3166-2
-[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
+[urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

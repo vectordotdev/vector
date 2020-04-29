@@ -9,6 +9,7 @@ pub struct Metric {
     pub timestamp: Option<DateTime<Utc>>,
     pub tags: Option<BTreeMap<String, String>>,
     pub kind: MetricKind,
+    #[serde(flatten)]
     pub value: MetricValue,
 }
 
@@ -20,7 +21,7 @@ pub enum MetricKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum MetricValue {
     Counter {
         value: f64,

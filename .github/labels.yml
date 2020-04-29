@@ -26,6 +26,9 @@
 - name: "domain: platforms"
   description: Anything platforms related
   color: 212f3e
+- name: "domain: privacy"
+  description: Anything privacy related
+  color: 212f3e
 - name: "domain: security"
   description: Anything security related
   color: 212f3e
@@ -60,9 +63,6 @@
   color: 1cd1a1
 - name: "event type: metric"
   description: Anything metric event related
-  color: 1cd1a1
-- name: "event type: trace"
-  description: Anything trace event related
   color: 1cd1a1
 
 #
@@ -138,50 +138,59 @@
 # platform
 #
 
+- name: "platform: arm64"
+  description: Anything arm64 related
+  color: ff9ff3
+- name: "platform: armv7"
+  description: Anything armv7 related
+  color: ff9ff3
 - name: "platform: amazon-linux"
-  description: Anything Amazon Linux related
+  description: Anything amazon-linux related
   color: ff9ff3
 - name: "platform: centos"
-  description: Anything CentOS related
+  description: Anything centos related
   color: ff9ff3
 - name: "platform: debian"
-  description: Anything Debian related
-  color: ff9ff3
-- name: "platform: macos"
-  description: Anything MacOS related
-  color: ff9ff3
-- name: "platform: nixos"
-  description: Anything NixOS related
-  color: ff9ff3
-- name: "platform: rhel"
-  description: Anything RHEL related
-  color: ff9ff3
-- name: "platform: raspbian"
-  description: Anything Raspbian related
-  color: ff9ff3
-- name: "platform: ubuntu"
-  description: Anything Ubuntu related
-  color: ff9ff3
-- name: "platform: windows"
-  description: Anything Windows related
-  color: ff9ff3
-- name: "platform: dpkg"
-  description: Anything DPKG related
-  color: ff9ff3
-- name: "platform: homebrew"
-  description: Anything Homebrew related
-  color: ff9ff3
-- name: "platform: msi"
-  description: Anything MSI related
-  color: ff9ff3
-- name: "platform: nix"
-  description: Anything Nix related
-  color: ff9ff3
-- name: "platform: rpm"
-  description: Anything RPM related
+  description: Anything debian related
   color: ff9ff3
 - name: "platform: docker"
-  description: Anything Docker related
+  description: Anything docker related
+  color: ff9ff3
+- name: "platform: dpkg"
+  description: Anything dpkg related
+  color: ff9ff3
+- name: "platform: homebrew"
+  description: Anything homebrew related
+  color: ff9ff3
+- name: "platform: macos"
+  description: Anything macos related
+  color: ff9ff3
+- name: "platform: msi"
+  description: Anything msi related
+  color: ff9ff3
+- name: "platform: nix"
+  description: Anything nix related
+  color: ff9ff3
+- name: "platform: nixos"
+  description: Anything nixos related
+  color: ff9ff3
+- name: "platform: raspbian"
+  description: Anything raspbian related
+  color: ff9ff3
+- name: "platform: rhel"
+  description: Anything rhel related
+  color: ff9ff3
+- name: "platform: rpm"
+  description: Anything rpm related
+  color: ff9ff3
+- name: "platform: ubuntu"
+  description: Anything ubuntu related
+  color: ff9ff3
+- name: "platform: windows"
+  description: Anything windows related
+  color: ff9ff3
+- name: "platform: x86_64"
+  description: Anything x86_64 related
   color: ff9ff3
 
 #
@@ -205,6 +214,9 @@
   color: ff9f43
 - name: "provider: datadog"
   description: Anything Datadog related
+  color: ff9f43
+- name: "provider: azure"
+  description: Anything Azure related
   color: ff9f43
 - name: "provider: elastic"
   description: Anything Elastic related
@@ -246,6 +258,9 @@
   color: ff9ff3
 - name: "source: file"
   description: Anything `file` source realted
+  color: ff9ff3
+- name: "source: generator"
+  description: Anything `generator` source realted
   color: ff9ff3
 - name: "source: http"
   description: Anything `http` source realted
@@ -317,9 +332,6 @@
   color: 54a0ff
 - name: "transform: json_parser"
   description: Anything `json_parser` transform related
-  color: 54a0ff
-- name: "transform: kubernetes_pod_metadata"
-  description: Anything `kubernetes_pod_metadata` transform related
   color: 54a0ff
 - name: "transform: log_to_metric"
   description: Anything `log_to_metric` transform related

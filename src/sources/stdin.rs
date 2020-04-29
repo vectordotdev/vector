@@ -106,6 +106,11 @@ where
 fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event {
     let mut event = Event::from(line);
 
+    // Add source type
+    event
+        .as_mut_log()
+        .insert(event::log_schema().source_type_key(), "stdin");
+
     if let Some(hostname) = &hostname {
         event.as_mut_log().insert(host_key, hostname.clone());
     }
@@ -136,6 +141,7 @@ mod tests {
             log[&event::log_schema().message_key()],
             "hello world".into()
         );
+        assert_eq!(log[event::log_schema().source_type_key()], "stdin".into());
     }
 
     #[test]
