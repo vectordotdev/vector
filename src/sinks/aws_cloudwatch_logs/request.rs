@@ -14,7 +14,7 @@ pub struct CloudwatchFuture {
     state: State,
     create_missing_group: bool,
     create_missing_stream: bool,
-    events: Option<Vec<InputLogEvent>>,
+    events: Vec<Vec<InputLogEvent>>,
     token_tx: Option<oneshot::Sender<Option<String>>>,
 }
 
@@ -32,13 +32,14 @@ enum State {
 }
 
 impl CloudwatchFuture {
+    /// Panics if events.is_empty()
     pub fn new(
         client: CloudWatchLogsClient,
         stream_name: String,
         group_name: String,
         create_missing_group: bool,
         create_missing_stream: bool,
-        events: Vec<InputLogEvent>,
+        mut events: Vec<Vec<InputLogEvent>>,
         token: Option<String>,
         token_tx: oneshot::Sender<Option<String>>,
     ) -> Self {
@@ -48,13 +49,10 @@ impl CloudwatchFuture {
             group_name,
         };
 
-        let (state, events) = if let Some(token) = token {
-            let (request, events) = client.put_logs(Some(token), events);
-            let state = State::Put(request);
-            (state, events)
+        let state = if let Some(token) = token {
+            State::Put(client.put_logs(Some(token), events.pop().expect("No Events to send")))
         } else {
-            let state = State::DescribeStream(client.describe_stream());
-            (state, Some(events))
+            State::DescribeStream(client.describe_stream())
         };
 
         Self {
@@ -108,15 +106,13 @@ impl Future for CloudwatchFuture {
 
                         let events = self
                             .events
-                            .take()
-                            .expect("Token got called twice, this is a bug!");
+                            .pop()
+                            .expect("Token got called multiple times, this is a bug!");
 
                         let token = stream.upload_sequence_token;
 
                         info!(message = "putting logs.", ?token);
-                        let (request, events) = self.client.put_logs(token, events);
-                        self.state = State::Put(request);
-                        self.events = events;
+                        self.state = State::Put(self.client.put_logs(token, events));
                     } else if self.create_missing_stream {
                         info!("provided stream does not exist; creating a new one.");
                         self.state = State::CreateStream(self.client.create_log_stream());
@@ -173,11 +169,9 @@ impl Future for CloudwatchFuture {
 
                     let next_token = res.next_sequence_token;
 
-                    if let Some(events) = self.events.take() {
+                    if let Some(events) = self.events.pop() {
                         debug!(message = "putting logs.", ?next_token);
-                        let (request, events) = self.client.put_logs(next_token, events);
-                        self.state = State::Put(request);
-                        self.events = events;
+                        self.state = State::Put(self.client.put_logs(next_token, events));
                     } else {
                         info!(message = "putting logs was successful.", ?next_token);
 
@@ -199,41 +193,8 @@ impl Client {
     pub fn put_logs(
         &self,
         sequence_token: Option<String>,
-        mut log_events: Vec<InputLogEvent>,
-    ) -> (
-        RusotoFuture<PutLogEventsResponse, PutLogEventsError>,
-        Option<Vec<InputLogEvent>>,
-    ) {
-        // We will only send events that happened in the 24h window since the oldest event.
-        // Relies on log_events being sorted by timestamp in ascending order.
-        let remainder = log_events
-            .first()
-            // -1 is for safe measure.
-            .map(|oldest| oldest.timestamp + Duration::days(1).num_milliseconds() - 1)
-            .and_then(|limit| {
-                // Fast path.
-                // In most cases the difference between oldest and newest event
-                // is less than 24h.
-                log_events
-                    .last()
-                    .filter(|newest| newest.timestamp > limit)
-                    .map(|_| limit)
-            })
-            .map(|limit| {
-                // At this point we know that an event older than the limit exists.
-                //
-                // We will find none or one of the events with timestamp==limit.
-                // In the case of more events with limit, we can just split them
-                // at found event, and send those before at with this request, and
-                // those after at with the next request.
-                let at = log_events
-                    .binary_search_by_key(&limit, |e| e.timestamp)
-                    .unwrap_or_else(|at| at);
-
-                // Can't be empty
-                log_events.drain(at..).collect()
-            });
-
+        log_events: Vec<InputLogEvent>,
+    ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
         let request = PutLogEventsRequest {
             log_events,
             sequence_token,
@@ -241,7 +202,7 @@ impl Client {
             log_stream_name: self.stream_name.clone(),
         };
 
-        (self.client.put_log_events(request), remainder)
+        self.client.put_log_events(request)
     }
 
     pub fn describe_stream(

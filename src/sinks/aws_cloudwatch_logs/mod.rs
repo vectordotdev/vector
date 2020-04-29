@@ -334,6 +334,40 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
             // Sort by timestamp
             events.sort_by_key(|e| e.timestamp);
 
+            let mut event_batches = Vec::new();
+            if events.is_empty() {
+                event_batches.push(Vec::new());
+            } else {
+                // We will split events into 24h batches.
+                // Relies on log_events being sorted by timestamp in ascending order.
+                while let Some(oldest) = events.first() {
+                    let limit = oldest.timestamp + Duration::days(1).num_milliseconds();
+
+                    if events.last().expect("Events can't be empty").timestamp <= limit {
+                        // Fast path.
+                        // In most cases the difference between oldest and newest event
+                        // is less than 24h.
+                        event_batches.push(events);
+                        break;
+                    }
+
+                    // At this point we know that an event older than the limit exists.
+                    //
+                    // We will find none or one of the events with timestamp==limit.
+                    // In the case of more events with limit, we can just split them
+                    // at found event, and send those before at with this batch, and
+                    // those after at with the next batch.
+                    let at = events
+                        .binary_search_by_key(&limit, |e| e.timestamp)
+                        .unwrap_or_else(|at| at);
+
+                    // Can't be empty
+                    let remainder = events.drain(at..).collect();
+                    event_batches.push(events);
+                    events = remainder;
+                }
+            }
+
             let (tx, rx) = oneshot::channel();
             self.token_rx = Some(rx);
 
@@ -344,7 +378,7 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
                 self.group_name.clone(),
                 self.create_missing_group,
                 self.create_missing_stream,
-                events,
+                event_batches,
                 self.token.take(),
                 tx,
             )
