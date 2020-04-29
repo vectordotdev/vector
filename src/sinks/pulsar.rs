@@ -169,19 +169,14 @@ fn encode_event(item: Event, enc: Encoding) -> crate::Result<Vec<u8>> {
 
 fn healthcheck(config: PulsarSinkConfig, pulsar: Pulsar) -> super::Healthcheck {
     Box::new(future::lazy(move || {
-        let consumer = pulsar
+        pulsar
             .consumer()
             .with_topic(&config.topic)
             .with_consumer_name("Healthcheck")
             .with_subscription_type(SubType::Shared)
             .with_subscription("HealthSubscription")
             .build::<String>()
-            .wait()
-            .expect("Pulsar healthcheck consumer failed to be created");
-
-        consumer
-            .take(1)
-            .collect()
+            .and_then(|consumer| consumer.take(1).collect())
             .map(|_| ())
             .map_err(|err| err.into())
     }))
