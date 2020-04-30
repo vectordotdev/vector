@@ -364,7 +364,7 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
                         .unwrap_or_else(|at| at);
 
                     // Can't be empty
-                    let remainder = events.drain(at..).collect();
+                    let remainder = events.split_off(at);
                     event_batches.push(events);
                     events = remainder;
                 }
