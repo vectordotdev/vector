@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-05-04"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Journald to InfluxDB"
 description: "A simple guide to send logs from Journald to InfluxDB in just a few minutes."
@@ -103,6 +103,8 @@ To be clear, here's everything we'll accomplish in this short guide:
 
 <InstallationCommand />
 
+Or choose your [preferred method][docs.installation].
+
 </li>
 <li>
 
@@ -151,6 +153,7 @@ flexibility of Vector:
 </Jump>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [urls.influxdb]: https://www.influxdata.com/products/influxdb-overview/
