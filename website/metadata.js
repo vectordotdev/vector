@@ -3997,16 +3997,81 @@ module.exports = {
         ],
         "sha": "b2bc1b77ac53b412162a845293487586f66b3007",
         "type": "enhancement"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-04-30 10:51:02 +0000",
+        "deletions_count": 5,
+        "description": "Use specific error for x509 from system ca",
+        "files_count": 2,
+        "highlight_permalink": null,
+        "insertions_count": 10,
+        "message": "fix(security): Use specific error for x509 from system ca (#2507)",
+        "pr_number": 2507,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "security"
+          }
+        ],
+        "sha": "af544f361cc03e31207fcdd5e57104d051fde136",
+        "type": "fix"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-04-30 12:55:08 +0000",
+        "deletions_count": 114,
+        "description": "Shutdown topology pieces before building new ones",
+        "files_count": 6,
+        "highlight_permalink": null,
+        "insertions_count": 349,
+        "message": "fix(config): Shutdown topology pieces before building new ones (#2449)",
+        "pr_number": 2449,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "config"
+          }
+        ],
+        "sha": "a0d5cf5469045d066bed5ed950187ff6a7612dc4",
+        "type": "fix"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-04-30 13:28:53 +0000",
+        "deletions_count": 34,
+        "description": "Enforce age requirements",
+        "files_count": 2,
+        "highlight_permalink": null,
+        "insertions_count": 195,
+        "message": "enhancement(aws_cloudwatch_logs sink): Enforce age requirements (#2437)",
+        "pr_number": 2437,
+        "scopes": [
+          {
+            "component": {
+              "name": "aws_cloudwatch_logs",
+              "type": "sink"
+            },
+            "name": "aws_cloudwatch_logs sink"
+          }
+        ],
+        "sha": "319a75ddc20060a8aecb2d0e990d3e52b19cc0e5",
+        "type": "enhancement"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.9.0...v0.9.1",
     "date": "2020-04-29",
-    "deletions_count": 223,
+    "deletions_count": 376,
     "description": "",
     "highlights": [
 
     ],
-    "insertions_count": 651,
+    "insertions_count": 1205,
     "last_version": "0.9.0",
     "permalink": "/releases/0.9.1/",
     "title": "Vector v0.9.1",
@@ -29779,16 +29844,81 @@ module.exports = {
           ],
           "sha": "b2bc1b77ac53b412162a845293487586f66b3007",
           "type": "enhancement"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-04-30 10:51:02 +0000",
+          "deletions_count": 5,
+          "description": "Use specific error for x509 from system ca",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 10,
+          "message": "fix(security): Use specific error for x509 from system ca (#2507)",
+          "pr_number": 2507,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "security"
+            }
+          ],
+          "sha": "af544f361cc03e31207fcdd5e57104d051fde136",
+          "type": "fix"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-04-30 12:55:08 +0000",
+          "deletions_count": 114,
+          "description": "Shutdown topology pieces before building new ones",
+          "files_count": 6,
+          "highlight_permalink": null,
+          "insertions_count": 349,
+          "message": "fix(config): Shutdown topology pieces before building new ones (#2449)",
+          "pr_number": 2449,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "config"
+            }
+          ],
+          "sha": "a0d5cf5469045d066bed5ed950187ff6a7612dc4",
+          "type": "fix"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-04-30 13:28:53 +0000",
+          "deletions_count": 34,
+          "description": "Enforce age requirements",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 195,
+          "message": "enhancement(aws_cloudwatch_logs sink): Enforce age requirements (#2437)",
+          "pr_number": 2437,
+          "scopes": [
+            {
+              "component": {
+                "name": "aws_cloudwatch_logs",
+                "type": "sink"
+              },
+              "name": "aws_cloudwatch_logs sink"
+            }
+          ],
+          "sha": "319a75ddc20060a8aecb2d0e990d3e52b19cc0e5",
+          "type": "enhancement"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.9.0...v0.9.1",
       "date": "2020-04-29",
-      "deletions_count": 223,
+      "deletions_count": 376,
       "description": "",
       "highlights": [
 
       ],
-      "insertions_count": 651,
+      "insertions_count": 1205,
       "last_version": "0.9.0",
       "permalink": "/releases/0.9.1/",
       "title": "Vector v0.9.1",

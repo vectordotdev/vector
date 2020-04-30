@@ -8,7 +8,7 @@
 
 ---
 
-* [**v0.9.1**][urls.release_notes_0.9.1] - 2020-04-29 - 2 enhancements, 9 bug fixes
+* [**v0.9.1**][urls.release_notes_0.9.1] - 2020-04-29 - 3 enhancements, 11 bug fixes
 * [**v0.9.0**][urls.release_notes_0.9.0] - 2020-04-17 - 14 new features, 48 enhancements, 20 bug fixes
 * [**v0.8.2**][urls.release_notes_0.8.2] - 2020-03-06 - 2 bug fixes
 * [**v0.8.1**][urls.release_notes_0.8.1] - 2020-03-04 - 1 bug fix
