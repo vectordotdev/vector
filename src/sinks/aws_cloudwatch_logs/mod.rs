@@ -284,6 +284,66 @@ impl CloudwatchLogsSvc {
             }
         }
     }
+
+    pub fn process_events(&self, events: Vec<Event>) -> Vec<Vec<InputLogEvent>> {
+        let now = Utc::now();
+        // Acceptable range of Event timestamps.
+        let age_range = (now - Duration::days(14)).timestamp_millis()
+            ..(now + Duration::hours(2)).timestamp_millis();
+
+        let mut events = events
+            .into_iter()
+            .map(|mut e| {
+                self.encoding.apply_rules(&mut e);
+                e
+            })
+            .map(|e| e.into_log())
+            .map(|e| self.encode_log(e))
+            .filter(|e| age_range.contains(&e.timestamp))
+            .collect::<Vec<_>>();
+
+        // Sort by timestamp
+        events.sort_by_key(|e| e.timestamp);
+
+        info!(message = "Sending events.", events = %events.len());
+
+        let mut event_batches = Vec::new();
+        if events.is_empty() {
+            // This should happen rarely.
+            event_batches.push(Vec::new());
+        } else {
+            // We will split events into 24h batches.
+            // Relies on log_events being sorted by timestamp in ascending order.
+            while let Some(oldest) = events.first() {
+                let limit = oldest.timestamp + Duration::days(1).num_milliseconds();
+
+                if events.last().expect("Events can't be empty").timestamp <= limit {
+                    // Fast path.
+                    // In most cases the difference between oldest and newest event
+                    // is less than 24h.
+                    event_batches.push(events);
+                    break;
+                }
+
+                // At this point we know that an event older than the limit exists.
+                //
+                // We will find none or one of the events with timestamp==limit.
+                // In the case of more events with limit, we can just split them
+                // at found event, and send those before at with this batch, and
+                // those after at with the next batch.
+                let at = events
+                    .binary_search_by_key(&limit, |e| e.timestamp)
+                    .unwrap_or_else(|at| at);
+
+                // Can't be empty
+                let remainder = events.split_off(at);
+                event_batches.push(events);
+                events = remainder;
+            }
+        }
+
+        event_batches
+    }
 }
 
 impl Service<Vec<Event>> for CloudwatchLogsSvc {
@@ -315,60 +375,7 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
 
     fn call(&mut self, req: Vec<Event>) -> Self::Future {
         if self.token_rx.is_none() {
-            let now = Utc::now();
-            // Acceptable range of Event timestamps.
-            let age_range = (now - Duration::days(14)).timestamp_millis()
-                ..(now + Duration::hours(2)).timestamp_millis();
-
-            let mut events = req
-                .into_iter()
-                .map(|mut e| {
-                    self.encoding.apply_rules(&mut e);
-                    e
-                })
-                .map(|e| e.into_log())
-                .map(|e| self.encode_log(e))
-                .filter(|e| age_range.contains(&e.timestamp))
-                .collect::<Vec<_>>();
-
-            // Sort by timestamp
-            events.sort_by_key(|e| e.timestamp);
-
-            info!(message = "Sending events.", events = %events.len());
-
-            let mut event_batches = Vec::new();
-            if events.is_empty() {
-                event_batches.push(Vec::new());
-            } else {
-                // We will split events into 24h batches.
-                // Relies on log_events being sorted by timestamp in ascending order.
-                while let Some(oldest) = events.first() {
-                    let limit = oldest.timestamp + Duration::days(1).num_milliseconds();
-
-                    if events.last().expect("Events can't be empty").timestamp <= limit {
-                        // Fast path.
-                        // In most cases the difference between oldest and newest event
-                        // is less than 24h.
-                        event_batches.push(events);
-                        break;
-                    }
-
-                    // At this point we know that an event older than the limit exists.
-                    //
-                    // We will find none or one of the events with timestamp==limit.
-                    // In the case of more events with limit, we can just split them
-                    // at found event, and send those before at with this batch, and
-                    // those after at with the next batch.
-                    let at = events
-                        .binary_search_by_key(&limit, |e| e.timestamp)
-                        .unwrap_or_else(|at| at);
-
-                    // Can't be empty
-                    let remainder = events.split_off(at);
-                    event_batches.push(events);
-                    events = remainder;
-                }
-            }
+            let event_batches = self.process_events(req);
 
             let (tx, rx) = oneshot::channel();
             self.token_rx = Some(rx);
@@ -779,6 +786,31 @@ mod tests {
         event.insert("key", "value");
         let encoded = svc(config).encode_log(event.clone());
         assert_eq!(encoded.message, "hello world");
+    }
+
+    #[test]
+    fn cloudwatch_24h_split() {
+        let now = Utc::now();
+        let events = (0..100)
+            .into_iter()
+            .map(|i| now - Duration::hours(i))
+            .map(|timestamp| {
+                let mut event = Event::new_empty_log();
+                event
+                    .as_mut_log()
+                    .insert(&event::log_schema().timestamp_key(), timestamp);
+                event
+            })
+            .collect();
+
+        let batches = svc(default_config(Encoding::Text)).process_events(events);
+
+        let day = Duration::days(1).num_milliseconds();
+        for batch in batches.iter() {
+            assert!((batch.last().unwrap().timestamp - batch.first().unwrap().timestamp) <= day);
+        }
+
+        assert_eq!(batches.len(), 5);
     }
 }
 
