@@ -4053,11 +4053,32 @@ module.exports = {
         ],
         "sha": "319a75ddc20060a8aecb2d0e990d3e52b19cc0e5",
         "type": "enhancement"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-04-30 11:17:14 +0000",
+        "deletions_count": 605,
+        "description": "Check code on Windows",
+        "files_count": 3,
+        "highlight_permalink": null,
+        "insertions_count": 640,
+        "message": "chore(operations): Check code on Windows (#2506)",
+        "pr_number": 2506,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "fcd5c1893713e08d1ee0f51cdca5aa16686af148",
+        "type": "chore"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.9.0...v0.9.1",
     "date": "2020-04-29",
-    "deletions_count": 376,
+    "deletions_count": 981,
     "description": "",
     "highlights": [
       {
@@ -4075,7 +4096,7 @@ module.exports = {
         "title": "A New Guides Section"
       }
     ],
-    "insertions_count": 1205,
+    "insertions_count": 1845,
     "last_version": "0.9.0",
     "permalink": "/releases/0.9.1/",
     "title": "Vector v0.9.1",
@@ -29913,11 +29934,32 @@ module.exports = {
           ],
           "sha": "319a75ddc20060a8aecb2d0e990d3e52b19cc0e5",
           "type": "enhancement"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-04-30 11:17:14 +0000",
+          "deletions_count": 605,
+          "description": "Check code on Windows",
+          "files_count": 3,
+          "highlight_permalink": null,
+          "insertions_count": 640,
+          "message": "chore(operations): Check code on Windows (#2506)",
+          "pr_number": 2506,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "fcd5c1893713e08d1ee0f51cdca5aa16686af148",
+          "type": "chore"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.9.0...v0.9.1",
       "date": "2020-04-29",
-      "deletions_count": 376,
+      "deletions_count": 981,
       "description": "",
       "highlights": [
         {
@@ -29935,7 +29977,7 @@ module.exports = {
           "title": "A New Guides Section"
         }
       ],
-      "insertions_count": 1205,
+      "insertions_count": 1845,
       "last_version": "0.9.0",
       "permalink": "/releases/0.9.1/",
       "title": "Vector v0.9.1",
