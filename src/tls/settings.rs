@@ -1,7 +1,7 @@
 use super::{
     AddCertToStore, AddExtraChainCert, DerExportError, FileOpenFailed, FileReadFailed, MaybeTls,
     NewStoreBuilder, ParsePkcs12, Pkcs12Error, PrivateKeyParseError, Result, SetCertificate,
-    SetPrivateKey, SetVerifyCert, TlsError, TlsIdentityError, X509ParseError, X509SystemParseError
+    SetPrivateKey, SetVerifyCert, TlsError, TlsIdentityError, X509ParseError, X509SystemParseError,
 };
 use openssl::{
     pkcs12::{ParsedPkcs12, Pkcs12},
@@ -264,7 +264,9 @@ fn load_mac_certs(builder: &mut SslContextBuilder) -> Result<()> {
         }
     }
 
-    builder.set_verify_cert_store(store.build()).context(SetVerifyCert)?;
+    builder
+        .set_verify_cert_store(store.build())
+        .context(SetVerifyCert)?;
 
     Ok(())
 }

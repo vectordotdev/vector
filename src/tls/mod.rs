@@ -112,7 +112,7 @@ pub enum TlsError {
     Schannel { source: std::io::Error },
     #[cfg(any(windows, target_os = "macos"))]
     #[snafu(display("Unable to parse X509 from system cert: {}", source))]
-    X509SystemParseError { source: ErrorStack }
+    X509SystemParseError { source: ErrorStack },
 }
 
 impl MaybeTlsStream<TcpStream> {
