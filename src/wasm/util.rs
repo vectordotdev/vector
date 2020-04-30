@@ -1,6 +1,6 @@
-use foreign_modules::Registration;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
+use vector_wasm::Registration;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[repr(transparent)]

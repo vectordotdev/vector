@@ -91,20 +91,20 @@ test-integration-splunk: ## Runs Kafka integration tests
 test-unit: ## Runs unit tests, tests which do not require additional services to be present
 	$(RUN) test-unit
 
-# Dev (foreign modules)
+# Dev (wasm modules)
 ensure-has-wasm-toolchain: ### Configures a wasm toolchain for test artifact building, if required
 	rustup target add wasm32-wasi
 
-TEST_FOREIGN_MODULES := $(patsubst tests/data/foreign_modules/%, target/wasm-wasi/release/%.wasm, $(wildcard tests/data/foreign_modules/*))
-build-test-foreign-modules: $(TEST_FOREIGN_MODULES) ### Builds engine test modules, if required
+TEST_WASM_MODULES := $(patsubst tests/data/wasm/%, target/wasm-wasi/release/%.wasm, $(wildcard tests/data/wasm/*))
+build-test-wasm-modules: $(TEST_WASM_MODULES) ### Builds engine test modules, if required
 
 .ONESHELL:
-$(TEST_FOREIGN_MODULES): ensure-has-wasm-toolchain ### Build the target test module
-	cd $(patsubst target/wasm-wasi/release/%.wasm, tests/data/foreign_modules/%, $@)
+$(TEST_WASM_MODULES): ensure-has-wasm-toolchain ### Build the target test module
+	cd $(patsubst target/wasm-wasi/release/%.wasm, tests/data/wasm/%, $@)
 	cargo build --target wasm32-wasi --release
 
-test-foreign-modules: build-test-foreign-modules  ### Run engine tests.
-	cargo test foreign_modules --no-default-features --features ${DEFAULT_FEATURES} -- --nocapture
+test-wasm-modules: build-test-wasm-modules  ### Run engine tests.
+	cargo test wasm --no-default-features --features ${DEFAULT_FEATURES} -- --nocapture
 
 ##@ Checking
 

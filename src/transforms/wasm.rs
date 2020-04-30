@@ -1,11 +1,12 @@
 use super::Transform;
 use crate::{
     event::Event,
-    foreign_modules::{Role, WasmModule, WasmModuleConfig},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    wasm::{WasmModule, WasmModuleConfig},
 };
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
+use vector_wasm::Role;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -64,12 +65,9 @@ impl Transform for Wasm {
 #[cfg(test)]
 mod tests {
     use super::Wasm;
-    use crate::{
-        event::Event, transforms::Transform,
-    };
+    use crate::{event::Event, transforms::Transform};
     use serde_json::Value;
-    use std::collections::HashMap;
-    use std::{fs, io::Read, path::Path};
+    use std::{collections::HashMap, fs, io::Read, path::Path};
 
     fn parse_config(s: &str) -> crate::Result<Wasm> {
         Wasm::new(toml::from_str(s).unwrap())
@@ -97,7 +95,7 @@ mod tests {
             "#,
         )?;
 
-        let input = parse_event_artifact("tests/data/foreign_modules/protobuf/demo.json")?;
+        let input = parse_event_artifact("tests/data/wasm/protobuf/demo.json")?;
 
         let mut expected = input.clone();
         expected.as_mut_log().insert(

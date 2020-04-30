@@ -1,8 +1,6 @@
 use serde_json::Value;
 use snafu::{ResultExt, Snafu};
-use std::ffi::CString;
-use std::os::raw::c_char;
-use std::str;
+use std::{ffi::CString, os::raw::c_char, str};
 
 #[derive(Debug, Snafu)]
 #[repr(C)]

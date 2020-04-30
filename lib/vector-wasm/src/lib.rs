@@ -43,14 +43,13 @@ where
     fn deref(self, heap: &[u8]) -> Result<Target, std::ffi::NulError>;
 }
 
-
 /// A module registration.
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize)]
 #[must_use]
 #[repr(C)]
 pub struct Registration {
     /// The role of the module.
-    /// 
+    ///
     /// The host will also define this, and the registration will fail if they differ in types.
     /// This is a simple two-way handshake safety procedure to ensure modules get used in the right place.
     role: Role,
@@ -82,4 +81,3 @@ impl Registration {
         self.wasi
     }
 }
-

@@ -1,6 +1,7 @@
-use crate::{foreign_modules::Role, emit, internal_events::InternalEvent};
-use metrics::counter;
 use super::State;
+use crate::{emit, internal_events::InternalEvent};
+use metrics::counter;
+use vector_wasm::Role;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[must_use]

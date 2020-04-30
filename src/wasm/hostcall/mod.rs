@@ -5,20 +5,24 @@
 //! #[no_mangle]
 //! ```
 
-use super::context::ForeignModuleContext;
+use super::context::EventBuffer;
+use crate::internal_events;
 use lucet_runtime::{lucet_hostcall, vmctx::Vmctx};
-use std::ffi::{CStr, CString};
-use std::io::Write;
-use std::os::raw::c_char;
-use std::str::FromStr;
-use crate::{internal_events, foreign_modules::Role};
+use std::{
+    ffi::{CStr, CString},
+    io::Write,
+    os::raw::c_char,
+    sync::Once,
+    str::FromStr,
+};
+use vector_wasm::Role;
 
 #[lucet_hostcall]
 #[no_mangle]
 pub unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> usize {
     let internal_event = internal_events::Hostcall::begin(Role::Transform, "hint_field_length");
 
-    let hostcall_context = vmctx.get_embed_ctx_mut::<ForeignModuleContext>();
+    let hostcall_context = vmctx.get_embed_ctx_mut::<EventBuffer>();
     let mut heap = vmctx.heap_mut();
     let field_cstr = CStr::from_ptr(heap[key_ptr as usize..].as_mut_ptr() as *mut c_char);
     let field_str = field_cstr.to_str().unwrap_or("Broke to str");
@@ -45,7 +49,7 @@ pub unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> us
 pub unsafe fn get(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) -> usize {
     let internal_event = internal_events::Hostcall::begin(Role::Transform, "get");
 
-    let hostcall_context = vmctx.get_embed_ctx_mut::<ForeignModuleContext>();
+    let hostcall_context = vmctx.get_embed_ctx_mut::<EventBuffer>();
     let mut heap = vmctx.heap_mut();
 
     let key_cstr = CStr::from_ptr(heap[key_ptr as usize..].as_mut_ptr() as *mut c_char);
@@ -77,7 +81,7 @@ pub unsafe fn get(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c
 pub unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) {
     let internal_event = internal_events::Hostcall::begin(Role::Transform, "insert");
 
-    let mut hostcall_context = vmctx.get_embed_ctx_mut::<ForeignModuleContext>();
+    let mut hostcall_context = vmctx.get_embed_ctx_mut::<EventBuffer>();
     let mut heap = vmctx.heap_mut();
 
     let key_cstr = CStr::from_ptr(heap[key_ptr as usize..].as_mut_ptr() as *mut c_char);
@@ -94,7 +98,7 @@ pub unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *cons
     internal_event.complete();
 }
 
-static HOSTCALL_API_INIT: std::sync::Once = std::sync::Once::new();
+static HOSTCALL_API_INIT: Once = Once::new();
 
 /// Call this if you're having trouble with `lucet_*` symbols not being exported.
 ///

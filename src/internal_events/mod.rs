@@ -11,8 +11,8 @@ mod tcp;
 mod udp;
 mod unix;
 mod vector;
-#[cfg(feature = "foreign_modules")]
-mod foreign_modules;
+#[cfg(feature = "modules-wasm")]
+mod wasm;
 
 pub use self::blackhole::*;
 pub use self::elasticsearch::*;
@@ -26,9 +26,9 @@ pub use self::syslog::*;
 pub use self::tcp::*;
 pub use self::udp::*;
 pub use self::unix::*;
-#[cfg(feature = "foreign_modules")]
-pub use self::foreign_modules::*;
 pub use self::vector::*;
+#[cfg(feature = "modules-wasm")]
+pub use self::wasm::*;
 
 pub trait InternalEvent: std::fmt::Debug {
     fn emit_logs(&self) {}

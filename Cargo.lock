@@ -1179,16 +1179,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 
 [[package]]
-name = "foreign_modules"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "snafu",
- "tracing",
-]
-
-[[package]]
 name = "fs_extra"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3366,11 +3356,11 @@ name = "protobuf"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "foreign_modules",
  "prost 0.6.1",
  "prost-build 0.6.1",
  "serde",
  "serde_json",
+ "vector-wasm",
 ]
 
 [[package]]
@@ -5746,7 +5736,6 @@ dependencies = [
  "exitcode",
  "file-source",
  "flate2",
- "foreign_modules",
  "futures 0.1.29",
  "futures 0.3.4",
  "getset",
@@ -5854,8 +5843,19 @@ dependencies = [
  "typetag",
  "url 1.7.2",
  "uuid 0.7.4",
+ "vector-wasm",
  "walkdir",
  "warp",
+]
+
+[[package]]
+name = "vector-wasm"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "snafu",
+ "tracing",
 ]
 
 [[package]]

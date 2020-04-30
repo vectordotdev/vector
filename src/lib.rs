@@ -15,9 +15,9 @@ pub mod config_paths;
 pub mod dns;
 pub mod event;
 pub mod expiring_hash_map;
-#[cfg(feature = "foreign_modules")]
-pub mod foreign_modules;
 pub mod generate;
+#[cfg(feature = "modules-wasm")]
+pub mod wasm;
 #[macro_use]
 pub mod internal_events;
 #[cfg(feature = "rdkafka")]

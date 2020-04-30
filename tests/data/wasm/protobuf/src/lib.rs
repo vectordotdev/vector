@@ -1,8 +1,5 @@
-use foreign_modules::{
-    hostcall,
-    Registration,
-};
 use prost::Message;
+use vector_wasm::{hostcall, Registration};
 
 pub mod items {
     include!(concat!(env!("OUT_DIR"), "/messages.rs"));

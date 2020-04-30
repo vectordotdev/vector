@@ -1,31 +1,27 @@
 //! Foreign module support
 //!
 //! This module contains the implementation code of our foreign module support. The core traits of
-//! our foreign module support exist in the `foreign_modules` crate.
+//! our foreign module support exist in the `vector-wasm` crate.
 //!
 //! **Note:** This code is experimental.
 
-use crate::{Event, Result};
+use crate::{internal_events, Event, Result};
+use context::EventBuffer;
 use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Region};
 use lucet_wasi::WasiCtxBuilder;
-use lucetc::Bindings;
-use lucetc::{Lucetc, LucetcOpts};
-use std::fs;
-use std::path::{Path, PathBuf};
-use tracing::{Level};
+use lucetc::{Bindings, Lucetc, LucetcOpts};
 use serde::{Deserialize, Serialize};
+use std::{
+    fmt::Debug,
+    fs,
+    path::{Path, PathBuf},
+};
+use tracing::Level;
+use util::GuestPointer;
+use vector_wasm::{Registration, Role};
 
 mod context;
 mod util;
-use context::ForeignModuleContext;
-use foreign_modules::Registration;
-use std::fmt::Debug;
-use util::GuestPointer;
-use crate::internal_events;
-
-pub use foreign_modules::{
-    Role,
-}; // This is kind of bad practice, but it's very convienent.
 
 pub mod hostcall; // Pub is required for lucet.
 
@@ -144,7 +140,8 @@ impl WasmModule {
 
         event!(Level::TRACE, "registering");
         // This is a pointer into the WASM Heap!
-        let registration_ptr: *mut Registration = wasm_module.instance.run("init", &[])?.returned()?.as_mut();
+        let registration_ptr: *mut Registration =
+            wasm_module.instance.run("init", &[])?.returned()?.as_mut();
         let registration_ptr = GuestPointer::<Registration>::from(registration_ptr);
         let registration = registration_ptr.deref(wasm_module.instance.heap_mut())?;
         if registration.wasi() {
@@ -159,16 +156,16 @@ impl WasmModule {
     pub fn process(&mut self, event: Event) -> Result<Option<Event>> {
         let internal_event_processing = internal_events::EventProcessing::begin(self.role);
 
-        let engine_context = ForeignModuleContext::new(event);
+        let engine_context = EventBuffer::new(event);
         self.instance.insert_embed_ctx(engine_context);
 
         let _worked = self.instance.run("process", &[])?;
 
-        let engine_context: ForeignModuleContext = self
+        let engine_context: EventBuffer = self
             .instance
             .remove_embed_ctx()
             .ok_or("Could not retrieve context after processing.")?;
-        let ForeignModuleContext { event: out } = engine_context;
+        let EventBuffer { event: out } = engine_context;
 
         internal_event_processing.complete();
         Ok(out)
@@ -191,7 +188,7 @@ fn protobuf() -> Result<()> {
     crate::test_util::trace_init();
 
     // Load in fixtures.
-    let mut test_file = fs::File::open("tests/data/foreign_modules/protobuf/demo.pb")?;
+    let mut test_file = fs::File::open("tests/data/wasm/protobuf/demo.pb")?;
     let mut buf = String::new();
     test_file.read_to_string(&mut buf)?;
     let mut event = Event::new_empty_log();
@@ -199,7 +196,7 @@ fn protobuf() -> Result<()> {
 
     // Refresh the test json.
     let event_string = serde_json::to_string(&event.as_log())?;
-    let mut json_fixture = fs::File::create("tests/data/foreign_modules/protobuf/demo.json")?;
+    let mut json_fixture = fs::File::create("tests/data/wasm/protobuf/demo.json")?;
     json_fixture.write(event_string.as_bytes())?;
 
     // Run the test.
