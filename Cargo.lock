@@ -2705,6 +2705,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "noop"
+version = "0.1.0"
+dependencies = [
+ "vector-wasm",
+]
+
+[[package]]
 name = "notify"
 version = "4.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"

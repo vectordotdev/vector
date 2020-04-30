@@ -58,7 +58,7 @@ impl Wasm {
 
 impl Transform for Wasm {
     fn transform(&mut self, event: Event) -> Option<Event> {
-        self.module.process(event.clone()).unwrap_or(None)
+        self.module.process(event).unwrap_or(None)
     }
 }
 

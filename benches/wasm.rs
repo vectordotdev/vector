@@ -48,4 +48,28 @@ pub fn protobuf(c: &mut Criterion) {
     );
 }
 
-criterion_group!(wasm, protobuf);
+pub fn noop(c: &mut Criterion) {
+    c.bench(
+        "noop",
+        Benchmark::new("wasm", move |b| {
+            let mut transform = parse_config(
+                r#"
+            module = "target/wasm32-wasi/release/noop.wasm"
+            "#,
+            )
+            .unwrap();
+
+            let input = Event::new_empty_log();
+
+            b.iter_with_setup(
+                || input.clone(),
+                |input| {
+                    let output = transform.transform(input);
+                    black_box(output)
+                },
+            )
+        }),
+    );
+}
+
+criterion_group!(wasm, protobuf, noop);
