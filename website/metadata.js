@@ -31909,7 +31909,7 @@ module.exports = {
       "features": [
 
       ],
-      "function_category": "shape",
+      "function_category": "schema",
       "id": "add_fields_transform",
       "inpuut_types": [
         "log"
@@ -31946,7 +31946,7 @@ module.exports = {
       "features": [
 
       ],
-      "function_category": "shape",
+      "function_category": "schema",
       "id": "add_tags_transform",
       "inpuut_types": [
         "metric"
@@ -32057,7 +32057,7 @@ module.exports = {
       "features": [
 
       ],
-      "function_category": "parse",
+      "function_category": "schema",
       "id": "coercer_transform",
       "inpuut_types": [
         "log"
@@ -32094,7 +32094,7 @@ module.exports = {
       "features": [
 
       ],
-      "function_category": "shape",
+      "function_category": "schema",
       "id": "concat_transform",
       "inpuut_types": [
         "log"
@@ -32508,7 +32508,7 @@ module.exports = {
       "features": [
 
       ],
-      "function_category": "shape",
+      "function_category": "schema",
       "id": "remove_fields_transform",
       "inpuut_types": [
         "log"
@@ -32545,7 +32545,7 @@ module.exports = {
       "features": [
 
       ],
-      "function_category": "shape",
+      "function_category": "schema",
       "id": "remove_tags_transform",
       "inpuut_types": [
         "metric"
@@ -32582,7 +32582,7 @@ module.exports = {
       "features": [
 
       ],
-      "function_category": "shape",
+      "function_category": "schema",
       "id": "rename_fields_transform",
       "inpuut_types": [
         "log"

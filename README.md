@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/components/">Components<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog/">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Community<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download/">Download v0.9.1<a/>
+    <a href="https://vector.dev/components/">Components<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog/">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download/">Download v0.9.1<a/>
   </strong>
 </p>
 
@@ -194,11 +194,11 @@ Or use your own [preferred method][docs.installation].
 
 ## Latest Highlights
 
-* [Improved Shutdown](https://vector.dev/highlights/2020-04-20-improved-shutdown/)
-* [4 New Sinks!](https://vector.dev/highlights/2020-04-17-new-sinks/)
-* [Set the Lua transform `search_dirs` option to Vector's config dir by default](https://vector.dev/highlights/2020-04-09-set-search_dirs-to-config-dirs-by-default/)
-* [ACL is now optional for the Google Cloud Storage sink](https://vector.dev/highlights/2020-04-09-make-acl-optional/)
-* [The Vector Source Now Accepts Metrics](https://vector.dev/highlights/2020-04-07-vector-to-vector-metrics/)
+* [2020/04/20 - Improved Shutdown](https://vector.dev/highlights/2020-04-20-improved-shutdown/) - available in [0.9.0][urls.vector_download]
+* [2020/04/17 - 4 New Sinks!](https://vector.dev/highlights/2020-04-17-new-sinks/) - available in [0.9.0][urls.vector_download]
+* [2020/04/09 - Set the Lua transform `search_dirs` option to Vector's config dir by default](https://vector.dev/highlights/2020-04-09-set-search_dirs-to-config-dirs-by-default/) - available in [0.9.0][urls.vector_download]
+* [2020/04/09 - ACL is now optional for the Google Cloud Storage sink](https://vector.dev/highlights/2020-04-09-make-acl-optional/) - available in [0.9.0][urls.vector_download]
+* [2020/04/07 - The Vector Source Now Accepts Metrics](https://vector.dev/highlights/2020-04-07-vector-to-vector-metrics/) - available in [0.9.0][urls.vector_download]
 
 [view all...][urls.vector_highlights]
 
@@ -280,6 +280,7 @@ Or use your own [preferred method][docs.installation].
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
 [urls.vector_community]: https://vector.dev/community/
+[urls.vector_download]: https://vector.dev/releases/latest/download/
 [urls.vector_enriching_transforms]: https://vector.dev/components/?functions%5B%5D=enrich
 [urls.vector_highlights]: https://vector.dev/highlights/
 [urls.vector_parsing_transforms]: https://vector.dev/components/?functions%5B%5D=parse
