@@ -91,3 +91,6 @@ spec:
               - configMap:
                   name: vector-config
                   optional: true
+              - secret:
+                  name: vector-config
+                  optional: true
