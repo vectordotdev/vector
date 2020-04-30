@@ -34,17 +34,20 @@ VECTOR_TEST_KUBECTL="${VECTOR_TEST_KUBECTL:-"kubectl"}"
 # Allow optionally installing custom resource configs.
 CUSTOM_RESOURCE_CONIFGS_FILE="${CUSTOM_RESOURCE_CONIFGS_FILE:-""}"
 
+
+# TODO: replace with `helm template | kubectl apply -f -` when Helm Chart is
+# available.
+
+templated-config-global() {
+  sed "s|^    namespace: vector|    namespace: $NAMESPACE|" < "distribution/kubernetes/vector-global.yaml" \
+    | sed "s|^  name: vector|  name: $NAMESPACE|"
+}
+
 up() {
   # A Vector container image to use.
   CONTAINER_IMAGE="${CONTAINER_IMAGE:?"You must assing CONTAINER_IMAGE variable with the Vector container image name"}"
 
-  # Accept a custom set of resources via stdin.
-
-  # TODO: replace with `helm template | kubectl apply -f -` when Helm Chart is
-  # available.
-
-  sed "s|namespace: vector|namespace: $NAMESPACE|" < "distribution/kubernetes/vector-global.yaml" \
-    | $VECTOR_TEST_KUBECTL create -f -
+  templated-config-global | $VECTOR_TEST_KUBECTL create -f -
 
   $VECTOR_TEST_KUBECTL create namespace "$NAMESPACE"
 
@@ -65,7 +68,7 @@ down() {
 
   $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE"
 
-  $VECTOR_TEST_KUBECTL delete -f - < "distribution/kubernetes/vector-global.yaml"
+  templated-config-global | $VECTOR_TEST_KUBECTL delete -f -
 }
 
 case "$COMMAND" in
