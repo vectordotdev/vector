@@ -330,7 +330,7 @@ fn encode_events(
             match event.kind {
                 MetricKind::Incremental => match event.value {
                     MetricValue::Counter { value } => Some(vec![signalfx_proto::DataPoint {
-                        source: Some(String::from("default")),
+                        source: Some(String::from("vector")),
                         metric: Some(fullname),
                         metric_type: Some(signalfx_proto::MetricType::Counter as i32),
                         timestamp: Some(ts),
@@ -339,13 +339,13 @@ fn encode_events(
                             str_value: None,
                             int_value: None,
                         }),
-                        dimensions: dimensions,
+                        dimensions,
                     }]),
                     _ => None,
                 },
                 MetricKind::Absolute => match event.value {
                     MetricValue::Gauge { value } => Some(vec![signalfx_proto::DataPoint {
-                        source: Some(String::from("default")),
+                        source: Some(String::from("vector")),
                         metric: Some(fullname),
                         metric_type: Some(signalfx_proto::MetricType::Gauge as i32),
                         timestamp: Some(ts),
@@ -354,7 +354,7 @@ fn encode_events(
                             str_value: None,
                             int_value: None,
                         }),
-                        dimensions: dimensions,
+                        dimensions,
                     }]),
                     _ => None,
                 },
