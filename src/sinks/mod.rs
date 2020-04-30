@@ -51,6 +51,8 @@ pub mod prometheus;
 pub mod pulsar;
 #[cfg(feature = "sinks-sematext_logs")]
 pub mod sematext_logs;
+#[cfg(feature = "sinks-signalfx")]
+pub mod signalfx;
 #[cfg(feature = "sinks-socket")]
 pub mod socket;
 #[cfg(feature = "sinks-splunk_hec")]

@@ -325,6 +325,7 @@ sinks = [
   "sinks-clickhouse",
   "sinks-console",
   "sinks-datadog",
+  "sinks-signalfx",
   "sinks-elasticsearch",
   "sinks-file",
   "sinks-gcp",
@@ -354,6 +355,7 @@ sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
 sinks-datadog = []
+sinks-signalfx = []
 sinks-elasticsearch = ["base64", "bytesize", "rusoto_core", "rusoto_credential", "rusoto_sts"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt", "uuid"]
