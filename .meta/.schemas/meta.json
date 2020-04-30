@@ -627,7 +627,7 @@
             "program",
             "route",
             "sanitize",
-            "shape"
+            "schema"
           ]
         },
         "input_types": {
