@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: vector-daemonset-managed-config
 data:
-  vector.toml: |
+  managed.toml: |
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
 
