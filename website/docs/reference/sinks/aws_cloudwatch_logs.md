@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-04-30"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Logs"
 description: "The Vector `aws_cloudwatch_logs` sink batches `log` events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint."
@@ -76,7 +76,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
   stream_name = "{{ host }}" # required
 
   # Batch
-  batch.max_size = 1049000 # optional, default, bytes
+  batch.max_events = 1000 # optional, default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
@@ -154,23 +154,23 @@ Configures the sink batching behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={1049000}
+  defaultValue={1000}
   enumValues={null}
-  examples={[1049000]}
+  examples={[1000]}
   groups={[]}
-  name={"max_size"}
+  name={"max_events"}
   path={"batch"}
   relevantWhen={null}
   required={false}
   templateable={false}
   type={"int"}
-  unit={"bytes"}
+  unit={"events"}
   warnings={[]}
   >
 
-#### max_size
+#### max_events
 
-The maximum size of a batch, in bytes, before it is flushed.
+The maximum size of a batch, in events, before it is flushed.
 
  See [Buffers & Batches](#buffers--batches) for more info.
 
@@ -246,7 +246,7 @@ Configures the sink specific buffer behavior.
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
 
-
+ See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -270,7 +270,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 The maximum size of the buffer on the disk.
 
- See [Buffers & Batches](#buffers--batches) for more info.
+
 
 
 </Field>
@@ -953,7 +953,7 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 *Batches* are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured [`timeout_secs`](#timeout_secs).
-2. The batch size meets or exceeds the configured [`max_size`](#max_size).
+2. The batch size meets or exceeds the configured [`max_events`](#max_events).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 

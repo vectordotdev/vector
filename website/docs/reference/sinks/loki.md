@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-04-30"
 delivery_guarantee: "at_least_once"
 component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
