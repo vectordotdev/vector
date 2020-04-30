@@ -30,7 +30,7 @@ pub enum Field {
 #[derive(Debug, Snafu)]
 enum ConfigError {
     #[snafu(display("InfluxDB v1 or v2 should be configured as endpoint."))]
-    MissingConfiguration {},
+    MissingConfiguration,
     #[snafu(display(
         "Unclear settings. Both version configured v1: {:?}, v2: {:?}.",
         v1_settings,
@@ -124,7 +124,7 @@ fn influxdb_settings(
     }
 
     if influxdb1_settings.is_none() & influxdb2_settings.is_none() {
-        return Err(ConfigError::MissingConfiguration {}.into());
+        return Err(ConfigError::MissingConfiguration.into());
     }
 
     if let Some(settings) = influxdb1_settings {
