@@ -4,8 +4,8 @@ use crate::{
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     wasm::{WasmModule, WasmModuleConfig},
 };
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use vector_wasm::Role;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

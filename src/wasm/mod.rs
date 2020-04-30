@@ -12,6 +12,7 @@ use lucet_wasi::WasiCtxBuilder;
 use lucetc::{Bindings, Lucetc, LucetcOpts};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     fmt::Debug,
     fs,
     path::{Path, PathBuf},
@@ -42,6 +43,9 @@ pub struct WasmModuleConfig {
     /// The path to the module's `wasm` file.
     pub path: PathBuf,
     /// The cache location where an optimized `so` file shall be placed.
+    ///
+    /// This folder also stores a `.fingerprints` file that is formatted as a JSON map, matching file paths
+    /// to fingerprints.
     #[derivative(Default(value = "defaults::ARTIFACT_CACHE.into()"))]
     pub artifact_cache: PathBuf,
     /// The maximum size of the heap the module may grow to.
@@ -75,16 +79,90 @@ impl WasmModuleConfig {
     }
 }
 
+// TODO: Make a proper fingerprinted artifact type.
+
+type Fingerprint = u64;
+
+/// Get the age (since UNIX epoch) of a file.
+fn calculate_fingerprint(file: impl AsRef<Path> + Debug) -> Result<Fingerprint> {
+    let path = file.as_ref();
+    let meta = std::fs::metadata(path)?;
+
+    let modified = meta.modified()?;
+    let age = modified.duration_since(std::time::UNIX_EPOCH)?;
+    Ok(age.as_secs())
+}
+
+/// Returns the stored JSON map in the fingerprint store.
+///
+/// If the `$ARTIFACT_CACHE/.fingerprints` file does not exist, we return an empty HashMap.
+fn fetch_known_fingerprints(
+    artifact_cache: impl AsRef<Path> + Debug,
+) -> Result<HashMap<PathBuf, Fingerprint>> {
+    let artifact_cache = artifact_cache.as_ref();
+    let mut fingerprint_pathbuf = artifact_cache.to_path_buf();
+    fingerprint_pathbuf.push(".fingerprints");
+
+    match std::fs::File::open(fingerprint_pathbuf) {
+        Ok(fingerprint_file) => {
+            let reader = std::io::BufReader::new(fingerprint_file);
+            let fingerprints = serde_json::from_reader(reader)?;
+            Ok(fingerprints)
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(HashMap::new()),
+        Err(e) => Err(Box::new(e)),
+    }
+}
+
+/// Parse `$ARTIFACT_CACHE/.fingerprints` and determine the fingerprint of the file path (which should be the wasm file).
+fn fetch_fingerprint(
+    artifact_cache: impl AsRef<Path> + Debug,
+    file: impl AsRef<Path> + Debug,
+) -> Result<Option<Fingerprint>> {
+    let artifact_cache = artifact_cache.as_ref();
+    let file_path = file.as_ref();
+
+    let fingerprints = fetch_known_fingerprints(artifact_cache)?;
+    Ok(fingerprints.get(file_path).cloned())
+}
+
+/// Parse `$ARTIFACT_CACHE/.fingerprints` and add the given fingerprint.
+fn store_fingerprint(
+    artifact_cache: impl AsRef<Path> + Debug,
+    file: impl AsRef<Path> + Debug,
+    fingerprint: Fingerprint,
+) -> Result<()> {
+    let artifact_cache = artifact_cache.as_ref();
+    let file_path = file.as_ref();
+
+    let mut fingerprints = fetch_known_fingerprints(artifact_cache)?;
+    fingerprints.insert(file_path.to_path_buf(), fingerprint);
+
+    let mut fingerprint_pathbuf = artifact_cache.to_path_buf();
+    fingerprint_pathbuf.push(".fingerprints");
+
+    let fingerprint_file = std::fs::File::create(fingerprint_pathbuf)?;
+    let writer = std::io::BufWriter::new(fingerprint_file);
+    serde_json::to_writer_pretty(writer, &fingerprints)?;
+    Ok(())
+}
+
 /// Compiles a WASM module located at `input` and writes an optimized shared object to `output`.
-fn compile(input: impl AsRef<Path> + Debug, output: impl AsRef<Path> + Debug) -> Result<()> {
+fn compile(
+    input: impl AsRef<Path> + Debug,
+    output: impl AsRef<Path> + Debug,
+) -> Result<Fingerprint> {
+    let input = input.as_ref();
+    let fingerprint = calculate_fingerprint(input)?;
+
     let mut bindings = lucet_wasi::bindings();
     bindings.extend(&Bindings::from_str(include_str!("hostcall/bindings.json"))?)?;
-    let ret = Lucetc::new(input)
+    Lucetc::new(input)
         .with_bindings(bindings)
         .shared_object_file(output)?;
 
     event!(Level::INFO, "done");
-    Ok(ret)
+    Ok(fingerprint)
 }
 
 /// A foreign module that is operating as a WASM guest.
@@ -113,9 +191,22 @@ impl WasmModule {
         fs::create_dir_all(&config.artifact_cache)?;
         hostcall::ensure_linked();
 
-        let internal_event_compilation = internal_events::WasmCompilation::begin(config.role);
-        compile(&config.path, &output_file)?;
-        internal_event_compilation.complete();
+        let calculated_fingerprint = calculate_fingerprint(&config.path)?;
+        let found_fingerprint = fetch_fingerprint(&config.artifact_cache, &config.path)?;
+        match found_fingerprint {
+            Some(found) if found == calculated_fingerprint => {
+                // We can be lazy and do nothing! How wonderful.
+                println!("Skipped wasm compile! Make me a metric later!");
+            }
+            None | Some(_) => {
+                println!("Rebuild wasm! Make me a metric later!");
+                let internal_event_compilation =
+                    internal_events::WasmCompilation::begin(config.role);
+                let fingerprint = compile(&config.path, &output_file)?;
+                store_fingerprint(&config.artifact_cache, &config.path, fingerprint)?;
+                internal_event_compilation.complete();
+            }
+        }
 
         // load the compiled Lucet module
         let module = DlModule::load(&output_file).unwrap();

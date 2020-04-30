@@ -12,8 +12,8 @@ use std::{
     ffi::{CStr, CString},
     io::Write,
     os::raw::c_char,
-    sync::Once,
     str::FromStr,
+    sync::Once,
 };
 use vector_wasm::Role;
 
@@ -100,8 +100,6 @@ pub unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *cons
 
 static HOSTCALL_API_INIT: Once = Once::new();
 
-/// Call this if you're having trouble with `lucet_*` symbols not being exported.
-///
 /// This is pretty hackish; we will hopefully be able to avoid this altogether once [this
 /// issue](https://github.com/rust-lang/rust/issues/58037) is addressed.
 #[no_mangle]

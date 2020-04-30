@@ -1,6 +1,7 @@
 use prost::Message;
 use vector_wasm::{hostcall, Registration};
 
+// Import from prost.
 pub mod items {
     include!(concat!(env!("OUT_DIR"), "/messages.rs"));
 }
