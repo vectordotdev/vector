@@ -1,0 +1,5 @@
+description = """\
+[SignalFx][urls.signalfx] is a monitoring service based on near real time streaming metrics \
+for cloud-scale applications, providing monitoring of servers, \
+databases, tools, and services, through a SaaS-based data analytics platform.\
+"""
