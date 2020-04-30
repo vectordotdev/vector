@@ -4,6 +4,7 @@
 .envrc
 .DS_Store
 .idea/
+.vscode/
 checkpoints/*
 logs*/
 miniodat
