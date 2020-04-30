@@ -13,8 +13,6 @@ data:
     # Ingest logs from Kubernetes.
     [sources.kubernetes]
         type = "kubernetes"
-
-  # This line is not in vector.toml
 ---
 apiVersion: apps/v1
 kind: DaemonSet
