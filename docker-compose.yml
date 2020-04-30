@@ -99,7 +99,7 @@ services:
       - ./target/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
     user: $USER
-    command: cargo check --all --all-targets
+    command: scripts/check-code.sh
 
   check-component-features:
     build:

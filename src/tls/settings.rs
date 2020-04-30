@@ -1,7 +1,7 @@
 use super::{
     AddCertToStore, AddExtraChainCert, DerExportError, FileOpenFailed, FileReadFailed, MaybeTls,
     NewStoreBuilder, ParsePkcs12, Pkcs12Error, PrivateKeyParseError, Result, SetCertificate,
-    SetPrivateKey, SetVerifyCert, TlsError, TlsIdentityError, X509ParseError, X509SystemParseError,
+    SetPrivateKey, SetVerifyCert, TlsError, TlsIdentityError, X509ParseError,
 };
 use openssl::{
     pkcs12::{ParsedPkcs12, Pkcs12},
@@ -204,7 +204,7 @@ fn load_windows_certs(builder: &mut SslContextBuilder) -> Result<()> {
 
     for cert in current_user_store.certs() {
         let cert = cert.to_der().to_vec();
-        let cert = X509::from_der(&cert[..]).context(X509SystemParseError)?;
+        let cert = X509::from_der(&cert[..]).context(super::X509SystemParseError)?;
         store.add_cert(cert).context(AddCertToStore)?;
     }
 
@@ -259,7 +259,7 @@ fn load_mac_certs(builder: &mut SslContextBuilder) -> Result<()> {
             trusted,
             TrustSettingsForCertificate::TrustRoot | TrustSettingsForCertificate::TrustAsRoot
         ) {
-            let cert = X509::from_der(&cert[..]).context(X509SystemParseError)?;
+            let cert = X509::from_der(&cert[..]).context(super::X509SystemParseError)?;
             store.add_cert(cert).context(AddCertToStore)?;
         }
     }
