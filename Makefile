@@ -262,6 +262,9 @@ sign-blog: ## Sign newly added blog articles using GPG
 
 ##@ Utility
 
+build-ci-docker-images: ## Rebuilds all Docker images used in CI
+	@scripts/build-ci-docker-images.sh
+
 clean: ## Clean everything
 	$(RUN) clean
 
