@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "at_least_once"
 component_title: "LogDNA"
 description: "The Vector `logdna` sink batches `log` events to LogDna's HTTP Ingestion API."
@@ -43,7 +43,7 @@ The Vector `logdna` sink
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "logdna" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${LOGDNA_API_KEY}" # required
   healthcheck = true # optional, default
   hostname = "${HOSTNAME}" # required
@@ -56,7 +56,7 @@ The Vector `logdna` sink
 [sinks.my_sink_id]
   # General
   type = "logdna" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${LOGDNA_API_KEY}" # required
   default_app = "vector" # optional, default
   healthcheck = true # optional, default
@@ -71,9 +71,9 @@ The Vector `logdna` sink
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -85,7 +85,7 @@ The Vector `logdna` sink
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 5 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
@@ -95,6 +95,30 @@ The Vector `logdna` sink
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${LOGDNA_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  groups={[]}
+  name={"api_key"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### api_key
+
+The Ingestion API key.
+
+
+
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -194,30 +218,6 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
-<Field
-  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -265,6 +265,30 @@ The maximum size of the buffer on the disk.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
@@ -289,6 +313,31 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"vector"}
+  enumValues={null}
+  examples={["vector","myapp"]}
+  groups={[]}
+  name={"default_app"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### default_app
+
+The default app that will be set for events that do not contain a `file` or
+`app` field.
+
+
+
 
 </Field>
 <Field
@@ -387,55 +436,6 @@ How to format event timestamps.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${LOGDNA_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
-  groups={[]}
-  name={"api_key"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### api_key
-
-The Ingestion API key.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={"vector"}
-  enumValues={null}
-  examples={["vector","myapp"]}
-  groups={[]}
-  name={"default_app"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### default_app
-
-The default app that will be set for events that do not contain a `file` or
-`app` field.
-
-
-
 
 </Field>
 <Field
@@ -562,30 +562,6 @@ The mac address that will be attached to each batch of events.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[["tag1","tag2"]]}
-  groups={[]}
-  name={"tags"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-### tags
-
-The tags that will be attached to each batch of events.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={[]}
   groups={[]}
   name={"request"}
@@ -680,9 +656,9 @@ time window.
 </Field>
 <Field
   common={false}
-  defaultValue={-1}
+  defaultValue={18446744073709551615}
   enumValues={null}
-  examples={[-1]}
+  examples={[18446744073709551615]}
   groups={[]}
   name={"retry_attempts"}
   path={"request"}
@@ -696,7 +672,8 @@ time window.
 
 #### retry_attempts
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
 
  See [Retry Policy](#retry-policy) for more info.
 
@@ -780,6 +757,30 @@ duplicate data downstream.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["tag1","tag2"]]}
+  groups={[]}
+  name={"tags"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### tags
+
+The tags that will be attached to each batch of events.
+
+
+
 
 </Field>
 </Fields>

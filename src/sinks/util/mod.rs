@@ -4,9 +4,11 @@ pub mod encoding;
 pub mod http;
 pub mod http2;
 pub mod retries;
+pub mod retries2;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod service;
+pub mod service2;
 pub mod sink;
 pub mod tcp;
 #[cfg(test)]
@@ -58,7 +60,7 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
     encoding.apply_rules(&mut event);
     let log = event.into_log();
 
-    let b = match encoding.codec {
+    let b = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log),
         Encoding::Text => {
             let bytes = log

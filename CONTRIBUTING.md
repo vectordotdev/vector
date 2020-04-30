@@ -33,6 +33,7 @@ expanding into more specifics.
       1. [Sample Logs](#sample-logs)
       1. [Tips and Tricks](#tips-and-tricks)
    1. [Benchmarking](#benchmarking)
+   1. [Profiling](#profiling)
 1. [Humans](#humans)
    1. [Documentation](#documentation)
    1. [Changelog](#changelog)
@@ -353,6 +354,82 @@ All benchmarks are placed in the [`/benches`](/benches) folder. You can
 run benchmarks via the `make benchmarks` command. In addition, Vector
 maintains a full [test hardness][urls.vector_test_harness] for complex
 end-to-end integration and performance testing.
+
+### Profiling
+
+If you're trying to improve Vector's performance (or understand why your change
+made it worse), profiling is a useful tool for seeing where time is being spent.
+
+While there are a bunch of useful profiling tools, a simple place to get started
+is with Linux's `perf`. Before getting started, you'll likely need to give
+yourself access to collect stats:
+
+```sh
+echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid
+```
+
+You'll also want to edit `Cargo.toml` and make sure that Vector is being built
+with debug symbols in release mode. This ensures that you'll get human-readable
+info in the eventual output:
+
+```toml
+[profile.release]
+debug = true
+```
+
+Then you can start up a release build of Vector with whatever config you're
+interested in profiling.
+
+```sh
+cargo run --release -- --config my_test_config.toml
+```
+
+Once it's started, use the `ps` tool (or equivalent) to make a note of its PID.
+We'll use this to tell `perf` which process we would like it to collect data
+about.
+
+The next step is somewhat dependent on the config you're testing. For this
+example, let's assume you're using a simple TCP-mode socket source listening on
+port 9000. Let's also assume that you have a large file of example input in
+`access.log` (you can use a tool like `flog` to generate this).
+
+With all that prepared, we can send our test input to Vector and collect data
+while it is under load:
+
+```sh
+perf record -F99 --call-graph dwarf -p $VECTOR_PID socat -dd OPEN:access.log TCP:localhost:9000
+```
+
+This instructs `perf` to collect data from our already-running Vector process
+for the duration of the `socat` command. The `-F` argument is the frequency at
+which `perf` should sample the Vector call stack. Higher frequencies will
+collect more data and produce more detailed output, but can produce enormous
+amounts of data that take a very long time to process. Using `-F99` works well
+when your input data is large enough to take a minute or more to process, but
+feel free to adjust both input size and sampling frequency for your setup.
+
+It's worth noting that this is not the normal way to profile programs with
+`perf`. Usually you would simply run something like `perf record my_program` and
+not have to worry about PIDs and such. We differ from this because we're only
+interested in data about what Vector is doing while under load. Running it
+directly under `perf` would collect data for the entire lifetime of the process,
+including startup, shutdown, and idle time. By telling `perf` to collect data
+only while the load generation command is running we get a more focused dataset
+and don't have to worry about timing different commands in quick succession.
+
+You'll now find a `perf.data` file in your current directory with all of the
+information that was collected. There are different ways to process this, but
+one of the most useful is to create
+a [flamegraph](http://www.brendangregg.com/flamegraphs.html). For this we can
+use the `inferno` tool (available via `cargo install`):
+
+```sh
+perf script | inferno-collapse-perf > stacks.folded
+cat stacks.folded | inferno-flamegraph > flamegraph.svg
+```
+
+And that's it! You now have a flamegraph SVG file that can be opened and
+navigated in your favorite web browser.
 
 ## Humans
 

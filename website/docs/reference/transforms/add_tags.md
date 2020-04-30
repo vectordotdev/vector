@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-04-29"
 component_title: "Add Tags"
-description: "The Vector `add_tags` transform accepts and outputs `metric` events allowing you to add one or more metric tags."
+description: "The Vector `add_tags` transform accepts and outputs `metric` events, allowing you to add one or more metric tags."
 event_types: ["metric"]
 function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `add_tags` transform
-accepts and outputs [`metric`][docs.data-model.metric] events allowing you to
+accepts and outputs [`metric`][docs.data-model.metric] events, allowing you to
 add one or more metric tags.
 
 <!--
@@ -40,7 +40,8 @@ add one or more metric tags.
 [transforms.my_transform_id]
   # General
   type = "add_tags" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
+  overwrite = true # optional, default
 
   # Tags
   tags.static_tag = "my value" # example
@@ -54,7 +55,8 @@ add one or more metric tags.
 [transforms.my_transform_id]
   # General
   type = "add_tags" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
+  overwrite = true # optional, default
 
   # Tags
   tags.static_tag = "my value" # example
@@ -67,6 +69,31 @@ add one or more metric tags.
 <Fields filters={true}>
 <Field
   common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"overwrite"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### overwrite
+
+By default, fields will be overridden. Set this to `false` to avoid overwriting
+values.
+
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -74,7 +101,7 @@ add one or more metric tags.
   name={"tags"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "at_least_once"
 component_title: "Datadog Metrics"
 description: "The Vector `datadog_metrics` sink batches `metric` events to Datadog's metrics service using HTTP API."
@@ -43,7 +43,7 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "datadog_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${DATADOG_API_KEY}" # required
   healthcheck = true # optional, default
   namespace = "service" # required
@@ -56,7 +56,7 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 [sinks.my_sink_id]
   # General
   type = "datadog_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${DATADOG_API_KEY}" # required
   healthcheck = true # optional, default
   host = "https://api.datadoghq.com" # optional, default
@@ -70,7 +70,7 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 5 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
@@ -80,6 +80,30 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${DATADOG_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  groups={[]}
+  name={"api_key"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### api_key
+
+Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
+
+
+
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -152,30 +176,6 @@ The maximum age of a batch before it is flushed.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${DATADOG_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
-  groups={[]}
-  name={"api_key"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### api_key
-
-Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
-
-
-
 
 </Field>
 <Field
@@ -348,9 +348,9 @@ time window.
 </Field>
 <Field
   common={false}
-  defaultValue={-1}
+  defaultValue={18446744073709551615}
   enumValues={null}
-  examples={[-1]}
+  examples={[18446744073709551615]}
   groups={[]}
   name={"retry_attempts"}
   path={"request"}
@@ -364,7 +364,8 @@ time window.
 
 #### retry_attempts
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
 
  See [Retry Policy](#retry-policy) for more info.
 

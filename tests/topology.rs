@@ -227,7 +227,9 @@ fn topology_remove_one_source() {
     config.add_source("in1", source().1);
     config.add_sink("out1", &["in1"], sink1);
 
-    assert!(topology.reload_config_and_respawn(config, &mut rt, false));
+    assert!(topology
+        .reload_config_and_respawn(config, &mut rt, false)
+        .unwrap());
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
@@ -260,7 +262,9 @@ fn topology_remove_one_sink() {
     config.add_source("in1", source().1);
     config.add_sink("out1", &["in1"], sink(10).1);
 
-    assert!(topology.reload_config_and_respawn(config, &mut rt, false));
+    assert!(topology
+        .reload_config_and_respawn(config, &mut rt, false)
+        .unwrap());
 
     let event = Event::from("this");
 
@@ -299,7 +303,9 @@ fn topology_remove_one_transform() {
     config.add_transform("t2", &["in1"], transform2);
     config.add_sink("out1", &["t2"], sink(10).1);
 
-    assert!(topology.reload_config_and_respawn(config, &mut rt, false));
+    assert!(topology
+        .reload_config_and_respawn(config, &mut rt, false)
+        .unwrap());
 
     let event = Event::from("this");
     let h_out1 = oneshot::spawn(out1.map(into_message).collect(), &rt.executor());
@@ -330,7 +336,9 @@ fn topology_swap_source() {
     config.add_source("in2", source2);
     config.add_sink("out1", &["in2"], sink1v2);
 
-    assert!(topology.reload_config_and_respawn(config, &mut rt, false));
+    assert!(topology
+        .reload_config_and_respawn(config, &mut rt, false)
+        .unwrap());
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
@@ -368,7 +376,9 @@ fn topology_swap_sink() {
     config.add_source("in1", source().1);
     config.add_sink("out2", &["in1"], sink2);
 
-    assert!(topology.reload_config_and_respawn(config, &mut rt, false));
+    assert!(topology
+        .reload_config_and_respawn(config, &mut rt, false)
+        .unwrap());
 
     let event = Event::from("this");
     let h_out1 = oneshot::spawn(out1.collect(), &rt.executor());
@@ -405,7 +415,9 @@ fn topology_swap_transform() {
     config.add_transform("t2", &["in1"], transform2);
     config.add_sink("out1", &["t2"], sink1v2);
 
-    assert!(topology.reload_config_and_respawn(config, &mut rt, false));
+    assert!(topology
+        .reload_config_and_respawn(config, &mut rt, false)
+        .unwrap());
 
     let event = Event::from("this");
     let h_out1v1 = oneshot::spawn(out1v1.map(into_message).collect(), &rt.executor());
@@ -469,7 +481,9 @@ fn topology_swap_transform_is_atomic() {
     config.add_transform("t1", &["in1"], transform1v2);
     config.add_sink("out1", &["t1"], sink(10).1);
 
-    assert!(topology.reload_config_and_respawn(config, &mut rt, false));
+    assert!(topology
+        .reload_config_and_respawn(config, &mut rt, false)
+        .unwrap());
     std::thread::sleep(std::time::Duration::from_millis(10));
 
     run_control.store(false, Ordering::Release);
@@ -501,7 +515,9 @@ fn topology_optional_healthcheck_does_not_fail_reload() {
     let config = basic_config();
     let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     let config = basic_config_with_sink_failing_healthcheck();
-    assert!(topology.reload_config_and_respawn(config, &mut rt, false));
+    assert!(topology
+        .reload_config_and_respawn(config, &mut rt, false)
+        .unwrap());
 }
 
 #[test]
@@ -510,16 +526,32 @@ fn topology_healthcheck_not_run_on_unchanged_reload() {
     let config = basic_config();
     let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     let config = basic_config_with_sink_failing_healthcheck();
-    assert!(topology.reload_config_and_respawn(config, &mut rt, true));
+    assert!(topology
+        .reload_config_and_respawn(config, &mut rt, true)
+        .unwrap());
 }
 
 #[test]
 fn topology_healthcheck_run_for_changes_on_reload() {
     let mut rt = runtime();
-    let config = basic_config();
-    let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+
     let mut config = Config::empty();
-    config.add_source("in1", source().1);
+    // We can't just drop the sender side since that will close the source.
+    let (_ch0, src) = source();
+    config.add_source("in1", src);
+    config.add_sink("out1", &["in1"], sink(10).1);
+    let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+
+    let mut config = Config::empty();
+    // We can't just drop the sender side since that will close the source.
+    let (_ch1, src) = source();
+    config.add_source("in1", src);
     config.add_sink("out2", &["in1"], sink_failing_healthcheck(10).1);
-    assert!(topology.reload_config_and_respawn(config, &mut rt, true) == false);
+
+    assert!(
+        topology
+            .reload_config_and_respawn(config, &mut rt, true)
+            .unwrap()
+            == false
+    );
 }

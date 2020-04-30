@@ -26,6 +26,9 @@
 - name: "domain: platforms"
   description: Anything platforms related
   color: 212f3e
+- name: "domain: privacy"
+  description: Anything privacy related
+  color: 212f3e
 - name: "domain: security"
   description: Anything security related
   color: 212f3e
@@ -211,6 +214,9 @@
   color: ff9f43
 - name: "provider: datadog"
   description: Anything Datadog related
+  color: ff9f43
+- name: "provider: azure"
+  description: Anything Azure related
   color: ff9f43
 - name: "provider: elastic"
   description: Anything Elastic related

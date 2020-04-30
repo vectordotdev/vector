@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "at_least_once"
 component_title: "GCP PubSub"
 description: "The Vector `gcp_pubsub` sink batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface."
@@ -44,7 +44,7 @@ Interface][urls.gcp_pubsub_rest].
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "gcp_pubsub" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 ```
@@ -56,7 +56,7 @@ Interface][urls.gcp_pubsub_rest].
 [sinks.my_sink_id]
   # General
   type = "gcp_pubsub" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${GCP_API_KEY}" # optional, no default
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
@@ -68,9 +68,9 @@ Interface][urls.gcp_pubsub_rest].
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -82,7 +82,7 @@ Interface][urls.gcp_pubsub_rest].
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 100 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
@@ -100,6 +100,32 @@ Interface][urls.gcp_pubsub_rest].
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${GCP_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  groups={[]}
+  name={"api_key"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### api_key
+
+A [Google Cloud API key][urls.gcp_authentication_api_key] used to authenticate
+access the pubsub project and topic. Either this or [`credentials_path`](#credentials_path) must be
+set.
+
+ See [GCP Authentication](#gcp-authentication) for more info.
+
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -199,30 +225,6 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
-<Field
-  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -270,6 +272,30 @@ The maximum size of the buffer on the disk.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
@@ -294,6 +320,36 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/credentials.json"]}
+  groups={[]}
+  name={"credentials_path"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### credentials_path
+
+The filename for a Google Cloud service account credentials JSON file used to
+authenticate access to the pubsub project and topic. If this is unset, Vector
+checks the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) environment variable for a filename.
+
+If no filename is named, Vector will attempt to fetch an instance service
+account for the compute instance the program is running on. If Vector is not
+running on a GCE instance, you must define a credentials file as above.
+
+ See [GCP Authentication](#gcp-authentication) for more info.
+
 
 </Field>
 <Field
@@ -395,63 +451,6 @@ How to format event timestamps.
 
 </Field>
 <Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${GCP_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
-  groups={[]}
-  name={"api_key"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### api_key
-
-A [Google Cloud API key][urls.gcp_authentication_api_key] used to authenticate
-access the pubsub project and topic. Either this or [`credentials_path`](#credentials_path) must be
-set.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/path/to/credentials.json"]}
-  groups={[]}
-  name={"credentials_path"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### credentials_path
-
-The filename for a Google Cloud service account credentials JSON file used to
-authenticate access to the pubsub project and topic. If this is unset, Vector
-checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
-filename.
-
-If no filename is named, Vector will attempt to fetch an instance service
-account for the compute instance the program is running on. If Vector is not
-running on a GCE instance, you must define a credentials file as above.
-
-
-
-
-</Field>
-<Field
   common={true}
   defaultValue={true}
   enumValues={null}
@@ -494,30 +493,6 @@ Enables/disables the sink healthcheck upon start.
 ### project
 
 The project name to which to publish logs.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["this-is-a-topic"]}
-  groups={[]}
-  name={"topic"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### topic
-
-The topic within the project to which to publish logs.
 
 
 
@@ -621,9 +596,9 @@ time window.
 </Field>
 <Field
   common={false}
-  defaultValue={-1}
+  defaultValue={18446744073709551615}
   enumValues={null}
-  examples={[-1]}
+  examples={[18446744073709551615]}
   groups={[]}
   name={"retry_attempts"}
   path={"request"}
@@ -637,7 +612,8 @@ time window.
 
 #### retry_attempts
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
 
  See [Retry Policy](#retry-policy) for more info.
 
@@ -901,6 +877,30 @@ you understand the risks of not verifying the remote hostname.
 </Fields>
 
 </Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["this-is-a-topic"]}
+  groups={[]}
+  name={"topic"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### topic
+
+The topic within the project to which to publish logs.
+
+
+
+
+</Field>
 </Fields>
 
 ## Env Vars
@@ -927,7 +927,7 @@ you understand the risks of not verifying the remote hostname.
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the pubsub project and topic.
 
-
+ See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -961,6 +961,21 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
+
+### GCP Authentication
+
+GCP offers a [variety of authentication methods][urls.gcp_authentication] and
+Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
+and will find credentials in the following order:
+
+1. If the [`credentials_path`](#credentials_path) option is set.
+1. If the [`api_key`](#api_key) option is set.
+1. If the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) envrionment variable is set.
+1. Finally, Vector will check for an [instance service account][urls.gcp_authentication_service_account].
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
 
 ### Health Checks
 
@@ -1015,7 +1030,11 @@ options.
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
+[docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
 [urls.gcp_authentication_api_key]: https://cloud.google.com/docs/authentication/api-keys
+[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
+[urls.gcp_authentication_service_account]: https://cloud.google.com/docs/authentication/production#obtaining_and_providing_service_account_credentials_manually
 [urls.gcp_pubsub]: https://cloud.google.com/pubsub/
 [urls.gcp_pubsub_rest]: https://cloud.google.com/pubsub/docs/reference/rest/
 [urls.new_gcp_pubsub_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_pubsub

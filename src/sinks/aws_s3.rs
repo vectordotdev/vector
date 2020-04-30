@@ -397,7 +397,7 @@ fn encode_event(
         .ok()?;
 
     let log = event.into_log();
-    let bytes = match encoding.codec {
+    let bytes = match encoding.codec() {
         Encoding::Ndjson => serde_json::to_vec(&log)
             .map(|mut b| {
                 b.push(b'\n');
@@ -506,7 +506,7 @@ mod tests {
     }
 }
 
-#[cfg(feature = "s3-integration-tests")]
+#[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
     use super::*;

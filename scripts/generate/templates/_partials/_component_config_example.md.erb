@@ -11,7 +11,7 @@
 <%- end -%>
 ```toml title="vector.toml"
 <%=
-  config_example(component.options_list, group: group.group_name, table_path: [component.type.pluralize, "my_#{component.type}_id"]) do |option|
+  config_example(component.options_list.sort_by(&:config_sort_obj), group: group.group_name, table_path: [component.type.pluralize, "my_#{component.type}_id"]) do |option|
     group.option_filter.call(option)
   end
 %>

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-12"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Kinesis Data Streams"
 description: "The Vector `aws_kinesis_streams` sink batches `log` events to Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint."
@@ -46,7 +46,7 @@ endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords
 [sinks.my_sink_id]
   # General
   type = "aws_kinesis_streams" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   partition_key_field = "user_id" # optional, no default
   region = "us-east-1" # required, required when endpoint = ""
   stream_name = "my-stream" # required
@@ -62,7 +62,7 @@ endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords
 [sinks.my_sink_id]
   # General
   type = "aws_kinesis_streams" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   partition_key_field = "user_id" # optional, no default
@@ -74,9 +74,9 @@ endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -89,7 +89,7 @@ endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 5 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 30 # optional, default, seconds
@@ -99,6 +99,30 @@ endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+
+ See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -198,30 +222,6 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
-<Field
-  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -263,6 +263,30 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
 
 
 
@@ -421,30 +445,6 @@ How to format event timestamps.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["arn:aws:iam::123456789098:role/my_role"]}
-  groups={[]}
-  name={"assume_role"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### assume_role
-
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
- See [AWS Authentication](#aws-authentication) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={["127.0.0.0:5000/path/to/service"]}
   groups={[]}
   name={"endpoint"}
@@ -510,31 +510,6 @@ The log field used as the Kinesis record's partition key value.
 
 The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is
 provided it will override this value since the endpoint includes the region.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["my-stream"]}
-  groups={[]}
-  name={"stream_name"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### stream_name
-
-The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis
-Logs stream.
 
 
 
@@ -638,9 +613,9 @@ time window.
 </Field>
 <Field
   common={false}
-  defaultValue={-1}
+  defaultValue={18446744073709551615}
   enumValues={null}
-  examples={[-1]}
+  examples={[18446744073709551615]}
   groups={[]}
   name={"retry_attempts"}
   path={"request"}
@@ -654,7 +629,8 @@ time window.
 
 #### retry_attempts
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
 
  See [Retry Policy](#retry-policy) for more info.
 
@@ -738,6 +714,31 @@ duplicate data downstream.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["my-stream"]}
+  groups={[]}
+  name={"stream_name"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### stream_name
+
+The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis
+Logs stream.
+
+
+
 
 </Field>
 </Fields>
@@ -832,7 +833,7 @@ X-Amz-Target: Kinesis_20131202.PutRecords
 
 Vector checks for AWS credentials in the following order:
 
-1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+1. Environment variables [`AWS_ACCESS_KEY_ID`](#aws_access_key_id) and [`AWS_SECRET_ACCESS_KEY`](#aws_secret_access_key).
 2. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
 3. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
 4. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)

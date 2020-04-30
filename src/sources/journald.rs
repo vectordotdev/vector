@@ -33,7 +33,8 @@ lazy_static! {
     static ref HOSTNAME: Atom = Atom::from("_HOSTNAME");
     static ref MESSAGE: Atom = Atom::from("MESSAGE");
     static ref SYSTEMD_UNIT: Atom = Atom::from("_SYSTEMD_UNIT");
-    static ref TIMESTAMP: Atom = Atom::from("_SOURCE_REALTIME_TIMESTAMP");
+    static ref SOURCE_TIMESTAMP: Atom = Atom::from("_SOURCE_REALTIME_TIMESTAMP");
+    static ref RECEIVED_TIMESTAMP: Atom = Atom::from("__REALTIME_TIMESTAMP");
     static ref JOURNALCTL: PathBuf = "journalctl".into();
 }
 
@@ -163,7 +164,10 @@ fn create_event(record: Record) -> Event {
         log.insert(event::log_schema().host_key().clone(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
-    if let Some(timestamp) = log.get(&TIMESTAMP) {
+    if let Some(timestamp) = log
+        .get(&SOURCE_TIMESTAMP)
+        .or_else(|| log.get(&RECEIVED_TIMESTAMP))
+    {
         if let Value::Bytes(timestamp) = timestamp {
             if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {
                 let timestamp = chrono::Utc.timestamp(
@@ -459,6 +463,8 @@ mod tests {
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002"}
 {"_SYSTEMD_UNIT":"badunit.service","MESSAGE":[194,191,72,101,108,108,111,63],"__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140003"}
+{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Missing timestamp","__CURSOR":"3","__REALTIME_TIMESTAMP":"1578529839140004"}
+{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Different timestamps","__CURSOR":"4","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004"}
 "#;
 
     struct FakeJournal {
@@ -527,7 +533,7 @@ mod tests {
     #[test]
     fn reads_journal() {
         let received = run_journal(&[], None);
-        assert_eq!(received.len(), 3);
+        assert_eq!(received.len(), 5);
         assert_eq!(
             message(&received[0]),
             Value::Bytes("System Initialization".into())
@@ -536,7 +542,9 @@ mod tests {
             received[0].as_log()[event::log_schema().source_type_key()],
             "journald".into()
         );
+        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140001000));
         assert_eq!(message(&received[1]), Value::Bytes("unit message".into()));
+        assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140002000));
     }
 
     #[test]
@@ -544,13 +552,15 @@ mod tests {
         let received = run_journal(&["unit.service"], None);
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
+        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
     #[test]
     fn handles_checkpoint() {
         let received = run_journal(&[], Some("1"));
-        assert_eq!(received.len(), 2);
+        assert_eq!(received.len(), 4);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
+        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
     #[test]
@@ -560,7 +570,23 @@ mod tests {
         assert_eq!(message(&received[0]), Value::Bytes("¿Hello?".into()));
     }
 
+    #[test]
+    fn handles_missing_timestamp() {
+        let received = run_journal(&["stdout"], None);
+        assert_eq!(received.len(), 2);
+        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140004000));
+        assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140005000));
+    }
+
     fn message(event: &Event) -> Value {
         event.as_log()[&event::log_schema().message_key()].clone()
+    }
+
+    fn timestamp(event: &Event) -> Value {
+        event.as_log()[&event::log_schema().timestamp_key()].clone()
+    }
+
+    fn value_ts(secs: i64, usecs: u32) -> Value {
+        Value::Timestamp(chrono::Utc.timestamp(secs, usecs))
     }
 }

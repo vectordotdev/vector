@@ -79,7 +79,7 @@ fn encode_event(
 ) -> Result<String, serde_json::Error> {
     encoding.apply_rules(&mut event);
     match event {
-        Event::Log(log) => match encoding.codec {
+        Event::Log(log) => match encoding.codec() {
             Encoding::Json => serde_json::to_string(&log),
             Encoding::Text => {
                 let s = log

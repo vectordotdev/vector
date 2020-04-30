@@ -666,11 +666,11 @@ class Templates
   def transform_short_description(transform)
     if transform.input_types == transform.output_types
       strip <<~EOF
-      Accepts and #{outputs_link(transform)} allowing you to #{transform.allow_you_to_description}.
+      Accepts and #{outputs_link(transform)}, allowing you to #{transform.allow_you_to_description}.
       EOF
     else
       strip <<~EOF
-      Accepts #{event_type_links(transform.input_types).to_sentence} events but #{outputs_link(transform)} allowing you to #{transform.allow_you_to_description}.
+      Accepts #{event_type_links(transform.input_types).to_sentence} events, but #{outputs_link(transform)}, allowing you to #{transform.allow_you_to_description}.
       EOF
     end
   end

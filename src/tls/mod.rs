@@ -102,6 +102,14 @@ pub enum TlsError {
     Connect { source: std::io::Error },
     #[snafu(display("Could not get peer address: {}", source))]
     PeerAddress { source: std::io::Error },
+    #[snafu(display("Security Framework Error: {}", source))]
+    #[cfg(target_os = "macos")]
+    SecurityFramework {
+        source: security_framework::base::Error,
+    },
+    #[snafu(display("Schannel Error: {}", source))]
+    #[cfg(windows)]
+    Schannel { source: std::io::Error },
 }
 
 impl MaybeTlsStream<TcpStream> {

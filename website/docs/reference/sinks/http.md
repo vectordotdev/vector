@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "at_least_once"
 component_title: "HTTP"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
@@ -44,7 +44,7 @@ The Vector `http` sink
 [sinks.my_sink_id]
   # General
   type = "http" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   compression = "none" # optional, default
   healthcheck = true # optional, default
   uri = "https://10.22.212.22:9000/endpoint" # required
@@ -54,8 +54,8 @@ The Vector `http` sink
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.type = "memory" # optional, default
 
   # Encoding
   encoding.codec = "json" # required
@@ -74,15 +74,15 @@ The Vector `http` sink
 [sinks.my_sink_id]
   # General
   type = "http" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   compression = "none" # optional, default
   healthcheck = true # optional, default
   healthcheck_uri = "https://10.22.212.22:9000/_health" # optional, no default
   uri = "https://10.22.212.22:9000/endpoint" # required
 
   # Auth
-  auth.strategy = "basic" # required
   auth.password = "${HTTP_PASSWORD}" # required, required when strategy = "basic"
+  auth.strategy = "basic" # required
   auth.user = "${HTTP_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
@@ -90,9 +90,9 @@ The Vector `http` sink
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -109,7 +109,7 @@ The Vector `http` sink
   request.in_flight_limit = 10 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 1000 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 30 # optional, default, seconds
@@ -153,30 +153,6 @@ Options for the authentication strategy.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
-  examples={["basic"]}
-  groups={[]}
-  name={"strategy"}
-  path={"auth"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### strategy
-
-The authentication strategy to use.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
   enumValues={null}
   examples={["${HTTP_PASSWORD}","password"]}
   groups={[]}
@@ -193,6 +169,30 @@ The authentication strategy to use.
 #### password
 
 The basic authentication password.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
+  examples={["basic"]}
+  groups={[]}
+  name={"strategy"}
+  path={"auth"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### strategy
+
+The authentication strategy to use.
 
 
 
@@ -324,30 +324,6 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
-<Field
-  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -395,6 +371,30 @@ The maximum size of the buffer on the disk.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
@@ -419,6 +419,31 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"none":"The payload will not be compressed.","gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
+  examples={["none","gzip"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+The compression strategy used to compress the encoded event data before
+outputting.
+
+
+
 
 </Field>
 <Field
@@ -544,28 +569,53 @@ How to format event timestamps.
 
 </Field>
 <Field
-  common={true}
-  defaultValue={"none"}
-  enumValues={{"none":"The payload will not be compressed.","gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
-  examples={["none","gzip"]}
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
   groups={[]}
-  name={"compression"}
+  name={"headers"}
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### headers
+
+Options for custom headers.
+
+ See [Authentication](#authentication) for more info.
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"Authorization":"${HTTP_TOKEN}"},{"X-Powered-By":"Vector"}]}
+  groups={[]}
+  name={"`[header-key]`"}
+  path={"headers"}
+  relevantWhen={null}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
   warnings={[]}
   >
 
-### compression
+#### `[header-key]`
 
-The compression strategy used to compress the encoded event data before
-outputting.
-
+A custom header to be added to each outgoing HTTP request.
 
 
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -614,81 +664,6 @@ A URI that Vector can request in order to determine the service health.
 
  See [Health Checks](#health-checks) for more info.
 
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["https://10.22.212.22:9000/endpoint"]}
-  groups={[]}
-  name={"uri"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### uri
-
-The full URI to make HTTP requests to. This should include the protocol and
-host, but can also include the port, path, and any other valid part of a URI.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"headers"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### headers
-
-Options for custom headers.
-
- See [Authentication](#authentication) for more info.
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"Authorization":"${HTTP_TOKEN}"},{"X-Powered-By":"Vector"}]}
-  groups={[]}
-  name={"`[header-key]`"}
-  path={"headers"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### `[header-key]`
-
-A custom header to be added to each outgoing HTTP request.
-
-
-
-
-</Field>
-</Fields>
 
 </Field>
 <Field
@@ -789,9 +764,9 @@ time window.
 </Field>
 <Field
   common={false}
-  defaultValue={-1}
+  defaultValue={18446744073709551615}
   enumValues={null}
-  examples={[-1]}
+  examples={[18446744073709551615]}
   groups={[]}
   name={"retry_attempts"}
   path={"request"}
@@ -805,7 +780,8 @@ time window.
 
 #### retry_attempts
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
 
  See [Retry Policy](#retry-policy) for more info.
 
@@ -1067,6 +1043,31 @@ you understand the risks of not verifying the remote hostname.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["https://10.22.212.22:9000/endpoint"]}
+  groups={[]}
+  name={"uri"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### uri
+
+The full URI to make HTTP requests to. This should include the protocol and
+host, but can also include the port, path, and any other valid part of a URI.
+
+
+
 
 </Field>
 </Fields>

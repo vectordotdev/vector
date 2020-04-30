@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-04-29"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
@@ -44,7 +44,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "gcp_stackdriver_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 ```
@@ -56,7 +56,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
 [sinks.my_sink_id]
   # General
   type = "gcp_stackdriver_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   billing_account_id = "012345-6789AB-CDEF01" # optional, no default
   credentials_path = "/path/to/credentials.json" # optional, no default
   folder_id = "My Folder" # optional, no default
@@ -70,9 +70,9 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -84,7 +84,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 1000 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
@@ -185,6 +185,33 @@ The maximum age of a batch before it is flushed.
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={["012345-6789AB-CDEF01"]}
+  groups={[]}
+  name={"billing_account_id"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### billing_account_id
+
+The billing account ID to which to publish logs.
+
+Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folder_id), [`organization_id`](#organization_id), or
+`project_id` must be set.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={[]}
   groups={[]}
   name={"buffer"}
@@ -204,30 +231,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -277,6 +280,30 @@ The maximum size of the buffer on the disk.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
@@ -301,6 +328,36 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/credentials.json"]}
+  groups={[]}
+  name={"credentials_path"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### credentials_path
+
+The filename for a Google Cloud service account credentials JSON file used to
+authenticate access to the Stackdriver Logging API. If this is unset, Vector
+checks the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) environment variable for a filename.
+
+If no filename is named, Vector will attempt to fetch an instance service
+account for the compute instance the program is running on. If Vector is not
+running on a GCE instance, you must define a credentials file as above.
+
+ See [GCP Authentication](#gcp-authentication) for more info.
+
 
 </Field>
 <Field
@@ -399,64 +456,6 @@ How to format event timestamps.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["012345-6789AB-CDEF01"]}
-  groups={[]}
-  name={"billing_account_id"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### billing_account_id
-
-The billing account ID to which to publish logs.
-
-Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folder_id), [`organization_id`](#organization_id), or
-`project_id` must be set.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/path/to/credentials.json"]}
-  groups={[]}
-  name={"credentials_path"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### credentials_path
-
-The filename for a Google Cloud service account credentials JSON file used to
-authenticate access to the Stackdriver Logging API. If this is unset, Vector
-checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
-filename.
-
-If no filename is named, Vector will attempt to fetch an instance service
-account for the compute instance the program is running on. If Vector is not
-running on a GCE instance, you must define a credentials file as above.
-
-
-
 
 </Field>
 <Field
@@ -691,9 +690,9 @@ time window.
 </Field>
 <Field
   common={false}
-  defaultValue={-1}
+  defaultValue={18446744073709551615}
   enumValues={null}
-  examples={[-1]}
+  examples={[18446744073709551615]}
   groups={[]}
   name={"retry_attempts"}
   path={"request"}
@@ -707,7 +706,8 @@ time window.
 
 #### retry_attempts
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
 
  See [Retry Policy](#retry-policy) for more info.
 
@@ -1079,7 +1079,7 @@ you understand the risks of not verifying the remote hostname.
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Stackdriver Logging API.
 
-
+ See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -1112,6 +1112,20 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
+
+### GCP Authentication
+
+GCP offers a [variety of authentication methods][urls.gcp_authentication] and
+Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
+and will find credentials in the following order:
+
+1. If the [`credentials_path`](#credentials_path) option is set.
+1. If the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) envrionment variable is set.
+1. Finally, Vector will check for an [instance service account][urls.gcp_authentication_service_account].
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
 
 ### Health Checks
 
@@ -1166,6 +1180,10 @@ options.
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
+[docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
+[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
+[urls.gcp_authentication_service_account]: https://cloud.google.com/docs/authentication/production#obtaining_and_providing_service_account_credentials_manually
 [urls.gcp_folders]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
 [urls.gcp_projects]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
 [urls.gcp_resources]: https://cloud.google.com/monitoring/api/resources
