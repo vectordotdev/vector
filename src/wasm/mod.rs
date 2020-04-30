@@ -196,10 +196,10 @@ impl WasmModule {
         match found_fingerprint {
             Some(found) if found == calculated_fingerprint => {
                 // We can be lazy and do nothing! How wonderful.
-                println!("Skipped wasm compile! Make me a metric later!");
+                // println!("Skipped wasm compile! Make me a metric later!");
             }
             None | Some(_) => {
-                println!("Rebuild wasm! Make me a metric later!");
+                // println!("Rebuild wasm! Make me a metric later!");
                 let internal_event_compilation =
                     internal_events::WasmCompilation::begin(config.role);
                 let fingerprint = compile(&config.path, &output_file)?;
