@@ -89,9 +89,9 @@ checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 
 [[package]]
 name = "async-trait"
-version = "0.1.24"
+version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "750b1c38a1dfadd108da0f01c08f4cdc7ff1bb39b325f9c82cc972361780a6e1"
+checksum = "da71fef07bc806586090247e971229289f64c210a278ee5ae419314eb386b31d"
 dependencies = [
  "proc-macro2 1.0.8",
  "quote 1.0.2",
@@ -123,9 +123,9 @@ checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
 
 [[package]]
 name = "backtrace"
-version = "0.3.43"
+version = "0.3.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f80256bc78f67e7df7e36d77366f636ed976895d91fe2ab9efa3973e8fe8c4f"
+checksum = "b1e692897359247cc6bb902933361652380af0f1b7651ae5c5013407f30e109e"
 dependencies = [
  "backtrace-sys",
  "cfg-if",
@@ -135,9 +135,9 @@ dependencies = [
 
 [[package]]
 name = "backtrace-sys"
-version = "0.1.32"
+version = "0.1.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d6575f128516de27e3ce99689419835fce9643a9b215a14d2b5b685be018491"
+checksum = "78848718ee1255a2485d1309ad9cdecfc2e7d0362dd11c6829364c6b35ae1bc7"
 dependencies = [
  "cc",
  "libc",
@@ -676,31 +676,9 @@ dependencies = [
 
 [[package]]
 name = "data-encoding"
-version = "2.1.2"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f47ca1860a761136924ddd2422ba77b2ea54fe8cc75b9040804a0d9d32ad97"
-
-[[package]]
-name = "data-encoding-macro"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1995a2e32b5306e4f49cf55ffcf4365a4dab2c7ca3a97163a4f099ec2fee3453"
-dependencies = [
- "data-encoding",
- "data-encoding-macro-internal",
- "proc-macro-hack",
-]
-
-[[package]]
-name = "data-encoding-macro-internal"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd41a6f6a292f3d5be0cd1562bd6007652279d6afe3246f2722749e927338f7a"
-dependencies = [
- "data-encoding",
- "proc-macro-hack",
- "syn 0.15.44",
-]
+checksum = "11c0346158a19b3627234e15596f5e465c360fcdb97d817bcb255e0510f5a788"
 
 [[package]]
 name = "db-key"
@@ -835,6 +813,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "enum-as-inner"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc4bfcfacb61d231109d1d55202c1f33263319668b168843e02ad4652725ec9c"
+dependencies = [
+ "heck",
+ "proc-macro2 1.0.8",
+ "quote 1.0.2",
+ "syn 1.0.14",
+]
+
+[[package]]
 name = "env_logger"
 version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -849,9 +839,9 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.6.2"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aafcde04e90a5226a6443b7aabdb016ba2f8307c847d524724bd9b346dd1a2d3"
+checksum = "44533bbbb3bb3c1fa17d9f2e4e38bbbaf8396ba82193c4cb1b6445d711445d36"
 dependencies = [
  "atty",
  "humantime",
@@ -923,18 +913,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 
 [[package]]
-name = "fallible-iterator"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
-
-[[package]]
-name = "fallible-streaming-iterator"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
-
-[[package]]
 name = "file-source"
 version = "0.1.0"
 dependencies = [
@@ -948,7 +926,7 @@ dependencies = [
  "quickcheck",
  "scan_fmt",
  "tempfile",
- "tokio 0.2.13",
+ "tokio 0.2.19",
  "tracing",
  "winapi 0.3.8",
 ]
@@ -1295,7 +1273,7 @@ dependencies = [
  "indexmap",
  "log",
  "slab",
- "tokio 0.2.13",
+ "tokio 0.2.19",
  "tokio-util",
 ]
 
@@ -1522,7 +1500,7 @@ dependencies = [
  "net2",
  "pin-project",
  "time",
- "tokio 0.2.13",
+ "tokio 0.2.19",
  "tower-service 0.3.0",
  "want 0.3.0",
 ]
@@ -1559,7 +1537,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-sys",
- "tokio 0.2.13",
+ "tokio 0.2.19",
  "tokio-openssl 0.4.0",
 ]
 
@@ -1874,17 +1852,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libsqlite3-sys"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e5b95e89c330291768dc840238db7f9e204fd208511ab6319b56193a7f2ae25"
-dependencies = [
- "cc",
- "pkg-config",
- "vcpkg",
-]
-
-[[package]]
 name = "libz-sys"
 version = "1.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2054,7 +2021,7 @@ checksum = "f3fc63816bd5f8bde5eb31ce471f9633adc69ba1c55b44191b4d5fc7e263e8ab"
 dependencies = [
  "log",
  "metrics-core",
- "tokio 0.2.13",
+ "tokio 0.2.19",
 ]
 
 [[package]]
@@ -2812,7 +2779,7 @@ dependencies = [
  "regex",
  "tokio 0.1.22",
  "tokio-codec",
- "trust-dns-resolver",
+ "trust-dns-resolver 0.12.0",
  "url 2.1.1",
 ]
 
@@ -3365,21 +3332,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rusqlite"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a194373ef527035645a1bc21b10dc2125f73497e6e155771233eb187aedd051"
-dependencies = [
- "bitflags",
- "fallible-iterator",
- "fallible-streaming-iterator",
- "libsqlite3-sys",
- "lru-cache",
- "memchr",
- "time",
-]
-
-[[package]]
 name = "rust-argon2"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3513,9 +3465,9 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.104"
+version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "414115f25f818d7dfccec8ee535d76949ae78584fc4f79a6f45a904bf8ab4449"
+checksum = "36df6ac6412072f67cf767ebbde4133a5b2e88e76dc6187fa7104cd16f783399"
 dependencies = [
  "serde_derive",
 ]
@@ -3532,9 +3484,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.104"
+version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "128f9e303a5a29922045a830221b8f78ec74a5f544944f3d5984f8ec3895ef64"
+checksum = "9e549e3abf4fb8621bd1609f11dfc9f5e50320802273b12f3811a67e6716ea6c"
 dependencies = [
  "proc-macro2 1.0.8",
  "quote 1.0.2",
@@ -4018,6 +3970,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "thiserror"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54b3d3d2ff68104100ab257bb6bb0cb26c901abe4bd4ba15961f3bf867924012"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca972988113b7715266f91250ddb98070d033c62a011fa0fcc57434a649310dd"
+dependencies = [
+ "proc-macro2 1.0.8",
+ "quote 1.0.2",
+ "syn 1.0.14",
+]
+
+[[package]]
 name = "thread_local"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4074,9 +4046,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.13"
+version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fa5e81d6bc4e67fe889d5783bd2a128ab2e0cfa487e0be16b6a8d177b101616"
+checksum = "7d9c43f1bb96970e153bcbae39a65e249ccb942bd9d36dbdf086024920417c9c"
 dependencies = [
  "bytes 0.5.4",
  "fnv",
@@ -4123,7 +4095,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "pin-project-lite",
- "tokio 0.2.13",
+ "tokio 0.2.19",
  "tokio-current-thread",
  "tokio-executor",
  "tokio-reactor",
@@ -4201,7 +4173,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c4b08c5f4208e699ede3df2520aca2e82401b2de33f45e96696a074480be594"
 dependencies = [
  "openssl",
- "tokio 0.2.13",
+ "tokio 0.2.19",
 ]
 
 [[package]]
@@ -4302,7 +4274,7 @@ checksum = "ed0049c119b6d505c4447f5c64873636c7af6c75ab0d45fd9f618d82acb8016d"
 dependencies = [
  "bytes 0.5.4",
  "futures-core",
- "tokio 0.2.13",
+ "tokio 0.2.19",
 ]
 
 [[package]]
@@ -4378,7 +4350,7 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite",
- "tokio 0.2.13",
+ "tokio 0.2.19",
 ]
 
 [[package]]
@@ -4436,7 +4408,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "pin-project",
- "tokio 0.2.13",
+ "tokio 0.2.19",
  "tower-layer 0.3.0",
  "tower-service 0.3.0",
  "tracing",
@@ -4553,7 +4525,7 @@ checksum = "9ba4bbc2c1e4a8543c30d4c13a4c8314ed72d6e07581910f665aa13fde0153c8"
 dependencies = [
  "futures-util",
  "pin-project",
- "tokio 0.2.13",
+ "tokio 0.2.19",
  "tokio-test",
  "tower-layer 0.3.0",
  "tower-service 0.3.0",
@@ -4702,24 +4674,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "trust-dns"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f006aceba2c2dedfccede277aa03f74b25ff89ab53ceb1cc5889aea29d7e55f"
+name = "trust-dns-client"
+version = "0.19.5"
+source = "git+https://github.com/bluejekyll/trust-dns#cb56f66d80f4a278178a35d499b2a8b330b16b82"
 dependencies = [
+ "backtrace",
  "chrono",
  "data-encoding",
- "data-encoding-macro",
- "failure",
- "futures 0.1.29",
+ "futures 0.3.4",
  "lazy_static",
  "log",
  "radix_trie",
  "rand 0.7.3",
- "tokio 0.1.22",
- "tokio-tcp",
- "tokio-udp",
- "trust-dns-proto",
+ "thiserror",
+ "tokio 0.2.19",
+ "trust-dns-proto 0.19.5",
 ]
 
 [[package]]
@@ -4728,15 +4697,13 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05457ece29839d056d8cb66ec080209d34492b3d2e7e00641b486977be973db9"
 dependencies = [
- "data-encoding",
- "enum-as-inner",
+ "enum-as-inner 0.2.1",
  "failure",
  "futures 0.1.29",
  "idna 0.2.0",
  "lazy_static",
  "log",
  "rand 0.7.3",
- "serde",
  "smallvec 0.6.13",
  "socket2",
  "tokio-executor",
@@ -4745,6 +4712,27 @@ dependencies = [
  "tokio-tcp",
  "tokio-timer",
  "tokio-udp",
+ "url 2.1.1",
+]
+
+[[package]]
+name = "trust-dns-proto"
+version = "0.19.5"
+source = "git+https://github.com/bluejekyll/trust-dns#cb56f66d80f4a278178a35d499b2a8b330b16b82"
+dependencies = [
+ "async-trait",
+ "backtrace",
+ "data-encoding",
+ "enum-as-inner 0.3.2",
+ "futures 0.3.4",
+ "idna 0.2.0",
+ "lazy_static",
+ "log",
+ "rand 0.7.3",
+ "serde",
+ "smallvec 1.2.0",
+ "thiserror",
+ "tokio 0.2.19",
  "url 2.1.1",
 ]
 
@@ -4762,46 +4750,53 @@ dependencies = [
  "log",
  "lru-cache",
  "resolv-conf",
- "serde",
  "smallvec 0.6.13",
  "tokio 0.1.22",
  "tokio-executor",
  "tokio-tcp",
  "tokio-udp",
- "trust-dns-proto",
+ "trust-dns-proto 0.8.0",
+]
+
+[[package]]
+name = "trust-dns-resolver"
+version = "0.19.5"
+source = "git+https://github.com/bluejekyll/trust-dns#cb56f66d80f4a278178a35d499b2a8b330b16b82"
+dependencies = [
+ "backtrace",
+ "cfg-if",
+ "futures 0.3.4",
+ "ipconfig",
+ "lazy_static",
+ "log",
+ "lru-cache",
+ "resolv-conf",
+ "serde",
+ "smallvec 1.2.0",
+ "thiserror",
+ "tokio 0.2.19",
+ "trust-dns-proto 0.19.5",
 ]
 
 [[package]]
 name = "trust-dns-server"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e526ea9c9203633a7818e9d459ff29a3fca050281f6de24db07d873f9d95792e"
+version = "0.19.5"
+source = "git+https://github.com/bluejekyll/trust-dns#cb56f66d80f4a278178a35d499b2a8b330b16b82"
 dependencies = [
  "backtrace",
- "bytes 0.4.12",
+ "bytes 0.5.4",
  "chrono",
- "clap",
- "enum-as-inner",
- "env_logger 0.6.2",
- "failure",
- "futures 0.1.29",
- "lazy_static",
+ "enum-as-inner 0.3.2",
+ "env_logger 0.7.1",
+ "futures 0.3.4",
  "log",
- "rand 0.7.3",
- "rusqlite",
  "serde",
+ "thiserror",
  "time",
- "tokio 0.1.22",
- "tokio-executor",
- "tokio-io",
- "tokio-reactor",
- "tokio-tcp",
- "tokio-timer",
- "tokio-udp",
+ "tokio 0.2.19",
  "toml 0.5.6",
- "trust-dns",
- "trust-dns-proto",
- "trust-dns-resolver",
+ "trust-dns-client",
+ "trust-dns-proto 0.19.5",
 ]
 
 [[package]]
@@ -5080,7 +5075,7 @@ dependencies = [
  "task-compat",
  "tempfile",
  "tokio 0.1.22",
- "tokio 0.2.13",
+ "tokio 0.2.19",
  "tokio-codec",
  "tokio-compat",
  "tokio-openssl 0.3.0",
@@ -5100,9 +5095,9 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "tracing-tower",
- "trust-dns",
- "trust-dns-proto",
- "trust-dns-resolver",
+ "trust-dns-client",
+ "trust-dns-proto 0.19.5",
+ "trust-dns-resolver 0.19.5",
  "trust-dns-server",
  "typetag",
  "url 1.7.2",

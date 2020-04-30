@@ -1,9 +1,9 @@
 use crate::runtime::TaskExecutor;
-use futures::{compat::Future01CompatExt, future::BoxFuture, FutureExt};
-use futures01::{future, Future};
+use futures::{compat::Compat, future::BoxFuture};
+use futures01::Future;
 use hyper::client::connect::dns::{Name, Resolve};
 use hyper13::client::connect::dns::Name as Name13;
-use snafu::{futures01::FutureExt as _, ResultExt};
+use snafu::ResultExt;
 use std::{
     fmt,
     net::{IpAddr, SocketAddr},
@@ -14,7 +14,7 @@ use tower03::Service;
 use trust_dns_resolver::{
     config::{LookupIpStrategy, NameServerConfig, Protocol, ResolverConfig, ResolverOpts},
     lookup_ip::LookupIpIntoIter,
-    system_conf, AsyncResolver,
+    system_conf, TokioAsyncResolver as AsyncResolver,
 };
 
 /// Default port for DNS service.
@@ -65,8 +65,6 @@ impl Resolver {
             opts.attempts = 2;
             opts.validate = false;
             opts.ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
-            // FIXME: multipe requests fails when this is commented out
-            opts.num_concurrent_reqs = 1;
 
             (config, opts)
         } else {
@@ -77,24 +75,25 @@ impl Resolver {
             res
         };
 
-        let (inner, bg_task) = AsyncResolver::new(config, opt);
-
-        exec.spawn(bg_task);
+        let inner = exec
+            .block_on_std(AsyncResolver::tokio(config, opt))
+            .context(Init)?;
 
         Ok(Self { inner })
     }
 
-    pub fn lookup_ip(&self, name: impl AsRef<str>) -> ResolverFuture {
+    pub async fn lookup_ip(&self, name: impl AsRef<str>) -> Result<LookupIp, DnsError> {
         if let Ok(ip) = IpAddr::from_str(name.as_ref()) {
-            return Box::new(future::ok(LookupIp::Single(Some(ip))));
+            return Ok(LookupIp::Single(Some(ip)));
         }
 
-        Box::new(
-            self.inner
-                .lookup_ip(name.as_ref())
-                .context(UnableLookup)
-                .map(|lu| LookupIp::Query(lu.into_iter())),
-        )
+        let lu = self
+            .inner
+            .lookup_ip(name.as_ref())
+            .await
+            .context(UnableLookup)?;
+
+        Ok(LookupIp::Query(lu.into_iter()))
     }
 }
 
@@ -111,14 +110,17 @@ impl Iterator for LookupIp {
 
 impl Resolve for Resolver {
     type Addrs = LookupIp;
-    type Future = Box<dyn Future<Item = Self::Addrs, Error = std::io::Error> + Send + 'static>;
+    type Future = Compat<BoxFuture<'static, Result<Self::Addrs, std::io::Error>>>;
 
     fn resolve(&self, name: Name) -> Self::Future {
-        let fut = self.lookup_ip(name.as_str()).map_err(|e| {
-            use std::io;
-            io::Error::new(io::ErrorKind::Other, e)
+        let me = self.clone();
+        let fut = Box::pin(async move {
+            me.lookup_ip(name.as_str())
+                .await
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
         });
-        Box::new(fut)
+
+        Compat::new(fut)
     }
 }
 
@@ -132,15 +134,24 @@ impl Service<Name13> for Resolver {
     }
 
     fn call(&mut self, name: Name13) -> Self::Future {
-        self.lookup_ip(name.as_str())
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-            .compat()
-            .boxed()
+        let resolver = self.clone();
+
+        Box::pin(async move {
+            resolver
+                .lookup_ip(name.as_str().to_string())
+                .await
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        })
     }
 }
 
 #[derive(Debug, snafu::Snafu)]
 pub enum DnsError {
+    #[snafu(display("Unable to initialize: {}", source))]
+    Init {
+        #[snafu(source(from(trust_dns_resolver::error::ResolveError, ResolveError::from)))]
+        source: ResolveError,
+    },
     #[snafu(display("Unable to parse dns servers: {}", errors.join(", ")))]
     ServerList { errors: Vec<String> },
     #[cfg(windows)]
@@ -210,7 +221,7 @@ mod tests {
     use std::net::{IpAddr, SocketAddr, UdpSocket};
     use std::str::FromStr;
     use tokio01::prelude::{future::poll_fn, Async};
-    use trust_dns::rr::{record_data::RData, LowerName, Name, RecordSet, RecordType, RrKey};
+    use trust_dns_client::rr::{record_data::RData, LowerName, Name, RecordSet, RecordType, RrKey};
     use trust_dns_proto::rr::rdata::soa::SOA;
     use trust_dns_server::{
         authority::{Catalog, ZoneType},
@@ -300,7 +311,7 @@ mod tests {
         // Start DNS server
         rt.spawn(poll_fn(move || {
             let handler = dns_authority(subdomains.as_slice(), domain);
-            let server = ServerFuture::new(handler);
+            let mut server = ServerFuture::new(handler);
             let socket = UdpSocket::bind(address).unwrap();
             server.register_socket_std(socket);
             debug!("DNS started at: {}", address);
@@ -336,7 +347,9 @@ mod tests {
         assert_eq!(
             target,
             runtime
-                .block_on(resolver.lookup_ip(join("name", domain).as_str()))
+                .block_on_std(
+                    async move { resolver.lookup_ip(join("name", domain).as_str()).await }
+                )
                 .unwrap()
                 .next()
                 .unwrap()
@@ -368,7 +381,7 @@ mod tests {
         assert_eq!(
             target_a,
             runtime
-                .block_on(resolver.lookup_ip(join("a", domain_a).as_str()))
+                .block_on_std(async { resolver.lookup_ip(join("a", domain_a).as_str()).await })
                 .unwrap()
                 .next()
                 .unwrap()
@@ -377,7 +390,7 @@ mod tests {
         assert_eq!(
             target_b,
             runtime
-                .block_on(resolver.lookup_ip(join("b", domain_b).as_str()))
+                .block_on_std(async { resolver.lookup_ip(join("b", domain_b).as_str()).await })
                 .unwrap()
                 .next()
                 .unwrap()
@@ -386,7 +399,7 @@ mod tests {
         assert_eq!(
             target_c,
             runtime
-                .block_on(resolver.lookup_ip(join("c", domain_c).as_str()))
+                .block_on_std(async { resolver.lookup_ip(join("c", domain_c).as_str()).await })
                 .unwrap()
                 .next()
                 .unwrap()
@@ -398,7 +411,9 @@ mod tests {
         let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
-        let mut res = rt.block_on(resolver.lookup_ip("127.0.0.1")).unwrap();
+        let mut res = rt
+            .block_on_std(async move { resolver.lookup_ip("127.0.0.1").await })
+            .unwrap();
 
         assert_eq!(res.next(), Some(IpAddr::from_str("127.0.0.1").unwrap()));
     }
@@ -408,12 +423,18 @@ mod tests {
         let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
-        let mut res = rt.block_on(resolver.lookup_ip("::0")).unwrap();
+        let mut res = rt
+            .block_on_std(async { resolver.lookup_ip("::0").await })
+            .unwrap();
 
         assert_eq!(res.next(), Some(IpAddr::from_str("::0").unwrap()));
 
         let mut res = rt
-            .block_on(resolver.lookup_ip("2001:0db8:85a3:0000:0000:8a2e:0370:7334"))
+            .block_on_std(async {
+                resolver
+                    .lookup_ip("2001:0db8:85a3:0000:0000:8a2e:0370:7334")
+                    .await
+            })
             .unwrap();
 
         assert_eq!(

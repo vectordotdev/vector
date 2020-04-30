@@ -1,18 +1,21 @@
 use futures01::future::{ExecuteError, Executor, Future};
 use std::io;
 use std::pin::Pin;
-use tokio::task::JoinHandle;
+use tokio::{runtime::Handle, task::JoinHandle};
 use tokio_compat::runtime::{Builder, Runtime as TokioRuntime, TaskExecutor as TokioTaskExecutor};
 
 pub struct Runtime {
     rt: TokioRuntime,
+    handle: Handle,
 }
 
 impl Runtime {
     pub fn new() -> io::Result<Self> {
-        Ok(Runtime {
-            rt: TokioRuntime::new()?,
-        })
+        let mut rt = TokioRuntime::new()?;
+
+        let handle = rt.block_on_std(async move { Handle::current() });
+
+        Ok(Runtime { rt, handle })
     }
 
     pub fn single_threaded() -> io::Result<Self> {
@@ -20,9 +23,11 @@ impl Runtime {
     }
 
     pub fn with_thread_count(number: usize) -> io::Result<Self> {
-        Ok(Runtime {
-            rt: Builder::new().core_threads(number).build()?,
-        })
+        let mut rt = Builder::new().core_threads(number).build()?;
+
+        let handle = rt.block_on_std(async move { Handle::current() });
+
+        Ok(Runtime { rt, handle })
     }
 
     pub fn spawn<F>(&mut self, future: F) -> &mut Self
@@ -52,28 +57,22 @@ impl Runtime {
     pub fn executor(&self) -> TaskExecutor {
         TaskExecutor {
             inner: self.rt.executor(),
+            handle: self.handle.clone(),
         }
     }
 
-    pub fn block_on<F, R, E>(&mut self, future: F) -> Result<R, E>
+    pub fn block_on<F>(&mut self, future: F) -> Result<F::Item, F::Error>
     where
-        F: Send + 'static + Future<Item = R, Error = E>,
-        R: Send + 'static,
-        E: Send + 'static,
+        F: Future,
     {
         self.rt.block_on(future)
     }
 
     pub fn block_on_std<F>(&mut self, future: F) -> F::Output
     where
-        F: std::future::Future + Send + 'static,
-        F::Output: Send + 'static,
+        F: std::future::Future,
     {
-        use futures::future::{FutureExt, TryFutureExt};
-
-        self.rt
-            .block_on(future.unit_error().boxed().compat())
-            .unwrap()
+        self.rt.block_on_std(future)
     }
 
     pub fn shutdown_on_idle(self) -> impl Future<Item = (), Error = ()> {
@@ -88,6 +87,7 @@ impl Runtime {
 #[derive(Clone, Debug)]
 pub struct TaskExecutor {
     inner: TokioTaskExecutor,
+    handle: Handle,
 }
 
 impl TaskExecutor {
@@ -99,6 +99,10 @@ impl TaskExecutor {
         use futures::future::{FutureExt, TryFutureExt};
 
         self.spawn(f.unit_error().boxed().compat());
+    }
+
+    pub fn block_on_std<F: std::future::Future>(&self, f: F) -> F::Output {
+        self.handle.block_on(f)
     }
 }
 

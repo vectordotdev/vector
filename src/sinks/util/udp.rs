@@ -5,6 +5,7 @@ use crate::{
     topology::config::SinkContext,
 };
 use bytes::Bytes;
+use futures::TryFutureExt;
 use futures01::{future, stream::iter_ok, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -111,7 +112,12 @@ impl UdpSink {
             self.state = match self.state {
                 State::Initializing => {
                     debug!(message = "resolving dns", host = %self.host);
-                    State::ResolvingDns(self.resolver.lookup_ip(&self.host))
+                    let resolver = self.resolver.clone();
+
+                    let host = self.host.clone();
+                    let fut = Box::pin(async move { resolver.lookup_ip(host).await }).compat();
+
+                    State::ResolvingDns(Box::new(fut))
                 }
                 State::ResolvingDns(ref mut dns) => match dns.poll() {
                     Ok(Async::Ready(mut addrs)) => match addrs.next() {
