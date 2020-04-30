@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-28"
+last_modified_on: "2020-04-30"
 delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Logs"
 description: "The Vector `influxdb_logs` sink batches `log` events to InfluxDB using v1 or v2 HTTP API."
@@ -773,7 +773,8 @@ time window.
 
 #### retry_attempts
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
 
  See [Retry Policy](#retry-policy) for more info.
 
