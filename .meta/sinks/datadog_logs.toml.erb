@@ -47,6 +47,7 @@ description = "The endpoint to stream logs to."
 <%= render(
   "_partials/fields/_tls_connector_options.toml",
   namespace: "sinks.datadog_logs.options",
+  enabled: true,
   can_enable: true,
   can_verify_certificate: true,
   can_verify_hostname: true

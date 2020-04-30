@@ -1,4 +1,5 @@
 <%- groups ||= [] -%>
+<%- enabled ||= false -%>
 [<%= namespace %>.tls]
 type = "table"
 category = "TLS"
@@ -10,7 +11,7 @@ description = "Configures the TLS options for connections from this sink."
 [<%= namespace %>.tls.children.enabled]
 type = "bool"
 common = true
-default = false
+default = <%= enabled %>
 groups = <%= groups.to_toml %>
 sort = 1
 description = "Enable TLS during connections to the remote."

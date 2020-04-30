@@ -4350,10 +4350,10 @@ require('custom_module')
     # Enable TLS during connections to the remote.
     #
     # * optional
-    # * default: false
+    # * default: true
     # * type: bool
-    enabled = false
     enabled = true
+    enabled = false
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_path` is set.

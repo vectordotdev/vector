@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-04-30"
 delivery_guarantee: "at_least_once"
 component_title: "Datadog Logs"
 description: "The Vector `datadog_logs` sink streams `log` events to Datadog's logs via the TCP endpoint."
@@ -80,7 +80,7 @@ endpoint][urls.datadog_logs_endpoints].
   # TLS
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
   tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
-  tls.enabled = false # optional, default
+  tls.enabled = true # optional, default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
   tls.verify_certificate = true # optional, default
@@ -483,9 +483,9 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 </Field>
 <Field
   common={true}
-  defaultValue={false}
+  defaultValue={true}
   enumValues={null}
-  examples={[false,true]}
+  examples={[true,false]}
   groups={[]}
   name={"enabled"}
   path={"tls"}
