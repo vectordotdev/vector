@@ -2759,13 +2759,13 @@ require('custom_module')
   #
 
   [sinks.aws_cloudwatch_logs.batch]
-    # The maximum size of a batch, in bytes, before it is flushed.
+    # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional
-    # * default: 1049000
+    # * default: 1000
     # * type: int
-    # * unit: bytes
-    max_size = 1049000
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
