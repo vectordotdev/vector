@@ -11,6 +11,8 @@ set -euo pipefail
 CHANNEL=${CHANNEL:-$(scripts/util/release-channel.sh)}
 VERSION=${VERSION:-$(scripts/version.sh)}
 DATE=${DATE:-$(date -u +%Y-%m-%d)}
+VERIFY_TIMEOUT=30 # seconds
+VERIFY_RETRIES=2
 
 #
 # Setup
@@ -45,9 +47,10 @@ if [[ "$CHANNEL" == "nightly" ]]; then
     --acl public-read
 
   # Verify that the files exist and can be downloaded
-  cmp <(curl https://packages.timber.io/vector/nightly/$DATE/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
-  cmp <(curl https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
-  cmp <(curl -L https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-gnu.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+  sleep $VERIFY_TIMEOUT
+  cmp <(curl --retry $VERIFY_RETRIES https://packages.timber.io/vector/nightly/$DATE/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+  cmp <(curl --retry $VERIFY_RETRIES https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+  cmp <(curl --retry $VERIFY_RETRIES -L https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-gnu.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
 elif [[ "$CHANNEL" == "latest" ]]; then
   version_exact=$VERSION
   version_minor_x=$(echo $VERSION | sed 's/\.[0-9]*$/.X/g')
@@ -69,10 +72,11 @@ elif [[ "$CHANNEL" == "latest" ]]; then
     --acl public-read
 
   # Verify that the files exist and can be downloaded
+  sleep $VERIFY_TIMEOUT
   for i in $version_exact $version_minor_x $version_major_x latest; do
-    cmp <(curl https://packages.timber.io/vector/$i/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+    cmp <(curl --retry $VERIFY_RETRIES https://packages.timber.io/vector/$i/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
   done
-  cmp <(curl -L https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-gnu.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+  cmp <(curl --retry $VERIFY_RETRIES -L https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-gnu.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
 fi
 
 #
