@@ -20,7 +20,7 @@ COMPETITORS = ["filebeat", "fluentbit", "fluentd", "logstash", "metricbeat", "sp
 FRAMEWORKS = ["angular", "backbone", "django", "drupal", "ember", "express", "laravel", "meteor", "materialize", "rails", "react", "ruby on rails", "spring", "symfony",   "vue"]
 PLATFORMS = ["aws", "docker", "ec2", "ec2", "gcp", "heroku", "kubernetes", "lambda", "linux", "netlify", "raspbian", "windows", "wordpress"]
 PROGRAMMING_LANGUAGES = ["c", "c++", "c#", "clojure", "elixir", "erlang", "go", "golang", "java", "javascript", "kotlin", "lua", "node", "php", "python", "scala", "ruby", "rust", "typescript", "webassembly"]
-SINK_SERVICES = ["blob store", "datadog", "honeycomb", "humio", "influxdb", "logdna", "loggly", "object store", "papertrail", "sematext", "splunk", "stackdriver", "sumologic"]
+SINK_SERVICES = ["blob store", "datadog", "signalfx", "honeycomb", "humio", "influxdb", "logdna", "loggly", "object store", "papertrail", "sematext", "splunk", "stackdriver", "sumologic"]
 SOURCE_SERVICES = ["apache web server", "auth0", "fastly", "memcached", "mysql", "nginx", "postgresql", "redis", "rds"]
 SOURCE_TERMS = ["application", "microservice", "service"]
 
@@ -34,6 +34,7 @@ def name_variations(name)
     name.gsub(/^aws_/, "").humanize.downcase,
     name.gsub(/^azure_/, "").humanize.downcase,
     name.gsub(/^datadog_/, "").humanize.downcase,
+    name.gsub(/^signalfx_/, "").humanize.downcase,
     name.gsub(/^gcp_/, "").humanize.downcase,
     name.gsub(/_logs$/, "").humanize.downcase,
     name.gsub(/_metrics$/, "").humanize.downcase,

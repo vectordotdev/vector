@@ -3,7 +3,9 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Vector Metadata Schema",
   "type": "object",
-  "required": ["sinks"],
+  "required": [
+    "sinks"
+  ],
   "properties": {
     "sinks": {
       "type": "object",
@@ -68,7 +70,10 @@
       "description": "A list of allowed Vector event types.",
       "items": {
         "type": "string",
-        "enum": ["log", "metric"]
+        "enum": [
+          "log",
+          "metric"
+        ]
       }
     },
     "examples": {
@@ -77,7 +82,10 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["body", "label"],
+        "required": [
+          "body",
+          "label"
+        ],
         "properties": {
           "body": {
             "type": "string",
@@ -94,7 +102,9 @@
       "type": "object",
       "description": "A Vector field, such as a component option, environment variable, log schema field, etc.",
       "additionalProperties": false,
-      "required": ["description"],
+      "required": [
+        "description"
+      ],
       "properties": {
         "category": {
           "type": "string",
@@ -162,7 +172,10 @@
         "toml_display": {
           "type": "string",
           "description": "How to display this option in TOML examples.",
-          "enum": ["normal", "inline"]
+          "enum": [
+            "normal",
+            "inline"
+          ]
         },
         "type": {
           "type": "string",
@@ -183,7 +196,13 @@
         "unit": {
           "type": "string",
           "description": "The unit of measurement for the option value",
-          "enum": ["bytes", "events", "milliseconds", "requests", "seconds"]
+          "enum": [
+            "bytes",
+            "events",
+            "milliseconds",
+            "requests",
+            "seconds"
+          ]
         },
         "warnings": {
           "type": "array",
@@ -194,7 +213,10 @@
               "visibility_level": {
                 "type": "string",
                 "description": "The visiblity level. `component` will bubble up the warning at the top of the component page (higher visibility). `option` will display the warning on the option only (lower visibility).",
-                "enum": ["component", "option"]
+                "enum": [
+                  "component",
+                  "option"
+                ]
               },
               "text": {
                 "type": "string",
@@ -228,7 +250,11 @@
       "description": "A list of Vector support operating systems.",
       "items": {
         "type": "string",
-        "enum": ["Linux", "MacOS", "Windows"]
+        "enum": [
+          "Linux",
+          "MacOS",
+          "Windows"
+        ]
       }
     },
     "permissions": {
@@ -244,7 +270,10 @@
       "type": "object",
       "description": "A Vector permission, such as a AWS IAM, GCP IAM, or Kubernetes RBAC permission.",
       "additionalProperties": false,
-      "required": ["description", "name"],
+      "required": [
+        "description",
+        "name"
+      ],
       "properties": {
         "description": {
           "type": "string",
@@ -312,6 +341,7 @@
           "Azure",
           "Confluent",
           "Datadog",
+          "SignalFx",
           "Elastic",
           "GCP",
           "Grafana",
@@ -355,7 +385,10 @@
         "delivery_guarantee": {
           "type": "string",
           "description": "The sink's delivery guarantee.",
-          "enum": ["at_least_once", "best_effort"]
+          "enum": [
+            "at_least_once",
+            "best_effort"
+          ]
         },
         "description": {
           "type": "string",
@@ -364,7 +397,11 @@
         "egress_method": {
           "type": "string",
           "description": "The sink's egress method.",
-          "enum": ["batching", "exposing", "streaming"]
+          "enum": [
+            "batching",
+            "exposing",
+            "streaming"
+          ]
         },
         "env_vars": {
           "$ref": "#/definitions/fields",
@@ -385,7 +422,10 @@
         "function_category": {
           "type": "string",
           "description": "The function category the sink serves. Used for filtering.",
-          "enum": ["test", "transmit"]
+          "enum": [
+            "test",
+            "transmit"
+          ]
         },
         "healthcheck": {
           "type": "boolean",
@@ -396,7 +436,10 @@
           "description": "The allow event input types.",
           "items": {
             "type": "string",
-            "enum": ["log", "metric"]
+            "enum": [
+              "log",
+              "metric"
+            ]
           }
         },
         "noun": {
@@ -467,7 +510,10 @@
         "delivery_guarantee": {
           "type": "string",
           "description": "The source's delivery guarantee",
-          "enum": ["at_least_once", "best_effort"]
+          "enum": [
+            "at_least_once",
+            "best_effort"
+          ]
         },
         "description": {
           "type": "string",
@@ -500,7 +546,11 @@
         "function_category": {
           "type": "string",
           "description": "The source's function category, used for filtering.",
-          "enum": ["collect", "receive", "test"]
+          "enum": [
+            "collect",
+            "receive",
+            "test"
+          ]
         },
         "noun": {
           "type": "string",

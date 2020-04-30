@@ -1,0 +1,56 @@
+[sinks.datadog_metrics]
+title = "SignalFx Metrics"
+noun = "SignalFx Metrics"
+beta = true
+common = false
+delivery_guarantee = "at_least_once"
+<%= render("_partials/descriptions/_signalfx.toml") %>
+egress_method = "batching"
+features = [
+  "Send metrics to SignalFx.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Automatically aggregate metrics at the edge for improved performance.",
+]
+function_category = "transmit"
+healthcheck = true
+input_types = ["metric"]
+service_providers = ["SignalFx"]
+requirements = {}
+write_to_description = "[SignalFx's][urls.signalfx] metrics service using [HTTP API](https://developers.signalfx.com/metrics/data_ingest_overview.html)"
+
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "signalfx_metrics") %>
+
+<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.signalfx_metrics.options", common: false, max_events: 20, max_size: nil, timeout_secs: 1) %>
+
+<%= render(
+  "_partials/fields/_request_options.toml",
+  namespace: "sinks.signalfx_metrics.options",
+  common: false,
+  in_flight_limit: 5,
+  rate_limit_duration_secs: 1,
+  rate_limit_num: 5,
+  retry_initial_backoff_secs: 1,
+  retry_max_duration_secs: 10,
+  timeout_secs: 60
+) %>
+
+[sinks.signalfx_metrics.options.token]
+type = "string"
+common = true
+examples = ["${SIGNALFX_TOKEN}", "AKSxrIslBQyvbGJq-aRqbm"]
+required = true
+description = "SignalFx [API key](https://developers.signalfx.com/administration/access_tokens_overview.html)"
+
+[sinks.signalfx_metrics.options.realm]
+type = "string"
+examples = ["us0", "eu0"]
+default = "us0"
+description = "SignalFx region endpoint to send datapoint to"
+
+[sinks.signalfx_metrics.options.namespace]
+type = "string"
+common = true
+examples = ["service"]
+required = true
+description = "A prefix that will be added to all metric names."

@@ -62,6 +62,7 @@ scopes:
   - splunk provider
   - yandex provider
   - datadog provider
+  - signalfx provider
   - azure provider
   - elastic provider
   - gcp provider
@@ -127,6 +128,7 @@ scopes:
   - console sink
   - datadog_logs sink
   - datadog_metrics sink
+  - signalfx_metrics sink
   - elasticsearch sink
   - file sink
   - gcp_cloud_storage sink
