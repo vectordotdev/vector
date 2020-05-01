@@ -4005,7 +4005,6 @@ dependencies = [
  "tokio-timer",
  "tokio-udp",
  "tokio-uds",
- "tracing-core",
 ]
 
 [[package]]
