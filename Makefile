@@ -103,22 +103,21 @@ target/wasm32-wasi/.obtained:
 	@mkdir -p target/wasm32-wasi
 	@touch target/wasm32-wasi/.obtained
 
-TEST_WASM_MODULES := $(patsubst tests/data/wasm/%, target/wasm32-wasi/release/%.wat, $(wildcard tests/data/wasm/*))
-build-wasm-tests: $(TEST_WASM_MODULES) ### Builds engine test modules, if required
+WASM_MODULES = $(patsubst tests/data/wasm/%/,%,$(wildcard tests/data/wasm/*/))
+WASM_WATS = $(foreach MODULE,$(WASM_MODULES),tests/data/wasm/${MODULE}/${MODULE}.wat)
+.PHONY: build-wasm-tests
+build-wasm-tests: pre-build-wasm-tests $(WASM_WATS)
 
 .PHONY: pre-build-wasm-tests
 pre-build-wasm-tests:
-	@cat <<-'EOF'
-		# Building test WASM modules as `wasm` then transforming them into `wat`!
-		# This will error if you don't have `wabt` installed as recommended.
-	EOF
+	@echo "# Building test WASM modules as .wasm then transforming them into .wat!"
+	@echo "# This will error if you don't have wabt installed as recommended."
 
-.ONESHELL:
-$(TEST_WASM_MODULES): pre-build-wasm-tests ensure-has-wasm-toolchain ### Build the target test module
-	@cd $(patsubst target/wasm32-wasi/release/%.wat, tests/data/wasm/%, $@)
-	cargo build --target wasm32-wasi --release
-	@cd ../../../../
-	wasm2wat $(patsubst target/wasm32-wasi/release/%.wat, target/wasm32-wasi/release/%.wasm, $@) -o $@
+tests/data/wasm/%.wat: MODULE = $(lastword $(subst /, , $(dir $@)))
+tests/data/wasm/%.wat:
+	@echo "# Building WASM module ${MODULE}, requires Rustc for wasm32-wasi and wabt."
+	cargo build --target wasm32-wasi --release --package ${MODULE}
+	wasm2wat target/wasm32-wasi/release/${MODULE}.wasm -o tests/data/wasm/${MODULE}/${MODULE}.wat
 
 test-wasm: build-wasm-tests  ### Run engine tests.
 	cargo test wasm --no-default-features --features wasm -- --nocapture
@@ -138,7 +137,7 @@ check-code: ## Check code
 check-component-features: ## Check that all component features are setup properly
 	$(RUN) check-component-features
 
-check-fmt: ## Check that all files are formatted properly
+check-fmt: ## Check that al files are formatted properly
 	$(RUN) check-fmt
 
 check-style: ## Check that all files are styled properly

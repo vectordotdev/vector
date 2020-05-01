@@ -293,7 +293,7 @@ fn protobuf() -> Result<()> {
     // Run the test.
     let mut module = WasmModule::build(WasmModuleConfig::new(
         Role::Transform,
-        "target/wasm32-wasi/release/protobuf.wasm",
+        "tests/data/wasm/protobuf/protobuf.wat",
     ))?;
     let out = module.process(event.clone())?;
     module.shutdown()?;

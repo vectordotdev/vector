@@ -91,7 +91,7 @@ mod tests {
     fn poc() -> crate::Result<()> {
         let mut transform = parse_config(
             r#"
-            module = "target/wasm32-wasi/release/protobuf.wat"
+            module = "tests/data/wasm/protobuf/protobuf.wat"
             "#,
         )?;
 
