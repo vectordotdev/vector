@@ -8,4 +8,8 @@
 
 set -euo pipefail
 
-cargo test --all --no-default-features --target ${TARGET}
+if [ -z "${TARGET:-}" ]; then
+    cargo test --all --no-default-features
+else 
+    cargo test --all --no-default-features --target "${TARGET}"
+fi

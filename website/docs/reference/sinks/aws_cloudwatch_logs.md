@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-24"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Logs"
 description: "The Vector `aws_cloudwatch_logs` sink batches `log` events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint."
@@ -76,7 +76,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
   stream_name = "{{ host }}" # required
 
   # Batch
-  batch.max_size = 1049000 # optional, default, bytes
+  batch.max_events = 1000 # optional, default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
@@ -95,7 +95,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 5 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 30 # optional, default, seconds
@@ -124,7 +124,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 ### assume_role
 
 The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
  See [AWS Authentication](#aws-authentication) for more info.
 
 
@@ -150,28 +149,26 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
 Configures the sink batching behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={1049000}
+  defaultValue={1000}
   enumValues={null}
-  examples={[1049000]}
+  examples={[1000]}
   groups={[]}
-  name={"max_size"}
+  name={"max_events"}
   path={"batch"}
   relevantWhen={null}
   required={false}
   templateable={false}
   type={"int"}
-  unit={"bytes"}
+  unit={"events"}
   warnings={[]}
   >
 
-#### max_size
+#### max_events
 
-The maximum size of a batch, in bytes, before it is flushed.
-
+The maximum size of a batch, in events, before it is flushed.
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -195,7 +192,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 #### timeout_secs
 
 The maximum age of a batch before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -224,7 +220,6 @@ The maximum age of a batch before it is flushed.
 Configures the sink specific buffer behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -245,8 +240,7 @@ Configures the sink specific buffer behavior.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
-
+ See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -270,7 +264,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 The maximum size of the buffer on the disk.
 
- See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -296,7 +289,6 @@ The buffer's type and storage mechanism.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -317,7 +309,6 @@ The buffer's type and storage mechanism.
 #### when_full
 
 The behavior when the buffer becomes full.
-
 
 
 
@@ -349,7 +340,6 @@ creating the group and will create the first stream.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -371,7 +361,6 @@ creating the group and will create the first stream.
 
 Dynamically create a [log stream][urls.aws_cloudwatch_logs_stream_name] if it
 does not already exist.
-
 
 
 
@@ -397,7 +386,6 @@ does not already exist.
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -418,7 +406,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -445,7 +432,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -469,7 +455,6 @@ Limit the sink to only encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -490,7 +475,6 @@ Limit the sink to only encoding the specified labels.
 #### timestamp_format
 
 How to format event timestamps.
-
 
 
 
@@ -521,7 +505,6 @@ this option will make [`region`](#region) moot.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -543,7 +526,6 @@ this option will make [`region`](#region) moot.
 
 The [group name][urls.aws_cloudwatch_logs_group_name] of the target CloudWatch
 Logs stream.
-
  See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.
 
 
@@ -567,7 +549,6 @@ Logs stream.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -595,7 +576,6 @@ provided it will override this value since the endpoint includes the region.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -618,7 +598,6 @@ provided it will override this value since the endpoint includes the region.
 Configures the sink request behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -639,7 +618,6 @@ Configures the sink request behavior.
 #### in_flight_limit
 
 The maximum number of in-flight requests allowed at any given time.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -663,7 +641,6 @@ The maximum number of in-flight requests allowed at any given time.
 #### rate_limit_duration_secs
 
 The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -688,16 +665,15 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
 time window.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
 <Field
   common={false}
-  defaultValue={-1}
+  defaultValue={18446744073709551615}
   enumValues={null}
-  examples={[-1]}
+  examples={[18446744073709551615]}
   groups={[]}
   name={"retry_attempts"}
   path={"request"}
@@ -711,8 +687,8 @@ time window.
 
 #### retry_attempts
 
-The maximum number of retries to make for failed requests.
-
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
  See [Retry Policy](#retry-policy) for more info.
 
 
@@ -741,7 +717,6 @@ to select future backoffs.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -762,7 +737,6 @@ to select future backoffs.
 #### retry_max_duration_secs
 
 The maximum amount of time, in seconds, to wait between retries.
-
 
 
 
@@ -789,7 +763,6 @@ The maximum time a request can take before being aborted. It is highly
 recommended that you do not lower value below the service's internal timeout,
 as this could create orphaned requests, pile on retries, and result in
 duplicate data downstream.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -817,7 +790,6 @@ duplicate data downstream.
 
 The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target
 CloudWatch Logs stream.
-
  See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.
 
 
@@ -847,7 +819,6 @@ CloudWatch Logs stream.
 
 Used for AWS authentication when communicating with AWS services. See relevant
 [AWS components][pages.aws_components] for more info.
-
  See [AWS Authentication](#aws-authentication) for more info.
 
 
@@ -872,7 +843,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 Used for AWS authentication when communicating with AWS services. See relevant
 [AWS components][pages.aws_components] for more info.
-
  See [AWS Authentication](#aws-authentication) for more info.
 
 
@@ -952,7 +922,7 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 *Batches* are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured [`timeout_secs`](#timeout_secs).
-2. The batch size meets or exceeds the configured [`max_size`](#max_size).
+2. The batch size meets or exceeds the configured [`max_events`](#max_events).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 

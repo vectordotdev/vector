@@ -27,8 +27,6 @@ pub mod geoip;
 pub mod grok_parser;
 #[cfg(feature = "transforms-json_parser")]
 pub mod json_parser;
-#[cfg(feature = "transforms-kubernetes")]
-pub mod kubernetes;
 #[cfg(feature = "transforms-log_to_metric")]
 pub mod log_to_metric;
 #[cfg(feature = "transforms-logfmt_parser")]
