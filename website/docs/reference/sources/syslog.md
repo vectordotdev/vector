@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "best_effort"
 component_title: "Syslog"
 description: "The Vector `syslog` source ingests data through the Syslog protocol and outputs `log` events."
@@ -107,7 +107,6 @@ Nth socket passed by systemd socket activation.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -130,7 +129,6 @@ Nth socket passed by systemd socket activation.
 The key name added to each event representing the current host. This can also
 be globally set via the [global [`host_key`](#host_key)
 option][docs.reference.global-options#host_key].
-
  See [Context](#context) for more info.
 
 
@@ -157,7 +155,6 @@ The maximum bytes size of incoming messages before they are discarded.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -178,7 +175,6 @@ The maximum bytes size of incoming messages before they are discarded.
 ### mode
 
 The input mode.
-
 
 
 
@@ -205,7 +201,6 @@ The unix socket path. *This should be absolute path.*
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -226,7 +221,6 @@ The unix socket path. *This should be absolute path.*
 ### tls
 
 Configures the TLS options for connections from this source.
-
 
 
 <Fields filters={false}>
@@ -250,7 +244,6 @@ Configures the TLS options for connections from this source.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -279,7 +272,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -301,7 +293,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Require TLS for incoming connections. If this is set, an identity certificate
 is also required.
-
 
 
 
@@ -329,7 +320,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -351,7 +341,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 Absolute path to a certificate key file used to identify this server, in DER or
 PEM format (PKCS#8).
-
 
 
 
@@ -377,7 +366,6 @@ PEM format (PKCS#8).
 If `true`, Vector will require a TLS certificate from the connecting host and
 terminate the connection if it is not valid. If `false` (the default), Vector
 will not request a certificate from the client.
-
 
 
 
@@ -430,7 +418,6 @@ found, then the key will not be added.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -452,7 +439,6 @@ found, then the key will not be added.
 
 The facility extracted from the Syslog line. If a facility is not found, then
 the key will not be added.
-
 
 
 
@@ -481,7 +467,6 @@ socket path will be used. This key can be renamed via the [`host_key`](#host_key
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -502,7 +487,6 @@ socket path will be used. This key can be renamed via the [`host_key`](#host_key
 ### message
 
 The raw message, unaltered.
-
  See [Parsing](#parsing) for more info.
 
 
@@ -530,7 +514,6 @@ will not be added.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -552,7 +535,6 @@ will not be added.
 
 The procid extracted from the Syslog line. If a procid is not found, then the
 key will not be added.
-
 
 
 
@@ -580,7 +562,6 @@ the key will not be added.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -602,7 +583,6 @@ the key will not be added.
 
 The timestamp extracted from the incoming line. If a timestamp is not found,
 then Vector will use the current time.
-
 
 
 
@@ -630,7 +610,6 @@ key will not be added.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -652,7 +631,6 @@ key will not be added.
 
 In addition to the defined fields, any Syslog 5424 structured fields are parsed
 and inserted as root level fields.
-
 
 
 

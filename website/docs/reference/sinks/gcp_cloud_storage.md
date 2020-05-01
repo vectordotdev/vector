@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
@@ -144,7 +144,6 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 Predefined ACL to apply to the created objects. For more information, see
 [Predefined ACLs][urls.gcs_predefined_acl]. If this is not set, GCS will apply
 a default ACL when the object is created.
-
  See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
@@ -170,7 +169,6 @@ a default ACL when the object is created.
 Configures the sink batching behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -191,7 +189,6 @@ Configures the sink batching behavior.
 #### max_size
 
 The maximum size of a batch, in bytes, before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -215,7 +212,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 #### timeout_secs
 
 The maximum age of a batch before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -245,7 +241,6 @@ The GCS bucket name.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -266,7 +261,6 @@ The GCS bucket name.
 ### buffer
 
 Configures the sink specific buffer behavior.
-
 
 
 <Fields filters={false}>
@@ -292,7 +286,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -313,7 +306,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -340,7 +332,6 @@ The buffer's type and storage mechanism.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -361,7 +352,6 @@ The buffer's type and storage mechanism.
 #### when_full
 
 The behavior when the buffer becomes full.
-
 
 
 
@@ -391,7 +381,6 @@ The compression mechanism to use.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -418,7 +407,6 @@ the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) environm
 If no filename is named, Vector will attempt to fetch an instance service
 account for the compute instance the program is running on. If Vector is not
 running on a GCE instance, you must define a credentials file as above.
-
  See [GCP Authentication](#gcp-authentication) for more info.
 
 
@@ -444,7 +432,6 @@ running on a GCE instance, you must define a credentials file as above.
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -465,7 +452,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -492,7 +478,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -516,7 +501,6 @@ Limit the sink to only encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -537,7 +521,6 @@ Limit the sink to only encoding the specified labels.
 #### timestamp_format
 
 How to format event timestamps.
-
 
 
 
@@ -565,7 +548,6 @@ How to format event timestamps.
 
 Whether or not to append a UUID v4 token to the end of the file. This ensures
 there are no name collisions high volume use cases.
-
  See [Object naming](#object-naming) for more info.
 
 
@@ -592,7 +574,6 @@ The filename extension to use in the object name.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -614,7 +595,6 @@ The filename extension to use in the object name.
 
 The format of the resulting object file name. [`strftime`
 specifiers][urls.strptime_specifiers] are supported.
-
  See [Object naming](#object-naming) for more info.
 
 
@@ -638,7 +618,6 @@ specifiers][urls.strptime_specifiers] are supported.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -664,7 +643,6 @@ Enables/disables the sink healthcheck upon start.
 A prefix to apply to all object key names. This should be used to partition
 your objects, and it's important to end this value with a `/` if you want this
 to be the root GCS "folder".
-
  See [Object naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
 
 
@@ -691,7 +669,6 @@ The set of metadata `key:value` pairs for the created objects. See the [GCS
 custom metadata][urls.gcs_custom_metadata] documentation for more details.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -712,7 +689,6 @@ custom metadata][urls.gcs_custom_metadata] documentation for more details.
 #### `[key-name]`
 
 A custom metadata item to be added to the created objects.
-
 
 
 
@@ -741,7 +717,6 @@ A custom metadata item to be added to the created objects.
 Configures the sink request behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -762,7 +737,6 @@ Configures the sink request behavior.
 #### in_flight_limit
 
 The maximum number of in-flight requests allowed at any given time.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -786,7 +760,6 @@ The maximum number of in-flight requests allowed at any given time.
 #### rate_limit_duration_secs
 
 The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -811,7 +784,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
 time window.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -836,7 +808,6 @@ time window.
 
 The maximum number of retries to make for failed requests. The default, for all
 intents and purposes, represents an infinite number of retries.
-
  See [Retry Policy](#retry-policy) for more info.
 
 
@@ -865,7 +836,6 @@ to select future backoffs.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -886,7 +856,6 @@ to select future backoffs.
 #### retry_max_duration_secs
 
 The maximum amount of time, in seconds, to wait between retries.
-
 
 
 
@@ -913,7 +882,6 @@ The maximum time a request can take before being aborted. It is highly
 recommended that you do not lower value below the service's internal timeout,
 as this could create orphaned requests, pile on retries, and result in
 duplicate data downstream.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -941,7 +909,6 @@ duplicate data downstream.
 
 The storage class for the created objects. See [the GCP storage
 classes][urls.gcs_storage_classes] for more details.
-
  See [Storage class](#storage-class) for more info.
 
 
@@ -967,7 +934,6 @@ classes][urls.gcs_storage_classes] for more details.
 Configures the TLS options for connections from this sink.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -989,7 +955,6 @@ Configures the TLS options for connections from this sink.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -1018,7 +983,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -1040,7 +1004,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
 `key_path` is set.
-
 
 
 
@@ -1068,7 +1031,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -1090,7 +1052,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
 host.
-
 
 
 
@@ -1116,7 +1077,6 @@ host.
 If `true` (the default), Vector will validate the configured remote host name
 against the remote host's TLS certificate. Do NOT set this to `false` unless
 you understand the risks of not verifying the remote hostname.
-
 
 
 
@@ -1149,7 +1109,6 @@ you understand the risks of not verifying the remote hostname.
 
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Cloud Storage API.
-
  See [GCP Authentication](#gcp-authentication) for more info.
 
 

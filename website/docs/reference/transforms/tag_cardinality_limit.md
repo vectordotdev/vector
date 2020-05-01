@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Tag Cardinality Limit"
 description: "The Vector `tag_cardinality_limit` transform accepts and outputs `metric` events, allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
 event_types: ["metric"]
@@ -84,7 +84,6 @@ metrics services.
 The size of the cache in bytes to use to detect duplicate tags. The bigger the
 cache the less likely it is to have a 'false positive' or a case where we allow
 a new value for tag even after we have reached the configured limits.
-
  See [Memory Utilization](#memory-utilization) for more info.
 
 
@@ -112,7 +111,6 @@ the configured limit on cardinality.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -137,7 +135,6 @@ and deterime when a tag on an incoming metric exceeds the limit.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -158,7 +155,6 @@ and deterime when a tag on an incoming metric exceeds the limit.
 ### value_limit
 
 How many distinct values to accept for any given key.
-
  See [Memory Utilization](#memory-utilization) for more info.
 
 

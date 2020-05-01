@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events, allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
@@ -162,7 +162,6 @@ with a full embedded [Lua][urls.lua] engine.
 Configures hooks handlers.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -184,7 +183,6 @@ Configures hooks handlers.
 
 A function which is called when the first event comes, before calling
 `hooks.process`
-
 
 
 
@@ -212,7 +210,6 @@ using `emit` function.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -234,7 +231,6 @@ using `emit` function.
 
 A function which is called when Vector is stopped. It can produce new events
 using `emit` function.
-
 
 
 
@@ -263,7 +259,6 @@ using `emit` function.
 A list of directories to search when loading a Lua file via the `require`
 function. If not specified, the modules are looked up in the directories of
 Vector's configs.
-
  See [Search Directories](#search-directories) for more info.
 
 
@@ -290,7 +285,6 @@ The source which is evaluated when the transform is created.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -311,7 +305,6 @@ The source which is evaluated when the transform is created.
 ### timers
 
 Configures timers which are executed periodically at given interval.
-
 
 
 <Fields filters={false}>
@@ -338,7 +331,6 @@ It can produce new events using `emit` function.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -359,7 +351,6 @@ It can produce new events using `emit` function.
 #### interval_seconds
 
 Defines the interval at which the timer handler would be executed.
-
 
 
 
@@ -387,7 +378,6 @@ Defines the interval at which the timer handler would be executed.
 
 Transform API version. Specifying this version ensures that Vector does not
 break backward compatibility.
-
 
 
 

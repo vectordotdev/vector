@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-30"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
@@ -138,7 +138,6 @@ The Vector `loki` sink
 Options for the authentication strategy.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -160,7 +159,6 @@ Options for the authentication strategy.
 
 The basic authentication password. If using GrafanaLab's hosted Loki then this
 must be set to your `instanceId`.
-
 
 
 
@@ -187,7 +185,6 @@ The authentication strategy to use.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -209,7 +206,6 @@ The authentication strategy to use.
 
 The basic authentication user name. If using GrafanaLab's hosted Loki then this
 must be set to your Grafana.com api key.
-
 
 
 
@@ -238,7 +234,6 @@ must be set to your Grafana.com api key.
 Configures the sink batching behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -259,7 +254,6 @@ Configures the sink batching behavior.
 #### max_size
 
 The maximum size of a batch, in bytes, before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -283,7 +277,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 #### timeout_secs
 
 The maximum age of a batch before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -312,7 +305,6 @@ The maximum age of a batch before it is flushed.
 Configures the sink specific buffer behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -336,7 +328,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -357,7 +348,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -384,7 +374,6 @@ The buffer's type and storage mechanism.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -405,7 +394,6 @@ The buffer's type and storage mechanism.
 #### when_full
 
 The behavior when the buffer becomes full.
-
 
 
 
@@ -434,7 +422,6 @@ The behavior when the buffer becomes full.
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -455,7 +442,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -482,7 +468,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -506,7 +491,6 @@ Limit the sink to only encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -527,7 +511,6 @@ Limit the sink to only encoding the specified labels.
 #### timestamp_format
 
 How to format event timestamps.
-
 
 
 
@@ -557,7 +540,6 @@ The endpoint used to ship logs to.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -578,7 +560,6 @@ The endpoint used to ship logs to.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -608,7 +589,6 @@ issues with Loki. To ensure this does not happen one should try to reduce the
 amount of unique label values.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -629,7 +609,6 @@ amount of unique label values.
 #### `[label-name]`
 
 A key-value pair for labels.
-
 
 
 
@@ -660,7 +639,6 @@ fields will also get removed from the event.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -682,7 +660,6 @@ fields will also get removed from the event.
 
 If this is set to `true` then the timestamp will be removed from the event.
 This is useful because Loki uses the timestamp to index the event.
-
 
 
 
@@ -708,7 +685,6 @@ This is useful because Loki uses the timestamp to index the event.
 Configures the sink request behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -729,7 +705,6 @@ Configures the sink request behavior.
 #### in_flight_limit
 
 The maximum number of in-flight requests allowed at any given time.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -753,7 +728,6 @@ The maximum number of in-flight requests allowed at any given time.
 #### rate_limit_duration_secs
 
 The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -778,7 +752,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
 time window.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -803,7 +776,6 @@ time window.
 
 The maximum number of retries to make for failed requests. The default, for all
 intents and purposes, represents an infinite number of retries.
-
  See [Retry Policy](#retry-policy) for more info.
 
 
@@ -832,7 +804,6 @@ to select future backoffs.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -853,7 +824,6 @@ to select future backoffs.
 #### retry_max_duration_secs
 
 The maximum amount of time, in seconds, to wait between retries.
-
 
 
 
@@ -880,7 +850,6 @@ The maximum time a request can take before being aborted. It is highly
 recommended that you do not lower value below the service's internal timeout,
 as this could create orphaned requests, pile on retries, and result in
 duplicate data downstream.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -914,7 +883,6 @@ You can read more about tenant id's [here][urls.loki_multi_tenancy]
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -935,7 +903,6 @@ You can read more about tenant id's [here][urls.loki_multi_tenancy]
 ### tls
 
 Configures the TLS options for connections from this sink.
-
 
 
 <Fields filters={false}>
@@ -959,7 +926,6 @@ Configures the TLS options for connections from this sink.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -988,7 +954,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -1010,7 +975,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
 `key_path` is set.
-
 
 
 
@@ -1038,7 +1002,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -1060,7 +1023,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
 host.
-
 
 
 
@@ -1086,7 +1048,6 @@ host.
 If `true` (the default), Vector will validate the configured remote host name
 against the remote host's TLS certificate. Do NOT set this to `false` unless
 you understand the risks of not verifying the remote hostname.
-
 
 
 

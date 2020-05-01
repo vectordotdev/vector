@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 title: Environment Variables
 description: "A full list of Vector's supported environment variables and how to use them."
 sidebar_label: Env Vars
@@ -52,7 +52,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -77,7 +76,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -98,7 +96,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 ### DOCKER_HOST
 
 The docker host to connect to.
-
 
 
 
@@ -127,7 +124,6 @@ verifying the remote certificate.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -149,7 +145,6 @@ verifying the remote certificate.
 
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Stackdriver Logging API.
-
 
 
 
@@ -177,7 +172,6 @@ guide][docs.monitoring#levels] for more information on the available levels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -199,7 +193,6 @@ guide][docs.monitoring#levels] for more information on the available levels.
 
 Enables backtraces when errors are logged. Use this when debugging only since
 it can degrade performance.
-
 
 
 

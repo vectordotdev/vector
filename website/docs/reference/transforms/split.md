@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Split"
 description: "The Vector `split` transform accepts and outputs `log` events, allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
 event_types: ["log"]
@@ -104,7 +104,6 @@ If `true` the [`field`](#field) will be dropped after parsing.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -125,7 +124,6 @@ If `true` the [`field`](#field) will be dropped after parsing.
 ### field
 
 The field to apply the split on.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
@@ -149,7 +147,6 @@ The field to apply the split on.
 ### field_names
 
 The field names assigned to the resulting tokens, in order.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
@@ -178,7 +175,6 @@ Derived Core Property `White_Space`][urls.unicode_whitespace].
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -200,7 +196,6 @@ Derived Core Property `White_Space`][urls.unicode_whitespace].
 
 Key/value pairs representing mapped log field names and types. This is used to
 coerce log fields into their proper types.
-
 
 
 <Fields filters={false}>
@@ -225,7 +220,6 @@ coerce log fields into their proper types.
 A definition of log field type conversions. They key is the log field name and
 the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are
 supported for the `timestamp` type.
-
 
 
 

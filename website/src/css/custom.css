@@ -661,7 +661,7 @@ ul.connected-list > li ul.info .examples {
 }
 
 ul.connected-list > li p + ul.info {
-  margin-top: calc(var(--ifm-spacing-horizontal) * -1);
+  margin-top: calc(var(--ifm-spacing-horizontal) * -0.5);
 }
 
 /* connected-list--blend */

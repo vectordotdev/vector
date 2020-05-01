@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Metrics"
 description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
@@ -168,7 +168,6 @@ The Vector `influxdb_metrics` sink
 Configures the sink batching behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -192,7 +191,6 @@ The maximum size of a batch, in events, before it is flushed.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -213,7 +211,6 @@ The maximum size of a batch, in events, before it is flushed.
 #### timeout_secs
 
 The maximum age of a batch before it is flushed.
-
 
 
 
@@ -243,7 +240,6 @@ The destination bucket for writes into InfluxDB 2.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -264,7 +260,6 @@ The destination bucket for writes into InfluxDB 2.
 ### consistency
 
 Sets the write consistency for the point for InfluxDB 1.
-
 
 
 
@@ -291,7 +286,6 @@ Sets the target database for the write into InfluxDB 1.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -315,7 +309,6 @@ InfluxDB endpoint to send metrics to.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -336,7 +329,6 @@ InfluxDB endpoint to send metrics to.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -363,7 +355,6 @@ A prefix that will be added to all metric names.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -384,7 +375,6 @@ A prefix that will be added to all metric names.
 ### org
 
 Specifies the destination organization for writes into InfluxDB 2.
-
 
 
 
@@ -412,7 +402,6 @@ write into InfluxDB 1.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -435,7 +424,6 @@ write into InfluxDB 1.
 Configures the sink request behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -456,7 +444,6 @@ Configures the sink request behavior.
 #### in_flight_limit
 
 The maximum number of in-flight requests allowed at any given time.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -480,7 +467,6 @@ The maximum number of in-flight requests allowed at any given time.
 #### rate_limit_duration_secs
 
 The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -505,7 +491,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
 time window.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -530,7 +515,6 @@ time window.
 
 The maximum number of retries to make for failed requests. The default, for all
 intents and purposes, represents an infinite number of retries.
-
  See [Retry Policy](#retry-policy) for more info.
 
 
@@ -559,7 +543,6 @@ to select future backoffs.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -580,7 +563,6 @@ to select future backoffs.
 #### retry_max_duration_secs
 
 The maximum amount of time, in seconds, to wait between retries.
-
 
 
 
@@ -610,7 +592,6 @@ duplicate data downstream.
 
 
 
-
 </Field>
 </Fields>
 
@@ -637,7 +618,6 @@ Sets the target retention policy for the write into InfluxDB 1.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -658,7 +638,6 @@ Sets the target retention policy for the write into InfluxDB 1.
 ### token
 
 [Authentication token][urls.influxdb_authentication_token] for InfluxDB 2.
-
 
 
 
@@ -683,7 +662,6 @@ Sets the target retention policy for the write into InfluxDB 1.
 
 Sets the username for authentication if you’ve enabled authentication for the
 write into InfluxDB 1.
-
 
 
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
@@ -92,7 +92,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 ### assume_role
 
 The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
  See [AWS Authentication](#aws-authentication) for more info.
 
 
@@ -118,7 +117,6 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
 Configures the sink batching behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -142,7 +140,6 @@ The maximum size of a batch, in events, before it is flushed.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -163,7 +160,6 @@ The maximum size of a batch, in events, before it is flushed.
 #### timeout_secs
 
 The maximum age of a batch before it is flushed.
-
 
 
 
@@ -194,7 +190,6 @@ this option will make [`region`](#region) moot.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -215,7 +210,6 @@ this option will make [`region`](#region) moot.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -244,7 +238,6 @@ that will isolate different metrics from each other.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -266,7 +259,6 @@ that will isolate different metrics from each other.
 
 The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is
 provided it will override this value since the endpoint includes the region.
-
 
 
 
@@ -296,7 +288,6 @@ provided it will override this value since the endpoint includes the region.
 
 Used for AWS authentication when communicating with AWS services. See relevant
 [AWS components][pages.aws_components] for more info.
-
  See [AWS Authentication](#aws-authentication) for more info.
 
 
@@ -321,7 +312,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 Used for AWS authentication when communicating with AWS services. See relevant
 [AWS components][pages.aws_components] for more info.
-
  See [AWS Authentication](#aws-authentication) for more info.
 
 

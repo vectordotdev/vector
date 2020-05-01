@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Grok Parser"
 description: "The Vector `grok_parser` transform accepts and outputs `log` events, allowing you to parse a log field value with Grok."
 event_types: ["log"]
@@ -101,7 +101,6 @@ If `true` will drop the specified [`field`](#field) after parsing.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -122,7 +121,6 @@ If `true` will drop the specified [`field`](#field) after parsing.
 ### field
 
 The log field to execute the [`pattern`](#pattern) against. Must be a `string` value.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
@@ -149,7 +147,6 @@ The [Grok pattern][urls.grok_patterns]
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -171,7 +168,6 @@ The [Grok pattern][urls.grok_patterns]
 
 Key/value pairs representing mapped log field names and types. This is used to
 coerce log fields into their proper types.
-
 
 
 <Fields filters={false}>
@@ -196,7 +192,6 @@ coerce log fields into their proper types.
 A definition of log field type conversions. They key is the log field name and
 the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are
 supported for the `timestamp` type.
-
 
 
 

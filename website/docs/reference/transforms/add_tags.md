@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-30"
+last_modified_on: "2020-05-01"
 component_title: "Add Tags"
 description: "The Vector `add_tags` transform accepts and outputs `metric` events, allowing you to add one or more metric tags."
 event_types: ["metric"]
@@ -90,7 +90,6 @@ values.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -111,7 +110,6 @@ values.
 ### tags
 
 A table of key/value pairs representing the tags to be added to the metric.
-
 
 
 <Fields filters={false}>
@@ -135,7 +133,6 @@ A table of key/value pairs representing the tags to be added to the metric.
 
 The name of the tag to add. Due to the nature of metric tags, the value must be
 a string.
-
 
 
 

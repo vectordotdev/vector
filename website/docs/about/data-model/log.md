@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 title: Log Event
 description: A detailed guide on Vector's internal log data model.
 ---
@@ -111,7 +111,6 @@ Represents the originating host of the log. This is automatically set within
 select [sources][docs.sources] if the key does not exist. Change this field
 name via the [global `host_key` option][docs.reference.global-options#host_key]
 or the source-level `host_key` option for relevant sources.
-
  See [Changing The Default Schema](#changing-the-default-schema) for more info.
 
 
@@ -137,7 +136,6 @@ or the source-level `host_key` option for relevant sources.
 Represents the log message. Change this field name via the [global
 `message_key` option][docs.reference.global-options#message_key] or the
 source-level `message_key` option for relevant sources.
-
  See [Changing The Default Schema](#changing-the-default-schema) for more info.
 
 
@@ -167,7 +165,6 @@ option][docs.reference.global-options#source_type_key] or the source-level
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -191,7 +188,6 @@ A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. Change this
 field name via the [global `timestamp_key`
 option][docs.reference.global-options#message_key] or the source-level
 `timestamp_key` option for relevant sources.
-
  See [Changing The Default Schema](#changing-the-default-schema) and [Timestamp Coercion](#timestamp-coercion) for more info.
 
 
@@ -216,7 +212,6 @@ option][docs.reference.global-options#message_key] or the source-level
 
 In addition to the defined fields, a log event can have any number of
 additional fields. This includes nested fields.
-
 
 
 

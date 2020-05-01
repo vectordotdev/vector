@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` sink exposes `metric` events to Prometheus metrics service."
@@ -92,7 +92,6 @@ The Vector `prometheus` sink
 ### address
 
 The address to expose for scraping.
-
  See [Exposing & Scraping](#exposing--scraping) for more info.
 
 
@@ -117,7 +116,6 @@ The address to expose for scraping.
 
 Default buckets to use for aggregating
 [distribution][docs.data-model.metric#distribution] metrics into histograms.
-
  See [Histogram Buckets](#histogram-buckets) for more info.
 
 
@@ -144,7 +142,6 @@ Time interval between [set][docs.data-model.metric#set] values are reset.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -166,7 +163,6 @@ Time interval between [set][docs.data-model.metric#set] values are reset.
 
 A prefix that will be added to all metric names.
 It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
-
 
 
 

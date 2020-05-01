@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "File"
 description: "The Vector `file` sink streams `log` events to a file."
@@ -94,7 +94,6 @@ The Vector `file` sink
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -115,7 +114,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -142,7 +140,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -166,7 +163,6 @@ Limit the sink to only encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -187,7 +183,6 @@ Limit the sink to only encoding the specified labels.
 #### timestamp_format
 
 How to format event timestamps.
-
 
 
 
@@ -217,7 +212,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -242,7 +236,6 @@ events for this timeout, the file will be flushed and closed.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -263,7 +256,6 @@ events for this timeout, the file will be flushed and closed.
 ### path
 
 File name to write events to.
-
  See [Template Syntax](#template-syntax) for more info.
 
 

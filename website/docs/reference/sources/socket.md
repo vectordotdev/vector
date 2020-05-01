@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` source ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs `log` events."
@@ -161,7 +161,6 @@ port.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -184,7 +183,6 @@ port.
 The key name added to each event representing the current host. This can also
 be globally set via the [global [`host_key`](#host_key)
 option][docs.reference.global-options#host_key].
-
  See [Context](#context) for more info.
 
 
@@ -211,7 +209,6 @@ The maximum bytes size of incoming messages before they are discarded.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -232,7 +229,6 @@ The maximum bytes size of incoming messages before they are discarded.
 ### mode
 
 The type of socket to use.
-
 
 
 
@@ -259,7 +255,6 @@ The unix socket path. *This should be absolute path*.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -280,7 +275,6 @@ The unix socket path. *This should be absolute path*.
 ### shutdown_timeout_secs
 
 The timeout before a connection is forcefully closed during shutdown.
-
 
 
 
@@ -306,7 +300,6 @@ The timeout before a connection is forcefully closed during shutdown.
 Configures the TLS options for connections from this source.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -328,7 +321,6 @@ Configures the TLS options for connections from this source.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -357,7 +349,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -379,7 +370,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Require TLS for incoming connections. If this is set, an identity certificate
 is also required.
-
 
 
 
@@ -407,7 +397,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -429,7 +418,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 Absolute path to a certificate key file used to identify this server, in DER or
 PEM format (PKCS#8).
-
 
 
 
@@ -455,7 +443,6 @@ PEM format (PKCS#8).
 If `true`, Vector will require a TLS certificate from the connecting host and
 terminate the connection if it is not valid. If `false` (the default), Vector
 will not request a certificate from the client.
-
 
 
 
@@ -500,7 +487,6 @@ The upstream hostname.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -524,7 +510,6 @@ The raw message, unaltered.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -545,7 +530,6 @@ The raw message, unaltered.
 ### timestamp
 
 The exact time the event was ingested.
-
 
 
 

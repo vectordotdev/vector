@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -114,7 +114,6 @@ option for explanation.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -137,7 +136,6 @@ option for explanation.
 A comma-separated list of host and port pairs that are the addresses of the
 Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
 initially to bootstrap itself.
-
 
 
 
@@ -164,7 +162,6 @@ Maximum time the broker may wait to fill the response.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -185,7 +182,6 @@ Maximum time the broker may wait to fill the response.
 ### group_id
 
 The consumer group name to be used to consume events from Kafka.
-
 
 
 
@@ -214,7 +210,6 @@ field would not be added to the log event.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -238,7 +233,6 @@ Advanced options. See [librdkafka documentation][urls.librdkafka_config] for
 details.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -259,7 +253,6 @@ details.
 #### `[field-name]`
 
 The options and their values. Accepts `string` values.
-
 
 
 
@@ -289,7 +282,6 @@ The Kafka session timeout in milliseconds.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -310,7 +302,6 @@ The Kafka session timeout in milliseconds.
 ### socket_timeout_ms
 
 Default timeout for network requests.
-
 
 
 
@@ -336,7 +327,6 @@ Default timeout for network requests.
 Configures the TLS options for connections from this sink.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -358,7 +348,6 @@ Configures the TLS options for connections from this sink.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -387,7 +376,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -408,7 +396,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 #### enabled
 
 Enable TLS during connections to the remote.
-
 
 
 
@@ -436,7 +423,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -458,7 +444,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 Absolute path to a certificate key file used to identify this connection, in
 DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be set.
-
 
 
 
@@ -486,7 +471,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 The Kafka topics names to read events from. Regex is supported if the topic
 begins with `^`.
-
 
 
 
@@ -527,7 +511,6 @@ The raw event message, unaltered.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -548,7 +531,6 @@ The raw event message, unaltered.
 ### timestamp
 
 The exact time the event was ingested.
-
 
 
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through Systemd's Journald utility and outputs `log` events."
@@ -93,7 +93,6 @@ utility and outputs [`log`][docs.data-model.log] events.
 
 The systemd journal is read in batches, and a checkpoint is set at the end of
 each batch. This option limits the size of the batch.
-
  See [Checkpointing](#checkpointing) for more info.
 
 
@@ -120,7 +119,6 @@ Include only entries from the current boot.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -143,7 +141,6 @@ Include only entries from the current boot.
 The directory used to persist the journal checkpoint position. By default, the
 global [`data_dir`](#data_dir) is used. Please make sure the Vector project has write
 permissions to this dir.
-
  See [Checkpointing](#checkpointing) for more info.
 
 
@@ -168,7 +165,6 @@ permissions to this dir.
 
 The full path of the [`journalctl`](#journalctl) executable. If not set, Vector will search
 the path for [`journalctl`](#journalctl).
-
  See [Communication strategy](#communication-strategy) for more info.
 
 
@@ -194,7 +190,6 @@ the path for [`journalctl`](#journalctl).
 The list of units names to monitor. If empty or not present, all units are
 accepted. Unit names lacking a `"."` will have `".service"` appended to make
 them a valid service unit name.
-
 
 
 
@@ -237,7 +232,6 @@ Additional Journald fields are passed through as log fields.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -258,7 +252,6 @@ Additional Journald fields are passed through as log fields.
 ### host
 
 The value of the journald `_HOSTNAME` field.
-
 
 
 
@@ -285,7 +278,6 @@ The value of the journald `MESSAGE` field.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -306,7 +298,6 @@ The value of the journald `MESSAGE` field.
 ### timestamp
 
 The value of the journald `_SOURCE_REALTIME_TIMESTAMP` field.
-
 
 
 
