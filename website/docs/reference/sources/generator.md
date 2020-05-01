@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-17"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "Generator"
 description: "The Vector `generator` source ingests data through an internal data generator and outputs `log` events."
@@ -86,7 +86,6 @@ not set, there will be no delay.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -110,7 +109,6 @@ The number of times to repeat outputting the [`lines`](#lines).
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -123,7 +121,7 @@ The number of times to repeat outputting the [`lines`](#lines).
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={["int"]}
+  type={"[string]"}
   unit={null}
   warnings={[]}
   >
@@ -131,7 +129,6 @@ The number of times to repeat outputting the [`lines`](#lines).
 ### lines
 
 The list of lines to output.
-
 
 
 
@@ -155,7 +152,6 @@ The list of lines to output.
 ### sequence
 
 If `true`, each output line will start with an increasing sequence number.
-
 
 
 

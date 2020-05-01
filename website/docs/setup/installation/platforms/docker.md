@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-04-29"
 title: Install Vector On Docker
 sidebar_label: Docker
 description: Install Vector on the Docker platform
@@ -292,7 +292,7 @@ smaller in size than other Docker images and statically links libraries. This
 is the image we recommend due to it's small size and reliability.
 
 ```bash
-docker run timberio/vector:0.9.0-alpine
+docker run timberio/vector:0.9.1-alpine
 ```
 
 #### debian
@@ -301,7 +301,7 @@ This image is based on the [`debian-slim` image][urls.docker_debian],
 which is a smaller, more compact variant of the [`debian` image][urls.docker_debian].
 
 ```bash
-docker run timberio/vector:0.9.0-debian
+docker run timberio/vector:0.9.1-debian
 ```
 
 ### Architectures

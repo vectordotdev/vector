@@ -67,7 +67,7 @@ inventory::submit! {
 impl SinkConfig for PulsarSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = PulsarSink::new(self.clone(), cx.acker(), cx.exec())?;
-        let hc = healthcheck(self, &sink.pulsar)?;
+        let hc = healthcheck(self.clone(), sink.pulsar.clone());
         Ok((Box::new(sink), hc))
     }
 
@@ -167,23 +167,19 @@ fn encode_event(item: Event, enc: Encoding) -> crate::Result<Vec<u8>> {
     Ok(data)
 }
 
-fn healthcheck(config: &PulsarSinkConfig, pulsar: &Pulsar) -> crate::Result<super::Healthcheck> {
-    let consumer = pulsar
-        .consumer()
-        .with_topic(&config.topic)
-        .with_consumer_name("Healthcheck")
-        .with_subscription_type(SubType::Shared)
-        .with_subscription("HealthSubscription")
-        .build::<String>()
-        .wait()?;
-
-    Ok(Box::new(
-        consumer
-            .take(1)
-            .collect()
+fn healthcheck(config: PulsarSinkConfig, pulsar: Pulsar) -> super::Healthcheck {
+    Box::new(future::lazy(move || {
+        pulsar
+            .consumer()
+            .with_topic(&config.topic)
+            .with_consumer_name("Healthcheck")
+            .with_subscription_type(SubType::Shared)
+            .with_subscription("HealthSubscription")
+            .build::<String>()
+            .and_then(|consumer| consumer.take(1).collect())
             .map(|_| ())
-            .map_err(|err| err.into()),
-    ))
+            .map_err(|err| err.into())
+    }))
 }
 
 #[cfg(test)]

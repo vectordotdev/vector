@@ -18,7 +18,7 @@ should be used for all pull requests:
 ## Backward Compatibility
 
 All changes should strive to retain backward compatibility. If a change breaks
-backward compatibility it is much less likely to be approved. It is highlighly
+backward compatibility, it is much less likely to be approved. It is highly
 recommended you discuss this change with a Vector team member before investing
 development time.
 
@@ -36,7 +36,7 @@ knowledge of the code.
 
 ## Dependencies
 
-Dependencies should be _carefully_ selected. Before adding a dependency we
+Dependencies should be _carefully_ selected. Before adding a dependency, we
 should ask the following questions:
 
 1. Is the dependency worth the cost?
@@ -49,7 +49,7 @@ should ask the following questions:
 
 ## Documentation
 
-Documentation is incredibly important to Vector, it is a feature and
+Documentation is incredibly important to Vector; it is a feature and
 differentiator for Vector. Pull requests should not be merged without adequate
 documentation, nor should they be merged with "TODOs" opened for documentation.
 
@@ -64,7 +64,7 @@ Vector currently offers 2 methods for performance testing:
 ## Single Concern
 
 Changes in a pull request should address a single concern. This promotes quality
-reviews through focus. If a pull request addresses multiple concerns it should
+reviews through focus. If a pull request addresses multiple concerns, it should
 be closed and followed up with multiple pull requests addresses each concern
 separately. If you are unsure about your change, please open an issue and the
 Vector maintainers will help guide you through the scope of the change.
@@ -76,21 +76,20 @@ Code is read more than it is written. Code must be documented and readable.
 ## Safe Code
 
 Unsafe code should be reviewed carefully and avoided if possible. If code is
-marked as unsafe a detailed comment should be added explaining why.
+marked as `unsafe`, a detailed comment should be added explaining why.
 
 ## Security
 
-Security is incredibly important to Vector. Users rely on Vector ship mission
-critical and sensitive data. Please review the code explicitly for security
-issues. See [Vector's Security guide for more info](SECURITY.md).
+Security is incredibly important to Vector. Users rely on Vector ship  
+mission-critical and sensitive data. Please review the code explicitly for  
+security issues. See [Vector's Security guide for more info](SECURITY.md).
 
 ## Testing
 
-Code should be reasonably tested. Vector does not require 100% test coverage,
-we believe this level of coverage is unnecessary. As a general rule of thumb,
+Code should be reasonably tested. Vector does not require 100% test coverage.
+We believe this level of coverage is unnecessary. As a general rule of thumb,
 we strive for 80% coverage, beyond this returns are diminishing. Please use
 your best judgment, some code requires more testing than others depending
 on its importance.
-
 
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/

@@ -509,13 +509,12 @@ class Templates
       interfaces = [metadata.installation.interfaces.send("vector-cli")]
       strategy = fetch_strategy(source.strategies.first)
     elsif sink
-      interfaces = metadata.installation.interfaces_list
+      interfaces = [metadata.installation.interfaces.send("vector-cli")]
       strategy = metadata.installation.strategies_list.first
     end
 
     guide =
       IntegrationGuide.new(
-        interfaces,
         strategy,
         platform: platform,
         source: source,

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-29"
 title: Setup
 description: "Everything you need to know to setup Vector"
 sidebar_label: hidden

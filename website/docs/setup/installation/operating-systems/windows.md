@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-05-01"
 title: Install Vector On Windows
 sidebar_label: Windows
 description: Install Vector on Windows
@@ -114,6 +114,8 @@ The following diagram demonstrates how it works.
 
 <InstallationCommand />
 
+Or choose your [preferred method][docs.installation].
+
 </li>
 <li>
 
@@ -192,6 +194,7 @@ compose!
 </Tabs>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.package_managers.msi#versions]: /docs/setup/installation/package-managers/msi/#versions
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.sources.journald]: /docs/reference/sources/journald/

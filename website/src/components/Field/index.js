@@ -226,15 +226,19 @@ function FieldFooter({
           Enum, must be one of: <Enum values={enumValues} />
         </li>
       )}
-      <li>
-        <div
-          className="show-more"
-          onClick={() => setShowExamples(!showExamples)}
-        >
-          {showExamples ? "Hide examples" : "View examples"}
-        </div>
-        {showExamples && <Examples name={name} path={path} values={examples} />}
-      </li>
+      {(examples.length > 1 || examples[0] != defaultValue) && (
+        <li>
+          <div
+            className="show-more"
+            onClick={() => setShowExamples(!showExamples)}
+          >
+            {showExamples ? "Hide examples" : "View examples"}
+          </div>
+          {showExamples && (
+            <Examples name={name} path={path} values={examples} />
+          )}
+        </li>
+      )}
     </ul>
   );
 }

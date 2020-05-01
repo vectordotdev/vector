@@ -29,6 +29,9 @@ lazy_static::lazy_static! {
     static ref INSTANCE_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/instance-id");
     static ref INSTANCE_ID_KEY: Atom = Atom::from("instance-id");
 
+    static ref INSTANCE_TYPE: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/instance-type");
+    static ref INSTANCE_TYPE_KEY: Atom = Atom::from("instance-type");
+
     static ref LOCAL_HOSTNAME: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/local-hostname");
     static ref LOCAL_HOSTNAME_KEY: Atom = Atom::from("local-hostname");
 
@@ -61,6 +64,7 @@ lazy_static::lazy_static! {
         AMI_ID_KEY.clone(),
         AVAILABILITY_ZONE_KEY.clone(),
         INSTANCE_ID_KEY.clone(),
+        INSTANCE_TYPE_KEY.clone(),
         LOCAL_HOSTNAME_KEY.clone(),
         LOCAL_IPV4_KEY.clone(),
         PUBLIC_HOSTNAME_KEY.clone(),
@@ -93,6 +97,7 @@ struct Keys {
     ami_id_key: Atom,
     availability_zone_key: Atom,
     instance_id_key: Atom,
+    instance_type_key: Atom,
     local_hostname_key: Atom,
     local_ipv4_key: Atom,
     public_hostname_key: Atom,
@@ -350,6 +355,13 @@ impl MetadataClient {
                 );
             }
 
+            if self.fields.contains(&INSTANCE_TYPE_KEY) {
+                self.state.update(
+                    self.keys.instance_type_key.clone(),
+                    document.instance_type.into(),
+                );
+            }
+
             if self.fields.contains(&REGION_KEY) {
                 self.state
                     .update(self.keys.region_key.clone(), document.region.into());
@@ -447,6 +459,7 @@ impl Keys {
                 availability_zone_key: format!("{}.{}", namespace, AVAILABILITY_ZONE_KEY.clone())
                     .into(),
                 instance_id_key: format!("{}.{}", namespace, INSTANCE_ID_KEY.clone()).into(),
+                instance_type_key: format!("{}.{}", namespace, INSTANCE_TYPE_KEY.clone()).into(),
                 local_hostname_key: format!("{}.{}", namespace, LOCAL_HOSTNAME_KEY.clone()).into(),
                 local_ipv4_key: format!("{}.{}", namespace, LOCAL_IPV4_KEY.clone()).into(),
                 public_hostname_key: format!("{}.{}", namespace, PUBLIC_HOSTNAME_KEY.clone())
@@ -462,6 +475,7 @@ impl Keys {
                 ami_id_key: AMI_ID_KEY.clone(),
                 availability_zone_key: AVAILABILITY_ZONE_KEY.clone(),
                 instance_id_key: INSTANCE_ID_KEY.clone(),
+                instance_type_key: INSTANCE_TYPE_KEY.clone(),
                 local_hostname_key: LOCAL_HOSTNAME_KEY.clone(),
                 local_ipv4_key: LOCAL_IPV4_KEY.clone(),
                 public_hostname_key: PUBLIC_HOSTNAME_KEY.clone(),
@@ -534,6 +548,7 @@ mod tests {
             log.get(&"ami-id".into()),
             Some(&"ami-05f27d4d6770a43d2".into())
         );
+        assert_eq!(log.get(&"instance-type".into()), Some(&"m5a.xlarge".into()));
         assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
         assert_eq!(log.get(&"vpc-id".into()), Some(&"mock-vpc-id".into()));
         assert_eq!(log.get(&"subnet-id".into()), Some(&"mock-subnet-id".into()));
@@ -567,6 +582,7 @@ mod tests {
         assert_eq!(log.get(&"local-ipv4".into()), None);
         assert_eq!(log.get(&"local-hostname".into()), None);
         assert_eq!(log.get(&"instance-id".into()), None,);
+        assert_eq!(log.get(&"instance-type".into()), None,);
         assert_eq!(log.get(&"ami-id".into()), None);
         assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
     }

@@ -40,6 +40,16 @@ pub struct SplunkConfig {
     tls: Option<TlsConfig>,
 }
 
+impl SplunkConfig {
+    #[cfg(test)]
+    pub fn on(address: SocketAddr) -> Self {
+        SplunkConfig {
+            address,
+            ..Self::default()
+        }
+    }
+}
+
 impl Default for SplunkConfig {
     fn default() -> Self {
         SplunkConfig {

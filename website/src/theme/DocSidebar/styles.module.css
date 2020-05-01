@@ -2,6 +2,10 @@
   font-size: 1.1em;
 }
 
+.menu {
+  margin-bottom: calc(var(--ifm-spacing-vertical) * 1);
+}
+
 @media (min-width: 997px) {
   .sidebar {
     font-size: 0.85em;

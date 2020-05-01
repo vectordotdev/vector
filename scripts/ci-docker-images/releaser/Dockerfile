@@ -5,7 +5,6 @@ FROM ruby:2.7
 RUN apt-get update && \
   apt-get install -y software-properties-common
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A1715D88E1DF1F24
-RUN add-apt-repository -y ppa:git-core/ppa
 
 RUN apt-get update && \
   apt-get install -y \

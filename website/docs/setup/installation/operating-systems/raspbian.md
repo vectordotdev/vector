@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-14"
+last_modified_on: "2020-05-01"
 title: Install Vector On Raspbian
 sidebar_label: Raspbian
 description: Install Vector On Raspbian
@@ -63,6 +63,8 @@ The following diagram demonstrates how it works.
 ### Install Vector
 
 <InstallationCommand />
+
+Or choose your [preferred method][docs.installation].
 
 </li>
 <li>
@@ -140,6 +142,7 @@ compose!
 </Tabs>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
