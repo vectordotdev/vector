@@ -30,7 +30,7 @@ pub fn basics(c: &mut Criterion) {
         Benchmark::new("protobuf", move |b| {
             let mut transform = parse_config(
                 r#"
-            module = "target/wasm32-wasi/release/protobuf.wasm"
+            module = "tests/data/wasm/protobuf/protobuf.wat"
             "#,
             )
             .unwrap();
@@ -51,7 +51,7 @@ pub fn basics(c: &mut Criterion) {
         Benchmark::new("noop", move |b| {
             let mut transform = parse_config(
                 r#"
-            module = "target/wasm32-wasi/release/noop.wasm"
+            module = "tests/data/wasm/noop/noop.wat"
             "#,
             )
             .unwrap();
