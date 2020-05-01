@@ -106,7 +106,7 @@ jobs:
           path: "./target/artifacts/vector-x86_64-apple-darwin.tar.gz"
 
   build-x86_64-pc-windows-msvc-packages:
-    runs-on: windows-latest
+    runs-on: windows-2019
     steps:
       - uses: actions/checkout@v1
       - name: "Download Perl"
