@@ -22,13 +22,22 @@ jobs:
       - run: sudo python3 -m pip install remarshal
       - run: make check-component-features
 
-  code:
+  code-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make check-code
         env:
           PASS_RUSTFLAGS: "-D warnings"
+
+  code-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v1
+      - env:
+          USE_CONTAINER: none
+          RUSTFLAGS: "-D warnings"
+        run: cargo check --no-default-features --features default-msvc
 
   fmt:
     runs-on: ubuntu-latest

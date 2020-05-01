@@ -15,6 +15,8 @@ use toml::value::Value as TomlValue;
 #[serde(deny_unknown_fields)]
 pub struct AddFieldsConfig {
     pub fields: Fields<TomlValue>,
+    #[serde(default = "crate::serde::default_true")]
+    pub overwrite: bool,
 }
 
 #[derive(Clone)]
@@ -37,6 +39,7 @@ impl From<Value> for TemplateOrValue {
 
 pub struct AddFields {
     fields: IndexMap<Atom, TemplateOrValue>,
+    overwrite: bool,
 }
 
 inventory::submit! {
@@ -52,6 +55,7 @@ impl TransformConfig for AddFieldsConfig {
                 .all_fields()
                 .map(|(k, v)| (k.into(), v.into()))
                 .collect(),
+            self.overwrite,
         )))
     }
 
@@ -69,14 +73,17 @@ impl TransformConfig for AddFieldsConfig {
 }
 
 impl AddFields {
-    pub fn new(fields: IndexMap<Atom, TomlValue>) -> Self {
+    pub fn new(fields: IndexMap<Atom, TomlValue>, overwrite: bool) -> Self {
         let mut new_fields = IndexMap::new();
 
         for (k, v) in fields {
             flatten_field(k.into(), v, &mut new_fields);
         }
 
-        AddFields { fields: new_fields }
+        AddFields {
+            fields: new_fields,
+            overwrite,
+        }
     }
 }
 
@@ -97,12 +104,24 @@ impl Transform for AddFields {
                 .into(),
                 TemplateOrValue::Value(v) => v,
             };
-            if let Some(_) = event.as_mut_log().insert(&key, value) {
-                debug!(
-                    message = "Field overwritten",
-                    field = key.as_ref(),
-                    rate_limit_secs = 30,
-                )
+            if self.overwrite {
+                if let Some(_) = event.as_mut_log().insert(&key, value) {
+                    debug!(
+                        message = "Field overwritten",
+                        field = key.as_ref(),
+                        rate_limit_secs = 30,
+                    )
+                }
+            } else {
+                if event.as_mut_log().contains(&key) {
+                    debug!(
+                        message = "Field not overwritten",
+                        field = key.as_ref(),
+                        rate_limit_secs = 30,
+                    )
+                } else {
+                    event.as_mut_log().insert(key, value);
+                }
             }
         }
 
@@ -170,7 +189,7 @@ mod tests {
         let event = Event::from("augment me");
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_val".into());
-        let mut augment = AddFields::new(fields);
+        let mut augment = AddFields::new(fields, true);
 
         let new_event = augment.transform(event).unwrap();
 
@@ -186,7 +205,7 @@ mod tests {
         let event = Event::from("augment me");
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "{{message}} {{message}}".into());
-        let mut augment = AddFields::new(fields);
+        let mut augment = AddFields::new(fields, true);
 
         let new_event = augment.transform(event).unwrap();
 
@@ -198,7 +217,22 @@ mod tests {
     }
 
     #[test]
-    fn add_fields_preserves_types() {
+    fn add_fields_overwrite() {
+        let mut event = Event::from("");
+        event.as_mut_log().insert("some_key", "some_message");
+
+        let mut fields = IndexMap::new();
+        fields.insert("some_key".into(), "some_overwritten_message".into());
+
+        let mut augment = AddFields::new(fields, false);
+
+        let new_event = augment.transform(event.clone()).unwrap();
+
+        assert_eq!(new_event, event);
+    }
+
+    #[test]
+    fn add_fields_preseves_types() {
         let event = Event::from("hello world");
 
         let mut fields = IndexMap::new();
@@ -213,7 +247,7 @@ mod tests {
 
         fields.insert("table".into(), map.into());
 
-        let mut transform = AddFields::new(fields);
+        let mut transform = AddFields::new(fields, false);
 
         let event = transform.transform(event).unwrap().into_log();
 

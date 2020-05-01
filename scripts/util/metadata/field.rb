@@ -50,6 +50,7 @@ class Field
     :category,
     :children,
     :default,
+    :default_label,
     :description,
     :enum,
     :examples,
@@ -219,6 +220,10 @@ class Field
 
   def context?
     category.downcase == "context"
+  end
+
+  def default_infinity?
+    default == 18446744073709551615
   end
 
   def eql?(other)

@@ -1,7 +1,7 @@
 use crate::{
     sinks::http::{HttpMethod, HttpSinkConfig},
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfigWithDefault},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         BatchBytesConfig, Compression, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -55,9 +55,11 @@ pub enum Encoding {
     Json,
 }
 
-impl Into<crate::sinks::http::Encoding> for Encoding {
-    fn into(self) -> crate::sinks::http::Encoding {
-        crate::sinks::http::Encoding::Json
+impl From<Encoding> for crate::sinks::http::Encoding {
+    fn from(v: Encoding) -> crate::sinks::http::Encoding {
+        match v {
+            Encoding::Json => crate::sinks::http::Encoding::Json,
+        }
     }
 }
 
@@ -65,7 +67,7 @@ impl Into<crate::sinks::http::Encoding> for Encoding {
 /// For encodings, answers "Is it possible to skip serializing this value, because it's the
 /// default?"
 pub(crate) fn skip_serializing_if_default(e: &EncodingConfigWithDefault<Encoding>) -> bool {
-    e.codec == Encoding::default()
+    e.codec() == &Encoding::default()
 }
 
 #[typetag::serde(name = "new_relic_logs")]
@@ -123,12 +125,7 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: Some(headers),
             compression: Some(Compression::None),
-            encoding: EncodingConfig {
-                codec: self.encoding.codec.clone().into(),
-                only_fields: self.encoding.only_fields.clone(),
-                except_fields: self.encoding.except_fields.clone(),
-                timestamp_format: self.encoding.timestamp_format.clone(),
-            },
+            encoding: self.encoding.clone().without_default(),
 
             batch,
             request,
@@ -177,7 +174,7 @@ mod tests {
             "https://log-api.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding.codec, Encoding::Json.into());
+        assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(
             http_config.batch.max_size,
             Some(bytesize::mib(5u64) as usize)
@@ -208,7 +205,7 @@ mod tests {
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding.codec, Encoding::Json.into());
+        assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(
             http_config.batch.max_size,
             Some(bytesize::mib(8u64) as usize)
@@ -245,7 +242,7 @@ mod tests {
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding.codec, Encoding::Json.into());
+        assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(
             http_config.batch.max_size,
             Some(bytesize::mib(8u64) as usize)

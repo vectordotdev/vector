@@ -1,9 +1,9 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-05-01"
 component_title: "Remove Fields"
 description: "The Vector `remove_fields` transform accepts and outputs `log` events, allowing you to remove one or more log fields."
 event_types: ["log"]
-function_category: "shape"
+function_category: "schema"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_fields%22
 sidebar_label: "remove_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/remove_fields.rs
@@ -81,7 +81,6 @@ empty.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -102,7 +101,6 @@ empty.
 ### fields
 
 The log field names to drop.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 

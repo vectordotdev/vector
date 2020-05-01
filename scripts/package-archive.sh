@@ -10,24 +10,24 @@
 #
 # ENV VARS
 #
-#   $ARCHIVE_TYPE - archive type, either "tar.gz" or "zip"
-#   $NATIVE_BUILD - whether to pass the --target flag when building via cargo
-#   $TARGET - a target triple. ex: x86_64-apple-darwin
+#   $ABORT          abort if the archive already exists (default "false")
+#   $ARCHIVE_TYPE   archive type, either "tar.gz" or "zip" (default "tar.gz")
+#   $NATIVE_BUILD   whether the binary was built natively or with a --target (default "true")
+#   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
 
+#
+# Env Vars
+#
+
+ABORT=${ABORT:-false}
 ARCHIVE_TYPE=${ARCHIVE_TYPE:-tar.gz}
-NATIVE_BUILD=${NATIVE_BUILD:-}
-
-set -eu
-
-echo "Packaging the Vector archive"
-echo "Archive Type: $ARCHIVE_TYPE"
-echo "Target: $TARGET"
+NATIVE_BUILD=${NATIVE_BUILD:-true}
 
 #
-# Build the archive directory
+# Local Vars
 #
 
-if [ -z "$NATIVE_BUILD" ]; then
+if [ "$NATIVE_BUILD" != "true" ]; then
   target_dir="target/$TARGET"
 else
   target_dir="target"
@@ -35,6 +35,39 @@ fi
 
 archive_dir_name="vector-$TARGET"
 archive_dir="$target_dir/$archive_dir_name"
+archive_name="vector-$TARGET.$ARCHIVE_TYPE"
+artifacts_dir="target/artifacts"
+
+#
+# Abort if possible
+#
+
+if [ -f "$artifacts_dir/$archive_name" ] && [ "$ABORT" == "true" ]; then
+  echo "Archive already exists at:"
+  echo ""
+  echo "    $artifacts_dir/$archive_name"
+  echo ""
+  echo "Remove the archive or set ABORT to \"false\"."
+
+  exit 0
+fi
+
+#
+# Header
+#
+
+set -eu
+
+echo "Packaging the Vector archive"
+echo "ABORT: $ABORT"
+echo "ARCHIVE_TYPE: $ARCHIVE_TYPE"
+echo "NATIVE_BUILD: $NATIVE_BUILD"
+echo "TARGET: $TARGET"
+
+#
+# Build the archive directory
+#
+
 rm -rf $archive_dir
 mkdir -p $archive_dir
 
@@ -80,7 +113,7 @@ fi
 _old_dir=$(pwd)
 cd $target_dir
 if [ "$ARCHIVE_TYPE" == "tar.gz" ]; then
-  tar cvf - ./$archive_dir_name | gzip -9 > vector-$TARGET.$ARCHIVE_TYPE
+  tar cvf - ./$archive_dir_name | gzip -9 > $archive_name
 elif [ "$ARCHIVE_TYPE" == "zip" ] && [[ $TARGET == *windows* ]]; then
   powershell '$progressPreference = "silentlyContinue"; Compress-Archive -DestinationPath vector-'$TARGET'.'$ARCHIVE_TYPE' -Path "./'$archive_dir_name'/*"'
 else
@@ -93,10 +126,9 @@ cd $_old_dir
 # Move to the artifacts dir
 #
 
-artifacts_dir="target/artifacts"
 mkdir -p $artifacts_dir
-mv -v $target_dir/vector-$TARGET.$ARCHIVE_TYPE $artifacts_dir
-echo "Moved $target_dir/vector-$TARGET.$ARCHIVE_TYPE to $artifacts_dir"
+mv -v $target_dir/$archive_name $artifacts_dir
+echo "Moved $target_dir/$archive_name to $artifacts_dir"
 
 #
 # Cleanup

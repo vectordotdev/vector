@@ -107,4 +107,4 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - run: make slim-builds
-      - run: cd tests && make test-unit
+      - run: make test-unit

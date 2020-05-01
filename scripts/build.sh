@@ -8,27 +8,56 @@
 #
 # ENV VARS
 #
-#   $FEATURES - a list of Vector features to include when building, defaults to all
-#   $NATIVE_BUILD - whether to pass the --target flag when building via cargo
-#   $STRIP - whether or not to strip the binary
-#   $TARGET - a target triple. ex: x86_64-apple-darwin
+#   $ABORT          abort if the Vector binary already exists (default "false")
+#   $CHANNEL        the release channel for the build, "nighly" or "stable" (default `scripts/util/release-channel.sh`)
+#   $FEATURES       a list of Vector features to include when building (default "default")
+#   $NATIVE_BUILD   whether to pass the --target flag when building via cargo (default "true")
+#   $STRIP          whether or not to strip the binary (default "false")
+#   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
 
 #
-# Env vars
+# Env Vars
 #
 
-NATIVE_BUILD=${NATIVE_BUILD:-true}
-STRIP=${STRIP:-}
+ABORT=${ABORT:-false}
 FEATURES=${FEATURES:-}
+NATIVE_BUILD=${NATIVE_BUILD:-true}
+STRIP=${STRIP:-false}
 TARGET=${TARGET:-}
 
 if [ -z "$FEATURES" ]; then
-    FEATURES="default"
+  FEATURES="default"
 fi
 
 CHANNEL=${CHANNEL:-$(scripts/util/release-channel.sh)}
 if [ "$CHANNEL" == "nightly" ]; then
   FEATURES="$FEATURES nightly"
+fi
+
+#
+# Local Vars
+#
+
+if [ "$NATIVE_BUILD" != "true" ]; then
+  target_dir="target/$TARGET"
+else
+  target_dir="target"
+fi
+
+binary_path="$target_dir/release/vector"
+
+#
+# Abort early if possible
+#
+
+if [ -f "$binary_path" ] && [ "$ABORT" == "true" ]; then
+  echo "Vector binary already exists at:"
+  echo ""
+  echo "    $binary_path"
+  echo ""
+  echo "Remove the binary or set ABORT to \"false\"."
+
+  exit 0
 fi
 
 #
@@ -38,19 +67,12 @@ fi
 set -eu
 
 echo "Building Vector binary"
-echo "Target: $TARGET"
-echo "Native build: $NATIVE_BUILD"
-echo "Features: $FEATURES"
-
-#
-# Setup directories
-#
-
-if [ -z "$NATIVE_BUILD" ]; then
-  target_dir="target/$TARGET"
-else
-  target_dir="target"
-fi
+echo "ABORT: $ABORT"
+echo "FEATURES: $FEATURES"
+echo "NATIVE_BUILD: $NATIVE_BUILD"
+echo "STRIP: $STRIP"
+echo "TARGET: $TARGET"
+echo "Binary path: $binary_path"
 
 #
 # Build
@@ -58,22 +80,22 @@ fi
 
 build_flags="--release"
 
-if [ -z "$NATIVE_BUILD" ]; then
+if [ "$NATIVE_BUILD" != "true" ]; then
   build_flags="$build_flags --target $TARGET"
 fi
 
 on_exit=""
 
 if [ "$FEATURES" != "default" ]; then
-    cargo build $build_flags --no-default-features --features "$FEATURES"
+  cargo build $build_flags --no-default-features --features "$FEATURES"
 else
-    cargo build $build_flags
+  cargo build $build_flags
 fi
 
 #
 # Strip the output binary
 #
 
-if [ "$STRIP" != "false" ]; then
-  strip $target_dir/release/vector
+if [ "$STRIP" == "true" ]; then
+  strip $binary_path
 fi

@@ -2,6 +2,7 @@ use super::{
     config::{DataType, SinkContext, TransformContext},
     fanout::{self, Fanout},
     task::Task,
+    ConfigDiff,
 };
 use crate::{buffers, dns::Resolver, event::Event, runtime, shutdown::SourceShutdownCoordinator};
 use futures01::{
@@ -87,8 +88,10 @@ pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
     }
 }
 
+/// Builds only the new pieces.
 pub fn build_pieces(
     config: &super::Config,
+    diff: &ConfigDiff,
     exec: runtime::TaskExecutor,
 ) -> Result<(Pieces, Vec<String>), Vec<String>> {
     let mut inputs = HashMap::new();
@@ -112,7 +115,11 @@ pub fn build_pieces(
     let resolver = Resolver::new(config.global.dns_servers.clone(), exec.clone()).unwrap();
 
     // Build sources
-    for (name, source) in &config.sources {
+    for (name, source) in config
+        .sources
+        .iter()
+        .filter(|(name, _)| diff.sources.contains_new(&name))
+    {
         let (tx, rx) = mpsc::channel(1000);
 
         let typetag = source.source_type();
@@ -148,7 +155,11 @@ pub fn build_pieces(
     }
 
     // Build transforms
-    for (name, transform) in &config.transforms {
+    for (name, transform) in config
+        .transforms
+        .iter()
+        .filter(|(name, _)| diff.transforms.contains_new(&name))
+    {
         let trans_inputs = &transform.inputs;
 
         let typetag = &transform.inner.transform_type();
@@ -184,7 +195,11 @@ pub fn build_pieces(
     }
 
     // Build sinks
-    for (name, sink) in &config.sinks {
+    for (name, sink) in config
+        .sinks
+        .iter()
+        .filter(|(name, _)| diff.sinks.contains_new(&name))
+    {
         let sink_inputs = &sink.inputs;
         let enable_healthcheck = sink.healthcheck;
 
