@@ -59,8 +59,8 @@ rm -rf %{buildroot}
 %config %{_sysconfdir}/%{_name}/vector.spec.toml
 %config %{_sysconfdir}/%{_name}/examples/*
 %dir %{_sharedstatedir}/%{_name}
-%doc /README.md
-%license /LICENSE
+%doc README.md
+%license LICENSE
 
 %changelog
 * Fri Jun 21 2019 Vector Devs <vector@timber.io> - 0.3.0
