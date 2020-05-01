@@ -199,16 +199,16 @@ release-homebrew: ## Release to timberio Homebrew tap
 	$(RUN) release-homebrew
 
 release-prepare: ## Prepares the release with metadata and highlights
-	$(RUN) release-prepare
+	@scripts/release-prepare.sh
 
 release-push: ## Push new Vector version
-	$(RUN) release-push
+	@scripts/release-push.sh
 
 release-rollback: ## Rollback pending release changes
-	$(RUN) release-rollback
+	@scripts/release-rollback.sh
 
 release-s3: ## Release artifacts to S3
-	$(RUN) release-s3
+	@scripts/release-s3.sh
 
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
