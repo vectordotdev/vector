@@ -68,7 +68,7 @@ cp -av distribution/systemd/. "$HOME/rpmbuild/SOURCES/systemd"
 cp -av $archive_path "$HOME/rpmbuild/SOURCES/vector-$ARCH.tar.gz"
 
 # Perform the build.
-rpmbuild --target "$ARCH-redhat-linux" --define "_arch $ARCH" -ba distribution/rpm/vector.spec
+rpmbuild  --define "_topdir $HOME/rpmbuild" --target "$ARCH-redhat-linux" --define "_arch $ARCH" -ba distribution/rpm/vector.spec
 
 #
 # Move the RPM into the artifacts dir
