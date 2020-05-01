@@ -25,9 +25,6 @@ URL: %{_url}
 tar -xvf %{_sourcedir}/%{_source} --strip-components=2
 cp -a %{_sourcedir}/systemd/. systemd
 
-chown -R root.root .
-chmod -R a+rX,g-w,o-w .
-
 %install
 # We are currently in the BUILDROOT dir
 rm -rf %{buildroot}
