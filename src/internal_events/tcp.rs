@@ -57,6 +57,23 @@ impl InternalEvent for TcpConnectionDisconnected {
 }
 
 #[derive(Debug)]
+pub struct TcpConnectionShutdown {}
+
+impl InternalEvent for TcpConnectionShutdown {
+    fn emit_logs(&self) {
+        debug!(message = "received EOF from the server; reconnecting.");
+    }
+
+    fn emit_metrics(&self) {
+        counter!("tcp_connection_shutdown", 1,
+            "component_kind" => "sink",
+            "component_type" => "socket",
+            "mode" => "tcp",
+        );
+    }
+}
+
+#[derive(Debug)]
 pub struct TcpConnectionError {
     pub error: std::io::Error,
 }
