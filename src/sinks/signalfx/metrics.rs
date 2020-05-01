@@ -261,7 +261,7 @@ fn healthcheck(config: SignalFxConfig, resolver: Resolver) -> crate::Result<supe
         .parse::<Uri>()
         .context(super::UriParseError)?;
 
-    let request = http::Request::get(uri)
+    let request = http::Request::post(uri)
         .header("X-SF-Token", config.token)
         .body(hyper::Body::empty())
         .unwrap();
@@ -272,7 +272,8 @@ fn healthcheck(config: SignalFxConfig, resolver: Resolver) -> crate::Result<supe
         .call(request)
         .map_err(|err| err.into())
         .and_then(|response| match response.status() {
-            StatusCode::OK => Ok(()),
+            // even if it's a bad request (400) status code, it proves that Token and Realm are valid.
+            StatusCode::BAD_REQUEST => Ok(()),
             other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
         });
 
