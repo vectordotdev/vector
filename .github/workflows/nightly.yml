@@ -85,7 +85,7 @@ jobs:
           path: "./target/artifacts/vector-armv7hl.rpm"
 
   build-x86_64-apple-darwin-packages:
-    runs-on: macos-latest
+    runs-on: macos-10.15
     steps:
       - uses: actions/checkout@v1
       - name: "Upgrade bash"
