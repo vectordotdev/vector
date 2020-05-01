@@ -48,15 +48,15 @@ CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/-/\./g')
 ARCH=${ARCH:-$(echo $TARGET | cut -d'-' -f1)}
 
 # Create source dir
-rm -rf /root/rpmbuild/SOURCES
-mkdir -p /root/rpmbuild/SOURCES
-mkdir -p /root/rpmbuild/SOURCES/init.d
-mkdir -p /root/rpmbuild/SOURCES/systemd
-cp -av distribution/init.d/. /root/rpmbuild/SOURCES/init.d
-cp -av distribution/systemd/. /root/rpmbuild/SOURCES/systemd
+rm -rf "$HOME/rpmbuild/SOURCES"
+mkdir -p "$HOME/rpmbuild/SOURCES"
+mkdir -p "$HOME/rpmbuild/SOURCES/init.d"
+mkdir -p "$HOME/rpmbuild/SOURCES/systemd"
+cp -av distribution/init.d/. "$HOME/rpmbuild/SOURCES/init.d"
+cp -av distribution/systemd/. "$HOME/rpmbuild/SOURCES/systemd"
 
 # Copy the archive into the sources dir
-cp -av $archive_path "/root/rpmbuild/SOURCES/vector-$ARCH.tar.gz"
+cp -av $archive_path "$HOME/rpmbuild/SOURCES/vector-$ARCH.tar.gz"
 
 # Perform the build.
 rpmbuild --target "$ARCH-redhat-linux" --define "_arch $ARCH" -ba distribution/rpm/vector.spec
@@ -65,5 +65,5 @@ rpmbuild --target "$ARCH-redhat-linux" --define "_arch $ARCH" -ba distribution/r
 # Move the RPM into the artifacts dir
 #
 
-ls "/root/rpmbuild/RPMS/$ARCH"
-mv -v "/root/rpmbuild/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-$ARCH.rpm"
+ls "$HOME/rpmbuild/RPMS/$ARCH"
+mv -v "$HOME/rpmbuild/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-$ARCH.rpm"
