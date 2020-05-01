@@ -207,11 +207,11 @@ tokio = { version = "0.2", features = ["test-util"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain", "rdkafka-plain", "modules-wasm"]
+default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain", "rdkafka-plain", "wasm"]
 # Default features for *-unknown-linux-musl
-default-musl = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake", "modules-wasm"]
+default-musl = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake", "wasm"]
 # Default features for *-pc-windows-msvc
-default-msvc = ["sources", "transforms", "sinks", "vendored", "leveldb-cmake", "rdkafka-cmake", "modules-wasm"]
+default-msvc = ["sources", "transforms", "sinks", "vendored", "leveldb-cmake", "rdkafka-cmake", "wasm"]
 
 # Enables features that work only on systems providing `cfg(unix)
 unix = ["jemallocator", "shiplift/unix-socket"]
@@ -228,7 +228,7 @@ leveldb-plain = ["leveldb", "leveldb/leveldb-sys-2"]
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `leveldb-plain` doesn't work.
 leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
 # This feature enables the WASM foreign module support.
-modules-wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm"]
+wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm"]
 
 # Sources
 sources = [
@@ -319,7 +319,7 @@ transforms-split = []
 transforms-swimlanes = []
 transforms-tag_cardinality_limit = []
 transforms-tokenizer = ["nom"]
-transforms-wasm = ["modules-wasm"]
+transforms-wasm = ["wasm"]
 
 # Sinks
 sinks = [

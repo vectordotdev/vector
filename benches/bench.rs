@@ -13,11 +13,17 @@ use vector::topology::{self, config};
 use vector::{runtime, sinks, sources, transforms};
 
 mod batch;
+#[cfg(feature = "sources-socket")]
 mod buffering;
+#[cfg(feature = "transforms-json_parser")]
 mod event;
+#[cfg(all(feature = "sources-file", feature = "sinks-file"))]
 mod files;
+#[cfg(feature = "sinks-http")]
 mod http;
+#[cfg(feature = "transforms-lua")]
 mod lua;
+#[cfg(feature = "wasm")]
 mod wasm;
 
 criterion_group!(

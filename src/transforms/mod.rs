@@ -53,7 +53,7 @@ pub mod swimlanes;
 pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
-#[cfg(feature = "modules-wasm")]
+#[cfg(feature = "wasm")]
 pub mod wasm;
 
 use futures01::Stream;

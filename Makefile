@@ -92,19 +92,39 @@ test-unit: ## Runs unit tests, tests which do not require additional services to
 	$(RUN) test-unit
 
 # Dev (wasm modules)
-ensure-has-wasm-toolchain: ### Configures a wasm toolchain for test artifact building, if required
+.PHONY: ensure-has-wasm-toolchain ### Configures a wasm toolchain for test artifact building, if required
+ensure-has-wasm-toolchain: target/wasm32-wasi/.obtained
+target/wasm32-wasi/.obtained:
+	@cat <<-'EOF'
+		# You should also install WABT for WASM module development!
+		# You can use your package manager or check https://github.com/WebAssembly/wabt
+	EOF
 	rustup target add wasm32-wasi
+	@mkdir -p target/wasm32-wasi
+	@touch target/wasm32-wasi/.obtained
 
-TEST_WASM_MODULES := $(patsubst tests/data/wasm/%, target/wasm-wasi/release/%.wasm, $(wildcard tests/data/wasm/*))
-build-test-wasm-modules: $(TEST_WASM_MODULES) ### Builds engine test modules, if required
+TEST_WASM_MODULES := $(patsubst tests/data/wasm/%, target/wasm32-wasi/release/%.wat, $(wildcard tests/data/wasm/*))
+build-wasm-tests: $(TEST_WASM_MODULES) ### Builds engine test modules, if required
+
+.PHONY: pre-build-wasm-tests
+pre-build-wasm-tests:
+	@cat <<-'EOF'
+		# Building test WASM modules as `wasm` then transforming them into `wat`!
+		# This will error if you don't have `wabt` installed as recommended.
+	EOF
 
 .ONESHELL:
-$(TEST_WASM_MODULES): ensure-has-wasm-toolchain ### Build the target test module
-	cd $(patsubst target/wasm-wasi/release/%.wasm, tests/data/wasm/%, $@)
+$(TEST_WASM_MODULES): pre-build-wasm-tests ensure-has-wasm-toolchain ### Build the target test module
+	@cd $(patsubst target/wasm32-wasi/release/%.wat, tests/data/wasm/%, $@)
 	cargo build --target wasm32-wasi --release
+	@cd ../../../../
+	wasm2wat $(patsubst target/wasm32-wasi/release/%.wat, target/wasm32-wasi/release/%.wasm, $@) -o $@
 
-test-wasm-modules: build-test-wasm-modules  ### Run engine tests.
-	cargo test wasm --no-default-features --features ${DEFAULT_FEATURES} -- --nocapture
+test-wasm: build-wasm-tests  ### Run engine tests.
+	cargo test wasm --no-default-features --features wasm -- --nocapture
+
+bench-wasm: build-wasm-tests  ### Run engine tests.
+	cargo bench wasm --no-default-features --features ${DEFAULT_FEATURES}
 
 ##@ Checking
 

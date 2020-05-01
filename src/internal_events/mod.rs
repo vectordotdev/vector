@@ -11,7 +11,7 @@ mod tcp;
 mod udp;
 mod unix;
 mod vector;
-#[cfg(feature = "modules-wasm")]
+#[cfg(feature = "wasm")]
 mod wasm;
 
 pub use self::blackhole::*;
@@ -27,7 +27,7 @@ pub use self::tcp::*;
 pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;
-#[cfg(feature = "modules-wasm")]
+#[cfg(feature = "wasm")]
 pub use self::wasm::*;
 
 pub trait InternalEvent: std::fmt::Debug {

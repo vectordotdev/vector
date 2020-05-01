@@ -24,10 +24,10 @@ fn parse_event_artifact(path: impl AsRef<Path>) -> vector::Result<Event> {
     Ok(event)
 }
 
-pub fn protobuf(c: &mut Criterion) {
+pub fn basics(c: &mut Criterion) {
     c.bench(
-        "protobuf",
-        Benchmark::new("wasm", move |b| {
+        "wasm",
+        Benchmark::new("protobuf", move |b| {
             let mut transform = parse_config(
                 r#"
             module = "target/wasm32-wasi/release/protobuf.wasm"
@@ -46,12 +46,9 @@ pub fn protobuf(c: &mut Criterion) {
             )
         }),
     );
-}
-
-pub fn noop(c: &mut Criterion) {
     c.bench(
-        "noop",
-        Benchmark::new("wasm", move |b| {
+        "wasm",
+        Benchmark::new("noop", move |b| {
             let mut transform = parse_config(
                 r#"
             module = "target/wasm32-wasi/release/noop.wasm"
@@ -72,4 +69,4 @@ pub fn noop(c: &mut Criterion) {
     );
 }
 
-criterion_group!(wasm, protobuf, noop);
+criterion_group!(wasm, basics);

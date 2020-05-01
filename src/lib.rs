@@ -16,7 +16,7 @@ pub mod dns;
 pub mod event;
 pub mod expiring_hash_map;
 pub mod generate;
-#[cfg(feature = "modules-wasm")]
+#[cfg(feature = "wasm")]
 pub mod wasm;
 #[macro_use]
 pub mod internal_events;

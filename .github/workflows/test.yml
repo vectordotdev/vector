@@ -113,6 +113,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
+      - run: apt install -y wabt
       - run: make slim-builds
       - run: make build-test-wasm-modules
       - run: make test-wasm-modules
