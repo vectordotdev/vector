@@ -2,7 +2,7 @@ class Templates
   class IntegrationGuide
     attr_reader :event_types, :platform, :sink, :source
 
-    def initialize(interfaces, strategy, platform: nil, source: nil, sink: nil)
+    def initialize(strategy, platform: nil, source: nil, sink: nil)
       if platform.nil? && source.nil? && sink.nil?
         raise ArgumentError.new("You must supply at least a platform, source, or sink")
       end
@@ -18,7 +18,6 @@ class Templates
           []
         end
 
-      @interfaces = interfaces
       @platform = platform
       @source = source
       @sink = sink
