@@ -59,10 +59,14 @@ ARCH=${ARCH:-$(echo $TARGET | cut -d'-' -f1)}
 # Prepare rpmbuild dir
 RPMBUILD_DIR="$(mktemp -td "rpmbuild.XXXX")"
 
-# Create source dir
-rm -rf "$RPMBUILD_DIR/SOURCES"
+# Create build dirs
+for ITEM in RPMS SOURCES SPECS SRPMS BUILD; do
+  rm -rf "${RPMBUILD_DIR:?}/${ITEM:?}"
+  mkdir -p "$RPMBUILD_DIR/$ITEM"
+done
+
+# Init support data
 mkdir -p \
-  "$RPMBUILD_DIR/SOURCES" \
   "$RPMBUILD_DIR/SOURCES/init.d" \
   "$RPMBUILD_DIR/SOURCES/systemd"
 cp -av distribution/init.d/. "$RPMBUILD_DIR/SOURCES/init.d"
