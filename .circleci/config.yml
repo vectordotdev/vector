@@ -241,7 +241,7 @@ jobs:
           name: Build archive and .deb package
           no_output_timeout: 60m
           environment:
-            PASS_FEATURES: "default-musl"
+            PASS_FEATURES: "default-cmake"
           command: |
             ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive package-deb
       - persist_to_workspace:
@@ -258,7 +258,7 @@ jobs:
           name: Build archive and .deb package
           no_output_timeout: 60m
           environment:
-            PASS_FEATURES: "default-musl"
+            PASS_FEATURES: "default-cmake"
             DOCKER_PRIVILEGED: "true"
           command: |
             ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build-archive package-deb
@@ -276,7 +276,7 @@ jobs:
           name: Build archive and .deb package
           no_output_timeout: 60m
           environment:
-            PASS_FEATURES: "default-musl"
+            PASS_FEATURES: "default-cmake"
             DOCKER_PRIVILEGED: "true"
           command: |
             ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build-archive package-deb
