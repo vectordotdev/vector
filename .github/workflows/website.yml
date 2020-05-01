@@ -1,0 +1,37 @@
+name: website
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "**/*.md.erb"
+      - ".meta/**"
+      - "scripts/generate.rb"
+      - "website/**"
+
+  pull_request:
+    paths:
+      - "**/*.md.erb"
+      - ".meta/**"
+      - "scripts/generate.rb"
+      - "website/**"
+
+jobs:
+  check-generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-generate
+
+  check-markdown:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@1.0.0
+      - run: make check-markdown
+
+  check-blog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-blog

@@ -130,7 +130,7 @@ services:
       - ./target/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
     user: $USER
-    command: cargo fmt -- --check
+    command: scripts/check-fmt.sh
 
   check-style:
     build:

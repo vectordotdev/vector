@@ -1,0 +1,16 @@
+name: pull-request
+
+on:
+  pull_request: {}
+
+jobs:
+  checklist:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Checklist
+        uses: wyozi/contextual-qa-checklist-action@master
+        with:
+          gh-token: ${{ secrets.GITHUB_TOKEN }}
+          input-file: .github/checklist.yml
