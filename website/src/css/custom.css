@@ -1522,6 +1522,7 @@ ul.list--indent {
 
 .menu .menu__link .badges {
   vertical-align: top;
+  margin-right: var(--ifm-spacing-horizontal);
   margin-top: -1px;
 }
 
