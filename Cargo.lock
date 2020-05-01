@@ -4676,7 +4676,7 @@ dependencies = [
 [[package]]
 name = "trust-dns-client"
 version = "0.19.5"
-source = "git+https://github.com/bluejekyll/trust-dns#cb56f66d80f4a278178a35d499b2a8b330b16b82"
+source = "git+https://github.com/bluejekyll/trust-dns#e4f736f341156c426811c760797b54f6e8663026"
 dependencies = [
  "backtrace",
  "chrono",
@@ -4718,7 +4718,7 @@ dependencies = [
 [[package]]
 name = "trust-dns-proto"
 version = "0.19.5"
-source = "git+https://github.com/bluejekyll/trust-dns#cb56f66d80f4a278178a35d499b2a8b330b16b82"
+source = "git+https://github.com/bluejekyll/trust-dns#e4f736f341156c426811c760797b54f6e8663026"
 dependencies = [
  "async-trait",
  "backtrace",
@@ -4761,7 +4761,7 @@ dependencies = [
 [[package]]
 name = "trust-dns-resolver"
 version = "0.19.5"
-source = "git+https://github.com/bluejekyll/trust-dns#cb56f66d80f4a278178a35d499b2a8b330b16b82"
+source = "git+https://github.com/bluejekyll/trust-dns#e4f736f341156c426811c760797b54f6e8663026"
 dependencies = [
  "backtrace",
  "cfg-if",
@@ -4781,7 +4781,7 @@ dependencies = [
 [[package]]
 name = "trust-dns-server"
 version = "0.19.5"
-source = "git+https://github.com/bluejekyll/trust-dns#cb56f66d80f4a278178a35d499b2a8b330b16b82"
+source = "git+https://github.com/bluejekyll/trust-dns#e4f736f341156c426811c760797b54f6e8663026"
 dependencies = [
  "backtrace",
  "bytes 0.5.4",
