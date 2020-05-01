@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Logfmt Parser"
 description: "The Vector `logfmt_parser` transform accepts and outputs `log` events, allowing you to parse a log field's value in the logfmt format."
 event_types: ["log"]
@@ -99,7 +99,6 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -120,7 +119,6 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 ### field
 
 The log field to parse.
-
  See [Field Notation Syntax](#field-notation-syntax) and [Format Specification](#format-specification) for more info.
 
 
@@ -147,7 +145,6 @@ Key/value pairs representing mapped log field names and types. This is used to
 coerce log fields into their proper types.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -170,7 +167,6 @@ coerce log fields into their proper types.
 A definition of log field type conversions. They key is the log field name and
 the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are
 supported for the `timestamp` type.
-
 
 
 

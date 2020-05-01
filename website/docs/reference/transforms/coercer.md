@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-30"
+last_modified_on: "2020-05-01"
 component_title: "Coercer"
 description: "The Vector `coercer` transform accepts and outputs `log` events, allowing you to coerce log fields into fixed types."
 event_types: ["log"]
@@ -99,7 +99,6 @@ other extraneous fields.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -121,7 +120,6 @@ other extraneous fields.
 
 Key/value pairs representing mapped log field names and types. This is used to
 coerce log fields into their proper types.
-
 
 
 <Fields filters={false}>
@@ -146,7 +144,6 @@ coerce log fields into their proper types.
 A definition of log field type conversions. They key is the log field name and
 the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are
 supported for the `timestamp` type.
-
 
 
 

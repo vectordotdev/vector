@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-30"
+last_modified_on: "2020-05-01"
 component_title: "Add Fields"
 description: "The Vector `add_fields` transform accepts and outputs `log` events, allowing you to add one or more log fields."
 event_types: ["log"]
@@ -102,7 +102,6 @@ one or more log fields.
 A table of key/value pairs representing the keys to be added to the event.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -124,7 +123,6 @@ A table of key/value pairs representing the keys to be added to the event.
 
 The name of the field to add. Accepts all [supported
 types][docs.configuration#types]. Use `.` for adding nested fields.
-
 
 
 
@@ -152,7 +150,6 @@ types][docs.configuration#types]. Use `.` for adding nested fields.
 
 By default, fields will be overridden. Set this to `false` to avoid overwriting
 values.
-
 
 
 

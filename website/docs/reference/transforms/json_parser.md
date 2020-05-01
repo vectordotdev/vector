@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "JSON Parser"
 description: "The Vector `json_parser` transform accepts and outputs `log` events, allowing you to parse a log field value as JSON."
 event_types: ["log"]
@@ -86,7 +86,6 @@ fails, the field will not be removed, irrespective of this setting.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -108,7 +107,6 @@ fails, the field will not be removed, irrespective of this setting.
 
 If `true` events with invalid JSON will be dropped, otherwise the event will be
 kept and passed through.
-
  See [Invalid JSON](#invalid-json) for more info.
 
 
@@ -132,7 +130,6 @@ kept and passed through.
 ### field
 
 The log field to decode as JSON. Must be a `string` value type.
-
  See [Field Notation Syntax](#field-notation-syntax) and [Invalid JSON](#invalid-json) for more info.
 
 
@@ -160,7 +157,6 @@ target, it will only be overwritten if this is set to `true`.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -183,7 +179,6 @@ target, it will only be overwritten if this is set to `true`.
 If this setting is present, the parsed JSON will be inserted into the log as a
 sub-object with this name. If a field with the same name already exists, the
 parser will fail and produce an error.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 

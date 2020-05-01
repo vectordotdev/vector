@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
@@ -120,7 +120,6 @@ ingests data through one or more local files and outputs
 The directory used to persist file checkpoint positions. By default, the
 [global [`data_dir`](#data_dir) option][docs.global-options#data_dir] is used. Please make
 sure the Vector project has write permissions to this dir.
-
  See [Checkpointing](#checkpointing) for more info.
 
 
@@ -148,7 +147,6 @@ precedence over the [`include` option](#include).*
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -169,7 +167,6 @@ precedence over the [`include` option](#include).*
 ### file_key
 
 The key name added to each event with the full path of the file.
-
  See [Context](#context) for more info.
 
 
@@ -195,7 +192,6 @@ The key name added to each event with the full path of the file.
 Configuration for how the file source should identify files.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -217,7 +213,6 @@ Configuration for how the file source should identify files.
 
 The number of bytes read off the head of the file to generate a unique
 fingerprint.
-
  See [Fingerprinting](#fingerprinting) for more info.
 
 
@@ -242,7 +237,6 @@ fingerprint.
 
 The number of bytes to skip ahead (or ignore) when generating a unique
 fingerprint. This is helpful if all files share a common header.
-
  See [Fingerprinting](#fingerprinting) for more info.
 
 
@@ -270,7 +264,6 @@ The strategy used to uniquely identify files. This is important for
 
 
 
-
 </Field>
 </Fields>
 
@@ -295,7 +288,6 @@ The strategy used to uniquely identify files. This is important for
 
 Delay between file discovery calls. This controls the interval at which Vector
 searches for files.
-
  See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.
 
 
@@ -321,7 +313,6 @@ searches for files.
 The key name added to each event representing the current host. This can also
 be globally set via the [global [`host_key`](#host_key)
 option][docs.reference.global-options#host_key].
-
  See [Context](#context) for more info.
 
 
@@ -348,7 +339,6 @@ Ignore files with a data modification date that does not exceed this age.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -369,7 +359,6 @@ Ignore files with a data modification date that does not exceed this age.
 ### include
 
 Array of file patterns to include. [Globbing](#globbing) is supported.
-
  See [File Read Order](#file-read-order) and [File Rotation](#file-rotation) for more info.
 
 
@@ -397,7 +386,6 @@ protects against malformed lines or tailing incorrect files.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -422,7 +410,6 @@ time.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -444,7 +431,6 @@ time.
 
 Multiline parsing configuration (per file).
 If not speicified, multiline parsing is disabled.
-
  See [Multi-Line Messages](#multi-line-messages) for more info.
 
 <Fields filters={false}>
@@ -467,7 +453,6 @@ If not speicified, multiline parsing is disabled.
 #### condition_pattern
 
 Condition regex pattern to look for. Exact behavior is configured via [`mode`](#mode).
-
  See [Multi-Line Messages](#multi-line-messages) for more info.
 
 
@@ -491,7 +476,6 @@ Condition regex pattern to look for. Exact behavior is configured via [`mode`](#
 #### mode
 
 Mode of operation, specifies how the [`condition_pattern`](#condition_pattern) is interpreted.
-
  See [Multi-Line Messages](#multi-line-messages) for more info.
 
 
@@ -515,7 +499,6 @@ Mode of operation, specifies how the [`condition_pattern`](#condition_pattern) i
 #### start_pattern
 
 Start regex pattern to look for as a beginning of the message.
-
  See [Multi-Line Messages](#multi-line-messages) for more info.
 
 
@@ -543,7 +526,6 @@ the buffered message is guaraneed to be flushed, even if incomplete.
 
 
 
-
 </Field>
 </Fields>
 
@@ -568,7 +550,6 @@ the buffered message is guaraneed to be flushed, even if incomplete.
 
 Instead of balancing read capacity fairly across all watched files, prioritize
 draining the oldest files before moving on to read data from younger files.
-
  See [File Read Order](#file-read-order) for more info.
 
 
@@ -594,7 +575,6 @@ draining the oldest files before moving on to read data from younger files.
 For files with a stored checkpoint at startup, setting this option to `true`
 will tell Vector to read from the beginning of the file instead of the stored
 checkpoint.
-
  See [Read Position](#read-position) for more info.
 
 
@@ -635,7 +615,6 @@ checkpoint.
 
 The _full_ path of the file tha the log originated from. This can be renamed
 via the [`file_key`](#file_key) option.
-
  See [Checkpointing](#checkpointing) and [Context](#context) for more info.
 
 
@@ -663,7 +642,6 @@ renamed via the [`host_key`](#host_key) option.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -688,7 +666,6 @@ The raw log message, unaltered. This can be renamed via the [global
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -710,7 +687,6 @@ The raw log message, unaltered. This can be renamed via the [global
 
 The exact time the event was ingested. This can be renamed via the [global
 `timestamp_key` option][docs.reference.global-options#timestamp_key].
-
 
 
 

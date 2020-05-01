@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
@@ -133,7 +133,6 @@ initially to bootstrap itself.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -156,7 +155,6 @@ initially to bootstrap itself.
 Configures the sink specific buffer behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -177,7 +175,6 @@ Configures the sink specific buffer behavior.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
 
 
 
@@ -204,7 +201,6 @@ The maximum size of the buffer on the disk.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -228,7 +224,6 @@ The buffer's type and storage mechanism.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -249,7 +244,6 @@ The buffer's type and storage mechanism.
 #### when_full
 
 The behavior when the buffer becomes full.
-
 
 
 
@@ -279,7 +273,6 @@ Compression codec to use for compressing message sets
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -302,7 +295,6 @@ Compression codec to use for compressing message sets
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -323,7 +315,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -350,7 +341,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -371,7 +361,6 @@ Prevent the sink from encoding the specified labels.
 #### only_fields
 
 Limit the sink to only encoding the specified labels.
-
 
 
 
@@ -398,7 +387,6 @@ How to format event timestamps.
 
 
 
-
 </Field>
 </Fields>
 
@@ -422,7 +410,6 @@ How to format event timestamps.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -451,7 +438,6 @@ be used.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -475,7 +461,6 @@ Advanced options. See [librdkafka documentation][urls.librdkafka_config] for
 details.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -496,7 +481,6 @@ details.
 #### `[field-name]`
 
 The options and their values. Accepts `string` values.
-
 
 
 
@@ -526,7 +510,6 @@ Local message timeout.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -547,7 +530,6 @@ Local message timeout.
 ### socket_timeout_ms
 
 Default timeout for network requests.
-
 
 
 
@@ -573,7 +555,6 @@ Default timeout for network requests.
 Configures the TLS options for connections from this sink.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -595,7 +576,6 @@ Configures the TLS options for connections from this sink.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -624,7 +604,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -645,7 +624,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 #### enabled
 
 Enable TLS during connections to the remote.
-
 
 
 
@@ -673,7 +651,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -695,7 +672,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 Absolute path to a certificate key file used to identify this connection, in
 DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be set.
-
 
 
 
@@ -722,7 +698,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 ### topic
 
 The Kafka topic name to write events to.
-
 
 
 

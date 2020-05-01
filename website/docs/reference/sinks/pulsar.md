@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "Apache Pulsar"
 description: "The Vector `pulsar` sink streams `log` events to Apache Pulsar via the Pulsar protocol."
@@ -101,7 +101,6 @@ A host and port pair that the pulsar client should connect to.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -122,7 +121,6 @@ A host and port pair that the pulsar client should connect to.
 ### auth
 
 Options for the authentication strategy.
-
 
 
 <Fields filters={false}>
@@ -148,7 +146,6 @@ The basic authentication name.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -169,7 +166,6 @@ The basic authentication name.
 #### token
 
 The basic authentication password.
-
 
 
 
@@ -198,7 +194,6 @@ The basic authentication password.
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -219,7 +214,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -246,7 +240,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -267,7 +260,6 @@ Prevent the sink from encoding the specified labels.
 #### only_fields
 
 Limit the sink to only encoding the specified labels.
-
 
 
 
@@ -294,7 +286,6 @@ How to format event timestamps.
 
 
 
-
 </Field>
 </Fields>
 
@@ -318,7 +309,6 @@ How to format event timestamps.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -342,7 +332,6 @@ Enables/disables the sink healthcheck upon start.
 ### topic
 
 The Pulsar topic name to write events to.
-
 
 
 

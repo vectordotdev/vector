@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Filter"
 description: "The Vector `filter` transform accepts and outputs `log` and `metric` events, allowing you to select events based on a set of logical conditions."
 event_types: ["log","metric"]
@@ -98,7 +98,6 @@ The set of logical conditions to be matched against every input event. Only
 messages that pass all conditions will be forwarded.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -122,7 +121,6 @@ The type of the condition to execute.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -143,7 +141,6 @@ The type of the condition to execute.
 #### `[field-name]`.eq
 
 Check whether a fields contents exactly matches the value specified.
-
 
 
 
@@ -171,7 +168,6 @@ being `true` or `false` respectively.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -192,7 +188,6 @@ being `true` or `false` respectively.
 #### `[field-name]`.neq
 
 Check whether a fields contents does not match the value specified.
-
 
 
 
@@ -219,7 +214,6 @@ Checks whether a string field contains a string argument.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -240,7 +234,6 @@ Checks whether a string field contains a string argument.
 #### `[field_name]`.ends_with
 
 Checks whether a string field ends with a string argument.
-
 
 
 
@@ -271,7 +264,6 @@ preferred where possible.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -292,7 +284,6 @@ preferred where possible.
 #### `[field_name]`.starts_with
 
 Checks whether a string field starts with a string argument.
-
 
 
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` sink streams `metric` events to StatsD metrics service."
@@ -86,7 +86,6 @@ The UDP socket address to send stats to.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -110,7 +109,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -131,7 +129,6 @@ Enables/disables the sink healthcheck upon start.
 ### namespace
 
 A prefix that will be added to all metric names.
-
 
 
 

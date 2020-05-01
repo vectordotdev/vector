@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
@@ -152,7 +152,6 @@ For more information about unit tests check out [this guide][guides.advanced.uni
 A table that defines a unit test input event.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -174,7 +173,6 @@ A table that defines a unit test input event.
 
 The name of a transform, the input event will be delivered to this transform in
 order to begin the test.
-
 
 
 
@@ -200,7 +198,6 @@ order to begin the test.
 Specifies the log fields when the input type is 'log'.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -221,7 +218,6 @@ Specifies the log fields when the input type is 'log'.
 ##### `[field-name]`
 
 A key/value pair representing a field to be added to the input event.
-
 
 
 
@@ -250,7 +246,6 @@ A key/value pair representing a field to be added to the input event.
 Specifies the metric type when the input type is 'metric'.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -271,7 +266,6 @@ Specifies the metric type when the input type is 'metric'.
 ##### direction
 
 The direction to increase or decrease the gauge value.
-
 
 
 
@@ -299,7 +293,6 @@ for `gauge`.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -320,7 +313,6 @@ for `gauge`.
 ##### sample_rate
 
 The bucket/distribution the metric is a part of.
-
 
 
 
@@ -346,7 +338,6 @@ The bucket/distribution the metric is a part of.
 Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -367,7 +358,6 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 ###### `[tag-name]`
 
 Key/value pairs representing [metric tags][docs.data-model.metric#tags].
-
 
 
 
@@ -397,7 +387,6 @@ Time metric was created/ingested.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -421,7 +410,6 @@ The metric type.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -442,7 +430,6 @@ The metric type.
 ##### val
 
 Amount to increment/decrement or gauge.
-
 
 
 
@@ -472,7 +459,6 @@ The event type.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -493,7 +479,6 @@ The event type.
 #### value
 
 Specifies the log message field contents when the input type is 'raw'.
-
 
 
 
@@ -523,7 +508,6 @@ A unique identifier for this test.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -547,7 +531,6 @@ A list of transforms that must NOT output events in order for the test to pass.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -568,7 +551,6 @@ A list of transforms that must NOT output events in order for the test to pass.
 ### outputs
 
 A table that defines a unit test expected output.
-
 
 
 <Fields filters={false}>
@@ -597,7 +579,6 @@ expected output without conditions instead prints the input and output of a
 target without checking its values.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -621,7 +602,6 @@ The type of the condition to execute.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -642,7 +622,6 @@ The type of the condition to execute.
 ##### `[field-name]`.eq
 
 Check whether a fields contents exactly matches the value specified.
-
 
 
 
@@ -670,7 +649,6 @@ being `true` or `false` respectively.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -691,7 +669,6 @@ being `true` or `false` respectively.
 ##### `[field-name]`.neq
 
 Check whether a fields contents does not match the value specified.
-
 
 
 
@@ -718,7 +695,6 @@ Checks whether a string field contains a string argument.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -739,7 +715,6 @@ Checks whether a string field contains a string argument.
 ##### `[field_name]`.ends_with
 
 Checks whether a string field ends with a string argument.
-
 
 
 
@@ -770,7 +745,6 @@ preferred where possible.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -791,7 +765,6 @@ preferred where possible.
 ##### `[field_name]`.starts_with
 
 Checks whether a string field starts with a string argument.
-
 
 
 
@@ -819,7 +792,6 @@ Checks whether a string field starts with a string argument.
 
 The name of a transform, at the end of the test events extracted from this
 transform will be checked against a table of conditions.
-
 
 
 

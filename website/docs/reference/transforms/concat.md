@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-30"
+last_modified_on: "2020-05-01"
 component_title: "Concat"
 description: "The Vector `concat` transform accepts and outputs `log` events, allowing you to concat (substrings) of other fields to a new one."
 event_types: ["log"]
@@ -83,7 +83,6 @@ both start and end negative values are counted from the end of the string.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -107,7 +106,6 @@ The string that is used to join all items.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -128,7 +126,6 @@ The string that is used to join all items.
 ### target
 
 The name for the new label.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 

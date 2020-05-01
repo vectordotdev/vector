@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-30"
+last_modified_on: "2020-05-01"
 component_title: "Remove Fields"
 description: "The Vector `remove_fields` transform accepts and outputs `log` events, allowing you to remove one or more log fields."
 event_types: ["log"]
@@ -81,7 +81,6 @@ empty.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -102,7 +101,6 @@ empty.
 ### fields
 
 The log field names to drop.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 

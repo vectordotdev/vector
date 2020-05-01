@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "STDIN"
 description: "The Vector `stdin` source ingests data through standard input (STDIN) and outputs `log` events."
@@ -82,7 +82,6 @@ ingests data through [standard input (STDIN)][urls.stdin] and outputs
 The key name added to each event representing the current host. This can also
 be globally set via the [global [`host_key`](#host_key)
 option][docs.reference.global-options#host_key].
-
  See [Context](#context) for more info.
 
 
@@ -106,7 +105,6 @@ option][docs.reference.global-options#host_key].
 ### max_length
 
 The maxiumum bytes size of a message before it is discarded.
-
 
 
 
@@ -148,7 +146,6 @@ The local hostname.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -172,7 +169,6 @@ The raw message, unaltered.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -193,7 +189,6 @@ The raw message, unaltered.
 ### timestamp
 
 The exact time the event was ingested.
-
 
 
 

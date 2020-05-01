@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 title: Metric Event
 description: A detailed guide on Vector's internal metric data model.
 ---
@@ -186,7 +186,6 @@ things like request durations or response sizes) and counts them in
 configurable buckets. It also provides a sum of all observed values.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -207,7 +206,6 @@ configurable buckets. It also provides a sum of all observed values.
 #### buckets
 
 The buckets contained within this histogram.
-
 
 
 
@@ -234,7 +232,6 @@ The total number of values contained within the histogram.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -258,7 +255,6 @@ The number of values contained within each bucket.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -279,7 +275,6 @@ The number of values contained within each bucket.
 #### sum
 
 The sum of all values contained within the histogram.
-
 
 
 
@@ -311,7 +306,6 @@ observations and a sum of all observed values, it calculates configurable
 quantiles over a sliding time window.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -332,7 +326,6 @@ quantiles over a sliding time window.
 #### count
 
 The total number of values contained within the summary.
-
 
 
 
@@ -359,7 +352,6 @@ The quantiles contained within the summary, where 0 ≤ quantile ≤ 1.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -383,7 +375,6 @@ The sum of all values contained within the summary.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -404,7 +395,6 @@ The sum of all values contained within the summary.
 #### values
 
 The values contained within the summary that align with the [`quantiles`](#quantiles).
-
 
 
 
@@ -434,7 +424,6 @@ A single value that can _only_ be incremented or reset to zero value, it cannot
 be decremented.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -455,7 +444,6 @@ be decremented.
 #### value
 
 The value to increment the counter by. Can only be positive.
-
 
 
 
@@ -484,7 +472,6 @@ The value to increment the counter by. Can only be positive.
 A distribution represents a distribution of sampled values.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -508,7 +495,6 @@ The rate at which each individual value was sampled.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -529,7 +515,6 @@ The rate at which each individual value was sampled.
 #### values
 
 The list of values contained within the distribution.
-
 
 
 
@@ -560,7 +545,6 @@ Vector's internal gauge type represents changes to that value. Gauges should be
 used to track fluctuations in values, like current memory or CPU usage.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -581,7 +565,6 @@ used to track fluctuations in values, like current memory or CPU usage.
 #### value
 
 A specific point-in-time value for the gauge.
-
 
 
 
@@ -612,7 +595,6 @@ metrics are aggregated.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -633,7 +615,6 @@ metrics are aggregated.
 ### name
 
 The metric name.
-
 
 
 
@@ -659,7 +640,6 @@ The metric name.
 A set represents a count of unique values, AKA the cardinality.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -680,7 +660,6 @@ A set represents a count of unique values, AKA the cardinality.
 #### values
 
 The list of unique values.
-
 
 
 
@@ -711,7 +690,6 @@ key/value pairs in `string` format and cannot be nested.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -733,7 +711,6 @@ key/value pairs in `string` format and cannot be nested.
 
 The metric timestamp, representing when the metric was created/ingested within
 Vector.
-
 
 
 

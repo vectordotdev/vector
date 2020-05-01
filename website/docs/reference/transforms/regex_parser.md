@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events, allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
@@ -103,7 +103,6 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -124,7 +123,6 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 ### field
 
 The log field to parse.
-
  See [Failed Parsing](#failed-parsing) and [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
@@ -152,7 +150,6 @@ target, it will only be overwritten if this is set to `true`.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -173,7 +170,6 @@ target, it will only be overwritten if this is set to `true`.
 ### regex
 
 The Regular Expression to apply. Do not include the leading or trailing `/`.
-
  See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.
 
 
@@ -199,7 +195,6 @@ The Regular Expression to apply. Do not include the leading or trailing `/`.
 If this setting is present, the parsed fields will be inserted into the log as
 a sub-object with this name. If a field with the same name already exists, the
 parser will fail and produce an error.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
@@ -224,7 +219,6 @@ parser will fail and produce an error.
 
 Key/value pairs representing mapped log field names and types. This is used to
 coerce log fields into their proper types.
-
  See [Regex Syntax](#regex-syntax) for more info.
 
 <Fields filters={false}>
@@ -249,7 +243,6 @@ coerce log fields into their proper types.
 A definition of log field type conversions. They key is the log field name and
 the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are
 supported for the `timestamp` type.
-
 
 
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Tokenizer"
 description: "The Vector `tokenizer` transform accepts and outputs `log` events, allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
 event_types: ["log"]
@@ -102,7 +102,6 @@ If `true` the [`field`](#field) will be dropped after parsing.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -123,7 +122,6 @@ If `true` the [`field`](#field) will be dropped after parsing.
 ### field
 
 The log field to tokenize.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
@@ -147,7 +145,6 @@ The log field to tokenize.
 ### field_names
 
 The log field names assigned to the resulting tokens, in order.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
@@ -174,7 +171,6 @@ Key/value pairs representing mapped log field names and types. This is used to
 coerce log fields into their proper types.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -197,7 +193,6 @@ coerce log fields into their proper types.
 A definition of log field type conversions. They key is the log field name and
 the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are
 supported for the `timestamp` type.
-
 
 
 

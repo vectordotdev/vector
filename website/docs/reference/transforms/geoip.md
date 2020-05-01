@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "GeoIP"
 description: "The Vector [`geoip`](#geoip) transform accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases."
 event_types: ["log"]
@@ -86,7 +86,6 @@ not supported.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -108,7 +107,6 @@ not supported.
 
 The field name that contains the IP address. This field should contain a valid
 IPv4 or IPv6 address.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
@@ -133,7 +131,6 @@ IPv4 or IPv6 address.
 
 The default field to insert the resulting GeoIP data into. See
 [output](#output) for more info.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
@@ -178,7 +175,6 @@ The default field to insert the resulting GeoIP data into. See
 ### geoip
 
 The root field containing all geolocation data as sub-fields.
-
  See [Complex Processing](#complex-processing) for more info.
 
 <Fields filters={false}>
@@ -201,7 +197,6 @@ The root field containing all geolocation data as sub-fields.
 #### city_name
 
 The city name associated with the IP address.
-
 
 
 
@@ -228,7 +223,6 @@ The continent code associated with the IP address.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -249,7 +243,6 @@ The continent code associated with the IP address.
 #### country_code
 
 The [ISO 3166-2 country codes][urls.iso3166-2] associated with the IP address.
-
 
 
 
@@ -276,7 +269,6 @@ The latitude associated with the IP address.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -297,7 +289,6 @@ The latitude associated with the IP address.
 #### longitude
 
 The longitude associated with the IP address.
-
 
 
 
@@ -324,7 +315,6 @@ The postal code associated with the IP address.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -347,7 +337,6 @@ The postal code associated with the IP address.
 The timezone associated with the IP address in [IANA time zone
 format][urls.iana_time_zone_format]. A full list of time zones can be found
 [here][urls.iana_time_zones].
-
 
 
 

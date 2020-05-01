@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` sink streams `log` events to a socket, such as a TCP, UDP, or UDS socket."
@@ -148,7 +148,6 @@ The address to connect to. The address _must_ include a port.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -171,7 +170,6 @@ The address to connect to. The address _must_ include a port.
 Configures the sink specific buffer behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -192,7 +190,6 @@ Configures the sink specific buffer behavior.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
 
 
 
@@ -219,7 +216,6 @@ The maximum size of the buffer on the disk.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -243,7 +239,6 @@ The buffer's type and storage mechanism.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -264,7 +259,6 @@ The buffer's type and storage mechanism.
 #### when_full
 
 The behavior when the buffer becomes full.
-
 
 
 
@@ -293,7 +287,6 @@ The behavior when the buffer becomes full.
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -314,7 +307,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -341,7 +333,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -362,7 +353,6 @@ Prevent the sink from encoding the specified labels.
 #### only_fields
 
 Limit the sink to only encoding the specified labels.
-
 
 
 
@@ -389,7 +379,6 @@ How to format event timestamps.
 
 
 
-
 </Field>
 </Fields>
 
@@ -413,7 +402,6 @@ How to format event timestamps.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -440,7 +428,6 @@ The type of socket to use.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -461,7 +448,6 @@ The type of socket to use.
 ### path
 
 The unix socket path. This should be the absolute path.
-
 
 
 
@@ -487,7 +473,6 @@ The unix socket path. This should be the absolute path.
 Configures the TLS options for connections from this sink.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -509,7 +494,6 @@ Configures the TLS options for connections from this sink.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -538,7 +522,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -559,7 +542,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 #### enabled
 
 Enable TLS during connections to the remote.
-
 
 
 
@@ -587,7 +569,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -609,7 +590,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 Absolute path to a certificate key file used to identify this connection, in
 DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be set.
-
 
 
 
@@ -637,7 +617,6 @@ host.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -660,7 +639,6 @@ host.
 If `true` (the default), Vector will validate the configured remote host name
 against the remote host's TLS certificate. Do NOT set this to `false` unless
 you understand the risks of not verifying the remote hostname.
-
 
 
 

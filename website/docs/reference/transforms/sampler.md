@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Sampler"
 description: "The Vector `sampler` transform accepts and outputs `log` events, allowing you to sample events with a configurable rate."
 event_types: ["log"]
@@ -84,7 +84,6 @@ option][docs.reference.global-options#message_key].
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -110,7 +109,6 @@ _not_ be sampled.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -133,7 +131,6 @@ _not_ be sampled.
 The rate at which events will be forwarded, expressed as 1/N. For example,
 `rate = 10` means 1 out of every 10 events will be forwarded and the rest will
 be dropped.
-
 
 
 

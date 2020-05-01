@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events, allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
@@ -100,7 +100,6 @@ of the swimlane. Each swimlane can then be referenced as an input by other
 components with the name `<transform_name>.<swimlane_id>`.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -121,7 +120,6 @@ components with the name `<transform_name>.<swimlane_id>`.
 #### `[swimlane-id]`
 
 The identifier of a swimlane.
-
 
 
 <Fields filters={false}>
@@ -147,7 +145,6 @@ The type of the condition to execute.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -168,7 +165,6 @@ The type of the condition to execute.
 ##### `[field-name]`.eq
 
 Check whether a fields contents exactly matches the value specified.
-
 
 
 
@@ -196,7 +192,6 @@ being `true` or `false` respectively.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -217,7 +212,6 @@ being `true` or `false` respectively.
 ##### `[field-name]`.neq
 
 Check whether a fields contents does not match the value specified.
-
 
 
 
@@ -244,7 +238,6 @@ Checks whether a string field contains a string argument.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -265,7 +258,6 @@ Checks whether a string field contains a string argument.
 ##### `[field_name]`.ends_with
 
 Checks whether a string field ends with a string argument.
-
 
 
 
@@ -296,7 +288,6 @@ preferred where possible.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -317,7 +308,6 @@ preferred where possible.
 ##### `[field_name]`.starts_with
 
 Checks whether a string field starts with a string argument.
-
 
 
 

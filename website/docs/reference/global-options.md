@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 title: Global Options
 description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---
@@ -56,7 +56,6 @@ log_schema.timestamp_key = "timestamp" # optional, default
 The directory used for persisting Vector state, such as on-disk buffers, file
 checkpoints, and more. Please make sure the Vector project has write
 permissions to this dir.
-
  See [Data Directory](#data-directory) for more info.
 
 
@@ -86,7 +85,6 @@ system configuration.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -108,7 +106,6 @@ system configuration.
 
 The default log schema that all Vector components operate on. See the [log data
 model page][docs.data-model.log] for more info.
-
 
 
 <Fields filters={false}>
@@ -135,7 +132,6 @@ page][docs.data-model.log#host] for more info.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -156,7 +152,6 @@ page][docs.data-model.log#host] for more info.
 #### kubernetes_key
 
 The key under which Kubernetes related fields are nested.
-
 
 
 
@@ -184,7 +179,6 @@ page][docs.data-model.log#message] for more info.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -209,7 +203,6 @@ page][docs.data-model.log#source_type] for more info.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -231,7 +224,6 @@ page][docs.data-model.log#source_type] for more info.
 
 The key used to represent when the log was generated. See the [log data model
 page][docs.data-model.log#timestamp] for more info.
-
 
 
 
