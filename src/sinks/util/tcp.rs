@@ -2,12 +2,12 @@ use crate::{
     dns::Resolver,
     emit,
     internal_events::{
-        TcpConnectionDisconnected, TcpConnectionEstablished, TcpConnectionFailed, TcpEventSent,
-        TcpFlushError,
+        TcpConnectionDisconnected, TcpConnectionEstablished, TcpConnectionFailed,
+        TcpConnectionShutdown, TcpEventSent, TcpFlushError,
     },
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink},
     sinks::{Healthcheck, RouterSink},
-    tls::{MaybeTlsConnector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
+    tls::{MaybeTls, MaybeTlsConnector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -175,11 +175,30 @@ impl Sink for TcpSink {
 
         match self.poll_connection() {
             Ok(Async::Ready(connection)) => {
-                let mut dummy = [0; 0];
-                // Test if the remote has issued a disconnect
-                match connection.get_mut().read(&mut dummy) {
+                // This type internally is either a `TcpStream` or a
+                // `SslStream<TcpStream>`. This match will provide the inner
+                // `TcpStream`.
+                let conn = match connection.get_mut() {
+                    MaybeTls::Raw(t) => t,
+                    MaybeTls::Tls(t) => t.get_mut().get_mut(),
+                };
+
+                // Test if the remote has issued a disconnect by calling read(2)
+                // with a 1 sized buffer.
+                //
+                // This can return a proper disconnect error or `Ok(0)`
+                // which means the pipe is broken and we should try to reconnect.
+                //
+                // If this returns `WouldBlock` we know the connection is still
+                // valid and the write will most likely succeed.
+                match conn.read(&mut [0u8; 1]) {
                     Err(error) if error.kind() != ErrorKind::WouldBlock => {
                         emit!(TcpConnectionDisconnected { error });
+                        self.state = TcpSinkState::Disconnected;
+                        Ok(AsyncSink::NotReady(line))
+                    }
+                    Ok(0) => {
+                        emit!(TcpConnectionShutdown {});
                         self.state = TcpSinkState::Disconnected;
                         Ok(AsyncSink::NotReady(line))
                     }
