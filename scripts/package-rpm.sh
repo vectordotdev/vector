@@ -56,21 +56,24 @@ CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/-/\./g')
 # from Rust target triple and needs to be specified manually.
 ARCH=${ARCH:-$(echo $TARGET | cut -d'-' -f1)}
 
+# Prepare rpmbuild dir
+RPMBUILD_DIR="$HOME/rpmbuild"
+
 # Create source dir
-rm -rf "$HOME/rpmbuild/SOURCES"
+rm -rf "$RPMBUILD_DIR/SOURCES"
 mkdir -p \
-  "$HOME/rpmbuild/SOURCES" \
-  "$HOME/rpmbuild/SOURCES/init.d" \
-  "$HOME/rpmbuild/SOURCES/systemd"
-cp -av distribution/init.d/. "$HOME/rpmbuild/SOURCES/init.d"
-cp -av distribution/systemd/. "$HOME/rpmbuild/SOURCES/systemd"
+  "$RPMBUILD_DIR/SOURCES" \
+  "$RPMBUILD_DIR/SOURCES/init.d" \
+  "$RPMBUILD_DIR/SOURCES/systemd"
+cp -av distribution/init.d/. "$RPMBUILD_DIR/SOURCES/init.d"
+cp -av distribution/systemd/. "$RPMBUILD_DIR/SOURCES/systemd"
 
 # Copy the archive into the sources dir
-cp -av $archive_path "$HOME/rpmbuild/SOURCES/vector-$ARCH.tar.gz"
+cp -av $archive_path "$RPMBUILD_DIR/SOURCES/vector-$ARCH.tar.gz"
 
 # Perform the build.
 rpmbuild \
-  --define "_topdir $HOME/rpmbuild" \
+  --define "_topdir $RPMBUILD_DIR" \
   --target "$ARCH-redhat-linux" \
   --define "_arch $ARCH" \
   -ba distribution/rpm/vector.spec
@@ -79,5 +82,5 @@ rpmbuild \
 # Move the RPM into the artifacts dir
 #
 
-ls "$HOME/rpmbuild/RPMS/$ARCH"
-mv -v "$HOME/rpmbuild/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-$ARCH.rpm"
+ls "$RPMBUILD_DIR/RPMS/$ARCH"
+mv -v "$RPMBUILD_DIR/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-$ARCH.rpm"
