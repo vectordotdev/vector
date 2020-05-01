@@ -29,6 +29,9 @@ DIRS=(
   ./target/cargo/git
   ./target/cargo/registry
   ./target/rustup/tmp
+  ./target/x86_64-unknown-linux-gnu/cargo/git
+  ./target/x86_64-unknown-linux-gnu/cargo/registry
+  ./target/x86_64-unknown-linux-gnu/rustup/tmp
   ./target/x86_64-unknown-linux-musl/cargo/git
   ./target/x86_64-unknown-linux-musl/cargo/registry
   ./target/x86_64-unknown-linux-musl/rustup/tmp
