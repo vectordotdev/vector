@@ -58,9 +58,10 @@ ARCH=${ARCH:-$(echo $TARGET | cut -d'-' -f1)}
 
 # Create source dir
 rm -rf "$HOME/rpmbuild/SOURCES"
-mkdir -p "$HOME/rpmbuild/SOURCES"
-mkdir -p "$HOME/rpmbuild/SOURCES/init.d"
-mkdir -p "$HOME/rpmbuild/SOURCES/systemd"
+mkdir -p \
+  "$HOME/rpmbuild/SOURCES" \
+  "$HOME/rpmbuild/SOURCES/init.d" \
+  "$HOME/rpmbuild/SOURCES/systemd"
 cp -av distribution/init.d/. "$HOME/rpmbuild/SOURCES/init.d"
 cp -av distribution/systemd/. "$HOME/rpmbuild/SOURCES/systemd"
 
