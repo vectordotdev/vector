@@ -6,8 +6,9 @@ on:
       - master
     paths:
       - .github/labels.yml
+
 jobs:
-  sync-labels:
+  sync:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@1.0.0
