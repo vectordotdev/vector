@@ -29,6 +29,15 @@ echo "Packaging .rpm for $archive_name"
 echo "TARGET: $TARGET"
 
 #
+# Safeguard
+#
+
+if [[ "$UID" == "0" ]]; then
+  echo "Error: aborting RPM build due to execution as root" >&2
+  exit 1
+fi
+
+#
 # Package
 #
 
