@@ -95,6 +95,8 @@ To be clear, here's everything we'll accomplish in this short guide:
 
 <InstallationCommand />
 
+Or choose your [preferred method][docs.installation].
+
 </li>
 <li>
 
@@ -143,6 +145,7 @@ flexibility of Vector:
 </Jump>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon

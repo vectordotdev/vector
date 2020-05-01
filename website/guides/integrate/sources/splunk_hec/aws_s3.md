@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-05-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Splunk HEC to AWS S3"
 description: "A simple guide to send logs from Splunk HEC to AWS S3 in just a few minutes."
@@ -104,6 +104,8 @@ To be clear, here's everything we'll accomplish in this short guide:
 
 <InstallationCommand />
 
+Or choose your [preferred method][docs.installation].
+
 </li>
 <li>
 
@@ -152,6 +154,7 @@ flexibility of Vector:
 </Jump>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.sources.splunk_hec]: /docs/reference/sources/splunk_hec/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.aws_s3]: https://aws.amazon.com/s3/

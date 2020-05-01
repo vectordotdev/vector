@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-05-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Collect metrics from Prometheus and send them anywhere"
 description: "A simple guide to collect metrics from Prometheus and send them anywhere in just a few minutes."
@@ -93,6 +93,8 @@ To be clear, here's everything we'll accomplish in this short guide:
 
 <InstallationCommand />
 
+Or choose your [preferred method][docs.installation].
+
 </li>
 <li>
 
@@ -141,6 +143,7 @@ flexibility of Vector:
 </Jump>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.sources.prometheus]: /docs/reference/sources/prometheus/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [urls.prometheus]: https://prometheus.io/

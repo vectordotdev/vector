@@ -16,7 +16,7 @@
 }
 
 .steps > ol > li > *:last-child {
-  margin-bottom: calc(var(--ifm-spacing-vertical) * 3 ) !important;
+  margin-bottom: calc(var(--ifm-spacing-vertical) * 3) !important;
 }
 
 .steps > ol > li:before {
@@ -25,7 +25,8 @@
   color: var(--ifm-background-color);
   content: counter(sections-counter);
   float: left;
-  min-width: 0.75em;
+  font-size: 0.9em;
+  min-width: 1em;
   padding: 0.2em 0.35em;
   text-align: center;
 }
@@ -36,7 +37,7 @@
 
 .steps > ol > li > ol {
   font-size: 0.95em;
-  margin-top: calc(var(--ifm-spacing-vertical) * 2 );
+  margin-top: calc(var(--ifm-spacing-vertical) * 2);
 }
 
 .steps .steps--feedback {
@@ -79,6 +80,3 @@
   margin: -1em 0 0 2.75em;
   padding: 1em 0;
 }
-
-
-

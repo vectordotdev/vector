@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-05-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Syslog to Papertrail"
 description: "A simple guide to send logs from Syslog to Papertrail in just a few minutes."
@@ -101,6 +101,8 @@ To be clear, here's everything we'll accomplish in this short guide:
 
 <InstallationCommand />
 
+Or choose your [preferred method][docs.installation].
+
 </li>
 <li>
 
@@ -149,6 +151,7 @@ flexibility of Vector:
 </Jump>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.sources.syslog]: /docs/reference/sources/syslog/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.papertrail]: https://www.papertrail.com/
