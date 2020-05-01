@@ -88,6 +88,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
+      - name: "Upgrade bash"
+        run: brew install bash
       - name: "Install realpath dependency"
         run: brew install coreutils
       - name: "Build archive"
@@ -211,6 +213,7 @@ jobs:
   release-s3:
     runs-on: ubuntu-latest
     needs:
+      - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-armv7-unknown-linux-musleabihf-packages
@@ -218,6 +221,10 @@ jobs:
       - build-x86_64-pc-windows-msvc-packages
     steps:
       - uses: actions/checkout@v1
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-x86_64-unknown-linux-gnu.tar.gz
+          path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-x86_64-unknown-linux-musl.tar.gz
