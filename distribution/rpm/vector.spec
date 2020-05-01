@@ -38,8 +38,6 @@ cp -a %{_builddir}/config/vector.toml %{buildroot}%{_sysconfdir}/%{_name}/vector
 cp -a %{_builddir}/config/vector.spec.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.spec.toml
 cp -a %{_builddir}/config/examples/. %{buildroot}%{_sysconfdir}/%{_name}/examples
 cp -a %{_builddir}/systemd/vector.service %{buildroot}%{_unitdir}/vector.service
-cp -a %{_builddir}/README.md %{buildroot}/README.md
-cp -a %{_builddir}/LICENSE %{buildroot}/LICENSE
 
 %post
 getent group %{_username} > /dev/null || groupadd -r %{_username}
