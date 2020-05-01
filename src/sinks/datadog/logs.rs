@@ -7,7 +7,7 @@ use crate::{
         uri::UriSerde,
         Encoding,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
@@ -20,7 +20,7 @@ pub struct DatadogLogsConfig {
     endpoint: Option<UriSerde>,
     api_key: String,
     encoding: EncodingConfig<Encoding>,
-    tls: Option<TlsOptions>,
+    tls: Option<TlsConfig>,
 }
 
 inventory::submit! {
@@ -38,22 +38,20 @@ impl SinkConfig for DatadogLogsConfig {
                 .port_u16()
                 .ok_or_else(|| "A port is required for endpoints".to_string())?;
 
-            let tls = if let Some(tls) = &self.tls {
-                Some(TlsSettings::from_options(&Some(tls.clone()))?)
-            } else {
-                None
-            };
-
-            (format!("{}", host), port, tls)
+            (format!("{}", host), port, self.tls.clone())
         } else {
-            (
-                "intake.logs.datadoghq.com".to_string(),
-                10516,
-                Some(TlsSettings::default()),
-            )
+            let tls = self.tls.clone().unwrap_or({
+                let mut tls = TlsConfig::default();
+                tls.enabled = Some(true);
+                tls
+            });
+
+            ("intake.logs.datadoghq.com".to_string(), 10516, Some(tls))
         };
 
-        let sink = TcpSink::new(host.clone(), port, cx.resolver(), tls.into());
+        let tls_settings = MaybeTlsSettings::from_config(&tls, false)?;
+
+        let sink = TcpSink::new(host.clone(), port, cx.resolver(), tls_settings);
         let healthcheck = tcp_healthcheck(host.clone(), port, cx.resolver());
 
         let encoding = self.encoding.clone();
