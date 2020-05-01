@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-05-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics from Prometheus to Statsd"
 description: "A simple guide to send metrics from Prometheus to Statsd in just a few minutes."
@@ -100,6 +100,8 @@ To be clear, here's everything we'll accomplish in this short guide:
 
 <InstallationCommand />
 
+Or choose your [preferred method][docs.installation].
+
 </li>
 <li>
 
@@ -148,6 +150,7 @@ flexibility of Vector:
 </Jump>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.sources.prometheus]: /docs/reference/sources/prometheus/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [urls.etsy]: https://www.etsy.com

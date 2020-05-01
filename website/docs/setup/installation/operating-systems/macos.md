@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-14"
+last_modified_on: "2020-05-01"
 title: Install Vector On MacOS
 sidebar_label: MacOS
 description: Install Vector on MacOS
@@ -103,6 +103,8 @@ brew services start vector
 
 <InstallationCommand />
 
+Or choose your [preferred method][docs.installation].
+
 </li>
 <li>
 
@@ -181,6 +183,7 @@ compose!
 </Tabs>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.package_managers.homebrew]: /docs/setup/installation/package-managers/homebrew/
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.sources.journald]: /docs/reference/sources/journald/

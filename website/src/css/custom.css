@@ -879,6 +879,7 @@ ul.connected-list.connected-list--hover > li:hover {
 
 .feather {
   font-size: inherit !important;
+  line-height: inherit !important;
 }
 
 /**
