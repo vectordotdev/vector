@@ -57,7 +57,7 @@ CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/-/\./g')
 ARCH=${ARCH:-$(echo $TARGET | cut -d'-' -f1)}
 
 # Prepare rpmbuild dir
-RPMBUILD_DIR="$HOME/rpmbuild"
+RPMBUILD_DIR="$(mktemp -td "rpmbuild.XXXX")"
 
 # Create source dir
 rm -rf "$RPMBUILD_DIR/SOURCES"
