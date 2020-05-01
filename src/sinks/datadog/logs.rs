@@ -41,7 +41,7 @@ impl SinkConfig for DatadogLogsConfig {
             let tls = if let Some(tls) = &self.tls {
                 Some(TlsSettings::from_options(&Some(tls.clone()))?)
             } else {
-                Some(TlsSettings::default())
+                None
             };
 
             (format!("{}", host), port, tls)
