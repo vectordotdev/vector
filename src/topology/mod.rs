@@ -201,14 +201,8 @@ impl RunningTopology {
             .map(|_| ())
             .map_err(|_| ());
 
-        // TODO: Once all Sources properly look for the ShutdownSignal, remove this in favor of
-        // using 'deadline' instead.
-        let source_shutdown_deadline = Instant::now() + Duration::from_secs(3);
-
         // Now kick off the shutdown process by shutting down the sources.
-        let source_shutdown_complete = self
-            .shutdown_coordinator
-            .shutdown_all(source_shutdown_deadline);
+        let source_shutdown_complete = self.shutdown_coordinator.shutdown_all(deadline);
 
         source_shutdown_complete
             .join(shutdown_complete_future)
@@ -310,8 +304,6 @@ impl RunningTopology {
 
         // First pass to tell the sources to shut down.
         let mut source_shutdown_complete_futures = Vec::new();
-        // TODO: Once all Sources properly look for the ShutdownSignal, up this time limit to something
-        // more like 30-60 seconds.
 
         // Only log that we are waiting for shutdown if we are actually removing
         // sources.
@@ -319,7 +311,7 @@ impl RunningTopology {
             info!("Waiting for up to 3 seconds for sources to finish shutting down");
         }
 
-        let deadline = Instant::now() + Duration::from_secs(3);
+        let deadline = Instant::now() + Duration::from_secs(60);
         for name in &diff.sources.to_remove {
             info!("Removing source {:?}", name);
 
