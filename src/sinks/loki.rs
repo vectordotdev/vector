@@ -210,7 +210,7 @@ impl HttpSink for LokiConfig {
         req.header("Content-Type", "application/json");
 
         if let Some(tenant_id) = &self.tenant_id {
-            req.header("X-Scope-OrigID", tenant_id);
+            req.header("X-Scope-OrgID", tenant_id);
         }
 
         let mut req = req.body(body).unwrap();
