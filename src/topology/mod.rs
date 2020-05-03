@@ -100,6 +100,11 @@ pub fn validate(config: &Config, diff: &ConfigDiff, exec: runtime::TaskExecutor)
 }
 
 impl RunningTopology {
+    /// Returned future will finish once all current sources have shutdown.
+    pub fn sources_finished(&self) -> impl Future<Item = (), Error = ()> {
+        self.shutdown_coordinator.shutdown_tripwire()
+    }
+
     /// Sends the shutdown signal to all sources and returns a future that resolves
     /// once all components (sources, transforms, and sinks) have finished shutting down.
     /// Transforms and sinks should shut down automatically once their input tasks finish.
