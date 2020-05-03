@@ -372,7 +372,7 @@ fn main() {
     #[cfg(windows)]
     {
         let ctrl_c = tokio_signal::ctrl_c().flatten_stream().into_future();
-        let to_shutdown = future::poll_fn(|| graceful_crash.poll())
+        let to_shutdown = future::poll_fn(move || graceful_crash.poll())
             .map(|_| ())
             .select(topology.sources_finished());
 

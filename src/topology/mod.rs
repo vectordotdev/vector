@@ -100,7 +100,7 @@ pub fn validate(config: &Config, diff: &ConfigDiff, exec: runtime::TaskExecutor)
 }
 
 impl RunningTopology {
-    /// Returned future will finish once all current sources have shutdown.
+    /// Returned future will finish once all current sources have finished.
     pub fn sources_finished(&self) -> impl Future<Item = (), Error = ()> {
         self.shutdown_coordinator.shutdown_tripwire()
     }
