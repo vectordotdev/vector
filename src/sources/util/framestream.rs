@@ -6,12 +6,12 @@ use crate::{
     stream::StreamExt,
 };
 use bytes::Bytes;
-use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{future, sync::mpsc, Future, Sink, Stream, IntoFuture};
 #[cfg(unix)]
 use std::path::PathBuf;
 use tokio01::{
     self,
-    codec::{Framed, LengthDelimitedCodec},
+    codec::{Framed, length_delimited},
 };
 use tokio_uds::UnixListener;
 use tracing::field;
@@ -112,7 +112,7 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
         }
     }
 
-    pub fn handle_frame(&mut self, mut frame: Bytes) -> Option<Bytes> {
+    pub fn handle_frame(&mut self, frame: Bytes) -> Option<Bytes> {
         if frame.len() == 0 {
             //frame length of zero means the next frame is a control frame
             self.state.expect_control_frame = true;
@@ -200,13 +200,14 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
     }
 
     fn send_control_frame(&mut self, frame: Bytes) {
-        let empty_frame = Bytes::from(&b""[..]); //send empty frame to say we are control frame
-        //TODO: use send_all instead of 2 send calls
         //TODO: better way that .wait().unwrap() (?)
 
+        let empty_frame = Bytes::from(&b""[..]); //send empty frame to say we are control frame
+        let stream = futures01::stream::iter_ok::<_, std::io::Error>(vec![empty_frame, frame].into_iter());
+
+        //send and send_all consume the sink
         let mut tmp_sink = self.response_sink.take().unwrap();
-        tmp_sink = tmp_sink.send(empty_frame).wait().unwrap();
-        tmp_sink = tmp_sink.send(frame).wait().unwrap();
+        tmp_sink = tmp_sink.send_all(stream).into_future().wait().unwrap().0; //get the sink back as first element of tuple
         self.response_sink = Some(tmp_sink);
     }
 
@@ -264,7 +265,7 @@ pub fn build_framestream_unix_source(
                 let received_from: Option<Bytes> =
                     path.map(|p| p.to_string_lossy().into_owned().into());
                 
-                let (sock_sink, sock_stream) = Framed::new(socket, LengthDelimitedCodec::new()).split();
+                let (sock_sink, sock_stream) = Framed::new(socket, length_delimited::Builder::new().max_frame_length(max_length).new_codec()).split();
                 let mut fs_reader = FrameStreamReader::new(sock_sink, content_type);
                 let events = sock_stream.take_until(shutdown.clone())
                     .filter_map(move |frame| {
@@ -318,7 +319,7 @@ tokio01::net::{UdpFramed, UdpSocket}
 //         .and_then(move |socket| {
 //             let host_key = host_key.clone();
 
-//             let (sock_sink, sock_stream) = UdpFramed::new(socket, LengthDelimitedCodec::new()).split();
+//             let (sock_sink, sock_stream) = UdpFramed::new(socket, length_delimited::Builder::new().max_frame_length(max_length).new_codec()).split();
 //             let bytes_sink = sock_sink.with(|frame| Ok((frame, addr)).into_future()); //add the SocketAddr to the item (UdpFramed::Item is (Bytes, SocketAddr))
 
 //             let fs_reader = FrameStreamReader::new(bytes_sink, host_key, Some(addr.to_string().into()));
