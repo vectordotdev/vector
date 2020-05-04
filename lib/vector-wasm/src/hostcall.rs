@@ -20,21 +20,25 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 /// Get a field from the event type.
 pub fn get(field: impl AsRef<str>) -> Result<Option<Value>> {
     let field_str = field.as_ref();
-    let field_cstring = CString::new(field_str).context(Nul)?;
-    let field_ptr: *const c_char = field_cstring.as_ptr();
 
-    let hinted_value_len = unsafe { ffi::hint_field_length(field_ptr) };
+    let field_ptr = CString::new(field_str).context(Nul)?.into_raw();
 
-    if hinted_value_len == 0 {
-        return Ok(None);
-    }
+    let hinted_value_len = unsafe {
+        let hinted_value_len = ffi::hint_field_length(field_ptr);
+        if hinted_value_len == 0 {
+            drop(CString::from_raw(field_ptr));
+            return Ok(None);
+        }
+        hinted_value_len
+    };
 
-    let mut value_buffer: Vec<c_char> = Vec::with_capacity(hinted_value_len);
-    let value_buffer_ptr = value_buffer.as_mut_ptr();
+    let value_buffer_ptr = Vec::<c_char>::with_capacity(hinted_value_len).as_mut_ptr();
 
-    unsafe { ffi::get(field_ptr, value_buffer_ptr) };
-
-    let ret_cstring = unsafe { CString::from_raw(value_buffer_ptr) };
+    let ret_cstring = unsafe {
+        ffi::get(field_ptr, value_buffer_ptr);
+        drop(CString::from_raw(field_ptr));
+        CString::from_raw(value_buffer_ptr)
+    };
     let ret_str = ret_cstring.to_str().context(Utf8)?;
     let ret_value: Value = serde_json::de::from_str(ret_str).context(Codec)?;
 
@@ -44,20 +48,19 @@ pub fn get(field: impl AsRef<str>) -> Result<Option<Value>> {
 
 pub fn insert(field: impl AsRef<str>, value: impl Into<Value>) -> Result<()> {
     let field_str = field.as_ref();
-
     let value = value.into();
     let value_serialized = serde_json::to_string(&value).context(Codec)?;
 
     let field_ptr = CString::new(field_str).context(Nul)?.into_raw();
     let value_ptr = CString::new(value_serialized).context(Nul)?.into_raw();
-    unsafe {
+
+    Ok(unsafe {
         let retval = ffi::insert(field_ptr, value_ptr);
 
-        let _drop_of_field_cstring = CString::from_raw(field_ptr);
-        let _drop_of_value_cstring = CString::from_raw(value_ptr);
-
-        Ok(retval)
-    }
+        drop(CString::from_raw(field_ptr));
+        drop(CString::from_raw(value_ptr));
+        retval
+    })
 }
 
 pub mod ffi {
