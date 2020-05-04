@@ -1,18 +1,18 @@
-# RFC #2341 - 2020-04-15 - WASM Foreign Module Support
+# RFC #2341 - 2020-04-15 - WASM Plugin Support
 
-Introduce Vector's foreign module support, a way for users to add custom functionality to Vector. This RFC introduces
-WASM modules specifically, but we envision the possibility of other implementations (these will be a different RFC).
+Introduce plugin support to Vector, providing a way for users to add custom functionality to Vector. This RFC introduces
+WASM plugins specifically, but we envision the possibility of other implementations that may reuse ideas from this RFC.
 This RFC introduces Transforms and will be later amended with Source and Sink functionality.
 
 
 ## Motivation
 
-There is a plurality of reasons for us to wish for flexible, practical foreign module support to Vector. These may also
- be regarded as 'Plugins' or 'Extensions.' WASM is the most versatile and obvious choice for a first implementation as
- it can be targetted by a number of languages, and is intended to be OS, arch, and platform independent.
+There is a plurality of reasons for us to wish for flexible, practical plugin support to Vector. These may also
+be regarded as 'Foreign Modules' or 'Extensions.' WASM is the most versatile and obvious choice for an implementation
+as it can be targeted by a number of languages and is intended to be OS, arch, and platform independent.
 
-Since the concept of a foreign module is very abstract, this section will instead discuss a number of seemingly
-unrelated topics, all asking for different features. While foreign module support does not resolve all these problems,
+Since the concept of a plugin is a abstract, this section will instead discuss a number of seemingly
+unrelated topics, all asking for different features. While plugin support does not resolve all these problems,
 it gives us or our users a path to a solution.
 
 
@@ -23,8 +23,8 @@ We noted in discussions with several current and prospective users that custom p
 
 Protobufs in their `proto` form aren't usable by the prevailing Rust Protobuf libraries in a dynamic way. Both
 `prost` and `rust-protobuf` focus almost solely on compiling support for specific Protobufs **into** a Rust program.
-While a `serde-protobuf` crate exists, we found it to be an order of magnitude slower than the other two options, we
-also noted it lacked serialization support.
+While a `serde-protobuf` crate exists and can do dynamic decoding, we found it to be an order of magnitude slower than
+the other two options, we also noted it lacked serialization support.
 
 While evaluating the possibility of adding serialization we noted that any implementation that operated dynamically
 would be quite slow. Notably, it would **it would seriously impact overall event processing infrastructure** if Vector
@@ -59,10 +59,10 @@ work on a [`javascript` transform](https://github.com/timberio/vector/issues/667
 
 Currently, each language requires as separate runtime, and possibly separate integration subtleties like needing to call
 a [GC](https://github.com/timberio/vector/pull/1990). It would be highly convenient if we could focus our efforts on one
-consistent API for all languages, and spend this time saved providing a better, faster, more safe experience.
+consistent API for all languages, and spend this time saved providing a better, faster, safer experience.
 
 
-### A Plugin System
+### Modularized functionality
 
 As Vector grows and supports more integrations, our binary size and build complexity will inevitable grow. In informal
 discussions we've previously noted the [module system of Terraform](https://www.terraform.io/docs/commands/init.html).
@@ -95,7 +95,7 @@ Having to, for example, use two transforms just to add 1 field and remove anothe
 We noted that the existing lua runtime was able to accomplish these tasks quite elegantly, however it was an order of
 magnitude slower than a native transform.
 
-> TODO: Proof
+> TODO
 
 Users shouldn't pay a high price just for a few lines saved in a configuration file. They shouldn't feel frustration
 when building these kinds of pipelines either.
