@@ -317,18 +317,8 @@ where
 
                 saw_record = true;
 
-                if let Some(unit) = record.get(&SYSTEMD_UNIT) {
-                    if !self.include_units.is_empty() {
-                        // Make sure the systemd unit is exactly one of the specified units
-                        if !self.include_units.contains(unit) {
-                            continue;
-                        }
-                    }
-                    // Make sure the systemd unit is not specifically excluded
-                    if !self.exclude_units.is_empty() && self.exclude_units.contains(unit) {
-                        continue;
-                    }
-                } else if !self.include_units.is_empty() {
+                let unit = record.get(&SYSTEMD_UNIT);
+                if filter_unit(unit, &self.include_units, &self.exclude_units) {
                     continue;
                 }
 
@@ -391,6 +381,21 @@ fn decode_array(array: &Vec<JsonValue>) -> Option<JsonValue> {
         })
         .collect::<Option<Vec<u8>>>()
         .map(|array| String::from_utf8_lossy(&array).into())
+}
+
+/// Should the given unit name be filtered (excluded)?
+fn filter_unit(
+    unit: Option<&String>,
+    includes: &HashSet<String>,
+    excludes: &HashSet<String>,
+) -> bool {
+    match (unit, includes.is_empty(), excludes.is_empty()) {
+        (None, empty, _) => !empty,
+        (Some(_), true, true) => false,
+        (Some(unit), false, true) => !includes.contains(unit),
+        (Some(unit), true, false) => excludes.contains(unit),
+        (Some(unit), false, false) => !includes.contains(unit) || excludes.contains(unit),
+    }
 }
 
 const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
@@ -629,6 +634,28 @@ mod tests {
         assert_eq!(received.len(), 2);
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140004000));
         assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140005000));
+    }
+
+    #[test]
+    fn filter_unit_works_correctly() {
+        let empty: HashSet<String> = vec![].into_iter().collect();
+        let includes: HashSet<String> = vec!["one", "two"].into_iter().map(Into::into).collect();
+        let excludes: HashSet<String> = vec!["foo", "bar"].into_iter().map(Into::into).collect();
+
+        assert_eq!(filter_unit(None, &empty, &empty), false);
+        assert_eq!(filter_unit(None, &includes, &empty), true);
+        assert_eq!(filter_unit(None, &empty, &excludes), false);
+        assert_eq!(filter_unit(None, &includes, &excludes), true);
+        let one = String::from("one");
+        assert_eq!(filter_unit(Some(&one), &empty, &empty), false);
+        assert_eq!(filter_unit(Some(&one), &includes, &empty), false);
+        assert_eq!(filter_unit(Some(&one), &empty, &excludes), false);
+        assert_eq!(filter_unit(Some(&one), &includes, &excludes), false);
+        let bar = String::from("bar");
+        assert_eq!(filter_unit(Some(&bar), &empty, &empty), false);
+        assert_eq!(filter_unit(Some(&bar), &includes, &empty), true);
+        assert_eq!(filter_unit(Some(&bar), &empty, &excludes), true);
+        assert_eq!(filter_unit(Some(&bar), &includes, &excludes), true);
     }
 
     fn message(event: &Event) -> Value {
