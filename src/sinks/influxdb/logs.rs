@@ -14,7 +14,7 @@ use futures01::Sink;
 use http::{Method, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -22,7 +22,7 @@ pub struct InfluxDBLogsConfig {
     pub namespace: String,
     pub endpoint: String,
     #[serde(default)]
-    pub tags: Vec<String>,
+    pub tags: HashSet<String>,
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDB1Settings>,
     #[serde(flatten)]
@@ -60,6 +60,12 @@ inventory::submit! {
 #[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDBLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let mut config = self.clone();
+        config.tags.insert(log_schema().host_key().to_string());
+        config
+            .tags
+            .insert(log_schema().source_type_key().to_string());
+
         let healthcheck = healthcheck(
             self.clone().endpoint,
             self.clone().influxdb1_settings,
@@ -67,12 +73,11 @@ impl SinkConfig for InfluxDBLogsConfig {
             cx.resolver(),
         )?;
 
-        let batch = self.batch.unwrap_or(bytesize::mib(1u64), 1);
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
+        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let sink =
-            BatchedHttpSink::new(self.clone(), Buffer::new(false), request, batch, None, &cx)
-                .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}", e));
+        let sink = BatchedHttpSink::new(config, Buffer::new(false), request, batch, None, &cx)
+            .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}", e));
 
         Ok((Box::new(sink), healthcheck))
     }
@@ -94,34 +99,26 @@ impl HttpSink for InfluxDBLogsConfig {
         let mut output = String::new();
         let mut event = event.into_log();
 
-        let tag_keys: Vec<String> = [
-            vec!["host".to_owned(), "source_type".to_owned()],
-            self.tags.clone(),
-        ]
-        .concat();
-
         // Measurement
         let measurement = encode_namespace(&self.namespace, &"vector");
 
         // Timestamp
-        let timestamp =
-            if let Some(Value::Timestamp(ts)) = event.remove(log_schema().timestamp_key()) {
-                encode_timestamp(Some(ts))
-            } else {
-                encode_timestamp(None)
-            };
+        let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
+            Some(Value::Timestamp(ts)) => Some(ts),
+            _ => None,
+        });
 
         // Tags
         let tags: BTreeMap<String, String> = event
             .all_fields()
-            .filter(|(key, _)| tag_keys.contains(key))
+            .filter(|(key, _)| self.tags.contains(key))
             .map(|(key, value)| (key, value.to_string_lossy()))
             .collect();
 
         // Fields
         let fields: HashMap<String, Field> = event
             .all_fields()
-            .filter(|(key, _)| !tag_keys.contains(key))
+            .filter(|(key, _)| !self.tags.contains(key))
             .map(|(key, value)| (key, value.to_field()))
             .collect();
 
@@ -151,7 +148,7 @@ impl HttpSink for InfluxDBLogsConfig {
 
         let mut builder = Request::builder();
         builder.method(Method::POST);
-        builder.uri(uri.clone());
+        builder.uri(uri);
 
         builder.header("Content-Type", "text/plain");
         builder.header("Authorization", format!("Token {}", token));
@@ -192,7 +189,7 @@ mod tests {
             token = "my-token"
         "#;
 
-        let _: InfluxDBLogsConfig = toml::from_str(&config).unwrap();
+        toml::from_str::<InfluxDBLogsConfig>(&config).unwrap();
     }
 
     #[test]
@@ -214,11 +211,12 @@ mod tests {
             bucket = "my-bucket"
             org = "my-org"
             token = "my-token"
+            tags = ["source_type", "host"]
         "#,
         )
         .unwrap();
 
-        let bytes = config.encode_event(event.clone()).unwrap();
+        let bytes = config.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(&string);
@@ -260,7 +258,7 @@ mod tests {
         )
         .unwrap();
 
-        let bytes = config.encode_event(event.clone()).unwrap();
+        let bytes = config.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(&string);
@@ -300,7 +298,7 @@ mod tests {
         )
         .unwrap();
 
-        let bytes = config.encode_event(event.clone()).unwrap();
+        let bytes = config.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(&string);
@@ -336,12 +334,12 @@ mod tests {
             bucket = "my-bucket"
             org = "my-org"
             token = "my-token"
-            tags = ["as_a_tag", "not_exists_field"]
+            tags = ["as_a_tag", "not_exists_field", "source_type"]
         "#,
         )
         .unwrap();
 
-        let bytes = config.encode_event(event.clone()).unwrap();
+        let bytes = config.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(&string);
@@ -395,6 +393,7 @@ mod tests {
 
             let timestamp = Utc.ymd(1970, 01, 01).and_hms_nano(0, 0, (i as u32) + 1, 0);
             event.as_mut_log().insert("timestamp", timestamp);
+            event.as_mut_log().insert("source_type", "file");
 
             events.push(event);
         }
@@ -458,6 +457,7 @@ mod tests {
 
             let timestamp = Utc.ymd(1970, 01, 01).and_hms_nano(0, 0, (i as u32) + 1, 0);
             event.as_mut_log().insert("timestamp", timestamp);
+            event.as_mut_log().insert("source_type", "file");
 
             events.push(event);
         }
@@ -484,7 +484,7 @@ mod tests {
         //ns.vector,metric_type=logs key0="value0",message="message_value" 1000000000
         let line_protocol = split_line_protocol(value.unwrap());
         assert_eq!("ns.vector", line_protocol.0);
-        assert_eq!("metric_type=logs", line_protocol.1);
+        assert_eq!("metric_type=logs,source_type=file", line_protocol.1);
         assert_fields(
             line_protocol.2.to_string(),
             [
