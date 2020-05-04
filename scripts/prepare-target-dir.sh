@@ -5,12 +5,16 @@ set -eou pipefail
 #
 # SUMMARY
 #
-#   A script to work around the issue with docker volume mounts having
+#   A script to work around the issue with Docker volume mounts having
 #   incorrect permissions.
 #
-#   Implemenmt a trick: we create the all paths that we use as docker volume
-#   mounts manually, so that when we use them as mounts they're already there,
-#   and docker doesn't create them owned as uid 0.
+#   Implement a trick: We create all the paths we use as Docker volume
+#   mounts manually, so that when we use them as mounts, they're already there
+#   and Docker doesn't create them owned as uid 0.
 
-mapfile -t DIRS < <(grep -o '\./target/[^:]*:' < docker-compose.yml | sed 's/:$//' | sort | uniq)
-mkdir -p "${DIRS[@]}"
+DIRS=$(grep -o '\./target/[^:]*:' < docker-compose.yml | sed 's/:$//' | sort | uniq)
+
+for DIR in ${DIRS}
+do
+    mkdir -p "${DIR}"
+done
