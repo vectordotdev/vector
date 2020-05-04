@@ -44,6 +44,11 @@ enum BuildError {
     JournalctlSpawn { source: io::Error },
     #[snafu(display("Cannot use both `units` and `include_units`"))]
     BothUnitsAndIncludeUnits,
+    #[snafu(display(
+        "The unit {:?} is duplicated in both include_units and exclude_units",
+        unit
+    ))]
+    DuplicatedUnit { unit: String },
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -87,6 +92,14 @@ impl SourceConfig for JournaldConfig {
 
         let include_units: HashSet<String> = include_units.iter().map(fixup_unit).collect();
         let exclude_units: HashSet<String> = self.exclude_units.iter().map(fixup_unit).collect();
+        if let Some(unit) = include_units
+            .iter()
+            .filter(|unit| exclude_units.contains(&unit[..]))
+            .next()
+        {
+            let unit = unit.into();
+            return Err(BuildError::DuplicatedUnit { unit }.into());
+        }
 
         let checkpointer = Checkpointer::new(data_dir)
             .map_err(|err| format!("Unable to open checkpoint file: {}", err))?;
