@@ -241,6 +241,17 @@ impl SourceShutdownCoordinator {
         )
     }
 
+    /// Returned future will finish once all sources have finished.
+    pub fn shutdown_tripwire(&self) -> impl Future<Item = (), Error = ()> {
+        future::join_all(
+            self.shutdown_complete_tripwires
+                .values()
+                .cloned()
+                .collect::<Vec<_>>(),
+        )
+        .map(|_| info!("All sources have finished."))
+    }
+
     fn shutdown_source_complete(
         shutdown_complete_tripwire: Tripwire,
         shutdown_force_trigger: Trigger,

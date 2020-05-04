@@ -100,6 +100,11 @@ pub fn validate(config: &Config, diff: &ConfigDiff, exec: runtime::TaskExecutor)
 }
 
 impl RunningTopology {
+    /// Returned future will finish once all current sources have finished.
+    pub fn sources_finished(&self) -> impl Future<Item = (), Error = ()> {
+        self.shutdown_coordinator.shutdown_tripwire()
+    }
+
     /// Sends the shutdown signal to all sources and returns a future that resolves
     /// once all components (sources, transforms, and sinks) have finished shutting down.
     /// Transforms and sinks should shut down automatically once their input tasks finish.
@@ -800,5 +805,37 @@ mod reload_tests {
         assert!(topology
             .reload_config_and_respawn(old_config, &mut rt, false)
             .unwrap());
+    }
+}
+
+#[cfg(all(test, feature = "sinks-console", feature = "sources-generator"))]
+mod source_finished_tests {
+    use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
+    use crate::sources::generator::GeneratorConfig;
+    use crate::test_util::runtime;
+    use crate::topology;
+    use crate::topology::config::Config;
+    use std::time::Duration;
+    use tokio01::util::FutureExt;
+
+    #[test]
+    fn sources_finished() {
+        let mut rt = runtime();
+
+        let mut old_config = Config::empty();
+        old_config.add_source("in", GeneratorConfig::repeat(vec!["text".to_owned()], 1));
+        old_config.add_sink(
+            "out",
+            &[&"in"],
+            ConsoleSinkConfig {
+                target: Target::Stdout,
+                encoding: Encoding::Text.into(),
+            },
+        );
+
+        let (topology, _crash) = topology::start(old_config.clone(), &mut rt, false).unwrap();
+
+        rt.block_on(topology.sources_finished().timeout(Duration::from_secs(2)))
+            .unwrap();
     }
 }

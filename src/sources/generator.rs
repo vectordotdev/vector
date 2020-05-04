@@ -15,7 +15,7 @@ use tokio::time::interval;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(self) struct GeneratorConfig {
+pub(crate) struct GeneratorConfig {
     #[serde(default)]
     sequence: bool,
     lines: Vec<String>,
@@ -23,6 +23,17 @@ pub(self) struct GeneratorConfig {
     batch_interval: Option<f64>,
     #[serde(default = "usize::max_value")]
     count: usize,
+}
+
+impl GeneratorConfig {
+    #[cfg(test)]
+    pub fn repeat(lines: Vec<String>, count: usize) -> Self {
+        Self {
+            lines,
+            count,
+            ..Self::default()
+        }
+    }
 }
 
 inventory::submit! {
