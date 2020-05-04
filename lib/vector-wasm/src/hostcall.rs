@@ -44,15 +44,20 @@ pub fn get(field: impl AsRef<str>) -> Result<Option<Value>> {
 
 pub fn insert(field: impl AsRef<str>, value: impl Into<Value>) -> Result<()> {
     let field_str = field.as_ref();
-    let field_cstring = CString::new(field_str).context(Nul)?;
-    let field_ptr = field_cstring.as_ptr();
 
     let value = value.into();
     let value_serialized = serde_json::to_string(&value).context(Codec)?;
-    let value_cstring = CString::new(value_serialized).context(Nul)?;
 
-    let value_ptr = value_cstring.as_ptr();
-    unsafe { Ok(ffi::insert(field_ptr, value_ptr)) }
+    let field_ptr = CString::new(field_str).context(Nul)?.into_raw();
+    let value_ptr = CString::new(value_serialized).context(Nul)?.into_raw();
+    unsafe {
+        let retval = ffi::insert(field_ptr, value_ptr);
+
+        let _drop_of_field_cstring = CString::from_raw(field_ptr);
+        let _drop_of_value_cstring = CString::from_raw(value_ptr);
+
+        Ok(retval)
+    }
 }
 
 pub mod ffi {
