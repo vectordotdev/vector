@@ -1634,6 +1634,8 @@ dns_servers = ["0.0.0.0:53"]
     # * type: any
     # * relevant when type = "check_fields"
     "message.not_contains" = "some phrase to ignore"
+    "unit.not_starts_with" = "sys-"
+    "unit.not_ends_with" = ".device"
 
     # Checks whether a string field contains a string argument.
     #
@@ -2528,6 +2530,8 @@ require('custom_module')
       # * type: any
       # * relevant when type = "check_fields"
       "message.not_contains" = "some phrase to ignore"
+      "unit.not_starts_with" = "sys-"
+      "unit.not_ends_with" = ".device"
 
       # Checks whether a string field contains a string argument.
       #

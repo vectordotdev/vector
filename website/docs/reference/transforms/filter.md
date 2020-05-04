@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-30"
+last_modified_on: "2020-05-04"
 component_title: "Filter"
 description: "The Vector `filter` transform accepts and outputs `log` and `metric` events, allowing you to select events based on a set of logical conditions."
 event_types: ["log","metric"]
@@ -67,6 +67,8 @@ on a set of logical conditions.
   condition."host.exists" = true # example
   condition."method.neq" = "POST" # example
   condition."message.not_contains" = "some phrase to ignore" # example
+  condition."unit.not_starts_with" = "sys-" # example
+  condition."unit.not_ends_with" = ".device" # example
   condition."message.contains" = "foo" # example
   condition."environment.ends_with" = "-staging" # example
   condition."message.regex" = " (any|of|these|five|words) " # example
@@ -202,7 +204,7 @@ Check whether a fields contents does not match the value specified.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"message.not_contains":"some phrase to ignore"}]}
+  examples={[{"message.not_contains":"some phrase to ignore"},{"unit.not_starts_with":"sys-"},{"unit.not_ends_with":".device"}]}
   groups={[]}
   name={"`[field-name]`.not_`[condition]`"}
   path={"condition"}

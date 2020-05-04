@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-30"
+last_modified_on: "2020-05-04"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
@@ -116,6 +116,8 @@ vector test /etc/vector/*.toml
     conditions."host.exists" = true # example
     conditions."method.neq" = "POST" # example
     conditions."message.not_contains" = "some phrase to ignore" # example
+    conditions."unit.not_starts_with" = "sys-" # example
+    conditions."unit.not_ends_with" = ".device" # example
     conditions."message.contains" = "foo" # example
     conditions."environment.ends_with" = "-staging" # example
     conditions."message.regex" = " (any|of|these|five|words) " # example
@@ -701,7 +703,7 @@ Check whether a fields contents does not match the value specified.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"message.not_contains":"some phrase to ignore"}]}
+  examples={[{"message.not_contains":"some phrase to ignore"},{"unit.not_starts_with":"sys-"},{"unit.not_ends_with":".device"}]}
   groups={[]}
   name={"`[field-name]`.not_`[condition]`"}
   path={"outputs.conditions"}
