@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "Datadog Metrics"
 description: "The Vector `datadog_metrics` sink batches `metric` events to Datadog's metrics service using HTTP API."
@@ -102,7 +102,6 @@ Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -125,7 +124,6 @@ Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
 Configures the sink batching behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -146,7 +144,6 @@ Configures the sink batching behavior.
 #### max_events
 
 The maximum size of a batch, in events, before it is flushed.
-
 
 
 
@@ -173,7 +170,6 @@ The maximum age of a batch before it is flushed.
 
 
 
-
 </Field>
 </Fields>
 
@@ -197,7 +193,6 @@ The maximum age of a batch before it is flushed.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -224,7 +219,6 @@ Datadog endpoint to send metrics to.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -245,7 +239,6 @@ Datadog endpoint to send metrics to.
 ### namespace
 
 A prefix that will be added to all metric names.
-
 
 
 
@@ -271,7 +264,6 @@ A prefix that will be added to all metric names.
 Configures the sink request behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -292,7 +284,6 @@ Configures the sink request behavior.
 #### in_flight_limit
 
 The maximum number of in-flight requests allowed at any given time.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -316,7 +307,6 @@ The maximum number of in-flight requests allowed at any given time.
 #### rate_limit_duration_secs
 
 The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -341,7 +331,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
 time window.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -366,7 +355,6 @@ time window.
 
 The maximum number of retries to make for failed requests. The default, for all
 intents and purposes, represents an infinite number of retries.
-
  See [Retry Policy](#retry-policy) for more info.
 
 
@@ -395,7 +383,6 @@ to select future backoffs.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -416,7 +403,6 @@ to select future backoffs.
 #### retry_max_duration_secs
 
 The maximum amount of time, in seconds, to wait between retries.
-
 
 
 
@@ -443,7 +429,6 @@ The maximum time a request can take before being aborted. It is highly
 recommended that you do not lower value below the service's internal timeout,
 as this could create orphaned requests, pile on retries, and result in
 duplicate data downstream.
-
 
 
 

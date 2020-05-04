@@ -661,7 +661,7 @@ ul.connected-list > li ul.info .examples {
 }
 
 ul.connected-list > li p + ul.info {
-  margin-top: calc(var(--ifm-spacing-horizontal) * -1);
+  margin-top: calc(var(--ifm-spacing-horizontal) * -0.5);
 }
 
 /* connected-list--blend */
@@ -879,6 +879,7 @@ ul.connected-list.connected-list--hover > li:hover {
 
 .feather {
   font-size: inherit !important;
+  line-height: inherit !important;
 }
 
 /**
@@ -1522,6 +1523,7 @@ ul.list--indent {
 
 .menu .menu__link .badges {
   vertical-align: top;
+  margin-right: var(--ifm-spacing-horizontal);
   margin-top: -1px;
 }
 

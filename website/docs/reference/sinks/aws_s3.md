@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
@@ -154,7 +154,6 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
 Canned ACL to apply to the created objects. For more information, see [Canned
 ACL][urls.aws_s3_canned_acl].
-
  See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
@@ -178,7 +177,6 @@ ACL][urls.aws_s3_canned_acl].
 ### assume_role
 
 The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
  See [AWS Authentication](#aws-authentication) for more info.
 
 
@@ -204,7 +202,6 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
 Configures the sink batching behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -225,7 +222,6 @@ Configures the sink batching behavior.
 #### max_size
 
 The maximum size of a batch, in bytes, before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -249,7 +245,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 #### timeout_secs
 
 The maximum age of a batch before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -279,7 +274,6 @@ The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -300,7 +294,6 @@ The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
 ### buffer
 
 Configures the sink specific buffer behavior.
-
 
 
 <Fields filters={false}>
@@ -326,7 +319,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -347,7 +339,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -374,7 +365,6 @@ The buffer's type and storage mechanism.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -395,7 +385,6 @@ The buffer's type and storage mechanism.
 #### when_full
 
 The behavior when the buffer becomes full.
-
 
 
 
@@ -425,7 +414,6 @@ The compression mechanism to use.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -448,7 +436,6 @@ The compression mechanism to use.
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -469,7 +456,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -496,7 +482,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -520,7 +505,6 @@ Limit the sink to only encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -541,7 +525,6 @@ Limit the sink to only encoding the specified labels.
 #### timestamp_format
 
 How to format event timestamps.
-
 
 
 
@@ -572,7 +555,6 @@ this option will make [`region`](#region) moot.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -594,7 +576,6 @@ this option will make [`region`](#region) moot.
 
 Whether or not to append a UUID v4 token to the end of the file. This ensures
 there are no name collisions high volume use cases.
-
  See [Object naming](#object-naming) for more info.
 
 
@@ -621,7 +602,6 @@ The filename extension to use in the object name.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -643,7 +623,6 @@ The filename extension to use in the object name.
 
 The format of the resulting object file name. [`strftime`
 specifiers][urls.strptime_specifiers] are supported.
-
  See [Object naming](#object-naming) for more info.
 
 
@@ -668,7 +647,6 @@ specifiers][urls.strptime_specifiers] are supported.
 
 Gives the named [grantee][urls.aws_s3_grantee] READ, READ_ACP, and WRITE_ACP
 permissions on the created objects.
-
  See [Cross account object writing](#cross-account-object-writing) and [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
@@ -693,7 +671,6 @@ permissions on the created objects.
 
 Allows the named [grantee][urls.aws_s3_grantee] to read the created objects and
 their metadata.
-
  See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
@@ -718,7 +695,6 @@ their metadata.
 
 Allows the named [grantee][urls.aws_s3_grantee] to read the created objects'
 ACL.
-
  See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
@@ -743,7 +719,6 @@ ACL.
 
 Allows the named [grantee][urls.aws_s3_grantee] to write the created objects'
 ACL.
-
  See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
@@ -767,7 +742,6 @@ ACL.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -793,7 +767,6 @@ Enables/disables the sink healthcheck upon start.
 A prefix to apply to all object key names. This should be used to partition
 your objects, and it's important to end this value with a `/` if you want this
 to be the root S3 "folder".
-
  See [Object naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
 
 
@@ -821,7 +794,6 @@ provided it will override this value since the endpoint includes the region.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -844,7 +816,6 @@ provided it will override this value since the endpoint includes the region.
 Configures the sink request behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -865,7 +836,6 @@ Configures the sink request behavior.
 #### in_flight_limit
 
 The maximum number of in-flight requests allowed at any given time.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -889,7 +859,6 @@ The maximum number of in-flight requests allowed at any given time.
 #### rate_limit_duration_secs
 
 The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -914,7 +883,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
 time window.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -939,7 +907,6 @@ time window.
 
 The maximum number of retries to make for failed requests. The default, for all
 intents and purposes, represents an infinite number of retries.
-
  See [Retry Policy](#retry-policy) for more info.
 
 
@@ -968,7 +935,6 @@ to select future backoffs.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -989,7 +955,6 @@ to select future backoffs.
 #### retry_max_duration_secs
 
 The maximum amount of time, in seconds, to wait between retries.
-
 
 
 
@@ -1016,7 +981,6 @@ The maximum time a request can take before being aborted. It is highly
 recommended that you do not lower value below the service's internal timeout,
 as this could create orphaned requests, pile on retries, and result in
 duplicate data downstream.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -1043,7 +1007,6 @@ duplicate data downstream.
 ### server_side_encryption
 
 The server-side encryption algorithm used when storing these objects.
-
  See [Server-side encryption (SSE)](#server-side-encryption-sse) for more info.
 
 
@@ -1073,7 +1036,6 @@ Amazon S3 uses the AWS managed CMK in AWS to protect the data.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -1096,7 +1058,6 @@ Amazon S3 uses the AWS managed CMK in AWS to protect the data.
 The storage class for the created objects. See [the S3 Storage
 Classes](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html)
 for more details.
-
  See [Storage class](#storage-class) for more info.
 
 
@@ -1122,7 +1083,6 @@ for more details.
 The tag-set for the object.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -1143,7 +1103,6 @@ The tag-set for the object.
 #### `[tag-name]`
 
 A custom tag to be added to the created objects.
-
 
 
 
@@ -1176,7 +1135,6 @@ A custom tag to be added to the created objects.
 
 Used for AWS authentication when communicating with AWS services. See relevant
 [AWS components][pages.aws_components] for more info.
-
  See [AWS Authentication](#aws-authentication) for more info.
 
 
@@ -1201,7 +1159,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 Used for AWS authentication when communicating with AWS services. See relevant
 [AWS components][pages.aws_components] for more info.
-
  See [AWS Authentication](#aws-authentication) for more info.
 
 

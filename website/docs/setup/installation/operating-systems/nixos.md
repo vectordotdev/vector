@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 title: Install Vector On NixOS
 sidebar_label: NixOS
 description: Install Vector on NixOS
@@ -109,6 +109,8 @@ The following diagram demonstrates how it works.
 
 <InstallationCommand />
 
+Or choose your [preferred method][docs.installation].
+
 </li>
 <li>
 
@@ -186,6 +188,7 @@ compose!
 
 
 [docs.configuration]: /docs/setup/configuration/
+[docs.installation]: /docs/setup/installation/
 [docs.package_managers.nix#versions]: /docs/setup/installation/package-managers/nix/#versions
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.sources.journald]: /docs/reference/sources/journald/

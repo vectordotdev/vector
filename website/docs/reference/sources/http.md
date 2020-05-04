@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "HTTP"
 description: "The Vector `http` source ingests data through the HTTP protocol and outputs `log` events."
@@ -102,7 +102,6 @@ The address to listen for connections on
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -124,7 +123,6 @@ The address to listen for connections on
 
 The expected encoding of received data. Note that for `json` and `ndjson`
 encodings, the fields of the JSON objects are output as separate fields.
-
 
 
 
@@ -154,7 +152,6 @@ missing.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -175,7 +172,6 @@ missing.
 ### tls
 
 Configures the TLS options for connections from this source.
-
 
 
 <Fields filters={false}>
@@ -199,7 +195,6 @@ Configures the TLS options for connections from this source.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -228,7 +223,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -250,7 +244,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Require TLS for incoming connections. If this is set, an identity certificate
 is also required.
-
 
 
 
@@ -278,7 +271,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -300,7 +292,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 Absolute path to a certificate key file used to identify this server, in DER or
 PEM format (PKCS#8).
-
 
 
 
@@ -326,7 +317,6 @@ PEM format (PKCS#8).
 If `true`, Vector will require a TLS certificate from the connecting host and
 terminate the connection if it is not valid. If `false` (the default), Vector
 will not request a certificate from the client.
-
 
 
 
@@ -370,7 +360,6 @@ The message field, containing the plain text message.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -391,7 +380,6 @@ The message field, containing the plain text message.
 ### timestamp
 
 The time the event was ingested. Note this may be overridden by JSON payloads.
-
 
 
 

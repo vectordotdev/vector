@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "AWS EC2 Metadata"
 description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events, allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
@@ -96,7 +96,6 @@ A list of fields to include in each event.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -117,7 +116,6 @@ A list of fields to include in each event.
 ### host
 
 Override the default EC2 Metadata host.
-
 
 
 
@@ -144,7 +142,6 @@ Prepend a namespace to each field's key.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -165,7 +162,6 @@ Prepend a namespace to each field's key.
 ### refresh_interval_secs
 
 The interval in seconds at which the EC2 Metadata api will be called.
-
 
 
 
@@ -215,7 +211,6 @@ The `ami-id` that the current EC2 instance is using.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -236,7 +231,6 @@ The `ami-id` that the current EC2 instance is using.
 ### availability-zone
 
 The `availability-zone` that the current EC2 instance is running in.
-
 
 
 
@@ -263,7 +257,6 @@ The `instance-id` of the current EC2 instance.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -284,7 +277,6 @@ The `instance-id` of the current EC2 instance.
 ### local-hostname
 
 The `local-hostname` of the current EC2 instance.
-
 
 
 
@@ -311,7 +303,6 @@ The `local-ipv4` of the current EC2 instance.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -332,7 +323,6 @@ The `local-ipv4` of the current EC2 instance.
 ### public-hostname
 
 The `public-hostname` of the current EC2 instance.
-
 
 
 
@@ -359,7 +349,6 @@ The `public-ipv4` of the current EC2 instance.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -380,7 +369,6 @@ The `public-ipv4` of the current EC2 instance.
 ### region
 
 The [`region`](#region) that the current EC2 instance is running in.
-
 
 
 
@@ -407,7 +395,6 @@ The `role-name` that the current EC2 instance is using.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -431,7 +418,6 @@ The `subnet-id` of the current EC2 instance's default network interface.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -452,7 +438,6 @@ The `subnet-id` of the current EC2 instance's default network interface.
 ### vpc-id
 
 The `vpc-id` of the current EC2 instance's default network interface.
-
 
 
 

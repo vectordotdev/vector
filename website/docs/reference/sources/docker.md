@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "best_effort"
 component_title: "Docker"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
@@ -93,7 +93,6 @@ daemon][urls.docker_daemon] and outputs [`log`][docs.data-model.log] events.
 ### auto_partial_merge
 
 Setting this to `false` will disable the automatic merging of partial events.
-
  See [Message Splitting & Merging](#message-splitting--merging) for more info.
 
 
@@ -122,7 +121,6 @@ container ID or name. If not provided, all containers will be included.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -144,7 +142,6 @@ container ID or name. If not provided, all containers will be included.
 
 A list of image names to match against. If not provided, all images will be
 included.
-
 
 
 
@@ -173,7 +170,6 @@ labels docs][urls.docker_object_labels].
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -196,7 +192,6 @@ labels docs][urls.docker_object_labels].
 The field name to be added to events that are detected to contain an incomplete
 message (i.e. partial events). If set to `""`, no field will be added to
 partial event. This allows to opt-out of partial event detection.
-
  See [Message Splitting & Merging](#message-splitting--merging) for more info.
 
 
@@ -225,7 +220,6 @@ partial event. This allows to opt-out of partial event detection.
 ### DOCKER_HOST
 
 The docker host to connect to.
-
  See [Connecting To The Docker Daemon](#connecting-to-the-docker-daemon) for more info.
 
 
@@ -251,7 +245,6 @@ The docker host to connect to.
 If `true` (the default), Vector will validate the TLS certificate of the remote
 host. Do NOT set this to `false` unless you understand the risks of not
 verifying the remote certificate.
-
  See [Connecting To The Docker Daemon](#connecting-to-the-docker-daemon) for more info.
 
 
@@ -298,7 +291,6 @@ A UTC timestamp representing when the container was created.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -319,7 +311,6 @@ A UTC timestamp representing when the container was created.
 ### container_id
 
 The Docker container ID that the log was collected from.
-
 
 
 
@@ -346,7 +337,6 @@ The Docker container name that the log was collected from.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -367,7 +357,6 @@ The Docker container name that the log was collected from.
 ### image
 
 The image name that the container is based on.
-
 
 
 
@@ -395,7 +384,6 @@ it's exact key/value pair.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -416,7 +404,6 @@ it's exact key/value pair.
 ### message
 
 The raw log message, unaltered.
-
 
 
 
@@ -443,7 +430,6 @@ The [standard stream][urls.standard_streams] that the log was collected from.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -464,7 +450,6 @@ The [standard stream][urls.standard_streams] that the log was collected from.
 ### timestamp
 
 The UTC timestamp extracted from the Docker log event.
-
 
 
 

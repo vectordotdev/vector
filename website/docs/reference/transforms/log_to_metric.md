@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Log to Metric"
 description: "The Vector `log_to_metric` transform accepts `log` events, but outputs [`metric`](#metric) events, allowing you to convert logs into one or more metrics."
 event_types: ["log","metric"]
@@ -66,7 +66,6 @@ one or more metrics.
 A table of key/value pairs representing the keys to be added to the event.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -87,7 +86,6 @@ A table of key/value pairs representing the keys to be added to the event.
 #### field
 
 The log field to use as the metric.
-
  See [Null Fields](#null-fields) for more info.
 
 
@@ -115,7 +113,6 @@ metric will be incremented by 1 regardless of the [`field`](#field) value.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -140,7 +137,6 @@ for `gauge`.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -161,7 +157,6 @@ for `gauge`.
 #### tags
 
 Key/value pairs representing [metric tags][docs.data-model.metric#tags].
-
 
 
 <Fields filters={false}>
@@ -188,7 +183,6 @@ Environment variables and field interpolation is allowed.
 
 
 
-
 </Field>
 </Fields>
 
@@ -212,7 +206,6 @@ Environment variables and field interpolation is allowed.
 #### type
 
 The metric type.
-
 
 
 

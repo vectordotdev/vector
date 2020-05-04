@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Merge"
 description: "The Vector [`merge`](#merge) transform accepts and outputs `log` events, allowing you to merge partial log events into a single event."
 event_types: ["log"]
@@ -84,7 +84,6 @@ partial event. Fields not specified here will be ignored. Merging process takes
 the first partial event and the base, then it merges in the fields from each
 successive partial event, until a non-partial event arrives. Finally, the
 non-partial event fields are merged in, producing the resulting merged event.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
@@ -109,7 +108,6 @@ non-partial event fields are merged in, producing the resulting merged event.
 
 The field that indicates that the event is partial. A consequent stream of
 partial events along with the first non-partial event will be merged together.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
@@ -135,7 +133,6 @@ partial events along with the first non-partial event will be merged together.
 An ordered list of fields to distinguish streams by. Each stream has a separate
 partial event merging state. Should be used to prevent events from unrelated
 sources from mixing together, as this affects partial event processing.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 

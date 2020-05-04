@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 $schema: "/.meta/.schemas/guides.json"
 title: Deploying Vector
 description: How to deploy Vector to your target environment
@@ -578,6 +578,8 @@ brew services start vector
 
 <InstallationCommand />
 
+Or choose your [preferred method][docs.installation].
+
 </li>
 <li>
 
@@ -611,6 +613,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 
 [docs.configuration]: /docs/setup/configuration/
+[docs.installation]: /docs/setup/installation/
 [docs.package_managers.dpkg#versions]: /docs/setup/installation/package-managers/dpkg/#versions
 [docs.package_managers.homebrew]: /docs/setup/installation/package-managers/homebrew/
 [docs.package_managers.msi#versions]: /docs/setup/installation/package-managers/msi/#versions

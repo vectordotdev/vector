@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "Papertrail"
 description: "The Vector `papertrail` sink streams `log` events to Papertrail via Syslog."
@@ -101,7 +101,6 @@ The Vector `papertrail` sink
 Configures the sink specific buffer behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -122,7 +121,6 @@ Configures the sink specific buffer behavior.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
 
 
 
@@ -149,7 +147,6 @@ The maximum size of the buffer on the disk.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -173,7 +170,6 @@ The buffer's type and storage mechanism.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -194,7 +190,6 @@ The buffer's type and storage mechanism.
 #### when_full
 
 The behavior when the buffer becomes full.
-
 
 
 
@@ -223,7 +218,6 @@ The behavior when the buffer becomes full.
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -244,7 +238,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -271,7 +264,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -292,7 +284,6 @@ Prevent the sink from encoding the specified labels.
 #### only_fields
 
 Limit the sink to only encoding the specified labels.
-
 
 
 
@@ -319,7 +310,6 @@ How to format event timestamps.
 
 
 
-
 </Field>
 </Fields>
 
@@ -343,7 +333,6 @@ How to format event timestamps.
 ### endpoint
 
 The endpoint to stream logs to.
-
  See [Obtaining a Log Destination](#obtaining-a-log-destination) for more info.
 
 
@@ -367,7 +356,6 @@ The endpoint to stream logs to.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 

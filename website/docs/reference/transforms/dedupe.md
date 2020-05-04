@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Dedupe events"
 description: "The Vector `dedupe` transform accepts and outputs `log` events, allowing you to prevent duplicate Events from being outputted by using an LRU cache."
 event_types: ["log"]
@@ -88,7 +88,6 @@ prevent duplicate Events from being outputted by using an LRU cache.
 Options controlling how we cache recent Events for future duplicate checking.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -109,7 +108,6 @@ Options controlling how we cache recent Events for future duplicate checking.
 #### num_events
 
 The number of recent Events to cache and compare new incoming Events against.
-
 
 
 
@@ -138,7 +136,6 @@ The number of recent Events to cache and compare new incoming Events against.
 Options controlling what fields to match against
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -160,7 +157,6 @@ Options controlling what fields to match against
 
 The field names to ignore when deciding if an Event is a duplicate.
 Incompatible with the `fields.match` option.
-
 
 
 
@@ -187,7 +183,6 @@ The field names considered when deciding if an Event is a duplicate. This can
 also be globally set via the [global `log_schema`
 options][docs.reference.global-options#log_schema].Incompatible with the
 `fields.ignore` option.
-
 
 
 

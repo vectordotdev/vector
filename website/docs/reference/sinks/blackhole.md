@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "Blackhole"
 description: "The Vector `blackhole` sink streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes."
@@ -81,7 +81,6 @@ data, designed for testing and benchmarking purposes.
 
 The number of events that must be received in order to print a summary of
 activity.
-
 
 
 

@@ -1,9 +1,9 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-05-01"
 component_title: "Add Tags"
 description: "The Vector `add_tags` transform accepts and outputs `metric` events, allowing you to add one or more metric tags."
 event_types: ["metric"]
-function_category: "shape"
+function_category: "schema"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22
 sidebar_label: "add_tags|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/add_tags.rs
@@ -90,7 +90,6 @@ values.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -111,7 +110,6 @@ values.
 ### tags
 
 A table of key/value pairs representing the tags to be added to the metric.
-
 
 
 <Fields filters={false}>
@@ -135,7 +133,6 @@ A table of key/value pairs representing the tags to be added to the metric.
 
 The name of the tag to add. Due to the nature of metric tags, the value must be
 a string.
-
 
 
 
