@@ -18,7 +18,7 @@ use tracing::field;
 use tracing_futures::Instrument;
 
 struct FrameStreamReader<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> {
-    response_sink: S,
+    response_sink: Option<S>,
     expected_content_type: String,
     state: FrameStreamState,
 }
@@ -106,13 +106,13 @@ fn advance_u32(b: &mut Bytes) -> u32 {
 impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> {
     pub fn new(response_sink: S, expected_content_type: String) -> Self {
         FrameStreamReader {
-            response_sink,
+            response_sink: Some(response_sink),
             expected_content_type,
             state: FrameStreamState::new(),
         }
     }
 
-    pub fn handle_frame(&mut self, frame: Bytes) -> Option<Bytes> {
+    pub fn handle_frame(&mut self, mut frame: Bytes) -> Option<Bytes> {
         if frame.len() == 0 {
             //frame length of zero means the next frame is a control frame
             self.state.expect_control_frame = true;
@@ -129,7 +129,7 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
         }
     }
 
-    fn handle_control_frame(&mut self, frame: Bytes) {
+    fn handle_control_frame(&mut self, mut frame: Bytes) {
         let header = ControlHeader::from_u32(advance_u32(&mut frame));
 
         //match current state to received header
@@ -179,7 +179,7 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
                     let field_len = advance_u32(frame) as usize;
                     let content_type = std::str::from_utf8(&frame[..field_len]).unwrap();
                     if content_type == self.expected_content_type {
-                        return Some(self.expected_content_type);
+                        return Some(content_type.to_string());
                     }
                 }
             }   
@@ -203,8 +203,11 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
         let empty_frame = Bytes::from(&b""[..]); //send empty frame to say we are control frame
         //TODO: use send_all instead of 2 send calls
         //TODO: better way that .wait().unwrap() (?)
-        self.response_sink = self.response_sink.send(empty_frame).wait().unwrap();
-        self.response_sink = self.response_sink.send(frame).wait().unwrap();
+
+        let mut tmp_sink = self.response_sink.take().unwrap();
+        tmp_sink = tmp_sink.send(empty_frame).wait().unwrap();
+        tmp_sink = tmp_sink.send(frame).wait().unwrap();
+        self.response_sink = Some(tmp_sink);
     }
 
 }
@@ -262,11 +265,11 @@ pub fn build_framestream_unix_source(
                     path.map(|p| p.to_string_lossy().into_owned().into());
                 
                 let (sock_sink, sock_stream) = Framed::new(socket, LengthDelimitedCodec::new()).split();
-                let fs_reader = FrameStreamReader::new(sock_sink, content_type);
+                let mut fs_reader = FrameStreamReader::new(sock_sink, content_type);
                 let events = sock_stream.take_until(shutdown.clone())
                     .filter_map(move |frame| {
                         match fs_reader.handle_frame(Bytes::from(frame)) {
-                            Some(f) => build_event(&host_key, received_from, f),
+                            Some(f) => build_event(&host_key, received_from.clone(), f),
                             None => None,
                         }
                     })

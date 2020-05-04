@@ -54,7 +54,7 @@ impl SourceConfig for DnstapConfig {
             .clone()
             .unwrap_or(event::log_schema().host_key().to_string());
         Ok(build_framestream_unix_source(
-            self.path,
+            self.path.clone(),
             self.max_length,
             host_key,
             self.content_type(),
