@@ -301,6 +301,7 @@ impl RunningTopology {
     /// Shutdowns removed and replaced pieces of topology.
     fn shutdown_diff(&mut self, diff: &ConfigDiff, rt: &mut runtime::Runtime) {
         // Sources
+        let timeout = Duration::from_secs(30); //sec
 
         // First pass to tell the sources to shut down.
         let mut source_shutdown_complete_futures = Vec::new();
@@ -308,10 +309,13 @@ impl RunningTopology {
         // Only log that we are waiting for shutdown if we are actually removing
         // sources.
         if !diff.sources.to_remove.is_empty() {
-            info!("Waiting for up to 3 seconds for sources to finish shutting down");
+            info!(
+                "Waiting for up to {} seconds for sources to finish shutting down",
+                timeout.as_secs()
+            );
         }
 
-        let deadline = Instant::now() + Duration::from_secs(60);
+        let deadline = Instant::now() + timeout;
         for name in &diff.sources.to_remove {
             info!("Removing source {:?}", name);
 
@@ -331,7 +335,10 @@ impl RunningTopology {
 
         // Only log message if there are actual futures to check.
         if !source_shutdown_complete_futures.is_empty() {
-            info!("Waiting for up to 3 seconds for sources to finish shutting down");
+            info!(
+                "Waiting for up to {} seconds for sources to finish shutting down",
+                timeout.as_secs()
+            );
         }
 
         rt.block_on(future::join_all(source_shutdown_complete_futures))
