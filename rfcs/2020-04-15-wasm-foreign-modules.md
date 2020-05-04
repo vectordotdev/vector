@@ -95,7 +95,10 @@ Having to, for example, use two transforms just to add 1 field and remove anothe
 We noted that the existing lua runtime was able to accomplish these tasks quite elegantly, however it was an order of
 magnitude slower than a native transform.
 
-> TODO
+```bash
+lua_add_fields/native   time:   [85.110 ms 85.159 ms 85.222 ms]
+lua_add_fields/v1       time:   [303.43 ms 306.10 ms 308.00 ms]
+```
 
 Users shouldn't pay a high price just for a few lines saved in a configuration file. They shouldn't feel frustration
 when building these kinds of pipelines either.
