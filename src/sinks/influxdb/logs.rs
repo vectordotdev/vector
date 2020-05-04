@@ -1,3 +1,4 @@
+use crate::dns::Resolver;
 use crate::event::Value;
 use crate::sinks::influxdb::{
     encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
@@ -6,6 +7,7 @@ use crate::sinks::influxdb::{
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
 use crate::sinks::util::{BatchBytesConfig, Buffer, TowerRequestConfig};
+use crate::sinks::Healthcheck;
 use crate::{
     event::{log_schema, Event},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -66,12 +68,7 @@ impl SinkConfig for InfluxDBLogsConfig {
             .tags
             .insert(log_schema().source_type_key().to_string());
 
-        let healthcheck = healthcheck(
-            self.clone().endpoint,
-            self.clone().influxdb1_settings,
-            self.clone().influxdb2_settings,
-            cx.resolver(),
-        )?;
+        let healthcheck = self.healthcheck(cx.resolver())?;
 
         let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -153,6 +150,21 @@ impl HttpSink for InfluxDBLogsConfig {
         builder.header("Content-Type", "text/plain");
         builder.header("Authorization", format!("Token {}", token));
         builder.body(events).unwrap()
+    }
+}
+
+impl InfluxDBLogsConfig {
+    fn healthcheck(&self, resolver: Resolver) -> crate::Result<Healthcheck> {
+        let config = self.clone();
+
+        let healthcheck = healthcheck(
+            config.endpoint,
+            config.influxdb1_settings,
+            config.influxdb2_settings,
+            resolver,
+        )?;
+
+        Ok(Box::new(healthcheck))
     }
 }
 
