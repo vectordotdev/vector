@@ -298,6 +298,30 @@ impl CheckFieldsPredicate for ExistsPredicate {
 
 //------------------------------------------------------------------------------
 
+#[derive(Debug)]
+struct NegatePredicate {
+    subpred: Box<dyn CheckFieldsPredicate>,
+}
+
+impl NegatePredicate {
+    pub fn new(
+        predicate: &str,
+        target: String,
+        arg: &CheckFieldsPredicateArg,
+    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+        let subpred = build_predicate(predicate, target, arg)?;
+        Ok(Box::new(Self { subpred }))
+    }
+}
+
+impl CheckFieldsPredicate for NegatePredicate {
+    fn check(&self, event: &Event) -> bool {
+        !self.subpred.check(event)
+    }
+}
+
+//------------------------------------------------------------------------------
+
 fn build_predicate(
     predicate: &str,
     target: String,
@@ -318,6 +342,7 @@ fn build_predicate(
         "ends_with" => EndsWithPredicate::new(target, arg),
         "exists" => ExistsPredicate::new(target, arg),
         "regex" => RegexPredicate::new(target, arg),
+        _ if predicate.starts_with("not_") => NegatePredicate::new(&predicate[4..], target, arg),
         _ => Err(format!("predicate type '{}' not recognized", predicate)),
     }
 }
@@ -436,7 +461,7 @@ mod test {
             (".nah", "predicate not found in check_fields value '.nah', format must be <target>.<predicate>"),
             ("", "predicate not found in check_fields value '', format must be <target>.<predicate>"),
             ("what.", "predicate not found in check_fields value 'what.', format must be <target>.<predicate>"),
-            ("foo.not_real", "predicate type 'not_real' not recognized"),
+            ("foo.nix_real", "predicate type 'nix_real' not recognized"),
         ];
 
         let mut aggregated_preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
@@ -798,6 +823,27 @@ mod test {
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ bar.exists: false ]".to_owned())
+        );
+    }
+
+    #[test]
+    fn negate_predicate() {
+        let mut preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
+        preds.insert(
+            "foo.not_exists".into(),
+            CheckFieldsPredicateArg::Boolean(true),
+        );
+        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+
+        let mut event = Event::from("ignored field");
+        assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
+
+        event.as_mut_log().insert("foo", "not ignored");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ foo.not_exists: true ]".into())
         );
     }
 }

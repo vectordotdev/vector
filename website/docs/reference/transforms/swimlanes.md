@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-04"
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events, allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
@@ -67,6 +67,9 @@ events across parallel streams using logical filters.
     "message.eq" = "this is the content to match against" # example
     "host.exists" = true # example
     "method.neq" = "POST" # example
+    "message.not_contains" = "some phrase to ignore" # example
+    "unit.not_starts_with" = "sys-" # example
+    "unit.not_ends_with" = ".device" # example
     "message.contains" = "foo" # example
     "environment.ends_with" = "-staging" # example
     "message.regex" = " (any|of|these|five|words) " # example
@@ -212,6 +215,29 @@ being `true` or `false` respectively.
 ##### `[field-name]`.neq
 
 Check whether a fields contents does not match the value specified.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.not_contains":"some phrase to ignore"},{"unit.not_starts_with":"sys-"},{"unit.not_ends_with":".device"}]}
+  groups={[]}
+  name={"`[field-name]`.not_`[condition]`"}
+  path={"lanes.`[swimlane-id]`"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"any"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[field-name]`.not_`[condition]`
+
+Check if the given `[condition]` does not match.
 
 
 

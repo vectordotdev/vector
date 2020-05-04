@@ -1627,6 +1627,16 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "method.neq" = "POST"
 
+    # Check if the given `[condition]` does not match.
+    #
+    # * optional
+    # * no default
+    # * type: any
+    # * relevant when type = "check_fields"
+    "message.not_contains" = "some phrase to ignore"
+    "unit.not_starts_with" = "sys-"
+    "unit.not_ends_with" = ".device"
+
     # Checks whether a string field contains a string argument.
     #
     # * optional
@@ -2512,6 +2522,16 @@ require('custom_module')
       # * type: string
       # * relevant when type = "check_fields"
       "method.neq" = "POST"
+
+      # Check if the given `[condition]` does not match.
+      #
+      # * optional
+      # * no default
+      # * type: any
+      # * relevant when type = "check_fields"
+      "message.not_contains" = "some phrase to ignore"
+      "unit.not_starts_with" = "sys-"
+      "unit.not_ends_with" = ".device"
 
       # Checks whether a string field contains a string argument.
       #

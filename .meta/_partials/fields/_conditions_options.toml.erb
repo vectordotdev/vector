@@ -12,6 +12,19 @@ is_log = "Returns true if the event is a log."
 is_metric = "Returns true if the event is a metric."
 
 
+[<%= namespace %>."`[field-name]`.not_`[condition]`"]
+type = "any"
+examples = [
+  { "message.not_contains" = "some phrase to ignore" },
+  { "unit.not_starts_with" = "sys-" },
+  { "unit.not_ends_with" = ".device" }
+]
+common = false
+relevant_when = {type = "check_fields"}
+description = """\
+Check if the given `[condition]` does not match.\
+"""
+
 [<%= namespace %>."`[field-name]`.eq"]
 type = "string"
 examples = [
