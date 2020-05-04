@@ -373,6 +373,7 @@ sources-logs = [
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
   "sources-datadog",
+  "sources-dnstap",
   "sources-docker_logs",
   "sources-exec",
   "sources-file",
@@ -407,6 +408,7 @@ sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
 sources-datadog = ["sources-utils-http"]
+sources-dnstap = ["bytesize", "listenfd", "tokio-uds", "sources-tls"]
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-exec = []
 sources-file = ["bytesize", "file-source"]

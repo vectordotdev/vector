@@ -11,6 +11,8 @@ pub mod aws_kinesis_firehose;
 pub mod aws_s3;
 #[cfg(feature = "sources-datadog")]
 pub mod datadog;
+#[cfg(feature = "sources-dnstap")]
+pub mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 pub mod docker_logs;
 #[cfg(feature = "sources-exec")]
