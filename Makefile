@@ -287,7 +287,7 @@ slim-builds: ## Updates the Cargo config to product disk optimized builds, usefu
 	$(RUN) slim-builds
 
 target-graph: ## Display dependencies between targets in this Makefile
-	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST))))/.. && docker-compose run --rm target-graph $(TARGET)
+	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))) && docker-compose run --rm target-graph $(TARGET)
 
 version: ## Get the current Vector version
 	$(RUN) version
