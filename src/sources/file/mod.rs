@@ -6,7 +6,10 @@ use crate::{
     trace::{current_span, Instrument},
 };
 use bytes::Bytes;
-use file_source::{FileServer, Fingerprinter, GlobPathProvider};
+use file_source::{
+    paths_provider::glob::{Glob, MatchOptions},
+    FileServer, Fingerprinter,
+};
 use futures::{
     compat::{Compat01As03Sink, Future01CompatExt},
     future::{FutureExt, TryFutureExt},
@@ -232,10 +235,11 @@ pub fn file_source(
         .map(|secs| SystemTime::now() - Duration::from_secs(secs));
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
 
-    let path_provider = GlobPathProvider::new(&config.include, &config.exclude);
+    let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())
+        .expect("invalid glob patterns");
 
     let file_server = FileServer {
-        path_provider,
+        paths_provider,
         max_read_bytes: config.max_read_bytes,
         start_at_beginning: config.start_at_beginning,
         ignore_before,
