@@ -1,11 +1,11 @@
-name: test
+name: code
 
 on:
   push:
     branches:
       - master
     paths:
-      - ".github/workflows/test.yml"
+      - ".github/workflows/code.yml"
       - "lib/*s"
       - "proto/**"
       - "src/**"
@@ -36,73 +36,122 @@ env:
   USE_CONTAINER: none
 
 jobs:
-  behavior:
+  check-advistories:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: EmbarkStudios/cargo-deny-action@v0
+        with:
+          command: check advisories
+
+  check-component-features:
+    runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
+    steps:
+      - uses: actions/checkout@v1
+      - run: sudo apt install -y python3-pip python3-setuptools python3-wheel
+      - run: sudo python3 -m pip install remarshal
+      - run: make check-component-features
+
+  check-fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-fmt
+        env:
+          PASS_RUSTFLAGS: "-D warnings"
+
+  check-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-code
+        env:
+          PASS_RUSTFLAGS: "-D warnings"
+
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-version
+
+  check-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v1
+      - env:
+          USE_CONTAINER: none
+          RUSTFLAGS: "-D warnings"
+        run: cargo check --no-default-features --features default-msvc
+
+  test-behavior:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make test-behavior
 
-  integration-aws:
+  test-integration-aws:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-aws
 
-  integration-clickhouse:
+  test-integration-clickhouse:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-clickhouse
 
-  integration-docker:
+  test-integration-docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-docker
 
-  integration-elasticsearch:
+  test-integration-elasticsearch:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-elasticsearch
 
-  integration-gcp:
+  test-integration-gcp:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-gcp
 
-  integration-influxdb:
+  test-integration-influxdb:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-influxdb
 
-  integration-kafka:
+  test-integration-kafka:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-kafka
 
-  integration-loki:
+  test-integration-loki:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-loki
 
-  integration-pulsar:
+  test-integration-pulsar:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-pulsar
 
-  integration-splunk:
+  test-integration-splunk:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-splunk
 
-  unit:
+  test-unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
