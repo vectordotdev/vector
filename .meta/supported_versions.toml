@@ -1,5 +1,5 @@
-# This file holds generic specification of version constraints of the third-pary
-# components that Vector integrates with.
+# This file holds the generic specification of version constraints of the
+# third-party components that Vector integrates with.
 # It's designed to be a signle source of truth for the decisions at the other
 # project domains: implementation, distribution, data models and etc.
 
