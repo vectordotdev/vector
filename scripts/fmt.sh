@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eo pipefail
+set -euo pipefail
 
 # fmt.sh
 #
@@ -7,5 +7,6 @@ set -eo pipefail
 #
 #   Applies fmt changes across the repo
 
-check-style.sh --fix
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+scripts/check-style.sh --fix
 cargo fmt
