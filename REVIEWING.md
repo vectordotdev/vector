@@ -80,8 +80,8 @@ marked as `unsafe`, a detailed comment should be added explaining why.
 
 ## Security
 
-Security is incredibly important to Vector. Users rely on Vector ship  
-mission-critical and sensitive data. Please review the code explicitly for  
+Security is incredibly important to Vector. Users rely on Vector ship
+mission-critical and sensitive data. Please review the code explicitly for
 security issues. See [Vector's Security guide for more info](SECURITY.md).
 
 ## Testing
