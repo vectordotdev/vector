@@ -72,11 +72,12 @@ jobs:
         env:
           PASS_RUSTFLAGS: "-D warnings"
 
-  check-version:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-version
+  # check-version:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v1
+  #     - run: sudo gem install git
+  #     - run: make check-version
 
   check-windows:
     runs-on: windows-latest
