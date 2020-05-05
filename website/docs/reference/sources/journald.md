@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-04"
+last_modified_on: "2020-05-05"
 delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through Systemd's Journald utility and outputs `log` events."
@@ -69,7 +69,6 @@ utility and outputs [`log`][docs.data-model.log] events.
   exclude_units = [] # optional, default
   include_units = [] # optional, default
   journalctl_path = "journalctl" # optional, default
-  units = [] # optional, default
 ```
 
 </TabItem>
@@ -218,32 +217,6 @@ them a valid service unit name.
 The full path of the [`journalctl`](#journalctl) executable. If not set, Vector will search
 the path for [`journalctl`](#journalctl).
  See [Communication strategy](#communication-strategy) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={[]}
-  enumValues={null}
-  examples={[["ntpd","sysinit.target"]]}
-  groups={[]}
-  name={"units"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-### units
-
-The list of units names to monitor. If empty or not present, all units are
-accepted. Unit names lacking a `"."` will have `".service"` appended to make
-them a valid service unit name. Note: This setting is deprecated. Use
-`include_units` instead.
-
 
 
 </Field>

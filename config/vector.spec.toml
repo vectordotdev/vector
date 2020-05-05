@@ -550,16 +550,6 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "journald"
   type = "journald"
 
-  # The list of units names to monitor. If empty or not present, all units are
-  # accepted. Unit names lacking a `"."` will have `".service"` appended to make
-  # them a valid service unit name. Note: This setting is deprecated. Use
-  # `include_units` instead.
-  #
-  # * optional
-  # * default: []
-  # * type: [string]
-  units = ["ntpd", "sysinit.target"]
-
 # Ingests data through Kafka and outputs `log` events.
 [sources.kafka]
   #

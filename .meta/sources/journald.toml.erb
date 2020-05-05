@@ -77,18 +77,6 @@ The list of units names to exclude from monitoring. \
 Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.\
 """
 
-[sources.journald.options.units]
-type = "[string]"
-common = false
-default = []
-examples = [["ntpd", "sysinit.target"]]
-description = """\
-The list of units names to monitor. \
-If empty or not present, all units are accepted. \
-Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name. \
-Note: This setting is deprecated. Use `include_units` instead.\
-"""
-
 [[sources.journald.examples]]
 label = "Generic"
 body = """\
