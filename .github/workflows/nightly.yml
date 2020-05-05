@@ -74,6 +74,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
+      - name: "Upgrade bash"
+        run: brew install bash
       - name: "Install realpath dependency"
         run: brew install coreutils
       - name: "Build archive"
