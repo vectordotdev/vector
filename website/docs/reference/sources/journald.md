@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-05"
 delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through Systemd's Journald utility and outputs `log` events."
@@ -53,7 +53,8 @@ utility and outputs [`log`][docs.data-model.log] events.
 [sources.my_source_id]
   type = "journald" # required
   current_boot_only = true # optional, default
-  units = [] # optional, default
+  exclude_units = [] # optional, default
+  include_units = [] # optional, default
 ```
 
 </TabItem>
@@ -65,8 +66,9 @@ utility and outputs [`log`][docs.data-model.log] events.
   batch_size = 16 # optional, default
   current_boot_only = true # optional, default
   data_dir = "/var/lib/vector" # optional, no default
+  exclude_units = [] # optional, default
+  include_units = [] # optional, default
   journalctl_path = "journalctl" # optional, default
-  units = [] # optional, default
 ```
 
 </TabItem>
@@ -146,6 +148,55 @@ permissions to this dir.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={[]}
+  enumValues={null}
+  examples={[["badservice","sysinit.target"]]}
+  groups={[]}
+  name={"exclude_units"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### exclude_units
+
+The list of units names to exclude from monitoring. Unit names lacking a `"."`
+will have `".service"` appended to make them a valid service unit name.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={[]}
+  enumValues={null}
+  examples={[["ntpd","sysinit.target"]]}
+  groups={[]}
+  name={"include_units"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### include_units
+
+The list of units names to monitor. If empty or not present, all units are
+accepted. Unit names lacking a `"."` will have `".service"` appended to make
+them a valid service unit name.
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={"journalctl"}
   enumValues={null}
@@ -166,31 +217,6 @@ permissions to this dir.
 The full path of the [`journalctl`](#journalctl) executable. If not set, Vector will search
 the path for [`journalctl`](#journalctl).
  See [Communication strategy](#communication-strategy) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={[]}
-  enumValues={null}
-  examples={[["ntpd","sysinit.target"]]}
-  groups={[]}
-  name={"units"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-### units
-
-The list of units names to monitor. If empty or not present, all units are
-accepted. Unit names lacking a `"."` will have `".service"` appended to make
-them a valid service unit name.
-
 
 
 </Field>
