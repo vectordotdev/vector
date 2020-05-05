@@ -54,14 +54,17 @@ enum ControlHeader {
 }
 
 impl ControlHeader {
-    fn from_u32(val: u32) -> Self {
+    fn from_u32(val: u32) -> Result<Self, ()> {
         match val {
-            0x01 => ControlHeader::Accept,
-            0x02 => ControlHeader::Start,
-            0x03 => ControlHeader::Stop,
-            0x04 => ControlHeader::Ready,
-            0x05 => ControlHeader::Finish,
-            _ => panic!("Don't know this header") //TODO: error
+            0x01 => Ok(ControlHeader::Accept),
+            0x02 => Ok(ControlHeader::Start),
+            0x03 => Ok(ControlHeader::Stop),
+            0x04 => Ok(ControlHeader::Ready),
+            0x05 => Ok(ControlHeader::Finish),
+            _ => {
+                error!("Don't know header value {} (expected 0x01 - 0x05)", val);
+                Err(())
+            },
         }
     }
 
@@ -81,10 +84,13 @@ enum ControlField {
 }
 
 impl ControlField {
-    fn from_u32(val: u32) -> Self {
+    fn from_u32(val: u32) -> Result<Self, ()> {
         match val {
-            0x01 => ControlField::ContentType,
-            _ => panic!("Don't know this field type") //TODO: error
+            0x01 => Ok(ControlField::ContentType),
+            _ => {
+                error!("Don't know field type {} (expected 0x01)", val);
+                Err(())
+            },
         }
     }
     fn to_u32(self) -> u32 {
@@ -94,12 +100,13 @@ impl ControlField {
     }
 }
 
-fn advance_u32(b: &mut Bytes) -> u32 {
+fn advance_u32(b: &mut Bytes) -> Result<u32, ()> {
     if b.len() < 4 {
-        panic!("Not long enough") //TODO: error
+        error!("Malformed frame");
+        return Err(());
     }
     let a = b.split_to(4);
-    u32::from_be_bytes(a[..].try_into().unwrap())
+    Ok(u32::from_be_bytes(a[..].try_into().unwrap()))
 }
 
 impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> {
@@ -119,7 +126,7 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
         } else {
             if self.state.expect_control_frame {
                 self.state.expect_control_frame = false;
-                self.handle_control_frame(frame);
+                let _ = self.handle_control_frame(frame);
                 None
             } else { 
                 emit!(UnixSocketEventReceived { byte_size: frame.len() });
@@ -128,22 +135,19 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
         }
     }
 
-    fn handle_control_frame(&mut self, mut frame: Bytes) {
-        let header = ControlHeader::from_u32(advance_u32(&mut frame));
+    fn handle_control_frame(&mut self, mut frame: Bytes) -> Result<(), ()> {
+        let header = ControlHeader::from_u32(advance_u32(&mut frame)?)?;
 
         //match current state to received header
         match self.state.control_state {
             ControlState::ReadingControlReady => {
                 match header {
                     ControlHeader::Ready => {
-                        if let Some(content_type) = self.process_content_type(&mut frame) {
-                            self.send_control_frame(Self::make_frame(ControlHeader::Accept, Some(content_type)));
-                            self.state.control_state = ControlState::ReadingControlStart; //waiting for a START control frame
-                        } else {
-                            error!("Content types did not match up.") //TODO: error
-                        }
+                        let content_type = self.process_content_type(&mut frame)?;
+                        self.send_control_frame(Self::make_frame(ControlHeader::Accept, Some(content_type)));
+                        self.state.control_state = ControlState::ReadingControlStart; //waiting for a START control frame
                     },
-                    _ => error!("Got wrong control frame, expected READY"), //TODO: error
+                    _ => error!("Got wrong control frame, expected READY"),
                 }
             },
             ControlState::ReadingControlStart => {
@@ -151,7 +155,7 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
                     ControlHeader::Start => {
                         self.state.control_state = ControlState::ReadingData; //just change state
                     },
-                    _ => error!("Got wrong control frame, expected START"), //TODO: error
+                    _ => error!("Got wrong control frame, expected START"),
                 }
             },
             ControlState::ReadingData => {
@@ -160,31 +164,33 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
                         self.send_control_frame(Self::make_frame(ControlHeader::Finish, None)); //send FINISH frame
                         self.state.control_state = ControlState::Stopped; //stream is now done
                     },
-                    _ => error!("Got wrong control frame, expected STOP"), //TODO: error
+                    _ => error!("Got wrong control frame, expected STOP"),
                 }
             },
-            ControlState::Stopped => error!("Unexpected control frame, current state is STOPPED"), //TODO: error
-        }
+            ControlState::Stopped => error!("Unexpected control frame, current state is STOPPED"),
+        };
+        Ok(())
     }
 
-    fn process_content_type(&self, frame: &mut Bytes) -> Option<String> {
+    fn process_content_type(&self, frame: &mut Bytes) -> Result<String, ()> {
         while frame.len() > 0 {
             //4 bytes of ControlField
-            let field_val = advance_u32(frame);
-            let field_type = ControlField::from_u32(field_val);
+            let field_val = advance_u32(frame)?;
+            let field_type = ControlField::from_u32(field_val)?;
             match field_type {
                 ControlField::ContentType => {
                     //4 bytes giving length of content type
-                    let field_len = advance_u32(frame) as usize;
+                    let field_len = advance_u32(frame)? as usize;
                     let content_type = std::str::from_utf8(&frame[..field_len]).unwrap();
                     if content_type == self.expected_content_type {
-                        return Some(content_type.to_string());
+                        return Ok(content_type.to_string());
                     }
                 }
             }   
         }
 
-        None
+        error!("Content types did not match up.");
+        Err(())
     }
 
     fn make_frame(header: ControlHeader, content_type: Option<String>) -> Bytes {
@@ -325,7 +331,7 @@ tokio01::net::{UdpFramed, UdpSocket}
 //             let lines_in = sock_stream
 //                 .take_until(shutdown)
 //                 .filter_map(move |(frame, addr)| fs_reader.handle_frame(Bytes::from(frame)))
-//                 .map_err(|error| panic!("TODO") emit!(SyslogUdpReadError { error })); //TODO: error
+//                 .map_err(|error| panic!("TODO") emit!(SyslogUdpReadError { error })); //needs changing
 
 //             lines_in.forward(out).map(|_| info!("finished sending"))
 //         }),
