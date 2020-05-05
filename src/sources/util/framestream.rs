@@ -6,9 +6,10 @@ use crate::{
     stream::StreamExt,
 };
 use bytes::Bytes;
-use futures01::{future, sync::mpsc, Future, Sink, Stream, IntoFuture};
+use futures01::{future, sync::mpsc, Future, IntoFuture, Sink, Stream};
 #[cfg(unix)]
 use std::path::PathBuf;
+use std::convert::TryInto;
 use tokio01::{
     self,
     codec::{Framed, length_delimited},
@@ -98,9 +99,7 @@ fn advance_u32(b: &mut Bytes) -> u32 {
         panic!("Not long enough") //TODO: error
     }
     let a = b.split_to(4);
-    let mut copy_header:[u8; 4] = [0,0,0,0]; //TODO: better than this
-    copy_header.copy_from_slice(&a[..]);
-    u32::from_be_bytes(copy_header)
+    u32::from_be_bytes(a[..].try_into().unwrap())
 }
 
 impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> {
@@ -141,7 +140,7 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
                             self.send_control_frame(Self::make_frame(ControlHeader::Accept, Some(content_type)));
                             self.state.control_state = ControlState::ReadingControlStart; //waiting for a START control frame
                         } else {
-                            error!("Content types did not match up.")
+                            error!("Content types did not match up.") //TODO: error
                         }
                     },
                     _ => error!("Got wrong control frame, expected READY"), //TODO: error
@@ -200,14 +199,13 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
     }
 
     fn send_control_frame(&mut self, frame: Bytes) {
-        //TODO: better way that .wait().unwrap() (?)
-
         let empty_frame = Bytes::from(&b""[..]); //send empty frame to say we are control frame
         let stream = futures01::stream::iter_ok::<_, std::io::Error>(vec![empty_frame, frame].into_iter());
 
         //send and send_all consume the sink
         let mut tmp_sink = self.response_sink.take().unwrap();
-        tmp_sink = tmp_sink.send_all(stream).into_future().wait().unwrap().0; //get the sink back as first element of tuple
+        //get the sink back as first element of tuple
+        tmp_sink = tmp_sink.send_all(stream).into_future().wait().unwrap().0; //TODO: better way than .wait().unwrap() (?)
         self.response_sink = Some(tmp_sink);
     }
 
