@@ -8,5 +8,7 @@ set -euo pipefail
 #   Checks the format of Vector code
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+set -x
+
 scripts/check-style.sh
 cargo fmt -- --check
