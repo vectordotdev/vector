@@ -65,29 +65,31 @@ impl TryFrom<RegionOrEndpoint> for Region {
 /// Translate an endpoint URL into a Region
 pub fn region_from_endpoint(endpoint: &str) -> Result<Region, ParseError> {
     let uri = endpoint.parse::<Uri>().context(EndpointParseError)?;
-    let name = region_name_from_host(uri.host().unwrap_or(""));
+    let name = uri
+        .host()
+        .and_then(region_name_from_host)
+        .unwrap_or_else(|| Region::default().name().into());
+    let endpoint = strip_endpoint(&uri);
+    Ok(Region::Custom { name, endpoint })
+}
 
-    // Reconstitute the endpoint from the URI, but strip off all path components
+/// Reconstitute the endpoint from the URI, but strip off all path components
+fn strip_endpoint(uri: &Uri) -> String {
     let pq_len = uri
         .path_and_query()
         .map(|pq| pq.as_str().len())
         .unwrap_or(1);
     let endpoint = uri.to_string();
-    let endpoint = endpoint[..endpoint.len() - pq_len].to_string();
-
-    Ok(Region::Custom { name, endpoint })
+    endpoint[..endpoint.len() - pq_len].to_string()
 }
 
-/// Translate a hostname into a custom region name
-fn region_name_from_host(host: &str) -> String {
-    // Find the first part of the domain name that matches a known region
-    for part in host.split('.') {
-        if let Ok(region) = Region::from_str(part) {
-            return region.name().into();
-        }
-    }
-    // Couldn't find a valid region, use the default
-    "custom".into()
+/// Translate a hostname into a region name by finding the first part of
+/// the domain name that matches a known region.
+fn region_name_from_host(host: &str) -> Option<String> {
+    host.split('.')
+        .filter_map(|part| Region::from_str(part).ok())
+        .map(|region| region.name().into())
+        .next()
 }
 
 #[cfg(test)]
@@ -133,7 +135,7 @@ mod tests {
         .unwrap();
 
         let expected_region = Region::Custom {
-            name: "custom".into(),
+            name: "us-east-1".into(),
             endpoint: "http://localhost:9000".into(),
         };
 
@@ -159,11 +161,28 @@ mod tests {
     }
 
     #[test]
+    fn extracts_region_name_from_host() {
+        assert_eq!(region_name_from_host("localhost"), None);
+        assert_eq!(
+            region_name_from_host("us-west-1.es.amazonaws.com"),
+            Some("us-west-1".into())
+        );
+        assert_eq!(
+            region_name_from_host("this-is-a-test.us-west-2.es.amazonaws.com"),
+            Some("us-west-2".into())
+        );
+        assert_eq!(
+            region_name_from_host("test.cn-north-1.es.amazonaws.com.cn"),
+            Some("cn-north-1".into())
+        );
+    }
+
+    #[test]
     fn region_from_endpoint_localhost() {
         assert_eq!(
             region_from_endpoint("http://localhost:9000").unwrap(),
             Region::Custom {
-                name: "custom".into(),
+                name: "us-east-1".into(),
                 endpoint: "http://localhost:9000".into()
             }
         );
@@ -190,7 +209,7 @@ mod tests {
         assert_eq!(
             region_from_endpoint("http://localhost:9000/path?query").unwrap(),
             Region::Custom {
-                name: "custom".into(),
+                name: "us-east-1".into(),
                 endpoint: "http://localhost:9000".into()
             }
         );

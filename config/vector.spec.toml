@@ -4579,6 +4579,22 @@ require('custom_module')
     user = "username"
 
   #
+  # AWS
+  #
+
+  [sinks.elasticsearch.aws]
+    # The AWS region of the target service. This defaults to the region named in
+    # the host parameter, or the value of the `$AWS_REGION` or
+    # `$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or
+    # "us-east-1".
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when strategy = "aws"
+    region = "us-east-1"
+
+  #
   # Batch
   #
 

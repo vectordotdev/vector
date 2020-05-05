@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-03"
 delivery_guarantee: "at_least_once"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
@@ -79,6 +79,9 @@ endpoint][urls.elasticsearch_bulk].
   auth.password = "${ELASTICSEARCH_PASSWORD}" # required, required when strategy = "basic"
   auth.strategy = "aws" # required
   auth.user = "${ELASTICSEARCH_USERNAME}" # required, required when strategy = "basic"
+
+  # AWS
+  aws.region = "us-east-1" # optional, no default, relevant when strategy = "aws"
 
   # Batch
   batch.max_size = 10490000 # optional, default, bytes
@@ -211,6 +214,57 @@ The authentication strategy to use.
 #### user
 
 The basic authentication user name.
+
+
+
+</Field>
+</Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"aws"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### aws
+
+Options for the AWS connections.
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["us-east-1"]}
+  groups={[]}
+  name={"region"}
+  path={"aws"}
+  relevantWhen={{"strategy":"aws"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### region
+
+The [AWS region][urls.aws_regions] of the target service. This defaults to the
+region named in the host parameter, or the value of the `$AWS_REGION` or
+`$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or
+"us-east-1".
 
 
 
@@ -1326,6 +1380,7 @@ You can learn more about the complete syntax in the
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_elasticsearch]: https://aws.amazon.com/elasticsearch-service/
+[urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.elasticsearch_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
