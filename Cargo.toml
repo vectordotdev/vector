@@ -152,6 +152,7 @@ bloom = "0.3.2"
 pulsar = { version = "1.0.0-alpha-2", default-features = false, features = ["tokio-runtime"], optional = true }
 task-compat = "0.1"
 cidr-utils = "0.4.1"
+pin-project = "0.4"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -160,7 +161,6 @@ lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "
 lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
 anyhow = { version = "1.0.28", optional = true }
 async-stream = "0.2.1"
-
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1"
