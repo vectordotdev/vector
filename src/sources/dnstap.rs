@@ -6,9 +6,15 @@ use crate::{
 };
 use bytes::Bytes;
 use futures01::sync::mpsc;
+use prost::Message;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::path::PathBuf;
+use trust_dns_proto::op::message::Message as TrustDnsMessage;
+
+mod proto {
+    include!(concat!(env!("OUT_DIR"), "/dnstap.rs"));
+}
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct DnstapConfig {
@@ -79,10 +85,43 @@ impl SourceConfig for DnstapConfig {
  * Takes a data frame from the unix socket and turns it into a Vector Event.
  **/
 fn handle_event(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
-    //TODO: decode protobuf
+    //parse frame with dnstap protobuf
+    let proto_msg = match proto::Dnstap::decode(frame) {
+        Ok(msg) => msg,
+        Err(e) => {
+            error!("Dnstap protobuf decode error {:?}", e);
+            return None;
+        }
+    };
+
+    //TODO: parse parts of dnstap that are left as bytes
+    if let Some(message) = proto_msg.message {
+        if let Some(query_msg) = message.query_message {
+            let query = match TrustDnsMessage::from_vec(&query_msg) {
+                Ok(msg) => msg,
+                Err(e) => {
+                    error!("Trust dns parsing error {:?}", e);
+                    return None;
+                }
+            };
+            println!("Query: {:?}", query);
+        }
+        if let Some(response_msg) = message.response_message {
+            let response = match TrustDnsMessage::from_vec(&response_msg) {
+                Ok(msg) => msg,
+                Err(e) => {
+                    error!("Trust dns parsing error {:?}", e);
+                    return None;
+                }
+            };
+            println!("Response: {:?}", response);
+        }
+    }
+
+
     //TODO: decode dns info
 
-    let mut event = Event::from(frame);
+    let mut event = Event::new_empty_log();
     event
         .as_mut_log()
         .insert(event::log_schema().source_type_key(), "dnstap");
