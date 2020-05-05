@@ -125,7 +125,7 @@ router, Tremor focuses on servicing demanding workloads from it's position as an
 What if we could provide users of Tremor and Vector with some sort of familiar shared experience? What if we could share
 functionality? What kind of framework could satisfy both our needs? There are so many questions!
 
-> TODO: We need to talk to them.
+We are in communication with them and this RFC may be amended in the future to include cross compatibility details.
 
 
 ## Prior Art
@@ -160,21 +160,21 @@ While it enables more functionality and possibly better speeds, it also introduc
 ### When to build your own module
 
 Using the WASM engine you can write your own sources, transforms, sinks, codecs in any language that compiles down to a
-`.wasm` file. Vector can then compile this file down to an optimized, platform specific module which it can use. This
-allows Vector to work with internal or uncommon protocols or services, support new language transforms, or just write a
-special transform to do *exactly* what you want. With the WASM engine, Vector puts you in command.
+`.wasm` or `.wat` file. Vector can then compile this file down to an optimized, platform specific module which it can
+use. This allows Vector to work with internal or uncommon protocols or services, support new language transforms, or
+just write a special transform to do *exactly* what you want. With the WASM engine, Vector puts you in command.
 
 There is a trade-off though! You'll need to embolden yourself, as WASM is a fledgling technology. When it first loads a
 WASM file, Vector needs to spend some time building an optimized module before it can load it. You'll also be
 responsible for the safety and correctness of your code, if your module crashes on an event, Vector will re-initialize
-the module and try again on the next event. This should be modelled roughly off
+the module and try again on the next event. We try to follow the ideas of
 [Erlang's OTP](https://erlang.org/doc/design_principles/sup_princ.html).
 
 Here's some examples of when a WASM module is a good fit:
 
 * You need to support a specific protobuf type.
-* You have a source or sink which is not currently supported by Vector.
-* You want to write a complex transform in your favorite language.
+* You require a source or sink which is not currently supported by Vector.
+* You want to write a complex transform in Rust. (Other languages will be library supported soon)
 
 Here's some examples of where WASM probably isn't right for you:
 
@@ -187,24 +187,19 @@ current time. Work on other operating systems is ongoing!)
 
 ### How Vector modules work
 
-Vector modules are `.wasm` files (WASI or not) exposing a predefined interface. We provide a `foreign_modules::guest`
-module for Rust projects located in `lib/foreign-modules` of the source tree, and we will be providing bindings for
+Vector modules are `.wasm` files (WASI or not) exposing a predefined interface. We provide a `vector_wasm`
+crate for Rust projects located in `lib/vector-wasm` of the source tree, and we will be providing bindings for
 other languages as we see user demand.
 
 Modules are sandboxed and can only interact with Vector over the Foreign Function Interface (FFI) which Vector exposes.
 For each instance of a module, Vector holds some context. For example, when a transform module processes an event, the
-context of the module contains an `Event` type. The guest can use calls like `get("foo")` and Vector perform the action
-and return the result to the guest.
+context of the module contains an event, as well as the configuration used to create the transform.
 
 A guest module is not able to access the memory of the Vector instance, but Vector is free to modify the guest memory.
 For example, behind the scenes of a `get` call, the Guest must allocate some memory for Vector to write the result into.
 
 Due to the current semantics of the `vector::Event` type, passing data between WASM modules and the Vector host involves
-serialization to JSON. We're investigating ways to speed this up.
-
-* It may be possible to add a `repr(C)` flag to Event.
-* It may be worthwhile to explore an `Event` refactor.
-* Other serialization options may be much faster but less compatible.
+serialization. This may change in the future, resulting in an increase major version of the `vector-wasm` crate.
 
 
 ### Initialization
@@ -212,7 +207,7 @@ serialization to JSON. We're investigating ways to speed this up.
 
 Regardless of whether of not the module uses WASI, or has access to a language specific binding, it can interact with
 Vector. Vector works by invoking the modules public interface. First, as soon as the module is loaded, `register` is
-called once, globally, per module. In this call, the module can configure how Vector sees it and talks to it. During
+called once per module. In this call, the module can configure how Vector sees it and talks to it. During
 this time, the module can do any one time setup it needs. (Eg. Opening a socket, a file).
 
 If using the Vector guest API this can be done via:
@@ -246,61 +241,22 @@ What happens next depends on which type of module it is.
   }
   ```
 
-> **TODO:** Sources, sinks, and codecs have no POC or formal specification, below is a work in progress.
-
-* `Source`: Modules of this role can be used as a source `type`.
-
-  ```rust
-  use foreign_modules::hostcall;
-
-  #[no_mangle]
-  // TODO: Add better FFI error handling!
-  pub extern "C" fn start() {
-      // TODO
-  }
-  ```
-
-* `Sink`: Modules of this role can be used as a sink `type`.
-
-  ```rust
-  use foreign_modules::hostcall;
-
-  #[no_mangle]
-  // TODO: Add better FFI error handling!
-  pub extern "C" fn process() {
-      if let Some(value) = hostcall::get("field").unwrap() {
-          hostcall::insert("field", value).unwrap();
-      }
-  }
-  ```
-
-* `Codec`:
-
-  ```rust
-  use foreign_modules::hostcall;
-  // TODO: Add better FFI error handling!
-  #[no_mangle]
-  pub extern "C" fn process() {
-      if let Some(value) = hostcall::get("field").unwrap() {
-          hostcall::insert("field", value).unwrap();
-      }
-  }
-  ```
+> **TODO:** Sources, sinks, and codecs have no POC or formal specification.
 
 
 ### Your first module (Rust)
 
 To create your first module, start with a working [Rust toolchain](https://rustup.rs/) add the `wasm32-wasi`
-toolchain's `nightly` version:
+toolchain:
 
 ```bash
-rustup target add wasm32-wasi --toolchain nightly
+rustup target add wasm32-wasi
 ```
 
 Then, create a module:
 
 ```bash
-cargo +nightly init --lib echo
+cargo init --lib echo
 ```
 
 In your `Cargo.toml` fill in:
@@ -310,14 +266,15 @@ In your `Cargo.toml` fill in:
 crate-type = ["cdylib"]
 
 [dependencies]
-foreign_modules = { path = "/path/to/your/clone/of/vector/lib/foreign-modules"}
+# This will be published at a later date.
+vector-wasm = { path = "/path/to/your/clone/of/vector/lib/vector-wasm"}
 serde = { version = "1", features = ["derive"] }
 ```
 
 Next, in your `lib.rs` file:
 
 ```rust
-use foreign_modules::{Registration, hostcall};
+use vector_wasm::{Registration, hostcall};
 use serde::{Serialize, Deserialize};
 
 #[no_mangle]
@@ -425,7 +382,7 @@ Integrating a flexible, practical, simple WASM module support means we can:
 
 WASM is still **very young**. We will be early adopters and will pay a high adoption price. Additionally, we may find
 ourselves using unstable functionality of some crates, including a non-trivial amount of `unsafe`, which may lead to
-unforseen consequences.
+unforeseen consequences.
 
 Our **binary size will bloom**. We currently (in unoptimized POC implementations) see our binary size grow by over 60
 MB. The Lucet team is aware of this issue, and in some preliminary discussions this binary size increase is unexpected and
@@ -433,8 +390,8 @@ we expect it to improve. If this does not improve, we can consider adopting `was
 which has a smaller binary footprint.
 
 Our team will need to diagnose, support, and evolve an arguably rather **complex API** for WASM modules to work
-correctly. This will mean we'll have to think of our system very abstractly, and has many questions around API stability
-and compatibility.
+correctly. This will mean we'll have to think of our system very abstractly, and opens many questions around API
+stability and compatibility.
 
 This feature is **advanced and may invoke user confusion**. Novice or casual users may not fully grasp the subtleties
 and limitations of WASM. We must practice caution around the user experience of this feature to ensure novices and
@@ -463,7 +420,7 @@ We should support modules so broadly?
 ### Consider supporting a blessed compiler
 
 Our original discussions included the idea of a blessed compiler and a UX similar to our existing `lua` or `javascript`
-transform. Indeed, our initial implementation should include just a transform, as it's by far the easiest place to
+transform. Indeed, our initial implementation includes just a transform, as it's by far the easiest place to
 introduce this feature.
 
 During investigation of the initial POC we determined that our most desirable "blessed" language would be
@@ -489,7 +446,7 @@ We should also consider if we want to change how we handle codecs, since it is l
 include wanting to add codec support to already existing sources.
 
 **Temporary Conclusion:** We will adopt hostcalls for the time being to allow for a minimal POC. We would like to
-investigate these choices lat er, and we will make a decision before stabilizing WASM modules.
+investigate these choices later, and we will make a decision before stabilizing WASM modules.
 
 
 ### Consider Packaging Approach
@@ -505,7 +462,7 @@ A couple good questions to consider:
 * Should a user import `vector::...` to use the Vector guest API in their Rust module?
 * Vector's internal API is largely undocumented and kind of a mess. Should we hide/clean the irrelevant stuff?
 
-**Conclusion:** We are including a workspace member `foreign_modules` in the `lib/foreign-modules` directory.
+**Conclusion:** We are including a workspace member `vector-wasm` in the `vector-wasm` directory.
 This may be renamed and/or published in the future.
 
 
@@ -548,9 +505,9 @@ Incremental steps that execute this change.
 
 * v0.1: (Done) This draft forms the groundwork for this RFC, and demos a POC of how a theoretical user could use this
   for a protobuf decoding transform, and permitting the first `wasm` transform test to pass.
-* v0.2: The POC of the initial transform has it's v1
-* v0.3: We have benchmarks of the initial transform POC.
-* v0.4: Compile artifact caching is implemented, so Vector doesn't unnecessarily recompile wasm modules.
+* v0.2: (Done) The POC of the initial transform has it's v1
+* v0.3: (Done) We have benchmarks of the initial transform POC.
+* v0.4: (Done) Compile artifact caching is implemented, so Vector doesn't unnecessarily recompile wasm modules.
 * v0.5: Guest API expanded to support majority of Event API.
 * v0.6: We talk to a couple known users who would be interested in this feature and let them test it out.
 * v0.7: This RFC is amended to include Sinks and Sources information.
