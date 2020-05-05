@@ -65,7 +65,9 @@ impl TryFrom<RegionOrEndpoint> for Region {
 /// Translate an endpoint URL into a Region
 pub fn region_from_endpoint(endpoint: &str) -> Result<Region, ParseError> {
     let uri = endpoint.parse::<Uri>().context(EndpointParseError)?;
-    let name = region_name_from_host(uri.host().unwrap_or(""))
+    let name = uri
+        .host()
+        .and_then(region_name_from_host)
         .unwrap_or_else(|| Region::default().name().into());
     let endpoint = strip_endpoint(&uri);
     Ok(Region::Custom { name, endpoint })
