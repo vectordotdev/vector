@@ -18,6 +18,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/test.yml"
+      - ".github/workflows/code.yml"
       - "lib/*s"
       - "proto/**"
       - "src/**"
@@ -58,6 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
+      - run: rustup component add rustfmt
       - run: make check-fmt
         env:
           PASS_RUSTFLAGS: "-D warnings"
