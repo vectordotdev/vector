@@ -6,7 +6,7 @@ use crate::{
     trace::{current_span, Instrument},
 };
 use bytes::Bytes;
-use file_source::{FileServer, Fingerprinter};
+use file_source::{FileServer, Fingerprinter, GlobPathProvider};
 use futures::{
     compat::{Compat01As03Sink, Future01CompatExt},
     future::{FutureExt, TryFutureExt},
@@ -232,9 +232,10 @@ pub fn file_source(
         .map(|secs| SystemTime::now() - Duration::from_secs(secs));
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
 
+    let path_provider = GlobPathProvider::new(&config.include, &config.exclude);
+
     let file_server = FileServer {
-        include: config.include.clone(),
-        exclude: config.exclude.clone(),
+        path_provider,
         max_read_bytes: config.max_read_bytes,
         start_at_beginning: config.start_at_beginning,
         ignore_before,
