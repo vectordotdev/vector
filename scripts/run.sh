@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # run.sh
 #
@@ -16,9 +17,7 @@
 #       export USE_CONTAINER=none
 #
 
-set -eou pipefail
-
-cd $(dirname $0)/..
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 # A workaround to prevent docker from creating directories at `./target` as
 # root.
@@ -45,15 +44,16 @@ case "$USE_CONTAINER" in
     FILE=$(find ./scripts -name "${1}.*")
 
     if [ -z "$FILE" ]; then
-        echo "Local invocation failed. Script not found!"
-        echo ""
-        echo "    scripts/${1}.*"
-        echo ""
-        echo "To run the ${1} target locally you must place a script in the"
-        echo "/scripts folder that can be executed. Otherwise, you can use the"
-        echo "service defined in /docker-compose.yml."
-        exit 1
+      echo "Local invocation failed. Script not found!"
+      echo ""
+      echo "    scripts/${1}.*"
+      echo ""
+      echo "To run the ${1} target locally you must place a script in the"
+      echo "/scripts folder that can be executed. Otherwise, you can use the"
+      echo "service defined in /docker-compose.yml."
+      exit 1
     fi
 
     ${FILE}
+    ;;
 esac

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # docker-run.sh
 #
@@ -6,8 +7,6 @@
 #
 #   Builds given `scripts/ci-docker-images/*` and runs a command inside of
 #   the provided container based on this image.
-
-set -eou pipefail
 
 #
 # Requirements
@@ -27,18 +26,17 @@ fi
 # Variables
 #
 
-DOCKER=${USE_CONTAINER:-docker}
-tag="$1"
-image="timberiodev/vector-$tag:latest"
+DOCKER="${USE_CONTAINER:-"docker"}"
+TAG="$1"
+IMAGE="timberiodev/vector-$TAG:latest"
 
 #
 # (Re)Build
 #
-if ! $DOCKER inspect $image >/dev/null 2>&1 || [ "${REBUILD_CONTAINER_IMAGE:-true}" == true ]
-then
+if ! $DOCKER inspect "$IMAGE" >/dev/null 2>&1 || [ "${REBUILD_CONTAINER_IMAGE:-"true"}" == "true" ]; then
   $DOCKER build \
-    --file scripts/ci-docker-images/$tag/Dockerfile \
-    --tag $image \
+    --file "scripts/ci-docker-images/$TAG/Dockerfile" \
+    --tag "$IMAGE" \
     .
 fi
 
@@ -49,31 +47,31 @@ fi
 # Set flags for "docker run".
 # The `--rm` flag is used to delete containers on exit.
 # The `--interactive` flag is used to keep `stdin` open.
-docker_flags=("--rm" "--interactive")
+DOCKER_FLAGS=("--rm" "--interactive")
 # If the script's input is connected to a terminal, then
 # use `--tty` to allocate a pseudo-TTY.
 if [ -t 0 ]; then
-  docker_flags+=("--tty")
+  DOCKER_FLAGS+=("--tty")
 fi
 # If `DOCKER_PRIVILEGED` environment variable is set to true,
 # pass `--privileged`. One use case is to register `binfmt`
 # handlers in order to run builders for ARM architectures
 # using `qemu-user`.
-if [ "${DOCKER_PRIVILEGED:-false}" == true ]; then
-  docker_flags+=("--privileged")
+if [ "${DOCKER_PRIVILEGED:-"false"}" == "true" ]; then
+  DOCKER_FLAGS+=("--privileged")
 fi
 
 # pass environment variables prefixed with `PASS_` to the container
 # with removed `PASS_` prefix
 IFS=$'\n'
-for line in $(env | grep '^PASS_' | sed 's/^PASS_//'); do
-  docker_flags+=("-e" "$line")
+for LINE in $(env | grep '^PASS_' | sed 's/^PASS_//'); do
+  DOCKER_FLAGS+=("-e" "$LINE")
 done
 unset IFS
 
 $DOCKER run \
-  "${docker_flags[@]}" \
+  "${DOCKER_FLAGS[@]}" \
   -w "$PWD" \
   -v "$PWD":"$PWD" \
-  $image \
+  "$IMAGE" \
   "${@:2}"

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # check-fmt.sh
 #
@@ -6,6 +7,8 @@
 #
 #   Checks the format of Vector code
 
-set -exuo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+set -x
 
+scripts/check-style.sh
 cargo fmt -- --check

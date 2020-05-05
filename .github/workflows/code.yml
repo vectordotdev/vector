@@ -8,6 +8,7 @@ on:
       - ".github/workflows/code.yml"
       - "lib/*s"
       - "proto/**"
+      - "scripts/**"
       - "src/**"
       - "tests/**"
       - "Cargo.lock"
@@ -21,6 +22,7 @@ on:
       - ".github/workflows/code.yml"
       - "lib/*s"
       - "proto/**"
+      - "scripts/**"
       - "src/**"
       - "tests/**"
       - "Cargo.lock"
@@ -63,6 +65,7 @@ jobs:
       - run: make check-fmt
         env:
           PASS_RUSTFLAGS: "-D warnings"
+          USE_CONTAINER: docker
 
   check-linux:
     runs-on: ubuntu-latest
@@ -72,12 +75,19 @@ jobs:
         env:
           PASS_RUSTFLAGS: "-D warnings"
 
-  # check-version:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v1
-  #     - run: sudo gem install git
-  #     - run: make check-version
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-version
+        env:
+          USE_CONTAINER: docker
+
+  check-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-scripts
 
   check-windows:
     runs-on: windows-latest

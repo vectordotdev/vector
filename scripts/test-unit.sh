@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # test-unit.sh
 #
@@ -6,10 +7,8 @@
 #
 #   Run unit tests
 
-set -euo pipefail
-
 if [ -z "${TARGET:-}" ]; then
-    cargo test --all --no-default-features
-else 
-    cargo test --all --no-default-features --target "${TARGET}"
+  cargo test --workspace --no-default-features
+else
+  cargo test --workspace --no-default-features --target "${TARGET}"
 fi
