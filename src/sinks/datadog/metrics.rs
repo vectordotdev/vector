@@ -19,10 +19,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::sync::atomic::{
-    AtomicI64,
-    Ordering::{Acquire, Release},
-};
+use std::sync::atomic::{AtomicI64, Ordering::SeqCst};
 use tower::Service;
 
 #[derive(Debug, Snafu)]
@@ -115,9 +112,7 @@ impl SinkConfig for DatadogConfig {
         let batch = self.batch.unwrap_or(20, 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let uri = format!("{}/api/v1/series", self.host)
-            .parse::<Uri>()
-            .context(super::UriParseError)?;
+        let uri = build_uri(&self.host)?;
         let timestamp = Utc::now().timestamp();
 
         let sink = DatadogSink {
@@ -151,18 +146,26 @@ impl HttpSink for DatadogSink {
 
     fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
         let now = Utc::now().timestamp();
-        let interval = now - self.last_sent_timestamp.load(Acquire);
-        self.last_sent_timestamp.store(now, Release);
+        let interval = now - self.last_sent_timestamp.load(SeqCst);
+        self.last_sent_timestamp.store(now, SeqCst);
 
         let input = encode_events(events, interval, &self.config.namespace);
         let body = serde_json::to_vec(&input).unwrap();
 
-        http::Request::get(self.uri.clone())
+        http::Request::post(self.uri.clone())
             .header("Content-Type", "application/json")
             .header("DD-API-KEY", self.config.api_key.clone())
             .body(body)
             .unwrap()
     }
+}
+
+fn build_uri(host: &str) -> crate::Result<Uri> {
+    let uri = format!("{}/api/v1/series", host)
+        .parse::<Uri>()
+        .context(super::UriParseError)?;
+
+    Ok(uri)
 }
 
 fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result<super::Healthcheck> {
@@ -373,8 +376,12 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
 mod tests {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::sinks::util::{http::HttpSink, test::load_sink};
     use chrono::offset::TimeZone;
+    use chrono::Utc;
+    use http::{Method, Uri};
     use pretty_assertions::assert_eq;
+    use std::sync::atomic::AtomicI64;
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -388,6 +395,56 @@ mod tests {
         ]
         .into_iter()
         .collect()
+    }
+
+    #[test]
+    fn test_request() {
+        let (sink, _, _) = load_sink::<DatadogConfig>(
+            r#"
+            namespace = "test"
+            api_key = "test"
+        "#,
+        )
+        .unwrap();
+
+        let timestamp = Utc::now().timestamp();
+        let sink = DatadogSink {
+            config: sink,
+            uri: build_uri(&default_host()).unwrap(),
+            last_sent_timestamp: AtomicI64::new(timestamp),
+        };
+
+        let events = vec![
+            Metric {
+                name: "total".into(),
+                timestamp: None,
+                tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.5 },
+            },
+            Metric {
+                name: "check".into(),
+                timestamp: Some(ts()),
+                tags: Some(tags()),
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
+            },
+            Metric {
+                name: "unsupported".into(),
+                timestamp: Some(ts()),
+                tags: Some(tags()),
+                kind: MetricKind::Absolute,
+                value: MetricValue::Counter { value: 1.0 },
+            },
+        ];
+
+        let req = sink.build_request(events);
+
+        assert_eq!(req.method(), Method::POST);
+        assert_eq!(
+            req.uri(),
+            &Uri::from_static("https://api.datadoghq.com/api/v1/series")
+        );
     }
 
     #[test]
