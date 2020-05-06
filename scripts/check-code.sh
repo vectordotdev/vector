@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # check-code.sh
 #
@@ -6,6 +7,4 @@
 #
 #   Checks all Vector code
 
-set -exuo pipefail
-
-cargo check --all --all-targets
+cargo check --workspace --all-targets

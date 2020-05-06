@@ -42,6 +42,13 @@ lazy_static! {
 enum BuildError {
     #[snafu(display("journalctl failed to execute: {}", source))]
     JournalctlSpawn { source: io::Error },
+    #[snafu(display("Cannot use both `units` and `include_units`"))]
+    BothUnitsAndIncludeUnits,
+    #[snafu(display(
+        "The unit {:?} is duplicated in both include_units and exclude_units",
+        unit
+    ))]
+    DuplicatedUnit { unit: String },
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -49,6 +56,8 @@ enum BuildError {
 pub struct JournaldConfig {
     pub current_boot_only: Option<bool>,
     pub units: Vec<String>,
+    pub include_units: Vec<String>,
+    pub exclude_units: Vec<String>,
     pub data_dir: Option<PathBuf>,
     pub batch_size: Option<usize>,
     pub journalctl_path: Option<PathBuf>,
@@ -72,24 +81,37 @@ impl SourceConfig for JournaldConfig {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
 
-        // Map the given unit names into valid systemd units by
-        // appending ".service" if no extension is present.
-        let units = self
-            .units
+        let include_units = match (self.units.is_empty(), self.include_units.is_empty()) {
+            (false, false) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
+            (true, false) => {
+                warn!("The `units` setting is deprecated, use `include_units` instead");
+                &self.units
+            }
+            (_, true) => &self.include_units,
+        };
+
+        let include_units: HashSet<String> = include_units.iter().map(fixup_unit).collect();
+        let exclude_units: HashSet<String> = self.exclude_units.iter().map(fixup_unit).collect();
+        if let Some(unit) = include_units
             .iter()
-            .map(|unit| {
-                if unit.contains('.') {
-                    unit.into()
-                } else {
-                    format!("{}.service", unit)
-                }
-            })
-            .collect::<HashSet<String>>();
+            .filter(|unit| exclude_units.contains(&unit[..]))
+            .next()
+        {
+            let unit = unit.into();
+            return Err(BuildError::DuplicatedUnit { unit }.into());
+        }
 
         let checkpointer = Checkpointer::new(data_dir)
             .map_err(|err| format!("Unable to open checkpoint file: {}", err))?;
 
-        self.source::<Journalctl>(out, shutdown, checkpointer, units, batch_size)
+        self.source::<Journalctl>(
+            out,
+            shutdown,
+            checkpointer,
+            include_units,
+            exclude_units,
+            batch_size,
+        )
     }
 
     fn output_type(&self) -> DataType {
@@ -107,7 +129,8 @@ impl JournaldConfig {
         out: mpsc::Sender<Event>,
         shutdown: ShutdownSignal,
         mut checkpointer: Checkpointer,
-        units: HashSet<String>,
+        include_units: HashSet<String>,
+        exclude_units: HashSet<String>,
         batch_size: usize,
     ) -> crate::Result<super::Source>
     where
@@ -136,7 +159,8 @@ impl JournaldConfig {
 
             let journald_server = JournaldServer {
                 journal,
-                units,
+                include_units,
+                exclude_units,
                 channel: out,
                 shutdown,
                 checkpointer,
@@ -185,6 +209,15 @@ fn create_event(record: Record) -> Event {
     log.try_insert(event::log_schema().source_type_key(), "journald");
 
     log.into()
+}
+
+/// Map the given unit name into a valid systemd unit
+/// by appending ".service" if no extension is present.
+fn fixup_unit(unit: &String) -> String {
+    match unit.contains('.') {
+        true => unit.into(),
+        false => format!("{}.service", unit),
+    }
 }
 
 /// A `JournalSource` is a data source that works as an `Iterator`
@@ -245,7 +278,8 @@ impl Iterator for Journalctl {
 
 struct JournaldServer<J, T> {
     journal: J,
-    units: HashSet<String>,
+    include_units: HashSet<String>,
+    exclude_units: HashSet<String>,
     channel: T,
     shutdown: ShutdownSignal,
     checkpointer: Checkpointer,
@@ -295,16 +329,12 @@ where
                 }
 
                 saw_record = true;
-                if !self.units.is_empty() {
-                    // Make sure the systemd unit is exactly one of the specified units
-                    if let Some(unit) = record.get(&SYSTEMD_UNIT) {
-                        if !self.units.contains(unit) {
-                            continue;
-                        }
-                    } else {
-                        continue;
-                    }
+
+                let unit = record.get(&SYSTEMD_UNIT);
+                if filter_unit(unit, &self.include_units, &self.exclude_units) {
+                    continue;
                 }
+
                 match channel.send(record).wait() {
                     Ok(_) => {}
                     Err(()) => error!(message = "Could not send journald log"),
@@ -364,6 +394,21 @@ fn decode_array(array: &Vec<JsonValue>) -> Option<JsonValue> {
         })
         .collect::<Option<Vec<u8>>>()
         .map(|array| String::from_utf8_lossy(&array).into())
+}
+
+/// Should the given unit name be filtered (excluded)?
+fn filter_unit(
+    unit: Option<&String>,
+    includes: &HashSet<String>,
+    excludes: &HashSet<String>,
+) -> bool {
+    match (unit, includes.is_empty(), excludes.is_empty()) {
+        (None, empty, _) => !empty,
+        (Some(_), true, true) => false,
+        (Some(unit), false, true) => !includes.contains(unit),
+        (Some(unit), true, false) => excludes.contains(unit),
+        (Some(unit), false, false) => !includes.contains(unit) || excludes.contains(unit),
+    }
 }
 
 const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
@@ -504,13 +549,14 @@ mod tests {
         }
     }
 
-    fn run_journal(units: &[&str], cursor: Option<&str>) -> Vec<Event> {
+    fn run_journal(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
         let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
         let tempdir = tempdir().unwrap();
         let mut checkpointer =
             Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
-        let units = HashSet::<String>::from_iter(units.into_iter().map(|&s| s.into()));
+        let include_units = HashSet::<String>::from_iter(iunits.into_iter().map(|&s| s.into()));
+        let exclude_units = HashSet::<String>::from_iter(xunits.into_iter().map(|&s| s.into()));
 
         if let Some(cursor) = cursor {
             checkpointer.set(cursor).expect("Could not set checkpoint");
@@ -518,7 +564,14 @@ mod tests {
 
         let config = JournaldConfig::default();
         let source = config
-            .source::<FakeJournal>(tx, shutdown, checkpointer, units, DEFAULT_BATCH_SIZE)
+            .source::<FakeJournal>(
+                tx,
+                shutdown,
+                checkpointer,
+                include_units,
+                exclude_units,
+                DEFAULT_BATCH_SIZE,
+            )
             .expect("Creating journald source failed");
         let mut rt = runtime();
         rt.spawn(source);
@@ -532,7 +585,7 @@ mod tests {
 
     #[test]
     fn reads_journal() {
-        let received = run_journal(&[], None);
+        let received = run_journal(&[], &[], None);
         assert_eq!(received.len(), 5);
         assert_eq!(
             message(&received[0]),
@@ -548,16 +601,34 @@ mod tests {
     }
 
     #[test]
-    fn filters_units() {
-        let received = run_journal(&["unit.service"], None);
+    fn includes_units() {
+        let received = run_journal(&["unit.service"], &[], None);
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
     #[test]
+    fn excludes_units() {
+        let received = run_journal(&[], &["unit.service", "badunit.service"], None);
+        assert_eq!(received.len(), 3);
+        assert_eq!(
+            message(&received[0]),
+            Value::Bytes("System Initialization".into())
+        );
+        assert_eq!(
+            message(&received[1]),
+            Value::Bytes("Missing timestamp".into())
+        );
+        assert_eq!(
+            message(&received[2]),
+            Value::Bytes("Different timestamps".into())
+        );
+    }
+
+    #[test]
     fn handles_checkpoint() {
-        let received = run_journal(&[], Some("1"));
+        let received = run_journal(&[], &[], Some("1"));
         assert_eq!(received.len(), 4);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
@@ -565,17 +636,39 @@ mod tests {
 
     #[test]
     fn parses_array_messages() {
-        let received = run_journal(&["badunit.service"], None);
+        let received = run_journal(&["badunit.service"], &[], None);
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("¿Hello?".into()));
     }
 
     #[test]
     fn handles_missing_timestamp() {
-        let received = run_journal(&["stdout"], None);
+        let received = run_journal(&["stdout"], &[], None);
         assert_eq!(received.len(), 2);
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140004000));
         assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140005000));
+    }
+
+    #[test]
+    fn filter_unit_works_correctly() {
+        let empty: HashSet<String> = vec![].into_iter().collect();
+        let includes: HashSet<String> = vec!["one", "two"].into_iter().map(Into::into).collect();
+        let excludes: HashSet<String> = vec!["foo", "bar"].into_iter().map(Into::into).collect();
+
+        assert_eq!(filter_unit(None, &empty, &empty), false);
+        assert_eq!(filter_unit(None, &includes, &empty), true);
+        assert_eq!(filter_unit(None, &empty, &excludes), false);
+        assert_eq!(filter_unit(None, &includes, &excludes), true);
+        let one = String::from("one");
+        assert_eq!(filter_unit(Some(&one), &empty, &empty), false);
+        assert_eq!(filter_unit(Some(&one), &includes, &empty), false);
+        assert_eq!(filter_unit(Some(&one), &empty, &excludes), false);
+        assert_eq!(filter_unit(Some(&one), &includes, &excludes), false);
+        let bar = String::from("bar");
+        assert_eq!(filter_unit(Some(&bar), &empty, &empty), false);
+        assert_eq!(filter_unit(Some(&bar), &includes, &empty), true);
+        assert_eq!(filter_unit(Some(&bar), &empty, &excludes), true);
+        assert_eq!(filter_unit(Some(&bar), &includes, &excludes), true);
     }
 
     fn message(event: &Event) -> Value {

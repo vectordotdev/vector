@@ -56,7 +56,7 @@ The full path of the `journalctl` executable. \
 If not set, Vector will search the path for `journalctl`.\
 """
 
-[sources.journald.options.units]
+[sources.journald.options.include_units]
 type = "[string]"
 common = true
 default = []
@@ -64,6 +64,16 @@ examples = [["ntpd", "sysinit.target"]]
 description = """\
 The list of units names to monitor. \
 If empty or not present, all units are accepted. \
+Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.\
+"""
+
+[sources.journald.options.exclude_units]
+type = "[string]"
+common = true
+default = []
+examples = [["badservice", "sysinit.target"]]
+description = """\
+The list of units names to exclude from monitoring. \
 Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.\
 """
 

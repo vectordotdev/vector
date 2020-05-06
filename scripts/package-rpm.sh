@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # package-rpm.sh
 #
@@ -10,22 +11,22 @@
 #
 #   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
 
+TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
+
 #
 # Local vars
 #
 
-project_root=$(pwd)
-archive_name="vector-$TARGET.tar.gz"
-archive_path="target/artifacts/$archive_name"
-package_version="$($project_root/scripts/version.sh)"
+PROJECT_ROOT="$(pwd)"
+ARCHIVE_NAME="vector-$TARGET.tar.gz"
+ARCHIVE_PATH="target/artifacts/$ARCHIVE_NAME"
+PACKAGE_VERSION="$("$PROJECT_ROOT/scripts/version.sh")"
 
 #
 # Header
 #
 
-set -eu
-
-echo "Packaging .rpm for $archive_name"
+echo "Packaging .rpm for $ARCHIVE_NAME"
 echo "TARGET: $TARGET"
 
 #
@@ -48,13 +49,12 @@ export RELEASE=1
 # The RPM spec does not like a leading `v` or `-` in the version name.
 # Therefore we clean the version so that the `rpmbuild` command does
 # not fail.
-export CLEANED_VERSION=$package_version
-CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/-/\./g')
+export CLEANED_VERSION="${PACKAGE_VERSION//-/.}"
 
 # The arch is the first part of the target
 # For some architectures, like armv7hl it doesn't match the arch
 # from Rust target triple and needs to be specified manually.
-ARCH=${ARCH:-$(echo $TARGET | cut -d'-' -f1)}
+ARCH="${ARCH:-"$(echo "$TARGET" | cut -d'-' -f1)"}"
 
 # Prepare rpmbuild dir
 RPMBUILD_DIR="$(mktemp -td "rpmbuild.XXXX")"
@@ -73,7 +73,7 @@ cp -av distribution/init.d/. "$RPMBUILD_DIR/SOURCES/init.d"
 cp -av distribution/systemd/. "$RPMBUILD_DIR/SOURCES/systemd"
 
 # Copy the archive into the sources dir
-cp -av $archive_path "$RPMBUILD_DIR/SOURCES/vector-$ARCH.tar.gz"
+cp -av "$ARCHIVE_PATH" "$RPMBUILD_DIR/SOURCES/vector-$ARCH.tar.gz"
 
 # Perform the build.
 rpmbuild \
