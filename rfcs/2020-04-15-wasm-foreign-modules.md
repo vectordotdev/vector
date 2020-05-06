@@ -95,10 +95,8 @@ Having to, for example, use two transforms just to add 1 field and remove anothe
 We noted that the existing lua runtime was able to accomplish these tasks quite elegantly, however it was an order of
 magnitude slower than a native transform.
 
-```bash
-lua_add_fields/native   time:   [85.110 ms 85.159 ms 85.222 ms]
-lua_add_fields/v1       time:   [303.43 ms 306.10 ms 308.00 ms]
-```
+![The Lua transform (v2) operating on a log event with 8 string fields.](./2020-04-15-wasm-plugins/lua-8.svg)
+![The native `add_fields` transform operating on a log event with 8 string fields.](./2020-04-15-wasm-plugins/native-8.svg)
 
 Users shouldn't pay a high price just for a few lines saved in a configuration file. They shouldn't feel frustration
 when building these kinds of pipelines either.
