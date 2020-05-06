@@ -1,3 +1,4 @@
+use super::controller::Controller;
 use super::future::ResponseFuture;
 
 use tower03::Service;
@@ -7,16 +8,16 @@ use std::fmt;
 use std::future::Future;
 use std::mem;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll};
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio::sync::OwnedSemaphorePermit;
 
 /// Enforces a limit on the concurrent number of requests the underlying
-/// service can handle.
+/// service can handle. Automatically expands and contracts the actual
+/// concurrency limit depending on observed request response behavior.
 #[derive(Debug)]
 pub struct AutoConcurrencyLimit<T> {
     inner: T,
-    semaphore: Arc<Semaphore>,
+    controller: Controller,
     state: State,
 }
 
@@ -27,11 +28,11 @@ enum State {
 }
 
 impl<T> AutoConcurrencyLimit<T> {
-    /// Create a new concurrency limiter.
+    /// Create a new automated concurrency limiter.
     pub(crate) fn new(inner: T, max: usize) -> Self {
         AutoConcurrencyLimit {
             inner,
-            semaphore: Arc::new(Semaphore::new(max)),
+            controller: Controller::new(max, 1),
             state: State::Empty,
         }
     }
@@ -54,7 +55,7 @@ where
                     let permit = ready!(fut.poll(cx));
                     State::Ready(permit)
                 }
-                State::Empty => State::Waiting(Box::pin(self.semaphore.clone().acquire_owned())),
+                State::Empty => State::Waiting(Box::pin(self.controller.acquire())),
             };
         }
     }
@@ -82,7 +83,7 @@ where
     fn clone(&self) -> AutoConcurrencyLimit<S> {
         AutoConcurrencyLimit {
             inner: self.inner.clone(),
-            semaphore: self.semaphore.clone(),
+            controller: self.controller.clone(),
             state: State::Empty,
         }
     }
