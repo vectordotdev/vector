@@ -9,8 +9,15 @@ use futures::compat::Compat;
 use futures01::{sync::mpsc, Future, Sink, Stream};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::{io, sync::Mutex, thread};
 use tokio::sync::broadcast::{channel, Sender};
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("CRITICAL_SECTION poisoned"))]
+    CriticalSectionPoisoned,
+}
 
 lazy_static! {
     static ref CRITICAL_SECTION: Mutex<Option<Sender<Bytes>>> = Mutex::default();
@@ -77,7 +84,7 @@ where
     // Implemented solution relies on having a copy of optional sender behind a global mutex,
     // and have stdin sources and background thread synchronize on it.
     //
-    // When source is builded it must:
+    // When source is built it must:
     // 1. enter critical section by locking mutex.
     // 2. if sender isn't present start background thread and set sender.
     // 3. gain receiver by calling subscribe on the sender.
@@ -87,7 +94,7 @@ where
     //
     // Background thread should be started with copy of the sender.
     //
-    // Once background thread want's to stop it must:
+    // Once background thread wants to stop it must:
     // 1. enter critical section by locking mutex.
     // 2. if there are receivers it must abort the stop.
     // 3. remove sender.
@@ -105,50 +112,52 @@ where
 
     let mut guard = CRITICAL_SECTION
         .lock()
-        .map_err(|_| "CRITICAL_SECTION poisoned.")?;
-    let receiver = if let Some(sender) = guard.as_ref() {
-        sender.subscribe()
-    } else {
-        let (sender, receiver) = channel(1024);
-        *guard = Some(sender.clone());
+        .map_err(|_| BuildError::CriticalSectionPoisoned)?;
+    let receiver = match guard.as_ref() {
+        Some(sender) => sender.subscribe(),
+        None => {
+            let (sender, receiver) = channel(1024);
+            *guard = Some(sender.clone());
 
-        // Start the background thread
-        thread::spawn(move || {
-            info!("Capturing STDIN.");
+            // Start the background thread
+            thread::spawn(move || {
+                info!("Capturing STDIN.");
 
-            for line in stdin.lines() {
-                match line {
-                    Err(e) => {
-                        error!(message = "Unable to read from source.", error = %e);
-                        break;
-                    }
-                    Ok(line) => {
-                        if sender.send(Bytes::from(line)).is_err() {
-                            // There are no active receivers.
-                            // Try to stop.
-                            let mut guard =
-                                CRITICAL_SECTION.lock().expect("CRITICAL_SECTION poisoned");
-                            if sender.receiver_count() > 0 {
-                                // A new new receiver has shown up.
+                for line in stdin.lines() {
+                    match line {
+                        Err(e) => {
+                            error!(message = "Unable to read from source.", error = %e);
+                            break;
+                        }
+                        Ok(line) => {
+                            if sender.send(Bytes::from(line)).is_err() {
+                                // There are no active receivers.
+                                // Try to stop.
+                                let mut guard =
+                                    CRITICAL_SECTION.lock().expect("CRITICAL_SECTION poisoned");
+
+                                if sender.receiver_count() == 0 {
+                                    guard.take();
+                                    return;
+                                }
+
+                                // A new receiver has shown up.
 
                                 // It's fine not to resend the line since it came from
                                 // before this new receiver has shown up.
-                                continue;
                             }
-                            guard.take();
-                            return;
                         }
                     }
                 }
-            }
 
-            CRITICAL_SECTION
-                .lock()
-                .expect("CRITICAL_SECTION poisoned")
-                .take();
-        });
+                CRITICAL_SECTION
+                    .lock()
+                    .expect("CRITICAL_SECTION poisoned")
+                    .take();
+            });
 
-        receiver
+            receiver
+        }
     };
     std::mem::drop(guard);
 
