@@ -1,6 +1,7 @@
 //! Limit the max number of requests being concurrently processed.
 
-pub mod future;
+mod controller;
+mod future;
 mod layer;
 mod service;
 
