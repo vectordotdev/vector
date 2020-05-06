@@ -91,17 +91,6 @@ where
     }
 }
 
-#[cfg(feature = "load")]
-impl<S> crate::load::Load for AutoConcurrencyLimit<S>
-where
-    S: crate::load::Load,
-{
-    type Metric = S::Metric;
-    fn load(&self) -> Self::Metric {
-        self.inner.load()
-    }
-}
-
 impl<S> Clone for AutoConcurrencyLimit<S>
 where
     S: Clone,
