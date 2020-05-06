@@ -105,6 +105,24 @@ relevant_when = {strategy = "basic"}
 required = true
 description = "The basic authentication user name."
 
+[sinks.elasticsearch.options.aws]
+type = "table"
+common = false
+description = "Options for the AWS connections."
+
+[sinks.elasticsearch.options.aws.children.region]
+type = "string"
+common = true
+examples = ["us-east-1"]
+relevant_when = {strategy = "aws"}
+required = false
+description = """\
+The [AWS region][urls.aws_regions] of the target service. \
+This defaults to the region named in the host parameter, \
+or the value of the `$AWS_REGION` or `$AWS_DEFAULT_REGION` environment \
+variables if that cannot be determined, or "us-east-1".\
+"""
+
 [sinks.elasticsearch.options.compression]
 type = "string"
 common = true

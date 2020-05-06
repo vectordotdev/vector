@@ -129,7 +129,7 @@ bench-wasm: build-wasm-tests  ### Run engine tests.
 
 check: check-all ## Default target, check everything
 
-check-all: check-code check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features ## Check everything
+check-all: check-code check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
 
 check-code: ## Check code
 	$(RUN) check-code
@@ -157,6 +157,9 @@ check-examples: build ## Check that the config/exmaples files are valid
 
 check-blog: ## Check that all blog posts are signed and valid
 	$(RUN) check-blog
+
+check-scripts: ## Check that scipts do not have common mistakes
+	$(RUN) check-scripts
 
 ##@ Packaging
 
@@ -233,16 +236,16 @@ release-homebrew: ## Release to timberio Homebrew tap
 	$(RUN) release-homebrew
 
 release-prepare: ## Prepares the release with metadata and highlights
-	$(RUN) release-prepare
+	@scripts/release-prepare.sh
 
 release-push: ## Push new Vector version
-	$(RUN) release-push
+	@scripts/release-push.sh
 
 release-rollback: ## Rollback pending release changes
-	$(RUN) release-rollback
+	@scripts/release-rollback.sh
 
 release-s3: ## Release artifacts to S3
-	$(RUN) release-s3
+	@scripts/release-s3.sh
 
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
@@ -318,7 +321,7 @@ slim-builds: ## Updates the Cargo config to product disk optimized builds, usefu
 	$(RUN) slim-builds
 
 target-graph: ## Display dependencies between targets in this Makefile
-	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST))))/.. && docker-compose run --rm target-graph $(TARGET)
+	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))) && docker-compose run --rm target-graph $(TARGET)
 
 version: ## Get the current Vector version
 	$(RUN) version

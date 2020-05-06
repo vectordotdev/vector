@@ -3,7 +3,7 @@ use crate::{
     emit,
     event::Event,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
-    region::region_from_endpoint,
+    region::{region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use tower::Service;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -53,6 +54,7 @@ pub struct ElasticSearchConfig {
     pub headers: Option<HashMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
 
+    pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsOptions>,
 }
 
@@ -291,7 +293,10 @@ impl ElasticSearchCommon {
         };
 
         let base_url = config.host.clone();
-        let region = region_from_endpoint(&config.host)?;
+        let region = match &config.aws {
+            Some(region) => Region::try_from(region)?,
+            None => region_from_endpoint(&config.host)?,
+        };
 
         // Test the configured host, but ignore the result
         let uri = format!("{}/_test", &config.host);

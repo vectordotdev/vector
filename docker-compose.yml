@@ -130,7 +130,7 @@ services:
       - ./target/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
     user: $USER
-    command: cargo fmt -- --check
+    command: scripts/check-fmt.sh
 
   check-style:
     build:
@@ -194,6 +194,16 @@ services:
     working_dir: $PWD
     user: $USER
     command: ./scripts/check-blog-signatures.rb
+
+  check-scripts:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/checker-shellcheck/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: ./scripts/check-scripts.sh
 
   package-archive-x86_64-unknown-linux-musl:
     build:
