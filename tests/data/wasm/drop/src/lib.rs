@@ -6,7 +6,7 @@ pub extern "C" fn init() -> *mut Registration {
 }
 
 #[no_mangle]
-pub extern "C" fn process() -> usize {
+pub extern "C" fn process(data: u64, length: u64) -> usize {
     0
 }
 

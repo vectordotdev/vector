@@ -1,14 +1,10 @@
-use criterion::{black_box, criterion_group, Benchmark, Criterion};
+use criterion::{black_box, criterion_group, Benchmark, BenchmarkId, Criterion};
 use serde_json::Value;
 use std::{collections::HashMap, fs, io::Read, path::Path};
 use vector::{
     transforms::{wasm::Wasm, Transform},
     Event,
 };
-
-fn parse_config(s: &str) -> vector::Result<Wasm> {
-    Wasm::new(toml::from_str(s).unwrap())
-}
 
 fn parse_event_artifact(path: impl AsRef<Path>) -> vector::Result<Event> {
     let mut event = Event::new_empty_log();
@@ -24,40 +20,22 @@ fn parse_event_artifact(path: impl AsRef<Path>) -> vector::Result<Event> {
     Ok(event)
 }
 
-pub fn basics(c: &mut Criterion) {
+pub fn protobuf(c: &mut Criterion) {
+    let input = parse_event_artifact("tests/data/wasm/protobuf/demo.json").unwrap();
+    let cloned_input = input.clone();
     c.bench(
-        "wasm",
-        Benchmark::new("protobuf", move |b| {
-            let mut transform = parse_config(
-                r#"
-            module = "tests/data/wasm/protobuf/protobuf.wat"
-            "#,
+        "wasm/protobuf",
+        Benchmark::new("wasm", move |b| {
+            let input = cloned_input.clone();
+            let mut transform = Wasm::new(
+                toml::from_str(
+                    r#"
+                module = "tests/data/wasm/protobuf/protobuf.wat"
+                "#,
+                )
+                .unwrap(),
             )
             .unwrap();
-
-            let input = parse_event_artifact("tests/data/wasm/protobuf/demo.json").unwrap();
-
-            b.iter_with_setup(
-                || input.clone(),
-                |input| {
-                    let output = transform.transform(input);
-                    black_box(output)
-                },
-            )
-        }),
-    );
-    c.bench(
-        "wasm",
-        Benchmark::new("noop", move |b| {
-            let mut transform = parse_config(
-                r#"
-            module = "tests/data/wasm/noop/noop.wat"
-            "#,
-            )
-            .unwrap();
-
-            let input = Event::new_empty_log();
-
             b.iter_with_setup(
                 || input.clone(),
                 |input| {
@@ -69,4 +47,136 @@ pub fn basics(c: &mut Criterion) {
     );
 }
 
-criterion_group!(wasm, basics);
+pub fn drop(criterion: &mut Criterion) {
+    let transforms: Vec<(&str, Box<Transform>)> = vec![
+        (
+            "lua",
+            Box::new(
+                vector::transforms::lua::v2::Lua::new(
+                    &toml::from_str(
+                        r#"
+                hooks.process = """
+                function (event, emit)
+                end
+                """
+                "#,
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            ),
+        ),
+        (
+            "wasm",
+            Box::new(
+                Wasm::new(
+                    toml::from_str(
+                        r#"
+              module = "tests/data/wasm/drop/drop.wat"
+              "#,
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            ),
+        ),
+    ];
+    let parameters = vec![0, 2, 8, 16];
+
+    bench_group_transforms_over_parameterized_event_sizes(
+        criterion,
+        "wasm/drop",
+        transforms,
+        parameters,
+    );
+}
+
+pub fn add_fields(criterion: &mut Criterion) {
+    let transforms: Vec<(&str, Box<Transform>)> = vec![
+        (
+            "lua",
+            Box::new(
+                vector::transforms::lua::v2::Lua::new(
+                    &toml::from_str(
+                        r#"
+                hooks.process = """
+                function (event, emit)
+                    event.log.test_key = "test_value"
+                    event.log.test_key2 = "test_value2"
+                    emit(event)
+                end
+                """
+                "#,
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            ),
+        ),
+        (
+            "wasm",
+            Box::new(
+                Wasm::new(
+                    toml::from_str(
+                        r#"
+              module = "tests/data/wasm/add_fields/add_fields.wat"
+              "#,
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            ),
+        ),
+        (
+            "native",
+            Box::new({
+                let mut fields = indexmap::IndexMap::default();
+                fields.insert("test_key".into(), "test_value".into());
+                fields.insert("test_key2".into(), "test_value2".into());
+                vector::transforms::add_fields::AddFields::new(fields, false)
+            }),
+        ),
+    ];
+    let parameters = vec![0, 2, 8, 16];
+
+    bench_group_transforms_over_parameterized_event_sizes(
+        criterion,
+        "wasm/add_fields",
+        transforms,
+        parameters,
+    );
+}
+
+fn bench_group_transforms_over_parameterized_event_sizes(
+    criterion: &mut Criterion,
+    group: &str,
+    transforms: Vec<(&str, Box<dyn Transform>)>,
+    parameters: Vec<usize>,
+) {
+    let mut group = criterion.benchmark_group(group);
+    for (name, mut transform) in transforms {
+        for &parameter in &parameters {
+            let mut input = Event::new_empty_log();
+            for key in 0..parameter {
+                input
+                    .as_mut_log()
+                    .insert(format!("key-{}", key), format!("value-{}", key));
+            }
+
+            let id = BenchmarkId::new(name.clone(), parameter);
+
+            group.bench_with_input(id, &input, |bencher, input| {
+                bencher.iter_with_setup(
+                    || input.clone(),
+                    |input| {
+                        let output = transform.transform(input);
+                        black_box(output)
+                    },
+                )
+            });
+        }
+    }
+    group.finish();
+}
+
+criterion_group!(wasm, protobuf, drop, add_fields);

@@ -1,5 +1,5 @@
 [package]
-name = "noop"
+name = "drop"
 version = "0.1.0"
 authors = ["Ana Hobden <operator@hoverbear.org>"]
 edition = "2018"

@@ -34,7 +34,8 @@ members = [
   "lib/vector-wasm",
   # Wasm test modules.
   "tests/data/wasm/protobuf",
-  "tests/data/wasm/noop",
+  "tests/data/wasm/drop",
+  "tests/data/wasm/add_fields",
 ]
 
 [dependencies]
