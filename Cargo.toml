@@ -194,6 +194,7 @@ trust-dns-proto = "0.8.0"
 dirs = "2.0.2"
 tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
+assert_cmd = "0.11"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
