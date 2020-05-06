@@ -5,16 +5,20 @@
 //!
 //! **Note:** This code is experimental.
 
+use crate::event::LogEvent;
 use crate::{internal_events, Event, Result};
+use bytes::Bytes;
 use context::EventBuffer;
 use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Region};
 use lucet_wasi::WasiCtxBuilder;
 use lucetc::{Bindings, Lucetc, LucetcOpts};
 use serde::{Deserialize, Serialize};
+use std::collections::LinkedList;
 use std::{
     collections::HashMap,
     fmt::Debug,
     fs,
+    io::{Read, Write},
     path::{Path, PathBuf},
 };
 use tracing::Level;
@@ -244,19 +248,35 @@ impl WasmModule {
         Ok(wasm_module)
     }
 
-    pub fn process(&mut self, event: Event) -> Result<Option<Event>> {
+    pub fn process(&mut self, mut data: Event) -> Result<LinkedList<Event>> {
         let internal_event_processing = internal_events::EventProcessing::begin(self.role);
 
-        let engine_context = EventBuffer::new(event);
-        self.instance.insert_embed_ctx(engine_context);
+        self.instance.insert_embed_ctx(EventBuffer::new());
 
-        let _worked = self.instance.run("process", &[])?;
+        // We unfortunately can't pass our `Event` type over FFI.
+        // Copy 1
+        let data_buf = serde_json::to_vec(data.as_mut_log())?;
+        let guest_data_size = data_buf.len() as u64;
+        let mut guest_data_ptr = self
+            .instance
+            .run("allocate_buffer", &[guest_data_size.into()])?
+            .returned()?
+            .as_u64();
+        let guest_data_buf: &mut [u8] = self.instance.heap_mut()
+            [guest_data_ptr as usize..(guest_data_ptr as usize + guest_data_size as usize)]
+            .as_mut();
+        // Copy 2
+        guest_data_buf.copy_from_slice(&data_buf);
+
+        let _worked = self
+            .instance
+            .run("process", &[guest_data_ptr.into(), guest_data_size.into()])?;
 
         let engine_context: EventBuffer = self
             .instance
             .remove_embed_ctx()
             .ok_or("Could not retrieve context after processing.")?;
-        let EventBuffer { event: out } = engine_context;
+        let EventBuffer { events: out } = engine_context;
 
         internal_event_processing.complete();
         Ok(out)
@@ -283,7 +303,7 @@ fn protobuf() -> Result<()> {
     let mut buf = String::new();
     test_file.read_to_string(&mut buf)?;
     let mut event = Event::new_empty_log();
-    event.as_mut_log().insert("test", buf);
+    event.as_mut_log().insert("message", buf);
 
     // Refresh the test json.
     let event_string = serde_json::to_string(&event.as_log())?;
@@ -298,7 +318,7 @@ fn protobuf() -> Result<()> {
     let out = module.process(event.clone())?;
     module.shutdown()?;
 
-    let retval = out.unwrap();
+    let retval = out.into_iter().next().unwrap();
     assert_eq!(
         retval
             .as_log()

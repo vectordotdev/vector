@@ -13,10 +13,7 @@ where
     target: PhantomData<Target>,
 }
 
-impl<Target> From<*mut Registration> for GuestPointer<Target>
-where
-    Target: Clone,
-{
+impl From<*mut Registration> for GuestPointer<Registration> {
     fn from(guest_pointer: *mut Registration) -> Self {
         Self {
             guest_pointer: guest_pointer as usize,
@@ -32,5 +29,8 @@ where
     pub(crate) fn deref(self, heap: &mut [u8]) -> Result<Target, std::ffi::NulError> {
         let host_pointer = heap[self.guest_pointer..].as_mut_ptr() as *const Target;
         Ok(unsafe { (*host_pointer).clone() })
+    }
+    pub(crate) fn guest_pointer(&mut self) -> usize {
+        self.guest_pointer
     }
 }
