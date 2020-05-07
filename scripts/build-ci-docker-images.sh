@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # build.sh
 #
@@ -7,24 +8,22 @@
 #   Used to build the variety of Docker images used to build, test, package,
 #   and release Vector. This is primarily used in CI.
 
-set -eou pipefail
-
 # Builds a generic Docker image with a `vector-` prefix. The name
 # maps to the contained folder.
-function build_image() {
-  local tag=$1
+build_image() {
+  local TAG="$1"
 
   docker build \
-    -t timberiodev/vector-$tag:latest \
-    -f scripts/ci-docker-images/$tag/Dockerfile \
+    -t "timberiodev/vector-$TAG:latest" \
+    -f "scripts/ci-docker-images/$TAG/Dockerfile" \
     .
 
-  docker push timberiodev/vector-$tag:latest
+  docker push "timberiodev/vector-$TAG:latest"
 }
 
 # The following images are basic Docker images that do not extend a
 # cross base image.
-all_images=(
+ALL_IMAGES=(
   build-aarch64-unknown-linux-musl
   builder-x86_64-unknown-linux-gnu
   builder-x86_64-unknown-linux-musl
@@ -41,7 +40,7 @@ all_images=(
   verifier-ubuntu-18-04
   verifier-ubuntu-19-04
 )
-for image in ${*:-${all_images[*]}}
-do
-  build_image $image
+
+for IMAGE in "${@:-"${ALL_IMAGES[@]}"}"; do
+  build_image "$IMAGE"
 done

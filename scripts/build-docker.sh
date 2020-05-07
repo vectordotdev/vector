@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # build-docker.sh
 #
@@ -7,21 +8,25 @@
 #   Builds the Vector docker images and optionally
 #   pushes it to the Docker registry
 
-set -eux
+set -x
 
-CHANNEL=${CHANNEL:-$(scripts/util/release-channel.sh)}
-VERSION=${VERSION:-$(scripts/version.sh)}
-DATE=${DATE:-$(date -u +%Y-%m-%d)}
-PUSH=${PUSH:-}
-PLATFORM=${PLATFORM:-}
+CHANNEL="${CHANNEL:-"$(scripts/util/release-channel.sh)"}"
+VERSION="${VERSION:-"$(scripts/version.sh)"}"
+DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
+PUSH="${PUSH:-}"
+PLATFORM="${PLATFORM:-}"
+REPO="${REPO:-"timberio/vector"}"
 
 #
 # Functions
 #
 
 build() {
-  base=$1
-  version=$2
+  local BASE="$1"
+  local VERSION="$2"
+
+  local TAG="$REPO:$VERSION-$BASE"
+  local DOCKERFILE="distribution/docker/$BASE/Dockerfile"
 
   if [ -n "$PLATFORM" ]; then
     export DOCKER_CLI_EXPERIMENTAL=enabled
@@ -32,17 +37,17 @@ build() {
 
     docker buildx build \
       --platform="$PLATFORM" \
-      --tag timberio/vector:$version-$base \
+      --tag "$TAG" \
       target/artifacts \
-      -f distribution/docker/$base/Dockerfile ${PUSH:+--push}
+      -f "$DOCKERFILE" ${PUSH:+--push}
   else
     docker build \
-      --tag timberio/vector:$version-$base \
+      --tag "$TAG" \
       target/artifacts \
-      -f distribution/docker/$base/Dockerfile
+      -f "$DOCKERFILE"
 
     if [ -n "$PUSH" ]; then
-      docker push timberio/vector:$version-$base
+      docker push "$TAG"
     fi
   fi
 }
@@ -51,20 +56,24 @@ build() {
 # Build
 #
 
-echo "Building timberio/vector:* Docker images"
+echo "Building $REPO:* Docker images"
 
 if [[ "$CHANNEL" == "latest" ]]; then
-  version_exact=$VERSION
-  version_minor_x=$(echo $VERSION | sed 's/\.[0-9]*$/.X/g')
-  version_major_x=$(echo $VERSION | sed 's/\.[0-9]*\.[0-9]*$/.X/g')
+  VERSION_EXACT="$VERSION"
+  # shellcheck disable=SC2001
+  VERSION_MINOR_X=$(echo "$VERSION" | sed 's/\.[0-9]*$/.X/g')
+  # shellcheck disable=SC2001
+  VERSION_MAJOR_X=$(echo "$VERSION" | sed 's/\.[0-9]*\.[0-9]*$/.X/g')
 
-  for i in $version_exact $version_minor_x $version_major_x latest; do
-    build alpine $i
-    build debian $i
+  for VERSION_TAG in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X" latest; do
+    build alpine "$VERSION_TAG"
+    build debian "$VERSION_TAG"
   done
 elif [[ "$CHANNEL" == "nightly" ]]; then
-  for i in nightly-$DATE nightly; do
-    build alpine $i
-    build debian $i
+  for VERSION_TAG in "nightly-$DATE" nightly; do
+    build alpine "$VERSION_TAG"
+    build debian "$VERSION_TAG"
   done
+elif [[ "$CHANNEL" == "test" ]]; then
+  build "${BASE:-"alpine"}" "${TAG:-"test"}"
 fi

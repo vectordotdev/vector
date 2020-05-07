@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eou pipefail
+set -euo pipefail
 
 # prepare-target-dir.sh
 #
@@ -8,13 +8,15 @@ set -eou pipefail
 #   A script to work around the issue with Docker volume mounts having
 #   incorrect permissions.
 #
-#   Implement a trick: We create all the paths we use as Docker volume
-#   mounts manually, so that when we use them as mounts, they're already there
+#   Implements a trick: we create all the paths we use as Docker volume mounts
+#   manually, so that when we use them as mounts, they're already there
 #   and Docker doesn't create them owned as uid 0.
 
-DIRS=$(grep -o '\./target/[^:]*:' < docker-compose.yml | sed 's/:$//' | sort | uniq)
+list-target-mounts() {
+  grep -o '\./target/[^:]*:' < docker-compose.yml | sed 's/:$//' | sort | uniq
+}
 
-for DIR in ${DIRS}
-do
-    mkdir -p "${DIR}"
-done
+DIRS=()
+while IFS='' read -r LINE; do DIRS+=("$LINE"); done < <(list-target-mounts)
+
+mkdir -p "${DIRS[@]}"

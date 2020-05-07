@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # package-archive.sh
 #
@@ -19,33 +20,34 @@
 # Env Vars
 #
 
-ABORT=${ABORT:-false}
-ARCHIVE_TYPE=${ARCHIVE_TYPE:-tar.gz}
-NATIVE_BUILD=${NATIVE_BUILD:-true}
+ABORT="${ABORT:-"false"}"
+ARCHIVE_TYPE="${ARCHIVE_TYPE:-"tar.gz"}"
+NATIVE_BUILD="${NATIVE_BUILD:-"true"}"
+TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
 
 #
 # Local Vars
 #
 
 if [ "$NATIVE_BUILD" != "true" ]; then
-  target_dir="target/$TARGET"
+  TARGET_DIR="target/$TARGET"
 else
-  target_dir="target"
+  TARGET_DIR="target"
 fi
 
-archive_dir_name="vector-$TARGET"
-archive_dir="$target_dir/$archive_dir_name"
-archive_name="vector-$TARGET.$ARCHIVE_TYPE"
-artifacts_dir="target/artifacts"
+ARCHIVE_DIR_NAME="vector-$TARGET"
+ARCHIVE_DIR="$TARGET_DIR/$ARCHIVE_DIR_NAME"
+ARCHIVE_NAME="vector-$TARGET.$ARCHIVE_TYPE"
+ARTIFACTS_DIR="target/artifacts"
 
 #
 # Abort if possible
 #
 
-if [ -f "$artifacts_dir/$archive_name" ] && [ "$ABORT" == "true" ]; then
+if [ -f "$ARTIFACTS_DIR/$ARCHIVE_NAME" ] && [ "$ABORT" == "true" ]; then
   echo "Archive already exists at:"
   echo ""
-  echo "    $artifacts_dir/$archive_name"
+  echo "    $ARTIFACTS_DIR/$ARCHIVE_NAME"
   echo ""
   echo "Remove the archive or set ABORT to \"false\"."
 
@@ -55,8 +57,6 @@ fi
 #
 # Header
 #
-
-set -eu
 
 echo "Packaging the Vector archive"
 echo "ABORT: $ABORT"
@@ -68,8 +68,8 @@ echo "TARGET: $TARGET"
 # Build the archive directory
 #
 
-rm -rf $archive_dir
-mkdir -p $archive_dir
+rm -rf "$ARCHIVE_DIR"
+mkdir -p "$ARCHIVE_DIR"
 
 #
 # Copy files to archive dir
@@ -78,60 +78,62 @@ mkdir -p $archive_dir
 # Copy root level files
 
 if [[ $TARGET == *windows* ]]; then
-  suffix=".txt"
+  SUFFIX=".txt"
 else
-  suffix=""
+  SUFFIX=""
 fi
-cp -av README.md $archive_dir/README.md$suffix
+cp -av README.md "$ARCHIVE_DIR/README.md$SUFFIX"
 # Create the license file for binary distributions (LICENSE + NOTICE)
-cat LICENSE NOTICE > $archive_dir/LICENSE$suffix
+cat LICENSE NOTICE > "$ARCHIVE_DIR/LICENSE$SUFFIX"
 
 # Copy the vector binary to /bin
 
-mkdir -p $archive_dir/bin
-cp -av $target_dir/release/vector $archive_dir/bin
+mkdir -p "$ARCHIVE_DIR/bin"
+cp -av "$TARGET_DIR/release/vector" "$ARCHIVE_DIR/bin"
 
 # Copy the entire config dir to /config
 
-cp -rv config $archive_dir/config
+cp -rv config "$ARCHIVE_DIR/config"
+
 # Remove templates sources
-rm $archive_dir/config/*.erb
+rm "$ARCHIVE_DIR/config"/*.erb
 
 # Copy /etc useful files
 
 if [[ $TARGET == *linux* ]]; then
-  mkdir -p $archive_dir/etc/systemd
-  cp -av distribution/systemd/vector.service $archive_dir/etc/systemd
-  mkdir -p $archive_dir/etc/init.d
-  cp -av distribution/init.d/vector $archive_dir/etc/init.d
+  mkdir -p "$ARCHIVE_DIR/etc/systemd"
+  cp -av distribution/systemd/vector.service "$ARCHIVE_DIR/etc/systemd"
+  mkdir -p "$ARCHIVE_DIR/etc/init.d"
+  cp -av distribution/init.d/vector "$ARCHIVE_DIR/etc/init.d"
 fi
 
 #
 # Build the release archive
 #
 
-_old_dir=$(pwd)
-cd $target_dir
-if [ "$ARCHIVE_TYPE" == "tar.gz" ]; then
-  tar cvf - ./$archive_dir_name | gzip -9 > $archive_name
-elif [ "$ARCHIVE_TYPE" == "zip" ] && [[ $TARGET == *windows* ]]; then
-  powershell '$progressPreference = "silentlyContinue"; Compress-Archive -DestinationPath vector-'$TARGET'.'$ARCHIVE_TYPE' -Path "./'$archive_dir_name'/*"'
-else
-  echo "Unsupported combination of ARCHIVE_TYPE and TARGET"
-  exit 1
-fi
-cd $_old_dir
+(
+  cd "$TARGET_DIR"
+  if [ "$ARCHIVE_TYPE" == "tar.gz" ]; then
+    tar cvf - "./$ARCHIVE_DIR_NAME" | gzip -9 > "$ARCHIVE_NAME"
+  elif [ "$ARCHIVE_TYPE" == "zip" ] && [[ $TARGET == *windows* ]]; then
+    # shellcheck disable=SC2016
+    powershell '$progressPreference = "silentlyContinue"; Compress-Archive -DestinationPath vector-'"$TARGET"'.'"$ARCHIVE_TYPE"' -Path "./'"$ARCHIVE_DIR_NAME"'/*"'
+  else
+    echo "Unsupported combination of ARCHIVE_TYPE and TARGET"
+    exit 1
+  fi
+)
 
 #
 # Move to the artifacts dir
 #
 
-mkdir -p $artifacts_dir
-mv -v $target_dir/$archive_name $artifacts_dir
-echo "Moved $target_dir/$archive_name to $artifacts_dir"
+mkdir -p "$ARTIFACTS_DIR"
+mv -v "$TARGET_DIR/$ARCHIVE_NAME" "$ARTIFACTS_DIR"
+echo "Moved $TARGET_DIR/$ARCHIVE_NAME to $ARTIFACTS_DIR"
 
 #
 # Cleanup
 #
 
-rm -rf $archive_dir
+rm -rf "$ARCHIVE_DIR"

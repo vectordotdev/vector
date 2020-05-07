@@ -517,6 +517,23 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   data_dir = "/var/lib/vector"
 
+  # The list of units names to exclude from monitoring. Unit names lacking a
+  # `"."` will have `".service"` appended to make them a valid service unit name.
+  #
+  # * optional
+  # * default: []
+  # * type: [string]
+  exclude_units = ["badservice", "sysinit.target"]
+
+  # The list of units names to monitor. If empty or not present, all units are
+  # accepted. Unit names lacking a `"."` will have `".service"` appended to make
+  # them a valid service unit name.
+  #
+  # * optional
+  # * default: []
+  # * type: [string]
+  include_units = ["ntpd", "sysinit.target"]
+
   # The full path of the `journalctl` executable. If not set, Vector will search
   # the path for `journalctl`.
   #
@@ -532,15 +549,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   # * must be: "journald"
   type = "journald"
-
-  # The list of units names to monitor. If empty or not present, all units are
-  # accepted. Unit names lacking a `"."` will have `".service"` appended to make
-  # them a valid service unit name.
-  #
-  # * optional
-  # * default: []
-  # * type: [string]
-  units = ["ntpd", "sysinit.target"]
 
 # Ingests data through Kafka and outputs `log` events.
 [sources.kafka]

@@ -8,7 +8,7 @@ cat <<EOF > LICENSE.rtf
 \viewkind4\uc1
 \pard\f0\fs14\lang1033\par
 EOF
-cat vector-x86_64-pc-windows-msvc/LICENSE.txt | sed 's/$/\\/' >> LICENSE.rtf
+sed 's/$/\\/' < vector-x86_64-pc-windows-msvc/LICENSE.txt >> LICENSE.rtf
 echo -e '\n}' >> LICENSE.rtf
 
 echo "Substituting version..."

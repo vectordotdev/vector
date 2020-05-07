@@ -88,6 +88,10 @@ test-integration-pulsar: ## Runs Kafka integration tests
 test-integration-splunk: ## Runs Kafka integration tests
 	$(RUN) test-integration-splunk
 
+PACKAGE_DEB_USE_CONTAINER ?= "$(USE_CONTAINER)"
+test-integration-kubernetes: ## Runs Kubernetes integration tests
+	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" USE_CONTAINER=none $(RUN) test-integration-kubernetes
+
 test-unit: ## Runs unit tests, tests which do not require additional services to be present
 	$(RUN) test-unit
 
@@ -95,7 +99,7 @@ test-unit: ## Runs unit tests, tests which do not require additional services to
 
 check: check-all ## Default target, check everything
 
-check-all: check-code check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features ## Check everything
+check-all: check-code check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
 
 check-code: ## Check code
 	$(RUN) check-code
@@ -123,6 +127,9 @@ check-examples: build ## Check that the config/exmaples files are valid
 
 check-blog: ## Check that all blog posts are signed and valid
 	$(RUN) check-blog
+
+check-scripts: ## Check that scipts do not have common mistakes
+	$(RUN) check-scripts
 
 ##@ Packaging
 
@@ -284,7 +291,7 @@ slim-builds: ## Updates the Cargo config to product disk optimized builds, usefu
 	$(RUN) slim-builds
 
 target-graph: ## Display dependencies between targets in this Makefile
-	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST))))/.. && docker-compose run --rm target-graph $(TARGET)
+	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))) && docker-compose run --rm target-graph $(TARGET)
 
 version: ## Get the current Vector version
 	$(RUN) version

@@ -11,7 +11,7 @@
 set -u
 
 # If PACKAGE_ROOT is unset or empty, default it.
-PACKAGE_ROOT="${PACKAGE_ROOT:-https://packages.timber.io/vector}"
+PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -82,7 +82,7 @@ main() {
         echo ""
 
         while true; do
-            read -p "$_prompt " _choice </dev/tty
+            read -rp "$_prompt " _choice </dev/tty
             case $_choice in
                 n)
                     err "exiting"
@@ -150,13 +150,12 @@ install_from_archive() {
 
     ensure mkdir -p "$_dir"
 
-    printf "$_prompt Downloading Vector via $_url"
+    printf "%s Downloading Vector via %s" "$_prompt" "$_url"
     ensure downloader "$_url" "$_file"
     printf " ✓\n"
 
-    printf "$_prompt Unpacking archive to $HOME/.vector ..."
+    printf "%s Unpacking archive to $HOME/.vector ..." "$_prompt"
     ensure mkdir -p "$HOME/.vector"
-    local _dir_name=$(tar -tzf ${_file} | head -1 | sed -e 's/\.\/\(.*\)\//\1/')
     ensure tar -xzf "$_file" --directory="$HOME/.vector" --strip-components=2
 
     printf " ✓\n"
@@ -168,12 +167,12 @@ install_from_archive() {
       printf " ✓\n"
     fi
 
-    printf "$_prompt Install succeeded! 🚀\n"
-    printf "$_prompt To start Vector:\n"
+    printf "%s Install succeeded! 🚀\n" "$_prompt"
+    printf "%s To start Vector:\n" "$_prompt"
     printf "\n"
-    printf "$_indent vector --config ~/.vector/vector.toml\n"
+    printf "%s vector --config ~/.vector/vector.toml\n" "$_indent"
     printf "\n"
-    printf "$_prompt More information at https://vector.dev/docs/\n"
+    printf "%s More information at https://vector.dev/docs/\n" "$_prompt"
 
     local _retval=$?
 
@@ -187,7 +186,7 @@ add_to_path() {
   local file="$1"
   local new_path="$2"
 
-  printf "${_prompt} Adding Vector path to ${file}"
+  printf "%s Adding Vector path to ${file}" "$_prompt"
 
   if [ ! -f "$file" ]; then
     echo "${new_path}" >> "${file}"
@@ -428,7 +427,8 @@ assert_nz() {
 # will immediately terminate with an error showing the failing
 # command.
 ensure() {
-    local output="$($@ 2>&1 > /dev/null)"
+    local output
+    output="$("$@" 2>&1 > /dev/null)"
 
     if [ "$output" ]; then
         echo ""

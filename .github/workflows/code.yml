@@ -8,6 +8,7 @@ on:
       - ".github/workflows/code.yml"
       - "lib/*s"
       - "proto/**"
+      - "scripts/**"
       - "src/**"
       - "tests/**"
       - "Cargo.lock"
@@ -21,6 +22,7 @@ on:
       - ".github/workflows/code.yml"
       - "lib/*s"
       - "proto/**"
+      - "scripts/**"
       - "src/**"
       - "tests/**"
       - "Cargo.lock"
@@ -63,6 +65,7 @@ jobs:
       - run: make check-fmt
         env:
           PASS_RUSTFLAGS: "-D warnings"
+          USE_CONTAINER: docker
 
   check-linux:
     runs-on: ubuntu-latest
@@ -77,6 +80,14 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - run: make check-version
+        env:
+          USE_CONTAINER: docker
+
+  check-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-scripts
 
   check-windows:
     runs-on: windows-latest
@@ -152,6 +163,34 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-splunk
+
+  integration-kubernetes:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        kubernetes:
+          - v1.18.2
+          - v1.17.5
+          - v1.16.9
+          - v1.15.11
+          - v1.14.10
+      fail-fast: false
+    steps:
+      - name: Setup Minikube
+        uses: manusa/actions-setup-minikube@v1.0.2
+        with:
+          minikube version: 'v1.9.2'
+          kubernetes version: '${{ matrix.kubernetes }}'
+          github token: '${{ secrets.GITHUB_TOKEN }}'
+      - name: Login to DockerHub Registry
+        run: docker login -u "${{ secrets.K8S_INTEGRATION_CI_DOCKER_USERNAME }}" -p "${{ secrets.K8S_INTEGRATION_CI_DOCKER_PASSWORD }}"
+      - name: Checkout
+        uses: actions/checkout@v1
+      - run: make slim-builds
+      - run: make test-integration-kubernetes
+        env:
+          CONTAINER_IMAGE_REPO: ${{ secrets.K8S_INTEGRATION_CI_DOCKER_REPO }}
+          PACKAGE_DEB_USE_CONTAINER: docker
 
   test-unit:
     runs-on: ubuntu-latest
