@@ -20,7 +20,7 @@ pub struct ResponseFuture<T> {
 }
 
 impl<T> ResponseFuture<T> {
-    pub(crate) fn new(inner: T, _permit: OwnedSemaphorePermit) -> ResponseFuture<T> {
+    pub(super) fn new(inner: T, _permit: OwnedSemaphorePermit) -> ResponseFuture<T> {
         ResponseFuture { inner, _permit }
     }
 }
