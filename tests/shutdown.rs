@@ -47,9 +47,9 @@ const ALL_SOURCE_CONFIG: &'static str = r#"
         type = "http"
         address = "0.0.0.0:7004"
 
-    [sources.in5]
-        type = "journald"
-        include_units = [".dummy.vector.service"]
+#    [sources.in5]
+#        type = "journald"
+#        include_units = [".dummy.vector.service"]
 
 #    [sources.in6]
 #        type = "kafka"
@@ -110,7 +110,7 @@ const ALL_SOURCE_CONFIG: &'static str = r#"
 
 [sinks.out]
 #    inputs = ["in0","in1","in2","in3","in4","in5","in6","in7","in8","in9","in10","in11","in12","in13","in14","in15","in16","in17"]
-    inputs = ["in0","in2","in3","in4","in5","in7","in9","in10","in11","in12","in13","in14","in15","in16","in17"]
+    inputs = ["in0","in2","in3","in4","in7","in9","in10","in11","in12","in13","in14","in15","in16","in17"]
     type = "console"
     encoding = "text"
 "#;
