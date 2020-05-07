@@ -72,17 +72,17 @@ to a third-party module ecosystem.
 Terraform typically runs on CIs and developer machines, making portability valuable. For Terraform, users can follow the
 [guide](https://www.terraform.io/docs/extend/writing-custom-providers.html) to write a Go-based provider, which they can
 then distribute as a portable binary. Notably: This means either distributing an unoptimized binary, distributing a lot
-of optimized binaries, or requiring folks build their own optimized binaries. Terraform doesn't care much about speed,
-so unoptimized binaries are acceptable.
+of optimized binaries (per architecture), or requiring folks build their own optimized binaries. Terraform doesn't care
+much about speed, so unoptimized binaries are acceptable.
 
 Vector is in a slightly different position than Terraform though! Vector runs primarily in servers and even end user
 machines. We can't expect users to have build tooling installed on their servers (it's a security risk!) and we
-definitely can't expect it on an end-user machines. Most people just aren't that interested in computers. Vector has
-different performance needs, too. While folk's aren't generally wanting to execute terraform providers hundreds of
+definitely can't expect it on end-user machines. *Most people just aren't that interested in computers.* Vector has
+different performance needs, too. While folks aren't generally wanting to execute terraform providers hundreds of
 thousands (or millions) of times per second, they are absolutely doing that with Vector.
 
 When we're processing the firehose of events originating from a modern infrastructure every millisecond counts. Vector
-needs a way to ship portable, *optimizable* modules if we ever hope of making this a reality.
+needs a way to ship portable, *optimizable* plugins if we ever hope of making this a reality.
 
 
 ### Simplifying common basic transforms
@@ -123,7 +123,8 @@ router, Tremor focuses on servicing demanding workloads from it's position as an
 What if we could provide users of Tremor and Vector with some sort of familiar shared experience? What if we could share
 functionality? What kind of framework could satisfy both our needs? There are so many questions!
 
-We are in communication with them and this RFC may be amended in the future to include cross compatibility details.
+We are in communication with them and this RFC will amended in the future to include cross compatibility details if any
+emerge.
 
 
 ## Prior Art
@@ -138,26 +139,28 @@ solution.
 
 We also noted that the existing `lua` v1 transform was quite simple. While this makes for nice usability, it means
 things like on-start initializations aren't possible. In [v2](https://github.com/timberio/vector/pull/2000) `lua` has
-learnt many new tricks, and this WASM support aims to match them.
+learnt many new tricks, and this WASM support shall match them.
 
 We also noted the capabilities and speed of WASM (particularly WASI) mean we could eventually support things like
 sockets and files.
 
-Indeed, it is possible we will be able to let Vector build and run Lua code as a wasm module in the future.
+Indeed, it is possible we will be able to let Vector build and run Lua code as a WASM module in the future.
 
 
 ## Guide-level Proposal
 
 Vector contains a WebAssembly (WASM) engine which allows you to write custom functionality for Vector. You might already
-be familiar with the [Javascript](https://github.com/timberio/vector/pull/721) or
-[Lua](https://vector.dev/docs/reference/transforms/lua/) transforms, WebAssembly is a bit different than that.
+be familiar with the [Lua](https://vector.dev/docs/reference/transforms/lua/) transform, WebAssembly is a bit different.
 
-While it enables more functionality and possibly better speeds, it also introduces complication to your system.
+While it enables more functionality and possibly better speeds, it also introduces complication to your system. You'll
+need to learn a bit about Foreign Function Interfaces (FFI), a bit about memory management, and build your WASM
+artifact. Don't worry: We'll walk you through it.
 
+It's a new frontier, and you've got a friend in Vector.
 
 ### When to build your own module
 
-Using the WASM engine you can write your own sources, transforms, sinks, codecs in any language that compiles down to a
+Using the WASM engine you can write your own transforms, sinks, codecs in any language that compiles down to a
 `.wasm` or `.wat` file. Vector can then compile this file down to an optimized, platform specific module which it can
 use. This allows Vector to work with internal or uncommon protocols or services, support new language transforms, or
 just write a special transform to do *exactly* what you want. With the WASM engine, Vector puts you in command.
@@ -168,52 +171,54 @@ responsible for the safety and correctness of your code, if your module crashes 
 the module and try again on the next event. We try to follow the ideas of
 [Erlang's OTP](https://erlang.org/doc/design_principles/sup_princ.html).
 
-Here's some examples of when a WASM module is a good fit:
+Some examples of when a WASM plugin is a good fit:
 
 * You need to support a specific protobuf type.
 * You require a source or sink which is not currently supported by Vector.
-* You want to write a complex transform in Rust. (Other languages will be library supported soon)
+* You want to write a complex transform in Rust. (Other languages will be library supported according to demand and
+  resources)
 
-Here's some examples of where WASM probably isn't right for you:
+Some examples of where WASM plugin probably isn't right for you:
 
 * You only need basic functionality already offered by Vector.
-* Your desired language doesn't support WASM as a compile target.
-* You are using Vector on a non-Linux X86-64 bit compatible target. (Lucet, our Engine, only supports Linux at this
-current time. Work on other operating systems is ongoing!)
+* Your desired language doesn't support compiling to WASM with WASI.
+* You are using Vector on a non-Linux X86-64 bit compatible target. ([Lucet](https://bytecodealliance.github.io/lucet),
+  our Engine, only supports Linux at this current time. Work on other operating systems is ongoing!)
 * You need a battle-proven system, WASM support in Vector is young!
 
 
-### How Vector modules work
+### How Vector plugins work
 
-Vector modules are `.wasm` files (WASI or not) exposing a predefined interface. We provide a `vector_wasm`
+Vector plugins are `.wasm` files (WASI or not) exposing a predefined interface. We provide a `vector_wasm`
 crate for Rust projects located in `lib/vector-wasm` of the source tree, and we will be providing bindings for
 other languages as we see user demand.
 
-Modules are sandboxed and can only interact with Vector over the Foreign Function Interface (FFI) which Vector exposes.
+Plugins are sandboxed and can only interact with Vector over the Foreign Function Interface (FFI) which Vector exposes.
 For each instance of a module, Vector holds some context. For example, when a transform module processes an event, the
 context of the module contains an event, as well as the configuration used to create the transform.
 
 A guest module is not able to access the memory of the Vector instance, but Vector is free to modify the guest memory.
 For example, behind the scenes of a `get` call, the Guest must allocate some memory for Vector to write the result into.
 
-Due to the current semantics of the `vector::Event` type, passing data between WASM modules and the Vector host involves
+Due to the current semantics of the `vector::Event` type, passing data between WASM plugin and the Vector host involves
 serialization. This may change in the future, resulting in an increase major version of the `vector-wasm` crate.
 
 
 ### Initialization
 
 
-Regardless of whether of not the module uses WASI, or has access to a language specific binding, it can interact with
-Vector. Vector works by invoking the modules public interface. First, as soon as the module is loaded, `register` is
+Regardless of whether of not the plugin uses WASI, or has access to a language specific binding, it can interact with
+Vector. Vector works by invoking the plugins public interface. First, as soon as the module loads, `register` is
 called once per module. In this call, the module can configure how Vector sees it and talks to it. During
-this time, the module can do any one time setup it needs. (Eg. Opening a socket, a file).
+this time, the module can do one time setup it needs. (Eg. Opening a socket, a file).
 
 If using the Vector guest API this can be done via:
 
 ```rust
-use foreign_modules::{Registration, roles::Sink};
+use vector_wasm::{Registration, roles::Sink};
 
 #[no_mangle]
+// TODO: This is unsafe -- Needs a fix.
 pub extern "C" fn init() -> *mut Registration {
  &mut Registration::transform()
     .set_wasi(true) as *mut Registration
@@ -227,15 +232,19 @@ What happens next depends on which type of module it is.
 * `Transform`: Modules of this role can be used as a transform `type`.
 
   ```rust
-  use foreign_modules::hostcall;
-
-  // TODO: Add better FFI error handling!
+  use vector_wasm::hostcall;
   #[no_mangle]
-  pub extern "C" fn process() -> usize {
-      if let Some(value) = hostcall::get("field").unwrap() {
-          hostcall::insert("field", value).unwrap();
-      }
-      0
+  pub extern "C" fn process(data: u64, length: u64) -> usize {
+      let data = unsafe {
+          std::ptr::slice_from_raw_parts_mut(data as *mut u8, length as usize)
+              .as_mut()
+              .unwrap()
+      };
+      let mut event: BTreeMap<String, Value> = serde_json::from_slice(data).unwrap();
+      event.insert("new_field".into(), "new_value".into());
+      event.insert("new_field_2".into(), "new_value_2".into());
+      hostcall::emit(serde_json::to_vec(&event).unwrap());
+      1
   }
   ```
 
@@ -272,31 +281,28 @@ serde = { version = "1", features = ["derive"] }
 Next, in your `lib.rs` file:
 
 ```rust
-use vector_wasm::{Registration, hostcall};
-use serde::{Serialize, Deserialize};
+use serde_json::Value;
+use std::collections::BTreeMap;
+use vector_wasm::{hostcall, Registration};
 
 #[no_mangle]
 pub extern "C" fn init() -> *mut Registration {
- &mut Registration::transform()
-    .set_wasi(true) as *mut Registration
+    &mut Registration::transform().set_wasi(true) as *mut Registration
 }
 
-// TODO: Add better FFI error handling!
 #[no_mangle]
-pub extern "C" fn process() -> usize {
-    let result = hostcall::get("message");
-
-    match result.unwrap() {
-        Some(value) => {
-            hostcall::insert("echo", value);
-            0
-        },
-        None => {
-            0
-        },
-    }
+pub extern "C" fn process(data: u64, length: u64) -> usize {
+    let data = unsafe {
+        std::ptr::slice_from_raw_parts_mut(data as *mut u8, length as usize)
+            .as_mut()
+            .unwrap()
+    };
+    let mut event: BTreeMap<String, Value> = serde_json::from_slice(data).unwrap();
+    event.insert("new_field".into(), "new_value".into());
+    event.insert("new_field_2".into(), "new_value_2".into());
+    hostcall::emit(serde_json::to_vec(&event).unwrap());
+    1
 }
-
 #[no_mangle]
 pub extern "C" fn shutdown() {
     ();
@@ -366,7 +372,7 @@ Congratulations, you're ready for a new frontier!
 
 ## Sales Pitch
 
-Integrating a flexible, practical, simple WASM module support means we can:
+Integrating a flexible, practical, simple WASM plugin support means we can:
 
 * Expose one common interface to any existing and future languages supported by WASM.
 * Allow large-scale users to use custom encodings.
@@ -403,7 +409,7 @@ Since this is a broad reaching feature with a number of green sky ideas, we shou
 
 ### Agree on breadth and depth of implementation
 
-We should support modules so broadly?
+We should support plugins so broadly?
 
 * As sinks? For this we should consider how we handle batching, partitioning, etc, more.
   * **Temporary Conclusion:** Held off on deciding. Some interest.
@@ -466,7 +472,7 @@ This may be renamed and/or published in the future.
 
 ### Consider observability
 
-How can we let users see what's happening in WASM modules? Can we use tracing somehow? Lucet supports tracing, perhaps
+How can we let users see what's happening in WASM plugins? Can we use tracing somehow? Lucet supports tracing, perhaps
 we could hook in somehow?
 
 **Conclusion:** Preliminary results show we may be able to allow guests to write with the current tracing subscriber.
