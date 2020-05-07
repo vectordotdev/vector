@@ -135,9 +135,9 @@ dependencies = [
 
 [[package]]
 name = "backtrace-sys"
-version = "0.1.36"
+version = "0.1.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78848718ee1255a2485d1309ad9cdecfc2e7d0362dd11c6829364c6b35ae1bc7"
+checksum = "18fbebbe1c9d1f383a9cc7e8ccdb471b91c8d024ee9c2ca5b5346121fe8b4399"
 dependencies = [
  "cc",
  "libc",
@@ -932,7 +932,7 @@ dependencies = [
  "quickcheck",
  "scan_fmt",
  "tempfile",
- "tokio 0.2.19",
+ "tokio 0.2.20",
  "tracing",
  "winapi 0.3.8",
 ]
@@ -1279,7 +1279,7 @@ dependencies = [
  "indexmap",
  "log",
  "slab",
- "tokio 0.2.19",
+ "tokio 0.2.20",
  "tokio-util",
 ]
 
@@ -1506,7 +1506,7 @@ dependencies = [
  "net2",
  "pin-project",
  "time",
- "tokio 0.2.19",
+ "tokio 0.2.20",
  "tower-service 0.3.0",
  "want 0.3.0",
 ]
@@ -1543,7 +1543,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-sys",
- "tokio 0.2.19",
+ "tokio 0.2.20",
  "tokio-openssl 0.4.0",
 ]
 
@@ -1670,9 +1670,9 @@ dependencies = [
 
 [[package]]
 name = "ipconfig"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa79fa216fbe60834a9c0737d7fcd30425b32d1c58854663e24d4c4b328ed83f"
+checksum = "f7e2f18aece9709094573a9f24f483c4f65caa4298e2f7ae1b71cc65d853fad7"
 dependencies = [
  "socket2",
  "widestring",
@@ -1987,7 +1987,7 @@ checksum = "f3fc63816bd5f8bde5eb31ce471f9633adc69ba1c55b44191b4d5fc7e263e8ab"
 dependencies = [
  "log",
  "metrics-core",
- "tokio 0.2.19",
+ "tokio 0.2.20",
 ]
 
 [[package]]
@@ -3935,18 +3935,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.15"
+version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54b3d3d2ff68104100ab257bb6bb0cb26c901abe4bd4ba15961f3bf867924012"
+checksum = "d12a1dae4add0f0d568eebc7bf142f145ba1aa2544cafb195c76f0f409091b60"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.15"
+version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca972988113b7715266f91250ddb98070d033c62a011fa0fcc57434a649310dd"
+checksum = "3f34e0c1caaa462fd840ec6b768946ea1e7842620d94fe29d5b847138f521269"
 dependencies = [
  "proc-macro2 1.0.8",
  "quote 1.0.2",
@@ -4009,9 +4009,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.19"
+version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d9c43f1bb96970e153bcbae39a65e249ccb942bd9d36dbdf086024920417c9c"
+checksum = "05c1d570eb1a36f0345a5ce9c6c6e665b70b73d11236912c0b477616aeec47b1"
 dependencies = [
  "bytes 0.5.4",
  "fnv",
@@ -4058,7 +4058,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "pin-project-lite",
- "tokio 0.2.19",
+ "tokio 0.2.20",
  "tokio-current-thread",
  "tokio-executor",
  "tokio-reactor",
@@ -4136,7 +4136,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c4b08c5f4208e699ede3df2520aca2e82401b2de33f45e96696a074480be594"
 dependencies = [
  "openssl",
- "tokio 0.2.19",
+ "tokio 0.2.20",
 ]
 
 [[package]]
@@ -4237,7 +4237,7 @@ checksum = "ed0049c119b6d505c4447f5c64873636c7af6c75ab0d45fd9f618d82acb8016d"
 dependencies = [
  "bytes 0.5.4",
  "futures-core",
- "tokio 0.2.19",
+ "tokio 0.2.20",
 ]
 
 [[package]]
@@ -4313,7 +4313,7 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite",
- "tokio 0.2.19",
+ "tokio 0.2.20",
 ]
 
 [[package]]
@@ -4371,7 +4371,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "pin-project",
- "tokio 0.2.19",
+ "tokio 0.2.20",
  "tower-layer 0.3.0",
  "tower-service 0.3.0",
  "tracing",
@@ -4488,7 +4488,7 @@ checksum = "9ba4bbc2c1e4a8543c30d4c13a4c8314ed72d6e07581910f665aa13fde0153c8"
 dependencies = [
  "futures-util",
  "pin-project",
- "tokio 0.2.19",
+ "tokio 0.2.20",
  "tokio-test",
  "tower-layer 0.3.0",
  "tower-service 0.3.0",
@@ -4638,8 +4638,8 @@ dependencies = [
 
 [[package]]
 name = "trust-dns-client"
-version = "0.19.5"
-source = "git+https://github.com/bluejekyll/trust-dns#e4f736f341156c426811c760797b54f6e8663026"
+version = "0.20.0"
+source = "git+https://github.com/bluejekyll/trust-dns#b99a8211f1656b117ca9618532299c236c22b486"
 dependencies = [
  "backtrace",
  "chrono",
@@ -4650,8 +4650,8 @@ dependencies = [
  "radix_trie",
  "rand 0.7.3",
  "thiserror",
- "tokio 0.2.19",
- "trust-dns-proto 0.19.5",
+ "tokio 0.2.20",
+ "trust-dns-proto 0.20.0",
 ]
 
 [[package]]
@@ -4680,8 +4680,8 @@ dependencies = [
 
 [[package]]
 name = "trust-dns-proto"
-version = "0.19.5"
-source = "git+https://github.com/bluejekyll/trust-dns#e4f736f341156c426811c760797b54f6e8663026"
+version = "0.20.0"
+source = "git+https://github.com/bluejekyll/trust-dns#b99a8211f1656b117ca9618532299c236c22b486"
 dependencies = [
  "async-trait",
  "backtrace",
@@ -4695,7 +4695,7 @@ dependencies = [
  "serde",
  "smallvec 1.2.0",
  "thiserror",
- "tokio 0.2.19",
+ "tokio 0.2.20",
  "url 2.1.1",
 ]
 
@@ -4723,8 +4723,8 @@ dependencies = [
 
 [[package]]
 name = "trust-dns-resolver"
-version = "0.19.5"
-source = "git+https://github.com/bluejekyll/trust-dns#e4f736f341156c426811c760797b54f6e8663026"
+version = "0.20.0"
+source = "git+https://github.com/bluejekyll/trust-dns#b99a8211f1656b117ca9618532299c236c22b486"
 dependencies = [
  "backtrace",
  "cfg-if",
@@ -4737,14 +4737,14 @@ dependencies = [
  "serde",
  "smallvec 1.2.0",
  "thiserror",
- "tokio 0.2.19",
- "trust-dns-proto 0.19.5",
+ "tokio 0.2.20",
+ "trust-dns-proto 0.20.0",
 ]
 
 [[package]]
 name = "trust-dns-server"
-version = "0.19.5"
-source = "git+https://github.com/bluejekyll/trust-dns#e4f736f341156c426811c760797b54f6e8663026"
+version = "0.20.0"
+source = "git+https://github.com/bluejekyll/trust-dns#b99a8211f1656b117ca9618532299c236c22b486"
 dependencies = [
  "backtrace",
  "bytes 0.5.4",
@@ -4756,10 +4756,10 @@ dependencies = [
  "serde",
  "thiserror",
  "time",
- "tokio 0.2.19",
+ "tokio 0.2.20",
  "toml 0.5.6",
  "trust-dns-client",
- "trust-dns-proto 0.19.5",
+ "trust-dns-proto 0.20.0",
 ]
 
 [[package]]
@@ -5038,7 +5038,7 @@ dependencies = [
  "task-compat",
  "tempfile",
  "tokio 0.1.22",
- "tokio 0.2.19",
+ "tokio 0.2.20",
  "tokio-codec",
  "tokio-compat",
  "tokio-openssl 0.3.0",
@@ -5059,8 +5059,8 @@ dependencies = [
  "tracing-subscriber",
  "tracing-tower",
  "trust-dns-client",
- "trust-dns-proto 0.19.5",
- "trust-dns-resolver 0.19.5",
+ "trust-dns-proto 0.20.0",
+ "trust-dns-resolver 0.20.0",
  "trust-dns-server",
  "typetag",
  "url 1.7.2",

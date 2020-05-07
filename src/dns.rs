@@ -76,7 +76,7 @@ impl Resolver {
         };
 
         let inner = exec
-            .block_on_std(AsyncResolver::tokio(config, opt))
+            .block_on_std(async move { AsyncResolver::tokio(config, opt) })
             .context(Init)?;
 
         Ok(Self { inner })
