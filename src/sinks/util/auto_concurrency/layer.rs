@@ -4,7 +4,7 @@ use tower03::Layer;
 /// Enforces a limit on the concurrent number of requests the underlying
 /// service can handle.
 #[derive(Debug, Clone)]
-pub struct AutoConcurrencyLimitLayer {
+pub(crate) struct AutoConcurrencyLimitLayer {
     max: usize,
 }
 
