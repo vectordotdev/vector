@@ -8,6 +8,7 @@ use std::fmt;
 use std::future::Future;
 use std::mem;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio::sync::OwnedSemaphorePermit;
 
@@ -17,7 +18,7 @@ use tokio::sync::OwnedSemaphorePermit;
 #[derive(Debug)]
 pub struct AutoConcurrencyLimit<T> {
     inner: T,
-    controller: Controller,
+    controller: Arc<Controller>,
     state: State,
 }
 
@@ -32,7 +33,7 @@ impl<T> AutoConcurrencyLimit<T> {
     pub(crate) fn new(inner: T, max: usize) -> Self {
         AutoConcurrencyLimit {
             inner,
-            controller: Controller::new(max, 1),
+            controller: Arc::new(Controller::new(max, 1)),
             state: State::Empty,
         }
     }
@@ -55,7 +56,7 @@ where
                     let permit = ready!(fut.poll(cx));
                     State::Ready(permit)
                 }
-                State::Empty => State::Waiting(Box::pin(self.controller.acquire())),
+                State::Empty => State::Waiting(Box::pin(self.controller.clone().acquire())),
             };
         }
     }
@@ -72,7 +73,7 @@ where
         // Call the inner service
         let future = self.inner.call(request);
 
-        ResponseFuture::new(future, permit)
+        ResponseFuture::new(future, permit, self.controller.clone())
     }
 }
 
