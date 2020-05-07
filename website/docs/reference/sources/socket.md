@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` source ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs `log` events."
@@ -35,7 +35,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 
 ## Requirements
 
-<Alert icon={false} type="danger" className="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * This component exposes a configured port. You must ensure your network allows access to this port.
 
@@ -138,32 +138,6 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 
 <Fields filters={true}>
 <Field
-  common={false}
-  defaultValue={"host"}
-  enumValues={null}
-  examples={["host"]}
-  groups={["tcp","udp","unix"]}
-  name={"host_key"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### host_key
-
-The key name added to each event representing the current host. This can also
-be globally set via the [global [`host_key`](#host_key)
-option][docs.reference.global-options#host_key].
-
- See [Context](#context) for more info.
-
-
-</Field>
-<Field
   common={true}
   defaultValue={null}
   enumValues={null}
@@ -187,6 +161,30 @@ port.
 
 
 
+</Field>
+<Field
+  common={false}
+  defaultValue={"host"}
+  enumValues={null}
+  examples={["host"]}
+  groups={["tcp","udp","unix"]}
+  name={"host_key"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### host_key
+
+The key name added to each event representing the current host. This can also
+be globally set via the [global [`host_key`](#host_key)
+option][docs.reference.global-options#host_key].
+ See [Context](#context) for more info.
+
 
 </Field>
 <Field
@@ -208,7 +206,6 @@ port.
 ### max_length
 
 The maximum bytes size of incoming messages before they are discarded.
-
 
 
 
@@ -235,7 +232,6 @@ The type of socket to use.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -256,7 +252,6 @@ The type of socket to use.
 ### path
 
 The unix socket path. *This should be absolute path*.
-
 
 
 
@@ -283,7 +278,6 @@ The timeout before a connection is forcefully closed during shutdown.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -304,7 +298,6 @@ The timeout before a connection is forcefully closed during shutdown.
 ### tls
 
 Configures the TLS options for connections from this source.
-
 
 
 <Fields filters={false}>
@@ -328,7 +321,6 @@ Configures the TLS options for connections from this source.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -357,7 +349,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -379,7 +370,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Require TLS for incoming connections. If this is set, an identity certificate
 is also required.
-
 
 
 
@@ -407,7 +397,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -429,7 +418,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 Absolute path to a certificate key file used to identify this server, in DER or
 PEM format (PKCS#8).
-
 
 
 
@@ -455,7 +443,6 @@ PEM format (PKCS#8).
 If `true`, Vector will require a TLS certificate from the connecting host and
 terminate the connection if it is not valid. If `false` (the default), Vector
 will not request a certificate from the client.
-
 
 
 
@@ -500,7 +487,6 @@ The upstream hostname.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -524,7 +510,6 @@ The raw message, unaltered.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -545,7 +530,6 @@ The raw message, unaltered.
 ### timestamp
 
 The exact time the event was ingested.
-
 
 
 

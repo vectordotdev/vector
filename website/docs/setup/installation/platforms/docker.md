@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-14"
+last_modified_on: "2020-04-29"
 title: Install Vector On Docker
 sidebar_label: Docker
 description: Install Vector on the Docker platform
@@ -182,7 +182,7 @@ compose!
 <TabItem value="service">
 
 The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
+separate service. It is designed to receive data from an upstream source and
 fan-out to one or more destinations.
 Typically, upstream sources are other Vector instances sending data via the
 [`vector` sink][docs.sinks.vector], but can be collected through any of Vector's
@@ -292,7 +292,7 @@ smaller in size than other Docker images and statically links libraries. This
 is the image we recommend due to it's small size and reliability.
 
 ```bash
-docker run timberio/vector:0.8.2-alpine
+docker run timberio/vector:0.9.1-alpine
 ```
 
 #### debian
@@ -301,7 +301,7 @@ This image is based on the [`debian-slim` image][urls.docker_debian],
 which is a smaller, more compact variant of the [`debian` image][urls.docker_debian].
 
 ```bash
-docker run timberio/vector:0.8.2-debian
+docker run timberio/vector:0.9.1-debian
 ```
 
 ### Architectures

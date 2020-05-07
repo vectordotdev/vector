@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "best_effort"
 component_title: "Vector"
 description: "The Vector `vector` sink streams `log` and `metric` events to another downstream `vector` source."
@@ -44,7 +44,7 @@ source][docs.sources.vector].
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "vector" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   address = "92.12.333.224:5000" # required
   healthcheck = true # optional, default
 ```
@@ -56,20 +56,20 @@ source][docs.sources.vector].
 [sinks.my_sink_id]
   # General
   type = "vector" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   address = "92.12.333.224:5000" # required
   healthcheck = true # optional, default
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # TLS
-  tls.enabled = false # optional, default
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
   tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
   tls.verify_certificate = true # optional, default
@@ -80,6 +80,29 @@ source][docs.sources.vector].
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["92.12.333.224:5000"]}
+  groups={[]}
+  name={"address"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### address
+
+The downstream Vector address to connect to. The address _must_ include a port.
+
+
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -101,32 +124,7 @@ source][docs.sources.vector].
 Configures the sink specific buffer behavior.
 
 
-
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -146,7 +144,6 @@ The buffer's type and storage mechanism.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
 
 
 
@@ -173,6 +170,28 @@ The maximum size of the buffer on the disk.
 
 
 
+</Field>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
 
 </Field>
 <Field
@@ -197,33 +216,8 @@ The behavior when the buffer becomes full.
 
 
 
-
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["92.12.333.224:5000"]}
-  groups={[]}
-  name={"address"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### address
-
-The downstream Vector address to connect to. The address _must_ include a port.
-
-
-
 
 </Field>
 <Field
@@ -245,7 +239,6 @@ The downstream Vector address to connect to. The address _must_ include a port.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -271,32 +264,7 @@ Enables/disables the sink healthcheck upon start.
 Configures the TLS options for connections from this sink.
 
 
-
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={false}
-  enumValues={null}
-  examples={[false,true]}
-  groups={[]}
-  name={"enabled"}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### enabled
-
-Enable TLS during connections to the remote.
-
-
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -317,7 +285,6 @@ Enable TLS during connections to the remote.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -346,6 +313,28 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
+</Field>
+<Field
+  common={true}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"enabled"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### enabled
+
+Enable TLS during connections to the remote.
+
+
 
 </Field>
 <Field
@@ -368,7 +357,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
 `key_path` is set.
-
 
 
 
@@ -396,7 +384,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -418,7 +405,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
 host.
-
 
 
 
@@ -444,7 +430,6 @@ host.
 If `true` (the default), Vector will validate the configured remote host name
 against the remote host's TLS certificate. Do NOT set this to `false` unless
 you understand the risks of not verifying the remote hostname.
-
 
 
 

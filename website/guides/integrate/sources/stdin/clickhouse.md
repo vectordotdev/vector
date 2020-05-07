@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-05-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from STDIN to Clickhouse"
 description: "A simple guide to send logs from STDIN to Clickhouse in just a few minutes."
@@ -35,6 +35,12 @@ your observability strategy.
      website/guides/integrate/sources/stdin/clickhouse.md.erb
 -->
 
+## Background
+
+### What is Clickhouse?
+
+[ClickHouse][urls.clickhouse] is an open-source column-oriented database management system that manages extremely large volumes of data, including non-aggregated data, in a stable and sustainable manner and allows generating custom data reports in real time. The system is linearly scalable and can be scaled up to store and process trillions of rows and petabytes of data. This makes it an best-in-class storage for logs and metrics data.
+
 ## Strategy
 
 ### How This Guide Works
@@ -61,24 +67,24 @@ each service. Typically data is collected by tailing local files via Vector's
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Accept new line delimited log data through STDIN.
-    <ol>
+    <ul>
       <li>Automatically enrich logs with host-level context.</li>
-    </ol>
+    </ul>
   </li>
   <li>
     Send logs to ClickHouse.
-    <ol>
+    <ul>
       <li>Compress and batch data to maximize throughput.</li>
       <li>Encode timestamps to ClickHouse supported formats.</li>
       <li>Automatically retry failed requests, with backoff.</li>
       <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
+    </ul>
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 
@@ -89,6 +95,8 @@ To be clear, here's everything we'll accomplish in this short guide:
 ### Install Vector
 
 <InstallationCommand />
+
+Or choose your [preferred method][docs.installation].
 
 </li>
 <li>
@@ -138,6 +146,7 @@ flexibility of Vector:
 </Jump>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.sources.file]: /docs/reference/sources/file/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#sidecar]: /docs/setup/deployment/strategies/#sidecar

@@ -1,0 +1,108 @@
+[<%= namespace %>.type]
+type = "string"
+common = true
+default = "check_fields"
+description = """\
+The type of the condition to execute.\
+"""
+
+[<%= namespace %>.type.enum]
+check_fields = "Allows you to check individual fields against a list of conditions."
+is_log = "Returns true if the event is a log."
+is_metric = "Returns true if the event is a metric."
+
+
+[<%= namespace %>."`[field-name]`.not_`[condition]`"]
+type = "any"
+examples = [
+  { "message.not_contains" = "some phrase to ignore" },
+  { "unit.not_starts_with" = "sys-" },
+  { "unit.not_ends_with" = ".device" }
+]
+common = false
+relevant_when = {type = "check_fields"}
+description = """\
+Check if the given `[condition]` does not match.\
+"""
+
+[<%= namespace %>."`[field-name]`.eq"]
+type = "string"
+examples = [
+  { "message.eq" = "this is the content to match against" }
+]
+common = true
+relevant_when = {type = "check_fields"}
+description = """\
+Check whether a fields contents exactly matches the value specified.\
+"""
+
+[<%= namespace %>."`[field-name]`.neq"]
+type = "string"
+examples = [
+  { "method.neq" = "POST" }
+]
+common = false
+relevant_when = {type = "check_fields"}
+description = """\
+Check whether a fields contents does not match the value specified.\
+"""
+
+[<%= namespace %>."`[field-name]`.exists"]
+type = "bool"
+examples = [
+  { "host.exists" = true }
+]
+common = false
+relevant_when = {type = "check_fields"}
+description = """\
+Check whether a field exists or does not exist, depending on the provided value \
+being `true` or `false` respectively.\
+"""
+
+[<%= namespace %>."`[field_name]`.contains"]
+type = "string"
+examples = [
+  { "message.contains" = "foo" }
+]
+common = true
+relevant_when = {type = "check_fields"}
+description = """\
+Checks whether a string field contains a string argument.\
+"""
+
+[<%= namespace %>."`[field_name]`.ends_with"]
+type = "string"
+examples = [
+  { "environment.ends_with" = "-staging" }
+]
+common = true
+relevant_when = {type = "check_fields"}
+description = """\
+Checks whether a string field ends with a string argument.\
+"""
+
+[<%= namespace %>."`[field_name]`.starts_with"]
+type = "string"
+examples = [
+  { "environment.starts_with" = "staging-" }
+]
+common = true
+relevant_when = {type = "check_fields"}
+description = """\
+Checks whether a string field starts with a string argument.\
+"""
+
+[<%= namespace %>."`[field_name]`.regex"]
+type = "string"
+examples = [
+  { "message.regex" = " (any|of|these|five|words) " }
+]
+common = true
+relevant_when = {type = "check_fields"}
+description = """\
+Checks whether a string field matches a [regular expression][urls.regex]. \
+Vector uses the [documented Rust Regex syntax][urls.rust_regex_syntax]. \
+Note that this condition is considerably more expensive than \
+a regular string match (such as `starts_with` or `contains`) \
+so the use of those conditions are preferred where possible.\
+"""

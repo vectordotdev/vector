@@ -5,6 +5,7 @@ use rusoto_core::{region::ParseRegionError, Region};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(default)]
@@ -47,13 +48,7 @@ impl TryFrom<&RegionOrEndpoint> for Region {
     fn try_from(r: &RegionOrEndpoint) -> Result<Self, Self::Error> {
         match (&r.region, &r.endpoint) {
             (Some(region), None) => region.parse().context(RegionParseError),
-            (None, Some(endpoint)) => endpoint
-                .parse::<Uri>()
-                .map(|_| Region::Custom {
-                    name: "custom".into(),
-                    endpoint: endpoint.into(),
-                })
-                .context(EndpointParseError),
+            (None, Some(endpoint)) => region_from_endpoint(endpoint),
             (Some(_), Some(_)) => Err(ParseError::BothRegionAndEndpoint),
             (None, None) => Err(ParseError::MissingRegionAndEndpoint),
         }
@@ -65,6 +60,36 @@ impl TryFrom<RegionOrEndpoint> for Region {
     fn try_from(r: RegionOrEndpoint) -> Result<Self, Self::Error> {
         Region::try_from(&r)
     }
+}
+
+/// Translate an endpoint URL into a Region
+pub fn region_from_endpoint(endpoint: &str) -> Result<Region, ParseError> {
+    let uri = endpoint.parse::<Uri>().context(EndpointParseError)?;
+    let name = uri
+        .host()
+        .and_then(region_name_from_host)
+        .unwrap_or_else(|| Region::default().name().into());
+    let endpoint = strip_endpoint(&uri);
+    Ok(Region::Custom { name, endpoint })
+}
+
+/// Reconstitute the endpoint from the URI, but strip off all path components
+fn strip_endpoint(uri: &Uri) -> String {
+    let pq_len = uri
+        .path_and_query()
+        .map(|pq| pq.as_str().len())
+        .unwrap_or(1);
+    let endpoint = uri.to_string();
+    endpoint[..endpoint.len() - pq_len].to_string()
+}
+
+/// Translate a hostname into a region name by finding the first part of
+/// the domain name that matches a known region.
+fn region_name_from_host(host: &str) -> Option<String> {
+    host.split('.')
+        .filter_map(|part| Region::from_str(part).ok())
+        .map(|region| region.name().into())
+        .next()
 }
 
 #[cfg(test)]
@@ -100,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn region_custom_name_endpoint() {
+    fn custom_name_endpoint_localhost() {
         let config: Config = toml::from_str(
             r#"
         [inner]
@@ -110,7 +135,7 @@ mod tests {
         .unwrap();
 
         let expected_region = Region::Custom {
-            name: "custom".into(),
+            name: "us-east-1".into(),
             endpoint: "http://localhost:9000".into(),
         };
 
@@ -133,5 +158,60 @@ mod tests {
             Err(ParseError::MissingRegionAndEndpoint) => {}
             other => panic!("assertion failed, wrong result {:?}", other),
         }
+    }
+
+    #[test]
+    fn extracts_region_name_from_host() {
+        assert_eq!(region_name_from_host("localhost"), None);
+        assert_eq!(
+            region_name_from_host("us-west-1.es.amazonaws.com"),
+            Some("us-west-1".into())
+        );
+        assert_eq!(
+            region_name_from_host("this-is-a-test.us-west-2.es.amazonaws.com"),
+            Some("us-west-2".into())
+        );
+        assert_eq!(
+            region_name_from_host("test.cn-north-1.es.amazonaws.com.cn"),
+            Some("cn-north-1".into())
+        );
+    }
+
+    #[test]
+    fn region_from_endpoint_localhost() {
+        assert_eq!(
+            region_from_endpoint("http://localhost:9000").unwrap(),
+            Region::Custom {
+                name: "us-east-1".into(),
+                endpoint: "http://localhost:9000".into()
+            }
+        );
+    }
+
+    #[test]
+    fn region_from_endpoint_standard_region() {
+        assert_eq!(
+            region_from_endpoint(
+                "https://this-is-a-test-5dec2c2qbgsuekvsecuylqu.us-west-2.es.amazonaws.com"
+            )
+            .unwrap(),
+            Region::Custom {
+                name: "us-west-2".into(),
+                endpoint:
+                    "https://this-is-a-test-5dec2c2qbgsuekvsecuylqu.us-west-2.es.amazonaws.com"
+                        .into()
+            }
+        );
+    }
+
+    #[test]
+    fn region_from_endpoint_strips_path_query() {
+        assert_eq!(
+            region_from_endpoint("http://localhost:9000/path?query").unwrap(),
+            Region::Custom {
+                name: "us-east-1".into(),
+                endpoint: "http://localhost:9000".into()
+            }
+        );
     }
 }

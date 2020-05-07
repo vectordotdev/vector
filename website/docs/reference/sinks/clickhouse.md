@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-07"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-05-01"
+delivery_guarantee: "at_least_once"
 component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."
 event_types: ["log"]
@@ -35,7 +35,7 @@ The Vector `clickhouse` sink
 
 ## Requirements
 
-<Alert icon={false} type="danger" className="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * [Clickhouse][urls.clickhouse] version `>= 1.1.54378` is required.
 
@@ -53,7 +53,7 @@ The Vector `clickhouse` sink
 [sinks.my_sink_id]
   # General
   type = "clickhouse" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   database = "mydatabase" # optional, no default
   healthcheck = true # optional, default
   host = "http://localhost:8123" # required
@@ -70,15 +70,15 @@ The Vector `clickhouse` sink
 [sinks.my_sink_id]
   # General
   type = "clickhouse" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   database = "mydatabase" # optional, no default
   healthcheck = true # optional, default
   host = "http://localhost:8123" # required
   table = "mytable" # required
 
   # Auth
-  auth.strategy = "basic" # required
   auth.password = "${CLICKHOUSE_PASSWORD}" # required, required when strategy = "basic"
+  auth.strategy = "basic" # required
   auth.user = "${CLICKHOUSE_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
@@ -86,9 +86,9 @@ The Vector `clickhouse` sink
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -100,7 +100,7 @@ The Vector `clickhouse` sink
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 5 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 30 # optional, default, seconds
@@ -142,32 +142,7 @@ The Vector `clickhouse` sink
 Options for the authentication strategy.
 
 
-
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
-  examples={["basic"]}
-  groups={[]}
-  name={"strategy"}
-  path={"auth"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### strategy
-
-The authentication strategy to use.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -188,6 +163,28 @@ The authentication strategy to use.
 
 The basic authentication password.
 
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
+  examples={["basic"]}
+  groups={[]}
+  name={"strategy"}
+  path={"auth"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### strategy
+
+The authentication strategy to use.
 
 
 
@@ -211,7 +208,6 @@ The basic authentication password.
 #### user
 
 The basic authentication user name.
-
 
 
 
@@ -240,7 +236,6 @@ The basic authentication user name.
 Configures the sink batching behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -261,7 +256,6 @@ Configures the sink batching behavior.
 #### max_size
 
 The maximum size of a batch, in bytes, before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -285,7 +279,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 #### timeout_secs
 
 The maximum age of a batch before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -314,32 +307,7 @@ The maximum age of a batch before it is flushed.
 Configures the sink specific buffer behavior.
 
 
-
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -359,7 +327,6 @@ The buffer's type and storage mechanism.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
 
 
 
@@ -383,8 +350,30 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
-
  See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
 
 
 </Field>
@@ -408,401 +397,6 @@ The maximum size of the buffer on the disk.
 
 The behavior when the buffer becomes full.
 
-
-
-
-</Field>
-</Fields>
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"encoding"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### encoding
-
-Configures the encoding specific sink behavior.
-
-
-
-<Fields filters={false}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["timestamp","message","host"]]}
-  groups={[]}
-  name={"except_fields"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### except_fields
-
-Prevent the sink from encoding the specified labels.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["timestamp","message","host"]]}
-  groups={[]}
-  name={"only_fields"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### only_fields
-
-Limit the sink to only encoding the specified labels.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"rfc3339"}
-  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
-  examples={["rfc3339","unix"]}
-  groups={[]}
-  name={"timestamp_format"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### timestamp_format
-
-How to format event timestamps.
-
-
-
-
-</Field>
-</Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["mydatabase"]}
-  groups={[]}
-  name={"database"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### database
-
-The database that contains the stable that data will be inserted into.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start.
-
- See [Health Checks](#health-checks) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["http://localhost:8123"]}
-  groups={[]}
-  name={"host"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### host
-
-The host url of the [Clickhouse][urls.clickhouse] server.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["mytable"]}
-  groups={[]}
-  name={"table"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### table
-
-The table that data will be inserted into.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"request"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### request
-
-Configures the sink request behavior.
-
-
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={5}
-  enumValues={null}
-  examples={[5]}
-  groups={[]}
-  name={"in_flight_limit"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"requests"}
-  warnings={[]}
-  >
-
-#### in_flight_limit
-
-The maximum number of in-flight requests allowed at any given time.
-
- See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={1}
-  enumValues={null}
-  examples={[1]}
-  groups={[]}
-  name={"rate_limit_duration_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  warnings={[]}
-  >
-
-#### rate_limit_duration_secs
-
-The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
- See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={5}
-  enumValues={null}
-  examples={[5]}
-  groups={[]}
-  name={"rate_limit_num"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### rate_limit_num
-
-The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
-time window.
-
- See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={-1}
-  enumValues={null}
-  examples={[-1]}
-  groups={[]}
-  name={"retry_attempts"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### retry_attempts
-
-The maximum number of retries to make for failed requests.
-
- See [Retry Policy](#retry-policy) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={1}
-  enumValues={null}
-  examples={[1]}
-  groups={[]}
-  name={"retry_initial_backoff_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  warnings={[]}
-  >
-
-#### retry_initial_backoff_secs
-
-The amount of time to wait before attempting the first retry for a failed
-request. Once, the first retry has failed the fibonacci sequence will be used
-to select future backoffs.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={10}
-  enumValues={null}
-  examples={[10]}
-  groups={[]}
-  name={"retry_max_duration_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  warnings={[]}
-  >
-
-#### retry_max_duration_secs
-
-The maximum amount of time, in seconds, to wait between retries.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={30}
-  enumValues={null}
-  examples={[30]}
-  groups={[]}
-  name={"timeout_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  warnings={[]}
-  >
-
-#### timeout_secs
-
-The maximum time a request can take before being aborted. It is highly
-recommended that you do not lower value below the service's internal timeout,
-as this could create orphaned requests, pile on retries, and result in
-duplicate data downstream.
-
- See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -832,6 +426,384 @@ outputting.
 
 
 
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["mydatabase"]}
+  groups={[]}
+  name={"database"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### database
+
+The database that contains the stable that data will be inserted into.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"encoding"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### encoding
+
+Configures the encoding specific sink behavior.
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+
+</Field>
+</Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"healthcheck"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### healthcheck
+
+Enables/disables the sink healthcheck upon start.
+ See [Health Checks](#health-checks) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["http://localhost:8123"]}
+  groups={[]}
+  name={"host"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### host
+
+The host url of the [Clickhouse][urls.clickhouse] server.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"request"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### request
+
+Configures the sink request behavior.
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={5}
+  enumValues={null}
+  examples={[5]}
+  groups={[]}
+  name={"in_flight_limit"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"requests"}
+  warnings={[]}
+  >
+
+#### in_flight_limit
+
+The maximum number of in-flight requests allowed at any given time.
+ See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  groups={[]}
+  name={"rate_limit_duration_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### rate_limit_duration_secs
+
+The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
+ See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={5}
+  enumValues={null}
+  examples={[5]}
+  groups={[]}
+  name={"rate_limit_num"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### rate_limit_num
+
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
+time window.
+ See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={18446744073709551615}
+  enumValues={null}
+  examples={[18446744073709551615]}
+  groups={[]}
+  name={"retry_attempts"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### retry_attempts
+
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
+ See [Retry Policy](#retry-policy) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  groups={[]}
+  name={"retry_initial_backoff_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### retry_initial_backoff_secs
+
+The amount of time to wait before attempting the first retry for a failed
+request. Once, the first retry has failed the fibonacci sequence will be used
+to select future backoffs.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={10}
+  enumValues={null}
+  examples={[10]}
+  groups={[]}
+  name={"retry_max_duration_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### retry_max_duration_secs
+
+The maximum amount of time, in seconds, to wait between retries.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={30}
+  enumValues={null}
+  examples={[30]}
+  groups={[]}
+  name={"timeout_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### timeout_secs
+
+The maximum time a request can take before being aborted. It is highly
+recommended that you do not lower value below the service's internal timeout,
+as this could create orphaned requests, pile on retries, and result in
+duplicate data downstream.
+ See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+</Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["mytable"]}
+  groups={[]}
+  name={"table"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### table
+
+The table that data will be inserted into.
+
+
 
 </Field>
 <Field
@@ -855,7 +827,6 @@ outputting.
 Configures the TLS options for connections from this sink.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -877,7 +848,6 @@ Configures the TLS options for connections from this sink.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -906,7 +876,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -928,7 +897,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
 `key_path` is set.
-
 
 
 
@@ -956,7 +924,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -978,7 +945,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
 host.
-
 
 
 
@@ -1004,7 +970,6 @@ host.
 If `true` (the default), Vector will validate the configured remote host name
 against the remote host's TLS certificate. Do NOT set this to `false` unless
 you understand the risks of not verifying the remote hostname.
-
 
 
 

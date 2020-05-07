@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-05-04"
 component_title: "Filter"
-description: "The Vector `filter` transform accepts and outputs `log` and `metric` events allowing you to select events based on a set of logical conditions."
+description: "The Vector `filter` transform accepts and outputs `log` and `metric` events, allowing you to select events based on a set of logical conditions."
 event_types: ["log","metric"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+filter%22
@@ -18,7 +18,7 @@ import TabItem from '@theme/TabItem';
 
 The Vector `filter` transform
 accepts and outputs [`log`][docs.data-model.log] and
-[`metric`][docs.data-model.metric] events allowing you to select events based
+[`metric`][docs.data-model.metric] events, allowing you to select events based
 on a set of logical conditions.
 
 <!--
@@ -41,7 +41,7 @@ on a set of logical conditions.
 [transforms.my_transform_id]
   # General
   type = "filter" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
 
   # Condition
   condition.type = "check_fields" # optional, default
@@ -59,13 +59,16 @@ on a set of logical conditions.
 [transforms.my_transform_id]
   # General
   type = "filter" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
 
   # Condition
   condition.type = "check_fields" # optional, default
   condition."message.eq" = "this is the content to match against" # example
   condition."host.exists" = true # example
   condition."method.neq" = "POST" # example
+  condition."message.not_contains" = "some phrase to ignore" # example
+  condition."unit.not_starts_with" = "sys-" # example
+  condition."unit.not_ends_with" = ".device" # example
   condition."message.contains" = "foo" # example
   condition."environment.ends_with" = "-staging" # example
   condition."message.regex" = " (any|of|these|five|words) " # example
@@ -98,7 +101,6 @@ The set of logical conditions to be matched against every input event. Only
 messages that pass all conditions will be forwarded.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -122,7 +124,6 @@ The type of the condition to execute.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -143,7 +144,6 @@ The type of the condition to execute.
 #### `[field-name]`.eq
 
 Check whether a fields contents exactly matches the value specified.
-
 
 
 
@@ -171,7 +171,6 @@ being `true` or `false` respectively.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -193,6 +192,28 @@ being `true` or `false` respectively.
 
 Check whether a fields contents does not match the value specified.
 
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.not_contains":"some phrase to ignore"},{"unit.not_starts_with":"sys-"},{"unit.not_ends_with":".device"}]}
+  groups={[]}
+  name={"`[field-name]`.not_`[condition]`"}
+  path={"condition"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"any"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[field-name]`.not_`[condition]`
+
+Check if the given `[condition]` does not match.
 
 
 
@@ -219,7 +240,6 @@ Checks whether a string field contains a string argument.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -240,7 +260,6 @@ Checks whether a string field contains a string argument.
 #### `[field_name]`.ends_with
 
 Checks whether a string field ends with a string argument.
-
 
 
 
@@ -271,7 +290,6 @@ preferred where possible.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -292,7 +310,6 @@ preferred where possible.
 #### `[field_name]`.starts_with
 
 Checks whether a string field starts with a string argument.
-
 
 
 

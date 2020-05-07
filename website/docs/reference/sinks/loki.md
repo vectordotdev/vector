@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-07"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-05-01"
+delivery_guarantee: "at_least_once"
 component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
 event_types: ["log"]
@@ -44,7 +44,7 @@ The Vector `loki` sink
 [sinks.my_sink_id]
   # General
   type = "loki" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "http://localhost:3100" # required
   healthcheck = true # optional, default
 
@@ -63,7 +63,7 @@ The Vector `loki` sink
 [sinks.my_sink_id]
   # General
   type = "loki" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "http://localhost:3100" # required
   healthcheck = true # optional, default
   remove_label_fields = false # optional, default
@@ -71,8 +71,8 @@ The Vector `loki` sink
   tenant_id = "some_tenant_id" # optional, no default
 
   # Auth
-  auth.strategy = "basic" # required
   auth.password = "${LOKI_PASSWORD}" # required, required when strategy = "basic"
+  auth.strategy = "basic" # required
   auth.user = "${LOKI_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
@@ -80,9 +80,9 @@ The Vector `loki` sink
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -99,7 +99,7 @@ The Vector `loki` sink
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 5 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
@@ -138,32 +138,7 @@ The Vector `loki` sink
 Options for the authentication strategy.
 
 
-
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
-  examples={["basic"]}
-  groups={[]}
-  name={"strategy"}
-  path={"auth"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### strategy
-
-The authentication strategy to use.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -185,6 +160,28 @@ The authentication strategy to use.
 The basic authentication password. If using GrafanaLab's hosted Loki then this
 must be set to your `instanceId`.
 
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
+  examples={["basic"]}
+  groups={[]}
+  name={"strategy"}
+  path={"auth"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### strategy
+
+The authentication strategy to use.
 
 
 
@@ -209,7 +206,6 @@ must be set to your `instanceId`.
 
 The basic authentication user name. If using GrafanaLab's hosted Loki then this
 must be set to your Grafana.com api key.
-
 
 
 
@@ -238,7 +234,6 @@ must be set to your Grafana.com api key.
 Configures the sink batching behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -259,7 +254,6 @@ Configures the sink batching behavior.
 #### max_size
 
 The maximum size of a batch, in bytes, before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -283,7 +277,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 #### timeout_secs
 
 The maximum age of a batch before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -312,32 +305,7 @@ The maximum age of a batch before it is flushed.
 Configures the sink specific buffer behavior.
 
 
-
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -357,7 +325,6 @@ The buffer's type and storage mechanism.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
 
 
 
@@ -381,8 +348,30 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
-
  See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
 
 
 </Field>
@@ -405,7 +394,6 @@ The maximum size of the buffer on the disk.
 #### when_full
 
 The behavior when the buffer becomes full.
-
 
 
 
@@ -434,7 +422,6 @@ The behavior when the buffer becomes full.
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -455,7 +442,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -482,7 +468,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -506,7 +491,6 @@ Limit the sink to only encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -527,7 +511,6 @@ Limit the sink to only encoding the specified labels.
 #### timestamp_format
 
 How to format event timestamps.
-
 
 
 
@@ -557,7 +540,6 @@ The endpoint used to ship logs to.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -578,9 +560,60 @@ The endpoint used to ship logs to.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"labels"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### labels
+
+A set of labels that will be attached to each batch of events. These values are
+also templateable to allow events to provide dynamic label values.Note: If the
+set of label values has high cardinality this can cause drastic performance
+issues with Loki. To ensure this does not happen one should try to reduce the
+amount of unique label values.
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"key":"value"},{"key":"{{ event_field }}"}]}
+  groups={[]}
+  name={"`[label-name]`"}
+  path={"labels"}
+  relevantWhen={null}
+  required={true}
+  templateable={true}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[label-name]`
+
+A key-value pair for labels.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -603,7 +636,6 @@ Enables/disables the sink healthcheck upon start.
 
 If this is set to `true` then when labels are collected from events those
 fields will also get removed from the event.
-
 
 
 
@@ -631,89 +663,6 @@ This is useful because Loki uses the timestamp to index the event.
 
 
 
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["some_tenant_id"]}
-  groups={[]}
-  name={"tenant_id"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### tenant_id
-
-The tenant id that will be sent with every request, by default this is not
-required since a proxy should set this header. When running Loki locally a
-tenant id is not required either.
-
-You can read more about tenant id's [here][urls.loki_multi_tenancy]
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"label":"value"}]}
-  groups={[]}
-  name={"labels"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### labels
-
-A set of labels that will be attached to each batch of events. These values are
-also templateable to allow events to provide dynamic label values.Note: If the
-set of label values has high cardinality this can cause drastic performance
-issues with Loki. To ensure this does not happen one should try to reduce the
-amount of unique label values.
-
-
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"key":"value"},{"key":"{{ event_field }}"}]}
-  groups={[]}
-  name={"`[label-name`"}
-  path={"labels"}
-  relevantWhen={null}
-  required={true}
-  templateable={true}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### `[label-name`
-
-A key-value pair for labels.
-
-
-
-
-</Field>
-</Fields>
-
 </Field>
 <Field
   common={false}
@@ -736,7 +685,6 @@ A key-value pair for labels.
 Configures the sink request behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -757,7 +705,6 @@ Configures the sink request behavior.
 #### in_flight_limit
 
 The maximum number of in-flight requests allowed at any given time.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -781,7 +728,6 @@ The maximum number of in-flight requests allowed at any given time.
 #### rate_limit_duration_secs
 
 The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -806,16 +752,15 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
 time window.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
 <Field
   common={false}
-  defaultValue={-1}
+  defaultValue={18446744073709551615}
   enumValues={null}
-  examples={[-1]}
+  examples={[18446744073709551615]}
   groups={[]}
   name={"retry_attempts"}
   path={"request"}
@@ -829,8 +774,8 @@ time window.
 
 #### retry_attempts
 
-The maximum number of retries to make for failed requests.
-
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
  See [Retry Policy](#retry-policy) for more info.
 
 
@@ -859,7 +804,6 @@ to select future backoffs.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -880,7 +824,6 @@ to select future backoffs.
 #### retry_max_duration_secs
 
 The maximum amount of time, in seconds, to wait between retries.
-
 
 
 
@@ -907,12 +850,38 @@ The maximum time a request can take before being aborted. It is highly
 recommended that you do not lower value below the service's internal timeout,
 as this could create orphaned requests, pile on retries, and result in
 duplicate data downstream.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["some_tenant_id"]}
+  groups={[]}
+  name={"tenant_id"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### tenant_id
+
+The tenant id that will be sent with every request, by default this is not
+required since a proxy should set this header. When running Loki locally a
+tenant id is not required either.
+
+You can read more about tenant id's [here][urls.loki_multi_tenancy]
+
+
 
 </Field>
 <Field
@@ -936,7 +905,6 @@ duplicate data downstream.
 Configures the TLS options for connections from this sink.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -958,7 +926,6 @@ Configures the TLS options for connections from this sink.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -987,7 +954,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -1009,7 +975,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
 `key_path` is set.
-
 
 
 
@@ -1037,7 +1002,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -1059,7 +1023,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
 host.
-
 
 
 
@@ -1085,7 +1048,6 @@ host.
 If `true` (the default), Vector will validate the configured remote host name
 against the remote host's TLS certificate. Do NOT set this to `false` unless
 you understand the risks of not verifying the remote hostname.
-
 
 
 

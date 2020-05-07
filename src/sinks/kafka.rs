@@ -209,9 +209,11 @@ impl Sink for KafkaSink {
 }
 
 fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
-    let consumer: BaseConsumer = config.to_rdkafka().unwrap().create().unwrap();
+    let client = config.to_rdkafka().unwrap();
 
     let check = future::lazy(move || {
+        let consumer: BaseConsumer = client.create().unwrap();
+
         tokio::task::block_in_place(|| {
             consumer
                 .fetch_metadata(Some(&config.topic), Duration::from_secs(3))
@@ -235,7 +237,7 @@ fn encode_event(
         .map(|v| v.as_bytes().to_vec())
         .unwrap_or_default();
 
-    let body = match encoding.codec {
+    let body = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
         Encoding::Text => event
             .as_log()

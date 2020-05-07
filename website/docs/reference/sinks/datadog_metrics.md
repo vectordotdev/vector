@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-06"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-05-01"
+delivery_guarantee: "at_least_once"
 component_title: "Datadog Metrics"
 description: "The Vector `datadog_metrics` sink batches `metric` events to Datadog's metrics service using HTTP API."
 event_types: ["metric"]
@@ -43,7 +43,7 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "datadog_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${DATADOG_API_KEY}" # required
   healthcheck = true # optional, default
   namespace = "service" # required
@@ -56,7 +56,7 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 [sinks.my_sink_id]
   # General
   type = "datadog_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${DATADOG_API_KEY}" # required
   healthcheck = true # optional, default
   host = "https://api.datadoghq.com" # optional, default
@@ -70,7 +70,7 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 5 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
@@ -80,6 +80,29 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${DATADOG_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  groups={[]}
+  name={"api_key"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### api_key
+
+Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
+
+
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -99,7 +122,6 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 ### batch
 
 Configures the sink batching behavior.
-
 
 
 <Fields filters={false}>
@@ -122,7 +144,6 @@ Configures the sink batching behavior.
 #### max_events
 
 The maximum size of a batch, in events, before it is flushed.
-
 
 
 
@@ -149,33 +170,8 @@ The maximum age of a batch before it is flushed.
 
 
 
-
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${DATADOG_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
-  groups={[]}
-  name={"api_key"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### api_key
-
-Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
-
-
-
 
 </Field>
 <Field
@@ -197,7 +193,6 @@ Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -224,7 +219,6 @@ Datadog endpoint to send metrics to.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -245,7 +239,6 @@ Datadog endpoint to send metrics to.
 ### namespace
 
 A prefix that will be added to all metric names.
-
 
 
 
@@ -271,7 +264,6 @@ A prefix that will be added to all metric names.
 Configures the sink request behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -292,7 +284,6 @@ Configures the sink request behavior.
 #### in_flight_limit
 
 The maximum number of in-flight requests allowed at any given time.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -316,7 +307,6 @@ The maximum number of in-flight requests allowed at any given time.
 #### rate_limit_duration_secs
 
 The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -341,16 +331,15 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
 time window.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
 <Field
   common={false}
-  defaultValue={-1}
+  defaultValue={18446744073709551615}
   enumValues={null}
-  examples={[-1]}
+  examples={[18446744073709551615]}
   groups={[]}
   name={"retry_attempts"}
   path={"request"}
@@ -364,8 +353,8 @@ time window.
 
 #### retry_attempts
 
-The maximum number of retries to make for failed requests.
-
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
  See [Retry Policy](#retry-policy) for more info.
 
 
@@ -394,7 +383,6 @@ to select future backoffs.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -415,7 +403,6 @@ to select future backoffs.
 #### retry_max_duration_secs
 
 The maximum amount of time, in seconds, to wait between retries.
-
 
 
 
@@ -442,7 +429,6 @@ The maximum time a request can take before being aborted. It is highly
 recommended that you do not lower value below the service's internal timeout,
 as this could create orphaned requests, pile on retries, and result in
 duplicate data downstream.
-
 
 
 

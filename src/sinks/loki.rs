@@ -142,7 +142,7 @@ impl HttpSink for LokiConfig {
                 .remove(&event::log_schema().timestamp_key());
         }
 
-        let event = match &self.encoding.codec {
+        let event = match &self.encoding.codec() {
             Encoding::Json => serde_json::to_string(&event.as_log().all_fields())
                 .expect("json encoding should never fail"),
 
@@ -210,7 +210,7 @@ impl HttpSink for LokiConfig {
         req.header("Content-Type", "application/json");
 
         if let Some(tenant_id) = &self.tenant_id {
-            req.header("X-Scope-OrigID", tenant_id);
+            req.header("X-Scope-OrgID", tenant_id);
         }
 
         let mut req = req.body(body).unwrap();

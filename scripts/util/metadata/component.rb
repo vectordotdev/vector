@@ -150,6 +150,14 @@ class Component
     @logo_path
   end
 
+  def logs?
+    event_types.include?("log")
+  end
+
+  def metrics?
+    event_types.include?("metric")
+  end
+
   def only_service_provider?(provider_name)
     service_providers.length == 1 && service_provider?(provider_name)
   end

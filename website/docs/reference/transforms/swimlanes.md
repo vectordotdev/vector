@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-05-04"
 component_title: "Swimlanes"
-description: "The Vector `swimlanes` transform accepts and outputs `log` events allowing you to route events across parallel streams using logical filters."
+description: "The Vector `swimlanes` transform accepts and outputs `log` events, allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
 function_category: "route"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+swimlanes%22
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `swimlanes` transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to route
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to route
 events across parallel streams using logical filters.
 
 <!--
@@ -40,7 +40,7 @@ events across parallel streams using logical filters.
 [transforms.my_transform_id]
   # General
   type = "swimlanes" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
 
   # Lanes
   [transforms.my_transform_id.lanes.`[swimlane-id]`]
@@ -59,7 +59,7 @@ events across parallel streams using logical filters.
 [transforms.my_transform_id]
   # General
   type = "swimlanes" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
 
   # Lanes
   [transforms.my_transform_id.lanes.`[swimlane-id]`]
@@ -67,6 +67,9 @@ events across parallel streams using logical filters.
     "message.eq" = "this is the content to match against" # example
     "host.exists" = true # example
     "method.neq" = "POST" # example
+    "message.not_contains" = "some phrase to ignore" # example
+    "unit.not_starts_with" = "sys-" # example
+    "unit.not_ends_with" = ".device" # example
     "message.contains" = "foo" # example
     "environment.ends_with" = "-staging" # example
     "message.regex" = " (any|of|these|five|words) " # example
@@ -100,7 +103,6 @@ of the swimlane. Each swimlane can then be referenced as an input by other
 components with the name `<transform_name>.<swimlane_id>`.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -121,7 +123,6 @@ components with the name `<transform_name>.<swimlane_id>`.
 #### `[swimlane-id]`
 
 The identifier of a swimlane.
-
 
 
 <Fields filters={false}>
@@ -147,7 +148,6 @@ The type of the condition to execute.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -168,7 +168,6 @@ The type of the condition to execute.
 ##### `[field-name]`.eq
 
 Check whether a fields contents exactly matches the value specified.
-
 
 
 
@@ -196,7 +195,6 @@ being `true` or `false` respectively.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -218,6 +216,28 @@ being `true` or `false` respectively.
 
 Check whether a fields contents does not match the value specified.
 
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.not_contains":"some phrase to ignore"},{"unit.not_starts_with":"sys-"},{"unit.not_ends_with":".device"}]}
+  groups={[]}
+  name={"`[field-name]`.not_`[condition]`"}
+  path={"lanes.`[swimlane-id]`"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"any"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[field-name]`.not_`[condition]`
+
+Check if the given `[condition]` does not match.
 
 
 
@@ -244,7 +264,6 @@ Checks whether a string field contains a string argument.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -265,7 +284,6 @@ Checks whether a string field contains a string argument.
 ##### `[field_name]`.ends_with
 
 Checks whether a string field ends with a string argument.
-
 
 
 
@@ -296,7 +314,6 @@ preferred where possible.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -317,7 +334,6 @@ preferred where possible.
 ##### `[field_name]`.starts_with
 
 Checks whether a string field starts with a string argument.
-
 
 
 

@@ -50,6 +50,7 @@ class Field
     :category,
     :children,
     :default,
+    :default_label,
     :description,
     :enum,
     :examples,
@@ -150,7 +151,7 @@ class Field
     if !wildcard? && other.wildcard?
       -1
     else
-      [sort || 99, "#{category}#{name}".downcase] <=> [other.sort || 99, "#{other.category}#{other.name}".downcase]
+      name.downcase <=> other.name.downcase
     end
   end
 
@@ -193,6 +194,10 @@ class Field
     end
   end
 
+  def config_sort_obj
+    @config_sort_obj ||= [sort || 99, "#{category}#{name}".downcase]
+  end
+
   def object_of_object?
     object? && children_list.length == 1 && children_list[0].object?
   end
@@ -215,6 +220,10 @@ class Field
 
   def context?
     category.downcase == "context"
+  end
+
+  def default_infinity?
+    default == 18446744073709551615
   end
 
   def eql?(other)

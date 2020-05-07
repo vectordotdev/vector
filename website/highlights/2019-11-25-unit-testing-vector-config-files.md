@@ -3,10 +3,10 @@ last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Unit Testing Your Vector Config Files"
 description: "Treating your Vector configuration files as code"
-author_github: https://github.com/binarylogic
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1220]
 release: "0.6.0"
-importance: "medium"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: config"]
 ---
 

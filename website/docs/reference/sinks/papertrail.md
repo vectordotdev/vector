@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-06"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-05-01"
+delivery_guarantee: "at_least_once"
 component_title: "Papertrail"
 description: "The Vector `papertrail` sink streams `log` events to Papertrail via Syslog."
 event_types: ["log"]
@@ -44,7 +44,7 @@ The Vector `papertrail` sink
 [sinks.my_sink_id]
   # General
   type = "papertrail" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "logs.papertrailapp.com:12345" # required
   healthcheck = true # optional, default
 
@@ -59,14 +59,14 @@ The Vector `papertrail` sink
 [sinks.my_sink_id]
   # General
   type = "papertrail" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "logs.papertrailapp.com:12345" # required
   healthcheck = true # optional, default
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -101,32 +101,7 @@ The Vector `papertrail` sink
 Configures the sink specific buffer behavior.
 
 
-
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -146,7 +121,6 @@ The buffer's type and storage mechanism.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
 
 
 
@@ -173,6 +147,28 @@ The maximum size of the buffer on the disk.
 
 
 
+</Field>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
 
 </Field>
 <Field
@@ -194,7 +190,6 @@ The maximum size of the buffer on the disk.
 #### when_full
 
 The behavior when the buffer becomes full.
-
 
 
 
@@ -223,7 +218,6 @@ The behavior when the buffer becomes full.
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -244,7 +238,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -271,7 +264,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -292,7 +284,6 @@ Prevent the sink from encoding the specified labels.
 #### only_fields
 
 Limit the sink to only encoding the specified labels.
-
 
 
 
@@ -319,7 +310,6 @@ How to format event timestamps.
 
 
 
-
 </Field>
 </Fields>
 
@@ -343,7 +333,6 @@ How to format event timestamps.
 ### endpoint
 
 The endpoint to stream logs to.
-
  See [Obtaining a Log Destination](#obtaining-a-log-destination) for more info.
 
 
@@ -367,7 +356,6 @@ The endpoint to stream logs to.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 

@@ -6,13 +6,15 @@ description: "This change achieve consistency with our `kafka` source and other 
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1502]
 release: "0.7.0"
-importance: "low"
+hide_on_release_notes: false
 tags: ["type: breaking change","domain: sinks","sink: kafka"]
 ---
 
 The `kafka` sink field `bootstrap_servers` has been changed from an array to a
 string, expecting a comma separated list of bootstrap servers similar to the
-`kafka` source:
+`kafka` source.
+
+## Upgrade Guide
 
 ```diff title="vector.toml"
  [sinks.my_sink_id]

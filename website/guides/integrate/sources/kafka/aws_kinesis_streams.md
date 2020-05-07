@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-05-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Kafka to AWS Kinesis Data Streams"
 description: "A simple guide to send logs from Kafka to AWS Kinesis Data Streams in just a few minutes."
@@ -57,7 +57,7 @@ we'll be deploying Vector as a
 [service][docs.strategies#service].
 
 The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
+separate service. It is designed to receive data from an upstream source and
 fan-out to one or more destinations.
 For this guide, Vector will collect data from
 Kafka via Vector's
@@ -73,24 +73,24 @@ The following diagram demonstrates how it works.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Consume one or more Kafka topics.
-    <ol>
+    <ul>
       <li>Checkpoint your position to ensure data is not lost between restarts.</li>
       <li>Enrich your logs with useful Kafka context.</li>
-    </ol>
+    </ul>
   </li>
   <li>
     Send logs to AWS Kinesis Data Streams.
-    <ol>
+    <ul>
       <li>Batch data to maximize throughput.</li>
       <li>Automatically retry failed requests, with backoff.</li>
       <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
+    </ul>
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 
@@ -101,6 +101,8 @@ To be clear, here's everything we'll accomplish in this short guide:
 ### Install Vector
 
 <InstallationCommand />
+
+Or choose your [preferred method][docs.installation].
 
 </li>
 <li>
@@ -150,6 +152,7 @@ flexibility of Vector:
 </Jump>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.sources.kafka]: /docs/reference/sources/kafka/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.aws_kinesis_streams]: https://aws.amazon.com/kinesis/data-streams/

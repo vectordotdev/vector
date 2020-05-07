@@ -26,6 +26,9 @@
 - name: "domain: platforms"
   description: Anything platforms related
   color: 212f3e
+- name: "domain: privacy"
+  description: Anything privacy related
+  color: 212f3e
 - name: "domain: security"
   description: Anything security related
   color: 212f3e
@@ -212,6 +215,9 @@
 - name: "provider: datadog"
   description: Anything Datadog related
   color: ff9f43
+- name: "provider: azure"
+  description: Anything Azure related
+  color: ff9f43
 - name: "provider: elastic"
   description: Anything Elastic related
   color: ff9f43
@@ -252,6 +258,9 @@
   color: ff9ff3
 - name: "source: file"
   description: Anything `file` source realted
+  color: ff9ff3
+- name: "source: generator"
+  description: Anything `generator` source realted
   color: ff9ff3
 - name: "source: http"
   description: Anything `http` source realted
@@ -323,9 +332,6 @@
   color: 54a0ff
 - name: "transform: json_parser"
   description: Anything `json_parser` transform related
-  color: 54a0ff
-- name: "transform: kubernetes_pod_metadata"
-  description: Anything `kubernetes_pod_metadata` transform related
   color: 54a0ff
 - name: "transform: log_to_metric"
   description: Anything `log_to_metric` transform related

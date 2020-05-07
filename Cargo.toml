@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -75,7 +75,7 @@ rusoto_sts = { version = "0.41.0", optional = true }
 
 # Tower
 tower = "0.1.1"
-tower03 = { package = "tower", version = "0.3" }
+tower03 = { package = "tower", version = "0.3", git = "https://github.com/tower-rs/tower", features = ["limit", "retry", "timeout", "util"] }
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }
@@ -89,10 +89,11 @@ prost-types = "0.5"
 # GCP
 goauth = { version = "0.6.1", optional = true }
 smpl_jwt = { version = "0.4.0", optional = true }
+reqwest = "0.9.5"
 
 # External libs
 derivative = "1.0"
-chrono = "0.4.6"
+chrono = { version = "0.4.6", features = ["serde"] }
 rand = "0.5.5"
 regex = "1.3.5"
 bytes = { version = "0.4.10", features = ["serde"] }
@@ -135,7 +136,7 @@ grok = { version = "~1.0.1", optional = true }
 nom = { version = "5.0.0", optional = true }
 uuid = { version = "0.7", features = ["serde", "v4"], optional = true }
 exitcode = "1.1.2"
-snafu = { version = "0.4.3", features = ["futures-01"] }
+snafu = { version = "0.6", features = ["futures-01", "futures"] }
 url = "1.7"
 base64 = { version = "0.10.1", optional = true }
 shiplift = { version = "0.6", default-features = false, features = ["tls"], optional = true }
@@ -155,9 +156,15 @@ notify = "4.0.14"
 once_cell = "1.3"
 getset = "0.1.0"
 lru = "0.4.3"
-k8s-openapi = { version = "0.5.1", features = ["v1_15"], optional = true }
 bloom = "0.3.2"
 pulsar = { version = "0.3.0", optional = true }
+task-compat = "0.1"
+
+[target.'cfg(windows)'.dependencies]
+schannel = "0.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "0.4"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
@@ -170,7 +177,6 @@ built = "0.3"
 [dev-dependencies]
 approx = "0.3.0"
 criterion = "0.3"
-reqwest = "0.9.5"
 tempfile = "3.0.6"
 libc = "0.2.43"
 libz-sys = "1.0"
@@ -178,16 +184,16 @@ walkdir = "2.2.7"
 elastic_responses = "0.20"
 matches = "0.1.8"
 pretty_assertions = "0.6.1"
-proptest = "0.9"
 tokio01-test = "0.1.1"
-tower-test = "0.1"
-kube = { version = "0.16.1", features = ["openapi"] }
+tower-test03 = { package = "tower-test", version = "0.3" }
+tower-test01 = { package = "tower-test", version = "0.1" }
 serde_yaml = "0.8.9"
 trust-dns-server = "0.17.0"
 trust-dns = "0.17.0"
 trust-dns-proto = "0.8.0"
 dirs = "2.0.2"
 tokio-test = "0.2"
+tokio = { version = "0.2", features = ["test-util"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -216,11 +222,11 @@ leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
 sources = [
   "sources-docker",
   "sources-file",
+  "sources-generator",
   "sources-http",
   "sources-internal_metrics",
   "sources-journald",
   "sources-kafka",
-  "sources-kubernetes",
   "sources-logplex",
   "sources-prometheus",
   "sources-socket",
@@ -231,21 +237,21 @@ sources = [
   "sources-tls",
   "sources-vector",
 ]
-sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-docker = ["shiplift"]
 sources-file = ["bytesize"]
+sources-generator = []
+sources-http = ["warp", "sources-tls"]
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["owning_ref"]
-sources-kubernetes = ["sources-file", "transforms-json_parser", "transforms-regex_parser"]
 sources-logplex = ["warp", "sources-tls"]
 sources-prometheus = []
-sources-http = ["warp", "sources-tls"]
 sources-socket = ["bytesize", "listenfd", "tokio-uds", "sources-tls"]
 sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
 sources-statsd = []
 sources-stdin = ["bytesize"]
 sources-syslog = ["sources-socket", "syslog_loose"]
+sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-vector = ["sources-socket"]
 
 # Transforms
@@ -262,7 +268,6 @@ transforms = [
   "transforms-geoip",
   "transforms-grok_parser",
   "transforms-json_parser",
-  "transforms-kubernetes",
   "transforms-log_to_metric",
   "transforms-logfmt_parser",
   "transforms-lua",
@@ -289,7 +294,6 @@ transforms-field_filter = []
 transforms-geoip = ["maxminddb"]
 transforms-grok_parser = ["grok"]
 transforms-json_parser = []
-transforms-kubernetes = ["k8s-openapi","evmap","sources-kubernetes"]
 transforms-log_to_metric = []
 transforms-logfmt_parser = ["logfmt"]
 transforms-lua = ["rlua"]
@@ -369,40 +373,35 @@ nightly = []
 
 # Testing-related features
 docker = [
+  "aws-integration-tests",
   "clickhouse-integration-tests",
-  "cloudwatch-logs-integration-tests",
-  "cloudwatch-metrics-integration-tests",
   "docker-integration-tests",
-  "ec2-metadata-integration-tests",
   "es-integration-tests",
-  "firehose-integration-tests",
-  "gcp-pubsub-integration-tests",
-  "gcs-integration-tests",
-  "kafka-integration-tests",
-  "kinesis-integration-tests",
-  "s3-integration-tests",
+  "gcp-integration-tests",
   "influxdb-integration-tests",
-  "splunk-integration-tests",
+  "kafka-integration-tests",
   "pulsar-integration-tests",
+  "splunk-integration-tests",
 ]
-clickhouse-integration-tests = []
-cloudwatch-logs-integration-tests = []
-cloudwatch-metrics-integration-tests = []
-docker-integration-tests = []
-ec2-metadata-integration-tests = []
-es-integration-tests = []
-firehose-integration-tests = []
-gcp-pubsub-integration-tests = []
-gcs-integration-tests = []
-kafka-integration-tests = []
-kinesis-integration-tests = []
-s3-integration-tests = []
-splunk-integration-tests = []
-influxdb-integration-tests = []
-pulsar-integration-tests = []
 
-kubernetes = ["kubernetes-integration-tests"]
-kubernetes-integration-tests = ["uuid"]
+aws-integration-tests = ["sinks-aws_cloudwatch_logs", "sinks-aws_cloudwatch_metrics", "sinks-elasticsearch", "sinks-aws_kinesis_firehose", "sinks-aws_kinesis_streams", "sinks-aws_s3", "transforms-aws_ec2_metadata"]
+aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
+aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
+aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
+aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-elasticsearch"]
+aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
+aws-s3-integration-tests = ["sinks-aws_s3"]
+clickhouse-integration-tests = ["sinks-clickhouse"]
+docker-integration-tests = ["sources-docker", "unix"]
+es-integration-tests = ["sinks-elasticsearch"]
+gcp-integration-tests = ["sinks-gcp"]
+gcp-pubsub-integration-tests = ["sinks-gcp"]
+gcp-cloud-storage-integration-tests = ["sinks-gcp"]
+influxdb-integration-tests = ["sinks-influxdb_metrics"]
+kafka-integration-tests = ["sinks-kafka"]
+loki-integration-tests = ["sinks-loki"]
+pulsar-integration-tests = ["sinks-pulsar"]
+splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 
 disable-resolv-conf = []
 
@@ -410,6 +409,13 @@ disable-resolv-conf = []
 name = "bench"
 harness = false
 
-[profile.release]
-lto = true
-codegen-units = 1
+[[bench]]
+name = "buffering"
+harness = false
+
+[[bench]]
+name = "isolated_buffering"
+harness = false
+
+[patch.'https://github.com/tower-rs/tower']
+tower-layer = "0.3"

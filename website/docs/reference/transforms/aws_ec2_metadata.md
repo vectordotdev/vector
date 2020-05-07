@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-05-01"
 component_title: "AWS EC2 Metadata"
-description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata."
+description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events, allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
 function_category: "enrich"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+aws_ec2_metadata%22
@@ -18,7 +18,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `aws_ec2_metadata` transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to enrich
 logs with AWS EC2 instance metadata.
 
 <!--
@@ -31,7 +31,7 @@ logs with AWS EC2 instance metadata.
 
 ## Requirements
 
-<Alert icon={false} type="danger" className="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 
 * [AWS IMDS v2][urls.aws_ec2_instance_metadata] is required. This is available by default on EC2.
@@ -50,7 +50,7 @@ logs with AWS EC2 instance metadata.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "aws_ec2_metadata" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # optional, default
   host = "http://169.254.169.254" # optional, default
   namespace = "" # optional, default
@@ -63,7 +63,7 @@ logs with AWS EC2 instance metadata.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "aws_ec2_metadata" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # optional, default
   host = "http://169.254.169.254" # optional, default
   namespace = "" # optional, default
@@ -96,7 +96,6 @@ A list of fields to include in each event.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -120,13 +119,12 @@ Override the default EC2 Metadata host.
 
 
 
-
 </Field>
 <Field
   common={true}
   defaultValue={""}
   enumValues={null}
-  examples={[""]}
+  examples={["","ec2","aws.ec2"]}
   groups={[]}
   name={"namespace"}
   path={null}
@@ -141,7 +139,6 @@ Override the default EC2 Metadata host.
 ### namespace
 
 Prepend a namespace to each field's key.
-
 
 
 
@@ -165,7 +162,6 @@ Prepend a namespace to each field's key.
 ### refresh_interval_secs
 
 The interval in seconds at which the EC2 Metadata api will be called.
-
 
 
 
@@ -215,7 +211,6 @@ The `ami-id` that the current EC2 instance is using.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -236,7 +231,6 @@ The `ami-id` that the current EC2 instance is using.
 ### availability-zone
 
 The `availability-zone` that the current EC2 instance is running in.
-
 
 
 
@@ -263,7 +257,6 @@ The `instance-id` of the current EC2 instance.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -284,7 +277,6 @@ The `instance-id` of the current EC2 instance.
 ### local-hostname
 
 The `local-hostname` of the current EC2 instance.
-
 
 
 
@@ -311,7 +303,6 @@ The `local-ipv4` of the current EC2 instance.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -332,7 +323,6 @@ The `local-ipv4` of the current EC2 instance.
 ### public-hostname
 
 The `public-hostname` of the current EC2 instance.
-
 
 
 
@@ -359,7 +349,6 @@ The `public-ipv4` of the current EC2 instance.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -380,7 +369,6 @@ The `public-ipv4` of the current EC2 instance.
 ### region
 
 The [`region`](#region) that the current EC2 instance is running in.
-
 
 
 
@@ -407,7 +395,6 @@ The `role-name` that the current EC2 instance is using.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -431,7 +418,6 @@ The `subnet-id` of the current EC2 instance's default network interface.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -452,7 +438,6 @@ The `subnet-id` of the current EC2 instance's default network interface.
 ### vpc-id
 
 The `vpc-id` of the current EC2 instance's default network interface.
-
 
 
 

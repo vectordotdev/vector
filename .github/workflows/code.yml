@@ -1,0 +1,200 @@
+name: code
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/code.yml"
+      - "lib/*s"
+      - "proto/**"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docker-compose.yml"
+      - "rust-toolchain"
+
+  pull_request:
+    paths:
+      - ".github/workflows/test.yml"
+      - ".github/workflows/code.yml"
+      - "lib/*s"
+      - "proto/**"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docker-compose.yml"
+      - "rust-toolchain"
+
+env:
+  AWS_ACCESS_KEY_ID: fake-aws-key
+  AWS_SECRET_ACCESS_KEY: fake-aws-key
+  RUST_BACKTRACE: full
+  TARGET: x86_64-unknown-linux-gnu
+  TEST_LOG: debug
+  USE_CONTAINER: none
+
+jobs:
+  check-advistories:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          command: check advisories
+
+  check-component-features:
+    runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
+    steps:
+      - uses: actions/checkout@v1
+      - run: sudo apt install -y python3-pip python3-setuptools python3-wheel
+      - run: sudo python3 -m pip install remarshal
+      - run: make check-component-features
+
+  check-fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: rustup component add rustfmt
+      - run: make check-fmt
+        env:
+          PASS_RUSTFLAGS: "-D warnings"
+          USE_CONTAINER: docker
+
+  check-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-code
+        env:
+          PASS_RUSTFLAGS: "-D warnings"
+
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-version
+        env:
+          USE_CONTAINER: docker
+
+  check-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-scripts
+
+  check-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v1
+      - env:
+          USE_CONTAINER: none
+          RUSTFLAGS: "-D warnings"
+        run: cargo check --no-default-features --features default-msvc
+
+  test-behavior:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make test-behavior
+
+  test-integration-aws:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make test-integration-aws
+
+  test-integration-clickhouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make test-integration-clickhouse
+
+  test-integration-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make test-integration-docker
+
+  test-integration-elasticsearch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make test-integration-elasticsearch
+
+  test-integration-gcp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make test-integration-gcp
+
+  test-integration-influxdb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make test-integration-influxdb
+
+  test-integration-kafka:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make test-integration-kafka
+
+  test-integration-loki:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make test-integration-loki
+
+  test-integration-pulsar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make test-integration-pulsar
+
+  test-integration-splunk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make test-integration-splunk
+
+  integration-kubernetes:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        kubernetes:
+          - v1.18.2
+          - v1.17.5
+          - v1.16.9
+          - v1.15.11
+          - v1.14.10
+      fail-fast: false
+    steps:
+      - name: Setup Minikube
+        uses: manusa/actions-setup-minikube@v1.0.2
+        with:
+          minikube version: 'v1.9.2'
+          kubernetes version: '${{ matrix.kubernetes }}'
+          github token: '${{ secrets.GITHUB_TOKEN }}'
+      - name: Login to DockerHub Registry
+        run: docker login -u "${{ secrets.K8S_INTEGRATION_CI_DOCKER_USERNAME }}" -p "${{ secrets.K8S_INTEGRATION_CI_DOCKER_PASSWORD }}"
+      - name: Checkout
+        uses: actions/checkout@v1
+      - run: make slim-builds
+      - run: make test-integration-kubernetes
+        env:
+          CONTAINER_IMAGE_REPO: ${{ secrets.K8S_INTEGRATION_CI_DOCKER_REPO }}
+          PACKAGE_DEB_USE_CONTAINER: docker
+
+  test-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make slim-builds
+      - run: make test-unit

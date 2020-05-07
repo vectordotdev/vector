@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-14"
+last_modified_on: "2020-05-01"
 title: Install Vector On Amazon Linux
 sidebar_label: Amazon Linux
 description: Install Vector on Amazon Linux
@@ -69,7 +69,7 @@ The following diagram demonstrates how it works.
 1.  ### Download the Vector `.rpm` file
 
     ```bash
-    curl -O https://packages.timber.io/vector/0.8.X/vector-aarch64.rpm
+    curl -O https://packages.timber.io/vector/0.9.X/vector-aarch64.rpm
     ```
 
     [Looking for a specific version?][docs.package_managers.rpm#versions]
@@ -100,7 +100,7 @@ The following diagram demonstrates how it works.
 1.  ### Download the Vector `.rpm` file
 
     ```bash
-    curl -O https://packages.timber.io/vector/0.8.X/vector-armv7hl.rpm
+    curl -O https://packages.timber.io/vector/0.9.X/vector-armv7hl.rpm
     ```
 
     [Looking for a specific version?][docs.package_managers.rpm#versions]
@@ -131,7 +131,7 @@ The following diagram demonstrates how it works.
 1.  ### Download the Vector `.rpm` file
 
     ```bash
-    curl -O https://packages.timber.io/vector/0.8.X/vector-x86_64.rpm
+    curl -O https://packages.timber.io/vector/0.9.X/vector-x86_64.rpm
     ```
 
     [Looking for a specific version?][docs.package_managers.rpm#versions]
@@ -170,6 +170,8 @@ The following diagram demonstrates how it works.
 ### Install Vector
 
 <InstallationCommand />
+
+Or choose your [preferred method][docs.installation].
 
 </li>
 <li>
@@ -247,6 +249,7 @@ compose!
 </Tabs>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.package_managers.rpm#versions]: /docs/setup/installation/package-managers/rpm/#versions
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.sources.journald]: /docs/reference/sources/journald/

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
@@ -34,7 +34,7 @@ ingests data through one or more local files and outputs
 
 ## Requirements
 
-<Alert icon={false} type="danger" className="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * This component must be provided access to the configured file system.
 
@@ -80,14 +80,14 @@ ingests data through one or more local files and outputs
   host_key = "host" # optional, default
 
   # Fingerprinting
-  fingerprinting.strategy = "checksum" # optional, default
   fingerprinting.fingerprint_bytes = 256 # optional, default, bytes, relevant when strategy = "checksum"
   fingerprinting.ignored_header_bytes = 0 # optional, default, bytes, relevant when strategy = "checksum"
+  fingerprinting.strategy = "checksum" # optional, default
 
   # Multiline
-  multiline.start_pattern = "^[^\\s]" # required
-  multiline.mode = "continue_through" # required
   multiline.condition_pattern = "^[\\s]+" # required
+  multiline.mode = "continue_through" # required
+  multiline.start_pattern = "^[^\\s]" # required
   multiline.timeout_ms = 1000 # required, milliseconds
 
   # Priority
@@ -99,157 +99,6 @@ ingests data through one or more local files and outputs
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={false}
-  defaultValue={"file"}
-  enumValues={null}
-  examples={["file"]}
-  groups={[]}
-  name={"file_key"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### file_key
-
-The key name added to each event with the full path of the file.
-
- See [Context](#context) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={"host"}
-  enumValues={null}
-  examples={["host"]}
-  groups={[]}
-  name={"host_key"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### host_key
-
-The key name added to each event representing the current host. This can also
-be globally set via the [global [`host_key`](#host_key)
-option][docs.reference.global-options#host_key].
-
- See [Context](#context) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"fingerprinting"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### fingerprinting
-
-Configuration for how the file source should identify files.
-
-
-
-<Fields filters={false}>
-<Field
-  common={false}
-  defaultValue={"checksum"}
-  enumValues={{"checksum":"Read [`fingerprint_bytes`](#fingerprint_bytes) bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
-  examples={["checksum","device_and_inode"]}
-  groups={[]}
-  name={"strategy"}
-  path={"fingerprinting"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### strategy
-
-The strategy used to uniquely identify files. This is important for
-[checkpointing](#checkpointing) when file rotation is used.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={256}
-  enumValues={null}
-  examples={[256]}
-  groups={[]}
-  name={"fingerprint_bytes"}
-  path={"fingerprinting"}
-  relevantWhen={{"strategy":"checksum"}}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"bytes"}
-  warnings={[]}
-  >
-
-#### fingerprint_bytes
-
-The number of bytes read off the head of the file to generate a unique
-fingerprint.
-
- See [Fingerprinting](#fingerprinting) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={0}
-  enumValues={null}
-  examples={[0]}
-  groups={[]}
-  name={"ignored_header_bytes"}
-  path={"fingerprinting"}
-  relevantWhen={{"strategy":"checksum"}}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"bytes"}
-  warnings={[]}
-  >
-
-#### ignored_header_bytes
-
-The number of bytes to skip ahead (or ignore) when generating a unique
-fingerprint. This is helpful if all files share a common header.
-
- See [Fingerprinting](#fingerprinting) for more info.
-
-
-</Field>
-</Fields>
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -271,7 +120,6 @@ fingerprint. This is helpful if all files share a common header.
 The directory used to persist file checkpoint positions. By default, the
 [global [`data_dir`](#data_dir) option][docs.global-options#data_dir] is used. Please make
 sure the Vector project has write permissions to this dir.
-
  See [Checkpointing](#checkpointing) for more info.
 
 
@@ -299,6 +147,125 @@ precedence over the [`include` option](#include).*
 
 
 
+</Field>
+<Field
+  common={false}
+  defaultValue={"file"}
+  enumValues={null}
+  examples={["file"]}
+  groups={[]}
+  name={"file_key"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### file_key
+
+The key name added to each event with the full path of the file.
+ See [Context](#context) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"fingerprinting"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### fingerprinting
+
+Configuration for how the file source should identify files.
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={256}
+  enumValues={null}
+  examples={[256]}
+  groups={[]}
+  name={"fingerprint_bytes"}
+  path={"fingerprinting"}
+  relevantWhen={{"strategy":"checksum"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+#### fingerprint_bytes
+
+The number of bytes read off the head of the file to generate a unique
+fingerprint.
+ See [Fingerprinting](#fingerprinting) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={0}
+  enumValues={null}
+  examples={[0]}
+  groups={[]}
+  name={"ignored_header_bytes"}
+  path={"fingerprinting"}
+  relevantWhen={{"strategy":"checksum"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+#### ignored_header_bytes
+
+The number of bytes to skip ahead (or ignore) when generating a unique
+fingerprint. This is helpful if all files share a common header.
+ See [Fingerprinting](#fingerprinting) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"checksum"}
+  enumValues={{"checksum":"Read [`fingerprint_bytes`](#fingerprint_bytes) bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
+  examples={["checksum","device_and_inode"]}
+  groups={[]}
+  name={"strategy"}
+  path={"fingerprinting"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### strategy
+
+The strategy used to uniquely identify files. This is important for
+[checkpointing](#checkpointing) when file rotation is used.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -321,8 +288,32 @@ precedence over the [`include` option](#include).*
 
 Delay between file discovery calls. This controls the interval at which Vector
 searches for files.
-
  See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"host"}
+  enumValues={null}
+  examples={["host"]}
+  groups={[]}
+  name={"host_key"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### host_key
+
+The key name added to each event representing the current host. This can also
+be globally set via the [global [`host_key`](#host_key)
+option][docs.reference.global-options#host_key].
+ See [Context](#context) for more info.
 
 
 </Field>
@@ -348,7 +339,6 @@ Ignore files with a data modification date that does not exceed this age.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -369,7 +359,6 @@ Ignore files with a data modification date that does not exceed this age.
 ### include
 
 Array of file patterns to include. [Globbing](#globbing) is supported.
-
  See [File Read Order](#file-read-order) and [File Rotation](#file-rotation) for more info.
 
 
@@ -397,31 +386,28 @@ protects against malformed lines or tailing incorrect files.
 
 
 
-
 </Field>
 <Field
-  common={true}
-  defaultValue={false}
+  common={false}
+  defaultValue={2048}
   enumValues={null}
-  examples={[false,true]}
+  examples={[2048]}
   groups={[]}
-  name={"start_at_beginning"}
+  name={"max_read_bytes"}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"bool"}
-  unit={null}
+  type={"int"}
+  unit={"bytes"}
   warnings={[]}
   >
 
-### start_at_beginning
+### max_read_bytes
 
-For files with a stored checkpoint at startup, setting this option to `true`
-will tell Vector to read from the beginning of the file instead of the stored
-checkpoint.
+An approximate limit on the amount of data read from a single file at a given
+time.
 
- See [Read Position](#read-position) for more info.
 
 
 </Field>
@@ -445,7 +431,6 @@ checkpoint.
 
 Multiline parsing configuration (per file).
 If not speicified, multiline parsing is disabled.
-
  See [Multi-Line Messages](#multi-line-messages) for more info.
 
 <Fields filters={false}>
@@ -453,9 +438,9 @@ If not speicified, multiline parsing is disabled.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["^[^\\s]","\\\\$","^(INFO|ERROR) ","[^;]$"]}
+  examples={["^[\\s]+","\\\\$","^(INFO|ERROR) ",";$"]}
   groups={[]}
-  name={"start_pattern"}
+  name={"condition_pattern"}
   path={"multiline"}
   relevantWhen={null}
   required={true}
@@ -465,10 +450,9 @@ If not speicified, multiline parsing is disabled.
   warnings={[]}
   >
 
-#### start_pattern
+#### condition_pattern
 
-Start regex pattern to look for as a beginning of the message.
-
+Condition regex pattern to look for. Exact behavior is configured via [`mode`](#mode).
  See [Multi-Line Messages](#multi-line-messages) for more info.
 
 
@@ -492,7 +476,6 @@ Start regex pattern to look for as a beginning of the message.
 #### mode
 
 Mode of operation, specifies how the [`condition_pattern`](#condition_pattern) is interpreted.
-
  See [Multi-Line Messages](#multi-line-messages) for more info.
 
 
@@ -501,9 +484,9 @@ Mode of operation, specifies how the [`condition_pattern`](#condition_pattern) i
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["^[\\s]+","\\\\$","^(INFO|ERROR) ",";$"]}
+  examples={["^[^\\s]","\\\\$","^(INFO|ERROR) ","[^;]$"]}
   groups={[]}
-  name={"condition_pattern"}
+  name={"start_pattern"}
   path={"multiline"}
   relevantWhen={null}
   required={true}
@@ -513,10 +496,9 @@ Mode of operation, specifies how the [`condition_pattern`](#condition_pattern) i
   warnings={[]}
   >
 
-#### condition_pattern
+#### start_pattern
 
-Condition regex pattern to look for. Exact behavior is configured via [`mode`](#mode).
-
+Start regex pattern to look for as a beginning of the message.
  See [Multi-Line Messages](#multi-line-messages) for more info.
 
 
@@ -544,34 +526,8 @@ the buffered message is guaraneed to be flushed, even if incomplete.
 
 
 
-
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={false}
-  defaultValue={2048}
-  enumValues={null}
-  examples={[2048]}
-  groups={[]}
-  name={"max_read_bytes"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"bytes"}
-  warnings={[]}
-  >
-
-### max_read_bytes
-
-An approximate limit on the amount of data read from a single file at a given
-time.
-
-
-
 
 </Field>
 <Field
@@ -594,8 +550,32 @@ time.
 
 Instead of balancing read capacity fairly across all watched files, prioritize
 draining the oldest files before moving on to read data from younger files.
-
  See [File Read Order](#file-read-order) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"start_at_beginning"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### start_at_beginning
+
+For files with a stored checkpoint at startup, setting this option to `true`
+will tell Vector to read from the beginning of the file instead of the stored
+checkpoint.
+ See [Read Position](#read-position) for more info.
 
 
 </Field>
@@ -635,7 +615,6 @@ draining the oldest files before moving on to read data from younger files.
 
 The _full_ path of the file tha the log originated from. This can be renamed
 via the [`file_key`](#file_key) option.
-
  See [Checkpointing](#checkpointing) and [Context](#context) for more info.
 
 
@@ -663,7 +642,6 @@ renamed via the [`host_key`](#host_key) option.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -688,7 +666,6 @@ The raw log message, unaltered. This can be renamed via the [global
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -710,7 +687,6 @@ The raw log message, unaltered. This can be renamed via the [global
 
 The exact time the event was ingested. This can be renamed via the [global
 `timestamp_key` option][docs.reference.global-options#timestamp_key].
-
 
 
 

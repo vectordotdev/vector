@@ -18,7 +18,6 @@ mod util;
 
 pub use metric::Metric;
 pub(crate) use util::log::PathComponent;
-#[cfg(feature = "transforms-grok_parser")]
 pub(crate) use util::log::PathIter;
 
 pub mod proto {

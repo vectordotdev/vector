@@ -3,10 +3,10 @@ last_modified_on: "2020-04-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "New Swimlanes Transform"
 description: "Split log streams with ease"
-author_github: https://github.com/Jeffail
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1785]
 release: "0.8.0"
-importance: "medium"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: transforms", "transform: swimlanes"]
 ---
 

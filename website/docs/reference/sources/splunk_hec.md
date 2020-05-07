@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` source ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events."
@@ -35,7 +35,7 @@ events.
 
 ## Requirements
 
-<Alert icon={false} type="danger" className="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * This component exposes a configured port. You must ensure your network allows access to this port.
 
@@ -101,34 +101,6 @@ The address to accept connections on.
 
 
 
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["A94A8FE5CCB19BA61C4C08"]}
-  groups={[]}
-  name={"token"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### token
-
-If supplied, incoming requests must supply this token in the `Authorization`
-header, just as a client would if it was communicating with the Splunk HEC
-endpoint directly. If _not_ supplied, the `Authorization` header will be
-ignored and requests will not be authenticated.
-
-
-
-
 </Field>
 <Field
   common={false}
@@ -149,7 +121,6 @@ ignored and requests will not be authenticated.
 ### tls
 
 Configures the TLS options for connections from this source.
-
 
 
 <Fields filters={false}>
@@ -173,7 +144,6 @@ Configures the TLS options for connections from this source.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -202,7 +172,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -224,7 +193,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Require TLS for incoming connections. If this is set, an identity certificate
 is also required.
-
 
 
 
@@ -252,7 +220,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -274,7 +241,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 Absolute path to a certificate key file used to identify this server, in DER or
 PEM format (PKCS#8).
-
 
 
 
@@ -303,9 +269,34 @@ will not request a certificate from the client.
 
 
 
-
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["A94A8FE5CCB19BA61C4C08"]}
+  groups={[]}
+  name={"token"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### token
+
+If supplied, incoming requests must supply this token in the `Authorization`
+header, just as a client would if it was communicating with the Splunk HEC
+endpoint directly. If _not_ supplied, the `Authorization` header will be
+ignored and requests will not be authenticated.
+
+
 
 </Field>
 </Fields>
@@ -345,7 +336,6 @@ The raw log message, unaltered.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -366,7 +356,6 @@ The raw log message, unaltered.
 ### splunk_channel
 
 The Splunk channel, value of the `X-Splunk-Request-Channel` header.
-
 
 
 
@@ -393,7 +382,6 @@ If the [Splunk HEC event endpoint][urls.splunk_hec_event_endpoint] is used then
 the value of the [`time`](#time) field will be used. If the [Splunk HEC raw
 endpoint][urls.splunk_hec_raw_endpoint] is used, then the current time the
 event was received will be used.
-
 
 
 

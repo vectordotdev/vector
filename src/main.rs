@@ -275,7 +275,8 @@ fn main() {
         info!("Dry run enabled, exiting after config validation.");
     }
 
-    let pieces = topology::validate(&config, rt.executor()).unwrap_or_else(|| {
+    let diff = topology::ConfigDiff::initial(&config);
+    let pieces = topology::validate(&config, &diff, rt.executor()).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 
@@ -284,7 +285,7 @@ fn main() {
         std::process::exit(exitcode::OK);
     }
 
-    let result = topology::start_validated(config, pieces, &mut rt, opts.require_healthy);
+    let result = topology::start_validated(config, diff, pieces, &mut rt, opts.require_healthy);
     let (topology, mut graceful_crash) = result.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
@@ -306,17 +307,20 @@ fn main() {
 
         let signal = loop {
             let signal = future::poll_fn(|| signals.poll());
-            let crash = future::poll_fn(|| graceful_crash.poll());
+            let to_shutdown = future::poll_fn(|| graceful_crash.poll())
+                .map(|_| ())
+                .select(topology.sources_finished());
 
             let next = signal
-                .select2(crash)
+                .select2(to_shutdown)
                 .wait()
                 .map_err(|_| ())
                 .expect("Neither stream errors");
 
             let signal = match next {
                 future::Either::A((signal, _)) => signal.expect("Signal streams never end"),
-                future::Either::B((_crash, _)) => SIGINT, // Trigger graceful shutdown if a component crashed
+                // Trigger graceful shutdown if a component crashed, or all sources have ended.
+                future::Either::B((_to_shutdown, _)) => SIGINT,
             };
 
             if signal != SIGHUP {
@@ -333,10 +337,11 @@ fn main() {
             trace!("Parsing config");
             let config = handle_config_errors(config);
             if let Some(config) = config {
-                let success =
-                    topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy);
-                if !success {
-                    error!("Reload was not successful.");
+                match topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy) {
+                    Ok(true) => (),
+                    Ok(false) => error!("Reload was not successful."),
+                    // Trigger graceful shutdown for what remains of the topology
+                    Err(()) => break SIGINT,
                 }
             } else {
                 error!("Reload aborted.");
@@ -367,10 +372,12 @@ fn main() {
     #[cfg(windows)]
     {
         let ctrl_c = tokio_signal::ctrl_c().flatten_stream().into_future();
-        let crash = future::poll_fn(move || graceful_crash.poll());
+        let to_shutdown = future::poll_fn(move || graceful_crash.poll())
+            .map(|_| ())
+            .select(topology.sources_finished());
 
         let interruption = rt
-            .block_on(ctrl_c.select2(crash))
+            .block_on(ctrl_c.select2(to_shutdown))
             .map_err(|_| ())
             .expect("Neither stream errors");
 

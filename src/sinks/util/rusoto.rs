@@ -1,6 +1,6 @@
 #![cfg(feature = "rusoto_core")]
 
-use crate::{dns::Resolver, sinks::util};
+use crate::{dns::Resolver, sinks::util, tls::MaybeTlsSettings};
 use futures01::{
     future::{self, Future, FutureResult},
     Async, Poll, Stream,
@@ -16,9 +16,8 @@ use rusoto_core::{
     ByteStream, CredentialsError, Region,
 };
 use rusoto_credential::{
-    AutoRefreshingProvider, AutoRefreshingProviderFuture, AwsCredentials,
-    DefaultCredentialsProvider, DefaultCredentialsProviderFuture, ProvideAwsCredentials,
-    StaticProvider,
+    AutoRefreshingProvider, AutoRefreshingProviderFuture, AwsCredentials, ChainProvider,
+    ProvideAwsCredentials, StaticProvider,
 };
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use snafu::{ResultExt, Snafu};
@@ -28,7 +27,8 @@ use tower::Service;
 pub type Client = HttpClient<util::http::HttpClient<RusotoBody>>;
 
 pub fn client(resolver: Resolver) -> crate::Result<Client> {
-    let client = util::http::HttpClient::new(resolver, None)?;
+    let settings = MaybeTlsSettings::enable_client()?;
+    let client = util::http::HttpClient::new(resolver, settings)?;
     Ok(HttpClient { client })
 }
 
@@ -40,7 +40,7 @@ enum RusotoError {
 
 // A place-holder for the types of AWS credentials we support
 pub enum AwsCredentialsProvider {
-    Default(DefaultCredentialsProvider),
+    Default(AutoRefreshingProvider<ChainProvider>),
     Role(AutoRefreshingProvider<StsAssumeRoleSessionCredentialsProvider>),
     Static(StaticProvider),
 }
@@ -48,6 +48,7 @@ pub enum AwsCredentialsProvider {
 impl AwsCredentialsProvider {
     pub fn new(region: &Region, assume_role: Option<String>) -> crate::Result<Self> {
         if let Some(role) = assume_role {
+            debug!("using sts assume role credentials for AWS.");
             let sts = StsClient::new(region.clone());
 
             let provider = StsAssumeRoleSessionCredentialsProvider::new(
@@ -63,7 +64,14 @@ impl AwsCredentialsProvider {
             let creds = AutoRefreshingProvider::new(provider).context(InvalidAWSCredentials)?;
             Ok(Self::Role(creds))
         } else {
-            let creds = DefaultCredentialsProvider::new().context(InvalidAWSCredentials)?;
+            debug!("using default credentials provider for AWS.");
+            let mut chain = ChainProvider::new();
+            // 8 seconds because our default healthcheck timeout
+            // is 10 seconds.
+            chain.set_timeout(Duration::from_secs(8));
+
+            let creds = AutoRefreshingProvider::new(chain).context(InvalidAWSCredentials)?;
+
             Ok(Self::Default(creds))
         }
     }
@@ -88,7 +96,7 @@ impl ProvideAwsCredentials for AwsCredentialsProvider {
 }
 
 pub enum AwsCredentialsProviderFuture {
-    Default(DefaultCredentialsProviderFuture),
+    Default(AutoRefreshingProviderFuture<ChainProvider>),
     Role(AutoRefreshingProviderFuture<StsAssumeRoleSessionCredentialsProvider>),
     Static(FutureResult<AwsCredentials, CredentialsError>),
 }

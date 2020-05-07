@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-05-01"
 component_title: "Tag Cardinality Limit"
-description: "The Vector `tag_cardinality_limit` transform accepts and outputs `metric` events allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
+description: "The Vector `tag_cardinality_limit` transform accepts and outputs `metric` events, allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
 event_types: ["metric"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+tag_cardinality_limit%22
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `tag_cardinality_limit` transform
-accepts and outputs [`metric`][docs.data-model.metric] events allowing you to
+accepts and outputs [`metric`][docs.data-model.metric] events, allowing you to
 limit the cardinality of metric tags to prevent downstream disruption of
 metrics services.
 
@@ -40,7 +40,7 @@ metrics services.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "tag_cardinality_limit" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   limit_exceeded_action = "drop_tag" # optional, default
   mode = "exact" # required
   value_limit = 500 # optional, default
@@ -52,7 +52,7 @@ metrics services.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "tag_cardinality_limit" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   cache_size_per_tag = 5120000 # optional, default, bytes, relevant when mode = "probabilistic"
   limit_exceeded_action = "drop_tag" # optional, default
   mode = "exact" # required
@@ -84,7 +84,6 @@ metrics services.
 The size of the cache in bytes to use to detect duplicate tags. The bigger the
 cache the less likely it is to have a 'false positive' or a case where we allow
 a new value for tag even after we have reached the configured limits.
-
  See [Memory Utilization](#memory-utilization) for more info.
 
 
@@ -112,7 +111,6 @@ the configured limit on cardinality.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -137,7 +135,6 @@ and deterime when a tag on an incoming metric exceeds the limit.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -158,7 +155,6 @@ and deterime when a tag on an incoming metric exceeds the limit.
 ### value_limit
 
 How many distinct values to accept for any given key.
-
  See [Memory Utilization](#memory-utilization) for more info.
 
 

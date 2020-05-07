@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-05-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Collect logs from a file and send them anywhere"
 description: "A simple guide to collect logs from a file and send them anywhere in just a few minutes."
@@ -63,21 +63,21 @@ The following diagram demonstrates how it works.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Tail one or more files.
-    <ol>
+    <ul>
       <li>Automatically discover new files with glob patterns.</li>
       <li>Merge multi-line logs into one event.</li>
       <li>Checkpoint your position to ensure data is not lost between restarts.</li>
       <li>Enrich your logs with useful file and host-level context.</li>
-    </ol>
+    </ul>
   </li>
   <li>
     Send your logs to one or more destinations
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 
@@ -88,6 +88,8 @@ To be clear, here's everything we'll accomplish in this short guide:
 ### Install Vector
 
 <InstallationCommand />
+
+Or choose your [preferred method][docs.installation].
 
 </li>
 <li>
@@ -137,6 +139,7 @@ flexibility of Vector:
 </Jump>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.sources.file]: /docs/reference/sources/file/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [urls.file]: https://en.wikipedia.org/wiki/Computer_file

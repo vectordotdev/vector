@@ -3,11 +3,11 @@ last_modified_on: "2020-04-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "The Add Fields Transform Supports Templating"
 description: "Use Vector's templating syntax to add new fields"
-author_github: https://github.com/binarylogic
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1799]
 release: "0.8.0"
-importance: "low"
-tags: ["type: new feature", "domain: transforms", "transform: add_fields"]
+hide_on_release_notes: true
+tags: ["type: enhancement", "domain: transforms", "transform: add_fields"]
 ---
 
 Vector offers a [templating syntax][docs.templating] that you can use to build

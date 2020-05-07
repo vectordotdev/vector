@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/components/">Components<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog/">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Community<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download/">Download v0.8.2<a/>
+    <a href="https://vector.dev/components/">Components<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog/">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download/">Download v0.9.1<a/>
   </strong>
 </p>
 
@@ -75,8 +75,8 @@ usage][urls.vector_performance].
 
 ### Reference
 
-* [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [7 more...][docs.sources]
-* [**Transforms**][docs.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [kubernetes_pod_metadata][docs.transforms.kubernetes_pod_metadata], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], and [19 more...][docs.transforms]
+* [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [8 more...][docs.sources]
+* [**Transforms**][docs.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], and [18 more...][docs.transforms]
 * [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], [gcp_pubsub][docs.sinks.gcp_pubsub], and [25 more...][docs.sinks]
 
 ### Administration
@@ -89,7 +89,7 @@ usage][urls.vector_performance].
 ### Resources
 
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.8.2 (latest)][urls.v0.8.2]
+* [**Releases**][urls.vector_releases] - [v0.9.1 (latest)][urls.v0.9.1]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 * **Policies** - [Security][urls.vector_security_policy], [Privacy][urls.vector_privacy_policy], [Code of Conduct][urls.vector_code_of_conduct]
 
@@ -194,11 +194,11 @@ Or use your own [preferred method][docs.installation].
 
 ## Latest Highlights
 
-* [~36% Performance Improvement](https://vector.dev/highlights/2020-04-11-overall-performance-increase/)
-* [The Vector Source Now Accepts Metrics](https://vector.dev/highlights/2020-04-07-vector-to-vector-metrics/)
-* [Lua Transform v2](https://vector.dev/highlights/2020-04-07-lua-transform-version-2/)
-* [More Condition Predicates](https://vector.dev/highlights/2020-04-01-more-condition-predicates/)
-* [New Kubernetes Pod Metdata Transform](https://vector.dev/highlights/2020-04-01-kubernetes-pod-metadata-transform/)
+* [2020/04/20 - Improved Shutdown](https://vector.dev/highlights/2020-04-20-improved-shutdown/) - available in [0.9.0][urls.vector_download]
+* [2020/04/17 - 4 New Sinks!](https://vector.dev/highlights/2020-04-17-new-sinks/) - available in [0.9.0][urls.vector_download]
+* [2020/04/09 - Set the Lua transform `search_dirs` option to Vector's config dir by default](https://vector.dev/highlights/2020-04-09-set-search_dirs-to-config-dirs-by-default/) - available in [0.9.0][urls.vector_download]
+* [2020/04/09 - ACL is now optional for the Google Cloud Storage sink](https://vector.dev/highlights/2020-04-09-make-acl-optional/) - available in [0.9.0][urls.vector_download]
+* [2020/04/07 - The Vector Source Now Accepts Metrics](https://vector.dev/highlights/2020-04-07-vector-to-vector-metrics/) - available in [0.9.0][urls.vector_download]
 
 [view all...][urls.vector_highlights]
 
@@ -259,7 +259,6 @@ Or use your own [preferred method][docs.installation].
 [docs.transforms.filter]: https://vector.dev/docs/reference/transforms/filter/
 [docs.transforms.grok_parser]: https://vector.dev/docs/reference/transforms/grok_parser/
 [docs.transforms.json_parser]: https://vector.dev/docs/reference/transforms/json_parser/
-[docs.transforms.kubernetes_pod_metadata]: https://vector.dev/docs/reference/transforms/kubernetes_pod_metadata/
 [docs.transforms.log_to_metric]: https://vector.dev/docs/reference/transforms/log_to_metric/
 [docs.transforms.logfmt_parser]: https://vector.dev/docs/reference/transforms/logfmt_parser/
 [docs.transforms.lua]: https://vector.dev/docs/reference/transforms/lua/
@@ -277,10 +276,11 @@ Or use your own [preferred method][docs.installation].
 [urls.pr_721]: https://github.com/timberio/vector/pull/721
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/
-[urls.v0.8.2]: https://vector.dev/releases/0.8.2/download
+[urls.v0.9.1]: https://vector.dev/releases/0.9.1/download
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
 [urls.vector_community]: https://vector.dev/community/
+[urls.vector_download]: https://vector.dev/releases/latest/download/
 [urls.vector_enriching_transforms]: https://vector.dev/components/?functions%5B%5D=enrich
 [urls.vector_highlights]: https://vector.dev/highlights/
 [urls.vector_parsing_transforms]: https://vector.dev/components/?functions%5B%5D=parse

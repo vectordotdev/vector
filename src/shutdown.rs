@@ -63,6 +63,15 @@ impl ShutdownSignal {
             shutdown_complete: Some(ShutdownSignalToken::new(trigger)),
         }
     }
+
+    #[cfg(test)]
+    pub fn new_wired() -> (Trigger, ShutdownSignal, Tripwire) {
+        let (trigger_shutdown, tripwire) = Tripwire::new();
+        let (trigger, shutdown_done) = Tripwire::new();
+        let shutdown = ShutdownSignal::new(tripwire, trigger);
+
+        (trigger_shutdown, shutdown, shutdown_done)
+    }
 }
 
 pub struct SourceShutdownCoordinator {
@@ -230,6 +239,17 @@ impl SourceShutdownCoordinator {
             name.to_owned(),
             deadline,
         )
+    }
+
+    /// Returned future will finish once all sources have finished.
+    pub fn shutdown_tripwire(&self) -> impl Future<Item = (), Error = ()> {
+        future::join_all(
+            self.shutdown_complete_tripwires
+                .values()
+                .cloned()
+                .collect::<Vec<_>>(),
+        )
+        .map(|_| info!("All sources have finished."))
     }
 
     fn shutdown_source_complete(

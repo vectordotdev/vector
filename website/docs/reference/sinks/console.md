@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-06"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-05-01"
+delivery_guarantee: "at_least_once"
 component_title: "Console"
 description: "The Vector `console` sink streams `log` and `metric` events to standard output streams, such as STDOUT and STDERR."
 event_types: ["log","metric"]
@@ -45,7 +45,7 @@ streams][urls.standard_streams], such as [STDOUT][urls.stdout] and
 [sinks.my_sink_id]
   # General
   type = "console" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   target = "stdout" # optional, default
 
   # Encoding
@@ -59,7 +59,7 @@ streams][urls.standard_streams], such as [STDOUT][urls.stdout] and
 [sinks.my_sink_id]
   # General
   type = "console" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   target = "stdout" # optional, default
 
   # Encoding
@@ -94,7 +94,6 @@ streams][urls.standard_streams], such as [STDOUT][urls.stdout] and
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -115,7 +114,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -142,7 +140,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -163,7 +160,6 @@ Prevent the sink from encoding the specified labels.
 #### only_fields
 
 Limit the sink to only encoding the specified labels.
-
 
 
 
@@ -190,7 +186,6 @@ How to format event timestamps.
 
 
 
-
 </Field>
 </Fields>
 
@@ -214,7 +209,6 @@ How to format event timestamps.
 ### target
 
 The [standard stream][urls.standard_streams] to write to.
-
 
 
 

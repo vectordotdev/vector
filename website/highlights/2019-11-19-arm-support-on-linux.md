@@ -3,10 +3,10 @@ last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/highlights.json"
 title: "ARMv7 & ARM64 Support on Linux"
 description: "These architectures are widely used in embeded devices & servers"
-author_github: https://github.com/binarylogic
+author_github: "https://github.com/binarylogic"
 pr_numbers: [1054, 1292]
 release: "0.6.0"
-importance: "high"
+hide_on_release_notes: false
 tags: ["type: new feature", "domain: platforms", "platform: arm64", "platform: armv7"]
 ---
 

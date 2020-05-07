@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Metrics"
 description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
@@ -44,7 +44,7 @@ The Vector `influxdb_metrics` sink
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com" # required
   namespace = "service" # required
   database = "vector-database" # required
@@ -66,7 +66,7 @@ The Vector `influxdb_metrics` sink
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com" # required
   namespace = "service" # required
   database = "vector-database" # required
@@ -88,7 +88,7 @@ The Vector `influxdb_metrics` sink
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 5 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
@@ -101,7 +101,7 @@ The Vector `influxdb_metrics` sink
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
   namespace = "service" # required
   bucket = "vector-bucket" # required
@@ -119,7 +119,7 @@ The Vector `influxdb_metrics` sink
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
   namespace = "service" # required
   bucket = "vector-bucket" # required
@@ -137,7 +137,7 @@ The Vector `influxdb_metrics` sink
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 5 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
@@ -147,152 +147,6 @@ The Vector `influxdb_metrics` sink
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["http://localhost:8086/","https://us-west-2-1.aws.cloud1.influxdata.com","https://us-west-2-1.aws.cloud2.influxdata.com"]}
-  groups={["v1","v2"]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### endpoint
-
-InfluxDB endpoint to send metrics to.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["service"]}
-  groups={["v1","v2"]}
-  name={"namespace"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### namespace
-
-A prefix that will be added to all metric names.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["my-org","33f2cff0a28e5b63"]}
-  groups={["v2"]}
-  name={"org"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### org
-
-Specifies the destination organization for writes into InfluxDB 2.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${INFLUXDB_PASSWORD}","influxdb4ever"]}
-  groups={["v1"]}
-  name={"password"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### password
-
-Sets the password for authentication if you’ve enabled authentication for the
-write into InfluxDB 1.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${INFLUXDB_TOKEN}","ef8d5de700e7989468166c40fc8a0ccd"]}
-  groups={["v2"]}
-  name={"token"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### token
-
-[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["todd","vector-source"]}
-  groups={["v1"]}
-  name={"username"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### username
-
-Sets the username for authentication if you’ve enabled authentication for the
-write into InfluxDB 1.
-
-
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -312,7 +166,6 @@ write into InfluxDB 1.
 ### batch
 
 Configures the sink batching behavior.
-
 
 
 <Fields filters={false}>
@@ -338,7 +191,6 @@ The maximum size of a batch, in events, before it is flushed.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -359,7 +211,6 @@ The maximum size of a batch, in events, before it is flushed.
 #### timeout_secs
 
 The maximum age of a batch before it is flushed.
-
 
 
 
@@ -389,6 +240,28 @@ The destination bucket for writes into InfluxDB 2.
 
 
 
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["any","one","quorum","all"]}
+  groups={["v1"]}
+  name={"consistency"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### consistency
+
+Sets the write consistency for the point for InfluxDB 1.
+
+
 
 </Field>
 <Field
@@ -413,6 +286,28 @@ Sets the target database for the write into InfluxDB 1.
 
 
 
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["http://localhost:8086/","https://us-west-2-1.aws.cloud1.influxdata.com","https://us-west-2-1.aws.cloud2.influxdata.com"]}
+  groups={["v1","v2"]}
+  name={"endpoint"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### endpoint
+
+InfluxDB endpoint to send metrics to.
+
+
 
 </Field>
 <Field
@@ -434,7 +329,6 @@ Sets the target database for the write into InfluxDB 1.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -443,22 +337,21 @@ Enables/disables the sink healthcheck upon start.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["any","one","quorum","all"]}
-  groups={["v1"]}
-  name={"consistency"}
+  examples={["service"]}
+  groups={["v1","v2"]}
+  name={"namespace"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
   warnings={[]}
   >
 
-### consistency
+### namespace
 
-Sets the write consistency for the point for InfluxDB 1.
-
+A prefix that will be added to all metric names.
 
 
 
@@ -467,9 +360,32 @@ Sets the write consistency for the point for InfluxDB 1.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["autogen","one_day_only"]}
+  examples={["my-org","33f2cff0a28e5b63"]}
+  groups={["v2"]}
+  name={"org"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### org
+
+Specifies the destination organization for writes into InfluxDB 2.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${INFLUXDB_PASSWORD}","influxdb4ever"]}
   groups={["v1"]}
-  name={"retention_policy_name"}
+  name={"password"}
   path={null}
   relevantWhen={null}
   required={false}
@@ -479,10 +395,10 @@ Sets the write consistency for the point for InfluxDB 1.
   warnings={[]}
   >
 
-### retention_policy_name
+### password
 
-Sets the target retention policy for the write into InfluxDB 1.
-
+Sets the password for authentication if you’ve enabled authentication for the
+write into InfluxDB 1.
 
 
 
@@ -508,7 +424,6 @@ Sets the target retention policy for the write into InfluxDB 1.
 Configures the sink request behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -529,7 +444,6 @@ Configures the sink request behavior.
 #### in_flight_limit
 
 The maximum number of in-flight requests allowed at any given time.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -553,7 +467,6 @@ The maximum number of in-flight requests allowed at any given time.
 #### rate_limit_duration_secs
 
 The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -578,16 +491,15 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
 time window.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
 <Field
   common={false}
-  defaultValue={-1}
+  defaultValue={18446744073709551615}
   enumValues={null}
-  examples={[-1]}
+  examples={[18446744073709551615]}
   groups={["v1","v2"]}
   name={"retry_attempts"}
   path={"request"}
@@ -601,8 +513,8 @@ time window.
 
 #### retry_attempts
 
-The maximum number of retries to make for failed requests.
-
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
  See [Retry Policy](#retry-policy) for more info.
 
 
@@ -631,7 +543,6 @@ to select future backoffs.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -652,7 +563,6 @@ to select future backoffs.
 #### retry_max_duration_secs
 
 The maximum amount of time, in seconds, to wait between retries.
-
 
 
 
@@ -682,9 +592,78 @@ duplicate data downstream.
 
 
 
-
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["autogen","one_day_only"]}
+  groups={["v1"]}
+  name={"retention_policy_name"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### retention_policy_name
+
+Sets the target retention policy for the write into InfluxDB 1.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${INFLUXDB_TOKEN}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  groups={["v2"]}
+  name={"token"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### token
+
+[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["todd","vector-source"]}
+  groups={["v1"]}
+  name={"username"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### username
+
+Sets the username for authentication if you’ve enabled authentication for the
+write into InfluxDB 1.
+
+
 
 </Field>
 </Fields>

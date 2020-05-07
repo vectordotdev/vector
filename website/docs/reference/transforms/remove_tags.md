@@ -1,9 +1,9 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-05-01"
 component_title: "Remove Tags"
-description: "The Vector `remove_tags` transform accepts and outputs `metric` events allowing you to remove one or more metric tags."
+description: "The Vector `remove_tags` transform accepts and outputs `metric` events, allowing you to remove one or more metric tags."
 event_types: ["metric"]
-function_category: "shape"
+function_category: "schema"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_tags%22
 sidebar_label: "remove_tags|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/remove_tags.rs
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `remove_tags` transform
-accepts and outputs [`metric`][docs.data-model.metric] events allowing you to
+accepts and outputs [`metric`][docs.data-model.metric] events, allowing you to
 remove one or more metric tags.
 
 <!--
@@ -39,7 +39,7 @@ remove one or more metric tags.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "remove_tags" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   tags = ["tag1", "tag2"] # required
 ```
 
@@ -49,7 +49,7 @@ remove one or more metric tags.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "remove_tags" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   tags = ["tag1", "tag2"] # required
 ```
 
@@ -76,7 +76,6 @@ remove one or more metric tags.
 ### tags
 
 The tag names to drop.
-
 
 
 

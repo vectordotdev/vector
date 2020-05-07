@@ -236,7 +236,11 @@ end
 #
 
 metadata.sources_list.
-  select { |s| !s.for_platform? && !BLACKLISTED_SOURCES.include?(s.name) }.
+  select do |source|
+    !source.for_platform? &&
+      !source.function_category?("test") &&
+      !BLACKLISTED_SOURCES.include?(source.name)
+  end.
   each do |source|
     template_path = "#{GUIDES_ROOT}/integrate/sources/#{source.name}.md.erb"
 
@@ -305,20 +309,20 @@ metadata.releases_list.each do |release|
     <%- if release.highlights.any? -%>
     ## Highlights
 
-    Highlights are noteworthy changes in this release. For a complete list of
-    changes please refer to the [changelog](#changelog).
+    <div className="sub-title">Noteworthy changes in this release</div>
 
     <%= release_highlights(release, heading_depth: 3) %>
 
     <%- end -%>
     ## Changelog
 
-    The changelog represents _all_ changes in this release. Vector follows the
-    [Conventional Commits spec][urls.conventional_commits]. The Vector specific
-    scopes can be found [in the Vector repo][urls.vector_semantic_yml].
+    <div className="sub-title">A complete list of changes</div>
 
     <Changelog version={<%= release.version.to_json %>} />
 
+    ## What's Next
+
+    <%= release_whats_next(release) %>
     EOF
   )
 end
@@ -337,8 +341,9 @@ metadata.components.each do |component|
 end
 
 erb_paths =
-  Dir.glob("#{ROOT_DIR}/**/*.erb", File::FNM_DOTMATCH).
+  Dir.glob("#{ROOT_DIR}/**/[^_]*.erb", File::FNM_DOTMATCH).
   to_a.
+  filter { |path| !path.start_with?("#{META_ROOT}/") }.
   filter { |path| !path.start_with?("#{ROOT_DIR}/scripts") }.
   filter { |path| !path.start_with?("#{ROOT_DIR}/distribution/nix") }
 
@@ -407,6 +412,8 @@ docs.each do |doc|
     Printer.say("Not changed - #{path}", color: :blue)
   end
 end
+
+
 
 #
 # Check URLs

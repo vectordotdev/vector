@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
@@ -35,7 +35,7 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 
 ## Requirements
 
-<Alert icon={false} type="danger" className="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * [Kafka][urls.kafka] version `>= 0.8` is required.
 
@@ -53,7 +53,7 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 [sinks.my_sink_id]
   # General
   type = "kafka" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
   compression = "none" # optional, default
   healthcheck = true # optional, default
@@ -71,7 +71,7 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 [sinks.my_sink_id]
   # General
   type = "kafka" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
   compression = "none" # optional, default
   healthcheck = true # optional, default
@@ -86,9 +86,9 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
   librdkafka_options."socket.send.buffer.bytes" = "100" # example
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -98,9 +98,9 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # TLS
-  tls.enabled = false # optional, default
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
   tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
 ```
@@ -110,54 +110,28 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 
 <Fields filters={true}>
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={["10.14.22.123:9092,10.14.23.332:9092"]}
   groups={[]}
-  name={"librdkafka_options"}
+  name={"bootstrap_servers"}
   path={null}
   relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### librdkafka_options
-
-Advanced options. See [librdkafka documentation][urls.librdkafka_config] for
-details.
-
-
-
-<Fields filters={false}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"},{"socket.send.buffer.bytes":"100"}]}
-  groups={[]}
-  name={"`[field-name]`"}
-  path={"librdkafka_options"}
-  relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
   warnings={[]}
   >
 
-#### `[field-name]`
+### bootstrap_servers
 
-The options and their values. Accepts `string` values.
+A comma-separated list of host and port pairs that are the addresses of the
+Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
+initially to bootstrap itself.
 
 
-
-
-</Field>
-</Fields>
 
 </Field>
 <Field
@@ -181,32 +155,7 @@ The options and their values. Accepts `string` values.
 Configures the sink specific buffer behavior.
 
 
-
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -226,7 +175,6 @@ The buffer's type and storage mechanism.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
 
 
 
@@ -253,6 +201,28 @@ The maximum size of the buffer on the disk.
 
 
 
+</Field>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
 
 </Field>
 <Field
@@ -277,9 +247,31 @@ The behavior when the buffer becomes full.
 
 
 
-
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"none":"No compression","gzip":"[Gzip](https://www.gnu.org/software/gzip/) standard DEFLATE compression","lz4":"High speed [LZ4 compression](https://lz4.github.io/lz4/)","snappy":"High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression.","zstd":"[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."}}
+  examples={["none","gzip","lz4","snappy","zstd"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+Compression codec to use for compressing message sets
+
+
 
 </Field>
 <Field
@@ -303,7 +295,6 @@ The behavior when the buffer becomes full.
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -324,7 +315,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -351,7 +341,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -372,7 +361,6 @@ Prevent the sink from encoding the specified labels.
 #### only_fields
 
 Limit the sink to only encoding the specified labels.
-
 
 
 
@@ -399,59 +387,8 @@ How to format event timestamps.
 
 
 
-
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["10.14.22.123:9092,10.14.23.332:9092"]}
-  groups={[]}
-  name={"bootstrap_servers"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### bootstrap_servers
-
-A comma-separated list of host and port pairs that are the addresses of the
-Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
-initially to bootstrap itself.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"none"}
-  enumValues={{"none":"No compression","gzip":"[Gzip](https://www.gnu.org/software/gzip/) standard DEFLATE compression","lz4":"High speed [LZ4 compression](https://lz4.github.io/lz4/)","snappy":"High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression.","zstd":"[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."}}
-  examples={["none","gzip","lz4","snappy","zstd"]}
-  groups={[]}
-  name={"compression"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### compression
-
-Compression codec to use for compressing message sets
-
-
-
 
 </Field>
 <Field
@@ -473,7 +410,6 @@ Compression codec to use for compressing message sets
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -502,6 +438,54 @@ be used.
 
 
 
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"librdkafka_options"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### librdkafka_options
+
+Advanced options. See [librdkafka documentation][urls.librdkafka_config] for
+details.
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"},{"socket.send.buffer.bytes":"100"}]}
+  groups={[]}
+  name={"`[field-name]`"}
+  path={"librdkafka_options"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[field-name]`
+
+The options and their values. Accepts `string` values.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -523,7 +507,6 @@ be used.
 ### message_timeout_ms
 
 Local message timeout.
-
 
 
 
@@ -550,31 +533,6 @@ Default timeout for network requests.
 
 
 
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["topic-1234"]}
-  groups={[]}
-  name={"topic"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### topic
-
-The Kafka topic name to write events to.
-
-
-
-
 </Field>
 <Field
   common={false}
@@ -597,32 +555,7 @@ The Kafka topic name to write events to.
 Configures the TLS options for connections from this sink.
 
 
-
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={false}
-  enumValues={null}
-  examples={[false,true]}
-  groups={[]}
-  name={"enabled"}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### enabled
-
-Enable TLS during connections to the remote.
-
-
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -643,7 +576,6 @@ Enable TLS during connections to the remote.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -672,6 +604,28 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
+</Field>
+<Field
+  common={true}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"enabled"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### enabled
+
+Enable TLS during connections to the remote.
+
+
 
 </Field>
 <Field
@@ -694,7 +648,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
 `key_path` is set.
-
 
 
 
@@ -722,9 +675,31 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 
-
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["topic-1234"]}
+  groups={[]}
+  name={"topic"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### topic
+
+The Kafka topic name to write events to.
+
+
 
 </Field>
 </Fields>

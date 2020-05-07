@@ -1,4 +1,4 @@
-use criterion::{criterion_group, Benchmark, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
 use tempfile::tempdir;
 use vector::test_util::{
@@ -102,7 +102,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                 },
             );
         })
-        .with_function("on-disk (low limit)", move |b| {
+        .with_function("low-limit-on-disk", move |b| {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
@@ -150,6 +150,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 }
 
 criterion_group!(buffers, benchmark_buffers);
+criterion_main!(buffers);
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {
     use rand::distributions::Alphanumeric;

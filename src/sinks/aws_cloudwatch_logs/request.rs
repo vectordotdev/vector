@@ -13,7 +13,7 @@ pub struct CloudwatchFuture {
     state: State,
     create_missing_group: bool,
     create_missing_stream: bool,
-    events: Option<Vec<InputLogEvent>>,
+    events: Vec<Vec<InputLogEvent>>,
     token_tx: Option<oneshot::Sender<Option<String>>>,
 }
 
@@ -31,13 +31,14 @@ enum State {
 }
 
 impl CloudwatchFuture {
+    /// Panics if events.is_empty()
     pub fn new(
         client: CloudWatchLogsClient,
         stream_name: String,
         group_name: String,
         create_missing_group: bool,
         create_missing_stream: bool,
-        events: Vec<InputLogEvent>,
+        mut events: Vec<Vec<InputLogEvent>>,
         token: Option<String>,
         token_tx: oneshot::Sender<Option<String>>,
     ) -> Self {
@@ -47,12 +48,10 @@ impl CloudwatchFuture {
             group_name,
         };
 
-        let (state, events) = if let Some(token) = token {
-            let state = State::Put(client.put_logs(Some(token), events));
-            (state, None)
+        let state = if let Some(token) = token {
+            State::Put(client.put_logs(Some(token), events.pop().expect("No Events to send")))
         } else {
-            let state = State::DescribeStream(client.describe_stream());
-            (state, Some(events))
+            State::DescribeStream(client.describe_stream())
         };
 
         Self {
@@ -106,8 +105,8 @@ impl Future for CloudwatchFuture {
 
                         let events = self
                             .events
-                            .take()
-                            .expect("Token got called twice, this is a bug!");
+                            .pop()
+                            .expect("Token got called multiple times, this is a bug!");
 
                         let token = stream.upload_sequence_token;
 
@@ -122,7 +121,19 @@ impl Future for CloudwatchFuture {
                 }
 
                 State::CreateGroup(fut) => {
-                    try_ready!(fut.poll().map_err(CloudwatchError::CreateGroup));
+                    try_ready!(fut
+                        .poll()
+                        .or_else(|e| {
+                            if let RusotoError::Service(
+                                CreateLogGroupError::ResourceAlreadyExists(_),
+                            ) = e
+                            {
+                                Ok(Async::Ready(()))
+                            } else {
+                                Err(e)
+                            }
+                        })
+                        .map_err(CloudwatchError::CreateGroup));
 
                     info!(message = "group created.", name = %self.client.group_name);
 
@@ -133,7 +144,19 @@ impl Future for CloudwatchFuture {
                 }
 
                 State::CreateStream(fut) => {
-                    try_ready!(fut.poll().map_err(CloudwatchError::CreateStream));
+                    try_ready!(fut
+                        .poll()
+                        .or_else(|e| {
+                            if let RusotoError::Service(
+                                CreateLogStreamError::ResourceAlreadyExists(_),
+                            ) = e
+                            {
+                                Ok(Async::Ready(()))
+                            } else {
+                                Err(e)
+                            }
+                        })
+                        .map_err(CloudwatchError::CreateStream));
 
                     info!(message = "stream created.", name = %self.client.stream_name);
 
@@ -145,15 +168,20 @@ impl Future for CloudwatchFuture {
 
                     let next_token = res.next_sequence_token;
 
-                    info!(message = "putting logs was successful.", ?next_token);
+                    if let Some(events) = self.events.pop() {
+                        debug!(message = "putting logs.", ?next_token);
+                        self.state = State::Put(self.client.put_logs(next_token, events));
+                    } else {
+                        info!(message = "putting logs was successful.", ?next_token);
 
-                    self.token_tx
-                        .take()
-                        .expect("Put was polled twice.")
-                        .send(next_token)
-                        .expect("CloudwatchLogsSvc was dropped unexpectedly");
+                        self.token_tx
+                            .take()
+                            .expect("Put was polled after finishing.")
+                            .send(next_token)
+                            .expect("CloudwatchLogsSvc was dropped unexpectedly");
 
-                    return Ok(().into());
+                        return Ok(().into());
+                    }
                 }
             }
         }
@@ -164,11 +192,8 @@ impl Client {
     pub fn put_logs(
         &self,
         sequence_token: Option<String>,
-        mut log_events: Vec<InputLogEvent>,
+        log_events: Vec<InputLogEvent>,
     ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
-        // Sort by timestamp
-        log_events.sort_by_key(|e| e.timestamp);
-
         let request = PutLogEventsRequest {
             log_events,
             sequence_token,

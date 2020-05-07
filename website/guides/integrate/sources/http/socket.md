@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-05-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from HTTP to a TCP, UDP, or UDS socket"
 description: "A simple guide to send logs from HTTP to a TCP, UDP, or UDS socket in just a few minutes."
@@ -47,7 +47,7 @@ we'll be deploying Vector as a
 [service][docs.strategies#service].
 
 The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
+separate service. It is designed to receive data from an upstream source and
 fan-out to one or more destinations.
 For this guide, Vector will receive data from
 HTTP via Vector's
@@ -63,22 +63,22 @@ The following diagram demonstrates how it works.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Accept log data over HTTP.
-    <ol>
+    <ul>
       <li>Decode JSON, NDJSON, and text.</li>
       <li>Enrich your logs with select HTTP headers.</li>
-    </ol>
+    </ul>
   </li>
   <li>
     Stream logs over a TCP, UDP, or Unix socket.
-    <ol>
+    <ul>
       <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
+    </ul>
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 
@@ -89,6 +89,8 @@ To be clear, here's everything we'll accomplish in this short guide:
 ### Install Vector
 
 <InstallationCommand />
+
+Or choose your [preferred method][docs.installation].
 
 </li>
 <li>
@@ -138,6 +140,7 @@ flexibility of Vector:
 </Jump>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.sources.http]: /docs/reference/sources/http/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.http]: https://www.w3.org/Protocols/

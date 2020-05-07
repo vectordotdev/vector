@@ -1,9 +1,9 @@
 ---
-last_modified_on: "2020-04-11"
+last_modified_on: "2020-05-01"
 component_title: "Concat"
-description: "The Vector `concat` transform accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one."
+description: "The Vector `concat` transform accepts and outputs `log` events, allowing you to concat (substrings) of other fields to a new one."
 event_types: ["log"]
-function_category: "shape"
+function_category: "schema"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+concat%22
 sidebar_label: "concat|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/concat.rs
@@ -17,7 +17,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `concat` transform
-accepts and outputs [`log`][docs.data-model.log] events allowing you to concat
+accepts and outputs [`log`][docs.data-model.log] events, allowing you to concat
 (substrings) of other fields to a new one.
 
 <!--
@@ -39,7 +39,7 @@ accepts and outputs [`log`][docs.data-model.log] events allowing you to concat
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "concat" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   items = ["first[..3]", "second[-5..]", "third[3..6]"] # required
   target = "root_field_name" # required
 ```
@@ -50,7 +50,7 @@ accepts and outputs [`log`][docs.data-model.log] events allowing you to concat
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "concat" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   items = ["first[..3]", "second[-5..]", "third[3..6]"] # required
   joiner = " " # optional, default
   target = "root_field_name" # required
@@ -83,7 +83,6 @@ both start and end negative values are counted from the end of the string.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -107,7 +106,6 @@ The string that is used to join all items.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -128,7 +126,6 @@ The string that is used to join all items.
 ### target
 
 The name for the new label.
-
  See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 

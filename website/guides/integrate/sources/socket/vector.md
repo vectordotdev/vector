@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-05-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a TCP, UDP, or UDS socket to another Vector instance"
 description: "A simple guide to send logs from a TCP, UDP, or UDS socket to another Vector instance in just a few minutes."
@@ -47,7 +47,7 @@ we'll be deploying Vector as a
 [service][docs.strategies#service].
 
 The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
+separate service. It is designed to receive data from an upstream source and
 fan-out to one or more destinations.
 For this guide, Vector will receive data from
 a TCP, UDP, or UDS socket via Vector's
@@ -63,18 +63,18 @@ The following diagram demonstrates how it works.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Accept log data over a TCP, UDP, or UDS socket.
-    <ol>
+    <ul>
       <li>Automatically enrich logs with host-level context.</li>
-    </ol>
+    </ul>
   </li>
   <li>
     Send data to another downstream Vector instance.
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 
@@ -85,6 +85,8 @@ To be clear, here's everything we'll accomplish in this short guide:
 ### Install Vector
 
 <InstallationCommand />
+
+Or choose your [preferred method][docs.installation].
 
 </li>
 <li>
@@ -134,6 +136,7 @@ flexibility of Vector:
 </Jump>
 
 
+[docs.installation]: /docs/setup/installation/
 [docs.sources.socket]: /docs/reference/sources/socket/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.rust]: https://www.rust-lang.org/

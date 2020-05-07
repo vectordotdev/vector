@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` source ingests data through the StatsD UDP protocol and outputs `metric` events."
@@ -34,7 +34,7 @@ outputs [`metric`][docs.data-model.metric] events.
 
 ## Requirements
 
-<Alert icon={false} type="danger" className="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * This component exposes a configured port. You must ensure your network allows access to this port.
 
@@ -86,7 +86,6 @@ outputs [`metric`][docs.data-model.metric] events.
 ### address
 
 UDP socket address to bind to.
-
 
 
 

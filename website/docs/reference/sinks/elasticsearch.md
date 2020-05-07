@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-12"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-05-03"
+delivery_guarantee: "at_least_once"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
 event_types: ["log"]
@@ -36,7 +36,7 @@ endpoint][urls.elasticsearch_bulk].
 
 ## Warnings
 
-<Alert icon={false} type="warning" className="list--warnings">
+<Alert icon={false} type="warning" className="list--icons list--icons--warnings">
 
 * [`compression`](#compression) - AWS hosted Elasticsearch is unable to use compression
 
@@ -53,7 +53,7 @@ endpoint][urls.elasticsearch_bulk].
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "elasticsearch" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   compression = "none" # optional, default
   healthcheck = true # optional, default
   host = "http://10.24.32.122:9000" # optional, no default
@@ -67,7 +67,7 @@ endpoint][urls.elasticsearch_bulk].
 [sinks.my_sink_id]
   # General
   type = "elasticsearch" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   compression = "none" # optional, default
   doc_type = "_doc" # optional, default
   healthcheck = true # optional, default
@@ -76,18 +76,21 @@ endpoint][urls.elasticsearch_bulk].
   index = "vector-%F" # optional, default
 
   # Auth
-  auth.strategy = "aws" # required
   auth.password = "${ELASTICSEARCH_PASSWORD}" # required, required when strategy = "basic"
+  auth.strategy = "aws" # required
   auth.user = "${ELASTICSEARCH_USERNAME}" # required, required when strategy = "basic"
+
+  # AWS
+  aws.region = "us-east-1" # optional, no default, relevant when strategy = "aws"
 
   # Batch
   batch.max_size = 10490000 # optional, default, bytes
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -106,7 +109,7 @@ endpoint][urls.elasticsearch_bulk].
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 5 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
@@ -145,32 +148,7 @@ endpoint][urls.elasticsearch_bulk].
 Options for the authentication strategy.
 
 
-
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"aws":"Authentication strategy used for [AWS' hosted Elasticsearch service][urls.aws_elasticsearch].","basic":"The [basic authentication strategy][urls.basic_auth]."}}
-  examples={["aws","basic"]}
-  groups={[]}
-  name={"strategy"}
-  path={"auth"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### strategy
-
-The authentication strategy to use.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -191,6 +169,28 @@ The authentication strategy to use.
 
 The basic authentication password.
 
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"aws":"Authentication strategy used for [AWS' hosted Elasticsearch service][urls.aws_elasticsearch].","basic":"The [basic authentication strategy][urls.basic_auth]."}}
+  examples={["aws","basic"]}
+  groups={[]}
+  name={"strategy"}
+  path={"auth"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### strategy
+
+The authentication strategy to use.
 
 
 
@@ -215,6 +215,56 @@ The basic authentication password.
 
 The basic authentication user name.
 
+
+
+</Field>
+</Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"aws"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### aws
+
+Options for the AWS connections.
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["us-east-1"]}
+  groups={[]}
+  name={"region"}
+  path={"aws"}
+  relevantWhen={{"strategy":"aws"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### region
+
+The [AWS region][urls.aws_regions] of the target service. This defaults to the
+region named in the host parameter, or the value of the `$AWS_REGION` or
+`$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or
+"us-east-1".
 
 
 
@@ -243,7 +293,6 @@ The basic authentication user name.
 Configures the sink batching behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -264,7 +313,6 @@ Configures the sink batching behavior.
 #### max_size
 
 The maximum size of a batch, in bytes, before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -288,7 +336,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 #### timeout_secs
 
 The maximum age of a batch before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -317,32 +364,7 @@ The maximum age of a batch before it is flushed.
 Configures the sink specific buffer behavior.
 
 
-
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -362,7 +384,6 @@ The buffer's type and storage mechanism.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
 
 
 
@@ -386,8 +407,30 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
-
  See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
 
 
 </Field>
@@ -410,105 +453,6 @@ The maximum size of the buffer on the disk.
 #### when_full
 
 The behavior when the buffer becomes full.
-
-
-
-
-</Field>
-</Fields>
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"encoding"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### encoding
-
-Configures the encoding specific sink behavior.
-
-
-
-<Fields filters={false}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["timestamp","message","host"]]}
-  groups={[]}
-  name={"except_fields"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### except_fields
-
-Prevent the sink from encoding the specified labels.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["timestamp","message","host"]]}
-  groups={[]}
-  name={"only_fields"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### only_fields
-
-Limit the sink to only encoding the specified labels.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={"rfc3339"}
-  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
-  examples={["rfc3339","unix"]}
-  groups={[]}
-  name={"timestamp_format"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### timestamp_format
-
-How to format event timestamps.
-
 
 
 
@@ -538,7 +482,6 @@ The compression mechanism to use.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -564,6 +507,147 @@ Elasticsearch has removed it.
 
 
 
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"encoding"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### encoding
+
+Configures the encoding specific sink behavior.
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+
+</Field>
+</Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"headers"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### headers
+
+Options for custom headers.
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"Authorization":"${ELASTICSEARCH_TOKEN}"},{"X-Powered-By":"Vector"}]}
+  groups={[]}
+  name={"`[header-name]`"}
+  path={"headers"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[header-name]`
+
+A custom header to be added to each outgoing Elasticsearch request.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -585,7 +669,6 @@ Elasticsearch has removed it.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -610,7 +693,6 @@ Enables/disables the sink healthcheck upon start.
 
 The host of your Elasticsearch cluster. This should be the full URL as shown in
 the example.
-
 
 
 
@@ -641,7 +723,6 @@ perofrmance][urls.elasticsearch_id_performance].
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -662,59 +743,8 @@ perofrmance][urls.elasticsearch_id_performance].
 ### index
 
 Index name to write events to.
-
  See [Document Conflicts](#document-conflicts) and [Template Syntax](#template-syntax) for more info.
 
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"headers"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### headers
-
-Options for custom headers.
-
-
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"Authorization":"${ELASTICSEARCH_TOKEN}"},{"X-Powered-By":"Vector"}]}
-  groups={[]}
-  name={"`[header-name]`"}
-  path={"headers"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### `[header-name]`
-
-A custom header to be added to each outgoing Elasticsearch request.
-
-
-
-
-</Field>
-</Fields>
 
 </Field>
 <Field
@@ -738,7 +768,6 @@ A custom header to be added to each outgoing Elasticsearch request.
 Custom parameters to Elasticsearch query string.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -759,7 +788,6 @@ Custom parameters to Elasticsearch query string.
 #### `[parameter-name]`
 
 A custom parameter to be added to each Elasticsearch request.
-
 
 
 
@@ -788,7 +816,6 @@ A custom parameter to be added to each Elasticsearch request.
 Configures the sink request behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -809,7 +836,6 @@ Configures the sink request behavior.
 #### in_flight_limit
 
 The maximum number of in-flight requests allowed at any given time.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -833,7 +859,6 @@ The maximum number of in-flight requests allowed at any given time.
 #### rate_limit_duration_secs
 
 The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -858,16 +883,15 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
 time window.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
 <Field
   common={false}
-  defaultValue={-1}
+  defaultValue={18446744073709551615}
   enumValues={null}
-  examples={[-1]}
+  examples={[18446744073709551615]}
   groups={[]}
   name={"retry_attempts"}
   path={"request"}
@@ -881,8 +905,8 @@ time window.
 
 #### retry_attempts
 
-The maximum number of retries to make for failed requests.
-
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
  See [Retry Policy](#retry-policy) for more info.
 
 
@@ -911,7 +935,6 @@ to select future backoffs.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -932,7 +955,6 @@ to select future backoffs.
 #### retry_max_duration_secs
 
 The maximum amount of time, in seconds, to wait between retries.
-
 
 
 
@@ -959,7 +981,6 @@ The maximum time a request can take before being aborted. It is highly
 recommended that you do not lower value below the service's internal timeout,
 as this could create orphaned requests, pile on retries, and result in
 duplicate data downstream.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -988,7 +1009,6 @@ duplicate data downstream.
 Configures the TLS options for connections from this sink.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -1010,7 +1030,6 @@ Configures the TLS options for connections from this sink.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -1039,7 +1058,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -1061,7 +1079,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
 `key_path` is set.
-
 
 
 
@@ -1089,7 +1106,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -1111,7 +1127,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
 host.
-
 
 
 
@@ -1137,7 +1152,6 @@ host.
 If `true` (the default), Vector will validate the configured remote host name
 against the remote host's TLS certificate. Do NOT set this to `false` unless
 you understand the risks of not verifying the remote hostname.
-
 
 
 
@@ -1170,7 +1184,6 @@ you understand the risks of not verifying the remote hostname.
 
 Used for AWS authentication when communicating with AWS services. See relevant
 [AWS components][pages.aws_components] for more info.
-
  See [AWS Authentication](#aws-authentication) for more info.
 
 
@@ -1195,7 +1208,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 Used for AWS authentication when communicating with AWS services. See relevant
 [AWS components][pages.aws_components] for more info.
-
  See [AWS Authentication](#aws-authentication) for more info.
 
 
@@ -1225,7 +1237,7 @@ Content-Length: <byte_size>
 
 Vector checks for AWS credentials in the following order:
 
-1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+1. Environment variables [`AWS_ACCESS_KEY_ID`](#aws_access_key_id) and [`AWS_SECRET_ACCESS_KEY`](#aws_secret_access_key).
 2. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
 3. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
 4. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
@@ -1274,6 +1286,20 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
+
+### GCP Authentication
+
+GCP offers a [variety of authentication methods][urls.gcp_authentication] and
+Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
+and will find credentials in the following order:
+
+1. If the `credentials_path` option is set.
+1. If the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
+1. Finally, Vector will check for an [instance service account][urls.gcp_authentication_service_account].
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
 
 ### Health Checks
 
@@ -1354,11 +1380,15 @@ You can learn more about the complete syntax in the
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_elasticsearch]: https://aws.amazon.com/elasticsearch-service/
+[urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.elasticsearch_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 [urls.elasticsearch_id_field]: https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-id-field.html
 [urls.elasticsearch_id_performance]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
+[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
+[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
+[urls.gcp_authentication_service_account]: https://cloud.google.com/docs/authentication/production#obtaining_and_providing_service_account_credentials_manually
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
 [urls.openssl]: https://www.openssl.org/

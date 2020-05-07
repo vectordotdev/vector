@@ -15,7 +15,7 @@ use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, value::Value as JsonValue};
+use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use string_cache::DefaultAtom as Atom;
 use tower::Service;
@@ -116,21 +116,36 @@ impl HttpSink for HecSinkConfig {
         let mut event = event.into_log();
 
         let host = event.get(&self.host_key).cloned();
+
         let timestamp = if let Some(Value::Timestamp(ts)) =
             event.remove(&event::log_schema().timestamp_key())
         {
-            ts.timestamp()
+            ts.timestamp_nanos()
         } else {
-            chrono::Utc::now().timestamp()
+            chrono::Utc::now().timestamp_nanos()
         };
 
-        let mut body = match self.encoding.codec() {
-            Encoding::Json => event_to_json(event, &self.indexed_fields, timestamp),
-            Encoding::Text => json!({
-                "event": event.get(&event::log_schema().message_key()).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
-                "time": timestamp,
-            }),
+        let sourcetype = event.get(&event::log_schema().source_type_key()).cloned();
+
+        let fields = self
+            .indexed_fields
+            .iter()
+            .filter_map(|field| event.get(field).map(|value| (field, value.clone())))
+            .collect::<LogEvent>();
+
+        let event = match self.encoding.codec() {
+            Encoding::Json => json!(event),
+            Encoding::Text => json!(event
+                .get(&event::log_schema().message_key())
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_else(|| "".into())),
         };
+
+        let mut body = json!({
+            "event": event,
+            "fields": fields,
+            "time": timestamp
+        });
 
         if let Some(host) = host {
             let host = host.to_string_lossy();
@@ -139,6 +154,11 @@ impl HttpSink for HecSinkConfig {
 
         if let Some(index) = &self.index {
             body["index"] = json!(index);
+        }
+
+        if let Some(sourcetype) = sourcetype {
+            let sourcetype = sourcetype.to_string_lossy();
+            body["sourcetype"] = json!(sourcetype);
         }
 
         serde_json::to_vec(&body)
@@ -221,19 +241,6 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
     }
 }
 
-fn event_to_json(event: LogEvent, indexed_fields: &[Atom], timestamp: i64) -> JsonValue {
-    let fields = indexed_fields
-        .iter()
-        .filter_map(|field| event.get(field).map(|value| (field, value.clone())))
-        .collect::<LogEvent>();
-
-    json!({
-        "fields": fields,
-        "event": event,
-        "time": timestamp
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,9 +250,16 @@ mod tests {
     use std::collections::BTreeMap;
 
     #[derive(Deserialize, Debug)]
-    struct HecEvent {
+    struct HecEventJson {
         time: i64,
         event: BTreeMap<String, String>,
+        fields: BTreeMap<String, String>,
+    }
+
+    #[derive(Deserialize, Debug)]
+    struct HecEventText {
+        time: i64,
+        event: String,
         fields: BTreeMap<String, String>,
     }
 
@@ -259,6 +273,7 @@ mod tests {
             host = "test.com"
             token = "alksjdfo"
             host_key = "host"
+            indexed_fields = ["key"]
 
             [encoding]
             codec = "json"
@@ -268,7 +283,7 @@ mod tests {
 
         let bytes = config.encode_event(event).unwrap();
 
-        let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
+        let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
 
         let event = &hec_event.event;
         let kv = event.get(&"key".to_string()).unwrap();
@@ -281,6 +296,41 @@ mod tests {
         assert!(event
             .get(&event::log_schema().timestamp_key().to_string())
             .is_none());
+
+        assert_eq!(
+            hec_event.fields.get("key").map(|s| s.as_str()),
+            Some("value")
+        );
+    }
+
+    #[test]
+    fn splunk_encode_event_text() {
+        let mut event = Event::from("hello world");
+        event.as_mut_log().insert("key", "value");
+
+        let (config, _, _) = crate::sinks::util::test::load_sink::<HecSinkConfig>(
+            r#"
+            host = "test.com"
+            token = "alksjdfo"
+            host_key = "host"
+            indexed_fields = ["key"]
+
+            [encoding]
+            codec = "text"
+        "#,
+        )
+        .unwrap();
+
+        let bytes = config.encode_event(event).unwrap();
+
+        let hec_event = serde_json::from_slice::<HecEventText>(&bytes[..]).unwrap();
+
+        assert_eq!(hec_event.event.as_str(), "hello world");
+
+        assert_eq!(
+            hec_event.fields.get("key").map(|s| s.as_str()),
+            Some("value")
+        );
     }
 
     #[test]
@@ -483,6 +533,45 @@ mod integration_tests {
         assert_eq!("hello", asdf);
         let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
         assert_eq!("example.com:1234", host);
+    }
+
+    #[test]
+    fn splunk_sourcetype() {
+        let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
+
+        let indexed_fields = vec![Atom::from("asdf")];
+        let config = config(Encoding::Json, indexed_fields);
+        let (sink, _) = config.build(cx).unwrap();
+
+        let message = random_string(100);
+        let mut event = Event::from(message.clone());
+        event.as_mut_log().insert("asdf", "hello");
+        event
+            .as_mut_log()
+            .insert(event::log_schema().source_type_key(), "file");
+
+        let pump = sink.send(event);
+
+        rt.block_on(pump).unwrap();
+
+        let entry = (0..20)
+            .find_map(|_| {
+                recent_entries(None)
+                    .into_iter()
+                    .find(|entry| entry["message"].as_str() == Some(message.as_str()))
+                    .or_else(|| {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        None
+                    })
+            })
+            .expect("Didn't find event in Splunk");
+
+        assert_eq!(message, entry["message"].as_str().unwrap());
+        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("hello", asdf);
+        let sourcetype = entry["sourcetype"].as_str().unwrap();
+        assert_eq!("file", sourcetype);
     }
 
     #[test]

@@ -5,7 +5,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto::{self, AwsCredentialsProvider},
+        rusoto2::{self, AwsCredentialsProvider},
         BatchEventsConfig, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -204,7 +204,7 @@ fn create_client(
     assume_role: Option<String>,
     resolver: Resolver,
 ) -> crate::Result<KinesisFirehoseClient> {
-    let client = rusoto::client(resolver)?;
+    let client = rusoto2::client(resolver)?;
     let creds = AwsCredentialsProvider::new(&region, assume_role)?;
 
     Ok(KinesisFirehoseClient::new_with(client, creds, region))
@@ -213,7 +213,7 @@ fn create_client(
 fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Record> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
-    let data = match encoding.codec {
+    let data = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
 
         Encoding::Text => log
@@ -255,7 +255,7 @@ mod tests {
     }
 }
 
-#[cfg(feature = "firehose-integration-tests")]
+#[cfg(feature = "aws-kinesis-firehose-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
     use super::*;

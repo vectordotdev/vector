@@ -3,10 +3,10 @@ last_modified_on: "2020-04-14"
 $schema: "/.meta/.schemas/highlights.json"
 title: "The Vector Source Now Accepts Metrics"
 description: "It's not possible to forward metrics between Vector instances"
-author_github: https://github.com/binarylogic
+author_github: "https://github.com/binarylogic"
 pr_numbers: [2245]
-release: "nightly"
-importance: "low"
+release: "0.9.0"
+hide_on_release_notes: true
 tags: ["type: new feature", "domain: sources", "source: vector"]
 ---
 
@@ -17,9 +17,7 @@ Until recently the [`vector` source][docs.sources.vector] only accepted
 metric data model development, as well as topology improvements.
 [PR#2245][urls.pr_2245] removes that limitation enabling you to truly build
 observability pipelines that can process both logs and metrics, such as
-the [centralized topology][docs.topologies#centralized] shown here:
-
-<SVG src="/img/topologies-centralized.svg" />
+the [centralized topology][docs.topologies#centralized].
 
 
 [docs.data-model.log]: /docs/about/data-model/log/

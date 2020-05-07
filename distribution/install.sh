@@ -11,7 +11,7 @@
 set -u
 
 # If PACKAGE_ROOT is unset or empty, default it.
-PACKAGE_ROOT="${PACKAGE_ROOT:-https://packages.timber.io/vector}"
+PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -46,6 +46,7 @@ USAGE:
 
 FLAGS:
     -y                      Disable confirmation prompt.
+        --no-modify-path    Don't configure the PATH environment variable
     -h, --help              Prints help information
 EOF
 }
@@ -55,11 +56,15 @@ main() {
     header
 
     local prompt=yes
+    local modify_path=yes
     for arg in "$@"; do
         case "$arg" in
             -h|--help)
                 usage
                 exit 0
+                ;;
+            --no-modify-path)
+                modify_path=no
                 ;;
             -y)
                 prompt=no
@@ -77,7 +82,7 @@ main() {
         echo ""
 
         while true; do
-            read -p "$_prompt " _choice </dev/tty
+            read -rp "$_prompt " _choice </dev/tty
             case $_choice in
                 n)
                     err "exiting"
@@ -98,7 +103,7 @@ main() {
         echo ""
     fi
 
-    install_from_archive
+    install_from_archive $modify_path
 }
 
 install_from_archive() {
@@ -113,6 +118,7 @@ install_from_archive() {
     need_cmd sed
 
     get_architecture || return 1
+    local modify_path="$1"
     local _arch="$RETVAL"
     assert_nz "$_arch" "arch"
 
@@ -144,29 +150,29 @@ install_from_archive() {
 
     ensure mkdir -p "$_dir"
 
-    printf "$_prompt Downloading Vector via $_url"
+    printf "%s Downloading Vector via %s" "$_prompt" "$_url"
     ensure downloader "$_url" "$_file"
     printf " ✓\n"
 
-    printf "$_prompt Unpacking archive to $HOME/.vector ..."
+    printf "%s Unpacking archive to $HOME/.vector ..." "$_prompt"
     ensure mkdir -p "$HOME/.vector"
-    local _dir_name=$(tar -tzf ${_file} | head -1 | sed -e 's/\.\/\(.*\)\//\1/')
-    ensure tar -xzf "$_file" --directory="$HOME/.vector" --strip-components=1
+    ensure tar -xzf "$_file" --directory="$HOME/.vector" --strip-components=2
 
     printf " ✓\n"
 
-    printf "$_prompt Adding Vector path to ~/.profile"
-    local _path="export PATH=\"\$HOME/.vector/${_dir_name}/bin:\$PATH\""
-    grep -qxF "${_path}" "${HOME}/.profile" || echo "${_path}" >> "${HOME}/.profile"
-    grep -qxF "${_path}" "${HOME}/.zprofile" || echo "${_path}" >> "${HOME}/.zprofile"
-    printf " ✓\n"
+    if [ "$modify_path" = "yes" ]; then
+      local _path="export PATH=\"\$HOME/.vector/bin:\$PATH\""
+      add_to_path "${HOME}/.zprofile" "${_path}"
+      add_to_path "${HOME}/.profile" "${_path}"
+      printf " ✓\n"
+    fi
 
-    printf "$_prompt Install succeeded! 🚀\n"
-    printf "$_prompt To start Vector:\n"
+    printf "%s Install succeeded! 🚀\n" "$_prompt"
+    printf "%s To start Vector:\n" "$_prompt"
     printf "\n"
-    printf "$_indent vector --config ~/.vector/vector.toml\n"
+    printf "%s vector --config ~/.vector/vector.toml\n" "$_indent"
     printf "\n"
-    printf "$_prompt More information at https://vector.dev/docs/\n"
+    printf "%s More information at https://vector.dev/docs/\n" "$_prompt"
 
     local _retval=$?
 
@@ -174,6 +180,19 @@ install_from_archive() {
     ignore rmdir "$_dir"
 
     return "$_retval"
+}
+
+add_to_path() {
+  local file="$1"
+  local new_path="$2"
+
+  printf "%s Adding Vector path to ${file}" "$_prompt"
+
+  if [ ! -f "$file" ]; then
+    echo "${new_path}" >> "${file}"
+  else
+    grep -qxF "${new_path}" "${file}" || echo "${new_path}" >> "${file}"
+  fi
 }
 
 # ------------------------------------------------------------------------------
@@ -359,6 +378,14 @@ get_architecture() {
             powerpc64)
                 _cputype=powerpc
                 ;;
+            aarch64)
+                _cputype=armv7
+                if [ "$_ostype" = "linux-android" ]; then
+                    _ostype=linux-androideabi
+                else
+                    _ostype="${_ostype}eabihf"
+                fi
+                ;;
         esac
     fi
 
@@ -384,7 +411,6 @@ err() {
 
 need_cmd() {
     if ! check_cmd "$1"; then
-
         err "need '$1' (command not found)"
     fi
 }
@@ -401,7 +427,8 @@ assert_nz() {
 # will immediately terminate with an error showing the failing
 # command.
 ensure() {
-    local output="$($@ 2>&1 > /dev/null)"
+    local output
+    output="$("$@" 2>&1 > /dev/null)"
 
     if [ "$output" ]; then
         echo ""
@@ -411,14 +438,6 @@ ensure() {
         echo ""
         echo "$output" >&2
         exit 1
-    fi
-}
-
-ensure_with_sudo() {
-    if ! [ -x "$(command -v sudo)" ]; then
-        ensure $@
-    else
-        ensure sudo $@
     fi
 }
 

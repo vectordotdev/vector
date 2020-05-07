@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-07"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-05-01"
+delivery_guarantee: "at_least_once"
 component_title: "Datadog Logs"
 description: "The Vector `datadog_logs` sink streams `log` events to Datadog's logs via the TCP endpoint."
 event_types: ["log"]
@@ -45,7 +45,7 @@ endpoint][urls.datadog_logs_endpoints].
 [sinks.my_sink_id]
   # General
   type = "datadog_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${DATADOG_API_KEY_ENV_VAR}" # required
   healthcheck = true # optional, default
 
@@ -60,15 +60,15 @@ endpoint][urls.datadog_logs_endpoints].
 [sinks.my_sink_id]
   # General
   type = "datadog_logs" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   api_key = "${DATADOG_API_KEY_ENV_VAR}" # required
   endpoint = "intake.logs.datadoghq.com:10516" # optional, default
   healthcheck = true # optional, default
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -78,9 +78,9 @@ endpoint][urls.datadog_logs_endpoints].
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # TLS
-  tls.enabled = false # optional, default
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
   tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
   tls.verify_certificate = true # optional, default
@@ -91,6 +91,29 @@ endpoint][urls.datadog_logs_endpoints].
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${DATADOG_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  groups={[]}
+  name={"api_key"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### api_key
+
+Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
+ See [Obtaining an API token](#obtaining-an-api-token) for more info.
+
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -112,32 +135,7 @@ endpoint][urls.datadog_logs_endpoints].
 Configures the sink specific buffer behavior.
 
 
-
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -157,7 +155,6 @@ The buffer's type and storage mechanism.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
 
 
 
@@ -184,6 +181,28 @@ The maximum size of the buffer on the disk.
 
 
 
+</Field>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
 
 </Field>
 <Field
@@ -205,7 +224,6 @@ The maximum size of the buffer on the disk.
 #### when_full
 
 The behavior when the buffer becomes full.
-
 
 
 
@@ -234,7 +252,6 @@ The behavior when the buffer becomes full.
 Configures the encoding specific sink behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -255,7 +272,6 @@ Configures the encoding specific sink behavior.
 #### codec
 
 The encoding codec used to serialize the events before outputting.
-
 
 
 
@@ -282,7 +298,6 @@ Prevent the sink from encoding the specified labels.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -303,7 +318,6 @@ Prevent the sink from encoding the specified labels.
 #### only_fields
 
 Limit the sink to only encoding the specified labels.
-
 
 
 
@@ -330,33 +344,8 @@ How to format event timestamps.
 
 
 
-
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${DATADOG_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
-  groups={[]}
-  name={"api_key"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### api_key
-
-Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
-
- See [Obtaining an API token](#obtaining-an-api-token) for more info.
-
 
 </Field>
 <Field
@@ -381,7 +370,6 @@ The endpoint to stream logs to.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -402,7 +390,6 @@ The endpoint to stream logs to.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -428,32 +415,7 @@ Enables/disables the sink healthcheck upon start.
 Configures the TLS options for connections from this sink.
 
 
-
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={false}
-  enumValues={null}
-  examples={[false,true]}
-  groups={[]}
-  name={"enabled"}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### enabled
-
-Enable TLS during connections to the remote.
-
-
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -474,7 +436,6 @@ Enable TLS during connections to the remote.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -503,6 +464,28 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
+</Field>
+<Field
+  common={true}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"enabled"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### enabled
+
+Enable TLS during connections to the remote.
+
+
 
 </Field>
 <Field
@@ -525,7 +508,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
 `key_path` is set.
-
 
 
 
@@ -553,7 +535,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -575,7 +556,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
 host.
-
 
 
 
@@ -601,7 +581,6 @@ host.
 If `true` (the default), Vector will validate the configured remote host name
 against the remote host's TLS certificate. Do NOT set this to `false` unless
 you understand the risks of not verifying the remote hostname.
-
 
 
 

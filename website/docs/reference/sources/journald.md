@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-05-05"
 delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through Systemd's Journald utility and outputs `log` events."
@@ -34,7 +34,7 @@ utility and outputs [`log`][docs.data-model.log] events.
 
 ## Requirements
 
-<Alert icon={false} type="danger" className="list--warnings">
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
 
 * The [`journalctl`](#journalctl) binary is required, this is the interface Vector uses to retrieve JournalD logs. See the ["Communication Strategy" section][docs.sources.journald#communication-strategy] for more info.
 * The Vector user must be part of the `systemd-journal` group in order to execute the [`journalctl`](#journalctl) binary. See the ["User Permissions" section][docs.sources.journald#user-permissions] for more info.
@@ -53,7 +53,8 @@ utility and outputs [`log`][docs.data-model.log] events.
 [sources.my_source_id]
   type = "journald" # required
   current_boot_only = true # optional, default
-  units = [] # optional, default
+  exclude_units = [] # optional, default
+  include_units = [] # optional, default
 ```
 
 </TabItem>
@@ -65,8 +66,9 @@ utility and outputs [`log`][docs.data-model.log] events.
   batch_size = 16 # optional, default
   current_boot_only = true # optional, default
   data_dir = "/var/lib/vector" # optional, no default
+  exclude_units = [] # optional, default
+  include_units = [] # optional, default
   journalctl_path = "journalctl" # optional, default
-  units = [] # optional, default
 ```
 
 </TabItem>
@@ -93,7 +95,6 @@ utility and outputs [`log`][docs.data-model.log] events.
 
 The systemd journal is read in batches, and a checkpoint is set at the end of
 each batch. This option limits the size of the batch.
-
  See [Checkpointing](#checkpointing) for more info.
 
 
@@ -120,7 +121,6 @@ Include only entries from the current boot.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -143,8 +143,56 @@ Include only entries from the current boot.
 The directory used to persist the journal checkpoint position. By default, the
 global [`data_dir`](#data_dir) is used. Please make sure the Vector project has write
 permissions to this dir.
-
  See [Checkpointing](#checkpointing) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={[]}
+  enumValues={null}
+  examples={[["badservice","sysinit.target"]]}
+  groups={[]}
+  name={"exclude_units"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### exclude_units
+
+The list of units names to exclude from monitoring. Unit names lacking a `"."`
+will have `".service"` appended to make them a valid service unit name.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={[]}
+  enumValues={null}
+  examples={[["ntpd","sysinit.target"]]}
+  groups={[]}
+  name={"include_units"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### include_units
+
+The list of units names to monitor. If empty or not present, all units are
+accepted. Unit names lacking a `"."` will have `".service"` appended to make
+them a valid service unit name.
+
 
 
 </Field>
@@ -168,34 +216,7 @@ permissions to this dir.
 
 The full path of the [`journalctl`](#journalctl) executable. If not set, Vector will search
 the path for [`journalctl`](#journalctl).
-
  See [Communication strategy](#communication-strategy) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={[]}
-  enumValues={null}
-  examples={[["ntpd","sysinit.target"]]}
-  groups={[]}
-  name={"units"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-### units
-
-The list of units names to monitor. If empty or not present, all units are
-accepted. Unit names lacking a `"."` will have `".service"` appended to make
-them a valid service unit name.
-
-
 
 
 </Field>
@@ -237,7 +258,6 @@ Additional Journald fields are passed through as log fields.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -258,7 +278,6 @@ Additional Journald fields are passed through as log fields.
 ### host
 
 The value of the journald `_HOSTNAME` field.
-
 
 
 
@@ -285,7 +304,6 @@ The value of the journald `MESSAGE` field.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -306,7 +324,6 @@ The value of the journald `MESSAGE` field.
 ### timestamp
 
 The value of the journald `_SOURCE_REALTIME_TIMESTAMP` field.
-
 
 
 

@@ -8,11 +8,13 @@
   box-shadow: var(--ifm-panel-box-shadow);
   transition: border 250ms ease;
 }
+
 .pagination-nav .pagination-nav__link:hover {
   background: var(--ifm-panel-background-color-active);
   box-shadow: var(--ifm-panel-box-shadow-active);
   color: var(--ifm-panel-color-active);
 }
+
 .pagination-nav .pagination-nav__link:hover * {
   color: var(--ifm-panel-color-active);
 }

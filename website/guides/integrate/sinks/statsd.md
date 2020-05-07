@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-05-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics to Statsd"
 description: "A simple guide to send metrics to Statsd in just a few minutes."
@@ -11,10 +11,9 @@ hide_pagination: true
 
 import ConfigExample from '@site/src/components/ConfigExample';
 import DaemonDiagram from '@site/src/components/DaemonDiagram';
+import InstallationCommand from '@site/src/components/InstallationCommand';
 import Jump from '@site/src/components/Jump';
 import Steps from '@site/src/components/Steps';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 Metrics are an _essential_ part of observing any
 service; without them you are flying blind. But collecting and analyzing them
@@ -70,48 +69,30 @@ The following diagram demonstrates how it works.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--flush">
+<ul className="list--icons list--icons--checks list--indent">
   <li>
     Collect your metrics from one or more sources
   </li>
   <li>
     Stream metrics over a StatsD UDP protocol.
-    <ol>
+    <ul>
       <li>Automatically aggregate metrics at the edge for improved performance.</li>
-    </ol>
+    </ul>
   </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
+  <li className="list--icons--arrow text--pink text--bold">All in just a few minutes!</li>
+</ul>
 
 ## Tutorial
 
-<Tabs
-  centered={true}
-  className="rounded"
-  defaultValue="x86_64"
-  values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"},{"label":"ARMv7","value":"armv7"}]}>
-
-<TabItem value="x86_64">
 <Steps headingDepth={3}>
 <ol>
 <li>
 
-### Download the Vector `.deb` package
+### Install Vector
 
-```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-amd64.deb
-```
+<InstallationCommand />
 
-[Looking for a different version?][docs.package_managers.dpkg#versions]
-
-</li>
-<li>
-
-### Install the downloaded package
-
-```bash
-sudo dpkg -i vector-amd64.deb
-```
+Or choose your [preferred method][docs.installation].
 
 </li>
 <li>
@@ -120,8 +101,8 @@ sudo dpkg -i vector-amd64.deb
 
 <ConfigExample
   format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={null}
+  path={"vector.toml"}
+  sourceName={"statsd"}
   sinkName={"statsd"} />
 
 </li>
@@ -130,106 +111,14 @@ sudo dpkg -i vector-amd64.deb
 ### Start Vector
 
 ```bash
-sudo systemctl start vector
+vector --config vector.toml
 ```
+
+That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
 </Steps>
-</TabItem>
-<TabItem value="arm64">
-<Steps headingDepth={3}>
-<ol>
-<li>
-
-### Download the Vector `.deb` package
-
-```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-arm64.deb
-```
-
-[Looking for a different version?][docs.package_managers.dpkg#versions]
-
-</li>
-<li>
-
-### Install the downloaded package
-
-```bash
-sudo dpkg -i vector-arm64.deb
-```
-
-</li>
-<li>
-
-### Configure Vector
-
-<ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={null}
-  sinkName={"statsd"} />
-
-</li>
-<li>
-
-### Start Vector
-
-```bash
-sudo systemctl start vector
-```
-
-</li>
-</ol>
-</Steps>
-</TabItem>
-<TabItem value="armv7">
-<Steps headingDepth={3}>
-<ol>
-<li>
-
-### Download the Vector `.deb` package
-
-```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-armhf.deb
-```
-
-[Looking for a different version?][docs.package_managers.dpkg#versions]
-
-</li>
-<li>
-
-### Install the downloaded package
-
-```bash
-sudo dpkg -i vector-armhf.deb
-```
-
-</li>
-<li>
-
-### Configure Vector
-
-<ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={null}
-  sinkName={"statsd"} />
-
-</li>
-<li>
-
-### Start Vector
-
-```bash
-sudo systemctl start vector
-```
-
-</li>
-</ol>
-</Steps>
-</TabItem>
-</Tabs>
 
 ## Next Steps
 
@@ -253,7 +142,7 @@ flexibility of Vector:
 </Jump>
 
 
-[docs.package_managers.dpkg#versions]: /docs/setup/installation/package-managers/dpkg/#versions
+[docs.installation]: /docs/setup/installation/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon

@@ -1,0 +1,67 @@
+[sinks.humio_logs]
+title = "Humio Logs"
+noun = "Humio"
+common = false
+beta = true
+delivery_guarantee = "at_least_once"
+description = """\
+[Humio][urls.humio] is a time-series logging and aggregation platform for \
+unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With \
+1TB/day of raw log ingest/node, in-memory stream processing, and live, \
+shareable dashboards and alerts, you can instantly and in real-time explore, \
+monitor, and visualize any system’s data.\
+"""
+egress_method = "batching"
+features = [
+  "Send logs to the Humio logging service.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
+function_category = "transmit"
+healthcheck = true
+input_types = ["log"]
+requirements = {}
+service_providers = ["Humio"]
+write_to_description = "[Humio][urls.humio] via the [HEC API][urls.humio_hec]"
+
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "humio_logs") %>
+
+<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.humio_logs.options", common: false, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
+
+<%= render(
+  "_partials/fields/_buffer_options.toml",
+  namespace: "sinks.humio_logs.options",
+  common: false
+) %>
+
+<%= render(
+  "_partials/fields/_request_options.toml",
+  namespace: "sinks.humio_logs.options",
+  common: false,
+  in_flight_limit: 10,
+  rate_limit_duration_secs: 1,
+  rate_limit_num: 10,
+  retry_initial_backoff_secs: 1,
+  retry_max_duration_secs: 10,
+  timeout_secs: 60
+) %>
+
+[sinks.humio_logs.options.token]
+type = "string"
+common = true
+examples = ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
+required = true
+description = "Your Humio ingestion token."
+
+[sinks.humio_logs.options.host]
+type = "string"
+examples = ["http://myhumiohost.com"]
+required = false
+description = "The optional host to send Humio logs to."
+
+<%= render("_partials/fields/_encoding_options.toml",
+  namespace: "sinks.humio_logs.options",
+  encodings: ["json", "text"],
+  default: "json"
+) %>

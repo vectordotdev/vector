@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-11"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-05-01"
+delivery_guarantee: "at_least_once"
 component_title: "Prometheus"
 description: "The Vector `prometheus` source ingests data through the Prometheus text exposition format and outputs `metric` events."
 event_types: ["metric"]
@@ -83,7 +83,6 @@ Host addresses to scrape metrics from.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -104,7 +103,6 @@ Host addresses to scrape metrics from.
 ### scrape_interval_secs
 
 The interval between scrapes, in seconds.
-
 
 
 

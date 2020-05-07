@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-12"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
@@ -44,7 +44,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "aws_cloudwatch_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   healthcheck = true # optional, default
   namespace = "service" # required
   region = "us-east-1" # required, required when endpoint = ""
@@ -57,7 +57,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 [sinks.my_sink_id]
   # General
   type = "aws_cloudwatch_metrics" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
@@ -77,6 +77,29 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+ See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={[]}
   groups={[]}
   name={"batch"}
@@ -92,7 +115,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 ### batch
 
 Configures the sink batching behavior.
-
 
 
 <Fields filters={false}>
@@ -115,7 +137,6 @@ Configures the sink batching behavior.
 #### max_events
 
 The maximum size of a batch, in events, before it is flushed.
-
 
 
 
@@ -142,33 +163,8 @@ The maximum age of a batch before it is flushed.
 
 
 
-
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["arn:aws:iam::123456789098:role/my_role"]}
-  groups={[]}
-  name={"assume_role"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### assume_role
-
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
- See [AWS Authentication](#aws-authentication) for more info.
-
 
 </Field>
 <Field
@@ -194,7 +190,6 @@ this option will make [`region`](#region) moot.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -215,7 +210,6 @@ this option will make [`region`](#region) moot.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start.
-
  See [Health Checks](#health-checks) for more info.
 
 
@@ -244,7 +238,6 @@ that will isolate different metrics from each other.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -266,7 +259,6 @@ that will isolate different metrics from each other.
 
 The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is
 provided it will override this value since the endpoint includes the region.
-
 
 
 
@@ -296,7 +288,6 @@ provided it will override this value since the endpoint includes the region.
 
 Used for AWS authentication when communicating with AWS services. See relevant
 [AWS components][pages.aws_components] for more info.
-
  See [AWS Authentication](#aws-authentication) for more info.
 
 
@@ -321,7 +312,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 Used for AWS authentication when communicating with AWS services. See relevant
 [AWS components][pages.aws_components] for more info.
-
  See [AWS Authentication](#aws-authentication) for more info.
 
 
@@ -335,7 +325,7 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 Vector checks for AWS credentials in the following order:
 
-1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+1. Environment variables [`AWS_ACCESS_KEY_ID`](#aws_access_key_id) and [`AWS_SECRET_ACCESS_KEY`](#aws_secret_access_key).
 2. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
 3. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
 4. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)

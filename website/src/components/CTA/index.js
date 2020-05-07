@@ -5,7 +5,7 @@ import classnames from 'classnames';
 function CTA({github, inline, size, style}) {
   let classes = classnames('panel', 'panel--button', `panel--${size}`, `panel--${style}`, {'panel--button--inline': inline});
 
-  return <div className="row">
+  return <div className="row row--squished">
     <div className="col">
       <a href="https://twitter.com/vectordotdev" target="_blank" className={classes}>
         <div className="panel--icon">

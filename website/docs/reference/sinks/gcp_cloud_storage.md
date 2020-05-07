@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-09"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
@@ -45,14 +45,14 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 [sinks.my_sink_id]
   # General
   type = "gcp_cloud_storage" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   compression = "gzip" # required
-  credentials_path = "/path/to/credentials.json" # required
+  credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.type = "memory" # optional, default
 
   # Encoding
   encoding.codec = "ndjson" # required
@@ -68,10 +68,10 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 [sinks.my_sink_id]
   # General
   type = "gcp_cloud_storage" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   bucket = "my-bucket" # required
   compression = "gzip" # required
-  credentials_path = "/path/to/credentials.json" # required
+  credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 
   # Batch
@@ -79,9 +79,9 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   batch.timeout_secs = 300 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -105,7 +105,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 1000 # optional, default
-  request.retry_attempts = -1 # optional, default
+  request.retry_attempts = 18446744073709551615 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
@@ -126,6 +126,31 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 <Field
   common={false}
   defaultValue={null}
+  enumValues={{"authenticatedRead":"Gives the bucket or object owner OWNER permission, and gives all authenticated Google account holders READER permission.","bucketOwnerFullControl":"Gives the object and bucket owners OWNER permission.","bucketOwnerRead":"Gives the object owner OWNER permission, and gives the bucket owner READER permission.","private":"Gives the bucket or object owner OWNER permission for a bucket or object.","projectPrivate":"Gives permission to the project team based on their roles. Anyone who is part of the team has READER permission. Project owners and project editors have OWNER permission. This the default.","publicRead":"Gives the bucket or object owner OWNER permission, and gives all users, both authenticated and anonymous, READER permission. When you apply this to an object, anyone on the Internet can read the object without authenticating."}}
+  examples={["authenticatedRead","bucketOwnerFullControl","bucketOwnerRead","private","projectPrivate","publicRead"]}
+  groups={[]}
+  name={"acl"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### acl
+
+Predefined ACL to apply to the created objects. For more information, see
+[Predefined ACLs][urls.gcs_predefined_acl]. If this is not set, GCS will apply
+a default ACL when the object is created.
+ See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
   enumValues={null}
   examples={[]}
   groups={[]}
@@ -142,7 +167,6 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 ### batch
 
 Configures the sink batching behavior.
-
 
 
 <Fields filters={false}>
@@ -165,7 +189,6 @@ Configures the sink batching behavior.
 #### max_size
 
 The maximum size of a batch, in bytes, before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -189,252 +212,7 @@ The maximum size of a batch, in bytes, before it is flushed.
 #### timeout_secs
 
 The maximum age of a batch before it is flushed.
-
  See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-</Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"buffer"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### buffer
-
-Configures the sink specific buffer behavior.
-
-
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={500}
-  enumValues={null}
-  examples={[500]}
-  groups={[]}
-  name={"max_events"}
-  path={"buffer"}
-  relevantWhen={{"type":"memory"}}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"events"}
-  warnings={[]}
-  >
-
-#### max_events
-
-The maximum number of [events][docs.data-model] allowed in the buffer.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[104900000]}
-  groups={[]}
-  name={"max_size"}
-  path={"buffer"}
-  relevantWhen={{"type":"disk"}}
-  required={true}
-  templateable={false}
-  type={"int"}
-  unit={"bytes"}
-  warnings={[]}
-  >
-
-#### max_size
-
-The maximum size of the buffer on the disk.
-
- See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={"block"}
-  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
-  examples={["block","drop_newest"]}
-  groups={[]}
-  name={"when_full"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### when_full
-
-The behavior when the buffer becomes full.
-
-
-
-
-</Field>
-</Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"encoding"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### encoding
-
-Configures the encoding specific sink behavior.
-
-
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["ndjson","text"]}
-  groups={[]}
-  name={"codec"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### codec
-
-The encoding codec used to serialize the events before outputting.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["timestamp","message","host"]]}
-  groups={[]}
-  name={"except_fields"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### except_fields
-
-Prevent the sink from encoding the specified labels.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["timestamp","message","host"]]}
-  groups={[]}
-  name={"only_fields"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### only_fields
-
-Limit the sink to only encoding the specified labels.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={"rfc3339"}
-  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
-  examples={["rfc3339","unix"]}
-  groups={[]}
-  name={"timestamp_format"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### timestamp_format
-
-How to format event timestamps.
-
-
 
 
 </Field>
@@ -463,6 +241,122 @@ The GCS bucket name.
 
 
 
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"buffer"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### buffer
+
+Configures the sink specific buffer behavior.
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={500}
+  enumValues={null}
+  examples={[500]}
+  groups={[]}
+  name={"max_events"}
+  path={"buffer"}
+  relevantWhen={{"type":"memory"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  warnings={[]}
+  >
+
+#### max_events
+
+The maximum number of [events][docs.data-model] allowed in the buffer.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[104900000]}
+  groups={[]}
+  name={"max_size"}
+  path={"buffer"}
+  relevantWhen={{"type":"disk"}}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+#### max_size
+
+The maximum size of the buffer on the disk.
+ See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"block"}
+  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
+  examples={["block","drop_newest"]}
+  groups={[]}
+  name={"when_full"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### when_full
+
+The behavior when the buffer becomes full.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -487,7 +381,6 @@ The compression mechanism to use.
 
 
 
-
 </Field>
 <Field
   common={true}
@@ -498,7 +391,7 @@ The compression mechanism to use.
   name={"credentials_path"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -509,94 +402,114 @@ The compression mechanism to use.
 
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Cloud Storage API. If this is unset, Vector checks
-the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
+the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) environment variable for a filename.
 
-
+If no filename is named, Vector will attempt to fetch an instance service
+account for the compute instance the program is running on. If Vector is not
+running on a GCE instance, you must define a credentials file as above.
+ See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
 <Field
   common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start.
-
- See [Health Checks](#health-checks) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={{"authenticatedRead":"Gives the bucket or object owner OWNER permission, and gives all authenticated Google account holders READER permission.","bucketOwnerFullControl":"Gives the object and bucket owners OWNER permission.","bucketOwnerRead":"Gives the object owner OWNER permission, and gives the bucket owner READER permission.","private":"Gives the bucket or object owner OWNER permission for a bucket or object.","projectPrivate":"Gives permission to the project team based on their roles. Anyone who is part of the team has READER permission. Project owners and project editors have OWNER permission. This the default.","publicRead":"Gives the bucket or object owner OWNER permission, and gives all users, both authenticated and anonymous, READER permission. When you apply this to an object, anyone on the Internet can read the object without authenticating."}}
-  examples={["authenticatedRead","bucketOwnerFullControl","bucketOwnerRead","private","projectPrivate","publicRead"]}
-  groups={[]}
-  name={"acl"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### acl
-
-Predefined ACL to apply to the created objects. For more information, see
-[Predefined ACLs][urls.gcs_predefined_acl]. If this is not set, GCS will apply
-a default ACL when the object is created.
-
- See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
-
-
-</Field>
-<Field
-  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
   groups={[]}
-  name={"metadata"}
+  name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
-  type={"string"}
+  type={"table"}
   unit={null}
   warnings={[]}
   >
 
-### metadata
+### encoding
 
-The set of metadata `key:value` pairs for the created objects. See the [GCS
-custom metadata][urls.gcs_custom_metadata] documentation for more details.
-
+Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
 <Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["ndjson","text"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### codec
+
+The encoding codec used to serialize the events before outputting.
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"Key1":"Value1"}]}
+  examples={[["timestamp","message","host"]]}
   groups={[]}
-  name={"`[key-name]`"}
-  path={"metadata"}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -605,40 +518,14 @@ custom metadata][urls.gcs_custom_metadata] documentation for more details.
   warnings={[]}
   >
 
-#### `[key-name]`
+#### timestamp_format
 
-A custom metadata item to be added to the created objects.
-
+How to format event timestamps.
 
 
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={{"STANDARD":"Standard Storage is best for data that is frequently accessed and/or stored for only brief periods of time. This is the default.","NEARLINE":"Nearline Storage is a low-cost, highly durable storage service for storing infrequently accessed data.","COLDLINE":"Coldline Storage is a very-low-cost, highly durable storage service for storing infrequently accessed data.","ARCHIVE":"Archive Storage is the lowest-cost, highly durable storage service for data archiving, online backup, and disaster recovery."}}
-  examples={["STANDARD","NEARLINE","COLDLINE","ARCHIVE"]}
-  groups={[]}
-  name={"storage_class"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### storage_class
-
-The storage class for the created objects. See [the GCP storage
-classes][urls.gcs_storage_classes] for more details.
-
- See [Storage class](#storage-class) for more info.
-
 
 </Field>
 <Field
@@ -661,7 +548,6 @@ classes][urls.gcs_storage_classes] for more details.
 
 Whether or not to append a UUID v4 token to the end of the file. This ensures
 there are no name collisions high volume use cases.
-
  See [Object naming](#object-naming) for more info.
 
 
@@ -688,7 +574,6 @@ The filename extension to use in the object name.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -710,8 +595,30 @@ The filename extension to use in the object name.
 
 The format of the resulting object file name. [`strftime`
 specifiers][urls.strptime_specifiers] are supported.
-
  See [Object naming](#object-naming) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"healthcheck"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### healthcheck
+
+Enables/disables the sink healthcheck upon start.
+ See [Health Checks](#health-checks) for more info.
 
 
 </Field>
@@ -736,9 +643,57 @@ specifiers][urls.strptime_specifiers] are supported.
 A prefix to apply to all object key names. This should be used to partition
 your objects, and it's important to end this value with a `/` if you want this
 to be the root GCS "folder".
-
  See [Object naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"metadata"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### metadata
+
+The set of metadata `key:value` pairs for the created objects. See the [GCS
+custom metadata][urls.gcs_custom_metadata] documentation for more details.
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"Key1":"Value1"}]}
+  groups={[]}
+  name={"`[key-name]`"}
+  path={"metadata"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[key-name]`
+
+A custom metadata item to be added to the created objects.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -762,7 +717,6 @@ to be the root GCS "folder".
 Configures the sink request behavior.
 
 
-
 <Fields filters={false}>
 <Field
   common={true}
@@ -783,7 +737,6 @@ Configures the sink request behavior.
 #### in_flight_limit
 
 The maximum number of in-flight requests allowed at any given time.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -807,7 +760,6 @@ The maximum number of in-flight requests allowed at any given time.
 #### rate_limit_duration_secs
 
 The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
@@ -832,16 +784,15 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs)
 time window.
-
  See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
 <Field
   common={false}
-  defaultValue={-1}
+  defaultValue={18446744073709551615}
   enumValues={null}
-  examples={[-1]}
+  examples={[18446744073709551615]}
   groups={[]}
   name={"retry_attempts"}
   path={"request"}
@@ -855,8 +806,8 @@ time window.
 
 #### retry_attempts
 
-The maximum number of retries to make for failed requests.
-
+The maximum number of retries to make for failed requests. The default, for all
+intents and purposes, represents an infinite number of retries.
  See [Retry Policy](#retry-policy) for more info.
 
 
@@ -885,7 +836,6 @@ to select future backoffs.
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -906,7 +856,6 @@ to select future backoffs.
 #### retry_max_duration_secs
 
 The maximum amount of time, in seconds, to wait between retries.
-
 
 
 
@@ -933,12 +882,35 @@ The maximum time a request can take before being aborted. It is highly
 recommended that you do not lower value below the service's internal timeout,
 as this could create orphaned requests, pile on retries, and result in
 duplicate data downstream.
-
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={{"STANDARD":"Standard Storage is best for data that is frequently accessed and/or stored for only brief periods of time. This is the default.","NEARLINE":"Nearline Storage is a low-cost, highly durable storage service for storing infrequently accessed data.","COLDLINE":"Coldline Storage is a very-low-cost, highly durable storage service for storing infrequently accessed data.","ARCHIVE":"Archive Storage is the lowest-cost, highly durable storage service for data archiving, online backup, and disaster recovery."}}
+  examples={["STANDARD","NEARLINE","COLDLINE","ARCHIVE"]}
+  groups={[]}
+  name={"storage_class"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### storage_class
+
+The storage class for the created objects. See [the GCP storage
+classes][urls.gcs_storage_classes] for more details.
+ See [Storage class](#storage-class) for more info.
+
 
 </Field>
 <Field
@@ -962,7 +934,6 @@ duplicate data downstream.
 Configures the TLS options for connections from this sink.
 
 
-
 <Fields filters={false}>
 <Field
   common={false}
@@ -984,7 +955,6 @@ Configures the TLS options for connections from this sink.
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
-
 
 
 
@@ -1013,7 +983,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -1035,7 +1004,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
 `key_path` is set.
-
 
 
 
@@ -1063,7 +1031,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 
-
 </Field>
 <Field
   common={false}
@@ -1085,7 +1052,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
 host.
-
 
 
 
@@ -1111,7 +1077,6 @@ host.
 If `true` (the default), Vector will validate the configured remote host name
 against the remote host's TLS certificate. Do NOT set this to `false` unless
 you understand the risks of not verifying the remote hostname.
-
 
 
 
@@ -1144,8 +1109,7 @@ you understand the risks of not verifying the remote hostname.
 
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Cloud Storage API.
-
-
+ See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -1178,6 +1142,20 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
+
+### GCP Authentication
+
+GCP offers a [variety of authentication methods][urls.gcp_authentication] and
+Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
+and will find credentials in the following order:
+
+1. If the [`credentials_path`](#credentials_path) option is set.
+1. If the [`GOOGLE_APPLICATION_CREDENTIALS`](#google_application_credentials) envrionment variable is set.
+1. Finally, Vector will check for an [instance service account][urls.gcp_authentication_service_account].
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
 
 ### Health Checks
 
@@ -1331,7 +1309,11 @@ You can learn more about the complete syntax in the
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
+[docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [docs.reference.templating]: /docs/reference/templating/
+[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
+[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
+[urls.gcp_authentication_service_account]: https://cloud.google.com/docs/authentication/production#obtaining_and_providing_service_account_credentials_manually
 [urls.gcs_custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
 [urls.gcs_predefined_acl]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
 [urls.gcs_storage_classes]: https://cloud.google.com/storage/docs/storage-classes

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # docker-compose-run.sh
 #
@@ -6,10 +7,14 @@
 #
 #   Runs a job from `docker-compose.yml` file.
 
-set -euo pipefail
+SERVICE="$1"
 
-cd $(dirname $0)/..
+DOCKER="${USE_CONTAINER:-"docker"}"
+COMPOSE="${COMPOSE:-"${DOCKER}-compose"}"
 
-export USER=$(id -u):$(id -g)
-docker-compose rm -svf $1 2>/dev/null || true
-docker-compose up --build --abort-on-container-exit --exit-code-from $1 $1 | sed $'s/^.*container exit...$/\033[0m\033[1A/'
+USER="$(id -u):$(id -g)"
+export USER
+
+$COMPOSE rm -svf "$SERVICE" 2>/dev/null || true
+$COMPOSE up --build --abort-on-container-exit --exit-code-from "$SERVICE" "$SERVICE" \
+  | sed $'s/^.*container exit...$/\033[0m\033[1A/'

@@ -1,13 +1,14 @@
 use super::Transform;
 use crate::{
     event::Event,
+    sinks::util::http::HttpClient,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
 use futures01::Stream;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
-use hyper::{client::connect::HttpConnector, Body, Client};
+use hyper::Body;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::RandomState, HashSet};
 use std::time::{Duration, Instant};
@@ -27,6 +28,9 @@ lazy_static::lazy_static! {
 
     static ref INSTANCE_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/instance-id");
     static ref INSTANCE_ID_KEY: Atom = Atom::from("instance-id");
+
+    static ref INSTANCE_TYPE: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/instance-type");
+    static ref INSTANCE_TYPE_KEY: Atom = Atom::from("instance-type");
 
     static ref LOCAL_HOSTNAME: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/local-hostname");
     static ref LOCAL_HOSTNAME_KEY: Atom = Atom::from("local-hostname");
@@ -60,6 +64,7 @@ lazy_static::lazy_static! {
         AMI_ID_KEY.clone(),
         AVAILABILITY_ZONE_KEY.clone(),
         INSTANCE_ID_KEY.clone(),
+        INSTANCE_TYPE_KEY.clone(),
         LOCAL_HOSTNAME_KEY.clone(),
         LOCAL_IPV4_KEY.clone(),
         PUBLIC_HOSTNAME_KEY.clone(),
@@ -92,6 +97,7 @@ struct Keys {
     ami_id_key: Atom,
     availability_zone_key: Atom,
     instance_id_key: Atom,
+    instance_type_key: Atom,
     local_hostname_key: Atom,
     local_ipv4_key: Atom,
     public_hostname_key: Atom,
@@ -111,7 +117,18 @@ impl TransformConfig for Ec2Metadata {
     fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let (read, write) = evmap::new();
 
-        let keys = Keys::new(&self.namespace);
+        // Check if the namespace is set to `""` which should mean that we do
+        // not want a prefixed namespace.
+        let namespace = self.namespace.clone().and_then(|namespace| {
+            if namespace == "" {
+                None
+            } else {
+                Some(namespace)
+            }
+        });
+
+        let keys = Keys::new(&namespace);
+
         let host = self
             .host
             .clone()
@@ -128,9 +145,12 @@ impl TransformConfig for Ec2Metadata {
             .map(|v| v.into_iter().map(Atom::from).collect())
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
+        let http_client = HttpClient::new(cx.resolver(), None)?;
+
         cx.executor().spawn_std(
             async move {
-                let mut client = MetadataClient::new(host, keys, write, refresh_interval, fields);
+                let mut client =
+                    MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
 
                 client.run().await;
             }
@@ -169,7 +189,7 @@ impl Transform for Ec2MetadataTransform {
 }
 
 struct MetadataClient {
-    client: Client<HttpConnector, Body>,
+    client: HttpClient<Body>,
     host: Uri,
     token: Option<(Bytes, Instant)>,
     keys: Keys,
@@ -193,6 +213,7 @@ struct IdentityDocument {
 
 impl MetadataClient {
     pub fn new(
+        client: HttpClient<Body>,
         host: Uri,
         keys: Keys,
         state: WriteHandle,
@@ -200,7 +221,7 @@ impl MetadataClient {
         fields: Vec<Atom>,
     ) -> Self {
         Self {
-            client: Client::new(),
+            client,
             host,
             token: None,
             keys,
@@ -247,7 +268,7 @@ impl MetadataClient {
             .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
             .body(Body::empty())?;
 
-        let res = self.client.request(req).compat().await?;
+        let res = self.client.send(req).await?;
 
         if res.status() != StatusCode::OK {
             return Err(Ec2MetadataError::UnableToFetchToken.into());
@@ -273,7 +294,7 @@ impl MetadataClient {
             .header(TOKEN_HEADER.clone(), token)
             .body(Body::empty())?;
 
-        let res = self.client.request(req).compat().await?;
+        let res = self.client.send(req).await?;
 
         if res.status() != StatusCode::OK {
             warn!(message="Identity document request failed.", status = %res.status());
@@ -305,7 +326,7 @@ impl MetadataClient {
             .header(TOKEN_HEADER.clone(), token)
             .body(Body::empty())?;
 
-        let res = self.client.request(req).compat().await?;
+        let res = self.client.send(req).await?;
 
         if StatusCode::OK != res.status() {
             warn!(message="Metadata request failed.", status = %res.status());
@@ -331,6 +352,13 @@ impl MetadataClient {
                 self.state.update(
                     self.keys.instance_id_key.clone(),
                     document.instance_id.into(),
+                );
+            }
+
+            if self.fields.contains(&INSTANCE_TYPE_KEY) {
+                self.state.update(
+                    self.keys.instance_type_key.clone(),
+                    document.instance_type.into(),
                 );
             }
 
@@ -431,6 +459,7 @@ impl Keys {
                 availability_zone_key: format!("{}.{}", namespace, AVAILABILITY_ZONE_KEY.clone())
                     .into(),
                 instance_id_key: format!("{}.{}", namespace, INSTANCE_ID_KEY.clone()).into(),
+                instance_type_key: format!("{}.{}", namespace, INSTANCE_TYPE_KEY.clone()).into(),
                 local_hostname_key: format!("{}.{}", namespace, LOCAL_HOSTNAME_KEY.clone()).into(),
                 local_ipv4_key: format!("{}.{}", namespace, LOCAL_IPV4_KEY.clone()).into(),
                 public_hostname_key: format!("{}.{}", namespace, PUBLIC_HOSTNAME_KEY.clone())
@@ -446,6 +475,7 @@ impl Keys {
                 ami_id_key: AMI_ID_KEY.clone(),
                 availability_zone_key: AVAILABILITY_ZONE_KEY.clone(),
                 instance_id_key: INSTANCE_ID_KEY.clone(),
+                instance_type_key: INSTANCE_TYPE_KEY.clone(),
                 local_hostname_key: LOCAL_HOSTNAME_KEY.clone(),
                 local_ipv4_key: LOCAL_IPV4_KEY.clone(),
                 public_hostname_key: PUBLIC_HOSTNAME_KEY.clone(),
@@ -466,7 +496,7 @@ enum Ec2MetadataError {
 }
 
 #[cfg(test)]
-#[cfg(feature = "ec2-metadata-integration-tests")]
+#[cfg(feature = "aws-ec2-metadata-integration-tests")]
 mod tests {
     use super::*;
     use crate::{event::Event, test_util::runtime};
@@ -518,6 +548,7 @@ mod tests {
             log.get(&"ami-id".into()),
             Some(&"ami-05f27d4d6770a43d2".into())
         );
+        assert_eq!(log.get(&"instance-type".into()), Some(&"m5a.xlarge".into()));
         assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
         assert_eq!(log.get(&"vpc-id".into()), Some(&"mock-vpc-id".into()));
         assert_eq!(log.get(&"subnet-id".into()), Some(&"mock-subnet-id".into()));
@@ -551,6 +582,7 @@ mod tests {
         assert_eq!(log.get(&"local-ipv4".into()), None);
         assert_eq!(log.get(&"local-hostname".into()), None);
         assert_eq!(log.get(&"instance-id".into()), None,);
+        assert_eq!(log.get(&"instance-type".into()), None,);
         assert_eq!(log.get(&"ami-id".into()), None);
         assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
     }
@@ -584,5 +616,29 @@ mod tests {
             log.get(&"ec2.metadata.public-ipv4".into()),
             Some(&"192.1.1.1".into())
         );
+
+        // Set an empty namespace to ensure we don't prepend one.
+        let config = Ec2Metadata {
+            host: Some(HOST.clone()),
+            namespace: Some("".into()),
+            ..Default::default()
+        };
+        let mut transform = config
+            .build(TransformContext::new_test(rt.executor()))
+            .unwrap();
+
+        // We need to sleep to let the background task fetch the data.
+        std::thread::sleep(std::time::Duration::from_secs(1));
+
+        let event = Event::new_empty_log();
+
+        let event = transform.transform(event).unwrap();
+        let log = event.as_log();
+
+        assert_eq!(
+            log.get(&"availability-zone".into()),
+            Some(&"ww-region-1a".into())
+        );
+        assert_eq!(log.get(&"public-ipv4".into()), Some(&"192.1.1.1".into()));
     }
 }

@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-04-06"
-delivery_guarantee: "best_effort"
+last_modified_on: "2020-05-01"
+delivery_guarantee: "at_least_once"
 component_title: "Blackhole"
 description: "The Vector `blackhole` sink streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes."
 event_types: ["log","metric"]
@@ -43,7 +43,7 @@ data, designed for testing and benchmarking purposes.
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "blackhole" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   print_amount = 1000 # required
 ```
 
@@ -53,7 +53,7 @@ data, designed for testing and benchmarking purposes.
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "blackhole" # required
-  inputs = ["my-source-id"] # required
+  inputs = ["my-source-or-transform-id"] # required
   print_amount = 1000 # required
 ```
 
@@ -81,7 +81,6 @@ data, designed for testing and benchmarking purposes.
 
 The number of events that must be received in order to print a summary of
 activity.
-
 
 
 
