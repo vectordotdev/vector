@@ -1,4 +1,8 @@
-#![cfg(all(feature = "sources", feature = "sinks-console"))]
+#![cfg(all(
+    feature = "sources",
+    feature = "sinks-console",
+    feature = "sinks-prometheus"
+))]
 
 extern crate assert_cmd;
 
@@ -15,24 +19,25 @@ use std::{
     thread::sleep,
     time::{Duration, Instant},
 };
-use vector::test_util::temp_file;
+use vector::test_util::{temp_dir, temp_file};
 
 const STDIO_CONFIG: &'static str = r#"
-[sources.in]
-    type = "stdin"
+    data_dir = "${VECTOR_DATA_DIR}"
 
-[sinks.out]
-    inputs = ["in"]
-    type = "console"
-    encoding = "text"
+    [sources.in]
+        type = "stdin"
+
+    [sinks.out]
+        inputs = ["in"]
+        type = "console"
+        encoding = "text"
 "#;
 
 const ALL_SOURCE_CONFIG: &'static str = r#"
+    data_dir = "${VECTOR_DATA_DIR}"
+
     [sources.in0]
         type = "stdin"
-
-#    [sources.in1]
-#        type = "docker"
 
     [sources.in2]
         type = "file" # required
@@ -47,24 +52,14 @@ const ALL_SOURCE_CONFIG: &'static str = r#"
         type = "http"
         address = "0.0.0.0:7004"
 
-#    [sources.in5]
-#        type = "journald"
-#        include_units = [".dummy.vector.service"]
-
-#    [sources.in6]
-#        type = "kafka"
-#        bootstrap_servers = "localhost:7006"
-#        group_id = "consumer-group-name"
-#        topics = ["topic-1"]
-
     [sources.in7]
         type = "logplex"
         address = "0.0.0.0:7007"
 
-#    [sources.in8]
-#        type = "prometheus"
-#        hosts = ["http://localhost:7008"]
-#
+    [sources.in8]
+        type = "prometheus"
+        hosts = ["http://localhost:7008"]
+
     [sources.in9]
         type = "socket"
         address = "0.0.0.0:7009"
@@ -108,11 +103,35 @@ const ALL_SOURCE_CONFIG: &'static str = r#"
         address = "0.0.0.0:7017"
 
 
-[sinks.out]
-#    inputs = ["in0","in1","in2","in3","in4","in5","in6","in7","in8","in9","in10","in11","in12","in13","in14","in15","in16","in17"]
-    inputs = ["in0","in2","in3","in4","in7","in9","in10","in11","in12","in13","in14","in15","in16","in17"]
-    type = "console"
-    encoding = "text"
+    [sinks.out0]
+        inputs = ["in0","in2","in3","in4","in7","in9","in10","in11","in12","in13","in14","in15","in16","in17"]
+        type = "console"
+        encoding = "text"
+
+    [sinks.out1]
+        type = "prometheus" 
+        inputs = ["in8"]
+        address = "0.0.0.0:7008" 
+        namespace = "service" 
+"#;
+
+#[cfg(feature = "shutdown-tests")]
+const SOURCE_DOCKER_CONFIG: &'static str = r#"
+    data_dir = "${VECTOR_DATA_DIR}"
+
+    [sources.in1]
+        type = "docker"
+
+    [sources.in6]
+        type = "kafka"
+        bootstrap_servers = "localhost:9092"
+        group_id = "consumer-group-name"
+        topics = ["topic-1"]
+  
+    [sinks.out]
+        inputs = ["in1","in6"]
+        type = "console"
+        encoding = "text"
 "#;
 
 /// Creates a file with given content
@@ -131,30 +150,23 @@ fn create_file(config: &str) -> PathBuf {
     path
 }
 
-#[test]
-fn auto_shutdown() {
-    let mut cmd = Command::cargo_bin("vector").unwrap();
-    cmd.arg("-c").arg(create_file(STDIO_CONFIG)).arg("--quiet");
-
-    // Once `stdin source` reads whole buffer it will automatically
-    // shutdown which will also cause vector process to shutdown
-    // because all sources have shutdown.
-    let assert = cmd.with_stdin().buffer("42").assert();
-
-    assert.success().stdout("42\n");
+fn create_directory() -> PathBuf {
+    let path = temp_dir();
+    Command::new("mkdir").arg(path.clone()).assert().success();
+    path
 }
 
-#[test]
-fn timely_shutdown() {
+fn test_timely_shutdown(config: &str) {
     let mut cmd = Command::cargo_bin("vector").unwrap();
     cmd.arg("-c")
-        .arg(create_file(ALL_SOURCE_CONFIG))
+        .arg(create_file(config))
+        .env("VECTOR_DATA_DIR", create_directory())
         .env("SYSLOG_UNIX_PATH", temp_file())
         .env("SOCKET_UNIX_PATH", temp_file());
 
     let mut vector = cmd.spawn().unwrap();
 
-    // Give time vector to start.
+    // Give vector time to start.
     sleep(Duration::from_secs(2));
 
     // Signal shutdown
@@ -167,4 +179,31 @@ fn timely_shutdown() {
     assert!(vector.wait().unwrap().success());
 
     assert!(now.elapsed() < Duration::from_secs(3));
+}
+
+#[test]
+fn auto_shutdown() {
+    let mut cmd = Command::cargo_bin("vector").unwrap();
+    cmd.arg("-c")
+        .arg("--quiet")
+        .arg(create_file(STDIO_CONFIG))
+        .env("VECTOR_DATA_DIR", create_directory());
+
+    // Once `stdin source` reads whole buffer it will automatically
+    // shutdown which will also cause vector process to shutdown
+    // because all sources have shutdown.
+    let assert = cmd.with_stdin().buffer("42").assert();
+
+    assert.success().stdout("42\n");
+}
+
+#[test]
+fn timely_shutdown() {
+    test_timely_shutdown(ALL_SOURCE_CONFIG);
+}
+
+#[cfg(feature = "shutdown-tests")]
+#[test]
+fn timely_docker_shutdown() {
+    test_timely_shutdown(SOURCE_DOCKER_CONFIG);
 }

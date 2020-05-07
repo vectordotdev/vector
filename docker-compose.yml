@@ -528,6 +528,27 @@ services:
     user: $USER
     command: cargo test --all --no-default-features --features default-musl,aws-integration-tests --target x86_64-unknown-linux-musl
 
+  test-shutdown:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+    environment:
+      CARGO_TERM_COLOR: always
+      TEST_LOG: debug
+      RUST_BACKTRACE: full
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - dependencies-kafka
+    network_mode: host
+    working_dir: $PWD
+    user: $USER
+    command: cargo test --all --no-default-features --features default-musl,shutdown-tests --target x86_64-unknown-linux-musl -- --test-threads 4
+
   test-behavior:
     image: ubuntu:18.04
     volumes:

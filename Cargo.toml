@@ -404,6 +404,7 @@ loki-integration-tests = ["sinks-loki"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 
+shutdown-tests = ["sources","sinks-console","sinks-prometheus"]
 disable-resolv-conf = []
 
 [[bench]]
