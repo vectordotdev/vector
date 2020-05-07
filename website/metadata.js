@@ -30,6 +30,15 @@ module.exports = {
         {
           "author_github": "https://github.com/hoverbear",
           "description": null,
+          "id": "/advanced/protobuf",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/protobuf.md",
+          "series_position": null,
+          "title": "Decoding Protobufs using WASM"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
+          "description": null,
           "id": "/advanced/schemas",
           "last_modified_on": null,
           "path": "website/guides/advanced/schemas.md",

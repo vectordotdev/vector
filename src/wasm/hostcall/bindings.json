@@ -1,9 +1,7 @@
 {
   "env": {
       "emit": "emit",
-      "register_transform": "register_transform",
-      "register_sink": "register_sink",
-      "register_source": "register_source"
+      "register": "register"
   },
   "wasi_snapshot_preview1": {
     "args_get": "__wasi_args_get",

@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use vector_wasm::{hostcall, Registration};
 
 #[no_mangle]
-pub extern "C" fn init() -> *mut Registration {
-    &mut Registration::transform().set_wasi(true) as *mut Registration
+pub extern "C" fn init() {
+    Registration::transform().register()
 }
 
 #[no_mangle]

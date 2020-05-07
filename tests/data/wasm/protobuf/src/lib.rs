@@ -9,8 +9,8 @@ pub mod items {
 }
 
 #[no_mangle]
-pub extern "C" fn init() -> *mut Registration {
-    &mut Registration::transform().set_wasi(true) as *mut Registration
+pub extern "C" fn init() {
+    Registration::transform().register()
 }
 
 #[no_mangle]

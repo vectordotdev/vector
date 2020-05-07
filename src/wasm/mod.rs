@@ -19,11 +19,9 @@ use std::{
     path::{Path, PathBuf},
 };
 use tracing::Level;
-use util::GuestPointer;
 use vector_wasm::{Registration, Role};
 
 mod context;
-mod util;
 
 pub mod hostcall; // Pub is required for lucet.
 
@@ -222,25 +220,30 @@ impl WasmModule {
         )?;
 
         // instantiate the module in the memory region
-        let instance = region.new_instance_builder(module).build()?;
+        let instance = region
+            .new_instance_builder(module)
+            .with_embed_ctx::<Option<Registration>>(None)
+            .build()?;
         let mut wasm_module = Self {
             config,
             instance,
             role: Role::Transform,
         };
-        event!(Level::TRACE, "instantiated");
 
-        event!(Level::TRACE, "registering");
-        // This is a pointer into the WASM Heap!
-        let registration_ptr: *mut Registration =
-            wasm_module.instance.run("init", &[])?.returned()?.as_mut();
-        let registration_ptr = GuestPointer::<Registration>::from(registration_ptr);
-        let registration = registration_ptr.deref(wasm_module.instance.heap_mut())?;
-        if registration.wasi() {
-            let wasi_ctx = WasiCtxBuilder::new().inherit_stdio().build()?;
-            wasm_module.instance.insert_embed_ctx(wasi_ctx);
+        let wasi_ctx = WasiCtxBuilder::new().inherit_stdio().build()?;
+        wasm_module.instance.insert_embed_ctx(wasi_ctx);
+
+        wasm_module.instance.run("init", &[])?.returned()?;
+        let registration = wasm_module
+            .instance
+            .get_embed_ctx::<Option<Registration>>()
+            .unwrap()
+            .unwrap()
+            .clone();
+
+        if let None = registration {
+            error!("Unable to find registration");
         }
-        event!(Level::TRACE, "registered");
 
         Ok(wasm_module)
     }

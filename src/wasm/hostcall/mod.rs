@@ -9,11 +9,27 @@ use super::context::EventBuffer;
 use crate::{internal_events, Event};
 use lucet_runtime::{lucet_hostcall, vmctx::Vmctx};
 use std::sync::Once;
-use vector_wasm::Role;
+use vector_wasm::{Registration, Role};
 
 #[lucet_hostcall]
 #[no_mangle]
-pub extern "C" fn emit(vmctx: &mut Vmctx, data: *mut u8, length: usize) -> usize {
+pub extern "C" fn register(vmctx: &mut Vmctx, data: u64, length: u64) -> usize {
+    let internal_event = internal_events::Hostcall::begin(Role::Transform, "register");
+
+    let heap = vmctx.heap_mut();
+    let slice = &heap[data as usize..(length as usize + data as usize)];
+    let value: Registration = serde_json::from_slice(slice).unwrap();
+
+    let mut maybe_registration = vmctx.get_embed_ctx_mut::<Option<Registration>>();
+    *maybe_registration = Some(value);
+
+    internal_event.complete();
+    0
+}
+
+#[lucet_hostcall]
+#[no_mangle]
+pub extern "C" fn emit(vmctx: &mut Vmctx, data: u64, length: u64) -> usize {
     let internal_event = internal_events::Hostcall::begin(Role::Transform, "emit");
 
     let mut event_buffer = vmctx.get_embed_ctx_mut::<EventBuffer>();
