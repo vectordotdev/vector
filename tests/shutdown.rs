@@ -1,8 +1,5 @@
-#![cfg(all(
-    feature = "sources",
-    feature = "sinks-console",
-    feature = "sinks-prometheus"
-))]
+// #![cfg(all(feature = "shutdown-tests"))]
+#![cfg(all(feature = "sources", feature = "sinks-console"))]
 
 extern crate assert_cmd;
 
@@ -19,7 +16,7 @@ use std::{
     thread::sleep,
     time::{Duration, Instant},
 };
-use vector::test_util::{temp_dir, temp_file};
+use vector::test_util::{next_addr, temp_dir, temp_file};
 
 const STDIO_CONFIG: &'static str = r#"
     data_dir = "${VECTOR_DATA_DIR}"
@@ -33,105 +30,18 @@ const STDIO_CONFIG: &'static str = r#"
         encoding = "text"
 "#;
 
-const ALL_SOURCE_CONFIG: &'static str = r#"
+const PROMETHEUS_CONFIG: &'static str = r#"
     data_dir = "${VECTOR_DATA_DIR}"
 
-    [sources.in0]
-        type = "stdin"
-
-    [sources.in2]
-        type = "file" # required
-        include = ["./*.log_dummy"]
-        
-    [sources.in3]
-        type = "generator"
-        batch_interval = 1.0 # optional, no default
-        lines = []
-
-    [sources.in4]
-        type = "http"
-        address = "0.0.0.0:7004"
-
-    [sources.in7]
-        type = "logplex"
-        address = "0.0.0.0:7007"
-
-    [sources.in8]
+    [sources.in]
         type = "prometheus"
-        hosts = ["http://localhost:7008"]
+        hosts = ["http://${VECTOR_TEST_ADDRESS}"]
 
-    [sources.in9]
-        type = "socket"
-        address = "0.0.0.0:7009"
-        mode = "tcp"
-
-    [sources.in10]
-        type = "socket"
-        address = "0.0.0.0:7010"
-        mode = "udp"
-
-    [sources.in11]
-        type = "socket"
-        path = "${SOCKET_UNIX_PATH}"
-        mode = "unix"
-
-    [sources.in12]
-        type = "splunk_hec"
-        address = "0.0.0.0:7012"
-
-    [sources.in13]
-        type = "statsd"
-        address = "127.0.0.1:7013"
-
-    [sources.in14]
-        type = "syslog"
-        address = "0.0.0.0:7014"
-        mode = "tcp"
-
-    [sources.in15]
-        type = "syslog"
-        address = "0.0.0.0:7015"
-        mode = "udp"
-
-    [sources.in16]
-        type = "syslog"
-        mode = "unix"
-        path = "${SYSLOG_UNIX_PATH}"
-
-    [sources.in17]
-        type = "vector"
-        address = "0.0.0.0:7017"
-
-
-    [sinks.out0]
-        inputs = ["in0","in2","in3","in4","in7","in9","in10","in11","in12","in13","in14","in15","in16","in17"]
-        type = "console"
-        encoding = "text"
-
-    [sinks.out1]
-        type = "prometheus" 
-        inputs = ["in8"]
-        address = "0.0.0.0:7008" 
-        namespace = "service" 
-"#;
-
-#[cfg(feature = "shutdown-tests")]
-const SOURCE_DOCKER_CONFIG: &'static str = r#"
-    data_dir = "${VECTOR_DATA_DIR}"
-
-    [sources.in1]
-        type = "docker"
-
-    [sources.in6]
-        type = "kafka"
-        bootstrap_servers = "localhost:9092"
-        group_id = "consumer-group-name"
-        topics = ["topic-1"]
-  
     [sinks.out]
-        inputs = ["in1","in6"]
-        type = "console"
-        encoding = "text"
+        type = "prometheus" 
+        inputs = ["in"]
+        address = "${VECTOR_TEST_ADDRESS}" 
+        namespace = "service" 
 "#;
 
 /// Creates a file with given content
@@ -156,14 +66,38 @@ fn create_directory() -> PathBuf {
     path
 }
 
-fn test_timely_shutdown(config: &str) {
+fn source_vector(source: &str) -> Command {
+    let config = format!(
+        r#"
+data_dir = "${{VECTOR_DATA_DIR}}"
+
+[sources.in]
+{}
+
+[sinks.out]
+    inputs = ["in"]
+    type = "blackhole"
+    print_amount = 10000 
+"#,
+        source
+    );
+
+    run_vector(config.as_str())
+}
+
+fn run_vector(config: &str) -> Command {
     let mut cmd = Command::cargo_bin("vector").unwrap();
     cmd.arg("-c")
         .arg(create_file(config))
+        .arg("--quiet")
         .env("VECTOR_DATA_DIR", create_directory())
-        .env("SYSLOG_UNIX_PATH", temp_file())
-        .env("SOCKET_UNIX_PATH", temp_file());
+        .env("VECTOR_TEST_UNIX_PATH", temp_file())
+        .env("VECTOR_TEST_ADDRESS", format!("{}", next_addr()));
 
+    cmd
+}
+
+fn test_timely_shutdown(mut cmd: Command) {
     let mut vector = cmd.spawn().unwrap();
 
     // Give vector time to start.
@@ -184,8 +118,8 @@ fn test_timely_shutdown(config: &str) {
 #[test]
 fn auto_shutdown() {
     let mut cmd = Command::cargo_bin("vector").unwrap();
-    cmd.arg("-c")
-        .arg("--quiet")
+    cmd.arg("--quiet")
+        .arg("-c")
         .arg(create_file(STDIO_CONFIG))
         .env("VECTOR_DATA_DIR", create_directory());
 
@@ -198,12 +132,160 @@ fn auto_shutdown() {
 }
 
 #[test]
-fn timely_shutdown() {
-    test_timely_shutdown(ALL_SOURCE_CONFIG);
+fn timely_shutdown_stdin() {
+    test_timely_shutdown(source_vector(r#"type = "stdin""#));
 }
 
-#[cfg(feature = "shutdown-tests")]
 #[test]
-fn timely_docker_shutdown() {
-    test_timely_shutdown(SOURCE_DOCKER_CONFIG);
+fn timely_shutdown_file() {
+    test_timely_shutdown(source_vector(
+        r#"
+    type = "file"
+    include = ["./*.log_dummy"]"#,
+    ));
+}
+
+#[test]
+fn timely_shutdown_generator() {
+    test_timely_shutdown(source_vector(
+        r#"
+    type = "generator"
+    batch_interval = 1.0 # optional, no default
+    lines = []"#,
+    ));
+}
+
+#[test]
+fn timely_shutdown_http() {
+    test_timely_shutdown(source_vector(
+        r#"
+    type = "http"
+    address = "${VECTOR_TEST_ADDRESS}""#,
+    ));
+}
+
+#[test]
+fn timely_shutdown_logplex() {
+    test_timely_shutdown(source_vector(
+        r#"
+    type = "logplex"
+    address = "${VECTOR_TEST_ADDRESS}""#,
+    ));
+}
+
+// #[test]
+// fn timely_shutdown_docker() {
+//     test_timely_shutdown(source_vector(r#"type = "docker""#));
+// }
+
+#[test]
+fn timely_shutdown_journald() {
+    test_timely_shutdown(source_vector(
+        r#"
+    type = "journald"
+    include_units = [".dummy.vector.service"]"#,
+    ));
+}
+
+#[test]
+fn timely_shutdown_prometheus() {
+    test_timely_shutdown(run_vector(PROMETHEUS_CONFIG));
+}
+
+// #[test]
+// fn timely_shutdown_kafka() {
+//     test_timely_shutdown(source_vector(
+//         r#"
+//         type = "kafka"
+//         bootstrap_servers = "localhost:9092"
+//         group_id = "consumer-group-name"
+//         topics = ["topic-1"]"#,
+//     ));
+// }
+
+#[test]
+fn timely_shutdown_socket_tcp() {
+    test_timely_shutdown(source_vector(
+        r#"
+        type = "socket"
+        address = "${VECTOR_TEST_ADDRESS}"
+        mode = "tcp""#,
+    ));
+}
+
+#[test]
+fn timely_shutdown_socket_udp() {
+    test_timely_shutdown(source_vector(
+        r#"
+        type = "socket"
+        address = "${VECTOR_TEST_ADDRESS}"
+        mode = "udp""#,
+    ));
+}
+
+#[test]
+fn timely_shutdown_socket_unix() {
+    test_timely_shutdown(source_vector(
+        r#"
+        type = "socket"
+        path = "${VECTOR_TEST_UNIX_PATH}"
+        mode = "unix""#,
+    ));
+}
+
+#[test]
+fn timely_shutdown_splunk_hec() {
+    test_timely_shutdown(source_vector(
+        r#"
+    type = "splunk_hec"
+    address = "${VECTOR_TEST_ADDRESS}""#,
+    ));
+}
+
+#[test]
+fn timely_shutdown_statsd() {
+    test_timely_shutdown(source_vector(
+        r#"
+    type = "statsd"
+    address = "${VECTOR_TEST_ADDRESS}""#,
+    ));
+}
+
+#[test]
+fn timely_shutdown_syslog_tcp() {
+    test_timely_shutdown(source_vector(
+        r#"
+        type = "syslog"
+        address = "${VECTOR_TEST_ADDRESS}"
+        mode = "tcp""#,
+    ));
+}
+
+#[test]
+fn timely_shutdown_syslog_udp() {
+    test_timely_shutdown(source_vector(
+        r#"
+        type = "syslog"
+        address = "${VECTOR_TEST_ADDRESS}"
+        mode = "udp""#,
+    ));
+}
+
+#[test]
+fn timely_shutdown_syslog_unix() {
+    test_timely_shutdown(source_vector(
+        r#"
+        type = "syslog"
+        path = "${VECTOR_TEST_UNIX_PATH}"
+        mode = "unix""#,
+    ));
+}
+
+#[test]
+fn timely_shutdown_vector() {
+    test_timely_shutdown(source_vector(
+        r#"
+    type = "vector"
+    address = "${VECTOR_TEST_ADDRESS}""#,
+    ));
 }
