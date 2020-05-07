@@ -2,16 +2,21 @@ use crate::{
     event,
     event::{Event, LogEvent, Value},
     shutdown::ShutdownSignal,
+    stream::StreamExt,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use chrono::TimeZone;
 use futures::{
     compat::Future01CompatExt,
     executor::block_on,
-    future::{select, Either, FutureExt, TryFutureExt},
+    future::{select, Either},
 };
-use futures01::{future, sync::mpsc, Future, Sink};
+use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use lazy_static::lazy_static;
+use nix::{
+    sys::signal::{kill, Signal},
+    unistd::Pid,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
@@ -136,10 +141,6 @@ impl JournaldConfig {
     where
         J: JournalSource + Send + 'static,
     {
-        let out = out
-            .sink_map_err(|_| ())
-            .with(|record: Record| future::ok(create_event(record)));
-
         // Retrieve the saved checkpoint, and use it to seek forward in the journald log
         let cursor = match checkpointer.get() {
             Ok(cursor) => cursor,
@@ -152,28 +153,47 @@ impl JournaldConfig {
             }
         };
 
-        let journal = J::new(self, cursor)?;
+        let (journal, pid) = J::new(self, cursor)?;
 
         Ok(Box::new(future::lazy(move || {
             info!(message = "Starting journald server.",);
+            let (tx, rx) = mpsc::channel(1000);
 
             let journald_server = JournaldServer {
                 journal,
                 include_units,
                 exclude_units,
-                channel: out,
-                shutdown,
+                channel: tx.sink_map_err(|_| ()),
+                shutdown: shutdown.clone(),
                 checkpointer,
                 batch_size,
             };
             let span = info_span!("journald-server");
             let dispatcher = dispatcher::get_default(|d| d.clone());
-            spawn_blocking(move || {
-                dispatcher::with_default(&dispatcher, || span.in_scope(|| journald_server.run()))
-            })
-            .boxed()
-            .compat()
-            .map_err(|error| error!(message="Journald server unexpectedly stopped.",%error))
+            let _ = spawn_blocking(move || {
+                dispatcher::with_default(&dispatcher, || {
+                    span.in_scope(|| {
+                        journald_server.run();
+                        debug!("Stopped");
+                    })
+                })
+            });
+
+            rx.take_until(shutdown)
+                .map(|record: Record| create_event(record))
+                .forward(
+                    out.sink_map_err(
+                        |error| error!(message = "Unable to send event to out.", %error),
+                    ),
+                )
+                .map(move |_| {
+                    if let Some(pid) = pid {
+                        // Signal the child process to terminate so that the
+                        // blocking future can be unblocked earlier rather
+                        // than later.
+                        let _ = kill(pid, Signal::SIGTERM);
+                    }
+                })
         })))
     }
 }
@@ -225,7 +245,7 @@ fn fixup_unit(unit: &String) -> String {
 /// trait functions is an addition to the standard iteration methods for
 /// initializing the source.
 trait JournalSource: Iterator<Item = Result<String, io::Error>> + Sized {
-    fn new(config: &JournaldConfig, cursor: Option<String>) -> crate::Result<Self>;
+    fn new(config: &JournaldConfig, cursor: Option<String>) -> crate::Result<(Self, Option<Pid>)>;
 }
 
 struct Journalctl {
@@ -235,7 +255,7 @@ struct Journalctl {
 }
 
 impl JournalSource for Journalctl {
-    fn new(config: &JournaldConfig, cursor: Option<String>) -> crate::Result<Self> {
+    fn new(config: &JournaldConfig, cursor: Option<String>) -> crate::Result<(Self, Option<Pid>)> {
         let journalctl = config.journalctl_path.as_ref().unwrap_or(&JOURNALCTL);
         let mut command = Command::new(journalctl);
         command.stdout(Stdio::piped());
@@ -260,7 +280,8 @@ impl JournalSource for Journalctl {
         let stdout = child.stdout.take().unwrap();
         let stdout = BufReader::new(stdout);
 
-        Ok(Journalctl { child, stdout })
+        let pid = Pid::from_raw(child.id() as i32);
+        Ok((Journalctl { child, stdout }, Some(pid)))
     }
 }
 
@@ -337,7 +358,8 @@ where
 
                 match channel.send(record).wait() {
                     Ok(_) => {}
-                    Err(()) => error!(message = "Could not send journald log"),
+                    // Channel closed, so source is in process of a shutdown.
+                    Err(()) => return,
                 }
             }
 
@@ -532,7 +554,10 @@ mod tests {
     }
 
     impl JournalSource for FakeJournal {
-        fn new(_: &JournaldConfig, checkpoint: Option<String>) -> crate::Result<Self> {
+        fn new(
+            _: &JournaldConfig,
+            checkpoint: Option<String>,
+        ) -> crate::Result<(Self, Option<Pid>)> {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
             let mut journal = FakeJournal { reader };
@@ -545,7 +570,7 @@ mod tests {
                 }
             }
 
-            Ok(journal)
+            Ok((journal, None))
         }
     }
 
