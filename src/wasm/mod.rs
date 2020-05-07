@@ -297,6 +297,7 @@ fn protobuf() -> Result<()> {
     use std::io::{Read, Write};
     use string_cache::DefaultAtom as Atom;
     crate::test_util::trace_init();
+    use serde_json::json;
 
     // Load in fixtures.
     let mut test_file = fs::File::open("tests/data/wasm/protobuf/demo.pb")?;
@@ -320,12 +321,17 @@ fn protobuf() -> Result<()> {
 
     let retval = out.into_iter().next().unwrap();
     assert_eq!(
-        retval
-            .as_log()
-            .get(&Atom::from("processed"))
-            .unwrap()
-            .to_string_lossy(),
-        "{\"people\":[{\"name\":\"Foo\",\"id\":1,\"email\":\"foo@test.com\",\"phones\":[]}]}"
+        serde_json::to_value(retval.as_log().get(&Atom::from("processed")).unwrap()).unwrap(),
+        json!({
+            "people": [
+                {
+                    "name": "Foo",
+                    "id": 1,
+                    "email": "foo@test.com",
+                    "phones": [],
+                }
+            ],
+        }),
     );
 
     Ok(())

@@ -92,6 +92,7 @@ mod tests {
 
     #[test]
     fn poc() -> crate::Result<()> {
+        use serde_json::json;
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/protobuf/protobuf.wat"
@@ -103,7 +104,16 @@ mod tests {
         let mut expected = input.clone();
         expected.as_mut_log().insert(
             "processed",
-            "{\"people\":[{\"name\":\"Foo\",\"id\":1,\"email\":\"foo@test.com\",\"phones\":[]}]}",
+            json!({
+                "people": [
+                    {
+                        "name": "Foo",
+                        "id": 1,
+                        "email": "foo@test.com",
+                        "phones": [],
+                    }
+                ]
+            }),
         );
 
         let new_event = transform.transform(input);

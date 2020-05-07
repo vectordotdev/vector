@@ -3334,6 +3334,7 @@ dependencies = [
  "prost-build 0.6.1",
  "serde",
  "serde_json",
+ "tracing",
  "vector-wasm",
 ]
 
