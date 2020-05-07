@@ -105,19 +105,16 @@ impl HttpSink for InfluxDBLogsConfig {
             _ => None,
         });
 
-        // Tags
-        let tags: BTreeMap<String, String> = event
-            .all_fields()
-            .filter(|(key, _)| self.tags.contains(key))
-            .map(|(key, value)| (key, value.to_string_lossy()))
-            .collect();
-
-        // Fields
-        let fields: HashMap<String, Field> = event
-            .all_fields()
-            .filter(|(key, _)| !self.tags.contains(key))
-            .map(|(key, value)| (key, value.to_field()))
-            .collect();
+        // Tags + Fields
+        let mut tags: BTreeMap<String, String> = BTreeMap::new();
+        let mut fields: HashMap<String, Field> = HashMap::new();
+        event.all_fields().for_each(|(key, value)| {
+            if self.tags.contains(&key) {
+                tags.insert(key, value.to_string_lossy());
+            } else {
+                fields.insert(key, value.to_field());
+            }
+        });
 
         influx_line_protocol(
             measurement,
