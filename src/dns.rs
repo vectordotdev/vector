@@ -62,9 +62,9 @@ impl Resolver {
             }
 
             let mut opts = ResolverOpts::default();
-            opts.attempts = 2;
-            opts.validate = false;
-            opts.ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
+            // opts.attempts = 2;
+            // opts.validate = false;
+            // opts.ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
 
             (config, opts)
         } else {
