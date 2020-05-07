@@ -2,7 +2,7 @@ use crate::{
     event::{self, Event},
     internal_events::FileEventReceived,
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    topology::config::{DataType, SourceConfig, SourceContext, SourceDescription},
     trace::{current_span, Instrument},
 };
 use bytes::Bytes;
@@ -188,13 +188,14 @@ inventory::submit! {
 
 #[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
-    fn build(
-        &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext {
+            name,
+            globals,
+            shutdown,
+            out,
+            ..
+        } = cx;
         // add the source name as a subdir, so that multiple sources can
         // operate within the same given data_dir (e.g. the global one)
         // without the file servers' checkpointers interfering with each

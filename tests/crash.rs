@@ -1,16 +1,15 @@
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
-use futures01::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
+use futures01::{future, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use vector::{
-    shutdown::ShutdownSignal,
     test_util::{
         block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
         wait_for_tcp,
     },
     topology::{
         self,
-        config::{self, GlobalOptions, SinkContext},
+        config::{self, SinkContext, SourceContext},
     },
     Event, {sinks, sources},
 };
@@ -183,13 +182,7 @@ struct ErrorSourceConfig;
 
 #[typetag::serde(name = "tcp")]
 impl config::SourceConfig for ErrorSourceConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: mpsc::Sender<Event>,
-    ) -> Result<sources::Source, vector::Error> {
+    fn build(&self, _cx: SourceContext) -> Result<sources::Source, vector::Error> {
         Ok(Box::new(future::err(())))
     }
 
@@ -251,13 +244,7 @@ struct PanicSourceConfig;
 
 #[typetag::serde(name = "tcp")]
 impl config::SourceConfig for PanicSourceConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: mpsc::Sender<Event>,
-    ) -> Result<sources::Source, vector::Error> {
+    fn build(&self, _cx: SourceContext) -> Result<sources::Source, vector::Error> {
         Ok(Box::new(future::lazy::<_, future::FutureResult<(), ()>>(
             || panic!(),
         )))

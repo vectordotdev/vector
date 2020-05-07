@@ -17,12 +17,11 @@ use std::sync::{
 };
 use tracing::{error, info};
 use vector::event::{self, metric::MetricValue, Event, Value};
-use vector::shutdown::ShutdownSignal;
 use vector::sinks::{util::StreamSink, Healthcheck, RouterSink};
 use vector::sources::Source;
 use vector::stream::StreamExt;
 use vector::topology::config::{
-    DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
+    DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
     TransformContext,
 };
 use vector::transforms::Transform;
@@ -99,13 +98,8 @@ impl MockSourceConfig {
 
 #[typetag::serde(name = "mock")]
 impl SourceConfig for MockSourceConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Sender<Event>,
-    ) -> Result<Source, vector::Error> {
+    fn build(&self, cx: SourceContext) -> Result<Source, vector::Error> {
+        let SourceContext { shutdown, out, .. } = cx;
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();
         let source = future::lazy(move || {

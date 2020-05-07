@@ -2,13 +2,11 @@ use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::proto,
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
-    shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    topology::config::{DataType, SourceConfig, SourceContext, SourceDescription},
     Event,
 };
 use bytes::{Bytes, BytesMut};
-use futures01::sync::mpsc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use tokio01::codec::LengthDelimitedCodec;
@@ -43,13 +41,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext { shutdown, out, .. } = cx;
         let vector = VectorSource;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         vector.run(self.address, self.shutdown_timeout_secs, tls, shutdown, out)
@@ -102,7 +95,7 @@ mod test {
         sinks::vector::VectorSinkConfig,
         test_util::{next_addr, wait_for_tcp, CollectCurrent},
         tls::{TlsConfig, TlsOptions},
-        topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
+        topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext},
         Event,
     };
     use futures01::{stream, sync::mpsc, Future, Sink};
@@ -112,12 +105,12 @@ mod test {
         let (tx, rx) = mpsc::channel(100);
 
         let server = source
-            .build(
+            .build(SourceContext::new_test(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 tx,
-            )
+            ))
             .unwrap();
         let mut rt = crate::runtime::Runtime::new().unwrap();
         rt.spawn(server);

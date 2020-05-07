@@ -2,7 +2,7 @@ use crate::{
     event,
     event::{Event, LogEvent, Value},
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    topology::config::{DataType, SourceConfig, SourceContext, SourceDescription},
 };
 use chrono::TimeZone;
 use futures::{
@@ -71,13 +71,15 @@ type Record = HashMap<Atom, String>;
 
 #[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
-    fn build(
-        &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext {
+            name,
+            globals,
+            shutdown,
+            out,
+            ..
+        } = cx;
+
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
 

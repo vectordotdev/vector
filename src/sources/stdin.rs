@@ -2,7 +2,7 @@ use crate::{
     event::{self, Event},
     shutdown::ShutdownSignal,
     stream::StreamExt,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    topology::config::{DataType, SourceConfig, SourceContext, SourceDescription},
 };
 use bytes::Bytes;
 use futures::compat::Compat;
@@ -50,13 +50,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext { shutdown, out, .. } = cx;
         stdin_source(io::BufReader::new(io::stdin()), self.clone(), shutdown, out)
     }
 

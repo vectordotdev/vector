@@ -7,7 +7,7 @@ use crate::{
     shutdown::ShutdownSignal,
     stream::StreamExt,
     tls::{MaybeTlsSettings, TlsConfig},
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    topology::config::{DataType, SourceConfig, SourceContext, SourceDescription},
 };
 use bytes::Bytes;
 use chrono::{Datelike, Utc};
@@ -72,13 +72,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "syslog")]
 impl SourceConfig for SyslogConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext { shutdown, out, .. } = cx;
         let host_key = self
             .host_key
             .clone()

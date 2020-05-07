@@ -1,7 +1,7 @@
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    topology::config::{DataType, SourceConfig, SourceContext, SourceDescription},
     Event,
 };
 use chrono::Utc;
@@ -26,13 +26,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext { shutdown, out, .. } = cx;
         let fut = run(get_controller()?, out, shutdown).boxed().compat();
         Ok(Box::new(fut))
     }

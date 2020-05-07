@@ -127,17 +127,35 @@ pub enum DataType {
 
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug {
-    fn build(
-        &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<sources::Source>;
+    fn build(&self, cx: SourceContext) -> crate::Result<sources::Source>;
 
     fn output_type(&self) -> DataType;
 
     fn source_type(&self) -> &'static str;
+}
+
+#[derive(Debug, Clone)]
+pub struct SourceContext<'a> {
+    pub name: &'a str,
+    pub globals: &'a GlobalOptions,
+    pub shutdown: ShutdownSignal,
+    pub out: mpsc::Sender<Event>,
+}
+
+impl<'a> SourceContext<'a> {
+    pub fn new_test(
+        name: &'a str,
+        globals: &'a GlobalOptions,
+        shutdown: ShutdownSignal,
+        out: mpsc::Sender<Event>,
+    ) -> Self {
+        Self {
+            name,
+            globals,
+            shutdown,
+            out,
+        }
+    }
 }
 
 pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;

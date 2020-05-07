@@ -5,12 +5,10 @@ mod unix;
 
 use super::util::TcpSource;
 use crate::{
-    event::{self, Event},
-    shutdown::ShutdownSignal,
+    event,
     tls::MaybeTlsSettings,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    topology::config::{DataType, SourceConfig, SourceContext, SourceDescription},
 };
-use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -68,13 +66,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "socket")]
 impl SourceConfig for SocketConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext { shutdown, out, .. } = cx;
         match self.mode.clone() {
             Mode::Tcp(config) => {
                 let tcp = tcp::RawTcpSource {
@@ -136,7 +129,7 @@ mod test {
         block_on, collect_n, next_addr, send_lines, send_lines_tls, wait_for_tcp, CollectN,
     };
     use crate::tls::{TlsConfig, TlsOptions};
-    use crate::topology::config::{GlobalOptions, SourceConfig};
+    use crate::topology::config::{GlobalOptions, SourceConfig, SourceContext};
     #[cfg(unix)]
     use futures01::Sink;
     use futures01::{
@@ -162,12 +155,12 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
-            .build(
+            .build(SourceContext::new_test(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 tx,
-            )
+            ))
             .unwrap();
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
@@ -190,12 +183,12 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
-            .build(
+            .build(SourceContext::new_test(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 tx,
-            )
+            ))
             .unwrap();
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
@@ -221,12 +214,12 @@ mod test {
         config.max_length = 10;
 
         let server = SocketConfig::from(config)
-            .build(
+            .build(SourceContext::new_test(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 tx,
-            )
+            ))
             .unwrap();
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
@@ -271,12 +264,12 @@ mod test {
         });
 
         let server = SocketConfig::from(config)
-            .build(
+            .build(SourceContext::new_test(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 tx,
-            )
+            ))
             .unwrap();
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
@@ -315,7 +308,12 @@ mod test {
 
         // Start TCP Source
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
-            .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
+            .build(SourceContext::new_test(
+                source_name,
+                &GlobalOptions::default(),
+                shutdown_signal,
+                tx,
+            ))
             .unwrap();
         let mut rt = runtime::Runtime::new().unwrap();
         let source_handle = oneshot::spawn(server, &rt.executor());
@@ -356,7 +354,12 @@ mod test {
 
         // Start TCP Source
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
-            .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
+            .build(SourceContext::new_test(
+                source_name,
+                &GlobalOptions::default(),
+                shutdown_signal,
+                tx,
+            ))
             .unwrap();
         let mut rt = runtime::Runtime::new().unwrap();
         let source_handle = oneshot::spawn(server, &rt.executor());
@@ -449,12 +452,12 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(UdpConfig::new(addr))
-            .build(
+            .build(SourceContext::new_test(
                 source_name,
                 &GlobalOptions::default(),
                 shutdown_signal,
                 sender,
-            )
+            ))
             .unwrap();
         let rt = runtime::Runtime::new().unwrap();
         let source_handle = oneshot::spawn(server, &rt.executor());
@@ -624,12 +627,12 @@ mod test {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
 
         let server = SocketConfig::from(UnixConfig::new(in_path.clone()))
-            .build(
+            .build(SourceContext::new_test(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,
-            )
+            ))
             .unwrap();
 
         let mut rt = runtime::Runtime::new().unwrap();

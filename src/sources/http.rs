@@ -1,14 +1,12 @@
 use crate::{
     event::{self, Event},
-    shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource},
     tls::TlsConfig,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    topology::config::{DataType, SourceConfig, SourceContext, SourceDescription},
 };
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
 use codec::{self, BytesDelimitedCodec};
-use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::net::SocketAddr;
@@ -67,13 +65,8 @@ impl HttpSource for SimpleHttpSource {
 
 #[typetag::serde(name = "http")]
 impl SourceConfig for SimpleHttpConfig {
-    fn build(
-        &self,
-        _: &str,
-        _: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext { shutdown, out, .. } = cx;
         let source = SimpleHttpSource {
             encoding: self.encoding,
             headers: self.headers.clone(),
@@ -209,7 +202,7 @@ mod tests {
         event::{self, Event},
         runtime::Runtime,
         test_util::{self, collect_n},
-        topology::config::{GlobalOptions, SourceConfig},
+        topology::config::{GlobalOptions, SourceConfig, SourceContext},
     };
     use futures01::sync::mpsc;
     use http::Method;
@@ -232,12 +225,12 @@ mod tests {
                 headers,
                 tls: None,
             }
-            .build(
+            .build(SourceContext::new_test(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,
-            )
+            ))
             .unwrap(),
         );
         (recv, address)

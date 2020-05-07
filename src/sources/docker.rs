@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     shutdown::ShutdownSignal,
     stream::StreamExt,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    topology::config::{DataType, SourceConfig, SourceContext, SourceDescription},
 };
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, FixedOffset, Utc};
@@ -102,13 +102,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "docker")]
 impl SourceConfig for DockerConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext { shutdown, out, .. } = cx;
         DockerSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
             out,
@@ -946,6 +941,7 @@ mod tests {
     use super::*;
     use crate::runtime;
     use crate::test_util::{self, collect_n, trace_init};
+    use crate::topology::config::{GlobalOptions, SourceContext};
     use futures01::future;
 
     static BUXYBOX_IMAGE_TAG: &'static str = "latest";
@@ -1008,12 +1004,12 @@ mod tests {
         let (sender, recv) = mpsc::channel(100);
         rt.spawn(
             config
-                .build(
+                .build(SourceContext::new_test(
                     "default",
                     &GlobalOptions::default(),
                     ShutdownSignal::noop(),
                     sender,
-                )
+                ))
                 .unwrap(),
         );
         recv

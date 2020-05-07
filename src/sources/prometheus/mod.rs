@@ -2,7 +2,7 @@ use crate::{
     internal_events::{PrometheusHttpError, PrometheusParseError, PrometheusRequestCompleted},
     shutdown::ShutdownSignal,
     stream::StreamExt,
-    topology::config::GlobalOptions,
+    topology::config::SourceContext,
     Event,
 };
 use futures01::{sync::mpsc, Future, Sink, Stream};
@@ -28,13 +28,8 @@ pub fn default_scrape_interval_secs() -> u64 {
 
 #[typetag::serde(name = "prometheus")]
 impl crate::topology::config::SourceConfig for PrometheusConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext { shutdown, out, .. } = cx;
         let mut urls = Vec::new();
         for host in self.hosts.iter() {
             let base_uri = host.parse::<Uri>().context(super::UriParseError)?;

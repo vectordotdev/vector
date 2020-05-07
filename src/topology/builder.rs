@@ -1,5 +1,5 @@
 use super::{
-    config::{DataType, SinkContext, TransformContext},
+    config::{DataType, SinkContext, SourceContext, TransformContext},
     fanout::{self, Fanout},
     task::Task,
     ConfigDiff,
@@ -126,7 +126,14 @@ pub fn build_pieces(
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
-        let server = match source.build(&name, &config.global, shutdown_signal, tx) {
+        let cx = SourceContext {
+            name,
+            globals: &config.global,
+            shutdown: shutdown_signal,
+            out: tx,
+        };
+
+        let server = match source.build(cx) {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", name, error));
                 continue;

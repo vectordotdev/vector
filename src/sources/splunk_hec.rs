@@ -1,8 +1,7 @@
 use crate::{
     event::{self, Event, LogEvent, Value},
-    shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, SourceConfig, SourceContext},
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
@@ -66,13 +65,8 @@ fn default_socket_address() -> SocketAddr {
 
 #[typetag::serde(name = "splunk_hec")]
 impl SourceConfig for SplunkConfig {
-    fn build(
-        &self,
-        _: &str,
-        _: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext { shutdown, out, .. } = cx;
         let source = SplunkSource::new(self);
 
         let event_service = source.event_service(out.clone());
@@ -725,7 +719,7 @@ mod tests {
             util::{encoding::EncodingConfigWithDefault, Compression},
             Healthcheck, RouterSink,
         },
-        topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
+        topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext},
     };
     use chrono::{TimeZone, Utc};
     use futures01::{stream, sync::mpsc, Sink};
@@ -751,12 +745,12 @@ mod tests {
                 token,
                 tls: None,
             }
-            .build(
+            .build(SourceContext::new_test(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,
-            )
+            ))
             .unwrap(),
         );
         (recv, address)

@@ -1,7 +1,7 @@
 use crate::{
     event::Event,
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    topology::config::{DataType, SourceConfig, SourceContext, SourceDescription},
 };
 use futures::{
     compat::Future01CompatExt,
@@ -42,13 +42,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "generator")]
 impl SourceConfig for GeneratorConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext { shutdown, out, .. } = cx;
         Ok(self.clone().generator(shutdown, out))
     }
 

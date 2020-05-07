@@ -1,4 +1,4 @@
-use crate::{shutdown::ShutdownSignal, stream::StreamExt, topology::config::GlobalOptions, Event};
+use crate::{shutdown::ShutdownSignal, stream::StreamExt, topology::config::SourceContext, Event};
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use parser::parse;
 use serde::{Deserialize, Serialize};
@@ -19,13 +19,8 @@ struct StatsdConfig {
 
 #[typetag::serde(name = "statsd")]
 impl crate::topology::config::SourceConfig for StatsdConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext { shutdown, out, .. } = cx;
         Ok(statsd(self.address, shutdown, out))
     }
 

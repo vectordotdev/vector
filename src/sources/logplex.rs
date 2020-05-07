@@ -1,13 +1,11 @@
 use crate::{
     event::{self, Event},
-    shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource},
     tls::TlsConfig,
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, SourceConfig, SourceContext},
 };
 use bytes::Buf;
 use chrono::{DateTime, Utc};
-use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::{
     io::{BufRead, BufReader},
@@ -38,13 +36,8 @@ impl HttpSource for LogplexSource {
 
 #[typetag::serde(name = "logplex")]
 impl SourceConfig for LogplexConfig {
-    fn build(
-        &self,
-        _: &str,
-        _: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext { shutdown, out, .. } = cx;
         let source = LogplexSource::default();
         source.run(self.address, "events", &self.tls, out, shutdown)
     }
@@ -165,7 +158,7 @@ mod tests {
         event::{self, Event},
         runtime::Runtime,
         test_util::{self, collect_n},
-        topology::config::{GlobalOptions, SourceConfig},
+        topology::config::{GlobalOptions, SourceConfig, SourceContext},
     };
     use chrono::{DateTime, Utc};
     use futures01::sync::mpsc;
@@ -179,12 +172,12 @@ mod tests {
         let address = test_util::next_addr();
         rt.spawn(
             LogplexConfig { address, tls: None }
-                .build(
+                .build(SourceContext::new_test(
                     "default",
                     &GlobalOptions::default(),
                     ShutdownSignal::noop(),
                     sender,
-                )
+                ))
                 .unwrap(),
         );
         (recv, address)

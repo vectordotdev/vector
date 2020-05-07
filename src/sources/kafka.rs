@@ -3,7 +3,7 @@ use crate::{
     kafka::{KafkaCompression, KafkaTlsConfig},
     shutdown::ShutdownSignal,
     stream::StreamExt,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    topology::config::{DataType, SourceConfig, SourceContext, SourceDescription},
 };
 use bytes::Bytes;
 use futures::compat::Compat;
@@ -77,13 +77,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let SourceContext { shutdown, out, .. } = cx;
         kafka_source(self.clone(), shutdown, out)
     }
 
