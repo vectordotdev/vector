@@ -116,6 +116,7 @@ impl RunningTopology {
     #[must_use]
     pub fn stop(self) -> impl Future<Item = (), Error = ()> {
         let mut running_tasks = self.tasks;
+        running_tasks.extend(self.source_tasks);
 
         let mut wait_handles = Vec::new();
         let mut check_handles = HashMap::new();
