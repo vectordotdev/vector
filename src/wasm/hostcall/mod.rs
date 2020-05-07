@@ -1,21 +1,14 @@
 //! Ensure your hostcalls have this on them:
 //!
 //! ```rust
-//! #[lucet_hostcall]
-//! #[no_mangle]
+//! #![lucet_hostcall]
+//! #![no_mangle]
 //! ```
 
 use super::context::EventBuffer;
-use crate::event::LogEvent;
 use crate::{internal_events, Event};
 use lucet_runtime::{lucet_hostcall, vmctx::Vmctx};
-use std::{
-    ffi::{CStr, CString},
-    io::Write,
-    os::raw::c_char,
-    str::FromStr,
-    sync::Once,
-};
+use std::sync::Once;
 use vector_wasm::Role;
 
 #[lucet_hostcall]
@@ -25,7 +18,7 @@ pub extern "C" fn emit(vmctx: &mut Vmctx, data: *mut u8, length: usize) -> usize
 
     let mut event_buffer = vmctx.get_embed_ctx_mut::<EventBuffer>();
 
-    let mut heap = vmctx.heap_mut();
+    let heap = vmctx.heap_mut();
     let slice = &heap[data as usize..(length as usize + data as usize)];
 
     // TODO: Add some usability around `LogEvent` for this.

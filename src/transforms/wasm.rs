@@ -57,7 +57,7 @@ impl Wasm {
 }
 
 impl Transform for Wasm {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, event: Event) -> Option<Event> {
         self.module
             .process(event)
             .map(|outputs| outputs.into_iter().next())

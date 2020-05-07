@@ -15,7 +15,4 @@ impl EventBuffer {
     pub(super) fn push_back(&mut self, event: Event) {
         self.events.push_back(event)
     }
-    pub(crate) fn events(&self) -> &LinkedList<Event> {
-        &self.events
-    }
 }

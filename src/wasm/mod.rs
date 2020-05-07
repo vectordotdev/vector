@@ -5,9 +5,7 @@
 //!
 //! **Note:** This code is experimental.
 
-use crate::event::LogEvent;
 use crate::{internal_events, Event, Result};
-use bytes::Bytes;
 use context::EventBuffer;
 use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Region};
 use lucet_wasi::WasiCtxBuilder;
@@ -18,7 +16,6 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     fs,
-    io::{Read, Write},
     path::{Path, PathBuf},
 };
 use tracing::Level;
@@ -257,7 +254,7 @@ impl WasmModule {
         // Copy 1
         let data_buf = serde_json::to_vec(data.as_mut_log())?;
         let guest_data_size = data_buf.len() as u64;
-        let mut guest_data_ptr = self
+        let guest_data_ptr = self
             .instance
             .run("allocate_buffer", &[guest_data_size.into()])?
             .returned()?
