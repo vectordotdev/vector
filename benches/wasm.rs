@@ -48,7 +48,7 @@ pub fn protobuf(c: &mut Criterion) {
 }
 
 pub fn drop(criterion: &mut Criterion) {
-    let transforms: Vec<(&str, Box<Transform>)> = vec![
+    let transforms: Vec<(&str, Box<dyn Transform>)> = vec![
         (
             "lua",
             Box::new(
@@ -92,7 +92,7 @@ pub fn drop(criterion: &mut Criterion) {
 }
 
 pub fn add_fields(criterion: &mut Criterion) {
-    let transforms: Vec<(&str, Box<Transform>)> = vec![
+    let transforms: Vec<(&str, Box<dyn Transform>)> = vec![
         (
             "lua",
             Box::new(
