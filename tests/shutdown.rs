@@ -32,16 +32,16 @@ const ALL_SOURCE_CONFIG: &'static str = r#"
         type = "stdin"
 
 #    [sources.in1]
-#        type = "docker" 
+#        type = "docker"
 
     [sources.in2]
         type = "file" # required
         include = ["./*.log_dummy"]
         
     [sources.in3]
-        type = "generator" 
+        type = "generator"
         batch_interval = 1.0 # optional, no default
-        lines = [] 
+        lines = []
 
     [sources.in4]
         type = "http"
@@ -53,32 +53,32 @@ const ALL_SOURCE_CONFIG: &'static str = r#"
 
 #    [sources.in6]
 #        type = "kafka"
-#        bootstrap_servers = "localhost:7006" 
+#        bootstrap_servers = "localhost:7006"
 #        group_id = "consumer-group-name"
 #        topics = ["topic-1"]
 
     [sources.in7]
         type = "logplex"
-        address = "0.0.0.0:7007" 
+        address = "0.0.0.0:7007"
 
 #    [sources.in8]
-#        type = "prometheus" 
-#        hosts = ["http://localhost:7008"] 
+#        type = "prometheus"
+#        hosts = ["http://localhost:7008"]
 #
     [sources.in9]
-        type = "socket" 
-        address = "0.0.0.0:7009" 
-        mode = "tcp" 
+        type = "socket"
+        address = "0.0.0.0:7009"
+        mode = "tcp"
 
     [sources.in10]
-        type = "socket" 
-        address = "0.0.0.0:7010" 
-        mode = "udp" 
+        type = "socket"
+        address = "0.0.0.0:7010"
+        mode = "udp"
 
     [sources.in11]
-        type = "socket" 
+        type = "socket"
         path = "${SOCKET_UNIX_PATH}"
-        mode = "unix" 
+        mode = "unix"
 
     [sources.in12]
         type = "splunk_hec"
@@ -89,23 +89,23 @@ const ALL_SOURCE_CONFIG: &'static str = r#"
         address = "127.0.0.1:7013"
 
     [sources.in14]
-        type = "syslog" 
-        address = "0.0.0.0:7014" 
-        mode = "tcp" 
+        type = "syslog"
+        address = "0.0.0.0:7014"
+        mode = "tcp"
 
     [sources.in15]
-        type = "syslog" 
-        address = "0.0.0.0:7015" 
-        mode = "udp" 
+        type = "syslog"
+        address = "0.0.0.0:7015"
+        mode = "udp"
 
     [sources.in16]
-        type = "syslog" 
-        mode = "unix" 
-        path = "${SYSLOG_UNIX_PATH}" 
+        type = "syslog"
+        mode = "unix"
+        path = "${SYSLOG_UNIX_PATH}"
 
     [sources.in17]
         type = "vector"
-        address = "0.0.0.0:7017" 
+        address = "0.0.0.0:7017"
 
 
 [sinks.out]
