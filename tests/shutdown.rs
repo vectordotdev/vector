@@ -1,5 +1,4 @@
-// #![cfg(all(feature = "shutdown-tests"))]
-#![cfg(all(feature = "sources", feature = "sinks-console"))]
+#![cfg(all(feature = "shutdown-tests"))]
 
 extern crate assert_cmd;
 
@@ -173,10 +172,10 @@ fn timely_shutdown_logplex() {
     ));
 }
 
-// #[test]
-// fn timely_shutdown_docker() {
-//     test_timely_shutdown(source_vector(r#"type = "docker""#));
-// }
+#[test]
+fn timely_shutdown_docker() {
+    test_timely_shutdown(source_vector(r#"type = "docker""#));
+}
 
 #[test]
 fn timely_shutdown_journald() {
@@ -192,16 +191,16 @@ fn timely_shutdown_prometheus() {
     test_timely_shutdown(run_vector(PROMETHEUS_CONFIG));
 }
 
-// #[test]
-// fn timely_shutdown_kafka() {
-//     test_timely_shutdown(source_vector(
-//         r#"
-//         type = "kafka"
-//         bootstrap_servers = "localhost:9092"
-//         group_id = "consumer-group-name"
-//         topics = ["topic-1"]"#,
-//     ));
-// }
+#[test]
+fn timely_shutdown_kafka() {
+    test_timely_shutdown(source_vector(
+        r#"
+        type = "kafka"
+        bootstrap_servers = "localhost:9092"
+        group_id = "consumer-group-name"
+        topics = ["topic-1"]"#,
+    ));
+}
 
 #[test]
 fn timely_shutdown_socket_tcp() {
