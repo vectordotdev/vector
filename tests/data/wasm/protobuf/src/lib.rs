@@ -33,22 +33,26 @@ pub extern "C" fn process(data: u64, length: u64) -> usize {
             return 0;
         }
     };
+
     let mut json: Value = match serde_json::from_slice(slice) {
         Ok(json) => json,
         Err(e) => {
             trace!(key = "message", error = ?e, "Vector sent invalid json");
+            hostcall::emit(slice);
             // TODO: Emit
             return 0;
         }
     };
+
     let obj = match json.as_object_mut() {
         Some(obj) => obj,
         None => {
             trace!("Vector sent a non-object event");
-            // TODO: Emit
+            hostcall::emit(slice);
             return 0;
         }
     };
+
     let field = match obj.get("message").and_then(Value::as_str) {
         // Try to transform the proto into some json.
         Some(value) => value,
@@ -57,10 +61,11 @@ pub extern "C" fn process(data: u64, length: u64) -> usize {
                 key = "message",
                 "Expected key did not contain string to read as protobuf",
             );
-            // TODO: Emit
+            hostcall::emit(slice);
             return 0;
         }
     };
+
     let proto = match DecodingTarget::decode(field.as_bytes()) {
         Ok(proto) => proto,
         Err(e) => {
@@ -69,27 +74,31 @@ pub extern "C" fn process(data: u64, length: u64) -> usize {
                 error = ?e,
                 "Vector sent an event with a key containing a string, but it was not a protobuf",
             );
-            // TODO: Emit
+            hostcall::emit(slice);
             return 0;
         }
     };
+
     let value = match serde_json::to_value(proto) {
         Ok(proto) => proto,
         Err(e) => {
             trace!(error = ?e, "Failed to turn proto into valid JSON");
-            // TODO: Emit
+            hostcall::emit(slice);
             return 0;
         }
     };
+
     obj.insert("processed".into(), value);
+
     let buffer = match serde_json::to_vec(&obj) {
         Ok(proto) => proto,
         Err(e) => {
             trace!(error = ?e, "Could not turn JSON back into a buffer.");
-            // TODO: Emit
+            hostcall::emit(slice);
             return 0;
         }
     };
+
     hostcall::emit(buffer);
     1
 }

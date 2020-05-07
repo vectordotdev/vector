@@ -28,10 +28,10 @@ pub fn register(registration: &Registration) {
 }
 
 /// Emit the data back to the host.
-pub fn emit(data: Vec<u8>) {
-    let mut slice = data.into_boxed_slice();
+pub fn emit(mut data: impl AsMut<[u8]>) {
+    let data = data.as_mut();
     unsafe {
-        ffi::emit(slice.as_mut_ptr() as u64, slice.len() as u64);
+        ffi::emit(data.as_mut_ptr() as u64, data.len() as u64);
     }
     // No need to clean up manually. The slice is dropped.
 }
