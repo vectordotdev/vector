@@ -186,6 +186,7 @@ jobs:
         run: docker login -u "${{ secrets.K8S_INTEGRATION_CI_DOCKER_USERNAME }}" -p "${{ secrets.K8S_INTEGRATION_CI_DOCKER_PASSWORD }}"
       - name: Checkout
         uses: actions/checkout@v1
+      - run: make slim-builds
       - run: make test-integration-kubernetes
         env:
           CONTAINER_IMAGE_REPO: ${{ secrets.K8S_INTEGRATION_CI_DOCKER_REPO }}
