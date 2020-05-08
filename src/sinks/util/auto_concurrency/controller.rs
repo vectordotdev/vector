@@ -27,6 +27,27 @@ impl Controller {
         }
     }
 
+    /// Increase (additive) the current number of permits
+    pub(super) fn increase(&mut self) {
+        if self.current < self.max {
+            self.semaphore.add_permits(1);
+            self.current += 1;
+            self.dropping = self.dropping.saturating_sub(1);
+        }
+    }
+
+    /// Decrease (multiplicative) the current concurrency
+    pub(super) fn decrease(&mut self) {
+        let new_current = (self.current + 1) / 2;
+        for _ in new_current..self.current {
+            match self.semaphore.try_acquire() {
+                Ok(permit) => permit.forget(),
+                Err(_) => self.dropping += 1,
+            }
+        }
+        self.current = new_current;
+    }
+
     pub(super) fn acquire(
         &mut self,
     ) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static {
