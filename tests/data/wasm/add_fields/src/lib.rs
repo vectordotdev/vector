@@ -20,7 +20,20 @@ pub extern "C" fn process(data: u64, length: u64) -> usize {
     hostcall::emit(serde_json::to_vec(&event).unwrap());
     1
 }
+
 #[no_mangle]
 pub extern "C" fn shutdown() {
     ();
+}
+
+#[no_mangle]
+pub extern "C" fn allocate_buffer(bytes: u64) -> *mut u8 {
+    let data: Vec<u8> = Vec::with_capacity(bytes as usize);
+    let mut boxed = data.into_boxed_slice();
+    boxed.as_mut_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn drop_buffer(start: *mut u8, length: usize) {
+    let _ = std::ptr::slice_from_raw_parts_mut(start, length);
 }
