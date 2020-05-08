@@ -6,8 +6,10 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-/// Wrapper class for `tokio::sync::Semaphore` that allows for easily
-/// adjusting the number of permits up to a maximum and down to 1.
+const EWMA_ALPHA: f64 = 0.5;
+
+/// Shared class for `tokio::sync::Semaphore` that manages adjusting the
+/// semaphore size and other associated data.
 #[derive(Clone, Debug)]
 pub(super) struct Controller {
     semaphore: Arc<Semaphore>,
@@ -19,6 +21,7 @@ pub(super) struct Controller {
 struct Inner {
     current: usize,
     dropping: usize,
+    average_rtt: f64,
 }
 
 impl Controller {
@@ -29,8 +32,19 @@ impl Controller {
             inner: Arc::new(Mutex::new(Inner {
                 current,
                 dropping: 0,
+                average_rtt: -1.0,
             })),
         }
+    }
+
+    /// Update the average RTT using EWMA, and return the new value.
+    pub(super) fn update_rtt(&mut self, rtt: f64) -> f64 {
+        let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
+        inner.average_rtt = match inner.average_rtt {
+            avg if avg < 0.0 => rtt,
+            avg => rtt * EWMA_ALPHA + avg * (1.0 - EWMA_ALPHA),
+        };
+        inner.average_rtt
     }
 
     /// Increase (additive) the current number of permits
