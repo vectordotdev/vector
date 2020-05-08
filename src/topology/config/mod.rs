@@ -515,7 +515,12 @@ fn healthcheck_default() -> bool {
     true
 }
 
-#[cfg(all(test, feature = "sources-file", feature = "sinks-console"))]
+#[cfg(all(
+    test,
+    feature = "sources-file",
+    feature = "sinks-console",
+    feature = "transforms-json_parser"
+))]
 mod test {
     use super::Config;
     use std::path::PathBuf;
