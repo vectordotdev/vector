@@ -108,10 +108,12 @@ where
     ) -> Self {
         let sink = Arc::new(sink);
         let sink1 = sink.clone();
-        let svc =
-            HttpBatchService::new(cx.resolver(), tls_settings, move |b| sink1.build_request(b));
+        let svc = HttpBatchService::new(cx.resolver.clone(), tls_settings, move |b| {
+            sink1.build_request(b)
+        });
 
-        let inner = request_settings.batch_sink(logic, svc, batch, batch_settings, cx.acker());
+        let inner =
+            request_settings.batch_sink(logic, svc, batch, batch_settings, cx.acker.clone());
 
         Self {
             sink,

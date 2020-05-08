@@ -202,7 +202,7 @@ impl GcsSink {
         let creds = config.auth.make_credentials(Scope::DevStorageReadWrite)?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls)?;
+        let client = HttpClient::new(cx.resolver.clone(), tls)?;
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
         Ok(GcsSink {
@@ -239,9 +239,10 @@ impl GcsSink {
 
         let buffer = PartitionBuffer::new(Buffer::new(compression));
 
-        let sink = crate::sinks::util::PartitionBatchSink::new(svc, buffer, batch, cx.acker())
-            .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
-            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
+        let sink =
+            crate::sinks::util::PartitionBatchSink::new(svc, buffer, batch, cx.acker.clone())
+                .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
+                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(Box::new(sink))
     }

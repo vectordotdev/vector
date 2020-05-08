@@ -78,7 +78,7 @@ inventory::submit! {
 impl SinkConfig for HecSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_host(&self.host)?;
-        let healthcheck = healthcheck(&self, cx.resolver())?;
+        let healthcheck = healthcheck(&self, cx.resolver.clone())?;
 
         let batch = self.batch.unwrap_or(bytesize::mib(1u64), 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);

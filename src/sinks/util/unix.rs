@@ -35,9 +35,10 @@ impl UnixSinkConfig {
     }
 
     pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        let SinkContext { acker, .. } = cx;
         let encoding = self.encoding.clone();
         let unix = UnixSink::new(self.path.clone());
-        let sink = StreamSink::new(unix, cx.acker());
+        let sink = StreamSink::new(unix, acker);
 
         let sink =
             Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))));

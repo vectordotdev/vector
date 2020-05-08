@@ -166,35 +166,19 @@ pub trait SinkConfig: core::fmt::Debug {
 
 #[derive(Debug, Clone)]
 pub struct SinkContext {
-    pub(super) acker: Acker,
-    pub(super) resolver: Resolver,
-    pub(super) exec: TaskExecutor,
+    pub acker: Acker,
+    pub resolver: Resolver,
+    pub executor: TaskExecutor,
 }
 
 impl SinkContext {
     #[cfg(test)]
-    pub fn new_test(exec: TaskExecutor) -> Self {
+    pub fn new_test(executor: TaskExecutor) -> Self {
         Self {
             acker: Acker::Null,
-            resolver: Resolver::new(Vec::new(), exec.clone()).unwrap(),
-            exec,
+            resolver: Resolver::new(Vec::new(), executor.clone()).unwrap(),
+            executor,
         }
-    }
-
-    pub fn acker(&self) -> Acker {
-        self.acker.clone()
-    }
-
-    pub fn exec(&self) -> TaskExecutor {
-        self.exec.clone()
-    }
-
-    pub fn resolver(&self) -> Resolver {
-        self.resolver.clone()
-    }
-
-    pub fn executor(&self) -> &TaskExecutor {
-        &self.exec
     }
 }
 
@@ -229,24 +213,16 @@ pub trait TransformConfig: core::fmt::Debug {
 
 #[derive(Debug, Clone)]
 pub struct TransformContext {
-    pub(super) exec: TaskExecutor,
-    pub(super) resolver: Resolver,
+    pub executor: TaskExecutor,
+    pub resolver: Resolver,
 }
 
 impl TransformContext {
-    pub fn new_test(exec: TaskExecutor) -> Self {
+    pub fn new_test(executor: TaskExecutor) -> Self {
         Self {
-            resolver: Resolver::new(Vec::new(), exec.clone()).unwrap(),
-            exec,
+            resolver: Resolver::new(Vec::new(), executor.clone()).unwrap(),
+            executor,
         }
-    }
-
-    pub fn executor(&self) -> &TaskExecutor {
-        &self.exec
-    }
-
-    pub fn resolver(&self) -> Resolver {
-        self.resolver.clone()
     }
 }
 

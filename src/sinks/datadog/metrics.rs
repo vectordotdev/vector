@@ -107,7 +107,7 @@ inventory::submit! {
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
+        let healthcheck = healthcheck(self.clone(), cx.resolver.clone())?;
 
         let batch = self.batch.unwrap_or(20, 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);

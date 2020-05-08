@@ -60,7 +60,7 @@ pub enum Encoding {
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = healthcheck(cx.resolver(), &self)?;
+        let healthcheck = healthcheck(cx.resolver.clone(), &self)?;
 
         let gzip = match self.compression.unwrap_or(Compression::Gzip) {
             Compression::None => false,

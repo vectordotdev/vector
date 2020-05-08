@@ -140,7 +140,7 @@ inventory::submit! {
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = S3Sink::healthcheck(self, cx.resolver())?;
+        let healthcheck = S3Sink::healthcheck(self, cx.resolver.clone())?;
         let sink = S3Sink::new(self, cx)?;
 
         Ok((sink, healthcheck))
@@ -167,6 +167,10 @@ enum HealthcheckError {
 
 impl S3Sink {
     pub fn new(config: &S3SinkConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
+        let SinkContext {
+            resolver, acker, ..
+        } = cx;
+
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
@@ -187,7 +191,7 @@ impl S3Sink {
         let region = config.region.clone().try_into()?;
 
         let s3 = S3Sink {
-            client: Self::create_client(region, config.assume_role.clone(), cx.resolver())?,
+            client: Self::create_client(region, config.assume_role.clone(), resolver)?,
         };
 
         let filename_extension = config.filename_extension.clone();
@@ -211,7 +215,7 @@ impl S3Sink {
 
         let buffer = PartitionBuffer::new(Buffer::new(compression));
 
-        let sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+        let sink = PartitionBatchSink::new(svc, buffer, batch, acker)
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
             .sink_map_err(|error| error!("Sink failed to flush: {}", error));
 

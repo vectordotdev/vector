@@ -138,6 +138,10 @@ pub enum CloudwatchError {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let SinkContext {
+            resolver, acker, ..
+        } = cx;
+
         let batch = self.batch.unwrap_or(1000, 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
@@ -148,18 +152,18 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             .concurrency_limit(request.in_flight_limit)
             .service(CloudwatchLogsPartitionSvc::new(
                 self.clone(),
-                cx.resolver(),
+                resolver.clone(),
             )?);
 
         let sink = {
             let buffer = PartitionBuffer::new(Vec::new());
-            let svc_sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+            let svc_sink = PartitionBatchSink::new(svc, buffer, batch, acker)
                 .sink_map_err(|e| error!("Fatal cloudwatchlogs sink error: {}", e))
                 .with_flat_map(move |event| iter_ok(partition(event, &log_group, &log_stream)));
             Box::new(svc_sink)
         };
 
-        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
+        let healthcheck = healthcheck(self.clone(), resolver)?;
 
         Ok((sink, healthcheck))
     }

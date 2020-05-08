@@ -30,6 +30,7 @@ inventory::submit! {
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let SinkContext { resolver, .. } = cx;
         let (host, port, tls) = if let Some(uri) = &self.endpoint {
             let host = uri
                 .host()
@@ -53,8 +54,8 @@ impl SinkConfig for DatadogLogsConfig {
             )
         };
 
-        let sink = TcpSink::new(host.clone(), port, cx.resolver(), tls.into());
-        let healthcheck = tcp_healthcheck(host.clone(), port, cx.resolver());
+        let sink = TcpSink::new(host.clone(), port, resolver.clone(), tls.into());
+        let healthcheck = tcp_healthcheck(host.clone(), port, resolver);
 
         let encoding = self.encoding.clone();
         let api_key = Bytes::from(format!("{} ", self.api_key));

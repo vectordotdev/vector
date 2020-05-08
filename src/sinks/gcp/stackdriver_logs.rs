@@ -184,7 +184,8 @@ impl StackdriverConfig {
     fn healthcheck(&self, cx: &SinkContext, sink: StackdriverSink) -> crate::Result<Healthcheck> {
         let request = sink.build_request(vec![]).map(Body::from);
 
-        let mut client = HttpClient::new(cx.resolver(), TlsSettings::from_options(&self.tls)?)?;
+        let mut client =
+            HttpClient::new(cx.resolver.clone(), TlsSettings::from_options(&self.tls)?)?;
 
         let healthcheck = client
             .call(request)

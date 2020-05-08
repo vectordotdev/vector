@@ -57,8 +57,8 @@ impl Default for Encoding {
 impl SinkConfig for FileSinkConfig {
     fn build(&self, mut cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = FileSink::new(&self);
-        let sink = streaming_sink::compat::adapt_to_topology(&mut cx, sink);
-        let sink = StreamSink::new(sink, cx.acker());
+        let sink = streaming_sink::compat::adapt_to_topology(&mut cx.executor, sink);
+        let sink = StreamSink::new(sink, cx.acker);
         Ok((Box::new(sink), Box::new(futures01::future::ok(()))))
     }
 

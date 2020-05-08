@@ -51,7 +51,8 @@ impl SinkConfig for HoneycombConfig {
         )
         .sink_map_err(|e| error!("Fatal honeycomb sink error: {}", e));
 
-        let healthcheck = Box::new(Box::pin(healthcheck(self.clone(), cx.resolver())).compat());
+        let healthcheck =
+            Box::new(Box::pin(healthcheck(self.clone(), cx.resolver.clone())).compat());
 
         Ok((Box::new(sink), healthcheck))
     }

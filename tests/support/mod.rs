@@ -263,11 +263,12 @@ where
     <T as Sink>::SinkError: std::fmt::Debug,
 {
     fn build(&self, cx: SinkContext) -> Result<(RouterSink, Healthcheck), vector::Error> {
+        let SinkContext { acker, .. } = cx;
         let sink = self.sink.clone().unwrap();
         let sink = sink.sink_map_err(|error| {
             error!(message = "Ingesting an event failed at mock sink", ?error)
         });
-        let sink = StreamSink::new(sink, cx.acker());
+        let sink = StreamSink::new(sink, acker);
         let healthcheck = match self.healthy {
             true => future::ok(()),
             false => future::err(HealthcheckError::Unhealthy.into()),

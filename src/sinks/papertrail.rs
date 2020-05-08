@@ -28,6 +28,7 @@ inventory::submit! {
 #[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let SinkContext { resolver, .. } = cx;
         let host = self
             .endpoint
             .host()
@@ -41,10 +42,10 @@ impl SinkConfig for PapertrailConfig {
         let sink = TcpSink::new(
             host.clone(),
             port,
-            cx.resolver(),
+            resolver.clone(),
             MaybeTlsSettings::Tls(TlsSettings::default()),
         );
-        let healthcheck = tcp_healthcheck(host.clone(), port, cx.resolver());
+        let healthcheck = tcp_healthcheck(host.clone(), port, resolver);
 
         let pid = std::process::id();
 

@@ -155,7 +155,7 @@ inventory::submit! {
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDBConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = InfluxDBSvc::healthcheck(self.clone(), cx.resolver())?;
+        let healthcheck = InfluxDBSvc::healthcheck(self.clone(), cx.resolver.clone())?;
         let sink = InfluxDBSvc::new(self.clone(), cx)?;
         Ok((sink, healthcheck))
     }
@@ -171,6 +171,10 @@ impl SinkConfig for InfluxDBConfig {
 
 impl InfluxDBSvc {
     pub fn new(config: InfluxDBConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
+        let SinkContext {
+            resolver, acker, ..
+        } = cx;
+
         let settings = InfluxDBSvc::influxdb_settings(config.clone())?;
 
         let endpoint = config.endpoint.clone();
@@ -191,7 +195,7 @@ impl InfluxDBSvc {
             builder.body(body).unwrap()
         };
 
-        let http_service = HttpBatchService::new(cx.resolver(), None, build_request);
+        let http_service = HttpBatchService::new(resolver, None, build_request);
 
         let influxdb_http_service = InfluxDBSvc {
             config,
@@ -204,7 +208,7 @@ impl InfluxDBSvc {
                 influxdb_http_service,
                 MetricBuffer::new(),
                 batch,
-                cx.acker(),
+                acker,
             )
             .sink_map_err(|e| error!("Fatal influxdb sink error: {}", e));
 
@@ -1249,7 +1253,7 @@ mod integration_tests {
             request: Default::default(),
         };
 
-        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver()).unwrap();
+        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
@@ -1272,7 +1276,7 @@ mod integration_tests {
             request: Default::default(),
         };
 
-        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver()).unwrap();
+        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver).unwrap();
         rt.block_on(healthcheck).unwrap_err();
     }
 
@@ -1403,7 +1407,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
         };
-        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver()).unwrap();
+        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
@@ -1426,7 +1430,7 @@ mod integration_tests {
             request: Default::default(),
         };
 
-        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver()).unwrap();
+        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver).unwrap();
         rt.block_on(healthcheck).unwrap_err();
     }
 }

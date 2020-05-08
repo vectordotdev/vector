@@ -52,8 +52,11 @@ pub fn raw_udp(
     encoding: EncodingConfig<Encoding>,
     cx: SinkContext,
 ) -> Result<RouterSink, UdpBuildError> {
-    let sink = UdpSink::new(host, port, cx.resolver())?;
-    let sink = StreamSink::new(sink, cx.acker());
+    let SinkContext {
+        resolver, acker, ..
+    } = cx;
+    let sink = UdpSink::new(host, port, resolver)?;
+    let sink = StreamSink::new(sink, acker);
     Ok(Box::new(sink.with_flat_map(move |event| {
         iter_ok(encode_event(event, &encoding))
     })))

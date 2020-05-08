@@ -66,7 +66,7 @@ inventory::submit! {
 impl SinkConfig for KinesisFirehoseSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let config = self.clone();
-        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
+        let healthcheck = healthcheck(self.clone(), cx.resolver.clone())?;
         let sink = KinesisFirehoseService::new(config, cx)?;
         Ok((Box::new(sink), healthcheck))
     }
@@ -85,10 +85,14 @@ impl KinesisFirehoseService {
         config: KinesisFirehoseSinkConfig,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
+        let SinkContext {
+            resolver, acker, ..
+        } = cx;
+
         let client = create_client(
             config.region.clone().try_into()?,
             config.assume_role.clone(),
-            cx.resolver(),
+            resolver,
         )?;
 
         let batch = config.batch.unwrap_or(500, 1);
@@ -98,13 +102,7 @@ impl KinesisFirehoseService {
         let kinesis = KinesisFirehoseService { client, config };
 
         let sink = request
-            .batch_sink(
-                KinesisFirehoseRetryLogic,
-                kinesis,
-                Vec::new(),
-                batch,
-                cx.acker(),
-            )
+            .batch_sink(KinesisFirehoseRetryLogic, kinesis, Vec::new(), batch, acker)
             .sink_map_err(|e| error!("Fatal kinesis firehose sink error: {}", e))
             .with_flat_map(move |e| iter_ok(encode_event(e, &encoding)));
 

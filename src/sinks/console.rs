@@ -58,8 +58,8 @@ impl SinkConfig for ConsoleSinkConfig {
         };
 
         let sink = WriterSink { output, encoding };
-        let sink = streaming_sink::compat::adapt_to_topology(&mut cx, sink);
-        let sink = StreamSink::new(sink, cx.acker());
+        let sink = streaming_sink::compat::adapt_to_topology(&mut cx.executor, sink);
+        let sink = StreamSink::new(sink, cx.acker);
 
         Ok((Box::new(sink), Box::new(future::ok(()))))
     }

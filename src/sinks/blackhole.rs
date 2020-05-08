@@ -27,7 +27,7 @@ inventory::submit! {
 #[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = Box::new(BlackholeSink::new(self.clone(), cx.acker()));
+        let sink = Box::new(BlackholeSink::new(self.clone(), cx.acker));
         let healthcheck = Box::new(healthcheck());
 
         Ok((sink, healthcheck))

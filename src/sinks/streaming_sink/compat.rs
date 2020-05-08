@@ -1,6 +1,6 @@
 use super::StreamingSink;
+use crate::runtime::TaskExecutor;
 use crate::sinks;
-use crate::topology::config::SinkContext;
 use crate::Event;
 use futures::channel::mpsc;
 use futures::compat::CompatSink;
@@ -48,12 +48,12 @@ pub type OldSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Se
 /// it'll only go as fast as `streaming_sink` is able to poll items, without any
 /// buffering.
 pub fn adapt_to_topology(
-    cx: &mut SinkContext,
+    executor: &mut TaskExecutor,
     mut streaming_sink: impl StreamingSink + 'static,
 ) -> sinks::RouterSink {
     let (stream, sink) = sink_interface_compat();
 
-    cx.executor().spawn_std(async move {
+    executor.spawn_std(async move {
         streaming_sink
             .run(stream)
             .await

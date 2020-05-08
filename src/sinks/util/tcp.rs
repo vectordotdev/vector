@@ -51,8 +51,9 @@ impl TcpSinkConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let sink = raw_tcp(host.clone(), port, cx.clone(), self.encoding.clone(), tls);
-        let healthcheck = tcp_healthcheck(host, port, cx.resolver());
+        let resolver = cx.resolver.clone();
+        let sink = raw_tcp(host.clone(), port, cx, self.encoding.clone(), tls);
+        let healthcheck = tcp_healthcheck(host, port, resolver);
 
         Ok((sink, healthcheck))
     }
@@ -252,8 +253,11 @@ pub fn raw_tcp(
     encoding: EncodingConfig<Encoding>,
     tls: MaybeTlsSettings,
 ) -> RouterSink {
-    let tcp = TcpSink::new(host, port, cx.resolver(), tls);
-    let sink = StreamSink::new(tcp, cx.acker());
+    let SinkContext {
+        resolver, acker, ..
+    } = cx;
+    let tcp = TcpSink::new(host, port, resolver, tls);
+    let sink = StreamSink::new(tcp, acker);
     Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))))
 }
 

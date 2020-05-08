@@ -115,6 +115,10 @@ inventory::submit! {
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
     fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+        let TransformContext {
+            resolver, executor, ..
+        } = cx;
+
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
@@ -145,9 +149,9 @@ impl TransformConfig for Ec2Metadata {
             .map(|v| v.into_iter().map(Atom::from).collect())
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
-        let http_client = HttpClient::new(cx.resolver(), None)?;
+        let http_client = HttpClient::new(resolver, None)?;
 
-        cx.executor().spawn_std(
+        executor.spawn_std(
             async move {
                 let mut client =
                     MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);

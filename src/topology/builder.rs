@@ -166,7 +166,7 @@ pub fn build_pieces(
 
         let cx = TransformContext {
             resolver: resolver.clone(),
-            exec: exec.clone(),
+            executor: exec.clone(),
         };
 
         let input_type = transform.inner.input_type();
@@ -218,7 +218,7 @@ pub fn build_pieces(
         let cx = SinkContext {
             resolver: resolver.clone(),
             acker,
-            exec: exec.clone(),
+            executor: exec.clone(),
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx) {

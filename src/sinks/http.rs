@@ -129,7 +129,7 @@ impl SinkConfig for HttpSinkConfig {
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
                 let healthcheck =
-                    healthcheck(healthcheck_uri, self.auth.clone(), cx.resolver(), tls)?;
+                    healthcheck(healthcheck_uri, self.auth.clone(), cx.resolver.clone(), tls)?;
                 Ok((sink, healthcheck))
             }
             None => Ok((sink, Box::new(future::ok(())))),

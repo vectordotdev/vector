@@ -131,7 +131,7 @@ impl PubsubSink {
             creds.apply(&mut request);
         }
 
-        let mut client = HttpClient::new(cx.resolver(), tls.clone())?;
+        let mut client = HttpClient::new(cx.resolver.clone(), tls.clone())?;
         let creds = self.creds.clone();
         let healthcheck = client
             .call(request)

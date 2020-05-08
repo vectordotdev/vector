@@ -55,7 +55,7 @@ inventory::submit! {
 #[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = CloudWatchMetricsSvc::healthcheck(self, cx.resolver())?;
+        let healthcheck = CloudWatchMetricsSvc::healthcheck(self, cx.resolver.clone())?;
         let sink = CloudWatchMetricsSvc::new(self.clone(), cx)?;
         Ok((sink, healthcheck))
     }
@@ -74,10 +74,14 @@ impl CloudWatchMetricsSvc {
         config: CloudWatchMetricsSinkConfig,
         cx: SinkContext,
     ) -> crate::Result<super::RouterSink> {
+        let SinkContext {
+            resolver, acker, ..
+        } = cx;
+
         let client = Self::create_client(
             config.region.clone().try_into()?,
             config.assume_role.clone(),
-            cx.resolver(),
+            resolver,
         )?;
 
         let batch = config.batch.unwrap_or(20, 1);
@@ -91,7 +95,7 @@ impl CloudWatchMetricsSvc {
                 cloudwatch_metrics,
                 MetricBuffer::new(),
                 batch,
-                cx.acker(),
+                acker,
             )
             .sink_map_err(|e| error!("CloudwatchMetrics sink error: {}", e));
 

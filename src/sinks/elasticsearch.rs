@@ -97,7 +97,7 @@ inventory::submit! {
 impl SinkConfig for ElasticSearchConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
-        let healthcheck = healthcheck(cx.resolver(), &common)?;
+        let healthcheck = healthcheck(cx.resolver.clone(), &common)?;
 
         let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -546,7 +546,7 @@ mod integration_tests {
         rt.block_on(pump).unwrap();
 
         // make sure writes all all visible
-        rt.block_on(flush(cx.resolver(), &common)).unwrap();
+        rt.block_on(flush(cx.resolver, &common)).unwrap();
 
         let response = reqwest::Client::new()
             .get(&format!("{}/{}/_search", common.base_url, index))
@@ -663,7 +663,7 @@ mod integration_tests {
         };
 
         // make sure writes all all visible
-        rt.block_on(flush(cx.resolver(), &common))
+        rt.block_on(flush(cx.resolver, &common))
             .expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();

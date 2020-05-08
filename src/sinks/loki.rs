@@ -92,7 +92,7 @@ impl SinkConfig for LokiConfig {
         )
         .sink_map_err(|e| error!("Fatal loki sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed_compat();
+        let healthcheck = healthcheck(self.clone(), cx.resolver.clone()).boxed_compat();
 
         Ok((Box::new(sink), Box::new(healthcheck)))
     }

@@ -66,7 +66,10 @@ inventory::submit! {
 #[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = PulsarSink::new(self.clone(), cx.acker(), cx.exec())?;
+        let SinkContext {
+            acker, executor, ..
+        } = cx;
+        let sink = PulsarSink::new(self.clone(), acker, executor)?;
         let hc = healthcheck(self.clone(), sink.pulsar.clone());
         Ok((Box::new(sink), hc))
     }

@@ -63,7 +63,8 @@ inventory::submit! {
 #[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = StatsdSvc::new(self.clone(), cx.acker())?;
+        let SinkContext { acker, .. } = cx;
+        let sink = StatsdSvc::new(self.clone(), acker)?;
         let healthcheck = StatsdSvc::healthcheck(self.clone())?;
         Ok((sink, healthcheck))
     }
