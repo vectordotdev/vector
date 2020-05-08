@@ -109,8 +109,12 @@ target/wasm32-wasi/.obtained:
 
 WASM_MODULES = $(patsubst tests/data/wasm/%/,%,$(wildcard tests/data/wasm/*/))
 WASM_WATS = $(foreach MODULE,$(WASM_MODULES),tests/data/wasm/${MODULE}/${MODULE}.wat)
+
 .PHONY: build-wasm-tests
 build-wasm-tests: pre-build-wasm-tests $(WASM_WATS)
+
+.PHONY: rebuild-wasm-tests
+rebuild-wasm-tests: clean-wasm pre-build-wasm-tests $(WASM_WATS)
 
 .PHONY: pre-build-wasm-tests
 pre-build-wasm-tests:
@@ -123,12 +127,17 @@ tests/data/wasm/%.wat:
 	cargo build --target wasm32-wasi --release --package ${MODULE}
 	wasm2wat target/wasm32-wasi/release/${MODULE}.wasm -o tests/data/wasm/${MODULE}/${MODULE}.wat
 
+.PHONY: test-wasm
 test-wasm: build-wasm-tests  ### Run engine tests.
 	cargo test wasm --no-default-features --features wasm -- --nocapture
 
+.PHONY: bench-wasm
 bench-wasm: build-wasm-tests  ### Run engine tests.
 	cargo bench wasm --no-default-features --features ${DEFAULT_FEATURES}
 
+.PHONY: clean-wasm
+clean-wasm:
+	rm -rfv tests/data/wasm/*/*.wat
 ##@ Checking
 
 check: check-all ## Default target, check everything

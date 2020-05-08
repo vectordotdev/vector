@@ -76,9 +76,13 @@ mod tests {
         Wasm::new(toml::from_str(s).unwrap())
     }
 
-    fn parse_event_artifact(path: impl AsRef<Path>) -> crate::Result<Event> {
+    fn parse_event_artifact(path: impl AsRef<Path>) -> crate::Result<Option<Event>> {
         let mut event = Event::new_empty_log();
-        let mut test_file = fs::File::open(path)?;
+        let mut test_file = match fs::File::open(path) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => Err(e)?,
+        };
 
         let mut buf = String::new();
         test_file.read_to_string(&mut buf)?;
@@ -87,38 +91,59 @@ mod tests {
         for (key, value) in test_json {
             event.as_mut_log().insert(key, value.clone());
         }
-        Ok(event)
+        Ok(Some(event))
     }
 
     #[test]
-    fn poc() -> crate::Result<()> {
-        use serde_json::json;
+    fn protobuf() -> crate::Result<()> {
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/protobuf/protobuf.wat"
             "#,
         )?;
 
-        let input = parse_event_artifact("tests/data/wasm/protobuf/demo.json")?;
+        let input =
+            parse_event_artifact("tests/data/wasm/protobuf/fixtures/a/input.json")?.unwrap();
 
-        let mut expected = input.clone();
-        expected.as_mut_log().insert(
-            "processed",
-            json!({
-                "people": [
-                    {
-                        "name": "Foo",
-                        "id": 1,
-                        "email": "foo@test.com",
-                        "phones": [],
-                    }
-                ]
-            }),
-        );
+        let output = transform.transform(input);
 
-        let new_event = transform.transform(input);
+        let expected = parse_event_artifact("tests/data/wasm/protobuf/fixtures/a/expected.json")?;
+        assert_eq!(output, expected);
+        Ok(())
+    }
 
-        assert_eq!(new_event, Some(expected));
+    #[test]
+    fn add_fields() -> crate::Result<()> {
+        let mut transform = parse_config(
+            r#"
+            module = "tests/data/wasm/add_fields/add_fields.wat"
+            "#,
+        )?;
+
+        let input =
+            parse_event_artifact("tests/data/wasm/add_fields/fixtures/a/input.json")?.unwrap();
+
+        let output = transform.transform(input);
+
+        let expected = parse_event_artifact("tests/data/wasm/add_fields/fixtures/a/expected.json")?;
+        assert_eq!(output, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn drop() -> crate::Result<()> {
+        let mut transform = parse_config(
+            r#"
+            module = "tests/data/wasm/drop/drop.wat"
+            "#,
+        )?;
+
+        let input = parse_event_artifact("tests/data/wasm/drop/fixtures/a/input.json")?.unwrap();
+
+        let output = transform.transform(input);
+
+        let expected = parse_event_artifact("tests/data/wasm/drop/fixtures/a/expected.json")?;
+        assert_eq!(output, expected);
         Ok(())
     }
 }
