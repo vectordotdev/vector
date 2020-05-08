@@ -173,12 +173,7 @@ impl JournaldConfig {
             let span = info_span!("journald-server");
             let dispatcher = dispatcher::get_default(|d| d.clone());
             spawn_blocking(move || {
-                dispatcher::with_default(&dispatcher, || {
-                    span.in_scope(|| {
-                        journald_server.run();
-                        debug!("Stopped");
-                    })
-                })
+                dispatcher::with_default(&dispatcher, || span.in_scope(|| journald_server.run()))
             })
             .boxed()
             .compat()
@@ -357,8 +352,7 @@ where
 
                 match channel.send(record).wait() {
                     Ok(_) => {}
-                    // Channel closed, so source is in process of a shutdown.
-                    Err(()) => return,
+                    Err(()) => error!(message = "Could not send journald log"),
                 }
             }
 
