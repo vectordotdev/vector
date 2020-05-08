@@ -116,18 +116,17 @@ impl RunningTopology {
     #[must_use]
     pub fn stop(self) -> impl Future<Item = (), Error = ()> {
         let mut running_tasks = self.tasks;
-        running_tasks.extend(self.source_tasks);
 
         let mut wait_handles = Vec::new();
-        let mut check_handles = HashMap::new();
+        let mut check_handles = HashMap::<String, Vec<_>>::new();
 
-        for (name, task) in running_tasks.drain() {
+        for (name, task) in running_tasks.drain().chain(self.source_tasks.into_iter()) {
             let task = task
                 .or_else(|_| future::ok(())) // Consider an errored task to be shutdown
                 .shared();
 
             wait_handles.push(task.clone());
-            check_handles.insert(name, task);
+            check_handles.entry(name).or_default().push(task);
         }
         let mut check_handles2 = check_handles.clone();
 
@@ -135,8 +134,11 @@ impl RunningTopology {
 
         let timeout = timer::Delay::new(deadline)
             .map(move |_| {
-                check_handles.retain(|_name, handle| {
-                    handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
+                check_handles.retain(|_name, handles| {
+                    retain(handles, |handle| {
+                        handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
+                    });
+                    !handles.is_empty()
                 });
                 let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
 
@@ -149,8 +151,11 @@ impl RunningTopology {
 
         let reporter = timer::Interval::new_interval(Duration::from_secs(5))
             .inspect(move |_| {
-                check_handles2.retain(|_name, handle| {
-                    handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
+                check_handles2.retain(|_name, handles| {
+                    retain(handles, |handle| {
+                        handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
+                    });
+                    !handles.is_empty()
                 });
                 let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
 
@@ -663,6 +668,18 @@ fn handle_errors(
             let _ = abort_tx.unbounded_send(());
             Err(())
         })
+}
+
+/// If the closure returns false, then the element is removed
+fn retain<T>(vec: &mut Vec<T>, mut retain_filter: impl FnMut(&mut T) -> bool) {
+    let mut i = 0;
+    while let Some(data) = vec.get_mut(i) {
+        if retain_filter(data) {
+            i += 1;
+        } else {
+            let _ = vec.remove(i);
+        }
+    }
 }
 
 #[cfg(all(test, feature = "sinks-console", feature = "sources-socket"))]
