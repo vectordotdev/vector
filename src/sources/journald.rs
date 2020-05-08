@@ -2,16 +2,15 @@ use crate::{
     event,
     event::{Event, LogEvent, Value},
     shutdown::ShutdownSignal,
-    stream::StreamExt,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use chrono::TimeZone;
 use futures::{
     compat::Future01CompatExt,
     executor::block_on,
-    future::{select, Either},
+    future::{select, Either, FutureExt, TryFutureExt},
 };
-use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{future, sync::mpsc, Future, Sink};
 use lazy_static::lazy_static;
 use nix::{
     sys::signal::{kill, Signal},
@@ -141,6 +140,10 @@ impl JournaldConfig {
     where
         J: JournalSource + Send + 'static,
     {
+        let out = out
+            .sink_map_err(|_| ())
+            .with(|record: Record| future::ok(create_event(record)));
+
         // Retrieve the saved checkpoint, and use it to seek forward in the journald log
         let cursor = match checkpointer.get() {
             Ok(cursor) => cursor,
@@ -157,43 +160,39 @@ impl JournaldConfig {
 
         Ok(Box::new(future::lazy(move || {
             info!(message = "Starting journald server.",);
-            let (tx, rx) = mpsc::channel(1000);
 
             let journald_server = JournaldServer {
                 journal,
                 include_units,
                 exclude_units,
-                channel: tx.sink_map_err(|_| ()),
+                channel: out,
                 shutdown: shutdown.clone(),
                 checkpointer,
                 batch_size,
             };
             let span = info_span!("journald-server");
             let dispatcher = dispatcher::get_default(|d| d.clone());
-            let _ = spawn_blocking(move || {
+            spawn_blocking(move || {
                 dispatcher::with_default(&dispatcher, || {
                     span.in_scope(|| {
                         journald_server.run();
                         debug!("Stopped");
                     })
                 })
-            });
-
-            rx.take_until(shutdown)
-                .map(|record: Record| create_event(record))
-                .forward(
-                    out.sink_map_err(
-                        |error| error!(message = "Unable to send event to out.", %error),
-                    ),
-                )
-                .map(move |_| {
-                    if let Some(pid) = pid {
-                        // Signal the child process to terminate so that the
-                        // blocking future can be unblocked earlier rather
-                        // than later.
-                        let _ = kill(pid, Signal::SIGTERM);
-                    }
-                })
+            })
+            .boxed()
+            .compat()
+            .map_err(|error| error!(message="Journald server unexpectedly stopped.",%error))
+            .select(shutdown.map(|_| ()))
+            .map(move |_| {
+                if let Some(pid) = pid {
+                    // Signal the child process to terminate so that the
+                    // blocking future can be unblocked earlier rather
+                    // than later.
+                    let _ = kill(pid, Signal::SIGTERM);
+                }
+            })
+            .map_err(|_| ())
         })))
     }
 }
