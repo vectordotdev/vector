@@ -163,7 +163,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-splunk
-  
+
   test-shutdown:
     runs-on: ubuntu-latest
     steps:

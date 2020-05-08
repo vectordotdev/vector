@@ -37,10 +37,10 @@ const PROMETHEUS_CONFIG: &'static str = r#"
         hosts = ["http://${VECTOR_TEST_ADDRESS}"]
 
     [sinks.out]
-        type = "prometheus" 
+        type = "prometheus"
         inputs = ["in"]
-        address = "${VECTOR_TEST_ADDRESS}" 
-        namespace = "service" 
+        address = "${VECTOR_TEST_ADDRESS}"
+        namespace = "service"
 "#;
 
 /// Creates a file with given content
@@ -76,7 +76,7 @@ data_dir = "${{VECTOR_DATA_DIR}}"
 [sinks.out]
     inputs = ["in"]
     type = "blackhole"
-    print_amount = 10000 
+    print_amount = 10000
 "#,
         source
     );
