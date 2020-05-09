@@ -22,12 +22,10 @@ impl InternalEvent for SplunkEventSent {
     }
 }
 
-
 #[derive(Debug)]
 pub struct SplunkEventEncodeError {
     pub error: Error,
 }
-
 
 impl InternalEvent for SplunkEventEncodeError {
     fn emit_logs(&self) {
