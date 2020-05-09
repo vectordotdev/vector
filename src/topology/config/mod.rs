@@ -143,6 +143,7 @@ pub struct SourceContext<'a> {
 }
 
 impl<'a> SourceContext<'a> {
+    #[cfg(test)]
     pub fn new_test(
         name: &'a str,
         globals: &'a GlobalOptions,
