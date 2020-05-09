@@ -41,7 +41,7 @@ impl Runtime {
         self
     }
 
-    pub fn spawn_handle<F>(&mut self, future: F) -> JoinHandle<F::Output>
+    pub fn spawn_handle_std<F>(&mut self, future: F) -> JoinHandle<F::Output>
     where
         F: std::future::Future + Send + 'static,
         F::Output: Send + 'static,
