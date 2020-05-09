@@ -6,6 +6,7 @@ mod lua;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
 mod regex;
+mod splunk_hec;
 mod syslog;
 mod tcp;
 mod udp;
@@ -20,6 +21,7 @@ pub use self::lua::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
 pub use self::regex::*;
+pub use self::splunk_hec::*;
 pub use self::syslog::*;
 pub use self::tcp::*;
 pub use self::udp::*;
