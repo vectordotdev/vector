@@ -48,8 +48,7 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let future = self.project();
         let output = ready!(future.inner.poll(cx));
-        let now = Instant::now();
-        let _rtt = now.saturating_duration_since(*future.start);
+        future.controller.adjust_to_response(*future.start);
         Poll::Ready(output)
     }
 }
