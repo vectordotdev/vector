@@ -253,6 +253,7 @@ pub struct TransformContext {
 }
 
 impl TransformContext {
+    #[cfg(test)]
     pub fn new_test(exec: TaskExecutor) -> Self {
         Self {
             resolver: Resolver::new(Vec::new(), exec.clone()).unwrap(),
