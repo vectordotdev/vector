@@ -4,9 +4,11 @@ use std::mem::{drop, replace};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
+use std::time::Instant;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 const EWMA_ALPHA: f64 = 0.5;
+const THRESHOLD: f64 = 0.01;
 
 /// Shared class for `tokio::sync::Semaphore` that manages adjusting the
 /// semaphore size and other associated data.
@@ -24,6 +26,17 @@ struct Inner {
     average_rtt: f64,
 }
 
+impl Inner {
+    /// Update the average RTT using EWMA, and return the new value.
+    fn update_rtt(&mut self, rtt: f64) -> f64 {
+        self.average_rtt = match self.average_rtt {
+            avg if avg < 0.0 => rtt,
+            avg => rtt * EWMA_ALPHA + avg * (1.0 - EWMA_ALPHA),
+        };
+        self.average_rtt
+    }
+}
+
 impl Controller {
     pub(super) fn new(max: usize, current: usize) -> Self {
         Self {
@@ -37,18 +50,8 @@ impl Controller {
         }
     }
 
-    /// Update the average RTT using EWMA, and return the new value.
-    pub(super) fn update_rtt(&mut self, rtt: f64) -> f64 {
-        let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
-        inner.average_rtt = match inner.average_rtt {
-            avg if avg < 0.0 => rtt,
-            avg => rtt * EWMA_ALPHA + avg * (1.0 - EWMA_ALPHA),
-        };
-        inner.average_rtt
-    }
-
     /// Increase (additive) the current number of permits
-    pub(super) fn expand(&mut self) {
+    fn expand(&self) {
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
         if inner.current < self.max {
             self.semaphore.add_permits(1);
@@ -58,7 +61,7 @@ impl Controller {
     }
 
     /// Decrease (multiplicative) the current concurrency
-    pub(super) fn contract(&mut self) {
+    fn contract(&self) {
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
         let new_current = (inner.current + 1) / 2;
         for _ in new_current..inner.current {
@@ -76,6 +79,24 @@ impl Controller {
             inner: self.inner.clone(),
             future: Box::pin(Arc::clone(&self.semaphore).acquire_owned()),
         }
+    }
+
+    pub(super) fn adjust_to_response(&self, start: Instant) {
+        // Problems:
+        // * adjusts on every measurement, not just once per RTT
+        // * adjusts for any response, does not differentiate
+        // * has recursive locking via `fn contract` and `fn expand`
+        let now = Instant::now();
+        let rtt = now.saturating_duration_since(start).as_secs_f64();
+        let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
+        let avg = inner.average_rtt;
+        let threshold = avg * THRESHOLD;
+        if rtt >= avg + threshold {
+            self.contract();
+        } else if inner.current < self.max && rtt <= avg {
+            self.expand();
+        }
+        inner.update_rtt(rtt);
     }
 }
 
