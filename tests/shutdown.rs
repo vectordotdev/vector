@@ -1,7 +1,5 @@
 #![cfg(all(feature = "shutdown-tests"))]
 
-extern crate assert_cmd;
-
 use assert_cmd::prelude::*;
 use nix::{
     sys::signal::{kill, Signal},
@@ -100,7 +98,7 @@ fn test_timely_shutdown(mut cmd: Command) {
     let mut vector = cmd.spawn().unwrap();
 
     // Give vector time to start.
-    sleep(Duration::from_secs(2));
+    sleep(Duration::from_secs(1));
 
     // Signal shutdown
     kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
@@ -111,6 +109,7 @@ fn test_timely_shutdown(mut cmd: Command) {
     // Wait for shutdown
     assert!(vector.wait().unwrap().success());
 
+    // Check if vector has shutdown in a reasonable time
     assert!(now.elapsed() < Duration::from_secs(3));
 }
 
