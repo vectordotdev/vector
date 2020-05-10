@@ -8,4 +8,4 @@ set -euo pipefail
 #   Run shutdown tests only.
 
 docker-compose up -d dependencies-kafka
-cargo test --no-default-features --features shutdown-tests
+cargo test --features shutdown-tests  --test shutdown -- --test-threads 4
