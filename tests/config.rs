@@ -130,7 +130,7 @@ fn bad_type() {
 
     assert_eq!(err.len(), 1);
     assert!(
-        err[0].starts_with("unknown variant `jabberwocky`, expected one of "),
+        err[0].starts_with("unknown variant `jabberwocky`, expected "),
         "Found: {:?}",
         &err[0]
     );
