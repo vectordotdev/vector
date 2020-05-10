@@ -101,7 +101,7 @@ fn test_timely_shutdown(mut cmd: Command) {
     sleep(Duration::from_secs(1));
 
     // Check if vector is still running
-    assert_eq!(None,vector.try_wait().unwrap(),"Vector exited to early.");
+    assert_eq!(None, vector.try_wait().unwrap(), "Vector exited to early.");
 
     // Signal shutdown
     kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
