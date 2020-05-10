@@ -87,7 +87,9 @@ impl SourceConfig for JournaldConfig {
                 warn!("The `units` setting is deprecated, use `include_units` instead");
                 &self.units
             }
-            (_, false) => &self.include_units,
+            // include_units is either empty or not, both cases are fine since units is 
+            // certainly empty.
+            _ => &self.include_units,
         };
 
         let include_units: HashSet<String> = include_units.iter().map(fixup_unit).collect();
