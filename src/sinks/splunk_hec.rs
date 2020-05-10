@@ -117,13 +117,11 @@ impl HttpSink for HecSinkConfig {
 
         let host = event.get(&self.host_key).cloned();
 
-        let timestamp = if let Some(Value::Timestamp(ts)) =
-            event.remove(&event::log_schema().timestamp_key())
-        {
-            ts.timestamp_nanos()
-        } else {
-            chrono::Utc::now().timestamp_nanos()
+        let timestamp = match event.remove(&event::log_schema().timestamp_key()) {
+            Some(Value::Timestamp(ts)) => ts,
+            _ => chrono::Utc::now(),
         };
+        let timestamp = (timestamp.timestamp_millis() as f64) / 1000f64;
 
         let sourcetype = event.get(&event::log_schema().source_type_key()).cloned();
 
@@ -251,14 +249,14 @@ mod tests {
 
     #[derive(Deserialize, Debug)]
     struct HecEventJson {
-        time: i64,
+        time: f64,
         event: BTreeMap<String, String>,
         fields: BTreeMap<String, String>,
     }
 
     #[derive(Deserialize, Debug)]
     struct HecEventText {
-        time: i64,
+        time: f64,
         event: String,
         fields: BTreeMap<String, String>,
     }
