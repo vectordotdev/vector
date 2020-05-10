@@ -547,7 +547,7 @@ services:
     network_mode: host
     working_dir: $PWD
     user: $USER
-    command: cargo test --no-default-features --features default-musl,shutdown-tests --target x86_64-unknown-linux-musl --test shutdown -- --test-threads 4
+    command: cargo test --no-default-features --features default-musl,shutdown-tests,unix,rdkafka --target x86_64-unknown-linux-musl --test shutdown -- --test-threads 4
 
   test-behavior:
     image: ubuntu:18.04

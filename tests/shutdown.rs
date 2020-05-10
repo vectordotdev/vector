@@ -185,6 +185,7 @@ fn timely_shutdown_docker() {
     test_timely_shutdown(source_vector(r#"type = "docker""#));
 }
 
+#[cfg(feature = "unix")]
 #[test]
 fn timely_shutdown_journald() {
     test_timely_shutdown(source_vector(
@@ -199,6 +200,7 @@ fn timely_shutdown_prometheus() {
     test_timely_shutdown(run_vector(PROMETHEUS_CONFIG));
 }
 
+#[cfg(feature = "rdkafka")]
 #[test]
 fn timely_shutdown_kafka() {
     test_timely_shutdown(source_vector(
@@ -230,6 +232,7 @@ fn timely_shutdown_socket_udp() {
     ));
 }
 
+#[cfg(feature = "unix")]
 #[test]
 fn timely_shutdown_socket_unix() {
     test_timely_shutdown(source_vector(
@@ -278,6 +281,7 @@ fn timely_shutdown_syslog_udp() {
     ));
 }
 
+#[cfg(feature = "unix")]
 #[test]
 fn timely_shutdown_syslog_unix() {
     test_timely_shutdown(source_vector(
