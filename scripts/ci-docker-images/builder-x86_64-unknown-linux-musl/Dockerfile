@@ -312,3 +312,6 @@ ENV TARGET="$TARGET"
 RUN cargo install --git https://github.com/mmstick/cargo-deb --rev cc879930c06fa22e99f2839bad620ac0d0da879e cargo-deb
 
 RUN apt-get install -y rename cmark-gfm
+
+# Install journalctl
+RUN apt-get install -y systemd

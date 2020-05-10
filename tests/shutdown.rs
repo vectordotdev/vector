@@ -95,10 +95,13 @@ fn run_vector(config: &str) -> Command {
 }
 
 fn test_timely_shutdown(mut cmd: Command) {
-    let mut vector = cmd.spawn().unwrap();
+    let mut vector = cmd.stdin(std::process::Stdio::piped()).spawn().unwrap();
 
     // Give vector time to start.
     sleep(Duration::from_secs(1));
+
+    // Check if vector is still running
+    assert_eq!(None,vector.try_wait().unwrap(),"Vector exited to early.");
 
     // Signal shutdown
     kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
@@ -187,7 +190,7 @@ fn timely_shutdown_journald() {
     test_timely_shutdown(source_vector(
         r#"
     type = "journald"
-    include_units = [".dummy.vector.service"]"#,
+    include_units = []"#,
     ));
 }
 
