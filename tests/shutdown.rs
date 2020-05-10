@@ -107,10 +107,10 @@ fn test_timely_shutdown(mut cmd: Command) {
     let now = Instant::now();
 
     // Wait for shutdown
-    assert!(vector.wait().unwrap().success());
+    assert!(vector.wait().unwrap().success(),"Vector didn't exited successfully.");
 
     // Check if vector has shutdown in a reasonable time
-    assert!(now.elapsed() < Duration::from_secs(3));
+    assert!(now.elapsed() < Duration::from_secs(3),"Shutdown lasted for more than 3 seconds.");
 }
 
 #[test]
