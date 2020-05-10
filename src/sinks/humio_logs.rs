@@ -1,6 +1,8 @@
 use crate::{
     sinks::splunk_hec::{self, HecSinkConfig},
-    sinks::util::{encoding::EncodingConfigWithDefault, BatchBytesConfig, TowerRequestConfig},
+    sinks::util::{
+        encoding::EncodingConfigWithDefault, BatchBytesConfig, Compression, TowerRequestConfig,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -16,6 +18,9 @@ pub struct HumioLogsConfig {
         default
     )]
     encoding: EncodingConfigWithDefault<Encoding>,
+
+    #[serde(default=Compression::Gzip)]
+    compression: Compression,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -60,6 +65,7 @@ impl SinkConfig for HumioLogsConfig {
             encoding: self.encoding.clone().transmute(),
             batch: self.batch.clone(),
             request: self.request.clone(),
+            compression: Some(self.compression),
             ..Default::default()
         }
         .build(cx)
