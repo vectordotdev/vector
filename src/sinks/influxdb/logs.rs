@@ -2,7 +2,7 @@ use crate::dns::Resolver;
 use crate::event::Value;
 use crate::sinks::influxdb::{
     encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
-    Field, InfluxDB1Settings, InfluxDB2Settings, InfluxDBSettings,
+    Field, InfluxDB1Settings, InfluxDB2Settings,
 };
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
@@ -13,7 +13,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::Sink;
-use http::{Method, Request};
+use http::{Method, Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -24,7 +24,7 @@ pub struct InfluxDBLogsConfig {
     pub namespace: String,
     pub endpoint: String,
     #[serde(default)]
-    pub tags: HashSet<String>,
+    pub tags: Vec<String>,
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDB1Settings>,
     #[serde(flatten)]
@@ -42,8 +42,10 @@ pub struct InfluxDBLogsConfig {
 
 #[derive(Debug)]
 struct InfluxDBLogsSink {
-    config: InfluxDBLogsConfig,
-    settings: Box<dyn InfluxDBSettings>,
+    uri: Uri,
+    token: String,
+    namespace: String,
+    tags: HashSet<String>,
 }
 
 lazy_static! {
@@ -68,23 +70,34 @@ inventory::submit! {
 #[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDBLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let mut config = self.clone();
-        config.tags.insert(log_schema().host_key().to_string());
-        config
-            .tags
-            .insert(log_schema().source_type_key().to_string());
+        // let mut config = self.clone();
+        let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
+        tags.insert(log_schema().host_key().to_string());
+        tags.insert(log_schema().source_type_key().to_string());
 
         let healthcheck = self.healthcheck(cx.resolver())?;
 
-        let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let batch = self.batch.unwrap_or(bytesize::mib(1u64), 1);
+        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let settings = influxdb_settings(
-            config.influxdb1_settings.clone(),
-            config.influxdb2_settings.clone(),
+            self.influxdb1_settings.clone(),
+            self.influxdb2_settings.clone(),
         )
         .unwrap();
-        let sink = InfluxDBLogsSink { config, settings };
+
+        let endpoint = self.endpoint.clone();
+        let uri = settings.write_uri(endpoint).unwrap();
+
+        let token = settings.token();
+        let namespace = self.namespace.clone();
+
+        let sink = InfluxDBLogsSink {
+            uri,
+            token,
+            namespace,
+            tags,
+        };
 
         let sink = BatchedHttpSink::new(sink, Buffer::new(false), request, batch, None, &cx)
             .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}", e));
@@ -110,7 +123,7 @@ impl HttpSink for InfluxDBLogsSink {
         let mut event = event.into_log();
 
         // Measurement
-        let measurement = encode_namespace(&self.config.namespace, &"vector");
+        let measurement = encode_namespace(&self.namespace, &"vector");
 
         // Timestamp
         let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
@@ -122,7 +135,7 @@ impl HttpSink for InfluxDBLogsSink {
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
         let mut fields: HashMap<String, Field> = HashMap::new();
         event.all_fields().for_each(|(key, value)| {
-            if self.config.tags.contains(&key) {
+            if self.tags.contains(&key) {
                 tags.insert(key, value.to_string_lossy());
             } else {
                 fields.insert(key, value.to_field());
@@ -142,17 +155,12 @@ impl HttpSink for InfluxDBLogsSink {
     }
 
     fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
-        let endpoint = self.config.endpoint.clone();
-        let token = self.settings.token();
-
-        let uri = self.settings.write_uri(endpoint).unwrap();
-
         let mut builder = Request::builder();
         builder.method(Method::POST);
-        builder.uri(uri);
+        builder.uri(&self.uri);
 
         builder.header("Content-Type", "text/plain");
-        builder.header("Authorization", format!("Token {}", token));
+        builder.header("Authorization", format!("Token {}", &self.token));
         builder.body(events).unwrap()
     }
 }
@@ -221,14 +229,10 @@ mod tests {
         event.as_mut_log().insert("timestamp", ts());
 
         let sink = create_sink(
-            r#"
-        namespace = "ns"
-        endpoint = "http://localhost:9999"
-        bucket = "my-bucket"
-        org = "my-org"
-        token = "my-token"
-        tags = ["source_type", "host"]
-    "#,
+            "http://localhost:9999",
+            "my-token",
+            "ns",
+            ["source_type", "host"].to_vec(),
         );
 
         let bytes = sink.encode_event(event).unwrap();
@@ -262,15 +266,7 @@ mod tests {
         event.as_mut_log().insert("value", 100);
         event.as_mut_log().insert("timestamp", ts());
 
-        let sink = create_sink(
-            r#"
-            namespace = "ns"
-            endpoint = "http://localhost:9999"
-            bucket = "my-bucket"
-            org = "my-org"
-            token = "my-token"
-        "#,
-        );
+        let sink = create_sink("http://localhost:9999", "my-token", "ns", [].to_vec());
 
         let bytes = sink.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -301,15 +297,7 @@ mod tests {
             .insert("nested.array[2]", "another-value");
         event.as_mut_log().insert("nested.array[3]", 15);
 
-        let sink = create_sink(
-            r#"
-            namespace = "ns"
-            endpoint = "http://localhost:9999"
-            bucket = "my-bucket"
-            org = "my-org"
-            token = "my-token"
-        "#,
-        );
+        let sink = create_sink("http://localhost:9999", "my-token", "ns", [].to_vec());
 
         let bytes = sink.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -341,14 +329,10 @@ mod tests {
         event.as_mut_log().insert("timestamp", ts());
 
         let sink = create_sink(
-            r#"
-            namespace = "ns"
-            endpoint = "http://localhost:9999"
-            bucket = "my-bucket"
-            org = "my-org"
-            token = "my-token"
-            tags = ["as_a_tag", "not_exists_field", "source_type"]
-        "#,
+            "http://localhost:9999",
+            "my-token",
+            "ns",
+            ["as_a_tag", "not_exists_field", "source_type"].to_vec(),
         );
 
         let bytes = sink.encode_event(event).unwrap();
@@ -509,15 +493,17 @@ mod tests {
         assert_eq!(format!("{}", (i + 1) * 1000000000), line_protocol.3);
     }
 
-    fn create_sink(configuration: &str) -> InfluxDBLogsSink {
-        let config: InfluxDBLogsConfig = toml::from_str(configuration).unwrap();
-        let settings = influxdb_settings(
-            config.clone().influxdb1_settings,
-            config.clone().influxdb2_settings,
-        )
-        .unwrap();
-
-        let sink = InfluxDBLogsSink { config, settings };
+    fn create_sink(uri: &str, token: &str, namespace: &str, tags: Vec<&str>) -> InfluxDBLogsSink {
+        let uri = uri.parse::<Uri>().unwrap();
+        let token = token.to_string();
+        let namespace = namespace.to_string();
+        let tags: HashSet<String> = tags.into_iter().map(|tag| tag.to_string()).collect();
+        let sink = InfluxDBLogsSink {
+            uri,
+            token,
+            namespace,
+            tags,
+        };
         sink
     }
 }

@@ -58,7 +58,7 @@ pub struct InfluxDB2Settings {
     token: String,
 }
 
-trait InfluxDBSettings: std::fmt::Debug + Send + Sync {
+trait InfluxDBSettings {
     fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
     fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
     fn token(self: &Self) -> String;
