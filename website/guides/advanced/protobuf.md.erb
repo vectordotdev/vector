@@ -51,25 +51,25 @@ cp vector/tests/data/wasm/protobuf/ my-protobuf-plugin
 cd my-protobuf-plugin
 ```
 
-# Using your protobuf
+# Roll a WASM plugin
 
-The template you downloaded can take a defined protobuf file then build it into a plaintext `wat` file. You
-can then include the output `wat` in your configuration management, dropping it into the `/etc/vector/plugins/` folder.
-
-You can follow the `README.md` file included for specific steps, but for most users, the following will suffice:
+The template you downloaded can take a defined protobuf file then build it into a `wasm` file (or a `wat` if you have
+`wabt`). You can then include the output `wat` in your configuration management, dropping it into the
+`/etc/vector/plugins/` folder.
 
 ```bash
 rm -r protos
 cp -r $YOUR_PROTOS protos
 ```
 
-Then, edit the `src/lib.rs` file's includes. Near the top you'll see `include!(...)` statements that look similar to the
+Then, edit the `src/lib.rs` file. Near the top you'll see `include!(...)` statements that look similar to the
 [`prost` documentation](https://docs.rs/prost-build/0.6.1/prost_build/). You'll need to match the structure of the
 protos you copied in:
 
 ```rust
 type DecodingTarget = crate::example::subexample::Example;
 
+// Not sure what to add here? Check `target/wasm32-wasi-release/protobuf-*/out`
 pub mod example {
     pub mod subexample {
         include!(concat!(env!("OUT_DIR"), "/example.subexample.rs"));
@@ -81,4 +81,16 @@ pub mod other_example {
 }
 ```
 
-Next, you can load
+Before we try to do anything serious, let's test the module.
+
+```bash
+cargo test --target wasm32-wasi
+```
+
+Assuming the tests pass, it's time to deploy to production!
+
+```bash
+cargo build --release --target wasm32-wasi
+```
+
+You'll find a `target/wasm32-wasi/release/protobuf.wasm` file which you can then load into Vector.

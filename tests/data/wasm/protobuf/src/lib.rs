@@ -2,15 +2,20 @@
 use anyhow::{Context, Result};
 use prost::Message;
 use serde_json::Value;
+// This is **required**.
+pub use vector_wasm::interop::*;
 use vector_wasm::{hostcall, Registration};
 
 // Choose the output type here:
 type DecodingTarget = crate::items::AddressBook;
 
 // Match the proto structure here:
+// Not sure what to add here? Check `target/wasm32-wasi-release/protobuf-*/out`
 pub mod items {
     include!(concat!(env!("OUT_DIR"), "/messages.rs"));
 }
+
+// New WASM adventurers need not explore below unless they are curious souls.
 
 fn handle(slice: &mut Vec<u8>) -> Result<Vec<u8>> {
     let mut json: Value = serde_json::from_slice(&slice).context("Vector sent invalid JSON")?;
@@ -47,17 +52,17 @@ pub extern "C" fn process(data: u64, length: u64) -> i64 {
     let mut buffer =
         unsafe { Vec::from_raw_parts(data as *mut u8, length as usize, length as usize) };
 
+    // At this point, if we have an error, we can only really panic.
     match handle(&mut buffer) {
         Err(e) => {
-            hostcall::emit(&mut buffer).unwrap();
+            // Output the error.
             hostcall::raise(e).unwrap();
-            drop(buffer);
-            1
+            // Even in the case of failure, we emit the event so it can progress through the pipeline.
+            hostcall::emit(&mut buffer).unwrap()
         }
         Ok(mut v) => {
-            hostcall::emit(&mut v).unwrap();
-            drop(v);
-            0
+            // Everything worked out, emit the event.
+            hostcall::emit(&mut v).unwrap()
         }
     }
 }
@@ -65,19 +70,6 @@ pub extern "C" fn process(data: u64, length: u64) -> i64 {
 #[no_mangle]
 pub extern "C" fn shutdown() {
     ();
-}
-
-#[no_mangle]
-pub extern "C" fn allocate_buffer(bytes: u64) -> *mut u8 {
-    let mut data: Vec<u8> = Vec::with_capacity(bytes as usize);
-    let ptr = data.as_mut_ptr();
-    std::mem::forget(data); // Yes this is unsafe, we'll get it back later.
-    ptr
-}
-
-#[no_mangle]
-pub extern "C" fn drop_buffer(start: *mut u8, length: usize) {
-    let _ = std::ptr::slice_from_raw_parts_mut(start, length);
 }
 
 #[test]

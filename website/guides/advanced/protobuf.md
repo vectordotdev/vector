@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-07"
+last_modified_on: "2020-05-11"
 $schema: "/.meta/.schemas/guides.json"
 title: Decoding Protobufs using WASM
 description: Plug an experimental protobuf plugin into Vector
@@ -51,8 +51,41 @@ Vector's official repository stores a template protobuf plugin used to test WASM
 ```bash
 git clone https://github.com/timberio/vector.git
 git checkout v0.x.x # Put your version here!
-cd tests/data/wasm/protobuf/
+cp vector/tests/data/wasm/protobuf/ my-protobuf-plugin
+cd my-protobuf-plugin
 ```
+
+# Using your protobuf
+
+The template you downloaded can take a defined protobuf file then build it into a plaintext `wat` file. You
+can then include the output `wat` in your configuration management, dropping it into the `/etc/vector/plugins/` folder.
+
+You can follow the `README.md` file included for specific steps, but for most users, the following will suffice:
+
+```bash
+rm -r protos
+cp -r $YOUR_PROTOS protos
+```
+
+Then, edit the `src/lib.rs` file's includes. Near the top you'll see `include!(...)` statements that look similar to the
+[`prost` documentation](https://docs.rs/prost-build/0.6.1/prost_build/). You'll need to match the structure of the
+protos you copied in:
+
+```rust
+type DecodingTarget = crate::example::subexample::Example;
+
+pub mod example {
+    pub mod subexample {
+        include!(concat!(env!("OUT_DIR"), "/example.subexample.rs"));
+    }
+}
+
+pub mod other_example {
+    include!(concat!(env!("OUT_DIR"), "/other_example.rs"));
+}
+```
+
+Next, you can load
 
 
 [docs.about.concepts]: /docs/about/concepts/

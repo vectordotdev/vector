@@ -10,19 +10,16 @@
   (type (;8;) (func (param i32 i32 i32 i32) (result i32)))
   (type (;9;) (func))
   (type (;10;) (func (param i64 i64) (result i32)))
-  (type (;11;) (func (param i64) (result i32)))
-  (type (;12;) (func (param i32 i32 i32 i32 i32)))
-  (type (;13;) (func (result i32)))
-  (type (;14;) (func (param i32) (result i32)))
-  (type (;15;) (func (param i32 i32 i32 i32 i32) (result i32)))
-  (type (;16;) (func (param i64 i32 i32) (result i32)))
-  (type (;17;) (func (param i32 i32 i32 i32 i32 i32) (result i32)))
-  (type (;18;) (func (param i32 i32 i32 i32 i32 i32 i32) (result i32)))
+  (type (;11;) (func (param i32 i32 i32 i32 i32)))
+  (type (;12;) (func (result i32)))
+  (type (;13;) (func (param i32) (result i32)))
+  (type (;14;) (func (param i32 i32 i32 i32 i32) (result i32)))
+  (type (;15;) (func (param i64 i32 i32) (result i32)))
+  (type (;16;) (func (param i32 i32 i32 i32 i32 i32) (result i32)))
+  (type (;17;) (func (param i32 i32 i32 i32 i32 i32 i32) (result i32)))
+  (type (;18;) (func (param i64) (result i32)))
   (import "env" "register" (func $register (type 7)))
   (import "wasi_snapshot_preview1" "fd_write" (func $_ZN4wasi13lib_generated22wasi_snapshot_preview18fd_write17h62539b3299a4581fE (type 8)))
-  (func $_ZN5alloc7raw_vec19RawVec$LT$T$C$A$GT$11allocate_in28_$u7b$$u7b$closure$u7d$$u7d$17hf04678ef09f41331E.llvm.11720802806971857734 (type 9)
-    call $_ZN5alloc7raw_vec17capacity_overflow17h60fd539dfca5134dE
-    unreachable)
   (func $init (type 9)
     (local i32)
     global.get 0
@@ -44,18 +41,6 @@
   (func $process (type 10) (param i64 i64) (result i32)
     i32.const 0)
   (func $shutdown (type 9))
-  (func $allocate_buffer (type 11) (param i64) (result i32)
-    block  ;; label = @1
-      local.get 0
-      i32.wrap_i64
-      i32.const -1
-      i32.gt_s
-      br_if 0 (;@1;)
-      call $_ZN5alloc7raw_vec19RawVec$LT$T$C$A$GT$11allocate_in28_$u7b$$u7b$closure$u7d$$u7d$17hf04678ef09f41331E.llvm.11720802806971857734
-      unreachable
-    end
-    i32.const 1)
-  (func $drop_buffer (type 4) (param i32 i32))
   (func $__rust_alloc (type 2) (param i32 i32) (result i32)
     (local i32)
     local.get 0
@@ -80,6 +65,9 @@
     local.set 4
     local.get 4
     return)
+  (func $_ZN5alloc7raw_vec19RawVec$LT$T$C$A$GT$11allocate_in28_$u7b$$u7b$closure$u7d$$u7d$17h44d68e4966a527b3E.llvm.1327916553274075906 (type 9)
+    call $_ZN5alloc7raw_vec17capacity_overflow17h60fd539dfca5134dE
+    unreachable)
   (func $_ZN5alloc7raw_vec19RawVec$LT$T$C$A$GT$7reserve17he2800ad5c7c510b4E (type 5) (param i32 i32 i32)
     (local i32)
     block  ;; label = @1
@@ -280,7 +268,7 @@
     call $_ZN4core5panic8Location6caller17hba7ec45f0d210bdeE
     call $_ZN4core9panicking9panic_fmt17h98142caac1112f39E
     unreachable)
-  (func $_ZN10serde_json3ser18format_escaped_str17h909b592d21f22459E (type 12) (param i32 i32 i32 i32 i32)
+  (func $_ZN10serde_json3ser18format_escaped_str17h909b592d21f22459E (type 11) (param i32 i32 i32 i32 i32)
     (local i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32)
     global.get 0
     i32.const 32
@@ -1023,7 +1011,7 @@
     i32.const 1048968
     call $_ZN3std9panicking11begin_panic17h8d948eabdf427119E
     unreachable)
-  (func $_ZN11vector_wasm12registration12Registration9transform17h71a5e930d73f4337E (type 13) (result i32)
+  (func $_ZN11vector_wasm12registration12Registration9transform17h71a5e930d73f4337E (type 12) (result i32)
     i32.const 0)
   (func $_ZN11vector_wasm12registration12Registration8register17h6a69957fe30ccf28E (type 0) (param i32)
     local.get 0
@@ -2029,7 +2017,7 @@
     i32.load offset=8
     local.get 1
     call $_ZN40_$LT$str$u20$as$u20$core..fmt..Debug$GT$3fmt17h1a54fd8ecae06fe9E)
-  (func $_ZN10serde_json5error5Error2io17h15dd2616b9b8f602E (type 14) (param i32) (result i32)
+  (func $_ZN10serde_json5error5Error2io17h15dd2616b9b8f602E (type 13) (param i32) (result i32)
     (local i64)
     local.get 0
     i64.load align=4
@@ -3983,7 +3971,7 @@
       unreachable
     end
     local.get 0)
-  (func $_ZN4core6option15Option$LT$T$GT$6unwrap17h1739ecdc6eda48e2E (type 14) (param i32) (result i32)
+  (func $_ZN4core6option15Option$LT$T$GT$6unwrap17h1739ecdc6eda48e2E (type 13) (param i32) (result i32)
     block  ;; label = @1
       local.get 0
       br_if 0 (;@1;)
@@ -4512,7 +4500,7 @@
     i32.load offset=8
     local.get 1
     call $_ZN42_$LT$str$u20$as$u20$core..fmt..Display$GT$3fmt17hcf977a4d08f25cc0E)
-  (func $_ZN3std10sys_common11thread_info10ThreadInfo4with28_$u7b$$u7b$closure$u7d$$u7d$17h7258ebfa61eae2eaE (type 14) (param i32) (result i32)
+  (func $_ZN3std10sys_common11thread_info10ThreadInfo4with28_$u7b$$u7b$closure$u7d$$u7d$17h7258ebfa61eae2eaE (type 13) (param i32) (result i32)
     (local i32 i32 i32 i32)
     global.get 0
     i32.const 32
@@ -4670,7 +4658,7 @@
     local.get 2
     call $rust_begin_unwind
     unreachable)
-  (func $_ZN3std6thread6Thread3new17h913808035e83dacfE (type 14) (param i32) (result i32)
+  (func $_ZN3std6thread6Thread3new17h913808035e83dacfE (type 13) (param i32) (result i32)
     (local i32 i32 i32 i32 i64)
     global.get 0
     i32.const 48
@@ -5812,7 +5800,7 @@
     call $_ZN73_$LT$std..sys_common..os_str_bytes..Slice$u20$as$u20$core..fmt..Debug$GT$3fmt17h8b2c8a7213186b17E)
   (func $_ZN3std5error5Error7type_id17h64ce692d4319812fE (type 1) (param i32) (result i64)
     i64.const -32900538044362730)
-  (func $_ZN3std5error5Error9backtrace17h799bc3f420176d06E (type 14) (param i32) (result i32)
+  (func $_ZN3std5error5Error9backtrace17h799bc3f420176d06E (type 13) (param i32) (result i32)
     i32.const 0)
   (func $_ZN3std5error5Error5cause17h955b446571fa3458E (type 4) (param i32 i32)
     local.get 0
@@ -5841,7 +5829,7 @@
     i32.load offset=8
     local.get 1
     call $_ZN40_$LT$str$u20$as$u20$core..fmt..Debug$GT$3fmt17h1a54fd8ecae06fe9E)
-  (func $_ZN3std3sys4wasi17decode_error_kind17h45e11c33b7590f34E (type 14) (param i32) (result i32)
+  (func $_ZN3std3sys4wasi17decode_error_kind17h45e11c33b7590f34E (type 13) (param i32) (result i32)
     (local i32)
     i32.const 16
     local.set 1
@@ -8129,10 +8117,10 @@
     i32.add
     global.set 0
     local.get 0)
-  (func $__rust_start_panic (type 14) (param i32) (result i32)
+  (func $__rust_start_panic (type 13) (param i32) (result i32)
     unreachable
     unreachable)
-  (func $_ZN4wasi5error5Error9raw_error17h3d77f281c47bf703E (type 14) (param i32) (result i32)
+  (func $_ZN4wasi5error5Error9raw_error17h3d77f281c47bf703E (type 13) (param i32) (result i32)
     local.get 0
     i32.load16_u)
   (func $_ZN4wasi13lib_generated8fd_write17h599f0274fd7b3c57E (type 3) (param i32 i32 i32 i32)
@@ -8176,7 +8164,7 @@
     i32.const 16
     i32.add
     global.set 0)
-  (func $_ZN9backtrace5print12BacktraceFmt3new17had3bff9dc6727220E (type 12) (param i32 i32 i32 i32 i32)
+  (func $_ZN9backtrace5print12BacktraceFmt3new17had3bff9dc6727220E (type 11) (param i32 i32 i32 i32 i32)
     local.get 0
     local.get 2
     i32.store8 offset=16
@@ -8194,21 +8182,21 @@
     i32.add
     local.get 4
     i32.store)
-  (func $_ZN9backtrace5print12BacktraceFmt11add_context17h0da2f7f19088e8c2E (type 14) (param i32) (result i32)
+  (func $_ZN9backtrace5print12BacktraceFmt11add_context17h0da2f7f19088e8c2E (type 13) (param i32) (result i32)
     local.get 0
     i32.load
     i32.const 1052527
     i32.const 17
     call $_ZN4core3fmt9Formatter9write_str17h6367e5f885508b07E)
-  (func $_ZN9backtrace5print12BacktraceFmt6finish17hec231066b8ef0ca6E (type 14) (param i32) (result i32)
+  (func $_ZN9backtrace5print12BacktraceFmt6finish17hec231066b8ef0ca6E (type 13) (param i32) (result i32)
     i32.const 0)
   (func $abort (type 9)
     unreachable
     unreachable)
-  (func $malloc (type 14) (param i32) (result i32)
+  (func $malloc (type 13) (param i32) (result i32)
     local.get 0
     call $dlmalloc)
-  (func $dlmalloc (type 14) (param i32) (result i32)
+  (func $dlmalloc (type 13) (param i32) (result i32)
     (local i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32)
     global.get 0
     i32.const 16
@@ -13997,7 +13985,7 @@
     local.get 0
     local.get 1
     call $internal_memalign)
-  (func $sbrk (type 14) (param i32) (result i32)
+  (func $sbrk (type 13) (param i32) (result i32)
     block  ;; label = @1
       local.get 0
       br_if 0 (;@1;)
@@ -14037,7 +14025,7 @@
     end
     call $abort
     unreachable)
-  (func $getenv (type 14) (param i32) (result i32)
+  (func $getenv (type 13) (param i32) (result i32)
     (local i32 i32 i32 i32)
     i32.const 0
     local.set 1
@@ -14103,7 +14091,7 @@
       local.set 1
     end
     local.get 1)
-  (func $strlen (type 14) (param i32) (result i32)
+  (func $strlen (type 13) (param i32) (result i32)
     (local i32 i32 i32)
     local.get 0
     local.set 1
@@ -14202,7 +14190,7 @@
     local.get 3
     local.get 0
     i32.sub)
-  (func $strerror (type 14) (param i32) (result i32)
+  (func $strerror (type 13) (param i32) (result i32)
     (local i32 i32 i32 i32)
     i32.const 0
     local.set 1
@@ -17611,7 +17599,7 @@
     i32.add
     local.get 6
     i64.store align=4)
-  (func $_ZN4core7unicode9printable12is_printable17h28b8beadd74ff247E (type 14) (param i32) (result i32)
+  (func $_ZN4core7unicode9printable12is_printable17h28b8beadd74ff247E (type 13) (param i32) (result i32)
     (local i32)
     block  ;; label = @1
       local.get 0
@@ -17690,7 +17678,7 @@
     i32.const 1056043
     i32.const 314
     call $_ZN4core7unicode9printable5check17h32a85d89e686515aE)
-  (func $_ZN82_$LT$core..char..EscapeDebug$u20$as$u20$core..iter..traits..iterator..Iterator$GT$4next17h8d8e9bdd03c8beb6E (type 14) (param i32) (result i32)
+  (func $_ZN82_$LT$core..char..EscapeDebug$u20$as$u20$core..iter..traits..iterator..Iterator$GT$4next17h8d8e9bdd03c8beb6E (type 13) (param i32) (result i32)
     (local i32 i32)
     i32.const 1114112
     local.set 1
@@ -17794,7 +17782,7 @@
       local.set 1
     end
     local.get 1)
-  (func $_ZN4core3fmt8builders11DebugStruct5field17hdb0382cc3deab674E (type 15) (param i32 i32 i32 i32 i32) (result i32)
+  (func $_ZN4core3fmt8builders11DebugStruct5field17hdb0382cc3deab674E (type 14) (param i32 i32 i32 i32 i32) (result i32)
     (local i32 i32 i32 i32 i64 i64)
     global.get 0
     i32.const 64
@@ -17995,7 +17983,7 @@
     local.get 0
     i32.load offset=4
     call $_ZN4core3fmt9Formatter3pad17h7b301e85900e29c6E)
-  (func $_ZN4core6option18expect_none_failed17h5718e8afd751d0acE (type 12) (param i32 i32 i32 i32 i32)
+  (func $_ZN4core6option18expect_none_failed17h5718e8afd751d0acE (type 11) (param i32 i32 i32 i32 i32)
     (local i32)
     global.get 0
     i32.const 64
@@ -18062,13 +18050,13 @@
     i32.load offset=4
     i32.load offset=12
     call_indirect (type 2))
-  (func $_ZN4core5panic9PanicInfo7message17hffa6f3d3e6ff0a39E (type 14) (param i32) (result i32)
+  (func $_ZN4core5panic9PanicInfo7message17hffa6f3d3e6ff0a39E (type 13) (param i32) (result i32)
     local.get 0
     i32.load offset=8)
-  (func $_ZN4core5panic9PanicInfo8location17h30a49797d3e7ef56E (type 14) (param i32) (result i32)
+  (func $_ZN4core5panic9PanicInfo8location17h30a49797d3e7ef56E (type 13) (param i32) (result i32)
     local.get 0
     i32.load offset=12)
-  (func $_ZN4core5panic8Location6caller17hba7ec45f0d210bdeE (type 14) (param i32) (result i32)
+  (func $_ZN4core5panic8Location6caller17hba7ec45f0d210bdeE (type 13) (param i32) (result i32)
     local.get 0)
   (func $_ZN4core5panic8Location4file17h54f5698a3003e7b3E (type 4) (param i32 i32)
     local.get 0
@@ -18773,7 +18761,7 @@
     i32.add
     global.set 0
     local.get 0)
-  (func $_ZN4core3fmt8builders10DebugTuple6finish17hd8ce6586f49c209fE (type 14) (param i32) (result i32)
+  (func $_ZN4core3fmt8builders10DebugTuple6finish17hd8ce6586f49c209fE (type 13) (param i32) (result i32)
     (local i32 i32 i32)
     local.get 0
     i32.load8_u offset=8
@@ -19001,7 +18989,7 @@
     local.get 2
     call $_ZN4core3fmt8builders10DebugInner5entry17h009755ce841ea300E
     local.get 0)
-  (func $_ZN4core3fmt8builders9DebugList6finish17h6732b39c5e331c0aE (type 14) (param i32) (result i32)
+  (func $_ZN4core3fmt8builders9DebugList6finish17h6732b39c5e331c0aE (type 13) (param i32) (result i32)
     (local i32)
     i32.const 1
     local.set 1
@@ -19277,7 +19265,7 @@
     i32.const 1
     local.get 1
     call $_ZN4core3fmt3num3imp7fmt_u6417h035a0daf9e6f2b5cE)
-  (func $_ZN4core3fmt3num3imp7fmt_u6417h035a0daf9e6f2b5cE (type 16) (param i64 i32 i32) (result i32)
+  (func $_ZN4core3fmt3num3imp7fmt_u6417h035a0daf9e6f2b5cE (type 15) (param i64 i32 i32) (result i32)
     (local i32 i32 i64 i32 i32 i32)
     global.get 0
     i32.const 48
@@ -19500,7 +19488,7 @@
     i32.add
     global.set 0
     local.get 0)
-  (func $_ZN4core3fmt9Formatter12pad_integral17he52ae3771fdc9ec7E (type 17) (param i32 i32 i32 i32 i32 i32) (result i32)
+  (func $_ZN4core3fmt9Formatter12pad_integral17he52ae3771fdc9ec7E (type 16) (param i32 i32 i32 i32 i32 i32) (result i32)
     (local i32 i32 i32 i32 i32 i32)
     block  ;; label = @1
       block  ;; label = @2
@@ -19993,14 +19981,14 @@
     i32.add
     global.set 0
     local.get 1)
-  (func $_ZN4core3fmt9Formatter15debug_lower_hex17h56f7e617e2f0ca72E (type 14) (param i32) (result i32)
+  (func $_ZN4core3fmt9Formatter15debug_lower_hex17h56f7e617e2f0ca72E (type 13) (param i32) (result i32)
     local.get 0
     i32.load8_u
     i32.const 16
     i32.and
     i32.const 4
     i32.shr_u)
-  (func $_ZN4core3fmt9Formatter15debug_upper_hex17h009e81a991e324e6E (type 14) (param i32) (result i32)
+  (func $_ZN4core3fmt9Formatter15debug_upper_hex17h009e81a991e324e6E (type 13) (param i32) (result i32)
     local.get 0
     i32.load8_u
     i32.const 32
@@ -22244,7 +22232,7 @@
     i32.const 1
     local.get 1
     call $_ZN4core3fmt3num3imp7fmt_u6417h035a0daf9e6f2b5cE)
-  (func $_ZN4core7unicode9printable5check17h32a85d89e686515aE (type 18) (param i32 i32 i32 i32 i32 i32 i32) (result i32)
+  (func $_ZN4core7unicode9printable5check17h32a85d89e686515aE (type 17) (param i32 i32 i32 i32 i32 i32 i32) (result i32)
     (local i32 i32 i32 i32 i32 i32 i32)
     i32.const 1
     local.set 7
@@ -23058,7 +23046,7 @@
     i32.and
     i32.const 0
     i32.ne)
-  (func $_ZN4core7unicode12unicode_data15grapheme_extend6lookup17he32874b852959152E (type 14) (param i32) (result i32)
+  (func $_ZN4core7unicode12unicode_data15grapheme_extend6lookup17he32874b852959152E (type 13) (param i32) (result i32)
     (local i32 i32)
     local.get 0
     i32.const 10
@@ -23134,6 +23122,48 @@
     i32.const 139
     call $_ZN4core9panicking18panic_bounds_check17h8c4f03235e0b5d9bE
     unreachable)
+  (func $allocate_buffer (type 18) (param i64) (result i32)
+    (local i32 i32)
+    block  ;; label = @1
+      block  ;; label = @2
+        local.get 0
+        i32.wrap_i64
+        local.tee 1
+        i32.const -1
+        i32.le_s
+        br_if 0 (;@2;)
+        block  ;; label = @3
+          local.get 1
+          br_if 0 (;@3;)
+          i32.const 1
+          return
+        end
+        local.get 1
+        i32.const 1
+        call $__rust_alloc
+        local.tee 2
+        i32.eqz
+        br_if 1 (;@1;)
+        local.get 2
+        return
+      end
+      call $_ZN5alloc7raw_vec19RawVec$LT$T$C$A$GT$11allocate_in28_$u7b$$u7b$closure$u7d$$u7d$17h44d68e4966a527b3E.llvm.1327916553274075906
+      unreachable
+    end
+    local.get 1
+    i32.const 1
+    call $_ZN5alloc5alloc18handle_alloc_error17hdb3c7feb2edf717fE
+    unreachable)
+  (func $drop_buffer (type 4) (param i32 i32)
+    block  ;; label = @1
+      local.get 1
+      i32.eqz
+      br_if 0 (;@1;)
+      local.get 0
+      local.get 1
+      i32.const 1
+      call $__rust_dealloc
+    end)
   (table (;0;) 91 91 funcref)
   (memory (;0;) 17)
   (global (;0;) (mut i32) (i32.const 1048576))
