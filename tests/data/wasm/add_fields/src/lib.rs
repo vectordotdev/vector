@@ -1,3 +1,5 @@
+#![deny(improper_ctypes)]
+
 use serde_json::Value;
 use std::collections::BTreeMap;
 use vector_wasm::{hostcall, Registration};
@@ -17,7 +19,7 @@ pub extern "C" fn process(data: u64, length: u64) -> usize {
     let mut event: BTreeMap<String, Value> = serde_json::from_slice(data).unwrap();
     event.insert("new_field".into(), "new_value".into());
     event.insert("new_field_2".into(), "new_value_2".into());
-    hostcall::emit(serde_json::to_vec(&event).unwrap());
+    hostcall::emit(serde_json::to_vec(&event).unwrap()).unwrap();
     1
 }
 

@@ -95,7 +95,7 @@ mod tests {
     }
 
     #[test]
-    fn protobuf() -> crate::Result<()> {
+    fn protobuf_happy() -> crate::Result<()> {
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/protobuf/protobuf.wat"
@@ -103,11 +103,30 @@ mod tests {
         )?;
 
         let input =
-            parse_event_artifact("tests/data/wasm/protobuf/fixtures/a/input.json")?.unwrap();
+            parse_event_artifact("tests/data/wasm/protobuf/fixtures/happy/input.json")?.unwrap();
 
         let output = transform.transform(input);
 
-        let expected = parse_event_artifact("tests/data/wasm/protobuf/fixtures/a/expected.json")?;
+        let expected =
+            parse_event_artifact("tests/data/wasm/protobuf/fixtures/happy/expected.json")?;
+        assert_eq!(output, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn protobuf_sad() -> crate::Result<()> {
+        let mut transform = parse_config(
+            r#"
+            module = "tests/data/wasm/protobuf/protobuf.wat"
+            "#,
+        )?;
+
+        let input =
+            parse_event_artifact("tests/data/wasm/protobuf/fixtures/sad/input.json")?.unwrap();
+
+        let output = transform.transform(input);
+
+        let expected = parse_event_artifact("tests/data/wasm/protobuf/fixtures/sad/expected.json")?;
         assert_eq!(output, expected);
         Ok(())
     }

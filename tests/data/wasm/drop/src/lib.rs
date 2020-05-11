@@ -1,3 +1,5 @@
+#![deny(improper_ctypes)]
+
 use vector_wasm::Registration;
 
 #[no_mangle]

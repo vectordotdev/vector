@@ -51,9 +51,9 @@ checksum = "34fde25430d87a9388dadbe6e34d7f72a462c8b43ac8d309b42b0a8505d7e2a5"
 
 [[package]]
 name = "anyhow"
-version = "1.0.26"
+version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7825f6833612eb2414095684fcf6c635becf3ce97fe48cf6421321e93bfbd53c"
+checksum = "d9a60d744a80c30fcb657dfe2c1b22bcb3e814c1a1e3674f32bf5820b570fbff"
 
 [[package]]
 name = "approx"
@@ -5696,6 +5696,7 @@ checksum = "05c78687fb1a80548ae3250346c3db86a80a7cdd77bda190189f2d0a0987c81a"
 name = "vector"
 version = "0.9.1"
 dependencies = [
+ "anyhow",
  "approx",
  "async-trait",
  "atty",
@@ -5834,9 +5835,9 @@ dependencies = [
 name = "vector-wasm"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "serde",
  "serde_json",
- "snafu",
  "tracing",
 ]
 

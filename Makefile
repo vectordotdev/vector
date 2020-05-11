@@ -129,7 +129,7 @@ tests/data/wasm/%.wat:
 
 .PHONY: test-wasm
 test-wasm: build-wasm-tests  ### Run engine tests.
-	cargo test wasm --no-default-features --features wasm -- --nocapture
+	TEST_THREADS=1 TEST_LOG=vector=trace cargo test wasm --no-default-features --features wasm -- --nocapture
 
 .PHONY: bench-wasm
 bench-wasm: build-wasm-tests  ### Run engine tests.

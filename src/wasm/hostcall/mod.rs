@@ -6,6 +6,7 @@
 //! ```
 
 use super::context::EventBuffer;
+use crate::wasm::context::RaisedError;
 use crate::{internal_events, Event};
 use lucet_runtime::{lucet_hostcall, vmctx::Vmctx};
 use std::sync::Once;
@@ -36,7 +37,6 @@ pub extern "C" fn emit(vmctx: &mut Vmctx, data: u64, length: u64) -> usize {
 
     let heap = vmctx.heap_mut();
     let slice = &heap[data as usize..(length as usize + data as usize)];
-
     // TODO: Add some usability around `LogEvent` for this.
     let value: serde_json::Value = serde_json::from_slice(slice).unwrap();
     let mut event = Event::new_empty_log();
@@ -45,6 +45,23 @@ pub extern "C" fn emit(vmctx: &mut Vmctx, data: u64, length: u64) -> usize {
     }
 
     event_buffer.push_back(event);
+
+    internal_event.complete();
+    0
+}
+
+#[lucet_hostcall]
+#[no_mangle]
+pub extern "C" fn raise(vmctx: &mut Vmctx, data: u64, length: u64) -> usize {
+    let internal_event = internal_events::Hostcall::begin(Role::Transform, "raise");
+
+    let heap = vmctx.heap_mut();
+    let slice = &heap[data as usize..(length as usize + data as usize)];
+
+    let value = String::from_utf8(slice.into()).unwrap();
+
+    let mut maybe_error = vmctx.get_embed_ctx_mut::<RaisedError>();
+    maybe_error.error = Some(value);
 
     internal_event.complete();
     0
@@ -60,6 +77,7 @@ pub extern "C" fn ensure_linked() {
     use std::ptr::read_volatile;
     HOSTCALL_API_INIT.call_once(|| unsafe {
         read_volatile(emit as *const extern "C" fn());
+        read_volatile(raise as *const extern "C" fn());
         lucet_wasi::export_wasi_funcs();
         lucet_runtime::lucet_internal_ensure_linked();
     });

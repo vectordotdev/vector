@@ -6,7 +6,6 @@
 //! **Note:** This code is experimental.
 
 use crate::{internal_events, Event, Result};
-use context::EventBuffer;
 use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Region};
 use lucet_wasi::WasiCtxBuilder;
 use lucetc::{Bindings, Lucetc, LucetcOpts};
@@ -223,6 +222,7 @@ impl WasmModule {
         let instance = region
             .new_instance_builder(module)
             .with_embed_ctx::<Option<Registration>>(None)
+            .with_embed_ctx::<context::RaisedError>(Default::default())
             .build()?;
         let mut wasm_module = Self {
             config,
@@ -251,7 +251,7 @@ impl WasmModule {
     pub fn process(&mut self, mut data: Event) -> Result<LinkedList<Event>> {
         let internal_event_processing = internal_events::EventProcessing::begin(self.role);
 
-        self.instance.insert_embed_ctx(EventBuffer::new());
+        self.instance.insert_embed_ctx(context::EventBuffer::new());
 
         // We unfortunately can't pass our `Event` type over FFI.
         // Copy 1
@@ -272,11 +272,18 @@ impl WasmModule {
             .instance
             .run("process", &[guest_data_ptr.into(), guest_data_size.into()])?;
 
-        let engine_context: EventBuffer = self
+        let context::EventBuffer { events: out } = self
             .instance
             .remove_embed_ctx()
             .ok_or("Could not retrieve context after processing.")?;
-        let EventBuffer { events: out } = engine_context;
+
+        if let context::RaisedError { error: Some(error) } = self
+            .instance
+            .remove_embed_ctx()
+            .ok_or("Could not retrieve context after processing.")?
+        {
+            error!("{}", error);
+        }
 
         internal_event_processing.complete();
         Ok(out)

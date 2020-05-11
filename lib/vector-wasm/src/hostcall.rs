@@ -1,20 +1,5 @@
 use crate::Registration;
-use snafu::Snafu;
-
-#[derive(Debug, Snafu)]
-#[repr(C)]
-pub enum Error {
-    #[snafu(display("Codec error: {}", source))]
-    Codec { source: serde_json::error::Error },
-    #[snafu(display("Null error: {}", source))]
-    Nul { source: std::ffi::NulError },
-    #[snafu(display("UTF-8 error: {}", source))]
-    Utf8 { source: std::str::Utf8Error },
-    #[snafu(display("Foreign Module error"))]
-    Foreign,
-}
-
-pub type Result<T, E = Error> = core::result::Result<T, E>;
+use anyhow::Result;
 
 /// Emit the data back to the host.
 pub fn register(registration: &Registration) {
@@ -28,17 +13,27 @@ pub fn register(registration: &Registration) {
 }
 
 /// Emit the data back to the host.
-pub fn emit(mut data: impl AsMut<[u8]>) {
+pub fn emit(mut data: impl AsMut<[u8]>) -> Result<i64> {
     let data = data.as_mut();
-    unsafe {
-        ffi::emit(data.as_mut_ptr() as u64, data.len() as u64);
-    }
+    let retval = unsafe { ffi::emit(data.as_mut_ptr() as u64, data.len() as u64) };
+    Ok(retval)
+}
+
+/// Emit the data back to the host.
+pub fn raise(error: anyhow::Error) -> Result<i64> {
+    let mut string = format!("{}", error);
+    let buffer = unsafe { string.as_mut_vec() };
+    let parts = buffer.as_mut_slice();
+    let retval = unsafe { ffi::raise(parts.as_mut_ptr() as u64, parts.len() as u64) };
+    drop(parts);
     // No need to clean up manually. The slice is dropped.
+    Ok(retval)
 }
 
 pub mod ffi {
     extern "C" {
         pub(super) fn register(ptr: u64, size: u64);
-        pub(super) fn emit(ptr: u64, size: u64);
+        pub(super) fn emit(ptr: u64, size: u64) -> i64;
+        pub(super) fn raise(ptr: u64, size: u64) -> i64;
     }
 }

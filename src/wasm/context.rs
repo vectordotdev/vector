@@ -16,3 +16,8 @@ impl EventBuffer {
         self.events.push_back(event)
     }
 }
+
+#[derive(Default)]
+pub(super) struct RaisedError {
+    pub(super) error: Option<String>,
+}

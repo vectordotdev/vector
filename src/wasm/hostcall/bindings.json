@@ -1,6 +1,7 @@
 {
   "env": {
       "emit": "emit",
+      "raise": "raise",
       "register": "register"
   },
   "wasi_snapshot_preview1": {

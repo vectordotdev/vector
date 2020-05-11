@@ -169,6 +169,7 @@ vector-wasm = { path = "lib/vector-wasm", optional = true } # Notably, this is t
 lucetc = { version = "0.6.1", optional = true }
 lucet-runtime = { version = "0.6.1", optional = true }
 lucet-wasi = { version = "0.6.1", optional = true }
+anyhow = { version = "1.0.28", optional = true }
 
 
 [target.'cfg(windows)'.dependencies]
@@ -229,7 +230,7 @@ leveldb-plain = ["leveldb", "leveldb/leveldb-sys-2"]
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `leveldb-plain` doesn't work.
 leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
 # This feature enables the WASM foreign module support.
-wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm"]
+wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm", "anyhow"]
 
 # Sources
 sources = [
