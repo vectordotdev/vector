@@ -952,6 +952,7 @@ dependencies = [
  "indexmap",
  "libc",
  "quickcheck",
+ "rental",
  "scan_fmt",
  "tempfile",
  "tokio 0.2.13",
@@ -3133,6 +3134,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a83fa3702a688b9359eccba92d153ac33fd2e8462f9e0e3fdf155239ea7792e"
 dependencies = [
  "winapi 0.3.8",
+]
+
+[[package]]
+name = "rental"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8545debe98b2b139fb04cad8618b530e9b07c152d99a5de83c860b877d67847f"
+dependencies = [
+ "rental-impl",
+ "stable_deref_trait",
+]
+
+[[package]]
+name = "rental-impl"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "475e68978dc5b743f2f40d8e0a8fdc83f1c5e78cbf4b8fa5e74e73beebc340de"
+dependencies = [
+ "proc-macro2 1.0.8",
+ "quote 1.0.2",
+ "syn 1.0.14",
 ]
 
 [[package]]

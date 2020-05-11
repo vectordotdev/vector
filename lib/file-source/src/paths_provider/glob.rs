@@ -116,8 +116,64 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-impl PathsProvider for Glob {
-    fn paths(&self) -> Vec<PathBuf> {
-        self.iter().collect()
+impl<'a> PathsProvider for &'a Glob {
+    type IntoIter = Iter<'a>;
+
+    fn paths(&self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+/// Workaround for the absense of the GATs in Rust.
+pub mod gat_workaround {
+    use super::*;
+    use std::sync::Arc;
+
+    impl Glob {
+        /// Create a new [`Glob`] wrapped in [`Arc`].
+        ///
+        /// `Arc<Glob>` implements [`PathsProvider`] with low overhead.
+        /// This complexity is required while Rust doesn't have GATs.
+        ///
+        /// Returns `None` if patterns aren't valid.
+        pub fn new_arc(
+            include_patterns: &[PathBuf],
+            exclude_patterns: &[PathBuf],
+            glob_match_options: MatchOptions,
+        ) -> Option<Arc<Self>> {
+            Some(Arc::new(Self::new(
+                include_patterns,
+                exclude_patterns,
+                glob_match_options,
+            )?))
+        }
+    }
+
+    rental! {
+        #[allow(missing_docs)]
+        pub mod rent_iter {
+            use super::*;
+            #[rental]
+            pub struct RentIter {
+                head: Arc<Glob>,
+                tail: Iter<'head>,
+            }
+        }
+    }
+
+    impl Iterator for rent_iter::RentIter {
+        type Item = PathBuf;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            self.rent_mut(|val| Iter::next(val))
+        }
+    }
+
+    impl PathsProvider for Arc<Glob> {
+        type IntoIter = rent_iter::RentIter;
+
+        fn paths(&self) -> Self::IntoIter {
+            rent_iter::RentIter::new(self.clone(), |glob| glob.iter())
+        }
     }
 }
