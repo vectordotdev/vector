@@ -5,6 +5,7 @@ services:
   #
 
   build-x86_64-unknown-linux-musl:
+    image: timberiodev/vector-builder-x86_64-unknown-linux-musl:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
@@ -23,6 +24,7 @@ services:
     command: scripts/build.sh
 
   build-armv7-unknown-linux-musleabihf:
+    image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
@@ -41,6 +43,7 @@ services:
     command: scripts/build.sh
 
   build-aarch64-unknown-linux-musl:
+    image: timberiodev/vector-builder-aarch64-unknown-linux-musl:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
@@ -59,6 +62,7 @@ services:
     command: scripts/build.sh
 
   bench:
+    image: timberiodev/vector-builder-x86_64-unknown-linux-musl:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
@@ -74,6 +78,7 @@ services:
     command: cargo bench --all --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
   generate:
+    image: timberiodev/vector-checker:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/checker/Dockerfile
@@ -86,6 +91,7 @@ services:
     command: ./scripts/generate.rb
 
   check-code:
+    image: timberiodev/vector-checker:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/checker/Dockerfile
@@ -102,6 +108,7 @@ services:
     command: scripts/check-code.sh
 
   check-component-features:
+    image: timberiodev/vector-checker-component-features:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/checker-component-features/Dockerfile
@@ -118,6 +125,7 @@ services:
     command: ./scripts/check-component-features.sh
 
   check-fmt:
+    image: timberiodev/vector-checker:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/checker/Dockerfile
@@ -133,6 +141,7 @@ services:
     command: scripts/check-fmt.sh
 
   check-style:
+    image: timberiodev/vector-checker:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/checker/Dockerfile
@@ -143,6 +152,7 @@ services:
     command: ./scripts/check-style.sh
 
   check-markdown:
+    image: timberiodev/vector-checker-markdown:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/checker-markdown/Dockerfile
@@ -153,6 +163,7 @@ services:
     command: markdownlint .
 
   check-generate:
+    image: timberiodev/vector-checker:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/checker/Dockerfile
@@ -163,6 +174,7 @@ services:
     command: ./scripts/check-generate.sh
 
   check-version:
+    image: timberiodev/vector-checker:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/checker/Dockerfile
@@ -186,6 +198,7 @@ services:
       ]
 
   check-blog:
+    image: timberiodev/vector-checker:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/checker/Dockerfile
@@ -196,6 +209,7 @@ services:
     command: ./scripts/check-blog-signatures.rb
 
   check-scripts:
+    image: timberiodev/vector-checker-shellcheck:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/checker-shellcheck/Dockerfile
@@ -206,6 +220,7 @@ services:
     command: ./scripts/check-scripts.sh
 
   package-archive-x86_64-unknown-linux-musl:
+    image: timberiodev/vector-builder-x86_64-unknown-linux-musl:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
@@ -224,6 +239,7 @@ services:
     command: ./scripts/package-archive.sh
 
   package-archive-armv7-unknown-linux-musleabihf:
+    image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
@@ -242,6 +258,7 @@ services:
     command: ./scripts/package-archive.sh
 
   package-archive-aarch64-unknown-linux-musl:
+    image: timberiodev/vector-builder-aarch64-unknown-linux-musl:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
@@ -260,6 +277,7 @@ services:
     command: ./scripts/package-archive.sh
 
   package-deb-x86_64:
+    image: timberiodev/vector-builder-x86_64-unknown-linux-musl:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
@@ -275,6 +293,7 @@ services:
     command: ./scripts/package-deb.sh
 
   package-deb-armv7:
+    image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
@@ -290,6 +309,7 @@ services:
     command: ./scripts/package-deb.sh
 
   package-deb-aarch64:
+    image: timberiodev/vector-builder-aarch64-unknown-linux-musl:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
@@ -305,6 +325,7 @@ services:
     command: ./scripts/package-deb.sh
 
   package-rpm-x86_64:
+    image: timberiodev/vector-packager-rpm:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
@@ -317,6 +338,7 @@ services:
     command: ./scripts/package-rpm.sh
 
   package-rpm-armv7:
+    image: timberiodev/vector-packager-rpm:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
@@ -330,6 +352,7 @@ services:
     command: ./scripts/package-rpm.sh
 
   package-rpm-aarch64:
+    image: timberiodev/vector-packager-rpm:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
@@ -342,6 +365,7 @@ services:
     command: ./scripts/package-rpm.sh
 
   verify-rpm-amazonlinux-1:
+    image: timberiodev/vector-verifier-amazonlinux-1:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/verifier-amazonlinux-1/Dockerfile
@@ -352,6 +376,7 @@ services:
       ["sh", "-ec", "rpm -i target/artifacts/*-x86_64.rpm && vector --version"]
 
   verify-rpm-amazonlinux-2:
+    image: timberiodev/vector-verifier-amazonlinux-2:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/verifier-amazonlinux-2/Dockerfile
@@ -362,6 +387,7 @@ services:
       ["sh", "-ec", "rpm -i target/artifacts/*-x86_64.rpm && vector --version"]
 
   verify-rpm-centos-7:
+    image: timberiodev/vector-verifier-centos-7:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/verifier-centos-7/Dockerfile
@@ -372,6 +398,7 @@ services:
       ["sh", "-ec", "rpm -i target/artifacts/*-x86_64.rpm && vector --version"]
 
   verify-deb-artifact-on-deb-8:
+    image: timberiodev/vector-verifier-deb-8:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/verifier-deb-8/Dockerfile
@@ -382,6 +409,7 @@ services:
       ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
   verify-deb-artifact-on-deb-9:
+    image: timberiodev/vector-verifier-deb-9:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/verifier-deb-9/Dockerfile
@@ -392,6 +420,7 @@ services:
       ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
   verify-deb-artifact-on-deb-10:
+    image: timberiodev/vector-verifier-deb-10:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/verifier-deb-10/Dockerfile
@@ -402,6 +431,7 @@ services:
       ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
   verify-deb-artifact-on-ubuntu-16-04:
+    image: timberiodev/vector-verifier-ubuntu-16-04:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/verifier-ubuntu-16-04/Dockerfile
@@ -412,6 +442,7 @@ services:
       ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
   verify-deb-artifact-on-ubuntu-18-04:
+    image: timberiodev/vector-verifier-ubuntu-18-04:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/verifier-ubuntu-18-04/Dockerfile
@@ -422,6 +453,7 @@ services:
       ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
   verify-deb-artifact-on-ubuntu-19-04:
+    image: timberiodev/vector-verifier-ubuntu-19-04:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/verifier-ubuntu-19-04/Dockerfile
@@ -432,6 +464,7 @@ services:
       ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
   verify-nixos:
+    image: timberiodev/vector-verifier-nixos:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/verifier-nixos/Dockerfile
@@ -441,6 +474,7 @@ services:
     command: ["sh", "-ec", "./scripts/verify-nix.sh && vector --version"]
 
   target-graph:
+    image: timberiodev/vector-target-graph:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/target-graph/Dockerfile
@@ -459,6 +493,7 @@ services:
     command: ["sh", "-ec", "rm -rf target"]
 
   load-qemu-binfmt:
+    image: timberiodev/vector-loader-qemu-binfmt:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/loader-qemu-binfmt/Dockerfile
@@ -466,6 +501,7 @@ services:
     command: dpkg-reconfigure qemu-user-binfmt
 
   test-unit:
+    image: timberiodev/vector-builder-x86_64-unknown-linux-musl:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
@@ -483,6 +519,7 @@ services:
     command: cargo test --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
   test-integration:
+    image: timberiodev/vector-builder-x86_64-unknown-linux-musl:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
@@ -506,6 +543,7 @@ services:
     command: cargo test --all --no-default-features --features default-musl,docker --target x86_64-unknown-linux-musl -- --test-threads 4
 
   test-integration-aws:
+    image: timberiodev/vector-builder-x86_64-unknown-linux-musl:latest
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
