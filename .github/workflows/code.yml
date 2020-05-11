@@ -165,7 +165,6 @@ jobs:
       - run: make test-integration-splunk
 
   test-integration-kubernetes:
-    if: ${{ false }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
