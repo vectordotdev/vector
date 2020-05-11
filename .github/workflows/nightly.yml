@@ -259,3 +259,13 @@ jobs:
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
           USE_CONTAINER: none
         run: make release-s3
+
+  build-ci-docker-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to docker registry
+        run: docker login -u "${{ secrets.CI_DOCKER_USERNAME }}" -p "${{ secrets.CI_DOCKER_PASSWORD }}"
+      - uses: actions/checkout@v1
+      - run: make build-ci-docker-images
+        env:
+          NIGHTLY_BUILD: "true"
