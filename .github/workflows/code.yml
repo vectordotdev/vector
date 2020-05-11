@@ -57,6 +57,14 @@ jobs:
       - run: sudo python3 -m pip install remarshal
       - run: make check-component-features
 
+  check-clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-clippy
+        env:
+          USE_CONTAINER: docker
+
   check-fmt:
     runs-on: ubuntu-latest
     steps:

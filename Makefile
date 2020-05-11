@@ -102,13 +102,16 @@ test-unit: ## Runs unit tests, tests which do not require additional services to
 
 check: check-all ## Default target, check everything
 
-check-all: check-code check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
+check-all: check-code check-clippy check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
 
 check-code: ## Check code
 	$(RUN) check-code
 
 check-component-features: ## Check that all component features are setup properly
 	$(RUN) check-component-features
+
+check-clippy: ## Check code with Clippy
+	$(RUN) check-clippy
 
 check-fmt: ## Check that all files are formatted properly
 	$(RUN) check-fmt
