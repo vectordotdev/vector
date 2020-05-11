@@ -3,21 +3,21 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink, Response},
-        retries::{RetryAction, RetryLogic},
-        BatchBytesConfig, Buffer, Compression, TowerRequestConfig,
+        http2::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink, Response},
+        retries2::{RetryAction, RetryLogic},
+        service2::TowerRequestConfig,
+        BatchBytesConfig, Buffer, Compression,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
+use futures::{FutureExt, TryFutureExt};
 use futures01::{Future, Sink};
-use http::StatusCode;
-use http::{Method, Uri};
-use hyper::{Body, Request};
+use http02::{Method, Request, StatusCode, Uri};
+use hyper13::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use tower::Service;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -60,8 +60,6 @@ pub enum Encoding {
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = healthcheck(cx.resolver(), &self)?;
-
         let gzip = match self.compression.unwrap_or(Compression::Gzip) {
             Compression::None => false,
             Compression::Gzip => true,
@@ -81,7 +79,9 @@ impl SinkConfig for ClickhouseConfig {
         )
         .sink_map_err(|e| error!("Fatal clickhouse sink error: {}", e));
 
-        Ok((Box::new(sink), healthcheck))
+        let healthcheck = healthcheck(cx.resolver(), self.clone()).boxed().compat();
+
+        Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -107,7 +107,7 @@ impl HttpSink for ClickhouseConfig {
         Some(body)
     }
 
-    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
         let database = if let Some(database) = &self.database {
             database.as_str()
         } else {
@@ -116,15 +116,16 @@ impl HttpSink for ClickhouseConfig {
 
         let uri = encode_uri(&self.host, database, &self.table).expect("Unable to encode uri");
 
-        let mut builder = hyper::Request::builder();
-        builder.method(Method::POST);
-        builder.uri(uri.clone());
+        let builder = Request::builder()
+            .method(Method::POST)
+            .uri(uri.clone())
+            .header("Content-Type", "application/x-ndjson");
 
-        builder.header("Content-Type", "application/x-ndjson");
-
-        if let Compression::Gzip = self.compression.unwrap_or(Compression::Gzip) {
-            builder.header("Content-Encoding", "gzip");
-        }
+        let builder = if let Compression::Gzip = self.compression.unwrap_or(Compression::Gzip) {
+            builder.header("Content-Encoding", "gzip")
+        } else {
+            builder
+        };
 
         let mut request = builder.body(events).unwrap();
 
@@ -136,7 +137,7 @@ impl HttpSink for ClickhouseConfig {
     }
 }
 
-fn healthcheck(resolver: Resolver, config: &ClickhouseConfig) -> crate::Result<super::Healthcheck> {
+async fn healthcheck(resolver: Resolver, config: ClickhouseConfig) -> crate::Result<()> {
     // TODO: check if table exists?
     let uri = format!("{}/?query=SELECT%201", config.host);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
@@ -147,15 +148,13 @@ fn healthcheck(resolver: Resolver, config: &ClickhouseConfig) -> crate::Result<s
 
     let tls = TlsSettings::from_options(&config.tls)?;
     let mut client = HttpClient::new(resolver, tls)?;
-    let healthcheck = client
-        .call(request)
-        .map_err(|err| err.into())
-        .and_then(|response| match response.status() {
-            hyper::StatusCode::OK => Ok(()),
-            status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
-        });
 
-    Ok(Box::new(healthcheck))
+    let response = client.send(request).await?;
+
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        status => Err(super::HealthcheckError::UnexpectedStatus2 { status }.into()),
+    }
 }
 
 fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
@@ -177,7 +176,7 @@ fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
         format!("{}/?{}", host, query)
     };
 
-    Ok(url.parse::<Uri>().context(super::UriParseError)?)
+    Ok(url.parse::<Uri>().context(super::UriParseError2)?)
 }
 
 #[derive(Clone)]
@@ -187,7 +186,7 @@ struct ClickhouseRetryLogic {
 
 impl RetryLogic for ClickhouseRetryLogic {
     type Response = Response;
-    type Error = hyper::Error;
+    type Error = hyper13::Error;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         self.inner.is_retriable_error(error)
