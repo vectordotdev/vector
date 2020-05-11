@@ -43,137 +43,25 @@ impl Glob {
             glob_match_options,
         })
     }
-
-    /// Iterates over the paths.
-    pub fn iter(&self) -> Iter<'_> {
-        Iter {
-            include_patterns_iter: self.include_patterns.iter(),
-            exclude_patterns: self.exclude_patterns.as_slice(),
-            glob_match_options: &self.glob_match_options,
-            current_glob_iter: None,
-        }
-    }
 }
 
-/// Iterator for [`Glob`].
-pub struct Iter<'a> {
-    include_patterns_iter: std::slice::Iter<'a, String>,
-    exclude_patterns: &'a [Pattern],
-    glob_match_options: &'a glob::MatchOptions,
-    current_glob_iter: Option<glob::Paths>,
-}
-
-impl<'a> Iterator for Iter<'a> {
-    type Item = PathBuf;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let Self {
-            current_glob_iter,
-            exclude_patterns,
-            glob_match_options,
-            include_patterns_iter,
-        } = self;
-
-        let exclude_predicate = |candidate_path: &PathBuf| -> bool {
-            exclude_patterns.iter().any(|exclude_pattern| {
-                let candidate_path_str = candidate_path.to_str().unwrap();
-                exclude_pattern.matches(candidate_path_str)
-            })
-        };
-
-        loop {
-            // See if we have an iterator it progress.
-            {
-                if let Some(ref mut glob_iter) = current_glob_iter {
-                    match glob_iter.next() {
-                        // If we exaust the current glob iter we need to try to
-                        // update it. To do it we just allow execution to continue
-                        // beyond this `if let`.
-                        None => {}
-                        // If we got the path, and it's not excluded - return
-                        // it!
-                        Some(Ok(path)) if !exclude_predicate(&path) => return Some(path),
-                        // Everything else we just mangle and continue the loop.
-                        Some(_) => continue,
-                    }
-                }
-            }
-
-            // We only get here if we need to update the `current_glob_iter`.
-
-            // Try fetching a new pattern. If the patterns iterator is
-            // exausted - we're done.
-            let pattern = include_patterns_iter.next()?;
-
-            // Glob over the new pattern. Panic we we encounter any
-            // issue.
-            let next_iter = glob::glob_with(pattern.as_str(), glob_match_options)
-                .expect("failed to read glob pattern");
-
-            // We got the new glob iter, stash it and continiue the loop.
-            *current_glob_iter = Some(next_iter);
-        }
-    }
-}
-
-impl<'a> PathsProvider for &'a Glob {
-    type IntoIter = Iter<'a>;
+impl PathsProvider for Glob {
+    type IntoIter = Vec<PathBuf>;
 
     fn paths(&self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-/// Workaround for the absense of the GATs in Rust.
-pub mod gat_workaround {
-    use super::*;
-    use std::sync::Arc;
-
-    impl Glob {
-        /// Create a new [`Glob`] wrapped in [`Arc`].
-        ///
-        /// `Arc<Glob>` implements [`PathsProvider`] with low overhead.
-        /// This complexity is required while Rust doesn't have GATs.
-        ///
-        /// Returns `None` if patterns aren't valid.
-        pub fn new_arc(
-            include_patterns: &[PathBuf],
-            exclude_patterns: &[PathBuf],
-            glob_match_options: MatchOptions,
-        ) -> Option<Arc<Self>> {
-            Some(Arc::new(Self::new(
-                include_patterns,
-                exclude_patterns,
-                glob_match_options,
-            )?))
-        }
-    }
-
-    rental! {
-        #[allow(missing_docs)]
-        pub mod rent_iter {
-            use super::*;
-            #[rental]
-            pub struct RentIter {
-                head: Arc<Glob>,
-                tail: Iter<'head>,
-            }
-        }
-    }
-
-    impl Iterator for rent_iter::RentIter {
-        type Item = PathBuf;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            self.rent_mut(|val| Iter::next(val))
-        }
-    }
-
-    impl PathsProvider for Arc<Glob> {
-        type IntoIter = rent_iter::RentIter;
-
-        fn paths(&self) -> Self::IntoIter {
-            rent_iter::RentIter::new(self.clone(), |glob| glob.iter())
-        }
+        self.include_patterns
+            .iter()
+            .flat_map(|include_pattern| {
+                glob::glob_with(include_pattern.as_str(), &self.glob_match_options)
+                    .expect("failed to read glob pattern")
+                    .filter_map(|val| val.ok())
+            })
+            .filter(|candidate_path: &PathBuf| -> bool {
+                !self.exclude_patterns.iter().any(|exclude_pattern| {
+                    let candidate_path_str = candidate_path.to_str().unwrap();
+                    exclude_pattern.matches(candidate_path_str)
+                })
+            })
+            .collect()
     }
 }

@@ -2,8 +2,6 @@
 extern crate scan_fmt;
 #[macro_use]
 extern crate tracing;
-#[macro_use]
-extern crate rental;
 
 mod file_server;
 mod file_watcher;

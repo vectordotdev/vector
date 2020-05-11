@@ -235,7 +235,7 @@ pub fn file_source(
         .map(|secs| SystemTime::now() - Duration::from_secs(secs));
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
 
-    let paths_provider = Glob::new_arc(&config.include, &config.exclude, MatchOptions::default())
+    let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())
         .expect("invalid glob patterns");
 
     let file_server = FileServer {

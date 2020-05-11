@@ -17,7 +17,6 @@ flate2 = "1.0.6"
 winapi = { version = "0.3", features = ["winioctl"] }
 libc =  "0.2"
 tokio = { version = "0.2.13", features = ["time"] }
-rental = "0.5"
 
 [dev-dependencies]
 quickcheck = "0.6"
