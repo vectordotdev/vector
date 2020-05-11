@@ -4,11 +4,11 @@ use std::mem::{drop, replace};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 const EWMA_ALPHA: f64 = 0.5;
-const THRESHOLD: f64 = 0.01;
+const THRESHOLD_RATIO: f64 = 0.01;
 
 /// Shared class for `tokio::sync::Semaphore` that manages adjusting the
 /// semaphore size and other associated data.
@@ -24,6 +24,7 @@ struct Inner {
     current: usize,
     to_forget: usize,
     average_rtt: f64,
+    next_update: Instant,
 }
 
 impl Inner {
@@ -46,6 +47,7 @@ impl Controller {
                 current,
                 to_forget: 0,
                 average_rtt: -1.0,
+                next_update: Instant::now(),
             })),
         }
     }
@@ -60,33 +62,38 @@ impl Controller {
 
     pub(super) fn adjust_to_response(&self, start: Instant) {
         // Problems:
-        // * adjusts on every measurement, not just once per RTT
         // * adjusts for any response, does not differentiate
         let now = Instant::now();
         let rtt = now.saturating_duration_since(start).as_secs_f64();
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
+
         let avg = inner.average_rtt;
-        let threshold = avg * THRESHOLD;
-        if inner.current > 1 && rtt >= avg + threshold {
-            // Decrease (multiplicative) the current concurrency
-            let new_current = inner.current / 2;
-            // Have to forget some permits from the semaphore but there
-            // may not be enough available. If so, increase the count we
-            // need to forget later and finish.
-            for _ in new_current..inner.current {
-                match self.semaphore.try_acquire() {
-                    Ok(permit) => permit.forget(),
-                    Err(_) => inner.to_forget += 1,
+        if avg > 0.0 && now >= inner.next_update {
+            let threshold = avg * THRESHOLD_RATIO;
+            if inner.current > 1 && rtt >= avg + threshold {
+                // Decrease (multiplicative) the current concurrency
+                let new_current = inner.current / 2;
+                // Have to forget some permits from the semaphore but there
+                // may not be enough available. If so, increase the count we
+                // need to forget later and finish.
+                for _ in new_current..inner.current {
+                    match self.semaphore.try_acquire() {
+                        Ok(permit) => permit.forget(),
+                        Err(_) => inner.to_forget += 1,
+                    }
                 }
+                inner.current = new_current;
+            } else if inner.current < self.max && rtt <= avg {
+                // Increase (additive) the current concurrency
+                self.semaphore.add_permits(1);
+                inner.current += 1;
+                inner.to_forget = inner.to_forget.saturating_sub(1);
             }
-            inner.current = new_current;
-        } else if inner.current < self.max && rtt <= avg {
-            // Increase (additive) the current concurrency
-            self.semaphore.add_permits(1);
-            inner.current += 1;
-            inner.to_forget = inner.to_forget.saturating_sub(1);
+            let new_avg = inner.update_rtt(rtt);
+            inner.next_update = now + Duration::from_secs_f64(new_avg);
+        } else {
+            inner.update_rtt(rtt);
         }
-        inner.update_rtt(rtt);
     }
 }
 
