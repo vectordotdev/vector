@@ -128,11 +128,11 @@ tests/data/wasm/%.wat:
 	wasm2wat target/wasm32-wasi/release/${MODULE}.wasm -o tests/data/wasm/${MODULE}/${MODULE}.wat
 
 .PHONY: test-wasm
-test-wasm: build-wasm-tests  ### Run engine tests.
+test-wasm: rebuild-wasm-tests  ### Run engine tests.
 	TEST_THREADS=1 TEST_LOG=vector=trace cargo test wasm --no-default-features --features wasm -- --nocapture
 
 .PHONY: bench-wasm
-bench-wasm: build-wasm-tests  ### Run engine tests.
+bench-wasm: rebuild-wasm-tests  ### Run engine tests.
 	cargo bench wasm --no-default-features --features ${DEFAULT_FEATURES}
 
 .PHONY: clean-wasm
