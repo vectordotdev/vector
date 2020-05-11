@@ -2949,6 +2949,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "panic"
+version = "0.1.0"
+dependencies = [
+ "vector-wasm",
+]
+
+[[package]]
 name = "parity-wasm"
 version = "0.40.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

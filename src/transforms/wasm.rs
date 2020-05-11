@@ -96,6 +96,7 @@ mod tests {
 
     #[test]
     fn protobuf_happy() -> crate::Result<()> {
+        crate::test_util::trace_init();
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/protobuf/protobuf.wat"
@@ -115,6 +116,7 @@ mod tests {
 
     #[test]
     fn protobuf_sad() -> crate::Result<()> {
+        crate::test_util::trace_init();
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/protobuf/protobuf.wat"
@@ -133,6 +135,7 @@ mod tests {
 
     #[test]
     fn add_fields() -> crate::Result<()> {
+        crate::test_util::trace_init();
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/add_fields/add_fields.wat"
@@ -151,6 +154,7 @@ mod tests {
 
     #[test]
     fn drop() -> crate::Result<()> {
+        crate::test_util::trace_init();
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/drop/drop.wat"
@@ -163,6 +167,31 @@ mod tests {
 
         let expected = parse_event_artifact("tests/data/wasm/drop/fixtures/a/expected.json")?;
         assert_eq!(output, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn panic() -> crate::Result<()> {
+        crate::test_util::trace_init();
+        let mut transform = parse_config(
+            r#"
+            module = "tests/data/wasm/panic/panic.wat"
+            "#,
+        )?;
+
+        let input = parse_event_artifact("tests/data/wasm/panic/fixtures/a/input.json")?.unwrap();
+
+        let output = transform.transform(input.clone());
+
+        let expected = parse_event_artifact("tests/data/wasm/panic/fixtures/a/expected.json")?;
+        assert_eq!(output, expected);
+
+        // Important to try again. :)
+        let output = transform.transform(input);
+
+        let expected = parse_event_artifact("tests/data/wasm/panic/fixtures/a/expected.json")?;
+        assert_eq!(output, expected);
+
         Ok(())
     }
 }

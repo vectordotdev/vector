@@ -268,9 +268,20 @@ impl WasmModule {
         // Copy 2
         guest_data_buf.copy_from_slice(&data_buf);
 
-        let _worked = self
+        match self
             .instance
-            .run("process", &[guest_data_ptr.into(), guest_data_size.into()])?;
+            .run("process", &[guest_data_ptr.into(), guest_data_size.into()])
+        {
+            Ok(_num_events) => (),
+            Err(lucet_runtime::Error::RuntimeFault(fault)) => {
+                error!(
+                    "WASM instance faulted, resetting: {:?}",
+                    fault.clone().rip_addr_details.and_then(|v| v.file_name),
+                );
+                self.instance.reset()?;
+            }
+            Err(e) => error!("WASM processing errored: {:?}", e,),
+        }
 
         let context::EventBuffer { events: out } = self
             .instance
@@ -282,7 +293,7 @@ impl WasmModule {
             .remove_embed_ctx()
             .ok_or("Could not retrieve context after processing.")?
         {
-            error!("{}", error);
+            error!("WASM plugin errored: {}", error);
         }
 
         internal_event_processing.complete();
@@ -301,10 +312,10 @@ impl WasmModule {
 
 #[test]
 fn protobuf() -> Result<()> {
+    use serde_json::json;
     use std::io::{Read, Write};
     use string_cache::DefaultAtom as Atom;
     crate::test_util::trace_init();
-    use serde_json::json;
 
     // Load in fixtures.
     let mut test_file = fs::File::open("tests/data/wasm/protobuf/demo.pb")?;

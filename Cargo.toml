@@ -36,6 +36,7 @@ members = [
   "tests/data/wasm/protobuf",
   "tests/data/wasm/drop",
   "tests/data/wasm/add_fields",
+  "tests/data/wasm/panic",
 ]
 
 [dependencies]
