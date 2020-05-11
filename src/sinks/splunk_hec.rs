@@ -242,8 +242,9 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{self, Event};
-    use crate::sinks::util::http::HttpSink;
+    use crate::event::Event;
+    use crate::sinks::util::{http::HttpSink, test::load_sink};
+    use chrono::Utc;
     use serde::Deserialize;
     use std::collections::BTreeMap;
 
@@ -266,7 +267,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let (config, _, _) = crate::sinks::util::test::load_sink::<HecSinkConfig>(
+        let (config, _, _) = load_sink::<HecSinkConfig>(
             r#"
             host = "test.com"
             token = "alksjdfo"
@@ -299,6 +300,10 @@ mod tests {
             hec_event.fields.get("key").map(|s| s.as_str()),
             Some("value")
         );
+
+        let now = Utc::now().timestamp_millis() as f64 / 1000f64;
+        assert!((hec_event.time - now).abs() < 0.1);
+        assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
 
     #[test]
@@ -306,7 +311,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let (config, _, _) = crate::sinks::util::test::load_sink::<HecSinkConfig>(
+        let (config, _, _) = load_sink::<HecSinkConfig>(
             r#"
             host = "test.com"
             token = "alksjdfo"
@@ -329,6 +334,10 @@ mod tests {
             hec_event.fields.get("key").map(|s| s.as_str()),
             Some("value")
         );
+
+        let now = Utc::now().timestamp_millis() as f64 / 1000f64;
+        assert!((hec_event.time - now).abs() < 0.1);
+        assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
 
     #[test]
