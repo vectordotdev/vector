@@ -8,39 +8,46 @@ set -euo pipefail
 #   Used to build the variety of Docker images used to build, test, package,
 #   and release Vector. This is primarily used in CI.
 
-# Builds a generic Docker image with a `vector-` prefix. The name
-# maps to the contained folder.
-build_image() {
-  local TAG="$1"
+build-image() {
+  local IMAGE_NAME="$1"
+  shift
+
+  local TAGS=("$@")
+
+  FULL_TAGS=()
+  for TAG in "${TAGS[@]}"; do
+    FULL_TAGS+=("timberiodev/vector-$IMAGE_NAME:$TAG")
+  done
+
+  BUILD_ARGS_TAGS=()
+  for FULL_TAG in "${FULL_TAGS[@]}"; do
+    BUILD_ARGS_TAGS+=(-t "$FULL_TAG")
+  done
 
   docker build \
-    -t "timberiodev/vector-$TAG:latest" \
-    -f "scripts/ci-docker-images/$TAG/Dockerfile" \
+    "${BUILD_ARGS_TAGS[@]}" \
+    -f "scripts/ci-docker-images/$IMAGE_NAME/Dockerfile" \
     .
 
-  docker push "timberiodev/vector-$TAG:latest"
+  for FULL_TAG in "${FULL_TAGS[@]}"; do
+    docker push "$FULL_TAG"
+  done
 }
 
-# The following images are basic Docker images that do not extend a
-# cross base image.
-ALL_IMAGES=(
-  build-aarch64-unknown-linux-musl
-  builder-x86_64-unknown-linux-gnu
-  builder-x86_64-unknown-linux-musl
-  checker
-  packager-rpm
-  releaser
-  verifier-amazonlinux-1
-  verifier-amazonlinux-2
-  verifier-centos-7
-  verifier-deb-8
-  verifier-deb-9
-  verifier-deb-10
-  verifier-ubuntu-16-04
-  verifier-ubuntu-18-04
-  verifier-ubuntu-19-04
-)
+list-images() {
+  find scripts/ci-docker-images -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort
+}
+
+ALL_IMAGES=()
+while IFS='' read -r LINE; do ALL_IMAGES+=("$LINE"); done < <(list-images)
+
+TAGS=(latest)
+if [[ "${NIGHTLY_BUILD:-}" == "true" ]]; then
+  DATE="$(date --iso)"
+  SHA="$(git rev-parse --short HEAD)"
+  TAGS+=("nightly" "nightly-$DATE" "nightly-$DATE-$SHA")
+fi
 
 for IMAGE in "${@:-"${ALL_IMAGES[@]}"}"; do
-  build_image "$IMAGE"
+  build-image "$IMAGE" "${TAGS[@]}"
 done
