@@ -23,14 +23,11 @@ pub mod glob;
 /// However, that's currently unavailable at Rust.
 /// See: https://github.com/rust-lang/rust/issues/44265
 ///
-/// We use a [`Vec`] here as a workaround.
-///
-/// The performance penalty is negligible, since [`crate::FileServer`] polls
-/// for paths only every minute. The expected amount of yelded paths is small,
-/// and there's plenty of time to east up the extra allocations.
-/// Of course, it would be better to avoid putting the paths in memory all at
-/// once - so improvements are welcome.
+/// We use an `IntoIter` here as a workaround.
 pub trait PathsProvider {
+    /// Provides the iterator that returns paths.
+    type IntoIter: IntoIterator<Item = PathBuf>;
+
     /// Provides a set of paths.
-    fn paths(&self) -> Vec<PathBuf>;
+    fn paths(&self) -> Self::IntoIter;
 }
