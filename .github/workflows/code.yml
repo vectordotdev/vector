@@ -39,7 +39,7 @@ env:
   USE_CONTAINER: none
 
 jobs:
-  check-advistories:
+  check-advisories:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
