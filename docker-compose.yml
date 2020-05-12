@@ -600,6 +600,14 @@ services:
         "./target/x86_64-unknown-linux-musl/debug/vector test tests/behavior/**/*.toml",
       ]
 
+  slim-builds:
+    image: ubuntu:18.04
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: ./scripts/slim-builds.sh
+
   #
   # Dependencies
   #
