@@ -156,7 +156,7 @@ impl JournaldConfig {
             }
         };
 
-        let (journal, pid) = J::new(self, cursor)?;
+        let (journal, close) = J::new(self, cursor)?;
 
         Ok(Box::new(future::lazy(move || {
             info!(message = "Starting journald server.",);
@@ -178,15 +178,8 @@ impl JournaldConfig {
             .boxed()
             .compat()
             .map_err(|error| error!(message="Journald server unexpectedly stopped.",%error))
-            .select(shutdown.map(|_| ()))
-            .map(move |_| {
-                if let Some(pid) = pid {
-                    // Signal the child process to terminate so that the
-                    // blocking future can be unblocked earlier rather
-                    // than later.
-                    let _ = kill(pid, Signal::SIGTERM);
-                }
-            })
+            .select(shutdown.map(move |_| close()))
+            .map(|_| ())
             .map_err(|_| ())
         })))
     }
@@ -239,7 +232,11 @@ fn fixup_unit(unit: &String) -> String {
 /// trait functions is an addition to the standard iteration methods for
 /// initializing the source.
 trait JournalSource: Iterator<Item = Result<String, io::Error>> + Sized {
-    fn new(config: &JournaldConfig, cursor: Option<String>) -> crate::Result<(Self, Option<Pid>)>;
+    /// (source, close_underlying_stream)
+    fn new(
+        config: &JournaldConfig,
+        cursor: Option<String>,
+    ) -> crate::Result<(Self, Box<dyn FnOnce() + Send>)>;
 }
 
 struct Journalctl {
@@ -249,7 +246,10 @@ struct Journalctl {
 }
 
 impl JournalSource for Journalctl {
-    fn new(config: &JournaldConfig, cursor: Option<String>) -> crate::Result<(Self, Option<Pid>)> {
+    fn new(
+        config: &JournaldConfig,
+        cursor: Option<String>,
+    ) -> crate::Result<(Self, Box<dyn FnOnce() + Send>)> {
         let journalctl = config.journalctl_path.as_ref().unwrap_or(&JOURNALCTL);
         let mut command = Command::new(journalctl);
         command.stdout(Stdio::piped());
@@ -275,7 +275,15 @@ impl JournalSource for Journalctl {
         let stdout = BufReader::new(stdout);
 
         let pid = Pid::from_raw(child.id() as i32);
-        Ok((Journalctl { child, stdout }, Some(pid)))
+        Ok((
+            Journalctl { child, stdout },
+            Box::new(move || {
+                // Signal the child process to terminate so that the
+                // blocking future can be unblocked sooner rather
+                // than later.
+                let _ = kill(pid, Signal::SIGTERM);
+            }),
+        ))
     }
 }
 
@@ -550,7 +558,7 @@ mod tests {
         fn new(
             _: &JournaldConfig,
             checkpoint: Option<String>,
-        ) -> crate::Result<(Self, Option<Pid>)> {
+        ) -> crate::Result<(Self, Box<dyn FnOnce() + Send>)> {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
             let mut journal = FakeJournal { reader };
@@ -563,7 +571,7 @@ mod tests {
                 }
             }
 
-            Ok((journal, None))
+            Ok((journal, Box::new(|| ())))
         }
     }
 
