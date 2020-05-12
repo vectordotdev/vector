@@ -115,12 +115,13 @@ impl RunningTopology {
     /// dropped.
     #[must_use]
     pub fn stop(self) -> impl Future<Item = (), Error = ()> {
-        let mut running_tasks = self.tasks;
-
+        // Create handy handles collections of all tasks for the subsequent operations.
         let mut wait_handles = Vec::new();
         let mut check_handles = HashMap::<String, Vec<_>>::new();
 
-        for (name, task) in running_tasks.drain().chain(self.source_tasks.into_iter()) {
+        // We need to give some time to the sources to gracefully shutdown, so we will merge
+        // them with other tasks.
+        for (name, task) in self.tasks.into_iter().chain(self.source_tasks.into_iter()) {
             let task = task
                 .or_else(|_| future::ok(())) // Consider an errored task to be shutdown
                 .shared();
@@ -128,13 +129,17 @@ impl RunningTopology {
             wait_handles.push(task.clone());
             check_handles.entry(name).or_default().push(task);
         }
-        let mut check_handles2 = check_handles.clone();
 
+        // If we reach this, we will forcefully shutdown the sources.
         let deadline = Instant::now() + Duration::from_secs(60);
 
+        // If we reach the deadline, this future will print out which components won't
+        // gracefully shutdown since we will start to forcefully shutdown the sources.
+        let mut check_handles2 = check_handles.clone();
         let timeout = timer::Delay::new(deadline)
             .map(move |_| {
-                check_handles.retain(|_name, handles| {
+                // Remove all tasks that have shutdown.
+                check_handles2.retain(|_name, handles| {
                     retain(handles, |handle| {
                         handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
                     });
@@ -149,9 +154,11 @@ impl RunningTopology {
             })
             .map_err(|err| panic!("Timer error: {:?}", err));
 
+        // Reports in intervals which componenets are still running.
         let reporter = timer::Interval::new_interval(Duration::from_secs(5))
             .inspect(move |_| {
-                check_handles2.retain(|_name, handles| {
+                // Remove all tasks that have shutdown.
+                check_handles.retain(|_name, handles| {
                     retain(handles, |handle| {
                         handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
                     });
@@ -177,10 +184,12 @@ impl RunningTopology {
             .map(|_| ())
             .map_err(|(err, _)| panic!("Timer error: {:?}", err));
 
+        // Finishes once all tasks have shutdown.
         let success = future::join_all(wait_handles)
             .map(|_| ())
             .map_err(|_: future::SharedError<()>| ());
 
+        // Aggregate future that ends once anything detectes that all tasks have shutdown.
         let shutdown_complete_future =
             future::select_all::<Vec<Box<dyn Future<Item = (), Error = ()> + Send>>>(vec![
                 Box::new(timeout),
