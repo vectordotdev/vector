@@ -96,66 +96,88 @@ jobs:
 
   test-integration-aws:
     runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-aws
 
   test-integration-clickhouse:
     runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-clickhouse
 
   test-integration-docker:
     runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-docker
 
   test-integration-elasticsearch:
     runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-elasticsearch
 
   test-integration-gcp:
     runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-gcp
 
   test-integration-influxdb:
     runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-influxdb
 
   test-integration-kafka:
     runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-kafka
 
   test-integration-loki:
     runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-loki
 
   test-integration-pulsar:
     runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-pulsar
 
   test-integration-splunk:
     runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-splunk
 
   test-shutdown:
     runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
     steps:
       - uses: actions/checkout@v1
       - run: make test-shutdown
@@ -165,6 +187,8 @@ jobs:
     # workflow, but keep it executing on every build to gather stats.
     continue-on-error: true
     runs-on: ubuntu-latest
+    env:
+      USE_CONTAINER: none
     strategy:
       matrix:
         kubernetes:
