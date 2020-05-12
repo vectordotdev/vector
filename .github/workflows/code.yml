@@ -38,7 +38,6 @@ env:
   TEST_LOG: debug
   USE_CONTAINER: docker
   DOCKER_IMAGES_STRATEGY: pull
-  PASS_RUSTFLAGS: "-D warnings"
 
 jobs:
   check-advisories:
