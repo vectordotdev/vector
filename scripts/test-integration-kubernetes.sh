@@ -44,12 +44,21 @@ if [[ -z "${SKIP_PACKAGE_DEB:-}" ]]; then
   make package-deb-x86_64 USE_CONTAINER="${PACKAGE_DEB_USE_CONTAINER:-"docker"}"
 fi
 
+# Prepare test image parameters.
+VERSION_TAG="test-$TEST_RUN_ID"
+BASE_TAG="alpine"
+
 # Build docker image with Vector - the same way it's done for releses. Don't
 # do the push - we'll handle it later.
-REPO="$CONTAINER_IMAGE_REPO" CHANNEL="test" TAG="$TEST_RUN_ID" PUSH="" scripts/build-docker.sh
+REPO="$CONTAINER_IMAGE_REPO" \
+  CHANNEL="test" \
+  BASE="$BASE_TAG" \
+  TAG="$VERSION_TAG" \
+  PUSH="" \
+  scripts/build-docker.sh
 
 # Prepare the container image for the deployment command.
-export CONTAINER_IMAGE="$CONTAINER_IMAGE_REPO:$TEST_RUN_ID"
+export CONTAINER_IMAGE="$CONTAINER_IMAGE_REPO:$VERSION_TAG-$BASE_TAG"
 
 # Make the container image accessible to the k8s cluster.
 if [[ "$USE_MINIKUBE_DOCKER" == "true" ]]; then
