@@ -33,7 +33,7 @@ build-image() {
     docker push "$FULL_TAG"
   done
 
-  if [[ "${LOW_DISK_SPACE:-"true"}" ]]; then
+  if [[ "${LOW_DISK_SPACE:-}" == "true" ]]; then
     docker image rm -f "${FULL_TAGS[@]}"
   fi
 }

@@ -269,3 +269,4 @@ jobs:
       - run: make build-ci-docker-images
         env:
           NIGHTLY_BUILD: "true"
+          LOW_DISK_SPACE: "true"
