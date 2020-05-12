@@ -165,7 +165,6 @@ jobs:
       - run: make test-integration-splunk
 
   test-integration-kubernetes:
-    if: ${{ false }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -183,14 +182,13 @@ jobs:
           minikube version: 'v1.9.2'
           kubernetes version: '${{ matrix.kubernetes }}'
           github token: '${{ secrets.GITHUB_TOKEN }}'
-      - name: Login to DockerHub Registry
-        run: docker login -u "${{ secrets.K8S_INTEGRATION_CI_DOCKER_USERNAME }}" -p "${{ secrets.K8S_INTEGRATION_CI_DOCKER_PASSWORD }}"
       - name: Checkout
         uses: actions/checkout@v1
       - run: make slim-builds
       - run: make test-integration-kubernetes
         env:
-          CONTAINER_IMAGE_REPO: ${{ secrets.K8S_INTEGRATION_CI_DOCKER_REPO }}
+          USE_MINIKUBE_DOCKER: "true"
+          CONTAINER_IMAGE_REPO: vector-test
           PACKAGE_DEB_USE_CONTAINER: docker
 
   test-unit:
