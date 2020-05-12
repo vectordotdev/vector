@@ -7,4 +7,5 @@ set -euo pipefail
 #
 #   Checks all Vector code
 
+export RUSTFLAGS="${RUSTFLAGS:-"-D warnings"}"
 cargo check --workspace --all-targets

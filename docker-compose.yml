@@ -96,7 +96,6 @@ services:
       context: .
       dockerfile: scripts/ci-docker-images/checker/Dockerfile
     environment:
-      RUSTFLAGS: "-D warnings"
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -113,7 +112,6 @@ services:
       context: .
       dockerfile: scripts/ci-docker-images/checker-component-features/Dockerfile
     environment:
-      RUSTFLAGS: "-D warnings"
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD

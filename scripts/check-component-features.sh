@@ -20,6 +20,8 @@ check-listed-features() {
   xargs -I{} sh -cx "(cargo check --tests --no-default-features --features {}) || exit 255"
 }
 
+export RUSTFLAGS="${RUSTFLAGS:-"-D warnings"}"
+
 echo "Checking that Vector and tests can be built without default features..."
 cargo check --tests --no-default-features
 
