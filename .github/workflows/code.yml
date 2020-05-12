@@ -36,7 +36,7 @@ env:
   RUST_BACKTRACE: full
   TARGET: x86_64-unknown-linux-gnu
   TEST_LOG: debug
-  USE_CONTAINER: none
+  USE_CONTAINER: docker
   DOCKER_IMAGES_STRATEGY: pull
 
 jobs:
