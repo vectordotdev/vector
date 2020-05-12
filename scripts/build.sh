@@ -24,7 +24,12 @@ ABORT="${ABORT:-"false"}"
 FEATURES="${FEATURES:-"default"}"
 NATIVE_BUILD="${NATIVE_BUILD:-"true"}"
 STRIP="${STRIP:-"false"}"
-TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
+
+if [ "$NATIVE_BUILD" == "true" ]; then
+  TARGET="${TARGET:-}"
+else
+  TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
+fi
 
 CHANNEL=${CHANNEL:-"$(scripts/util/release-channel.sh)"}
 if [ "$CHANNEL" == "nightly" ]; then
