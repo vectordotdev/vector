@@ -12,7 +12,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
-use futures01::{Future, Sink};
+use futures01::Sink;
 use http02::{Method, Request, StatusCode, Uri};
 use hyper13::Body;
 use lazy_static::lazy_static;
