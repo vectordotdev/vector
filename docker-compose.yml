@@ -593,12 +593,7 @@ services:
       - $PWD:$PWD
     working_dir: $PWD
     user: $USER
-    command:
-      [
-        "sh",
-        "-c",
-        "./target/x86_64-unknown-linux-musl/debug/vector test tests/behavior/**/*.toml",
-      ]
+    command: ./scripts/test-behavior.sh
 
   slim-builds:
     image: ubuntu:18.04
