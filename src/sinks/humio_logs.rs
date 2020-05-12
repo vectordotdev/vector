@@ -63,9 +63,6 @@ impl SinkConfig for HumioLogsConfig {
 
 impl HumioLogsConfig {
     fn build_hec_config(&self) -> HecSinkConfig {
-        if self.encoding.codec != Encoding::Json {
-            error!("Using an unsupported encoding for Humio");
-        }
         let host = self.host.clone().unwrap_or_else(|| HOST.to_string());
 
         HecSinkConfig {
