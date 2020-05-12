@@ -1,4 +1,5 @@
 use super::semaphore::ShrinkableSemaphore;
+use std::cmp::max;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -19,8 +20,9 @@ pub(super) struct Controller {
 #[derive(Debug)]
 struct Inner {
     current: usize,
-    measured_rtt: EWMA,
+    past_rtt: EWMA,
     next_update: Instant,
+    current_rtt: Mean,
 }
 
 impl Controller {
@@ -30,8 +32,9 @@ impl Controller {
             max,
             inner: Arc::new(Mutex::new(Inner {
                 current,
-                measured_rtt: Default::default(),
+                past_rtt: Default::default(),
                 next_update: Instant::now(),
+                current_rtt: Default::default(),
             })),
         }
     }
@@ -47,7 +50,8 @@ impl Controller {
         let rtt = now.saturating_duration_since(start).as_secs_f64();
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
 
-        let avg = inner.measured_rtt.average();
+        let rtt = inner.current_rtt.update(rtt);
+        let avg = inner.past_rtt.average();
         if avg > 0.0 && now >= inner.next_update {
             let threshold = avg * THRESHOLD_RATIO;
             if inner.current > 1 && rtt >= avg + threshold {
@@ -61,11 +65,11 @@ impl Controller {
                 inner.current += 1;
             }
 
-            let new_avg = inner.measured_rtt.update(rtt);
+            let new_avg = inner.past_rtt.update(rtt);
             inner.next_update = now + Duration::from_secs_f64(new_avg);
-        } else {
-            inner.measured_rtt.update(rtt);
         }
+
+        inner.current_rtt.reset();
     }
 }
 
@@ -85,5 +89,25 @@ impl EWMA {
             avg => point * EWMA_ALPHA + avg * (1.0 - EWMA_ALPHA),
         };
         self.average
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct Mean {
+    sum: f64,
+    count: usize,
+}
+
+impl Mean {
+    fn update(&mut self, point: f64) -> f64 {
+        self.sum += point;
+        self.count += 1;
+        // Return current average
+        self.sum / max(self.count, 1) as f64
+    }
+
+    fn reset(&mut self) {
+        self.sum = 0.0;
+        self.count = 0;
     }
 }
