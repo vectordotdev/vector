@@ -1,7 +1,7 @@
 [transforms.regex_parser_simple]
   inputs = []
   type = "regex_parser"
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
+  patterns = ["^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"]
 [[tests]]
   name = "regex_parser_simple"
   [tests.input]
@@ -18,7 +18,7 @@
 [transforms.regex_parser_target]
   inputs = []
   type = "regex_parser"
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
+  patterns = ["^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"]
   target_field = "something"
 [[tests]]
   name = "regex_parser_target"
