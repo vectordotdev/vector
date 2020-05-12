@@ -37,6 +37,7 @@ env:
   TARGET: x86_64-unknown-linux-gnu
   TEST_LOG: debug
   USE_CONTAINER: none
+  DOCKER_IMAGES_STRATEGY: pull
 
 jobs:
   check-advisories:
