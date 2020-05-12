@@ -385,9 +385,9 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-deb-artifact-on-ubuntu-19-04:
+  verify-deb-artifact-on-ubuntu-20-04:
     docker:
-      - image: timberiodev/vector-verifier-ubuntu-19-04:latest
+      - image: timberiodev/vector-verifier-ubuntu-20-04:latest
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -519,9 +519,9 @@ jobs:
       - *install-vector
       - *test-install-script
 
-  test-install-script-on-unbuntu-19-04:
+  test-install-script-on-unbuntu-20-04:
     docker:
-      - image: timberiodev/vector-verifier-ubuntu-19-04:latest
+      - image: timberiodev/vector-verifier-ubuntu-20-04:latest
     steps:
       - checkout
       - *install-vector
@@ -699,7 +699,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - verify-deb-artifact-on-deb-10
     - verify-deb-artifact-on-ubuntu-16-04
     - verify-deb-artifact-on-ubuntu-18-04
-    - verify-deb-artifact-on-ubuntu-19-04
+    - verify-deb-artifact-on-ubuntu-20-04
     - verify-zip-artifact-on-wine
     - verify-docker
     - verify-rpm-artifact-on-amazon-linux-1
@@ -722,7 +722,7 @@ require-artifacts: &require-artifacts
     - verify-deb-artifact-on-deb-10
     - verify-deb-artifact-on-ubuntu-16-04
     - verify-deb-artifact-on-ubuntu-18-04
-    - verify-deb-artifact-on-ubuntu-19-04
+    - verify-deb-artifact-on-ubuntu-20-04
     - verify-zip-artifact-on-wine
     - verify-docker
     - verify-rpm-artifact-on-amazon-linux-1
@@ -785,7 +785,7 @@ workflows:
       - verify-deb-artifact-on-ubuntu-18-04:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
-      - verify-deb-artifact-on-ubuntu-19-04:
+      - verify-deb-artifact-on-ubuntu-20-04:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-zip-artifact-on-wine:
@@ -859,7 +859,7 @@ workflows:
           <<: *release-filters
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
-      - verify-deb-artifact-on-ubuntu-19-04:
+      - verify-deb-artifact-on-ubuntu-20-04:
           <<: *release-filters
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -930,7 +930,7 @@ workflows:
           <<: *prerelease-filters
       - test-install-script-on-unbuntu-18-04:
           <<: *prerelease-filters
-      - test-install-script-on-unbuntu-19-04:
+      - test-install-script-on-unbuntu-20-04:
           <<: *prerelease-filters
       - test-install-script-without-sudo:
           <<: *prerelease-filters
@@ -948,7 +948,7 @@ workflows:
             - test-install-script-on-mac-homebrew
             - test-install-script-on-unbuntu-16-04
             - test-install-script-on-unbuntu-18-04
-            - test-install-script-on-unbuntu-19-04
+            - test-install-script-on-unbuntu-20-04
             - test-install-script-without-sudo
 
   remote-checks:

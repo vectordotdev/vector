@@ -450,11 +450,11 @@ services:
     command:
       ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
-  verify-deb-artifact-on-ubuntu-19-04:
-    image: timberiodev/vector-verifier-ubuntu-19-04:latest
+  verify-deb-artifact-on-ubuntu-20-04:
+    image: timberiodev/vector-verifier-ubuntu-20-04:latest
     build:
       context: .
-      dockerfile: scripts/ci-docker-images/verifier-ubuntu-19-04/Dockerfile
+      dockerfile: scripts/ci-docker-images/verifier-ubuntu-20-04/Dockerfile
     volumes:
       - $PWD:$PWD
     working_dir: $PWD

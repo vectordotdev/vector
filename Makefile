@@ -238,7 +238,7 @@ verify-rpm-amazonlinux-2: package-rpm-x86_64 ## Verify the rpm package on Amazon
 verify-rpm-centos-7: package-rpm-x86_64 ## Verify the rpm package on CentOS 7
 	$(RUN) verify-rpm-centos-7
 
-verify-deb: verify-deb-artifact-on-deb-8 verify-deb-artifact-on-deb-9 verify-deb-artifact-on-deb-10 verify-deb-artifact-on-ubuntu-16-04 verify-deb-artifact-on-ubuntu-18-04 verify-deb-artifact-on-ubuntu-19-04 ## Verify all deb packages
+verify-deb: verify-deb-artifact-on-deb-8 verify-deb-artifact-on-deb-9 verify-deb-artifact-on-deb-10 verify-deb-artifact-on-ubuntu-16-04 verify-deb-artifact-on-ubuntu-18-04 verify-deb-artifact-on-ubuntu-20-04 ## Verify all deb packages
 
 verify-deb-artifact-on-deb-8: package-deb-x86_64 ## Verify the deb package on Debian 8
 	$(RUN) verify-deb-artifact-on-deb-8
@@ -255,8 +255,8 @@ verify-deb-artifact-on-ubuntu-16-04: package-deb-x86_64 ## Verify the deb packag
 verify-deb-artifact-on-ubuntu-18-04: package-deb-x86_64 ## Verify the deb package on Ubuntu 18.04
 	$(RUN) verify-deb-artifact-on-ubuntu-18-04
 
-verify-deb-artifact-on-ubuntu-19-04: package-deb-x86_64 ## Verify the deb package on Ubuntu 19.04
-	$(RUN) verify-deb-artifact-on-ubuntu-19-04
+verify-deb-artifact-on-ubuntu-20-04: package-deb-x86_64 ## Verify the deb package on Ubuntu 20.04
+	$(RUN) verify-deb-artifact-on-ubuntu-20-04
 
 verify-nixos:  ## Verify that Vector can be built on NixOS
 	$(RUN) verify-nixos
