@@ -52,7 +52,7 @@ bench: build ## Run benchmarks in /benches
 
 test: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
 
-test-behavior: build ## Runs behaviorial tests
+test-behavior: build-x86_64-unknown-linux-musl ## Runs behaviorial tests
 	$(RUN) test-behavior
 
 test-integration: ## Runs all integration tests
