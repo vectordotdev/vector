@@ -296,3 +296,11 @@ fn timely_shutdown_vector() {
     address = "${VECTOR_TEST_ADDRESS}""#,
     ));
 }
+
+#[test]
+fn timely_shutdown_internal_metrics() {
+    test_timely_shutdown(source_vector(
+        r#"
+    type = "internal_metrics""#,
+    ));
+}

@@ -147,7 +147,7 @@ impl RunningTopology {
                     });
                     !handles.is_empty()
                 });
-                let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
+                let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
 
                 error!(
                     "Failed to gracefully shut down in time. Killing: {}",
@@ -166,7 +166,7 @@ impl RunningTopology {
                     });
                     !handles.is_empty()
                 });
-                let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
+                let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
 
                 // TODO: replace with checked_duration_since once it's stable
                 let time_remaining = if deadline > Instant::now() {
