@@ -40,10 +40,10 @@ fi
 # Local Vars
 #
 
-if [ "$NATIVE_BUILD" != "true" ]; then
-  TARGET_DIR="target/$TARGET"
-else
+if [ "$NATIVE_BUILD" == "true" ]; then
   TARGET_DIR="target"
+else
+  TARGET_DIR="target/$TARGET"
 fi
 
 BINARY_PATH="$TARGET_DIR/release/vector"
