@@ -117,6 +117,8 @@ impl RunningTopology {
     pub fn stop(self) -> impl Future<Item = (), Error = ()> {
         // Create handy handles collections of all tasks for the subsequent operations.
         let mut wait_handles = Vec::new();
+        // We need a Vec here since source compnents have two tasks. One for pump in self.tasks,
+        // and the other for source in self.source_tasks.
         let mut check_handles = HashMap::<String, Vec<_>>::new();
 
         // We need to give some time to the sources to gracefully shutdown, so we will merge
