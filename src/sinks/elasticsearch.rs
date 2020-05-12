@@ -561,14 +561,13 @@ mod integration_tests {
         assert_eq!(1, response.total());
 
         let hit = response.into_hits().next().unwrap();
-        assert_eq!("42", hit.id());
-
         let doc = hit.document().unwrap();
-        assert_eq!(None, doc["my_id"].as_str());
+        assert_eq!(Some("42"), doc["my_id"].as_str());
 
         let value = hit.into_document().unwrap();
         let expected = json!({
             "message": "raw log line",
+            "my_id": "42",
             "foo": "bar",
             "timestamp": input_event.as_log()[&event::log_schema().timestamp_key()],
         });

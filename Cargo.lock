@@ -804,11 +804,10 @@ checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
 
 [[package]]
 name = "elastic_responses"
-version = "0.21.0-pre.4"
+version = "0.20.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb0edd76d9dcdffc1b2e65178df45a4b8d805581571839d3bca9fa188043eb66"
+checksum = "4c5783170dca235427b4b9899dcb2e94242c0a578f43ed205d70ee9bd82331f0"
 dependencies = [
- "http 0.1.21",
  "quick-error",
  "serde",
  "serde_derive",
