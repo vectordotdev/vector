@@ -12,6 +12,10 @@ use futures::{
 };
 use futures01::{future, sync::mpsc, Future, Sink};
 use lazy_static::lazy_static;
+use nix::{
+    sys::signal::{kill, Signal},
+    unistd::Pid,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
@@ -152,7 +156,7 @@ impl JournaldConfig {
             }
         };
 
-        let journal = J::new(self, cursor)?;
+        let (journal, close) = J::new(self, cursor)?;
 
         Ok(Box::new(future::lazy(move || {
             info!(message = "Starting journald server.",);
@@ -162,7 +166,7 @@ impl JournaldConfig {
                 include_units,
                 exclude_units,
                 channel: out,
-                shutdown,
+                shutdown: shutdown.clone(),
                 checkpointer,
                 batch_size,
             };
@@ -174,6 +178,9 @@ impl JournaldConfig {
             .boxed()
             .compat()
             .map_err(|error| error!(message="Journald server unexpectedly stopped.",%error))
+            .select(shutdown.map(move |_| close()))
+            .map(|_| ())
+            .map_err(|_| ())
         })))
     }
 }
@@ -225,7 +232,11 @@ fn fixup_unit(unit: &String) -> String {
 /// trait functions is an addition to the standard iteration methods for
 /// initializing the source.
 trait JournalSource: Iterator<Item = Result<String, io::Error>> + Sized {
-    fn new(config: &JournaldConfig, cursor: Option<String>) -> crate::Result<Self>;
+    /// (source, close_underlying_stream)
+    fn new(
+        config: &JournaldConfig,
+        cursor: Option<String>,
+    ) -> crate::Result<(Self, Box<dyn FnOnce() + Send>)>;
 }
 
 struct Journalctl {
@@ -235,7 +246,10 @@ struct Journalctl {
 }
 
 impl JournalSource for Journalctl {
-    fn new(config: &JournaldConfig, cursor: Option<String>) -> crate::Result<Self> {
+    fn new(
+        config: &JournaldConfig,
+        cursor: Option<String>,
+    ) -> crate::Result<(Self, Box<dyn FnOnce() + Send>)> {
         let journalctl = config.journalctl_path.as_ref().unwrap_or(&JOURNALCTL);
         let mut command = Command::new(journalctl);
         command.stdout(Stdio::piped());
@@ -260,7 +274,16 @@ impl JournalSource for Journalctl {
         let stdout = child.stdout.take().unwrap();
         let stdout = BufReader::new(stdout);
 
-        Ok(Journalctl { child, stdout })
+        let pid = Pid::from_raw(child.id() as i32);
+        Ok((
+            Journalctl { child, stdout },
+            Box::new(move || {
+                // Signal the child process to terminate so that the
+                // blocking future can be unblocked sooner rather
+                // than later.
+                let _ = kill(pid, Signal::SIGTERM);
+            }),
+        ))
     }
 }
 
@@ -532,7 +555,10 @@ mod tests {
     }
 
     impl JournalSource for FakeJournal {
-        fn new(_: &JournaldConfig, checkpoint: Option<String>) -> crate::Result<Self> {
+        fn new(
+            _: &JournaldConfig,
+            checkpoint: Option<String>,
+        ) -> crate::Result<(Self, Box<dyn FnOnce() + Send>)> {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
             let mut journal = FakeJournal { reader };
@@ -545,7 +571,7 @@ mod tests {
                 }
             }
 
-            Ok(journal)
+            Ok((journal, Box::new(|| ())))
         }
     }
 

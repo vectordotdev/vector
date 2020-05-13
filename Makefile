@@ -82,15 +82,18 @@ test-integration-kafka: ## Runs Kafka integration tests
 test-integration-loki: ## Runs Loki integration tests
 	$(RUN) test-integration-loki
 
-test-integration-pulsar: ## Runs Kafka integration tests
+test-integration-pulsar: ## Runs Pulsar integration tests
 	$(RUN) test-integration-pulsar
 
-test-integration-splunk: ## Runs Kafka integration tests
+test-integration-splunk: ## Runs Splunk integration tests
 	$(RUN) test-integration-splunk
 
 PACKAGE_DEB_USE_CONTAINER ?= "$(USE_CONTAINER)"
 test-integration-kubernetes: ## Runs Kubernetes integration tests
 	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" USE_CONTAINER=none $(RUN) test-integration-kubernetes
+	
+test-shutdown: ## Runs shutdown tests
+	$(RUN) test-shutdown
 
 test-unit: ## Runs unit tests, tests which do not require additional services to be present
 	$(RUN) test-unit
