@@ -4,6 +4,7 @@ use crate::{
     kafka::{KafkaCompression, KafkaTlsConfig},
     serde::to_string,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
+    template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::compat::Compat;
@@ -62,7 +63,7 @@ pub enum Encoding {
 
 pub struct KafkaSink {
     producer: FutureProducer,
-    topic: String,
+    topic: Template,
     key_field: Option<Atom>,
     encoding: EncodingConfig<Encoding>,
     in_flight: FuturesUnordered<MetadataFuture<Compat<DeliveryFuture>, usize>>,
@@ -121,7 +122,7 @@ impl KafkaSink {
         let producer = config.to_rdkafka()?.create().context(KafkaCreateFailed)?;
         Ok(KafkaSink {
             producer,
-            topic: config.topic,
+            topic: Template::from(config.topic),
             key_field: config.key_field,
             encoding: config.encoding.into(),
             in_flight: FuturesUnordered::new(),
@@ -138,7 +139,10 @@ impl Sink for KafkaSink {
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let topic = self.topic.clone();
+        let topic = self.topic.render_string(&item).map_err(|missing_keys| {
+            error!(message = "Missing keys for topic", ?missing_keys);
+            ()
+        })?;
 
         let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);
 
