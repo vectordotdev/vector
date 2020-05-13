@@ -32,7 +32,7 @@ const PROMETHEUS_CONFIG: &'static str = r#"
 
     [sources.in]
         type = "prometheus"
-        hosts = ["http://${VECTOR_TEST_ADDRESS}"]
+        hosts = ["http://${VECTOR_LOCALHOST_TEST_ADDRESS}"]
 
     [sinks.out]
         type = "prometheus"
@@ -83,13 +83,18 @@ data_dir = "${{VECTOR_DATA_DIR}}"
 }
 
 fn run_vector(config: &str) -> Command {
+    let address = next_addr();
     let mut cmd = Command::cargo_bin("vector").unwrap();
     cmd.arg("-c")
         .arg(create_file(config))
         .arg("--quiet")
         .env("VECTOR_DATA_DIR", create_directory())
         .env("VECTOR_TEST_UNIX_PATH", temp_file())
-        .env("VECTOR_TEST_ADDRESS", format!("{}", next_addr()));
+        .env("VECTOR_TEST_ADDRESS", format!("{}", address))
+        .env(
+            "VECTOR_LOCALHOST_TEST_ADDRESS",
+            format!("localhost:{}", address.port()),
+        );
 
     cmd
 }
