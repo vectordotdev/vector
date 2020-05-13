@@ -15,12 +15,15 @@ pub mod disk;
 #[serde(rename_all = "snake_case")]
 pub enum BufferConfig {
     Memory {
+        #[serde(default = "BufferConfig::memory_max_events")]
         max_events: usize,
+        #[serde(default)]
         when_full: WhenFull,
     },
     #[cfg(feature = "leveldb")]
     Disk {
         max_size: usize,
+        #[serde(default)]
         when_full: WhenFull,
     },
 }
@@ -28,7 +31,7 @@ pub enum BufferConfig {
 impl Default for BufferConfig {
     fn default() -> Self {
         BufferConfig::Memory {
-            max_events: 500,
+            max_events: BufferConfig::memory_max_events(),
             when_full: Default::default(),
         }
     }
@@ -80,6 +83,11 @@ impl BufferInputCloner {
 }
 
 impl BufferConfig {
+    #[inline]
+    const fn memory_max_events() -> usize {
+        500
+    }
+
     #[cfg_attr(not(feature = "leveldb"), allow(unused))]
     pub fn build(
         &self,
@@ -187,7 +195,7 @@ impl<S: Sink> Sink for DropWhenFull<S> {
 
 #[cfg(test)]
 mod test {
-    use super::{Acker, DropWhenFull};
+    use super::{Acker, BufferConfig, DropWhenFull, WhenFull};
     use crate::test_util::block_on;
     use futures01::{future, sync::mpsc, task::AtomicTask, Async, AsyncSink, Sink, Stream};
     use std::sync::{atomic::AtomicUsize, Arc};
@@ -230,5 +238,57 @@ mod test {
         assert!(!mock.is_notified());
         acker.ack(1);
         assert!(mock.is_notified());
+    }
+
+    #[test]
+    fn config_default_values() {
+        fn check(source: &str, config: BufferConfig) {
+            let conf: BufferConfig = toml::from_str(source).unwrap();
+            assert_eq!(toml::to_string(&conf), toml::to_string(&config));
+        }
+
+        check(
+            r#"
+          type = "memory"
+          "#,
+            BufferConfig::Memory {
+                max_events: 500,
+                when_full: WhenFull::Block,
+            },
+        );
+
+        check(
+            r#"
+          type = "memory"
+          max_events = 100
+          "#,
+            BufferConfig::Memory {
+                max_events: 100,
+                when_full: WhenFull::Block,
+            },
+        );
+
+        check(
+            r#"
+          type = "memory"
+          when_full = "drop_newest"
+          "#,
+            BufferConfig::Memory {
+                max_events: 500,
+                when_full: WhenFull::DropNewest,
+            },
+        );
+
+        #[cfg(feature = "leveldb")]
+        check(
+            r#"
+          type = "disk"
+          max_size = 1024
+          "#,
+            BufferConfig::Disk {
+                max_size: 1024,
+                when_full: WhenFull::Block,
+            },
+        );
     }
 }
