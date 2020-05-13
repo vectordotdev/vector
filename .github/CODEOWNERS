@@ -77,6 +77,9 @@
 
 /src/event/merge.rs @MOZGIII
 
+/lib/file-source/src/paths_provider/mod.rs @MOZGIII
+/lib/file-source/src/paths_provider/glob.rs @MOZGIII
+
 /tests/buffering.rs @MOZGIII
 
 /website/ @binarylogic

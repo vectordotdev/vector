@@ -6,6 +6,7 @@ extern crate tracing;
 mod file_server;
 mod file_watcher;
 mod metadata_ext;
+pub mod paths_provider;
 
 pub use self::file_server::{FileServer, Fingerprinter};
 
