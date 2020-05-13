@@ -218,7 +218,7 @@ fn bad_regex() {
         [transforms.parser]
         type = "regex_parser"
         inputs = ["in"]
-        regex = "(["
+        patterns = ["(["]
 
         [sinks.out]
         type = "socket"

@@ -346,7 +346,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                         "parser",
                         &["in"],
                         transforms::regex_parser::RegexParserConfig {
-                            regex: r"status=(?P<status>\d+)".to_string(),
+                            patterns: vec![r"status=(?P<status>\d+)".to_string()],
                             field: None,
                             ..Default::default()
                         },
@@ -410,7 +410,7 @@ fn benchmark_regex(c: &mut Criterion) {
                     let rt = vector::runtime::Runtime::single_threaded().unwrap();
                     let parser =transforms::regex_parser::RegexParserConfig {
                         // Many captures to stress the regex parser
-                        regex: r#"^(?P<addr>\d+\.\d+\.\d+\.\d+) (?P<user>\S+) (?P<auth>\S+) \[(?P<date>\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ [+-]\d{4})\] "(?P<method>[A-Z]+) (?P<uri>[^"]+) HTTP/\d\.\d" (?P<code>\d+) (?P<size>\d+) "(?P<referrer>[^"]+)" "(?P<browser>[^"]+)""#.into(),
+                        patterns: vec![r#"^(?P<addr>\d+\.\d+\.\d+\.\d+) (?P<user>\S+) (?P<auth>\S+) \[(?P<date>\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ [+-]\d{4})\] "(?P<method>[A-Z]+) (?P<uri>[^"]+) HTTP/\d\.\d" (?P<code>\d+) (?P<size>\d+) "(?P<referrer>[^"]+)" "(?P<browser>[^"]+)""#.into()],
                         field: None,
                         drop_failed: true,
                         ..Default::default()
@@ -465,7 +465,7 @@ fn benchmark_complex(c: &mut Criterion) {
                         "parser",
                         &["in1", "in2"],
                         transforms::regex_parser::RegexParserConfig {
-                            regex: r"status=(?P<status>\d+)".to_string(),
+                            patterns: vec![r"status=(?P<status>\d+)".to_string()],
                             field: None,
                             ..Default::default()
                         },
