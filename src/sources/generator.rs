@@ -26,6 +26,7 @@ pub(crate) struct GeneratorConfig {
 }
 
 impl GeneratorConfig {
+    #[allow(dead_code)] // to make check-component-features pass
     #[cfg(test)]
     pub fn repeat(lines: Vec<String>, count: usize) -> Self {
         Self {
