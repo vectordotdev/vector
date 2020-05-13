@@ -159,27 +159,15 @@ impl<L: RetryLogic> Future for RetryPolicyFuture<L> {
 
 impl RetryAction {
     pub fn is_retryable(&self) -> bool {
-        if let RetryAction::Retry(_) = &self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RetryAction::Retry(_))
     }
 
     pub fn is_not_retryable(&self) -> bool {
-        if let RetryAction::DontRetry(_) = &self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RetryAction::DontRetry(_))
     }
 
     pub fn is_successful(&self) -> bool {
-        if let RetryAction::Successful = &self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RetryAction::Successful)
     }
 }
 
