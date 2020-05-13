@@ -32,7 +32,7 @@ impl Hostcall {
 
 impl InternalEvent for Hostcall {
     fn emit_logs(&self) {
-        debug!(
+        trace!(
             message = "WASM hostcall",
             state = self.state.as_const_str(),
             call = self.call,

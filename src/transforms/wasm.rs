@@ -97,6 +97,9 @@ mod tests {
     #[test]
     fn protobuf_happy() -> crate::Result<()> {
         crate::test_util::trace_init();
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::protobuf::happy");
+        let _enter = span.enter();
+
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/protobuf/protobuf.wat"
@@ -117,6 +120,9 @@ mod tests {
     #[test]
     fn protobuf_sad() -> crate::Result<()> {
         crate::test_util::trace_init();
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::protobuf::sad");
+        let _enter = span.enter();
+
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/protobuf/protobuf.wat"
@@ -136,6 +142,9 @@ mod tests {
     #[test]
     fn add_fields() -> crate::Result<()> {
         crate::test_util::trace_init();
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::add_fields");
+        let _enter = span.enter();
+
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/add_fields/add_fields.wat"
@@ -155,6 +164,9 @@ mod tests {
     #[test]
     fn drop() -> crate::Result<()> {
         crate::test_util::trace_init();
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::drop");
+        let _enter = span.enter();
+
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/drop/drop.wat"
@@ -173,6 +185,9 @@ mod tests {
     #[test]
     fn panic() -> crate::Result<()> {
         crate::test_util::trace_init();
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::panic");
+        let _enter = span.enter();
+
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/panic/panic.wat"

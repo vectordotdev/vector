@@ -29,7 +29,7 @@ impl EventProcessing {
 
 impl InternalEvent for EventProcessing {
     fn emit_logs(&self) {
-        debug!(
+        trace!(
             message = "WASM Event Processing",
             state = self.state.as_const_str(),
             role = self.role.as_const_str(),

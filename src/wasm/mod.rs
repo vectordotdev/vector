@@ -315,6 +315,8 @@ fn protobuf() -> Result<()> {
     use std::io::{Read, Write};
     use string_cache::DefaultAtom as Atom;
     crate::test_util::trace_init();
+    let span = span!(tracing::Level::TRACE, "wasm::protobuf");
+    let _enter = span.enter();
 
     // Load in fixtures.
     let mut test_file = fs::File::open("tests/data/wasm/protobuf/demo.pb")?;
