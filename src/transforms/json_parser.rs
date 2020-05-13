@@ -78,7 +78,7 @@ impl Transform for JsonParser {
             .and_then(|to_parse| {
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
-                        debug!(
+                        warn!(
                             message = "Event failed to parse as JSON",
                             field = self.field.as_ref(),
                             %error,
