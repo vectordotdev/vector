@@ -25,6 +25,12 @@ impl WasmCompilation {
             role: self.role,
         })
     }
+    pub fn cached(self) {
+        emit!(Self {
+            state: State::Cached,
+            role: self.role,
+        })
+    }
 }
 
 impl InternalEvent for WasmCompilation {

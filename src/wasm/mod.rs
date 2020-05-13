@@ -189,17 +189,15 @@ impl WasmModule {
         fs::create_dir_all(&config.artifact_cache)?;
         hostcall::ensure_linked();
 
+        let internal_event_compilation = internal_events::WasmCompilation::begin(config.role);
         let calculated_fingerprint = calculate_fingerprint(&config.path)?;
         let found_fingerprint = fetch_fingerprint(&config.artifact_cache, &config.path)?;
         match found_fingerprint {
             Some(found) if found == calculated_fingerprint => {
                 // We can be lazy and do nothing! How wonderful.
-                // println!("Skipped wasm compile! Make me a metric later!");
+                internal_event_compilation.cached();
             }
             None | Some(_) => {
-                // println!("Rebuild wasm! Make me a metric later!");
-                let internal_event_compilation =
-                    internal_events::WasmCompilation::begin(config.role);
                 let fingerprint = compile(&config.path, &output_file)?;
                 store_fingerprint(&config.artifact_cache, &config.path, fingerprint)?;
                 internal_event_compilation.complete();

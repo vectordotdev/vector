@@ -10,6 +10,7 @@ pub use event_processing::EventProcessing;
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum State {
     Beginning,
+    Cached,
     Completed,
 }
 
@@ -19,9 +20,11 @@ impl State {
         match self {
             State::Beginning => BEGINNING,
             State::Completed => COMPLETED,
+            State::Cached => CACHED,
         }
     }
 }
 
 const BEGINNING: &str = "beginning";
 const COMPLETED: &str = "completed";
+const CACHED: &str = "cached";
