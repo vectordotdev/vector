@@ -180,7 +180,7 @@ impl HttpSink for ElasticSearchCommon {
         maybe_set_id(
             self.config.id_key.as_ref(),
             action.pointer_mut("/index").unwrap(),
-            &event,
+            &mut event,
         );
 
         let mut body = serde_json::to_vec(&action).unwrap();
@@ -432,8 +432,8 @@ fn finish_signer(
     }
 }
 
-fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event: &Event) {
-    if let Some(val) = key.and_then(|k| event.as_log().get(&k.as_ref().into())) {
+fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event: &mut Event) {
+    if let Some(val) = key.and_then(|k| event.as_mut_log().remove(&k.as_ref().into())) {
         let val = val.to_string_lossy();
 
         doc.as_object_mut()
@@ -445,21 +445,22 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sinks::util::retries::RetryAction;
-    use crate::Event;
+    use crate::{sinks::util::retries::RetryAction, Event};
     use http::{Response, StatusCode};
     use serde_json::json;
+    use string_cache::DefaultAtom as Atom;
 
     #[test]
-    fn sets_id_from_custom_field() {
+    fn removes_and_sets_id_from_custom_field() {
         let id_key = Some("foo");
         let mut event = Event::from("butts");
         event.as_mut_log().insert("foo", "bar");
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &event);
+        maybe_set_id(id_key, &mut action, &mut event);
 
         assert_eq!(json!({"_id": "bar"}), action);
+        assert_eq!(None, event.as_log().get(&Atom::from("foo")));
     }
 
     #[test]
@@ -469,7 +470,7 @@ mod tests {
         event.as_mut_log().insert("not_foo", "bar");
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &event);
+        maybe_set_id(id_key, &mut action, &mut event);
 
         assert_eq!(json!({}), action);
     }
@@ -481,7 +482,7 @@ mod tests {
         event.as_mut_log().insert("foo", "bar");
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &event);
+        maybe_set_id(id_key, &mut action, &mut event);
 
         assert_eq!(json!({}), action);
     }
@@ -561,13 +562,14 @@ mod integration_tests {
         assert_eq!(1, response.total());
 
         let hit = response.into_hits().next().unwrap();
+        assert_eq!("42", hit.id());
+
         let doc = hit.document().unwrap();
-        assert_eq!(Some("42"), doc["my_id"].as_str());
+        assert_eq!(None, doc["my_id"].as_str());
 
         let value = hit.into_document().unwrap();
         let expected = json!({
             "message": "raw log line",
-            "my_id": "42",
             "foo": "bar",
             "timestamp": input_event.as_log()[&event::log_schema().timestamp_key()],
         });
