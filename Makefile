@@ -99,10 +99,8 @@ test-unit: ## Runs unit tests, tests which do not require additional services to
 .PHONY: ensure-has-wasm-toolchain ### Configures a wasm toolchain for test artifact building, if required
 ensure-has-wasm-toolchain: target/wasm32-wasi/.obtained
 target/wasm32-wasi/.obtained:
-	@cat <<-'EOF'
-		# You should also install WABT for WASM module development!
-		# You can use your package manager or check https://github.com/WebAssembly/wabt
-	EOF
+	@echo "# You should also install WABT for WASM module development!"
+	@echo "# You can use your package manager or check https://github.com/WebAssembly/wabt"
 	rustup target add wasm32-wasi
 	@mkdir -p target/wasm32-wasi
 	@touch target/wasm32-wasi/.obtained
@@ -111,10 +109,7 @@ WASM_MODULES = $(patsubst tests/data/wasm/%/,%,$(wildcard tests/data/wasm/*/))
 WASM_WATS = $(foreach MODULE,$(WASM_MODULES),tests/data/wasm/${MODULE}/${MODULE}.wat)
 
 .PHONY: build-wasm-tests
-build-wasm-tests: pre-build-wasm-tests $(WASM_WATS)
-
-.PHONY: rebuild-wasm-tests
-rebuild-wasm-tests: clean-wasm pre-build-wasm-tests $(WASM_WATS)
+build-wasm-tests: clean-wasm pre-build-wasm-tests $(WASM_WATS) ### builds all WASM test modules.
 
 .PHONY: pre-build-wasm-tests
 pre-build-wasm-tests:
@@ -122,17 +117,17 @@ pre-build-wasm-tests:
 	@echo "# This will error if you don't have wabt installed as recommended."
 
 tests/data/wasm/%.wat: MODULE = $(lastword $(subst /, , $(dir $@)))
-tests/data/wasm/%.wat:
+tests/data/wasm/%.wat: ### Build a specific WASM module.
 	@echo "# Building WASM module ${MODULE}, requires Rustc for wasm32-wasi and wabt."
 	cargo build --target wasm32-wasi --release --package ${MODULE}
 	wasm2wat target/wasm32-wasi/release/${MODULE}.wasm -o tests/data/wasm/${MODULE}/${MODULE}.wat
 
 .PHONY: test-wasm
-test-wasm: rebuild-wasm-tests  ### Run engine tests.
+test-wasm: build-wasm-tests  ### Run engine tests.
 	TEST_THREADS=1 TEST_LOG=vector=trace cargo test wasm --no-default-features --features wasm -- --nocapture
 
 .PHONY: bench-wasm
-bench-wasm: rebuild-wasm-tests  ### Run engine tests.
+bench-wasm: build-wasm-tests  ### Run engine tests.
 	cargo bench wasm --no-default-features --features ${DEFAULT_FEATURES}
 
 .PHONY: clean-wasm
@@ -150,7 +145,7 @@ check-code: ## Check code
 check-component-features: ## Check that all component features are setup properly
 	$(RUN) check-component-features
 
-check-fmt: ## Check that al files are formatted properly
+check-fmt: ## Check that all files are formatted properly
 	$(RUN) check-fmt
 
 check-style: ## Check that all files are styled properly

@@ -166,7 +166,7 @@ bloom = "0.3.2"
 pulsar = { version = "0.3.0", optional = true }
 task-compat = "0.1"
 # For WASM
-vector-wasm = { path = "lib/vector-wasm", optional = true } # Notably, this is the guest API which must be WASM-without-wasi (That means no_std) compatible.
+vector-wasm = { path = "lib/vector-wasm", optional = true }
 lucetc = { version = "0.6.1", optional = true }
 lucet-runtime = { version = "0.6.1", optional = true }
 lucet-wasi = { version = "0.6.1", optional = true }
@@ -214,7 +214,7 @@ default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain"
 # Default features for *-unknown-linux-musl
 default-musl = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake", "wasm"]
 # Default features for *-pc-windows-msvc
-default-msvc = ["sources", "transforms", "sinks", "vendored", "leveldb-cmake", "rdkafka-cmake", "wasm"]
+default-msvc = ["sources", "transforms", "sinks", "vendored", "leveldb-cmake", "rdkafka-cmake"]
 
 # Enables features that work only on systems providing `cfg(unix)
 unix = ["jemallocator", "shiplift/unix-socket"]

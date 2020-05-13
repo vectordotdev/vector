@@ -1,6 +1,8 @@
 #![deny(improper_ctypes)]
 
 use vector_wasm::Registration;
+// This is **required**.
+pub use vector_wasm::interop::*;
 
 #[no_mangle]
 pub extern "C" fn init() {

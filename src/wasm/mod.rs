@@ -253,8 +253,8 @@ impl WasmModule {
 
         self.instance.insert_embed_ctx(context::EventBuffer::new());
 
-        // We unfortunately can't pass our `Event` type over FFI.
-        // Copy 1
+        // We unfortunately can't pass our `Event` type easily over FFI.
+        // This can definitely be improved later with some `Event` type changes.
         let data_buf = serde_json::to_vec(data.as_mut_log())?;
         let guest_data_size = data_buf.len() as u64;
         let guest_data_ptr = self
@@ -265,7 +265,6 @@ impl WasmModule {
         let guest_data_buf: &mut [u8] = self.instance.heap_mut()
             [guest_data_ptr as usize..(guest_data_ptr as usize + guest_data_size as usize)]
             .as_mut();
-        // Copy 2
         guest_data_buf.copy_from_slice(&data_buf);
 
         match self

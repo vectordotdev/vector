@@ -3,6 +3,8 @@
 use serde_json::Value;
 use std::collections::BTreeMap;
 use vector_wasm::{hostcall, Registration};
+// This is **required**.
+pub use vector_wasm::interop::*;
 
 #[no_mangle]
 pub extern "C" fn init() {
