@@ -279,6 +279,7 @@ mod test {
             },
         );
 
+        #[cfg(feature = "leveldb")]
         check(
             r#"
           type = "disk"
