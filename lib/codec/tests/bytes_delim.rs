@@ -38,6 +38,22 @@ fn bytes_decode_max_length() {
     assert!(codec.decode_eof(buf).unwrap().is_some());
 }
 
+// Regression test for [infinite loop bug](https://github.com/timberio/vector/issues/2564)
+// Derived from https://github.com/tokio-rs/tokio/issues/1483
+#[test]
+fn bytes_decoder_discard_repeat() {
+    const MAX_LENGTH: usize = 1;
+
+    let mut codec = BytesDelimitedCodec::new_with_max_length(b'\n', MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put("aa");
+    assert!(codec.decode(buf).unwrap().is_none());
+    buf.put("a");
+    assert!(codec.decode(buf).unwrap().is_none());
+}
+
 #[test]
 fn bytes_decode_json_escaped() {
     let mut input = HashMap::new();
