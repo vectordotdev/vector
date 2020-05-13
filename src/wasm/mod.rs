@@ -294,7 +294,9 @@ impl WasmModule {
             .ok_or("Could not retrieve context after processing.")?
         {
             error!("WASM plugin errored: {}", error);
-        }
+            self.instance
+                .insert_embed_ctx::<context::RaisedError>(Default::default());
+        };
 
         internal_event_processing.complete();
         Ok(out)

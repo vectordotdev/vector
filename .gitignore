@@ -12,5 +12,4 @@ sample.log
 target
 node_modules
 tests/data/wasm/*/target
-tests/data/wasm/enterprise
 cache/
