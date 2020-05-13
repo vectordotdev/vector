@@ -81,13 +81,13 @@ impl SourceConfig for JournaldConfig {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
 
-        let include_units = match (self.units.is_empty(), self.include_units.is_empty()) {
-            (false, false) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
+        let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
+            (true, true) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
             (true, false) => {
                 warn!("The `units` setting is deprecated, use `include_units` instead");
                 &self.units
             }
-            (_, true) => &self.include_units,
+            (false, _) => &self.include_units,
         };
 
         let include_units: HashSet<String> = include_units.iter().map(fixup_unit).collect();
