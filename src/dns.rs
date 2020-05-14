@@ -1,5 +1,9 @@
 use crate::runtime::TaskExecutor;
-use futures::{compat::Future01CompatExt, future::BoxFuture, FutureExt};
+use futures::{
+    compat::{Compat, Future01CompatExt},
+    future::BoxFuture,
+    FutureExt,
+};
 use futures01::{future, Future};
 use hyper::client::connect::dns::{Name, Resolve};
 use hyper13::client::connect::dns::Name as Name13;
@@ -14,7 +18,7 @@ use tower03::Service;
 use trust_dns_resolver::{
     config::{LookupIpStrategy, NameServerConfig, Protocol, ResolverConfig, ResolverOpts},
     lookup_ip::LookupIpIntoIter,
-    system_conf, AsyncResolver,
+    system_conf, TokioAsyncResolver,
 };
 
 /// Default port for DNS service.
@@ -24,7 +28,7 @@ pub type ResolverFuture = Box<dyn Future<Item = LookupIp, Error = DnsError> + Se
 
 #[derive(Debug, Clone)]
 pub struct Resolver {
-    inner: AsyncResolver,
+    inner: TokioAsyncResolver,
 }
 
 pub enum LookupIp {
@@ -62,11 +66,11 @@ impl Resolver {
             }
 
             let mut opts = ResolverOpts::default();
-            opts.attempts = 2;
-            opts.validate = false;
-            opts.ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
-            // FIXME: multipe requests fails when this is commented out
-            opts.num_concurrent_reqs = 1;
+            // opts.attempts = 2;
+            // opts.validate = false;
+            // opts.ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
+            // // FIXME: multipe requests fails when this is commented out
+            // opts.num_concurrent_reqs = 1;
 
             (config, opts)
         } else {
@@ -77,24 +81,28 @@ impl Resolver {
             res
         };
 
-        let (inner, bg_task) = AsyncResolver::new(config, opt);
-
-        exec.spawn(bg_task);
+        // TODO: we need to run this within the runtime to capture the
+        let handle = exec.block_on_std(async move { tokio::runtime::Handle::current() });
+        let inner = TokioAsyncResolver::new(config, opt, handle).unwrap();
 
         Ok(Self { inner })
     }
 
-    pub fn lookup_ip(&self, name: impl AsRef<str>) -> ResolverFuture {
+    pub fn lookup_ip(&self, name: String) -> ResolverFuture {
         if let Ok(ip) = IpAddr::from_str(name.as_ref()) {
             return Box::new(future::ok(LookupIp::Single(Some(ip))));
         }
 
-        Box::new(
-            self.inner
+        let resolver = self.inner.clone();
+        let fut = Box::pin(async move {
+            let lu = resolver
                 .lookup_ip(name.as_ref())
-                .context(UnableLookup)
-                .map(|lu| LookupIp::Query(lu.into_iter())),
-        )
+                .await
+                .context(UnableLookup)?;
+            Ok(LookupIp::Query(lu.into_iter()))
+        });
+
+        Box::new(Compat::new(fut))
     }
 }
 
@@ -114,7 +122,7 @@ impl Resolve for Resolver {
     type Future = Box<dyn Future<Item = Self::Addrs, Error = std::io::Error> + Send + 'static>;
 
     fn resolve(&self, name: Name) -> Self::Future {
-        let fut = self.lookup_ip(name.as_str()).map_err(|e| {
+        let fut = self.lookup_ip(name.as_str().to_string()).map_err(|e| {
             use std::io;
             io::Error::new(io::ErrorKind::Other, e)
         });
@@ -132,7 +140,7 @@ impl Service<Name13> for Resolver {
     }
 
     fn call(&mut self, name: Name13) -> Self::Future {
-        self.lookup_ip(name.as_str())
+        self.lookup_ip(name.as_str().to_string())
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
             .compat()
             .boxed()
@@ -201,6 +209,7 @@ impl From<trust_dns_proto::error::ProtoError> for ProtoError {
 }
 
 #[cfg(test)]
+#[cfg(feature = "ignore")]
 mod tests {
     use super::Resolver;
     use crate::runtime::Runtime;

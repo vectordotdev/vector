@@ -108,7 +108,7 @@ impl TcpSink {
             self.state = match self.state {
                 TcpSinkState::Disconnected => {
                     debug!(message = "resolving dns.", host = %self.host);
-                    let fut = self.resolver.lookup_ip(&self.host);
+                    let fut = self.resolver.lookup_ip(self.host.clone());
 
                     TcpSinkState::ResolvingDns(fut)
                 }
