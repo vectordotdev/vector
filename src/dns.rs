@@ -74,7 +74,7 @@ impl Resolver {
 
             (config, opts)
         } else {
-            #[cfg(feature = "disable-resolv-conf")]
+            // #[cfg(feature = "disable-resolv-conf")]
             let res = (Default::default(), Default::default());
             // #[cfg(not(feature = "disable-resolv-conf"))]
             // let res = system_conf::read_system_conf().context(ReadSystemConf)?;
@@ -95,10 +95,7 @@ impl Resolver {
 
         let resolver = self.inner.clone();
         let fut = Box::pin(async move {
-            let lu = resolver
-                .lookup_ip(name.as_ref())
-                .await
-                .context(UnableLookup)?;
+            let lu = resolver.lookup_ip(name).await.context(UnableLookup)?;
             Ok(LookupIp::Query(lu.into_iter()))
         });
 
