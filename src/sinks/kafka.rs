@@ -397,7 +397,7 @@ mod integration_test {
         let tls_enabled = tls.as_ref().map(|tls| tls.enabled()).unwrap_or(false);
         let config = KafkaSinkConfig {
             bootstrap_servers: server.to_string(),
-            topic: topic.clone(),
+            topic: format!("{}-%Y%m%d", topic),
             compression,
             encoding: EncodingConfigWithDefault::from(Encoding::Text),
             key_field: None,
@@ -406,6 +406,7 @@ mod integration_test {
             message_timeout_ms: 300000,
             ..Default::default()
         };
+        let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = KafkaSink::new(config, acker).unwrap();
 
