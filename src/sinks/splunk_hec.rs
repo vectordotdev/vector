@@ -117,13 +117,11 @@ impl HttpSink for HecSinkConfig {
 
         let host = event.get(&self.host_key).cloned();
 
-        let timestamp = if let Some(Value::Timestamp(ts)) =
-            event.remove(&event::log_schema().timestamp_key())
-        {
-            ts.timestamp_nanos()
-        } else {
-            chrono::Utc::now().timestamp_nanos()
+        let timestamp = match event.remove(&event::log_schema().timestamp_key()) {
+            Some(Value::Timestamp(ts)) => ts,
+            _ => chrono::Utc::now(),
         };
+        let timestamp = (timestamp.timestamp_millis() as f64) / 1000f64;
 
         let sourcetype = event.get(&event::log_schema().source_type_key()).cloned();
 
@@ -244,21 +242,22 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{self, Event};
-    use crate::sinks::util::http::HttpSink;
+    use crate::event::Event;
+    use crate::sinks::util::{http::HttpSink, test::load_sink};
+    use chrono::Utc;
     use serde::Deserialize;
     use std::collections::BTreeMap;
 
     #[derive(Deserialize, Debug)]
     struct HecEventJson {
-        time: i64,
+        time: f64,
         event: BTreeMap<String, String>,
         fields: BTreeMap<String, String>,
     }
 
     #[derive(Deserialize, Debug)]
     struct HecEventText {
-        time: i64,
+        time: f64,
         event: String,
         fields: BTreeMap<String, String>,
     }
@@ -268,7 +267,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let (config, _, _) = crate::sinks::util::test::load_sink::<HecSinkConfig>(
+        let (config, _, _) = load_sink::<HecSinkConfig>(
             r#"
             host = "test.com"
             token = "alksjdfo"
@@ -301,6 +300,10 @@ mod tests {
             hec_event.fields.get("key").map(|s| s.as_str()),
             Some("value")
         );
+
+        let now = Utc::now().timestamp_millis() as f64 / 1000f64;
+        assert!((hec_event.time - now).abs() < 0.1);
+        assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
 
     #[test]
@@ -308,7 +311,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let (config, _, _) = crate::sinks::util::test::load_sink::<HecSinkConfig>(
+        let (config, _, _) = load_sink::<HecSinkConfig>(
             r#"
             host = "test.com"
             token = "alksjdfo"
@@ -331,6 +334,10 @@ mod tests {
             hec_event.fields.get("key").map(|s| s.as_str()),
             Some("value")
         );
+
+        let now = Utc::now().timestamp_millis() as f64 / 1000f64;
+        assert!((hec_event.time - now).abs() < 0.1);
+        assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
 
     #[test]

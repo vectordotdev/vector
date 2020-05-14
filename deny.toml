@@ -4,5 +4,4 @@ ignore = [
                          # dns servers.
     "RUSTSEC-2020-0002", # tracked in #1639
     "RUSTSEC-2020-0001", # dev dependency only
-    "RUSTSEC-2019-0031", # spin is unmaintained
 ]

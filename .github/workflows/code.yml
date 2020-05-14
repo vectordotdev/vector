@@ -8,6 +8,7 @@ on:
       - ".github/workflows/code.yml"
       - "lib/*s"
       - "proto/**"
+      - "scripts/**"
       - "src/**"
       - "tests/**"
       - "Cargo.lock"
@@ -18,8 +19,10 @@ on:
   pull_request:
     paths:
       - ".github/workflows/test.yml"
+      - ".github/workflows/code.yml"
       - "lib/*s"
       - "proto/**"
+      - "scripts/**"
       - "src/**"
       - "tests/**"
       - "Cargo.lock"
@@ -36,11 +39,11 @@ env:
   USE_CONTAINER: none
 
 jobs:
-  check-advistories:
+  check-advisories:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - uses: EmbarkStudios/cargo-deny-action@v0
+      - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
 
@@ -58,9 +61,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
+      - run: rustup component add rustfmt
       - run: make check-fmt
         env:
           PASS_RUSTFLAGS: "-D warnings"
+          USE_CONTAINER: docker
 
   check-linux:
     runs-on: ubuntu-latest
@@ -75,6 +80,14 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - run: make check-version
+        env:
+          USE_CONTAINER: docker
+
+  check-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-scripts
 
   check-windows:
     runs-on: windows-latest
@@ -150,6 +163,42 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - run: make test-integration-splunk
+
+  test-shutdown:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make test-shutdown
+
+  test-integration-kubernetes:
+    # This is an experimental test. Allow it to fail without failing the whole
+    # workflow, but keep it executing on every build to gather stats.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        kubernetes:
+          - v1.18.2
+          - v1.17.5
+          - v1.16.9
+          - v1.15.11
+          - v1.14.10
+      fail-fast: false
+    steps:
+      - name: Setup Minikube
+        uses: manusa/actions-setup-minikube@v1.0.2
+        with:
+          minikube version: 'v1.9.2'
+          kubernetes version: '${{ matrix.kubernetes }}'
+          github token: '${{ secrets.GITHUB_TOKEN }}'
+      - name: Checkout
+        uses: actions/checkout@v1
+      - run: make slim-builds
+      - run: make test-integration-kubernetes
+        env:
+          USE_MINIKUBE_DOCKER: "true"
+          CONTAINER_IMAGE_REPO: vector-test
+          PACKAGE_DEB_USE_CONTAINER: docker
 
   test-unit:
     runs-on: ubuntu-latest

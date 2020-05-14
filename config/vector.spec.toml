@@ -517,6 +517,23 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   data_dir = "/var/lib/vector"
 
+  # The list of units names to exclude from monitoring. Unit names lacking a
+  # `"."` will have `".service"` appended to make them a valid service unit name.
+  #
+  # * optional
+  # * default: []
+  # * type: [string]
+  exclude_units = ["badservice", "sysinit.target"]
+
+  # The list of units names to monitor. If empty or not present, all units are
+  # accepted. Unit names lacking a `"."` will have `".service"` appended to make
+  # them a valid service unit name.
+  #
+  # * optional
+  # * default: []
+  # * type: [string]
+  include_units = ["ntpd", "sysinit.target"]
+
   # The full path of the `journalctl` executable. If not set, Vector will search
   # the path for `journalctl`.
   #
@@ -532,15 +549,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   # * must be: "journald"
   type = "journald"
-
-  # The list of units names to monitor. If empty or not present, all units are
-  # accepted. Unit names lacking a `"."` will have `".service"` appended to make
-  # them a valid service unit name.
-  #
-  # * optional
-  # * default: []
-  # * type: [string]
-  units = ["ntpd", "sysinit.target"]
 
 # Ingests data through Kafka and outputs `log` events.
 [sources.kafka]
@@ -1627,6 +1635,16 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "method.neq" = "POST"
 
+    # Check if the given `[condition]` does not match.
+    #
+    # * optional
+    # * no default
+    # * type: any
+    # * relevant when type = "check_fields"
+    "message.not_contains" = "some phrase to ignore"
+    "unit.not_starts_with" = "sys-"
+    "unit.not_ends_with" = ".device"
+
     # Checks whether a string field contains a string argument.
     #
     # * optional
@@ -2202,11 +2220,12 @@ require('custom_module')
   overwrite_target = true
   overwrite_target = false
 
-  # The Regular Expression to apply. Do not include the leading or trailing `/`.
+  # The Regular Expressions to apply. Do not include the leading or trailing `/`
+  # in any of the expressions.
   #
   # * required
   # * type: string
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
+  patterns = "['^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$']"
 
   # If this setting is present, the parsed fields will be inserted into the log
   # as a sub-object with this name. If a field with the same name already exists,
@@ -2512,6 +2531,16 @@ require('custom_module')
       # * type: string
       # * relevant when type = "check_fields"
       "method.neq" = "POST"
+
+      # Check if the given `[condition]` does not match.
+      #
+      # * optional
+      # * no default
+      # * type: any
+      # * relevant when type = "check_fields"
+      "message.not_contains" = "some phrase to ignore"
+      "unit.not_starts_with" = "sys-"
+      "unit.not_ends_with" = ".device"
 
       # Checks whether a string field contains a string argument.
       #
@@ -4557,6 +4586,22 @@ require('custom_module')
     # * required when strategy = "basic"
     user = "${ELASTICSEARCH_USERNAME}"
     user = "username"
+
+  #
+  # AWS
+  #
+
+  [sinks.elasticsearch.aws]
+    # The AWS region of the target service. This defaults to the region named in
+    # the host parameter, or the value of the `$AWS_REGION` or
+    # `$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or
+    # "us-east-1".
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when strategy = "aws"
+    region = "us-east-1"
 
   #
   # Batch
