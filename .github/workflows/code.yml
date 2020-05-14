@@ -171,6 +171,9 @@ jobs:
       - run: make test-shutdown
 
   test-integration-kubernetes:
+    # This is an experimental test. Allow it to fail without failing the whole
+    # workflow, but keep it executing on every build to gather stats.
+    continue-on-error: true
     runs-on: ubuntu-latest
     strategy:
       matrix:
