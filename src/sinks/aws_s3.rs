@@ -384,7 +384,6 @@ fn encode_event(
     key_prefix: &Template,
     encoding: &EncodingConfigWithDefault<Encoding>,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
-    encoding.apply_rules(&mut event);
     let key = key_prefix
         .render_string(&event)
         .map_err(|missing_keys| {
@@ -395,6 +394,8 @@ fn encode_event(
             );
         })
         .ok()?;
+
+    encoding.apply_rules(&mut event);
 
     let log = event.into_log();
     let bytes = match encoding.codec() {
@@ -454,6 +455,29 @@ mod tests {
 
         assert_eq!(map[&event::log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
+    }
+
+    #[test]
+    fn s3_encode_event_with_removed_key() {
+        let message = "hello world".to_string();
+        let mut event = Event::from(message.clone());
+        event.as_mut_log().insert("key", "value");
+
+        let key_prefix = Template::from("{{ key }}");
+
+        let encoding_config = EncodingConfigWithDefault {
+            codec: Encoding::Ndjson,
+            except_fields: Some(vec!["key".into()]),
+            ..Default::default()
+        };
+
+        let bytes = encode_event(event, &key_prefix, &encoding_config).unwrap();
+
+        let (bytes, _) = bytes.into_parts();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+
+        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
+        // assert_eq!(map["key"], "value".to_string());
     }
 
     #[test]

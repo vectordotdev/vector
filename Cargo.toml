@@ -181,7 +181,7 @@ tempfile = "3.0.6"
 libc = "0.2.43"
 libz-sys = "1.0"
 walkdir = "2.2.7"
-elastic_responses = "0.20"
+elastic_responses = "0.21.0-pre.4"
 matches = "0.1.8"
 pretty_assertions = "0.6.1"
 tokio01-test = "0.1.1"
@@ -193,6 +193,7 @@ trust-dns-client = "0.20"
 dirs = "2.0.2"
 tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
+assert_cmd = "0.11"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -402,6 +403,7 @@ loki-integration-tests = ["sinks-loki"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 
+shutdown-tests = ["sources","sinks-console","sinks-prometheus","sinks-blackhole","unix","rdkafka"]
 disable-resolv-conf = []
 
 [[bench]]

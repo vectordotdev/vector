@@ -129,7 +129,11 @@ fn bad_type() {
     .unwrap_err();
 
     assert_eq!(err.len(), 1);
-    assert!(err[0].starts_with("unknown variant `jabberwocky`, expected one of "));
+    assert!(
+        err[0].starts_with("unknown variant `jabberwocky`, expected "),
+        "Found: {:?}",
+        &err[0]
+    );
 }
 
 #[cfg(all(
@@ -214,7 +218,7 @@ fn bad_regex() {
         [transforms.parser]
         type = "regex_parser"
         inputs = ["in"]
-        regex = "(["
+        patterns = ["(["]
 
         [sinks.out]
         type = "socket"

@@ -49,20 +49,7 @@ impl From<Encoding> for splunk_hec::Encoding {
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        if self.encoding.codec != Encoding::Json {
-            error!("Using an unsupported encoding for Humio");
-        }
-        let host = self.host.clone().unwrap_or_else(|| HOST.to_string());
-
-        HecSinkConfig {
-            token: self.token.clone(),
-            host,
-            encoding: self.encoding.clone().transmute(),
-            batch: self.batch.clone(),
-            request: self.request.clone(),
-            ..Default::default()
-        }
-        .build(cx)
+        self.build_hec_config().build(cx)
     }
 
     fn input_type(&self) -> DataType {
@@ -74,19 +61,52 @@ impl SinkConfig for HumioLogsConfig {
     }
 }
 
+impl HumioLogsConfig {
+    fn build_hec_config(&self) -> HecSinkConfig {
+        let host = self.host.clone().unwrap_or_else(|| HOST.to_string());
+
+        HecSinkConfig {
+            token: self.token.clone(),
+            host,
+            encoding: self.encoding.clone().transmute(),
+            batch: self.batch.clone(),
+            request: self.request.clone(),
+            ..Default::default()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sinks::util::test::load_sink;
+    use crate::event::Event;
+    use crate::sinks::util::{http::HttpSink, test::load_sink};
+    use chrono::Utc;
+    use serde::Deserialize;
+
+    #[derive(Deserialize, Debug)]
+    struct HecEventJson {
+        time: f64,
+    }
 
     #[test]
-    fn smoke() {
-        load_sink::<HumioLogsConfig>(
+    fn humio_valid_time_field() {
+        let event = Event::from("hello world");
+
+        let (config, _, _) = load_sink::<HumioLogsConfig>(
             r#"
             token = "alsdkfjaslkdfjsalkfj"
             host = "https://127.0.0.1"
         "#,
         )
         .unwrap();
+        let config = config.build_hec_config();
+
+        let bytes = config.encode_event(event).unwrap();
+        let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
+
+        let now = Utc::now().timestamp_millis() as f64 / 1000f64;
+        assert!((hec_event.time - now).abs() < 0.1);
+        assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
 }
