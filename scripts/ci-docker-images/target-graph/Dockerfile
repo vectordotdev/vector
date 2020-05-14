@@ -8,3 +8,8 @@ RUN git clone https://github.com/lindenb/makefile2graph && \
   make install && \
   cd .. && \
   rm -rf makefile2graph
+
+# Configure temp dir
+ENV TMPDIR=/docker-tmp
+RUN mkdir -p "$TMPDIR" && chmod 0777 "$TMPDIR"
+VOLUME [ "$TMPDIR" ]

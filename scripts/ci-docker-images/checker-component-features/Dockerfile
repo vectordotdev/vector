@@ -21,3 +21,8 @@ RUN rustup component add rustfmt
 
 # Install `remarshal`
 RUN pip3 install remarshal==0.11.2
+
+# Configure temp dir
+ENV TMPDIR=/docker-tmp
+RUN mkdir -p "$TMPDIR" && chmod 0777 "$TMPDIR"
+VOLUME [ "$TMPDIR" ]

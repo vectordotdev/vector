@@ -5,3 +5,8 @@ RUN apt-get update && \
   ca-certificates \
   curl \
   git
+
+# Configure temp dir
+ENV TMPDIR=/docker-tmp
+RUN mkdir -p "$TMPDIR" && chmod 0777 "$TMPDIR"
+VOLUME [ "$TMPDIR" ]

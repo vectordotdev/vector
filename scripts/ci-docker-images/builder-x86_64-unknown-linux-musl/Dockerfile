@@ -82,16 +82,16 @@ ENV LDFLAGS=""
 RUN mkdir build && \
   cd build && \
   cmake \
-    -DCMAKE_BUILD_TYPE=release \
-    -DLLVM_CONFIG_PATH=$CLANG_PREFIX/bin/llvm-config \
-		-DCOMPILER_RT_DEFAULT_TARGET_TRIPLE=$TARGET \
-    -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
-    -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
-    -DCOMPILER_RT_BUILD_XRAY=OFF \
-    -DCOMPILER_RT_BUILD_PROFILE=OFF \
-    -DCMAKE_INSTALL_PREFIX=$LIBS_PREFIX \
-    -G Ninja \
-    .. && \
+  -DCMAKE_BUILD_TYPE=release \
+  -DLLVM_CONFIG_PATH=$CLANG_PREFIX/bin/llvm-config \
+  -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE=$TARGET \
+  -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+  -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+  -DCOMPILER_RT_BUILD_XRAY=OFF \
+  -DCOMPILER_RT_BUILD_PROFILE=OFF \
+  -DCMAKE_INSTALL_PREFIX=$LIBS_PREFIX \
+  -G Ninja \
+  .. && \
   cmake --build . --target install
 
 # Compile musl.
@@ -315,3 +315,8 @@ RUN apt-get install -y rename cmark-gfm
 
 # Install journalctl
 RUN apt-get install -y systemd
+
+# Configure temp dir
+ENV TMPDIR=/docker-tmp
+RUN mkdir -p "$TMPDIR" && chmod 0777 "$TMPDIR"
+VOLUME [ "$TMPDIR" ]

@@ -22,3 +22,8 @@ COPY scripts/Gemfile Gemfile
 COPY scripts/Gemfile.lock Gemfile.lock
 RUN bundle install
 RUN rm Gemfile
+
+# Configure temp dir
+ENV TMPDIR=/docker-tmp
+RUN mkdir -p "$TMPDIR" && chmod 0777 "$TMPDIR"
+VOLUME [ "$TMPDIR" ]

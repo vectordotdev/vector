@@ -17,7 +17,7 @@ RUN apt-get update && \
   rename \
   ruby-full \
   zlib1g-dev \
-	wget
+  wget
 
 # AWS CLI
 RUN pip3 install --upgrade awscli
@@ -42,3 +42,8 @@ COPY scripts/Gemfile Gemfile
 COPY scripts/Gemfile.lock Gemfile.lock
 RUN bundle install
 RUN rm Gemfile
+
+# Configure temp dir
+ENV TMPDIR=/docker-tmp
+RUN mkdir -p "$TMPDIR" && chmod 0777 "$TMPDIR"
+VOLUME [ "$TMPDIR" ]
