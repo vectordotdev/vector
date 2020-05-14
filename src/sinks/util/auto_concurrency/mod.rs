@@ -3,6 +3,7 @@
 mod controller;
 mod future;
 mod layer;
+mod semaphore;
 mod service;
 
 pub(crate) use layer::AutoConcurrencyLimitLayer;
