@@ -6909,6 +6909,7 @@ require('custom_module')
   # * required
   # * type: string
   topic = "topic-1234"
+  topic = "logs-{{unit}}-%Y-%m-%d"
 
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.

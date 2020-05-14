@@ -4,6 +4,7 @@ use crate::{
     kafka::{KafkaCompression, KafkaTlsConfig},
     serde::to_string,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
+    template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::compat::Compat;
@@ -62,7 +63,7 @@ pub enum Encoding {
 
 pub struct KafkaSink {
     producer: FutureProducer,
-    topic: String,
+    topic: Template,
     key_field: Option<Atom>,
     encoding: EncodingConfig<Encoding>,
     in_flight: FuturesUnordered<MetadataFuture<Compat<DeliveryFuture>, usize>>,
@@ -121,7 +122,7 @@ impl KafkaSink {
         let producer = config.to_rdkafka()?.create().context(KafkaCreateFailed)?;
         Ok(KafkaSink {
             producer,
-            topic: config.topic,
+            topic: Template::from(config.topic),
             key_field: config.key_field,
             encoding: config.encoding.into(),
             in_flight: FuturesUnordered::new(),
@@ -138,7 +139,10 @@ impl Sink for KafkaSink {
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let topic = self.topic.clone();
+        let topic = self.topic.render_string(&item).map_err(|missing_keys| {
+            error!(message = "Missing keys for topic", ?missing_keys);
+            ()
+        })?;
 
         let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);
 
@@ -210,13 +214,24 @@ impl Sink for KafkaSink {
 
 fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
     let client = config.to_rdkafka().unwrap();
+    let topic = match Template::from(config.topic).render_string(&Event::from("")) {
+        Ok(topic) => Some(topic),
+        Err(missing_keys) => {
+            warn!(
+                message = "Could not generate topic for healthcheck",
+                ?missing_keys
+            );
+            None
+        }
+    };
 
     let check = future::lazy(move || {
         let consumer: BaseConsumer = client.create().unwrap();
 
         tokio::task::block_in_place(|| {
+            let topic = topic.as_ref().map(|topic| &topic[..]);
             consumer
-                .fetch_metadata(Some(&config.topic), Duration::from_secs(3))
+                .fetch_metadata(topic, Duration::from_secs(3))
                 .map(|_| ())
                 .map_err(|err| err.into())
         })
@@ -383,7 +398,7 @@ mod integration_test {
         let tls_enabled = tls.as_ref().map(|tls| tls.enabled()).unwrap_or(false);
         let config = KafkaSinkConfig {
             bootstrap_servers: server.to_string(),
-            topic: topic.clone(),
+            topic: format!("{}-%Y%m%d", topic),
             compression,
             encoding: EncodingConfigWithDefault::from(Encoding::Text),
             key_field: None,
@@ -392,6 +407,7 @@ mod integration_test {
             message_timeout_ms: 300000,
             ..Default::default()
         };
+        let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = KafkaSink::new(config, acker).unwrap();
 
