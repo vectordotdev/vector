@@ -1,3 +1,6 @@
+#![allow(clippy::inherent_to_string)]
+#![allow(clippy::redundant_clone)]
+
 #![cfg(all(feature = "sources-syslog", feature = "sinks-socket"))]
 
 use approx::assert_relative_eq;
