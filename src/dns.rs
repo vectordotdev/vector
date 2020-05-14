@@ -76,8 +76,8 @@ impl Resolver {
         } else {
             #[cfg(feature = "disable-resolv-conf")]
             let res = (Default::default(), Default::default());
-            #[cfg(not(feature = "disable-resolv-conf"))]
-            let res = system_conf::read_system_conf().context(ReadSystemConf)?;
+            // #[cfg(not(feature = "disable-resolv-conf"))]
+            // let res = system_conf::read_system_conf().context(ReadSystemConf)?;
             res
         };
 
