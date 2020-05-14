@@ -51,16 +51,22 @@ pub struct WasmModuleConfig {
     //       the module begins processing.
     #[derivative(Default(value = "defaults::HEAP_MEMORY_SIZE"))]
     pub max_heap_memory_size: usize,
+    pub options: HashMap<String, serde_json::Value>,
 }
 
 impl WasmModuleConfig {
     /// Build a new configuration with the required options set.
-    pub fn new(role: Role, path: impl Into<PathBuf>) -> Self {
+    pub fn new(
+        role: Role,
+        path: impl Into<PathBuf>,
+        options: HashMap<String, serde_json::Value>,
+    ) -> Self {
         Self {
             role,
             path: path.into(),
             artifact_cache: defaults::ARTIFACT_CACHE.into(),
             max_heap_memory_size: defaults::HEAP_MEMORY_SIZE,
+            options,
         }
     }
 
@@ -178,7 +184,6 @@ pub struct WasmModule {
 impl WasmModule {
     /// Build the WASM instance from a given config.
     pub fn build(config: impl Into<WasmModuleConfig> + Debug) -> Result<Self> {
-        event!(Level::TRACE, "instantiating");
         let config = config.into();
         let output_file = config
             .artifact_cache
@@ -219,6 +224,7 @@ impl WasmModule {
         // instantiate the module in the memory region
         let instance = region
             .new_instance_builder(module)
+            .with_embed_ctx::<WasmModuleConfig>(config.clone())
             .with_embed_ctx::<Option<Registration>>(None)
             .with_embed_ctx::<context::RaisedError>(Default::default())
             .build()?;
@@ -250,6 +256,8 @@ impl WasmModule {
         let internal_event_processing = internal_events::EventProcessing::begin(self.role);
 
         self.instance.insert_embed_ctx(context::EventBuffer::new());
+        self.instance
+            .insert_embed_ctx::<context::RaisedError>(Default::default());
 
         // We unfortunately can't pass our `Event` type easily over FFI.
         // This can definitely be improved later with some `Event` type changes.
@@ -285,14 +293,9 @@ impl WasmModule {
             .remove_embed_ctx()
             .ok_or("Could not retrieve context after processing.")?;
 
-        if let context::RaisedError { error: Some(error) } = self
-            .instance
-            .remove_embed_ctx()
-            .ok_or("Could not retrieve context after processing.")?
+        if let Some(context::RaisedError { error: Some(error) }) = self.instance.remove_embed_ctx()
         {
             error!("WASM plugin errored: {}", error);
-            self.instance
-                .insert_embed_ctx::<context::RaisedError>(Default::default());
         };
 
         internal_event_processing.complete();
@@ -300,11 +303,7 @@ impl WasmModule {
     }
 
     pub fn shutdown(&mut self) -> Result<()> {
-        event!(Level::TRACE, "shutting down");
-
         let _worked = self.instance.run("shutdown", &[])?;
-
-        event!(Level::TRACE, "processed");
         Ok(())
     }
 }
@@ -334,6 +333,7 @@ fn protobuf() -> Result<()> {
     let mut module = WasmModule::build(WasmModuleConfig::new(
         Role::Transform,
         "tests/data/wasm/protobuf/protobuf.wat",
+        HashMap::new(),
     ))?;
     let out = module.process(event.clone())?;
     module.shutdown()?;

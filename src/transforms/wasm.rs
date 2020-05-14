@@ -5,6 +5,7 @@ use crate::{
     wasm::{WasmModule, WasmModuleConfig},
 };
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use vector_wasm::Role;
 
@@ -12,11 +13,14 @@ use vector_wasm::Role;
 #[serde(deny_unknown_fields)]
 pub struct WasmConfig {
     pub module: PathBuf,
+    /// Options to be passed to the WASM module.b
+    #[serde(default)]
+    pub options: HashMap<String, serde_json::Value>,
 }
 
 impl Into<WasmModuleConfig> for WasmConfig {
     fn into(self) -> WasmModuleConfig {
-        WasmModuleConfig::new(Role::Transform, self.module)
+        WasmModuleConfig::new(Role::Transform, self.module, self.options)
     }
 }
 
@@ -205,6 +209,43 @@ mod tests {
         let output = transform.transform(input);
 
         let expected = parse_event_artifact("tests/data/wasm/panic/fixtures/a/expected.json")?;
+        assert_eq!(output, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn assert_options() -> crate::Result<()> {
+        crate::test_util::trace_init();
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::assert_options");
+        let _enter = span.enter();
+
+        let mut transform = parse_config(
+            r#"
+            module = "tests/data/wasm/assert_options/assert_options.wat"
+            // options.takes_string = "test"
+            // options.takes_number = 123
+            // options.takes_bool = true
+            // options.takes_array = [1, 2, "three"],
+            // options.takes_map.one = "a"
+            // options.takes_map.two = "b"
+            "#,
+        )?;
+
+        let input =
+            parse_event_artifact("tests/data/wasm/assert_options/fixtures/a/input.json")?.unwrap();
+
+        let output = transform.transform(input.clone());
+
+        let expected =
+            parse_event_artifact("tests/data/wasm/assert_options/fixtures/a/expected.json")?;
+        assert_eq!(output, expected);
+
+        // Important to try again. :)
+        let output = transform.transform(input);
+
+        let expected =
+            parse_event_artifact("tests/data/wasm/assert_options/fixtures/a/expected.json")?;
         assert_eq!(output, expected);
 
         Ok(())

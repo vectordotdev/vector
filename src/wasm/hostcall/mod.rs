@@ -67,6 +67,23 @@ pub extern "C" fn raise(vmctx: &mut Vmctx, data: u64, length: u64) -> usize {
     0
 }
 
+#[lucet_hostcall]
+#[no_mangle]
+pub extern "C" fn options(vmctx: &mut Vmctx) -> usize {
+    let internal_event = internal_events::Hostcall::begin(Role::Transform, "options");
+
+    // let heap = vmctx.heap_mut();
+    // let slice = &heap[data as usize..(length as usize + data as usize)];
+    //
+    // let value = String::from_utf8(slice.into()).unwrap();
+    //
+    // let mut maybe_error = vmctx.get_embed_ctx_mut::<RaisedError>();
+    // maybe_error.error = Some(value);
+
+    internal_event.complete();
+    0
+}
+
 static HOSTCALL_API_INIT: Once = Once::new();
 
 /// This is pretty hackish; we will hopefully be able to avoid this altogether once [this

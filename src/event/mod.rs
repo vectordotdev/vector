@@ -283,9 +283,11 @@ impl Serialize for Value {
             Value::Integer(i) => serializer.serialize_i64(*i),
             Value::Float(f) => serializer.serialize_f64(*f),
             Value::Boolean(b) => serializer.serialize_bool(*b),
-            Value::Bytes(_) | Value::Timestamp(_) => {
-                serializer.serialize_str(&self.to_string_lossy())
-            }
+            Value::Timestamp(_) => serializer.serialize_str(&self.to_string_lossy()),
+            Value::Bytes(b) => match std::str::from_utf8(&b) {
+                Ok(s) => serializer.serialize_str(s),
+                Err(_) => serializer.serialize_bytes(&b),
+            },
             Value::Map(m) => serializer.collect_map(m),
             Value::Array(a) => serializer.collect_seq(a),
             Value::Null => serializer.serialize_none(),
