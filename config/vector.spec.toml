@@ -3887,8 +3887,17 @@ require('custom_module')
     #
     # * required
     # * type: string
-    # * must be: "basic"
+    # * enum: "basic" or "bearer"
     strategy = "basic"
+    strategy = "bearer"
+
+    # The token to use for bearer authentication
+    #
+    # * required
+    # * type: string
+    # * required when strategy = "bearer"
+    token = "${API_TOKEN}"
+    token = "xyz123"
 
     # The basic authentication user name.
     #
