@@ -1,7 +1,0 @@
-# This file holds the generic specification of version constraints of the
-# third-party components that Vector integrates with.
-# It's designed to be a signle source of truth for the decisions at the other
-# project domains: implementation, distribution, data models and etc.
-
-# The minimal supported kubernetes version.
-kubernetes = "v1.14"

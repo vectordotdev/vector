@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-14"
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events, allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
@@ -43,7 +43,7 @@ a log field's value with a [Regular Expression][urls.regex].
   inputs = ["my-source-or-transform-id"] # required
   drop_field = true # optional, default
   field = "message" # optional, default
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
+  patterns = "['^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$']" # required
 
   # Types
   types.status = "int" # example
@@ -65,7 +65,7 @@ a log field's value with a [Regular Expression][urls.regex].
   drop_field = true # optional, default
   field = "message" # optional, default
   overwrite_target = true # optional, default
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
+  patterns = "['^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$']" # required
   target_field = "root_field" # optional, no default
 
   # Types
@@ -155,9 +155,9 @@ target, it will only be overwritten if this is set to `true`.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"]}
+  examples={["['^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$']"]}
   groups={[]}
-  name={"regex"}
+  name={"patterns"}
   path={null}
   relevantWhen={null}
   required={true}
@@ -167,10 +167,11 @@ target, it will only be overwritten if this is set to `true`.
   warnings={[]}
   >
 
-### regex
+### patterns
 
-The Regular Expression to apply. Do not include the leading or trailing `/`.
- See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.
+The Regular Expressions to apply. Do not include the leading or trailing `/` in
+any of the expressions.
+
 
 
 </Field>
@@ -268,7 +269,7 @@ And the following configuration:
 [transforms.<transform-id>]
   type = "regex_parser"
   field = "message"
-  regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
+  patterns = ['^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$']
 
 [transforms.<transform-id>.types]
   bytes_in = "int"
@@ -317,12 +318,12 @@ You can learn more in the
 
 ### Failed Parsing
 
-If the [`field`](#field) value fails to parse against the provided [`regex`](#regex) then an error
+If the [`field`](#field) value fails to parse against the provided `regex` then an error
 will be [logged][docs.monitoring#logs] and the event will be kept or discarded
 depending on the `drop_failed` value.
 
 A failure includes any event that does not successfully parse against the
-provided [`regex`](#regex). This includes bad values as well as events missing the
+provided `regex`. This includes bad values as well as events missing the
 specified [`field`](#field).
 
 ### Field Notation Syntax
