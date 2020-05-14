@@ -214,13 +214,23 @@ impl Sink for KafkaSink {
 
 fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
     let client = config.to_rdkafka().unwrap();
+    let topic = match Template::from(config.topic).render_string(&Event::from("")) {
+        Ok(topic) => topic,
+        Err(missing_keys) => {
+            warn!(
+                message = "Could not generate topic for healthcheck",
+                ?missing_keys
+            );
+            return Box::new(future::ok(()));
+        }
+    };
 
     let check = future::lazy(move || {
         let consumer: BaseConsumer = client.create().unwrap();
 
         tokio::task::block_in_place(|| {
             consumer
-                .fetch_metadata(Some(&config.topic), Duration::from_secs(3))
+                .fetch_metadata(Some(&topic), Duration::from_secs(3))
                 .map(|_| ())
                 .map_err(|err| err.into())
         })
