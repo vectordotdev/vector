@@ -518,14 +518,9 @@ fn topology_required_healthcheck_fails_start() {
 
 #[test]
 fn topology_optional_healthcheck_does_not_fail_start() {
-    let (_rx, sink) = sink_failing_healthcheck(10);
-    let mut config = Config::empty();
-    config.add_source("in1", source().1);
-    config.add_sink("out1", &["in1"], sink);
-
     vector::test_util::trace_init();
 
-    // let config = basic_config_with_sink_failing_healthcheck();
+    let config = basic_config_with_sink_failing_healthcheck();
     let mut rt = runtime();
     assert!(topology::start(config, &mut rt, false).is_some());
 }
@@ -537,13 +532,7 @@ fn topology_optional_healthcheck_does_not_fail_reload() {
     let mut rt = runtime();
     let config = basic_config();
     let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
-
-    let (_rx, sink) = sink_failing_healthcheck(10);
-    let mut config = Config::empty();
-    config.add_source("in1", source().1);
-    config.add_sink("out1", &["in1"], sink);
-
-    // let config = basic_config_with_sink_failing_healthcheck();
+    let config = basic_config_with_sink_failing_healthcheck();
     assert!(topology
         .reload_config_and_respawn(config, &mut rt, false)
         .unwrap());
