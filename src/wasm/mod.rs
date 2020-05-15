@@ -198,16 +198,16 @@ impl WasmModule {
         let config = config.into();
         let output_file = config
             .artifact_cache
-            .join(config.path.file_stem().ok_or("Must load files")?)
+            .join(config.path.file_stem().ok_or("A file is required")?)
             .with_extension("so");
 
         // Prepwork
         fs::create_dir_all(&config.artifact_cache)?;
         hostcall::ensure_linked();
 
-        let internal_event_compilation = internal_events::WasmCompilation::begin(config.role);
         let artifact_cache = ArtifactCache::new(config.artifact_cache.clone())?;
 
+        let internal_event_compilation = internal_events::WasmCompilation::begin(config.role);
         if artifact_cache.has_fresh(&config.path)? {
             // We can be lazy and do nothing! How wonderful.
             internal_event_compilation.cached();
@@ -237,6 +237,7 @@ impl WasmModule {
             .with_embed_ctx::<Option<Registration>>(None)
             .with_embed_ctx::<context::RaisedError>(Default::default())
             .build()?;
+
         let mut wasm_module = Self {
             config,
             instance,

@@ -1,6 +1,8 @@
 use super::State;
 use crate::{emit, internal_events::InternalEvent};
 use metrics::counter;
+#[cfg(feature = "wasm-timings")]
+use std::time::{Duration, Instant};
 use vector_wasm::Role;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -8,6 +10,10 @@ use vector_wasm::Role;
 pub struct EventProcessing {
     role: Role,
     state: State,
+    #[cfg(feature = "wasm-timings")]
+    epoch: Instant,
+    #[cfg(feature = "wasm-timings")]
+    elapsed: Duration,
 }
 
 impl EventProcessing {
@@ -15,6 +21,10 @@ impl EventProcessing {
         let me = Self {
             state: State::Beginning,
             role,
+            #[cfg(feature = "wasm-timings")]
+            epoch: Instant::now(),
+            #[cfg(feature = "wasm-timings")]
+            elapsed: Default::default(),
         };
         emit!(me);
         me
@@ -23,17 +33,36 @@ impl EventProcessing {
         emit!(Self {
             state: State::Completed,
             role: self.role,
+            #[cfg(feature = "wasm-timings")]
+            epoch: self.epoch,
+            #[cfg(feature = "wasm-timings")]
+            elapsed: self.epoch.elapsed()
         })
     }
 }
 
 impl InternalEvent for EventProcessing {
     fn emit_logs(&self) {
+        #[cfg(not(feature = "wasm-timings"))]
         trace!(
-            message = "WASM Event Processing",
             state = self.state.as_const_str(),
             role = self.role.as_const_str(),
         );
+        #[cfg(feature = "wasm-timings")]
+        {
+            if self.elapsed.as_nanos() == 0 {
+                trace!(
+                    state = self.state.as_const_str(),
+                    role = self.role.as_const_str(),
+                );
+            } else {
+                trace!(
+                    state = self.state.as_const_str(),
+                    role = self.role.as_const_str(),
+                    elapsed_micros = self.elapsed.as_micros() as u64,
+                );
+            }
+        }
     }
 
     fn emit_metrics(&self) {

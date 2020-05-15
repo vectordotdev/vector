@@ -233,6 +233,7 @@ leveldb-plain = ["leveldb", "leveldb/leveldb-sys-2"]
 leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
 # This feature enables the WASM foreign module support.
 wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm", "anyhow"]
+wasm-timings = ["wasm"]
 
 # Sources
 sources = [
