@@ -8,4 +8,4 @@ set -euo pipefail
 #   Run integration tests for GCP components only.
 
 docker-compose up -d dependencies-gcp
-cargo test --no-default-features --features gcp-integration-tests
+cargo test --no-default-features --features gcp-integration-tests -- --nocapture
