@@ -11,7 +11,6 @@ use lucet_wasi::WasiCtxBuilder;
 use lucetc::{Bindings, Lucetc, LucetcOpts};
 use serde::{Deserialize, Serialize};
 use std::collections::LinkedList;
-use std::convert::TryFrom;
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -20,6 +19,10 @@ use std::{
 };
 use tracing::Level;
 use vector_wasm::{Registration, Role};
+mod artifact_cache;
+mod fingerprint;
+pub use artifact_cache::ArtifactCache;
+pub use fingerprint::Fingerprint;
 
 mod context;
 
@@ -81,84 +84,6 @@ impl WasmModuleConfig {
     pub fn set_artifact_cache(&mut self, artifact_cache: impl Into<PathBuf>) -> &mut Self {
         self.artifact_cache = artifact_cache.into();
         self
-    }
-}
-
-// TODO: Make a proper fingerprinted artifact type.
-
-#[derive(Derivative, Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
-#[repr(transparent)]
-struct Fingerprint(u64);
-
-impl Fingerprint {
-    fn new(file: impl AsRef<Path> + Debug) -> Result<Fingerprint> {
-        let path = file.as_ref();
-        let meta = std::fs::metadata(path)?;
-
-        let modified = meta.modified()?;
-        let age = modified.duration_since(std::time::UNIX_EPOCH)?;
-        Ok(Self(age.as_secs()))
-    }
-}
-
-impl TryFrom<&Path> for Fingerprint {
-    type Error = crate::Error;
-
-    fn try_from(file: &Path) -> Result<Self> {
-        Self::new(file)
-    }
-}
-
-impl TryFrom<&str> for Fingerprint {
-    type Error = crate::Error;
-
-    fn try_from(file: &str) -> Result<Self> {
-        Self::new(file)
-    }
-}
-
-#[derive(Derivative, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-#[repr(C)]
-struct ArtifactCache {
-    fingerprints: HashMap<PathBuf, Fingerprint>,
-    root: PathBuf,
-}
-
-impl ArtifactCache {
-    fn new(root: impl Into<PathBuf>) -> Result<Self> {
-        let root = root.into();
-
-        match std::fs::File::open(root.clone().join(".fingerprints")) {
-            Ok(fingerprint_file) => {
-                let reader = std::io::BufReader::new(fingerprint_file);
-                let fingerprints = serde_json::from_reader(reader)?;
-                Ok(Self { fingerprints, root })
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self {
-                fingerprints: HashMap::new(),
-                root,
-            }),
-            Err(e) => Err(Box::new(e)),
-        }
-    }
-
-    /// Returns true if the file is fresh and needs to be rebuilt.
-    fn has_fresh(&self, file: impl AsRef<Path> + Debug) -> Result<bool> {
-        let file = file.as_ref();
-        let fingerprint = Fingerprint::new(file)?;
-        Ok(self.fingerprints.get(file) == Some(&fingerprint))
-    }
-
-    /// Parse `$ARTIFACT_CACHE/.fingerprints` and add the given fingerprint.
-    fn upsert(&mut self, file: impl AsRef<Path> + Debug, fingerprint: Fingerprint) -> Result<()> {
-        let file_path = file.as_ref();
-        self.fingerprints
-            .insert(file_path.to_path_buf(), fingerprint);
-
-        let fingerprint_file = std::fs::File::create(self.root.clone().join(".fingerprints"))?;
-        let writer = std::io::BufWriter::new(fingerprint_file);
-        serde_json::to_writer_pretty(writer, &self.fingerprints)?;
-        Ok(())
     }
 }
 
