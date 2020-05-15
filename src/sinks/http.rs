@@ -262,11 +262,16 @@ fn healthcheck(
     Ok(Box::new(healthcheck))
 }
 
-fn validate_headers(headers: &Option<IndexMap<String, String>>, auth: &Option<Auth>) -> crate::Result<()> {
+fn validate_headers(
+    headers: &Option<IndexMap<String, String>>,
+    auth: &Option<Auth>,
+) -> crate::Result<()> {
     if let Some(map) = headers {
         for (name, value) in map {
             if auth.is_some() && name.eq_ignore_ascii_case("Authorization") {
-                return Err("Authorization header can not be used with defined auth options".into());
+                return Err(
+                    "Authorization header can not be used with defined auth options".into(),
+                );
             }
 
             HeaderName::from_bytes(name.as_bytes()).with_context(|| InvalidHeaderName { name })?;
