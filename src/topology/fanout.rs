@@ -140,6 +140,12 @@ impl Sink for Fanout {
     }
 }
 
+impl Drop for Fanout {
+    fn drop(&mut self) {
+        debug!("DROPPING FANOUT");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{ControlMessage, Fanout};
