@@ -2,6 +2,7 @@ use super::Transform;
 use crate::serde::Fields;
 use crate::{
     event::{Event, Value},
+    internal_events::AddFieldsEventProcessed,
     template::Template,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
@@ -124,7 +125,7 @@ impl Transform for AddFields {
                 }
             }
         }
-
+        emit!(AddFieldsEventProcessed);
         Some(event)
     }
 }

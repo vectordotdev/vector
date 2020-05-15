@@ -1,3 +1,4 @@
+mod add_fields;
 mod aws_kinesis_streams;
 mod blackhole;
 mod elasticsearch;
@@ -14,6 +15,7 @@ mod udp;
 mod unix;
 mod vector;
 
+pub use self::add_fields::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
 pub use self::elasticsearch::*;
