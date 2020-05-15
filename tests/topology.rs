@@ -526,7 +526,6 @@ fn topology_optional_healthcheck_does_not_fail_start() {
 }
 
 #[test]
-#[ignore]
 fn topology_optional_healthcheck_does_not_fail_reload() {
     vector::test_util::trace_init();
 
