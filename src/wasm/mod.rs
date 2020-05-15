@@ -144,7 +144,7 @@ impl WasmModule {
         }
 
         // load the compiled Lucet module
-        let module = DlModule::load(&output_file).unwrap();
+        let module = DlModule::load(&output_file)?;
 
         // create a new memory region with default limits on heap and stack size
         let region = &MmapRegion::create(
@@ -175,13 +175,11 @@ impl WasmModule {
         wasm_module.instance.run("init", &[])?.returned()?;
         let registration = wasm_module
             .instance
-            .get_embed_ctx::<Option<Registration>>()
-            .unwrap()
-            .unwrap()
-            .clone();
+            .remove_embed_ctx::<Option<Registration>>()
+            .and_then(|v| v);
 
         if let None = registration {
-            error!("Unable to find registration");
+            error!("Not registered! Please fill your `init` call with a `Registration::transform().register()`!");
         }
 
         Ok(wasm_module)
