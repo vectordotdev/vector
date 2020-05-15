@@ -2,7 +2,9 @@
   "env": {
       "emit": "emit",
       "raise": "raise",
-      "register": "register"
+      "register": "register",
+      "config": "config",
+      "config_size": "config_size"
   },
   "wasi_snapshot_preview1": {
     "args_get": "__wasi_args_get",

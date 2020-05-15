@@ -37,7 +37,7 @@ members = [
   "tests/data/wasm/drop",
   "tests/data/wasm/add_fields",
   "tests/data/wasm/panic",
-  "tests/data/wasm/assert_options",
+  "tests/data/wasm/assert_config",
 ]
 
 [dependencies]

@@ -71,6 +71,7 @@ fn handle(slice: &mut Vec<u8>) -> Result<Vec<u8>> {
 
 #[no_mangle]
 pub extern "C" fn init() {
+    let _config = hostcall::config().unwrap();
     Registration::transform().register()
 }
 

@@ -215,37 +215,30 @@ mod tests {
     }
 
     #[test]
-    fn assert_options() -> crate::Result<()> {
+    fn assert_config() -> crate::Result<()> {
         crate::test_util::trace_init();
-        let span = span!(tracing::Level::TRACE, "transforms::wasm::assert_options");
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::assert_config");
         let _enter = span.enter();
 
         let mut transform = parse_config(
             r#"
-            module = "tests/data/wasm/assert_options/assert_options.wat"
-            // options.takes_string = "test"
-            // options.takes_number = 123
-            // options.takes_bool = true
-            // options.takes_array = [1, 2, "three"],
-            // options.takes_map.one = "a"
-            // options.takes_map.two = "b"
+            module = "tests/data/wasm/assert_config/assert_config.wat"
+            options.takes_string = "test"
+            options.takes_number = 123
+            options.takes_bool = true
+            options.takes_array = [1, 2, 3]
+            options.takes_map.one = "a"
+            options.takes_map.two = "b"
             "#,
         )?;
 
         let input =
-            parse_event_artifact("tests/data/wasm/assert_options/fixtures/a/input.json")?.unwrap();
+            parse_event_artifact("tests/data/wasm/assert_config/fixtures/a/input.json")?.unwrap();
 
         let output = transform.transform(input.clone());
 
         let expected =
-            parse_event_artifact("tests/data/wasm/assert_options/fixtures/a/expected.json")?;
-        assert_eq!(output, expected);
-
-        // Important to try again. :)
-        let output = transform.transform(input);
-
-        let expected =
-            parse_event_artifact("tests/data/wasm/assert_options/fixtures/a/expected.json")?;
+            parse_event_artifact("tests/data/wasm/assert_config/fixtures/a/expected.json")?;
         assert_eq!(output, expected);
 
         Ok(())

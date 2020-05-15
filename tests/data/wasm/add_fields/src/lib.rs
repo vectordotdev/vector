@@ -8,6 +8,7 @@ pub use vector_wasm::interop::*;
 
 #[no_mangle]
 pub extern "C" fn init() {
+    let _config = hostcall::config().unwrap();
     Registration::transform().register()
 }
 
