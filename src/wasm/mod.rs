@@ -11,6 +11,7 @@ use lucet_wasi::WasiCtxBuilder;
 use lucetc::{Bindings, Lucetc, LucetcOpts};
 use serde::{Deserialize, Serialize};
 use std::collections::LinkedList;
+use std::convert::TryFrom;
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -85,7 +86,42 @@ impl WasmModuleConfig {
 
 // TODO: Make a proper fingerprinted artifact type.
 
-type Fingerprint = u64;
+#[derive(Derivative, Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[repr(transparent)]
+struct Fingerprint(u64);
+
+impl Fingerprint {
+    fn calculate(file: impl AsRef<Path> + Debug) -> Result<Fingerprint> {
+        let path = file.as_ref();
+        let meta = std::fs::metadata(path)?;
+
+        let modified = meta.modified()?;
+        let age = modified.duration_since(std::time::UNIX_EPOCH)?;
+        Ok(Self(age.as_secs()))
+    }
+}
+
+impl TryFrom<Path> for Fingerprint {
+    type Error = crate::Error;
+
+    fn try_from(file: &Path) -> Resut<Self> {
+        Self::calculate(file)
+    }
+}
+
+impl TryFrom<&str> for Fingerprint {
+    type Error = crate::Error;
+
+    fn try_from(file: &str) -> Resut<Self> {
+        Self::calculate(file)
+    }
+}
+
+#[derive(Derivative, Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[repr(transparent)]
+struct ArtifactCache(HashMap<PathBuf, Fingerprint>);
+
+impl ArtifactCache {}
 
 /// Get the age (since UNIX epoch) of a file.
 fn calculate_fingerprint(file: impl AsRef<Path> + Debug) -> Result<Fingerprint> {
