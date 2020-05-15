@@ -72,58 +72,11 @@ impl TlsSettings {
             }
         }
 
-        if options.key_path.is_some() && options.crt_path.is_none() {
-            return Err(TlsError::MissingCrtKeyFile.into());
-        }
-
-        let authority = match options.ca_path {
-            None => None,
-            Some(ref path) => Some(load_x509(path)?),
-        };
-
-        let identity = match options.crt_path {
-            None => None,
-            Some(ref crt_path) => {
-                let name = crt_path.to_string_lossy().to_string();
-                let cert_data = open_read(crt_path, "certificate")?;
-                let key_pass: &str = options.key_pass.as_ref().map(|s| s.as_str()).unwrap_or("");
-
-                match Pkcs12::from_der(&cert_data) {
-                    // Certificate file is DER encoded PKCS#12 archive
-                    Ok(pkcs12) => {
-                        // Verify password
-                        pkcs12.parse(&key_pass).context(ParsePkcs12)?;
-                        Some(IdentityStore(cert_data, key_pass.to_string()))
-                    }
-                    Err(source) => {
-                        if options.key_path.is_none() {
-                            return Err(TlsError::ParsePkcs12 { source });
-                        }
-                        // Identity is a PEM encoded certficate+key pair
-                        let crt = load_x509(crt_path)?;
-                        let key_path = options.key_path.as_ref().unwrap();
-                        let key = load_key(&key_path, &options.key_pass)?;
-                        let pkcs12 = Pkcs12::builder()
-                            .build("", &name, &key, &crt)
-                            .context(Pkcs12Error)?;
-                        let identity = pkcs12.to_der().context(DerExportError)?;
-
-                        // Build the resulting parsed PKCS#12 archive,
-                        // but don't store it, as it cannot be cloned.
-                        // This is just for error checking.
-                        pkcs12.parse("").context(TlsIdentityError)?;
-
-                        Some(IdentityStore(identity, "".into()))
-                    }
-                }
-            }
-        };
-
         Ok(Self {
             verify_certificate: options.verify_certificate.unwrap_or(!for_server),
             verify_hostname: options.verify_hostname.unwrap_or(!for_server),
-            authority,
-            identity,
+            authority: options.load_authority()?,
+            identity: options.load_identity()?,
         })
     }
 
@@ -184,6 +137,59 @@ impl TlsSettings {
 
     pub fn apply_connect_configuration(&self, connection: &mut ConnectConfiguration) {
         connection.set_verify_hostname(self.verify_hostname);
+    }
+}
+
+impl TlsOptions {
+    fn load_authority(&self) -> Result<Option<X509>> {
+        Ok(match self.ca_path {
+            None => None,
+            Some(ref path) => Some(load_x509(path)?),
+        })
+    }
+
+    fn load_identity(&self) -> Result<Option<IdentityStore>> {
+        if self.key_path.is_some() && self.crt_path.is_none() {
+            return Err(TlsError::MissingCrtKeyFile.into());
+        }
+
+        Ok(match &self.crt_path {
+            None => None,
+            Some(crt_path) => {
+                let name = crt_path.to_string_lossy().to_string();
+                let cert_data = open_read(crt_path, "certificate")?;
+                let key_pass: &str = self.key_pass.as_ref().map(|s| s.as_str()).unwrap_or("");
+
+                Some(match Pkcs12::from_der(&cert_data) {
+                    // Certificate file is DER encoded PKCS#12 archive
+                    Ok(pkcs12) => {
+                        // Verify password
+                        pkcs12.parse(&key_pass).context(ParsePkcs12)?;
+                        IdentityStore(cert_data, key_pass.to_string())
+                    }
+                    Err(source) => {
+                        if self.key_path.is_none() {
+                            return Err(TlsError::ParsePkcs12 { source });
+                        }
+                        // Identity is a PEM encoded certficate+key pair
+                        let crt = load_x509(crt_path)?;
+                        let key_path = self.key_path.as_ref().unwrap();
+                        let key = load_key(&key_path, &self.key_pass)?;
+                        let pkcs12 = Pkcs12::builder()
+                            .build("", &name, &key, &crt)
+                            .context(Pkcs12Error)?;
+                        let identity = pkcs12.to_der().context(DerExportError)?;
+
+                        // Build the resulting parsed PKCS#12 archive,
+                        // but don't store it, as it cannot be cloned.
+                        // This is just for error checking.
+                        pkcs12.parse("").context(TlsIdentityError)?;
+
+                        IdentityStore(identity, "".into())
+                    }
+                })
+            }
+        })
     }
 }
 
