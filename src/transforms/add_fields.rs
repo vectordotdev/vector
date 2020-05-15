@@ -90,6 +90,8 @@ impl AddFields {
 
 impl Transform for AddFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
+        emit!(AddFieldsEventProcessed);
+
         for (key, value_or_template) in self.fields.clone() {
             let value = match value_or_template {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
@@ -125,7 +127,7 @@ impl Transform for AddFields {
                 }
             }
         }
-        emit!(AddFieldsEventProcessed);
+
         Some(event)
     }
 }

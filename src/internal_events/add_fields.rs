@@ -4,7 +4,7 @@ use metrics::counter;
 #[derive(Debug)]
 pub struct AddFieldsEventProcessed;
 
-impl InternalEvent for RegexEventProcessed {
+impl InternalEvent for AddFieldsEventProcessed {
     fn emit_metrics(&self) {
         counter!("events_processed", 1,
             "component_kind" => "transform",
