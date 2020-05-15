@@ -16,6 +16,8 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+const PEM_START_MARKER: &str = "-----BEGIN ";
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TlsConfig {
     pub enabled: Option<bool>,
@@ -39,7 +41,7 @@ pub struct TlsOptions {
 pub struct TlsSettings {
     verify_certificate: bool,
     pub(super) verify_hostname: bool,
-    authority: Option<X509>,
+    authorities: Vec<X509>,
     pub(super) identity: Option<IdentityStore>, // openssl::pkcs12::ParsedPkcs12 doesn't impl Clone yet
 }
 
@@ -75,7 +77,7 @@ impl TlsSettings {
         Ok(Self {
             verify_certificate: options.verify_certificate.unwrap_or(!for_server),
             verify_hostname: options.verify_hostname.unwrap_or(!for_server),
-            authority: options.load_authority()?,
+            authorities: options.load_authorities()?,
             identity: options.load_identity()?,
         })
     }
@@ -114,11 +116,11 @@ impl TlsSettings {
                 }
             }
         }
-        if let Some(certificate) = &self.authority {
+        if self.authorities.len() > 0 {
             let mut store = X509StoreBuilder::new().context(NewStoreBuilder)?;
-            store
-                .add_cert(certificate.clone())
-                .context(AddCertToStore)?;
+            for authority in &self.authorities {
+                store.add_cert(authority.clone()).context(AddCertToStore)?;
+            }
             context
                 .set_verify_cert_store(store.build())
                 .context(SetVerifyCert)?;
@@ -141,11 +143,23 @@ impl TlsSettings {
 }
 
 impl TlsOptions {
-    fn load_authority(&self) -> Result<Option<X509>> {
-        Ok(match self.ca_path {
-            None => None,
-            Some(ref path) => Some(load_x509(path)?),
-        })
+    fn load_authorities(&self) -> Result<Vec<X509>> {
+        match &self.ca_path {
+            None => Ok(vec![]),
+            Some(filename) => {
+                let data = open_read(filename, "certificate")?;
+                der_or_pem(
+                    data,
+                    |der| X509::from_der(&der).map(|x509| vec![x509]),
+                    |pem| {
+                        pem.match_indices(PEM_START_MARKER)
+                            .map(|(start, _)| X509::from_pem(pem[start..].as_bytes()))
+                            .collect()
+                    },
+                )
+                .with_context(|| X509ParseError { filename })
+            }
+        }
     }
 
     fn load_identity(&self) -> Result<Option<IdentityStore>> {
@@ -161,17 +175,13 @@ impl TlsOptions {
     }
 
     /// Parse identity from a PEM encoded certificate + key pair of files
-    fn parse_pem_identity(
-        &self,
-        pem: Vec<u8>,
-        crt_path: &PathBuf,
-    ) -> Result<Option<IdentityStore>> {
+    fn parse_pem_identity(&self, pem: String, crt_path: &PathBuf) -> Result<Option<IdentityStore>> {
         match &self.key_path {
             None => Err(TlsError::MissingKey),
             Some(key_path) => {
                 let name = crt_path.to_string_lossy().to_string();
-                let crt =
-                    X509::from_pem(&pem).with_context(|| X509ParseError { filename: crt_path })?;
+                let crt = X509::from_pem(pem.as_bytes())
+                    .with_context(|| X509ParseError { filename: crt_path })?;
                 let key = load_key(&key_path, &self.key_pass)?;
                 let pkcs12 = Pkcs12::builder()
                     .build("", &name, &key, &crt)
@@ -337,34 +347,27 @@ fn load_key(filename: &Path, pass_phrase: &Option<String>) -> Result<PKey<Privat
         None => der_or_pem(
             data,
             |der| PKey::private_key_from_der(&der),
-            |pem| PKey::private_key_from_pem(&pem),
+            |pem| PKey::private_key_from_pem(pem.as_bytes()),
         )
         .with_context(|| PrivateKeyParseError { filename }),
         Some(phrase) => der_or_pem(
             data,
             |der| PKey::private_key_from_pkcs8_passphrase(&der, phrase.as_bytes()),
-            |pem| PKey::private_key_from_pem_passphrase(&pem, phrase.as_bytes()),
+            |pem| PKey::private_key_from_pem_passphrase(pem.as_bytes(), phrase.as_bytes()),
         )
         .with_context(|| PrivateKeyParseError { filename }),
     }
 }
 
-/// Load an X.509 certificate from a named file
-fn load_x509(filename: &Path) -> Result<X509> {
-    let data = open_read(filename, "certificate")?;
-    der_or_pem(data, |der| X509::from_der(&der), |pem| X509::from_pem(&pem))
-        .with_context(|| X509ParseError { filename })
-}
-
 /// Parse the data one way if it looks like a DER file, and the other if
 /// it looks like a PEM file. For the content to be treated as PEM, it
 /// must parse as valid UTF-8 and contain a PEM start marker.
-fn der_or_pem<T>(data: Vec<u8>, der_fn: impl Fn(Vec<u8>) -> T, pem_fn: impl Fn(Vec<u8>) -> T) -> T {
+fn der_or_pem<T>(data: Vec<u8>, der_fn: impl Fn(Vec<u8>) -> T, pem_fn: impl Fn(String) -> T) -> T {
     // None of these steps cause (re)allocations,
     // just parsing and type manipulation
     match String::from_utf8(data) {
-        Ok(text) => match text.find("-----BEGIN ") {
-            Some(_) => pem_fn(text.into_bytes()),
+        Ok(text) => match text.find(PEM_START_MARKER) {
+            Some(_) => pem_fn(text),
             None => der_fn(text.into_bytes()),
         },
         Err(err) => der_fn(err.into_bytes()),
@@ -400,7 +403,7 @@ mod test {
         let settings =
             TlsSettings::from_options(&Some(options)).expect("Failed to load PKCS#12 certificate");
         assert!(settings.identity.is_some());
-        assert!(settings.authority.is_none());
+        assert_eq!(settings.authorities.len(), 0);
     }
 
     #[test]
@@ -413,7 +416,7 @@ mod test {
         let settings =
             TlsSettings::from_options(&Some(options)).expect("Failed to load PEM certificate");
         assert!(settings.identity.is_some());
-        assert!(settings.authority.is_none());
+        assert_eq!(settings.authorities.len(), 0);
     }
 
     #[test]
@@ -425,14 +428,26 @@ mod test {
         let settings = TlsSettings::from_options(&Some(options))
             .expect("Failed to load authority certificate");
         assert!(settings.identity.is_none());
-        assert!(settings.authority.is_some());
+        assert_eq!(settings.authorities.len(), 1);
+    }
+
+    #[test]
+    fn from_options_multi_ca() {
+        let options = TlsOptions {
+            ca_path: Some("tests/data/Multi_CA.crt".into()),
+            ..Default::default()
+        };
+        let settings = TlsSettings::from_options(&Some(options))
+            .expect("Failed to load authority certificate");
+        assert!(settings.identity.is_none());
+        assert_eq!(settings.authorities.len(), 2);
     }
 
     #[test]
     fn from_options_none() {
         let settings = TlsSettings::from_options(&None).expect("Failed to generate null settings");
         assert!(settings.identity.is_none());
-        assert!(settings.authority.is_none());
+        assert_eq!(settings.authorities.len(), 0);
     }
 
     #[test]
