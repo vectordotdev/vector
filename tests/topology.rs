@@ -500,17 +500,21 @@ fn topology_swap_transform_is_atomic() {
 #[test]
 fn topology_required_healthcheck_fails_start() {
     let config = basic_config_with_sink_failing_healthcheck();
-    assert!(topology::start(config, &mut runtime(), true).is_none());
+    let mut rt = runtime();
+    assert!(topology::start(config, &mut rt, true).is_none());
 }
 
 #[test]
 fn topology_optional_healthcheck_does_not_fail_start() {
     let config = basic_config_with_sink_failing_healthcheck();
-    assert!(topology::start(config, &mut runtime(), false).is_some());
+    let mut rt = runtime();
+    assert!(topology::start(config, &mut rt, false).is_some());
 }
 
 #[test]
 fn topology_optional_healthcheck_does_not_fail_reload() {
+    vector::test_util::trace_init();
+
     let mut rt = runtime();
     let config = basic_config();
     let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
