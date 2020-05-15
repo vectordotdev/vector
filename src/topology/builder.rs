@@ -112,6 +112,7 @@ pub fn build_pieces(
     }
 
     // TODO: remove the unimplemented
+    debug!("creating resolver");
     let resolver = Resolver::new(config.global.dns_servers.clone(), exec.clone()).unwrap();
 
     // Build sources
