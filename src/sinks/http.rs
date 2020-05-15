@@ -101,7 +101,7 @@ inventory::submit! {
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        validate_headers(&self.headers)?;
+        validate_headers(&self.headers, &self.auth)?;
         let tls = TlsSettings::from_options(&self.tls)?;
 
         let mut config = self.clone();
@@ -262,9 +262,18 @@ fn healthcheck(
     Ok(Box::new(healthcheck))
 }
 
-fn validate_headers(headers: &Option<IndexMap<String, String>>) -> crate::Result<()> {
+fn validate_headers(
+    headers: &Option<IndexMap<String, String>>,
+    auth: &Option<Auth>,
+) -> crate::Result<()> {
     if let Some(map) = headers {
         for (name, value) in map {
+            if auth.is_some() && name.eq_ignore_ascii_case("Authorization") {
+                return Err(
+                    "Authorization header can not be used with defined auth options".into(),
+                );
+            }
+
             HeaderName::from_bytes(name.as_bytes()).with_context(|| InvalidHeaderName { name })?;
             HeaderValue::from_bytes(value.as_bytes())
                 .with_context(|| InvalidHeaderValue { value })?;
@@ -350,7 +359,7 @@ mod tests {
         "#;
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        assert!(super::validate_headers(&config.headers).is_ok());
+        assert!(super::validate_headers(&config.headers, &None).is_ok());
     }
 
     #[test]
@@ -364,10 +373,31 @@ mod tests {
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
         assert_downcast_matches!(
-            super::validate_headers(&config.headers).unwrap_err(),
+            super::validate_headers(&config.headers, &None).unwrap_err(),
             BuildError,
             BuildError::InvalidHeaderName{..}
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "Authorization header can not be used with defined auth options")]
+    fn http_headers_auth_conflict() {
+        let config = r#"
+        uri = "http://$IN_ADDR/"
+        encoding = "text"
+        [headers]
+        Authorization = "Basic base64encodedstring"
+        [auth]
+        strategy = "basic"
+        user = "user"
+        password = "password"
+        "#;
+        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+        let rt = Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
+
+        let _ = config.build(cx).unwrap();
     }
 
     #[test]
