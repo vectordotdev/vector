@@ -26,7 +26,7 @@ groups = <%= groups.to_toml %>
 <%= relevant %>
 description = """\
 Absolute path to an additional CA certificate file, in DER or PEM format \
-(X.509).\
+(X.509), or an inline CA certificate in PEM format.\
 """
 
 [<%= namespace %>.tls.children.crt_file]
@@ -37,8 +37,8 @@ groups = <%= groups.to_toml %>
 <%= relevant %>
 description = """\
 Absolute path to a certificate file used to identify this server, in DER \
-or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, \
-`key_file` must also be set. \
+or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. \
+If this is set and is not a PKCS#12 archive, `key_file` must also be set. \
 This is required if `enabled` is set to `true`.\
 """
 
@@ -49,8 +49,8 @@ examples = ["/path/to/host_certificate.key"]
 groups = <%= groups.to_toml %>
 <%= relevant %>
 description = """\
-Absolute path to a certificate key file used to identify this server, in \
-DER or PEM format (PKCS#8).\
+Absolute path to a private key file used to identify this server, in \
+DER or PEM format (PKCS#8), or an inline private key in PEM format.\
 """
 
 [<%= namespace %>.tls.children.key_pass]
