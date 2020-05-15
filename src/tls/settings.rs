@@ -147,7 +147,7 @@ impl TlsOptions {
         match &self.ca_file {
             None => Ok(vec![]),
             Some(filename) => {
-                let data = open_read(filename, "certificate")?;
+                let (data, filename) = open_read(filename, "certificate")?;
                 der_or_pem(
                     data,
                     |der| X509::from_der(&der).map(|x509| vec![x509]),
@@ -166,11 +166,14 @@ impl TlsOptions {
         match (&self.crt_file, &self.key_file) {
             (None, Some(_)) => Err(TlsError::MissingCrtKeyFile.into()),
             (None, None) => Ok(None),
-            (Some(crt_file), _) => der_or_pem(
-                open_read(crt_file, "certificate")?,
-                |der| self.parse_pkcs12_identity(der),
-                |pem| self.parse_pem_identity(pem, crt_file),
-            ),
+            (Some(filename), _) => {
+                let (data, filename) = open_read(filename, "certificate")?;
+                der_or_pem(
+                    data,
+                    |der| self.parse_pkcs12_identity(der),
+                    |pem| self.parse_pem_identity(pem, &filename),
+                )
+            }
         }
     }
 
@@ -342,7 +345,7 @@ impl From<TlsSettings> for MaybeTlsSettings {
 
 /// Load a private key from a named file
 fn load_key(filename: &Path, pass_phrase: &Option<String>) -> Result<PKey<Private>> {
-    let data = open_read(filename, "key")?;
+    let (data, filename) = open_read(filename, "key")?;
     match pass_phrase {
         None => der_or_pem(
             data,
@@ -377,10 +380,10 @@ fn der_or_pem<T>(data: Vec<u8>, der_fn: impl Fn(Vec<u8>) -> T, pem_fn: impl Fn(S
 /// Open the named file and read its entire contents into memory. If the
 /// file "name" contains a PEM start marker, it is assumed to contain
 /// inline data and is used directly instead of opening a file.
-fn open_read(filename: &Path, note: &'static str) -> Result<Vec<u8>> {
+fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> {
     if let Some(filename) = filename.to_str() {
         if let Some(_) = filename.find(PEM_START_MARKER) {
-            return Ok(Vec::from(filename));
+            return Ok((Vec::from(filename), "inline text".into()));
         }
     }
 
@@ -391,7 +394,7 @@ fn open_read(filename: &Path, note: &'static str) -> Result<Vec<u8>> {
         .read_to_end(&mut text)
         .with_context(|| FileReadFailed { note, filename })?;
 
-    Ok(text)
+    Ok((text, filename.into()))
 }
 
 #[cfg(test)]
