@@ -541,6 +541,7 @@ impl RunningTopology {
         let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
 
         for input in inputs {
+            debug!("hooking up input: {} -> {}", name, input);
             self.outputs[&input]
                 .unbounded_send(fanout::ControlMessage::Add(name.to_string(), tx.get()))
                 .unwrap();
