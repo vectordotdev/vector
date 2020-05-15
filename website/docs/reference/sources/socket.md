@@ -73,11 +73,11 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
   host_key = "host" # optional, default
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default, relevant when mode = "tcp"
-  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default, relevant when mode = "tcp"
+  tls.ca_file = "/path/to/certificate_authority.crt" # optional, no default, relevant when mode = "tcp"
+  tls.crt_file = "/path/to/host_certificate.crt" # optional, no default, relevant when mode = "tcp"
   tls.enabled = false # optional, default, relevant when mode = "tcp"
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default, relevant when mode = "tcp"
-  tls.key_path = "/path/to/host_certificate.key" # optional, no default, relevant when mode = "tcp"
+  tls.key_file = "/path/to/host_certificate.key" # optional, no default, relevant when mode = "tcp"
   tls.verify_certificate = false # optional, default, relevant when mode = "tcp"
 ```
 
@@ -307,7 +307,7 @@ Configures the TLS options for connections from this source.
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
   groups={["tcp"]}
-  name={"ca_path"}
+  name={"ca_file"}
   path={"tls"}
   relevantWhen={{"mode":"tcp"}}
   required={false}
@@ -317,7 +317,7 @@ Configures the TLS options for connections from this source.
   warnings={[]}
   >
 
-#### ca_path
+#### ca_file
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
@@ -331,7 +331,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
   groups={["tcp"]}
-  name={"crt_path"}
+  name={"crt_file"}
   path={"tls"}
   relevantWhen={{"mode":"tcp"}}
   required={false}
@@ -341,11 +341,11 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   warnings={[]}
   >
 
-#### crt_path
+#### crt_file
 
 Absolute path to a certificate file used to identify this server, in DER or PEM
 format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-`key_path` must also be set. This is required if [`enabled`](#enabled) is set to `true`.
+`key_file` must also be set. This is required if [`enabled`](#enabled) is set to `true`.
 
 
 
@@ -393,7 +393,7 @@ is also required.
 #### key_pass
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
-`key_path` is set.
+`key_file` is set.
 
 
 
@@ -404,7 +404,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
   groups={["tcp"]}
-  name={"key_path"}
+  name={"key_file"}
   path={"tls"}
   relevantWhen={{"mode":"tcp"}}
   required={false}
@@ -414,7 +414,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   warnings={[]}
   >
 
-#### key_path
+#### key_file
 
 Absolute path to a certificate key file used to identify this server, in DER or
 PEM format (PKCS#8).

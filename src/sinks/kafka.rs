@@ -360,7 +360,7 @@ mod integration_test {
             Some(KafkaTlsConfig {
                 enabled: Some(true),
                 options: TlsOptions {
-                    ca_path: Some(TEST_CA.into()),
+                    ca_file: Some(TEST_CA.into()),
                     ..Default::default()
                 },
             }),

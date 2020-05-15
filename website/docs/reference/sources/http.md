@@ -68,11 +68,11 @@ ingests data through the [HTTP protocol][urls.http] and outputs
   headers = ["User-Agent", "X-My-Custom-Header"] # optional, no default
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
-  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.ca_file = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_file = "/path/to/host_certificate.crt" # optional, no default
   tls.enabled = false # optional, default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
-  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.key_file = "/path/to/host_certificate.key" # optional, no default
   tls.verify_certificate = false # optional, default
 ```
 
@@ -181,7 +181,7 @@ Configures the TLS options for connections from this source.
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
   groups={[]}
-  name={"ca_path"}
+  name={"ca_file"}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -191,7 +191,7 @@ Configures the TLS options for connections from this source.
   warnings={[]}
   >
 
-#### ca_path
+#### ca_file
 
 Absolute path to an additional CA certificate file, in DER or PEM format
 (X.509).
@@ -205,7 +205,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
   groups={[]}
-  name={"crt_path"}
+  name={"crt_file"}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -215,11 +215,11 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   warnings={[]}
   >
 
-#### crt_path
+#### crt_file
 
 Absolute path to a certificate file used to identify this server, in DER or PEM
 format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-`key_path` must also be set. This is required if [`enabled`](#enabled) is set to `true`.
+`key_file` must also be set. This is required if [`enabled`](#enabled) is set to `true`.
 
 
 
@@ -267,7 +267,7 @@ is also required.
 #### key_pass
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
-`key_path` is set.
+`key_file` is set.
 
 
 
@@ -278,7 +278,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
   groups={[]}
-  name={"key_path"}
+  name={"key_file"}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -288,7 +288,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   warnings={[]}
   >
 
-#### key_path
+#### key_file
 
 Absolute path to a certificate key file used to identify this server, in DER or
 PEM format (PKCS#8).

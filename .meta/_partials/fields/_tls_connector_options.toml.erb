@@ -16,7 +16,7 @@ sort = 1
 description = "Enable TLS during connections to the remote."
 <%- end -%>
 
-[<%= namespace %>.tls.children.ca_path]
+[<%= namespace %>.tls.children.ca_file]
 type = "string"
 examples = ["/path/to/certificate_authority.crt"]
 groups = <%= groups.to_toml %>
@@ -25,7 +25,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format \
 (X.509).\
 """
 
-[<%= namespace %>.tls.children.crt_path]
+[<%= namespace %>.tls.children.crt_file]
 type = "string"
 common = true
 examples = ["/path/to/host_certificate.crt"]
@@ -33,17 +33,17 @@ groups = <%= groups.to_toml %>
 description = """\
 Absolute path to a certificate file used to identify this connection, in DER \
 or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, \
-`key_path` must also be set.\
+`key_file` must also be set.\
 """
 
-[<%= namespace %>.tls.children.key_path]
+[<%= namespace %>.tls.children.key_file]
 type = "string"
 common = true
 examples = ["/path/to/host_certificate.key"]
 groups = <%= groups.to_toml %>
 description = """\
 Absolute path to a certificate key file used to identify this connection, in \
-DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.\
+DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.\
 """
 
 [<%= namespace %>.tls.children.key_pass]
@@ -52,7 +52,7 @@ examples = ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 groups = <%= groups.to_toml %>
 description = """\
 Pass phrase used to unlock the encrypted key file. This has no effect unless \
-`key_path` is set.\
+`key_file` is set.\
 """
 
 <%- if can_verify_certificate -%>

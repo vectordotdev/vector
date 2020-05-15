@@ -436,16 +436,16 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # `key_file` must also be set. This is required if `enabled` is set to `true`.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -457,7 +457,7 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -471,7 +471,7 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -653,16 +653,16 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Enable TLS during connections to the remote.
     #
@@ -673,7 +673,7 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -682,12 +682,12 @@ dns_servers = ["0.0.0.0:53"]
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
 # Ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events.
 [sources.logplex]
@@ -720,16 +720,16 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # `key_file` must also be set. This is required if `enabled` is set to `true`.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -741,7 +741,7 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -755,7 +755,7 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -873,17 +873,17 @@ dns_servers = ["0.0.0.0:53"]
     # * no default
     # * type: string
     # * relevant when mode = "tcp"
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # `key_file` must also be set. This is required if `enabled` is set to `true`.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when mode = "tcp"
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -896,7 +896,7 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -912,7 +912,7 @@ dns_servers = ["0.0.0.0:53"]
     # * no default
     # * type: string
     # * relevant when mode = "tcp"
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -967,16 +967,16 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # `key_file` must also be set. This is required if `enabled` is set to `true`.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -988,7 +988,7 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -1002,7 +1002,7 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -1135,16 +1135,16 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # `key_file` must also be set. This is required if `enabled` is set to `true`.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -1156,7 +1156,7 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -1170,7 +1170,7 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -1225,16 +1225,16 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # `key_file` must also be set. This is required if `enabled` is set to `true`.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -1246,7 +1246,7 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -1260,7 +1260,7 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -4127,19 +4127,19 @@ require('custom_module')
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -4148,12 +4148,12 @@ require('custom_module')
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -4369,16 +4369,16 @@ require('custom_module')
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Enable TLS during connections to the remote.
     #
@@ -4389,7 +4389,7 @@ require('custom_module')
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -4398,12 +4398,12 @@ require('custom_module')
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -4868,19 +4868,19 @@ require('custom_module')
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -4889,12 +4889,12 @@ require('custom_module')
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -5303,19 +5303,19 @@ require('custom_module')
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -5324,12 +5324,12 @@ require('custom_module')
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -5579,19 +5579,19 @@ require('custom_module')
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -5600,12 +5600,12 @@ require('custom_module')
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -5911,19 +5911,19 @@ require('custom_module')
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -5932,12 +5932,12 @@ require('custom_module')
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -6402,19 +6402,19 @@ require('custom_module')
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -6423,12 +6423,12 @@ require('custom_module')
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -7315,16 +7315,16 @@ require('custom_module')
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Enable TLS during connections to the remote.
     #
@@ -7335,7 +7335,7 @@ require('custom_module')
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -7344,12 +7344,12 @@ require('custom_module')
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
 # Batches `log` events to LogDna's HTTP Ingestion API.
 [sinks.logdna]
@@ -7876,19 +7876,19 @@ require('custom_module')
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -7897,12 +7897,12 @@ require('custom_module')
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -8737,16 +8737,16 @@ require('custom_module')
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Enable TLS during connections to the remote.
     #
@@ -8757,7 +8757,7 @@ require('custom_module')
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -8766,12 +8766,12 @@ require('custom_module')
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -9045,19 +9045,19 @@ require('custom_module')
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -9066,12 +9066,12 @@ require('custom_module')
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -9215,16 +9215,16 @@ require('custom_module')
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Enable TLS during connections to the remote.
     #
@@ -9235,7 +9235,7 @@ require('custom_module')
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -9244,12 +9244,12 @@ require('custom_module')
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    key_path = "/path/to/host_certificate.key"
+    key_file = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
