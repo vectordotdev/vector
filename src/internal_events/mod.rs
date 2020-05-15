@@ -1,3 +1,4 @@
+mod aws_kinesis_streams;
 mod blackhole;
 mod elasticsearch;
 mod file;
@@ -13,6 +14,7 @@ mod udp;
 mod unix;
 mod vector;
 
+pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
