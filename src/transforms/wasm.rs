@@ -5,7 +5,7 @@ use crate::{
     wasm::{WasmModule, WasmModuleConfig},
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use vector_wasm::Role;
 

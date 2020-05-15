@@ -1,4 +1,5 @@
 use super::Role;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 /// A module registration.
@@ -22,7 +23,7 @@ impl Registration {
     pub fn role(&self) -> Role {
         self.role
     }
-    pub fn register(&self) {
-        super::hostcall::register(self);
+    pub fn register(&self) -> Result<()> {
+        super::hostcall::register(self)
     }
 }

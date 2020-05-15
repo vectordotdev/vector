@@ -1,11 +1,12 @@
 use crate::Registration;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::fmt::Display;
 
 /// Emit the data back to the host.
 pub fn register(registration: &Registration) -> Result<()> {
-    let buffer = serde_json::to_vec(registration).context("Could not turn registration to JSON.");
+    let buffer =
+        serde_json::to_vec(registration).context("Could not turn registration to JSON.")?;
     let mut slice = buffer.into_boxed_slice();
     unsafe {
         ffi::register(slice.as_mut_ptr() as u64, slice.len() as u64);

@@ -91,7 +91,7 @@ impl WasmModuleConfig {
 struct Fingerprint(u64);
 
 impl Fingerprint {
-    fn calculate(file: impl AsRef<Path> + Debug) -> Result<Fingerprint> {
+    fn new(file: impl AsRef<Path> + Debug) -> Result<Fingerprint> {
         let path = file.as_ref();
         let meta = std::fs::metadata(path)?;
 
@@ -101,90 +101,65 @@ impl Fingerprint {
     }
 }
 
-impl TryFrom<Path> for Fingerprint {
+impl TryFrom<&Path> for Fingerprint {
     type Error = crate::Error;
 
-    fn try_from(file: &Path) -> Resut<Self> {
-        Self::calculate(file)
+    fn try_from(file: &Path) -> Result<Self> {
+        Self::new(file)
     }
 }
 
 impl TryFrom<&str> for Fingerprint {
     type Error = crate::Error;
 
-    fn try_from(file: &str) -> Resut<Self> {
-        Self::calculate(file)
+    fn try_from(file: &str) -> Result<Self> {
+        Self::new(file)
     }
 }
 
-#[derive(Derivative, Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
-#[repr(transparent)]
-struct ArtifactCache(HashMap<PathBuf, Fingerprint>);
-
-impl ArtifactCache {}
-
-/// Get the age (since UNIX epoch) of a file.
-fn calculate_fingerprint(file: impl AsRef<Path> + Debug) -> Result<Fingerprint> {
-    let path = file.as_ref();
-    let meta = std::fs::metadata(path)?;
-
-    let modified = meta.modified()?;
-    let age = modified.duration_since(std::time::UNIX_EPOCH)?;
-    Ok(age.as_secs())
+#[derive(Derivative, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[repr(C)]
+struct ArtifactCache {
+    fingerprints: HashMap<PathBuf, Fingerprint>,
+    root: PathBuf,
 }
 
-/// Returns the stored JSON map in the fingerprint store.
-///
-/// If the `$ARTIFACT_CACHE/.fingerprints` file does not exist, we return an empty HashMap.
-fn fetch_known_fingerprints(
-    artifact_cache: impl AsRef<Path> + Debug,
-) -> Result<HashMap<PathBuf, Fingerprint>> {
-    let artifact_cache = artifact_cache.as_ref();
-    let mut fingerprint_pathbuf = artifact_cache.to_path_buf();
-    fingerprint_pathbuf.push(".fingerprints");
+impl ArtifactCache {
+    fn new(root: impl Into<PathBuf>) -> Result<Self> {
+        let root = root.into();
 
-    match std::fs::File::open(fingerprint_pathbuf) {
-        Ok(fingerprint_file) => {
-            let reader = std::io::BufReader::new(fingerprint_file);
-            let fingerprints = serde_json::from_reader(reader)?;
-            Ok(fingerprints)
+        match std::fs::File::open(root.clone().join(".fingerprints")) {
+            Ok(fingerprint_file) => {
+                let reader = std::io::BufReader::new(fingerprint_file);
+                let fingerprints = serde_json::from_reader(reader)?;
+                Ok(Self { fingerprints, root })
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self {
+                fingerprints: HashMap::new(),
+                root,
+            }),
+            Err(e) => Err(Box::new(e)),
         }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(HashMap::new()),
-        Err(e) => Err(Box::new(e)),
     }
-}
 
-/// Parse `$ARTIFACT_CACHE/.fingerprints` and determine the fingerprint of the file path (which should be the wasm file).
-fn fetch_fingerprint(
-    artifact_cache: impl AsRef<Path> + Debug,
-    file: impl AsRef<Path> + Debug,
-) -> Result<Option<Fingerprint>> {
-    let artifact_cache = artifact_cache.as_ref();
-    let file_path = file.as_ref();
+    /// Returns true if the file is fresh and needs to be rebuilt.
+    fn has_fresh(&self, file: impl AsRef<Path> + Debug) -> Result<bool> {
+        let file = file.as_ref();
+        let fingerprint = Fingerprint::new(file)?;
+        Ok(self.fingerprints.get(file) == Some(&fingerprint))
+    }
 
-    let fingerprints = fetch_known_fingerprints(artifact_cache)?;
-    Ok(fingerprints.get(file_path).cloned())
-}
+    /// Parse `$ARTIFACT_CACHE/.fingerprints` and add the given fingerprint.
+    fn upsert(&mut self, file: impl AsRef<Path> + Debug, fingerprint: Fingerprint) -> Result<()> {
+        let file_path = file.as_ref();
+        self.fingerprints
+            .insert(file_path.to_path_buf(), fingerprint);
 
-/// Parse `$ARTIFACT_CACHE/.fingerprints` and add the given fingerprint.
-fn store_fingerprint(
-    artifact_cache: impl AsRef<Path> + Debug,
-    file: impl AsRef<Path> + Debug,
-    fingerprint: Fingerprint,
-) -> Result<()> {
-    let artifact_cache = artifact_cache.as_ref();
-    let file_path = file.as_ref();
-
-    let mut fingerprints = fetch_known_fingerprints(artifact_cache)?;
-    fingerprints.insert(file_path.to_path_buf(), fingerprint);
-
-    let mut fingerprint_pathbuf = artifact_cache.to_path_buf();
-    fingerprint_pathbuf.push(".fingerprints");
-
-    let fingerprint_file = std::fs::File::create(fingerprint_pathbuf)?;
-    let writer = std::io::BufWriter::new(fingerprint_file);
-    serde_json::to_writer_pretty(writer, &fingerprints)?;
-    Ok(())
+        let fingerprint_file = std::fs::File::create(self.root.clone().join(".fingerprints"))?;
+        let writer = std::io::BufWriter::new(fingerprint_file);
+        serde_json::to_writer_pretty(writer, &self.fingerprints)?;
+        Ok(())
+    }
 }
 
 /// Compiles a WASM module located at `input` and writes an optimized shared object to `output`.
@@ -193,7 +168,7 @@ fn compile(
     output: impl AsRef<Path> + Debug,
 ) -> Result<Fingerprint> {
     let input = input.as_ref();
-    let fingerprint = calculate_fingerprint(input)?;
+    let fingerprint = Fingerprint::new(input)?;
 
     let mut bindings = lucet_wasi::bindings();
     bindings.extend(&Bindings::from_str(include_str!("hostcall/bindings.json"))?)?;
@@ -231,18 +206,16 @@ impl WasmModule {
         hostcall::ensure_linked();
 
         let internal_event_compilation = internal_events::WasmCompilation::begin(config.role);
-        let calculated_fingerprint = calculate_fingerprint(&config.path)?;
-        let found_fingerprint = fetch_fingerprint(&config.artifact_cache, &config.path)?;
-        match found_fingerprint {
-            Some(found) if found == calculated_fingerprint => {
-                // We can be lazy and do nothing! How wonderful.
-                internal_event_compilation.cached();
-            }
-            None | Some(_) => {
-                let fingerprint = compile(&config.path, &output_file)?;
-                store_fingerprint(&config.artifact_cache, &config.path, fingerprint)?;
-                internal_event_compilation.complete();
-            }
+        let artifact_cache = ArtifactCache::new(config.artifact_cache.clone())?;
+
+        if artifact_cache.has_fresh(&config.path)? {
+            // We can be lazy and do nothing! How wonderful.
+            internal_event_compilation.cached();
+        } else {
+            let fingerprint = compile(&config.path, &output_file)?;
+            let mut artifact_cache = artifact_cache; // Just for this scope.
+            artifact_cache.upsert(&config.path, fingerprint)?;
+            internal_event_compilation.complete();
         }
 
         // load the compiled Lucet module
