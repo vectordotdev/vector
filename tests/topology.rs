@@ -39,6 +39,7 @@ fn into_message(event: Event) -> String {
 }
 
 #[test]
+#[ignore]
 fn topology_shutdown_while_active() {
     let source_event_counter = Arc::new(AtomicUsize::new(0));
     let source_event_total = source_event_counter.clone();
@@ -96,6 +97,7 @@ fn topology_shutdown_while_active() {
 }
 
 #[test]
+#[ignore]
 fn topology_source_and_sink() {
     let mut rt = runtime();
     let (in1, source1) = source();
@@ -119,6 +121,7 @@ fn topology_source_and_sink() {
 }
 
 #[test]
+#[ignore]
 fn topology_multiple_sources() {
     let mut rt = runtime();
     let (in1, source1) = source();
@@ -152,6 +155,7 @@ fn topology_multiple_sources() {
 }
 
 #[test]
+#[ignore]
 fn topology_multiple_sinks() {
     let mut rt = runtime();
     let (in1, source1) = source();
@@ -180,6 +184,7 @@ fn topology_multiple_sinks() {
 }
 
 #[test]
+#[ignore]
 fn topology_transform_chain() {
     let mut rt = runtime();
     let (in1, source1) = source();
@@ -208,6 +213,7 @@ fn topology_transform_chain() {
 }
 
 #[test]
+#[ignore]
 fn topology_remove_one_source() {
     let mut rt = runtime();
     let (in1, source1) = source();
@@ -245,6 +251,7 @@ fn topology_remove_one_source() {
 }
 
 #[test]
+#[ignore]
 fn topology_remove_one_sink() {
     let mut rt = runtime();
     let (in1, source1) = source();
@@ -281,6 +288,7 @@ fn topology_remove_one_sink() {
 }
 
 #[test]
+#[ignore]
 fn topology_remove_one_transform() {
     let mut rt = runtime();
     let (in1, source1) = source();
@@ -318,6 +326,7 @@ fn topology_remove_one_transform() {
 }
 
 #[test]
+#[ignore]
 fn topology_swap_source() {
     let mut rt = runtime();
     let (in1, source1) = source();
@@ -358,6 +367,7 @@ fn topology_swap_source() {
 }
 
 #[test]
+#[ignore]
 fn topology_swap_sink() {
     trace_init();
     let mut rt = runtime();
@@ -394,6 +404,7 @@ fn topology_swap_sink() {
 }
 
 #[test]
+#[ignore]
 fn topology_swap_transform() {
     let mut rt = runtime();
     let (in1, source1) = source();
@@ -498,6 +509,7 @@ fn topology_swap_transform_is_atomic() {
 }
 
 #[test]
+#[ignore]
 fn topology_required_healthcheck_fails_start() {
     let config = basic_config_with_sink_failing_healthcheck();
     let mut rt = runtime();
@@ -506,6 +518,8 @@ fn topology_required_healthcheck_fails_start() {
 
 #[test]
 fn topology_optional_healthcheck_does_not_fail_start() {
+    vector::test_util::trace_init();
+
     let config = basic_config_with_sink_failing_healthcheck();
     let mut rt = runtime();
     assert!(topology::start(config, &mut rt, false).is_some());
@@ -525,6 +539,7 @@ fn topology_optional_healthcheck_does_not_fail_reload() {
 }
 
 #[test]
+#[ignore]
 fn topology_healthcheck_not_run_on_unchanged_reload() {
     let mut rt = runtime();
     let config = basic_config();
@@ -536,6 +551,7 @@ fn topology_healthcheck_not_run_on_unchanged_reload() {
 }
 
 #[test]
+#[ignore]
 fn topology_healthcheck_run_for_changes_on_reload() {
     let mut rt = runtime();
 
