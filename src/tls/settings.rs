@@ -152,40 +152,49 @@ impl TlsOptions {
         match (&self.crt_path, &self.key_path) {
             (None, Some(_)) => Err(TlsError::MissingCrtKeyFile.into()),
             (None, None) => Ok(None),
-            (Some(crt_path), key_path) => {
+            (Some(crt_path), _) => der_or_pem(
+                open_read(crt_path, "certificate")?,
+                |der| self.parse_pkcs12_identity(der),
+                |pem| self.parse_pem_identity(pem, crt_path),
+            ),
+        }
+    }
+
+    /// Parse identity from a PEM encoded certificate + key pair of files
+    fn parse_pem_identity(
+        &self,
+        pem: Vec<u8>,
+        crt_path: &PathBuf,
+    ) -> Result<Option<IdentityStore>> {
+        match &self.key_path {
+            None => Err(TlsError::MissingKey),
+            Some(key_path) => {
                 let name = crt_path.to_string_lossy().to_string();
-                let cert_data = open_read(crt_path, "certificate")?;
-                let key_pass: &str = self.key_pass.as_ref().map(|s| s.as_str()).unwrap_or("");
+                let crt =
+                    X509::from_pem(&pem).with_context(|| X509ParseError { filename: crt_path })?;
+                let key = load_key(&key_path, &self.key_pass)?;
+                let pkcs12 = Pkcs12::builder()
+                    .build("", &name, &key, &crt)
+                    .context(Pkcs12Error)?;
+                let identity = pkcs12.to_der().context(DerExportError)?;
 
-                match Pkcs12::from_der(&cert_data) {
-                    // Certificate file is DER encoded PKCS#12 archive
-                    Ok(pkcs12) => {
-                        // Verify password
-                        pkcs12.parse(&key_pass).context(ParsePkcs12)?;
-                        Ok(Some(IdentityStore(cert_data, key_pass.to_string())))
-                    }
-                    Err(source) => match key_path {
-                        None => Err(TlsError::ParsePkcs12 { source }),
-                        Some(key_path) => {
-                            // Identity is a PEM encoded certficate+key pair
-                            let crt = load_x509(crt_path)?;
-                            let key = load_key(&key_path, &self.key_pass)?;
-                            let pkcs12 = Pkcs12::builder()
-                                .build("", &name, &key, &crt)
-                                .context(Pkcs12Error)?;
-                            let identity = pkcs12.to_der().context(DerExportError)?;
+                // Build the resulting parsed PKCS#12 archive,
+                // but don't store it, as it cannot be cloned.
+                // This is just for error checking.
+                pkcs12.parse("").context(TlsIdentityError)?;
 
-                            // Build the resulting parsed PKCS#12 archive,
-                            // but don't store it, as it cannot be cloned.
-                            // This is just for error checking.
-                            pkcs12.parse("").context(TlsIdentityError)?;
-
-                            Ok(Some(IdentityStore(identity, "".into())))
-                        }
-                    },
-                }
+                Ok(Some(IdentityStore(identity, "".into())))
             }
         }
+    }
+
+    /// Parse identity from a DER encoded PKCS#12 archive
+    fn parse_pkcs12_identity(&self, der: Vec<u8>) -> Result<Option<IdentityStore>> {
+        let pkcs12 = Pkcs12::from_der(&der).context(ParsePkcs12)?;
+        // Verify password
+        let key_pass = self.key_pass.as_ref().map(|s| s.as_str()).unwrap_or("");
+        pkcs12.parse(&key_pass).context(ParsePkcs12)?;
+        Ok(Some(IdentityStore(der, key_pass.to_string())))
     }
 }
 
@@ -325,23 +334,41 @@ impl From<TlsSettings> for MaybeTlsSettings {
 fn load_key(filename: &Path, pass_phrase: &Option<String>) -> Result<PKey<Private>> {
     let data = open_read(filename, "key")?;
     match pass_phrase {
-        None => Ok(PKey::private_key_from_der(&data)
-            .or_else(|_| PKey::private_key_from_pem(&data))
-            .with_context(|| PrivateKeyParseError { filename })?),
-        Some(phrase) => Ok(
-            PKey::private_key_from_pkcs8_passphrase(&data, phrase.as_bytes())
-                .or_else(|_| PKey::private_key_from_pem_passphrase(&data, phrase.as_bytes()))
-                .with_context(|| PrivateKeyParseError { filename })?,
-        ),
+        None => der_or_pem(
+            data,
+            |der| PKey::private_key_from_der(&der),
+            |pem| PKey::private_key_from_pem(&pem),
+        )
+        .with_context(|| PrivateKeyParseError { filename }),
+        Some(phrase) => der_or_pem(
+            data,
+            |der| PKey::private_key_from_pkcs8_passphrase(&der, phrase.as_bytes()),
+            |pem| PKey::private_key_from_pem_passphrase(&pem, phrase.as_bytes()),
+        )
+        .with_context(|| PrivateKeyParseError { filename }),
     }
 }
 
 /// Load an X.509 certificate from a named file
 fn load_x509(filename: &Path) -> Result<X509> {
     let data = open_read(filename, "certificate")?;
-    Ok(X509::from_der(&data)
-        .or_else(|_| X509::from_pem(&data))
-        .with_context(|| X509ParseError { filename })?)
+    der_or_pem(data, |der| X509::from_der(&der), |pem| X509::from_pem(&pem))
+        .with_context(|| X509ParseError { filename })
+}
+
+/// Parse the data one way if it looks like a DER file, and the other if
+/// it looks like a PEM file. For the content to be treated as PEM, it
+/// must parse as valid UTF-8 and contain a PEM start marker.
+fn der_or_pem<T>(data: Vec<u8>, der_fn: impl Fn(Vec<u8>) -> T, pem_fn: impl Fn(Vec<u8>) -> T) -> T {
+    // None of these steps cause (re)allocations,
+    // just parsing and type manipulation
+    match String::from_utf8(data) {
+        Ok(text) => match text.find("-----BEGIN ") {
+            Some(_) => pem_fn(text.into_bytes()),
+            None => der_fn(text.into_bytes()),
+        },
+        Err(err) => der_fn(err.into_bytes()),
+    }
 }
 
 fn open_read(filename: &Path, note: &'static str) -> Result<Vec<u8>> {
