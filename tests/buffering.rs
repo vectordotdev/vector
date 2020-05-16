@@ -69,7 +69,10 @@ fn test_buffering() {
 
     // There was a race caused by a channel in the mock source, and this
     // check is here to ensure it's really gone.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| assert!(x == num_events));
+    test_util::wait_for_atomic_usize(source_event_counter, |x| {
+        assert!(x == num_events);
+        true
+    });
 
     // Give the topology some time to process the received data and simulate
     // a crash.
@@ -108,7 +111,10 @@ fn test_buffering() {
 
     // There was a race caused by a channel in the mock source, and this
     // check is here to ensure it's really gone.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| assert!(x == num_events));
+    test_util::wait_for_atomic_usize(source_event_counter, |x| {
+        assert!(x == num_events);
+        true
+    });
 
     terminate_gracefully(rt, topology);
 
@@ -166,7 +172,10 @@ fn test_max_size() {
 
     // There was a race caused by a channel in the mock source, and this
     // check is here to ensure it's really gone.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| assert!(x == num_events));
+    test_util::wait_for_atomic_usize(source_event_counter, |x| {
+        assert!(x == num_events);
+        true
+    });
 
     // Give the topology some time to process the received data and simulate
     // a crash.
@@ -304,7 +313,10 @@ fn test_reclaim_disk_space() {
 
     // There was a race caused by a channel in the mock source, and this
     // check is here to ensure it's really gone.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| assert!(x == num_events));
+    test_util::wait_for_atomic_usize(source_event_counter, |x| {
+        assert!(x == num_events);
+        true
+    });
 
     // Give the topology some time to process the received data and simulate
     // a crash.
@@ -345,7 +357,10 @@ fn test_reclaim_disk_space() {
 
     // There was a race caused by a channel in the mock source, and this
     // check is here to ensure it's really gone.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| assert!(x == num_events));
+    test_util::wait_for_atomic_usize(source_event_counter, |x| {
+        assert!(x == num_events);
+        true
+    });
 
     terminate_gracefully(rt, topology);
 
