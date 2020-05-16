@@ -1,4 +1,5 @@
 use crate::{
+    async_read::AsyncReadExt,
     internal_events::TcpConnectionError,
     shutdown::ShutdownSignal,
     stream::StreamExt,
@@ -136,7 +137,13 @@ pub trait TcpSource: Clone + Send + 'static {
                     span.in_scope(|| {
                         let peer_addr = socket.peer_addr();
                         debug!(message = "accepted a new connection", %peer_addr);
-                        handle_stream(span.clone(), socket, source, tripwire, host, out.clone())
+                        handle_stream(
+                            span.clone(),
+                            socket.read_until(tripwire),
+                            source,
+                            host,
+                            out.clone(),
+                        )
                     });
                     Ok(())
                 })
@@ -152,12 +159,10 @@ fn handle_stream(
     span: Span,
     socket: impl AsyncRead + Send + 'static,
     source: impl TcpSource,
-    tripwire: impl Future<Item = (), Error = ()> + Send + 'static,
     host: Bytes,
     out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
 ) {
     let handler = FramedRead::new(socket, source.decoder())
-        .take_until(tripwire)
         .filter_map(move |frame| {
             let host = host.clone();
             source.build_event(frame, host)
