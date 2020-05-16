@@ -504,7 +504,6 @@ impl RunningTopology {
                     output
                         .unbounded_send(fanout::ControlMessage::Remove(name.to_string()))
                         .unwrap();
-                    // std::thread::sleep(std::time::Duration::from_millis(100));
                 }
             }
         }
@@ -515,22 +514,25 @@ impl RunningTopology {
 
         for (sink_name, sink) in &self.config.sinks {
             if sink.inputs.iter().any(|i| i == name) {
-                output
-                    .unbounded_send(fanout::ControlMessage::Add(
-                        sink_name.clone(),
-                        self.inputs[sink_name].get(),
-                    ))
-                    .unwrap();
+                // Sink may have been removed with the new config so it may not be present.
+                if let Some(input) = self.inputs.get(sink_name) {
+                    output
+                        .unbounded_send(fanout::ControlMessage::Add(sink_name.clone(), input.get()))
+                        .unwrap();
+                }
             }
         }
         for (transform_name, transform) in &self.config.transforms {
             if transform.inputs.iter().any(|i| i == name) {
-                output
-                    .unbounded_send(fanout::ControlMessage::Add(
-                        transform_name.clone(),
-                        self.inputs[transform_name].get(),
-                    ))
-                    .unwrap();
+                // Transform may have been removed with the new config so it may not be present.
+                if let Some(input) = self.inputs.get(transform_name) {
+                    output
+                        .unbounded_send(fanout::ControlMessage::Add(
+                            transform_name.clone(),
+                            input.get(),
+                        ))
+                        .unwrap();
+                }
             }
         }
 
