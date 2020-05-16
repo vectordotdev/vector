@@ -172,9 +172,6 @@ impl HttpSink for HecSinkConfig {
                 None
             }
         }
-        // serde_json::to_vec(&body)
-        //     .map_err(|e| error!("Error encoding json body: {}", e))
-        //     .ok()
     }
 
     fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
