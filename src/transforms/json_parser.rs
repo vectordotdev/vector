@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    internal_events::{JsonFailedParse, JsonParserEventProcessed},
+    internal_events::{JsonEventProcessed, JsonFailedParse},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -75,7 +75,7 @@ impl Transform for JsonParser {
         let log = event.as_mut_log();
         let to_parse = log.get(&self.field).map(|s| s.as_bytes());
 
-        emit!(JsonParserEventProcessed);
+        emit!(JsonEventProcessed);
 
         let parsed = to_parse
             .and_then(|to_parse| {
