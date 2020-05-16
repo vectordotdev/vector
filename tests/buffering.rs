@@ -2,6 +2,7 @@
 
 use futures01::{Future, Sink};
 use prost::Message;
+use std::sync::atomic::Ordering;
 use tempfile::tempdir;
 use tracing::trace;
 use vector::event;
@@ -69,10 +70,7 @@ fn test_buffering() {
 
     // There was a race caused by a channel in the mock source, and this
     // check is here to ensure it's really gone.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| {
-        assert!(x == num_events);
-        true
-    });
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     // Give the topology some time to process the received data and simulate
     // a crash.
@@ -111,10 +109,7 @@ fn test_buffering() {
 
     // There was a race caused by a channel in the mock source, and this
     // check is here to ensure it's really gone.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| {
-        assert!(x == num_events);
-        true
-    });
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     terminate_gracefully(rt, topology);
 
@@ -172,10 +167,7 @@ fn test_max_size() {
 
     // There was a race caused by a channel in the mock source, and this
     // check is here to ensure it's really gone.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| {
-        assert!(x == num_events);
-        true
-    });
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     // Give the topology some time to process the received data and simulate
     // a crash.
@@ -313,10 +305,7 @@ fn test_reclaim_disk_space() {
 
     // There was a race caused by a channel in the mock source, and this
     // check is here to ensure it's really gone.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| {
-        assert!(x == num_events);
-        true
-    });
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     // Give the topology some time to process the received data and simulate
     // a crash.
@@ -357,10 +346,7 @@ fn test_reclaim_disk_space() {
 
     // There was a race caused by a channel in the mock source, and this
     // check is here to ensure it's really gone.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| {
-        assert!(x == num_events);
-        true
-    });
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     terminate_gracefully(rt, topology);
 
