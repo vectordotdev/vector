@@ -94,11 +94,11 @@ pub enum Encoding {
     Json,
 }
 
-inventory::submit! {
-    SinkDescription::new_without_default::<HttpSinkConfig>("http")
-}
-
-#[typetag::serde(name = "http")]
+#[vector_macro::impl_sink_config(
+    name = "http",
+    input_type = "DataType::Log",
+    component = "SinkDescription::new_without_default"
+)]
 impl SinkConfig for HttpSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_headers(&self.headers, &self.auth)?;
@@ -134,14 +134,6 @@ impl SinkConfig for HttpSinkConfig {
             }
             None => Ok((sink, Box::new(future::ok(())))),
         }
-    }
-
-    fn input_type(&self) -> DataType {
-        DataType::Log
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "http"
     }
 }
 

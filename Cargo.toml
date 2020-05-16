@@ -31,6 +31,7 @@ members = [
   "lib/codec",
   "lib/file-source",
   "lib/tracing-limit",
+  "lib/vector-macro",
 ]
 
 [dependencies]
@@ -38,6 +39,7 @@ members = [
 codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source" }
 tracing-limit = { path = "lib/tracing-limit" }
+vector-macro = { path = "lib/vector-macro" }
 
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
