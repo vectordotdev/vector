@@ -1,5 +1,5 @@
 use crate::{
-    async_read::AsyncReadExt, emit, event::Event, internal_events::UnixSocketError,
+    async_read::AsyncAllowReadExt, emit, event::Event, internal_events::UnixSocketError,
     shutdown::ShutdownSignal, sources::Source, stream::StreamExt,
 };
 use bytes::Bytes;
@@ -63,7 +63,7 @@ pub fn build_unix_source(
                 let received_from: Option<Bytes> =
                     path.map(|p| p.to_string_lossy().into_owned().into());
                 let lines_in = FramedRead::new(
-                    socket.read_until(shutdown.clone()),
+                    socket.allow_read_until(shutdown.clone()),
                     LinesCodec::new_with_max_length(max_length),
                 )
                 .filter_map(move |line| build_event(&host_key, received_from.clone(), &line))

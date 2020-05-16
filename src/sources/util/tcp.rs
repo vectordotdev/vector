@@ -1,5 +1,5 @@
 use crate::{
-    async_read::AsyncReadExt,
+    async_read::AsyncAllowReadExt,
     internal_events::TcpConnectionError,
     shutdown::ShutdownSignal,
     stream::StreamExt,
@@ -139,7 +139,7 @@ pub trait TcpSource: Clone + Send + 'static {
                         debug!(message = "accepted a new connection", %peer_addr);
                         handle_stream(
                             span.clone(),
-                            socket.read_until(tripwire),
+                            socket.allow_read_until(tripwire),
                             source,
                             host,
                             out.clone(),

@@ -16,11 +16,11 @@ pub struct ReadUntil<S, F, O> {
 
 /// This `AsyncRead` extension trait provides a `read_until` method that terminates the reader once
 /// the given future resolves.
-pub trait AsyncReadExt: AsyncRead {
+pub trait AsyncAllowReadExt: AsyncRead {
     /// Read data from this reader until the given future resolves.
     ///
     /// If the future produces an error, the read will be allowed to continue indefinitely.
-    fn read_until<U, O>(self, until: U) -> ReadUntil<Self, U::Future, O>
+    fn allow_read_until<U, O>(self, until: U) -> ReadUntil<Self, U::Future, O>
     where
         U: IntoFuture<Item = O, Error = ()>,
         Self: Sized,
@@ -34,7 +34,7 @@ pub trait AsyncReadExt: AsyncRead {
     }
 }
 
-impl<S> AsyncReadExt for S where S: AsyncRead {}
+impl<S> AsyncAllowReadExt for S where S: AsyncRead {}
 
 impl<S, F, O> Read for ReadUntil<S, F, O>
 where
