@@ -1,6 +1,4 @@
 //! Hostcall endpoints exposed to guests.
-//!
-//! You should expose
 use super::context::EventBuffer;
 use crate::wasm::context::RaisedError;
 use crate::wasm::WasmModuleConfig;
@@ -10,7 +8,7 @@ use std::convert::TryInto;
 use vector_wasm::Registration;
 pub use wrapped_for_ffi::ensure_linked;
 
-pub fn emit(vmctx: &mut Vmctx, data: u32, length: u32) -> crate::Result<i32> {
+pub fn emit(vmctx: &mut Vmctx, data: u32, length: u32) -> crate::Result<u32> {
     let mut event_buffer = vmctx.get_embed_ctx_mut::<EventBuffer>();
     let heap = vmctx.heap_mut();
     let slice = &heap[data as usize..(length as usize + data as usize)];
@@ -37,7 +35,7 @@ fn register(vmctx: &mut Vmctx, data: u32, length: u32) -> crate::Result<()> {
     Ok(())
 }
 
-fn raise(vmctx: &mut Vmctx, data: u32, length: u32) -> crate::Result<i32> {
+fn raise(vmctx: &mut Vmctx, data: u32, length: u32) -> crate::Result<u32> {
     let heap = vmctx.heap_mut();
     let slice = &heap[data as usize..(length as usize + data as usize)];
 
@@ -87,7 +85,7 @@ mod wrapped_for_ffi {
 
     #[lucet_hostcall]
     #[no_mangle]
-    pub extern "C" fn emit(vmctx: &mut Vmctx, data: u32, length: u32) -> i32 {
+    pub extern "C" fn emit(vmctx: &mut Vmctx, data: u32, length: u32) -> u32 {
         let internal_event = internal_events::Hostcall::begin(Role::Transform, "register");
         // TODO: Handle error.
         let ret = super::emit(vmctx, data, length).unwrap();
@@ -97,7 +95,7 @@ mod wrapped_for_ffi {
 
     #[lucet_hostcall]
     #[no_mangle]
-    pub extern "C" fn raise(vmctx: &mut Vmctx, data: u32, length: u32) -> i32 {
+    pub extern "C" fn raise(vmctx: &mut Vmctx, data: u32, length: u32) -> u32 {
         let internal_event = internal_events::Hostcall::begin(Role::Transform, "raise");
         // TODO: Handle error.
         let ret = super::raise(vmctx, data, length).unwrap();

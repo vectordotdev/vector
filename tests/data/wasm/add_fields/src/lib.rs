@@ -4,6 +4,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use vector_wasm::{hostcall, Registration};
 // This is **required**.
+use std::convert::TryInto;
 pub use vector_wasm::interop::*;
 
 #[no_mangle]
@@ -13,9 +14,9 @@ pub extern "C" fn init() {
 }
 
 #[no_mangle]
-pub extern "C" fn process(data: u64, length: u64) -> usize {
+pub extern "C" fn process(data: u32, length: u32) -> u32 {
     let data = unsafe {
-        std::ptr::slice_from_raw_parts_mut(data as *mut u8, length as usize)
+        std::ptr::slice_from_raw_parts_mut(data as *mut u8, length.try_into().unwrap())
             .as_mut()
             .unwrap()
     };

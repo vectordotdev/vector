@@ -3,7 +3,7 @@ use anyhow::{anyhow, Context, Result};
 use prost::Message;
 use serde_json::Value;
 // This is **required**.
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 pub use vector_wasm::interop::*;
 use vector_wasm::{hostcall, Registration};
 
@@ -76,9 +76,14 @@ pub extern "C" fn init() {
 }
 
 #[no_mangle]
-pub extern "C" fn process(data: u64, length: u64) -> i64 {
-    let mut buffer =
-        unsafe { Vec::from_raw_parts(data as *mut u8, length as usize, length as usize) };
+pub extern "C" fn process(data: u32, length: u32) -> u32 {
+    let mut buffer = unsafe {
+        Vec::from_raw_parts(
+            data as *mut u8,
+            length.try_into().unwrap(),
+            length.try_into().unwrap(),
+        )
+    };
 
     // At this point, if we have an error, we can only really panic.
     match handle(&mut buffer) {

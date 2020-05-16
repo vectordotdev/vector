@@ -11,7 +11,7 @@ pub extern "C" fn init() {
 }
 
 #[no_mangle]
-pub extern "C" fn process(_data: u64, _length: u64) -> usize {
+pub extern "C" fn process(_data: u32, _length: u32) -> u32 {
     let config = hostcall::config().unwrap();
     hostcall::emit(serde_json::to_vec(&config).unwrap()).unwrap();
     1

@@ -11,7 +11,7 @@ pub extern "C" fn init() {
 }
 
 #[no_mangle]
-pub extern "C" fn process(_data: u64, _length: u64) -> usize {
+pub extern "C" fn process(_data: u32, _length: u32) -> u32 {
     0
 }
 
