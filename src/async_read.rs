@@ -7,7 +7,7 @@ use tokio01::io::AsyncRead;
 ///
 /// This structure is produced by the [`AsyncReadExt::read_until`] method.
 #[derive(Clone, Debug)]
-pub struct ReadUntil<S, F, O> {
+pub struct AllowReadUntil<S, F, O> {
     reader: S,
     until: F,
     until_res: Option<O>,
@@ -20,12 +20,12 @@ pub trait AsyncAllowReadExt: AsyncRead {
     /// Read data from this reader until the given future resolves.
     ///
     /// If the future produces an error, the read will be allowed to continue indefinitely.
-    fn allow_read_until<U, O>(self, until: U) -> ReadUntil<Self, U::Future, O>
+    fn allow_read_until<U, O>(self, until: U) -> AllowReadUntil<Self, U::Future, O>
     where
         U: IntoFuture<Item = O, Error = ()>,
         Self: Sized,
     {
-        ReadUntil {
+        AllowReadUntil {
             reader: self,
             until: until.into_future(),
             until_res: None,
@@ -36,7 +36,7 @@ pub trait AsyncAllowReadExt: AsyncRead {
 
 impl<S> AsyncAllowReadExt for S where S: AsyncRead {}
 
-impl<S, F, O> Read for ReadUntil<S, F, O>
+impl<S, F, O> Read for AllowReadUntil<S, F, O>
 where
     S: Read,
 {
@@ -45,7 +45,7 @@ where
     }
 }
 
-impl<S, F, O> AsyncRead for ReadUntil<S, F, O>
+impl<S, F, O> AsyncRead for AllowReadUntil<S, F, O>
 where
     S: AsyncRead,
     F: Future<Item = O, Error = ()>,
