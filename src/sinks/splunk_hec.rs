@@ -168,9 +168,7 @@ impl HttpSink for HecSinkConfig {
                 Some(value)
             }
             Err(e) => {
-                emit!(SplunkEventEncodeError {
-                    error: e
-                });
+                emit!(SplunkEventEncodeError { error: e });
                 None
             }
         }

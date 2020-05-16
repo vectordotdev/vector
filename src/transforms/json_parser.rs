@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    internal_events::{JsonParserEventProcessed, JsonFailedParse},
+    internal_events::{JsonFailedParse, JsonParserEventProcessed},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
