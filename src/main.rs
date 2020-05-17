@@ -91,9 +91,13 @@ enum SubCommand {
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 struct Validate {
-    /// Ensure that the config topology is correct and that all components resolve
+    /// Disables topology check
     #[structopt(short, long)]
-    topology: bool,
+    no_topology: bool,
+
+    /// Disables healthcheck check
+    #[structopt(short, long)]
+    no_healthchecks: bool,
 
     /// Fail validation on warnings
     #[structopt(short, long)]
@@ -223,14 +227,9 @@ fn main() {
         }
     }
 
-    let mut config_paths = config_paths::expand(opts.config_paths.clone()).unwrap_or_else(|| {
+    let config_paths = prepare_config_paths(opts.config_paths.clone()).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
-    config_paths.sort();
-    config_paths.dedup();
-    config_paths::CONFIG_PATHS
-        .set(config_paths.clone())
-        .expect("Cannot set global config paths");
 
     if opts.watch_config {
         // Start listening for config changes immediately.
@@ -404,6 +403,16 @@ fn main() {
     rt.shutdown_now().wait().unwrap();
 }
 
+fn prepare_config_paths(paths: Vec<PathBuf>) -> Option<Vec<PathBuf>> {
+    let mut config_paths = config_paths::expand(paths)?;
+    config_paths.sort();
+    config_paths.dedup();
+    config_paths::CONFIG_PATHS
+        .set(config_paths.clone())
+        .expect("Cannot set global config paths");
+    Some(config_paths)
+}
+
 fn handle_config_errors(config: Result<Config, Vec<String>>) -> Option<Config> {
     match config {
         Err(errors) => {
@@ -466,19 +475,54 @@ fn open_config(path: &Path) -> Option<File> {
 }
 
 fn validate(opts: &Validate) -> exitcode::ExitCode {
-    let paths = config_paths::expand(opts.paths.clone()).unwrap_or_else(|| {
-        std::process::exit(exitcode::CONFIG);
-    });
-
-    for config_path in paths {
-        let file = if let Some(file) = open_config(&config_path) {
-            file
+    // Print constants,functions
+    let error_intro = "   x";
+    let warning_intro = "   ~";
+    let print_sub = |intro, errors| {
+        for error in errors {
+            println!("  {} {}", intro, error);
+        }
+    };
+    let print_success = |message| println!("√ {}", message);
+    let print_title = |title| println!("- {}", title);
+    let print_warnings = |warnings| {
+        let intro = if opts.deny_warnings {
+            error_intro
         } else {
-            error!(
-                message = "Failed to open config file.",
-                path = ?config_path
-            );
-            return exitcode::CONFIG;
+            warning_intro
+        };
+        print_sub(intro, warnings);
+    };
+    let print_errors = |errors| print_sub(error_intro, errors);
+
+    // Prepare paths
+    let paths = if let Some(paths) = prepare_config_paths(opts.paths.clone()) {
+        paths
+    } else {
+        println!("x No config file paths");
+        return exitcode::CONFIG;
+    };
+
+    // Validate configuration files
+    let mut success = true;
+    let mut full_config = vector::topology::Config::empty();
+    for config_path in paths {
+        let mut failed = || {
+            success = false;
+            println!("# Config: {:?}", &config_path);
+        };
+
+        let file = match File::open(&config_path) {
+            Ok(file) => file,
+            Err(error) => {
+                failed();
+                if let std::io::ErrorKind::NotFound = error.kind() {
+                    println!("{} File not found", error_intro);
+                } else {
+                    println!("{} Error opening file: {:?}", error_intro, error);
+                }
+                continue;
+            }
         };
 
         trace!(
@@ -486,53 +530,102 @@ fn validate(opts: &Validate) -> exitcode::ExitCode {
             path = ?config_path
         );
 
-        let config = vector::topology::Config::load(file);
-        let config = handle_config_errors(config);
-        let mut config = config.unwrap_or_else(|| {
-            error!(
-                message = "Failed to parse config file.",
-                path = ?config_path
-            );
-            std::process::exit(exitcode::CONFIG);
-        });
-        if let Err(errs) = config.expand_macros() {
-            for error in errs {
-                error!("Parse error: {}", error);
+        let mut sub_failed = |title, errors| {
+            failed();
+            print_title(title);
+            print_errors(errors);
+        };
+
+        let mut config = match vector::topology::Config::load(file) {
+            Ok(config) => config,
+            Err(errors) => {
+                sub_failed("Failed to parse file", errors);
+                continue;
             }
+        };
+
+        if let Err(errors) = config.expand_macros() {
+            sub_failed("Failed to expand macros", errors);
+            continue;
         }
 
-        if opts.topology {
-            let exit = match topology::builder::check(&config) {
-                Err(errors) => {
-                    for error in errors {
-                        error!("Topology error: {}", error);
-                    }
-                    Some(exitcode::CONFIG)
-                }
-                Ok(warnings) => {
-                    for warning in &warnings {
-                        warn!("Topology warning: {}", warning);
-                    }
-                    if opts.deny_warnings && !warnings.is_empty() {
-                        Some(exitcode::CONFIG)
-                    } else {
-                        None
-                    }
-                }
-            };
-            if exit.is_some() {
-                error!(
-                    message = "Failed to verify config file topology.",
-                    path = ?config_path
-                );
-                return exit.unwrap();
-            }
+        if let Err(errors) = full_config.append(config) {
+            sub_failed("Failed in merging config", errors);
+            continue;
         }
 
         debug!(
-            message = "Validation successful.",
+            message = "Validation successful",
             path = ?config_path
         );
+    }
+
+    // Validate configuration of components
+
+    event::LOG_SCHEMA
+        .set(config.global.log_schema.clone())
+        .expect("Couldn't set schema");
+
+    let mut rt = runtime::Runtime::with_thread_count(1).expect("Unable to create async runtime");
+    let diff = topology::ConfigDiff::initial(&full_config);
+    let pieces = match topology::builder::build_pieces(&full_config, &diff, rt.executor()) {
+        Ok((pieces, warnings)) => {
+            if warnings.is_empty() {
+                pieces
+            } else {
+                print_title("Component warnings");
+                print_warnings(warnings);
+                if opts.deny_warnings {
+                    return exitcode::CONFIG;
+                }
+                pieces
+            }
+        }
+        Err(errors) => {
+            print_title("Component errors");
+            print_errors(errors);
+            return exitcode::CONFIG;
+        }
+    };
+
+    if success {
+        print_success("Configuration options are valid");
+    } else {
+        return exitcode::CONFIG;
+    }
+
+    // Validate topology
+    if !opts.no_topology {
+        let success = match topology::builder::check(&full_config) {
+            Ok(warnings) => {
+                if warnings.is_empty() {
+                    true
+                } else {
+                    print_title("Topology warnings");
+                    print_warnings(warnings);
+                    !opts.deny_warnings
+                }
+            }
+            Err(errors) => {
+                print_title("Topology errors");
+                print_errors(errors);
+                false
+            }
+        };
+
+        if success {
+            print_success("Configuration topology is valid");
+        } else {
+            return exitcode::CONFIG;
+        }
+    }
+
+    // Validate healthchecks
+    if !opts.no_healthchecks {
+        let result = topology::start_validated(config, diff, pieces, &mut rt, opts.require_healthy);
+        let (topology, mut graceful_crash) = result.unwrap_or_else(|| {
+            std::process::exit(exitcode::CONFIG);
+        });
     }
 
     exitcode::OK
