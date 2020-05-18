@@ -85,7 +85,7 @@ impl Resolver {
         let handle = exec.block_on_std(async move { tokio::runtime::Handle::current() });
         let inner = TokioAsyncResolver::new(config, opt, handle).unwrap();
 
-        Ok(Self { inner: None })
+        Ok(Self { inner: Some(inner) })
     }
 
     pub fn lookup_ip(&self, name: String) -> ResolverFuture {

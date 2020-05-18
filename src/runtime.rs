@@ -19,7 +19,7 @@ impl Runtime {
     }
 
     pub fn single_threaded() -> io::Result<Self> {
-        Self::with_thread_count(1)
+        Self::with_thread_count(2)
     }
 
     pub fn with_thread_count(number: usize) -> io::Result<Self> {
