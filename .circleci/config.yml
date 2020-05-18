@@ -93,7 +93,7 @@ jobs:
           no_output_timeout: 60m
           environment:
             RUSTFLAGS: -Ctarget-feature=+crt-static
-            RUST_BACKTRACE: full
+            # RUST_BACKTRACE: full
           command: |
             PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
             cargo test --release --no-default-features --features default-msvc -- --test-threads 1

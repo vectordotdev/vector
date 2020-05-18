@@ -33,7 +33,7 @@ on:
 env:
   AWS_ACCESS_KEY_ID: fake-aws-key
   AWS_SECRET_ACCESS_KEY: fake-aws-key
-  RUST_BACKTRACE: full
+  # RUST_BACKTRACE: full
   TARGET: x86_64-unknown-linux-gnu
   TEST_LOG: debug
   USE_CONTAINER: none
