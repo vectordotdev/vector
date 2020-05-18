@@ -199,8 +199,8 @@ assert_cmd = "0.11"
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
 default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain", "rdkafka-plain"]
-# Default features for *-unknown-linux-musl
-default-musl = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake"]
+# Default features for *-unknown-linux-* which make use of `cmake` for dependencies
+default-cmake = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 default-msvc = ["sources", "transforms", "sinks", "vendored", "leveldb-cmake", "rdkafka-cmake"]
 

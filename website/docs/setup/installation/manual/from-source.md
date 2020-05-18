@@ -262,7 +262,7 @@ Building steps:
     <TabItem value="x86_64-unknown-linux-musl">
 
     ```bash
-    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build
+    PASS_FEATURES=default-cmake ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build
     ```
 
     </TabItem>
@@ -270,7 +270,7 @@ Building steps:
     <TabItem value="aarch64-unknown-linux-musl">
 
     ```bash
-    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build
+    PASS_FEATURES=default-cmake ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build
     ```
 
     </TabItem>
@@ -278,7 +278,7 @@ Building steps:
     <TabItem value="armv7-unknown-linux-musleabihf">
 
     ```bash
-    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build
+    PASS_FEATURES=default-cmake ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build
     ```
 
     </TabItem>
@@ -372,7 +372,7 @@ used.
 | Feature        | Description                                                                                                    | Enabled by default                     |
 |:---------------|:---------------------------------------------------------------------------------------------------------------|:---------------------------------------|
 | `default`      | Default set of features for `*-unknown-linux-gnu` and `*-apple-darwin` targets.                                | <i className="feather icon-check"></i> |
-| `default-musl` | Default set of features for `*-unknown-linux-musl` targets. Requires `cmake` and `perl` as build dependencies. |                                        |
+| `default-cmake` | Default set of features for `*-unknown-linux-*` targets which uses `cmake` and `perl` as build dependencies. |                                        |
 | `default-msvc` | Default set of features for `*-pc-windows-msvc` targets. Requires `cmake` and `perl` as build dependencies.    |                                        |
 
 Alternatively, for finer control over dependencies and operating system
