@@ -28,7 +28,7 @@ pub type ResolverFuture = Box<dyn Future<Item = LookupIp, Error = DnsError> + Se
 
 #[derive(Debug, Clone)]
 pub struct Resolver {
-    inner: TokioAsyncResolver,
+    inner: Option<TokioAsyncResolver>,
 }
 
 pub enum LookupIp {
@@ -38,6 +38,10 @@ pub enum LookupIp {
 
 impl Resolver {
     pub fn new(dns_servers: Vec<String>, exec: TaskExecutor) -> Result<Self, DnsError> {
+        Ok(Self { inner: None })
+    }
+
+    pub fn new2(dns_servers: Vec<String>, exec: TaskExecutor) -> Result<Self, DnsError> {
         let (config, opt) = if !dns_servers.is_empty() {
             let mut config = ResolverConfig::new();
 
@@ -85,7 +89,7 @@ impl Resolver {
         let handle = exec.block_on_std(async move { tokio::runtime::Handle::current() });
         let inner = TokioAsyncResolver::new(config, opt, handle).unwrap();
 
-        Ok(Self { inner })
+        Ok(Self { inner: Some(inner) })
     }
 
     pub fn lookup_ip(&self, name: String) -> ResolverFuture {
@@ -95,7 +99,11 @@ impl Resolver {
 
         let resolver = self.inner.clone();
         let fut = Box::pin(async move {
-            let lu = resolver.lookup_ip(name).await.context(UnableLookup)?;
+            let lu = resolver
+                .expect("resolver")
+                .lookup_ip(name)
+                .await
+                .context(UnableLookup)?;
             Ok(LookupIp::Query(lu.into_iter()))
         });
 
