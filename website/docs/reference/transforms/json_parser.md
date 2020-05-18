@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-18"
 component_title: "JSON Parser"
 description: "The Vector `json_parser` transform accepts and outputs `log` events, allowing you to parse a log field value as JSON."
 event_types: ["log"]
@@ -273,8 +273,7 @@ option.
 
 ### Chaining / Unwrapping
 
-Please see the [Output section](#output) for an example of chaining and
-unwrapping JSON.
+Please see the [Examples section](#examples).
 
 ### Complex Processing
 
