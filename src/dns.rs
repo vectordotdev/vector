@@ -89,6 +89,7 @@ impl Resolver {
     }
 
     pub fn lookup_ip(&self, name: String) -> ResolverFuture {
+        info!("looking up dns");
         if let Ok(ip) = IpAddr::from_str(name.as_ref()) {
             return Box::new(future::ok(LookupIp::Single(Some(ip))));
         }

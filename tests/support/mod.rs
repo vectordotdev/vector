@@ -114,7 +114,7 @@ impl SourceConfig for MockSourceConfig {
                 .unwrap()
                 .take()
                 .unwrap()
-                // .take_until(shutdown)
+                .take_until(shutdown)
                 .map(move |x| {
                     if let Some(counter) = &event_counter {
                         counter.fetch_add(1, Ordering::Relaxed);
