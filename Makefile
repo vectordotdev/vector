@@ -1,4 +1,4 @@
-.PHONY: help
+.PHONY: $(MAKECMDGOALS) all
 .DEFAULT_GOAL := help
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/run.sh)
 
@@ -32,17 +32,20 @@ all: check build-all package-all test-docker test-behavior verify ## Run all tes
 ##@ Building
 
 build: ## Build the project natively in release mode
-	$(RUN) build
+	@scripts/build.sh
 
 build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
-build-x86_64-unknown-linux-musl: ## Build the project in release mode for the x86_64 architecture
+build-x86_64-unknown-linux-gnu: ## Build dynamically linked binary in release mode for the x86_64 architecture
+	$(RUN) build-x86_64-unknown-linux-gnu
+
+build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture
 	$(RUN) build-x86_64-unknown-linux-musl
 
-build-armv7-unknown-linux-musleabihf: load-qemu-binfmt ## Build the project in release mode for the armv7 architecture
+build-armv7-unknown-linux-musleabihf: load-qemu-binfmt ## Build static binary in release mode for the armv7 architecture
 	$(RUN) build-armv7-unknown-linux-musleabihf
 
-build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build the project in release mode for the aarch64 architecture
+build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in release mode for the aarch64 architecture
 	$(RUN) build-aarch64-unknown-linux-musl
 
 ##@ Developing
@@ -140,6 +143,11 @@ package-all: package-archive-all package-deb-all package-rpm-all ## Build all pa
 
 package-x86_64-unknown-linux-musl-all: package-archive-x86_64-unknown-linux-musl package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 MUSL packages
 
+
+package-x86_64-unknown-linux-musl-all: package-archive-x86_64-unknown-linux-musl # Build all x86_64 MUSL packages
+
+package-x86_64-unknown-linux-gnu-all: package-archive-x86_64-unknown-linux-gnu package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 GNU packages
+
 package-armv7-unknown-linux-musleabihf-all: package-archive-armv7-unknown-linux-musleabihf package-deb-armv7 package-rpm-armv7  # Build all armv7 MUSL packages
 
 package-aarch64-unknown-linux-musl-all: package-archive-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
@@ -149,10 +157,13 @@ package-aarch64-unknown-linux-musl-all: package-archive-aarch64-unknown-linux-mu
 package-archive: build ## Build the Vector archive
 	$(RUN) package-archive
 
-package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-armv7-unknown-linux-musleabihf package-archive-aarch64-unknown-linux-musl ## Build all archives
+package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-x86_64-unknown-linux-gnu package-archive-armv7-unknown-linux-musleabihf package-archive-aarch64-unknown-linux-musl ## Build all archives
 
 package-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 archive
 	$(RUN) package-archive-x86_64-unknown-linux-musl
+
+package-archive-x86_64-unknown-linux-gnu: build-x86_64-unknown-linux-gnu ## Build the x86_64 archive
+	$(RUN) package-archive-x86_64-unknown-linux-gnu
 
 package-archive-armv7-unknown-linux-musleabihf: build-armv7-unknown-linux-musleabihf ## Build the armv7 archive
 	$(RUN) package-archive-armv7-unknown-linux-musleabihf
@@ -167,7 +178,7 @@ package-deb: ## Build the deb package
 
 package-deb-all: package-deb-x86_64 package-deb-armv7 package-deb-aarch64 ## Build all deb packages
 
-package-deb-x86_64: package-archive-x86_64-unknown-linux-musl ## Build the x86_64 deb package
+package-deb-x86_64: package-archive-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
 	$(RUN) package-deb-x86_64
 
 package-deb-armv7: package-archive-armv7-unknown-linux-musleabihf ## Build the armv7 deb package
@@ -183,7 +194,7 @@ package-rpm: ## Build the rpm package
 
 package-rpm-all: package-rpm-x86_64 package-rpm-armv7 package-rpm-aarch64 ## Build all rpm packages
 
-package-rpm-x86_64: package-archive-x86_64-unknown-linux-musl ## Build the x86_64 rpm package
+package-rpm-x86_64: package-archive-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
 	$(RUN) package-rpm-x86_64
 
 package-rpm-armv7: package-archive-armv7-unknown-linux-musleabihf ## Build the armv7 rpm package

@@ -46,7 +46,7 @@ fi
 
 # Prepare test image parameters.
 VERSION_TAG="test-$TEST_RUN_ID"
-BASE_TAG="alpine"
+BASE_TAG="debian"
 
 # Build docker image with Vector - the same way it's done for releses. Don't
 # do the push - we'll handle it later.
