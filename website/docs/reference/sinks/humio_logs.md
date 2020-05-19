@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-19"
 delivery_guarantee: "at_least_once"
 component_title: "Humio Logs"
 description: "The Vector `humio_logs` sink batches `log` events to Humio via the HEC API."
@@ -50,6 +50,9 @@ The Vector `humio_logs` sink
 
   # Encoding
   encoding.codec = "json" # optional, default
+
+  # Requests
+  compression = "none" # optional, default
 ```
 
 </TabItem>
@@ -88,6 +91,9 @@ The Vector `humio_logs` sink
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
+
+  # Requests
+  compression = "none" # optional, default
 ```
 
 </TabItem>
@@ -280,6 +286,30 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"none":"The payload will not be compressed.","gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
+  examples={["none","gzip"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+The compression strategy used to compress the encoded event data before
+outputting.
+
+
 
 </Field>
 <Field
@@ -744,6 +774,7 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
+[urls.gzip]: https://www.gzip.org/
 [urls.humio]: https://humio.com
 [urls.humio_hec]: https://docs.humio.com/integrations/data-shippers/hec/
 [urls.new_humio_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+humio_logs
