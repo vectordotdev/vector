@@ -11,7 +11,7 @@ pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
 #[derive(Serialize, Deserialize, Debug, Derivative, Copy, Clone, Eq, PartialEq)]
 #[derivative(Default)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "lowercase")]
 pub enum Compression {
     #[derivative(Default)]
     None,
