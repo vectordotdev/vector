@@ -218,10 +218,7 @@ impl GcsSink {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
-        let compression = match config.compression {
-            Compression::Gzip => true,
-            Compression::None => false,
-        };
+        let gzip = matches!(config.compression, Compression::Gzip);
         let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
 
         let key_prefix = if let Some(kp) = &config.key_prefix {
@@ -237,7 +234,7 @@ impl GcsSink {
             .settings(request, GcsRetryLogic)
             .service(self);
 
-        let buffer = PartitionBuffer::new(Buffer::new(compression));
+        let buffer = PartitionBuffer::new(Buffer::new(gzip));
 
         let sink = crate::sinks::util::PartitionBatchSink::new(svc, buffer, batch, cx.acker())
             .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
@@ -538,7 +535,7 @@ mod tests {
             filename_time_format: Some("date".into()),
             filename_extension: extension.map(Into::into),
             filename_append_uuid: Some(uuid),
-            compression: compression,
+            compression,
             ..default_config(Encoding::Ndjson)
         })
         .expect("Could not create request settings")
