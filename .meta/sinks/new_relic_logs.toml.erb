@@ -67,6 +67,20 @@ description = "The API region to send logs to."
 us = "The US region"
 eu = "The EU region"
 
+[sinks.new_relic_logs.options.compression]
+type = "string"
+category = "Requests"
+common = true
+default = "none"
+description = """\
+The compression strategy used to compress the encoded event data before \
+outputting.\
+"""
+
+[sinks.new_relic_logs.options.compression.enum]
+none = "The payload will not be compressed."
+gzip = "The payload will be compressed in [Gzip][urls.gzip] format before being sent."
+
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.new_relic_logs.options",
   encodings: ["json"],
