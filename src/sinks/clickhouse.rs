@@ -25,7 +25,7 @@ pub struct ClickhouseConfig {
     pub host: String,
     pub table: String,
     pub database: Option<String>,
-    pub compression: Option<Compression>,
+    pub compression: Compression,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -60,10 +60,7 @@ pub enum Encoding {
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let gzip = match self.compression.unwrap_or(Compression::Gzip) {
-            Compression::None => false,
-            Compression::Gzip => true,
-        };
+        let gzip = self.compression == Compression::Gzip;
 
         let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -116,15 +113,13 @@ impl HttpSink for ClickhouseConfig {
 
         let uri = encode_uri(&self.host, database, &self.table).expect("Unable to encode uri");
 
-        let builder = Request::builder()
+        let mut builder = Request::builder()
             .method(Method::POST)
             .uri(uri.clone())
             .header("Content-Type", "application/x-ndjson");
 
-        let builder = if let Compression::Gzip = self.compression.unwrap_or(Compression::Gzip) {
-            builder.header("Content-Encoding", "gzip")
-        } else {
-            builder
+        if self.compression == Compression::Gzip {
+            builder = builder.header("Content-Encoding", "gzip")
         };
 
         let mut request = builder.body(events).unwrap();

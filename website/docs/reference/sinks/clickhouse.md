@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-19"
 delivery_guarantee: "at_least_once"
 component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."
@@ -59,7 +59,7 @@ The Vector `clickhouse` sink
   host = "http://localhost:8123" # required
   table = "mytable" # required
 
-  # requests
+  # Requests
   compression = "none" # optional, default
 ```
 
@@ -105,7 +105,7 @@ The Vector `clickhouse` sink
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 30 # optional, default, seconds
 
-  # requests
+  # Requests
   compression = "none" # optional, default
 
   # TLS
