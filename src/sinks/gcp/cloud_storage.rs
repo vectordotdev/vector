@@ -62,6 +62,7 @@ pub struct GcsSinkConfig {
     filename_append_uuid: Option<bool>,
     filename_extension: Option<String>,
     encoding: EncodingConfig<Encoding>,
+    #[serde(default)]
     compression: Compression,
     #[serde(default)]
     batch: BatchBytesConfig,
@@ -145,8 +146,8 @@ impl Encoding {
 #[derivative(Default)]
 enum Compression {
     #[derivative(Default)]
-    Gzip,
     None,
+    Gzip,
 }
 
 impl Compression {
@@ -218,7 +219,7 @@ impl GcsSink {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
-        let gzip = matches!(config.compression, Compression::Gzip);
+        let gzip = config.compression == Compression::Gzip;
         let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
 
         let key_prefix = if let Some(kp) = &config.key_prefix {

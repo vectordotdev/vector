@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-19"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
@@ -46,7 +46,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   # General
   type = "gcp_cloud_storage" # required
   inputs = ["my-source-or-transform-id"] # required
-  compression = "gzip" # required
+  compression = "none" # optional, default
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 
@@ -70,7 +70,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   type = "gcp_cloud_storage" # required
   inputs = ["my-source-or-transform-id"] # required
   bucket = "my-bucket" # required
-  compression = "gzip" # required
+  compression = "none" # optional, default
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 
@@ -361,14 +361,14 @@ The behavior when the buffer becomes full.
 </Field>
 <Field
   common={true}
-  defaultValue={null}
-  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
-  examples={["gzip","none"]}
+  defaultValue={"none"}
+  enumValues={{"none":"No compression","gzip":"GZIP compression"}}
+  examples={["none","gzip"]}
   groups={[]}
   name={"compression"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

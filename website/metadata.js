@@ -30475,7 +30475,7 @@ module.exports = {
     "gcp_cloud_storage": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  inputs = [\"in\"] # required\n  type = \"gcp_cloud_storage\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
+        "toml": "[sinks.out]\n  # General\n  bucket = \"my-bucket\" # required\n  inputs = [\"in\"] # required\n  type = \"gcp_cloud_storage\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Google Cloud Storage is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. This makes it a prime candidate for log data.",

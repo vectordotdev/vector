@@ -5063,11 +5063,12 @@ require('custom_module')
 
   # The compression mechanism to use.
   #
-  # * required
+  # * optional
+  # * default: "none"
   # * type: string
-  # * enum: "gzip" or "none"
-  compression = "gzip"
+  # * enum: "none" or "gzip"
   compression = "none"
+  compression = "gzip"
 
   # The filename for a Google Cloud service account credentials JSON file used to
   # authenticate access to the Cloud Storage API. If this is unset, Vector checks

@@ -148,12 +148,12 @@ description = "The filename extension to use in the object name."
 [sinks.gcp_cloud_storage.options.compression]
 type = "string"
 common = true
-required = true
+default = "none"
 description = "The compression mechanism to use."
 
 [sinks.gcp_cloud_storage.options.compression.enum]
-gzip = "GZIP compression"
 none = "No compression"
+gzip = "GZIP compression"
 
 <%= render(
   "_partials/fields/_tls_connector_options.toml",
