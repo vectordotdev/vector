@@ -62,7 +62,7 @@ pub struct GcsSinkConfig {
     filename_append_uuid: Option<bool>,
     filename_extension: Option<String>,
     encoding: EncodingConfig<Encoding>,
-    #[serde(default)]
+    #[serde(default = "Compression::config_default")]
     compression: Compression,
     #[serde(default)]
     batch: BatchBytesConfig,
@@ -141,13 +141,19 @@ impl Encoding {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Copy, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, Derivative, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 enum Compression {
-    #[derivative(Default)]
     None,
+    #[derivative(Default)]
     Gzip,
+}
+
+impl Compression {
+    fn config_default() -> Compression {
+        Compression::None
+    }
 }
 
 impl Compression {
