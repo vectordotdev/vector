@@ -154,6 +154,8 @@ enum ParseError {
     AWSCredentialsProviderFailed { source: CredentialsError },
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
+    #[snafu(display("Compression can not be used with AWS hosted Elasticsearch"))]
+    AWSCompressionNotAllowed,
 }
 
 impl HttpSink for ElasticSearchCommon {
@@ -327,12 +329,11 @@ impl ElasticSearchCommon {
             }
         };
 
-        // Only apply compression if explicitly selected and we are
-        // running with no AWS credentials.
-        let compression = match (&credentials, config.compression) {
-            (Some(_), _) => Compression::None,
-            (None, c) => c,
-        };
+        // Only allow compression if we are running with no AWS credentials.
+        let compression = config.compression;
+        if credentials.is_some() && compression != Compression::None {
+            return Err(ParseError::AWSCompressionNotAllowed.into());
+        }
 
         let index = if let Some(idx) = &config.index {
             Template::from(idx.as_str())
