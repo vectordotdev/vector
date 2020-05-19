@@ -87,7 +87,7 @@ description = "The filename extension to use in the object name."
 [sinks.aws_s3.options.compression]
 type = "string"
 common = true
-required = true
+default = "none"
 description = "The compression mechanism to use."
 
 [sinks.aws_s3.options.compression.enum]

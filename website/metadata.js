@@ -30141,7 +30141,7 @@ module.exports = {
     "aws_s3": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  type = \"aws_s3\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
+        "toml": "[sinks.out]\n  # General\n  bucket = \"my-bucket\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  type = \"aws_s3\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Amazon Simple Storage Service (Amazon S3) is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data.",

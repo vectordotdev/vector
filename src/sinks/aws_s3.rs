@@ -51,6 +51,7 @@ pub struct S3SinkConfig {
         default
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
+    #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchBytesConfig,
