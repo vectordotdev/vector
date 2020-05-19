@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-19"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."
@@ -1015,6 +1015,6 @@ options.
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [urls.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+splunk_hec
 [urls.openssl]: https://www.openssl.org/
-[urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[urls.splunk_hec]: https://dev.splunk.com/enterprise/docs/dataapps/httpeventcollector/
 [urls.splunk_hec_indexed_fields]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC
 [urls.splunk_hec_setup]: https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector

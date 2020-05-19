@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-19"
 component_title: "Grok Parser"
 description: "The Vector `grok_parser` transform accepts and outputs `log` events, allowing you to parse a log field value with Grok."
 event_types: ["log"]
@@ -306,8 +306,8 @@ common formats:
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [pages.index#performance]: /#performance
-[urls.grok]: http://grokdebug.herokuapp.com/
-[urls.grok_debugger]: http://grokdebug.herokuapp.com/
+[urls.grok]: https://grokdebug.herokuapp.com/
+[urls.grok_debugger]: https://grokdebug.herokuapp.com/
 [urls.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns
 [urls.rust_grok_library]: https://github.com/daschl/grok
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers

@@ -1,6 +1,6 @@
 [Unit]
 Description=Vector
-Documentation=http://vector.dev
+Documentation=https://vector.dev
 After=network-online.target
 Requires=network-online.target
 

@@ -2,7 +2,7 @@
 
 This document will cover how to properly release Vector.
 
-Vector adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html) and the release
+Vector adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the release
 process is dependent on the version change.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->

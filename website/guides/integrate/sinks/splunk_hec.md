@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-19"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs to a Splunk HEC"
 description: "A simple guide to send logs to a Splunk HEC in just a few minutes."
@@ -150,7 +150,7 @@ flexibility of Vector:
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [urls.rust]: https://www.rust-lang.org/
-[urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[urls.splunk_hec]: https://dev.splunk.com/enterprise/docs/dataapps/httpeventcollector/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
