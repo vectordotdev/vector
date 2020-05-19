@@ -41,7 +41,8 @@ pub struct HecSinkConfig {
         default
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
-    pub compression: Option<Compression>,
+    #[serde(default)]
+    pub compression: Compression,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     #[serde(default)]
@@ -189,7 +190,7 @@ impl HttpSink for HecSinkConfig {
 
 impl HecSinkConfig {
     fn is_gzip(&self) -> bool {
-        matches!(&self.compression, Some(Compression::Gzip))
+        self.compression == Compression::Gzip
     }
 }
 
@@ -715,7 +716,7 @@ mod integration_tests {
             host: "http://localhost:8088/".into(),
             token: get_token(),
             host_key: "host".into(),
-            compression: Some(Compression::None),
+            compression: Compression::None,
             encoding: encoding.into(),
             batch: BatchBytesConfig {
                 max_size: Some(1),
