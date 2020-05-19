@@ -124,7 +124,7 @@ impl NewRelicLogsConfig {
             healthcheck_uri: None,
             auth: None,
             headers: Some(headers),
-            compression: Some(Compression::None),
+            compression: Compression::None,
             encoding: self.encoding.clone().without_default(),
 
             batch,

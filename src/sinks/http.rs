@@ -43,7 +43,8 @@ pub struct HttpSinkConfig {
     pub healthcheck_uri: Option<UriSerde>,
     pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
-    pub compression: Option<Compression>,
+    #[serde(default)]
+    pub compression: Compression,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -107,10 +108,7 @@ impl SinkConfig for HttpSinkConfig {
         let mut config = self.clone();
 
         config.uri = build_uri(config.uri.clone()).into();
-        let gzip = match config.compression.unwrap_or(Compression::None) {
-            Compression::None => false,
-            Compression::Gzip => true,
-        };
+        let gzip = config.compression == Compression::Gzip;
         let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
@@ -212,7 +210,7 @@ impl HttpSink for HttpSinkConfig {
             }
         };
 
-        if let Some(Compression::Gzip) = &self.compression {
+        if self.compression == Compression::Gzip {
             builder.header("Content-Encoding", "gzip");
         }
 
