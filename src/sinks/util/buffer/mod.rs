@@ -9,9 +9,11 @@ pub mod partition;
 
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, Eq, PartialEq)]
-#[serde(rename_all = "lowercase")]
+#[derive(Serialize, Deserialize, Debug, Derivative, Copy, Clone, Eq, PartialEq)]
+#[derivative(Default)]
+#[serde(rename_all = "snake_case")]
 pub enum Compression {
+    #[derivative(Default)]
     None,
     Gzip,
 }
