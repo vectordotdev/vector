@@ -257,7 +257,7 @@ mod integration_tests {
         let config = ClickhouseConfig {
             host: host.clone(),
             table: table.clone(),
-            compression: Some(Compression::None),
+            compression: Compression::None,
             batch: BatchBytesConfig {
                 max_size: Some(1),
                 timeout_secs: None,
@@ -300,7 +300,7 @@ mod integration_tests {
         let config = ClickhouseConfig {
             host: host.clone(),
             table: table.clone(),
-            compression: Some(Compression::None),
+            compression: Compression::None,
             encoding,
             batch: BatchBytesConfig {
                 max_size: Some(1),
@@ -417,7 +417,7 @@ compression = "none"
         let config = ClickhouseConfig {
             host: host.clone(),
             table: table.clone(),
-            compression: Some(Compression::None),
+            compression: Compression::None,
             batch: BatchBytesConfig {
                 max_size: Some(1),
                 timeout_secs: None,
