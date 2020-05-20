@@ -69,7 +69,7 @@ impl InfluxDBSettings for InfluxDB1Settings {
         encode_uri(
             &endpoint,
             "write",
-            &mut [
+            &[
                 ("consistency", self.consistency.clone()),
                 ("db", Some(self.database.clone())),
                 ("rp", self.retention_policy_name.clone()),
@@ -81,7 +81,7 @@ impl InfluxDBSettings for InfluxDB1Settings {
     }
 
     fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
-        encode_uri(&endpoint, "ping", &mut [])
+        encode_uri(&endpoint, "ping", &[])
     }
 
     fn token(self: &Self) -> String {
@@ -94,7 +94,7 @@ impl InfluxDBSettings for InfluxDB2Settings {
         encode_uri(
             &endpoint,
             "api/v2/write",
-            &mut [
+            &[
                 ("org", Some(self.org.clone())),
                 ("bucket", Some(self.bucket.clone())),
                 ("precision", Some("ns".to_owned())),
@@ -103,7 +103,7 @@ impl InfluxDBSettings for InfluxDB2Settings {
     }
 
     fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
-        encode_uri(&endpoint, "health", &mut [])
+        encode_uri(&endpoint, "health", &[])
     }
 
     fn token(self: &Self) -> String {
@@ -278,11 +278,7 @@ fn encode_namespace(namespace: &str, name: &str) -> String {
     }
 }
 
-fn encode_uri(
-    endpoint: &str,
-    path: &str,
-    pairs: &mut [(&str, Option<String>)],
-) -> crate::Result<Uri> {
+fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> crate::Result<Uri> {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
 
     for pair in pairs {
@@ -617,7 +613,7 @@ mod tests {
         let uri = encode_uri(
             "http://localhost:9999",
             "api/v2/write",
-            &mut [
+            &[
                 ("org", Some("my-org".to_owned())),
                 ("bucket", Some("my-bucket".to_owned())),
                 ("precision", Some("ns".to_owned())),
@@ -632,7 +628,7 @@ mod tests {
         let uri = encode_uri(
             "http://localhost:9999/",
             "api/v2/write",
-            &mut [
+            &[
                 ("org", Some("my-org".to_owned())),
                 ("bucket", Some("my-bucket".to_owned())),
             ],
@@ -646,7 +642,7 @@ mod tests {
         let uri = encode_uri(
             "http://localhost:9999",
             "api/v2/write",
-            &mut [
+            &[
                 ("org", Some("Orgazniation name".to_owned())),
                 ("bucket", Some("Bucket=name".to_owned())),
                 ("none", None),
@@ -664,7 +660,7 @@ mod tests {
         encode_uri(
             "localhost:9999",
             "api/v2/write",
-            &mut [
+            &[
                 ("org", Some("my-org".to_owned())),
                 ("bucket", Some("my-bucket".to_owned())),
             ],
