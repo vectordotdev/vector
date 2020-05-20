@@ -60,7 +60,7 @@ The Vector `clickhouse` sink
   table = "mytable" # required
 
   # Requests
-  compression = "none" # optional, default
+  compression = "gzip" # optional, default
 ```
 
 </TabItem>
@@ -106,7 +106,7 @@ The Vector `clickhouse` sink
   request.timeout_secs = 30 # optional, default, seconds
 
   # Requests
-  compression = "none" # optional, default
+  compression = "gzip" # optional, default
 
   # TLS
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
@@ -405,7 +405,7 @@ The behavior when the buffer becomes full.
 </Field>
 <Field
   common={true}
-  defaultValue={"none"}
+  defaultValue={"gzip"}
   enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
   examples={["none","gzip"]}
   groups={[]}

@@ -3969,7 +3969,7 @@ require('custom_module')
   # transmission.
   #
   # * optional
-  # * default: "none"
+  # * default: "gzip"
   # * type: string
   # * enum: "none" or "gzip"
   compression = "none"

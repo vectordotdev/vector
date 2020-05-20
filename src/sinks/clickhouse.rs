@@ -25,7 +25,7 @@ pub struct ClickhouseConfig {
     pub host: String,
     pub table: String,
     pub database: Option<String>,
-    #[serde(default)]
+    #[serde(default = "compression_default")]
     pub compression: Compression,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
@@ -48,6 +48,10 @@ lazy_static! {
 
 inventory::submit! {
     SinkDescription::new::<ClickhouseConfig>("clickhouse")
+}
+
+fn compression_default() -> Compression {
+    Compression::Gzip
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]

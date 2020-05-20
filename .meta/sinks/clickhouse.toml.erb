@@ -80,7 +80,8 @@ description = "The basic authentication user name."
 <%= render("_partials/fields/_compression_options.toml",
   namespace: "sinks.clickhouse.options",
   options: {
-    "category" => "Requests"
+    "category" => "Requests",
+    "default" => "gzip"
   }
 ) %>
 
