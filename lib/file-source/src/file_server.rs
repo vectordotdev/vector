@@ -3,9 +3,7 @@ use bytes::Bytes;
 use futures::{
     executor::block_on,
     future::{select, Either},
-    stream,
-    stream::StreamExt,
-    Future, Sink,
+    stream, Future, Sink, SinkExt,
 };
 use glob::glob;
 use indexmap::IndexMap;
@@ -235,8 +233,8 @@ where
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
             fp_map.retain(|_file_id, watcher| !watcher.dead());
 
-            let stream = stream::iter(lines.drain(..).map(Result::<_, ()>::Ok));
-            let result = block_on(stream.forward(&mut chans));
+            let mut stream = stream::iter(lines.drain(..).map(Result::<_, ()>::Ok));
+            let result = block_on(chans.send_all(&mut stream));
             if result.is_err() {
                 debug!("Output channel closed.");
                 return;
