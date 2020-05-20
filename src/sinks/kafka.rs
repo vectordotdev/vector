@@ -352,6 +352,8 @@ mod integration_test {
     }
 
     const TEST_CA: &str = "tests/data/Vector_CA.crt";
+    const TEST_CRT: &str = "tests/data/localhost.crt";
+    const TEST_KEY: &str = "tests/data/localhost.key";
 
     #[test]
     fn kafka_happy_path_tls() {
@@ -361,6 +363,24 @@ mod integration_test {
                 enabled: Some(true),
                 options: TlsOptions {
                     ca_path: Some(TEST_CA.into()),
+                    ..Default::default()
+                },
+            }),
+            None,
+        );
+    }
+
+    #[test]
+    fn kafka_happy_path_tls_with_key() {
+        kafka_happy_path(
+            "localhost:9091",
+            Some(KafkaTlsConfig {
+                enabled: Some(true),
+                options: TlsOptions {
+                    ca_path: Some(TEST_CA.into()),
+                    // Dummy key, not actually checked by server
+                    crt_path: Some(TEST_CRT.into()),
+                    key_path: Some(TEST_KEY.into()),
                     ..Default::default()
                 },
             }),
