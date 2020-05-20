@@ -145,8 +145,8 @@ impl Encoding {
 #[derivative(Default)]
 enum Compression {
     #[derivative(Default)]
-    Gzip,
     None,
+    Gzip,
 }
 
 impl Compression {
