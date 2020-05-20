@@ -162,6 +162,7 @@ impl S3Sink {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
+        let compression = config.compression;
         let gzip = config.compression == Compression::Gzip;
         let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
         let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
@@ -190,7 +191,7 @@ impl S3Sink {
                     filename_time_format.clone(),
                     filename_extension.clone(),
                     filename_append_uuid,
-                    gzip,
+                    compression,
                     bucket.clone(),
                     options.clone(),
                 )
@@ -303,7 +304,7 @@ fn build_request(
     time_format: String,
     extension: Option<String>,
     uuid: bool,
-    gzip: bool,
+    compression: Compression,
     bucket: String,
     options: S3Options,
 ) -> Request {
@@ -321,7 +322,13 @@ fn build_request(
         }
     };
 
-    let extension = extension.unwrap_or_else(|| if gzip { "log.gz".into() } else { "log".into() });
+    let extension = extension.unwrap_or_else(|| {
+        match compression {
+            Compression::None => "log",
+            Compression::Gzip => "log.gz",
+        }
+        .into()
+    });
 
     let key = String::from_utf8_lossy(&key[..]).into_owned();
 
@@ -338,7 +345,7 @@ fn build_request(
         body: inner,
         bucket,
         key,
-        content_encoding: if gzip { Some("gzip".to_string()) } else { None },
+        content_encoding: compression.content_encoding().map(|ce| ce.to_string()),
         options,
     }
 }
@@ -478,7 +485,7 @@ mod tests {
             "date".into(),
             Some("ext".into()),
             false,
-            false,
+            Compression::None,
             "bucket".into(),
             S3Options::default(),
         );
@@ -489,7 +496,7 @@ mod tests {
             "date".into(),
             None,
             false,
-            false,
+            Compression::None,
             "bucket".into(),
             S3Options::default(),
         );
@@ -500,7 +507,7 @@ mod tests {
             "date".into(),
             None,
             false,
-            true,
+            Compression::Gzip,
             "bucket".into(),
             S3Options::default(),
         );
@@ -511,7 +518,7 @@ mod tests {
             "date".into(),
             None,
             true,
-            true,
+            Compression::Gzip,
             "bucket".into(),
             S3Options::default(),
         );

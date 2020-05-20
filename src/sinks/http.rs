@@ -210,8 +210,8 @@ impl HttpSink for HttpSinkConfig {
             }
         };
 
-        if self.compression == Compression::Gzip {
-            builder.header("Content-Encoding", "gzip");
+        if let Some(ce) = self.compression.content_encoding() {
+            builder.header("Content-Encoding", ce);
         }
 
         if let Some(headers) = &self.headers {

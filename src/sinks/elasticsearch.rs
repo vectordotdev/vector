@@ -227,8 +227,8 @@ impl HttpSink for ElasticSearchCommon {
         } else {
             builder.header("Content-Type", "application/x-ndjson");
 
-            if self.compression == Compression::Gzip {
-                builder.header("Content-Encoding", "gzip");
+            if let Some(ce) = self.compression.content_encoding() {
+                builder.header("Content-Encoding", ce);
             }
 
             if let Some(headers) = &self.config.headers {

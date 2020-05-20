@@ -118,9 +118,9 @@ impl HttpSink for ClickhouseConfig {
             .uri(uri.clone())
             .header("Content-Type", "application/x-ndjson");
 
-        if self.compression == Compression::Gzip {
-            builder = builder.header("Content-Encoding", "gzip")
-        };
+        if let Some(ce) = self.compression.content_encoding() {
+            builder = builder.header("Content-Encoding", ce);
+        }
 
         let mut request = builder.body(events).unwrap();
 

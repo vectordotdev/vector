@@ -18,6 +18,15 @@ pub enum Compression {
     Gzip,
 }
 
+impl Compression {
+    pub fn content_encoding(&self) -> Option<&'static str> {
+        match self {
+            Self::Gzip => Some("gzip"),
+            Self::None => None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Buffer {
     inner: InnerBuffer,

@@ -178,8 +178,8 @@ impl HttpSink for HecSinkConfig {
 
         builder.header("Content-Type", "application/json");
 
-        if self.is_gzip() {
-            builder.header("Content-Encoding", "gzip");
+        if let Some(ce) = self.compression.content_encoding() {
+            builder.header("Content-Encoding", ce);
         }
 
         builder.header("Authorization", token.clone());
