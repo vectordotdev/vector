@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-19"
+last_modified_on: "2020-05-20"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
@@ -254,7 +254,7 @@ The behavior when the buffer becomes full.
 <Field
   common={true}
   defaultValue={"none"}
-  enumValues={{"none":"No compression","gzip":"[Gzip][urls.gzip] standard DEFLATE compression","lz4":"High speed [LZ4 compression][urls.lz4]","snappy":"High speed [Snappy compression][urls.snappy], developed by Google. Slower than LZ4 but higher compression.","zstd":"[Zstandard compression][urls.zstd], developed at Facebook. Faster than gzip at similar compression ratios."}}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression.","lz4":"High speed [LZ4 compression][urls.lz4].","snappy":"High speed [Snappy compression][urls.snappy], developed by Google. Slower than [LZ4][urls.lz4] but higher compression.","zstd":"[Zstandard compression][urls.zstd], developed at Facebook. Faster than [Gzip][urls.gzip] at similar compression ratios."}}
   examples={["none","gzip","lz4","snappy","zstd"]}
   groups={[]}
   name={"compression"}
@@ -269,7 +269,8 @@ The behavior when the buffer becomes full.
 
 ### compression
 
-Compression codec to use for compressing message sets
+The compression strategy used to compress the encoded event data before
+transmission.
 
 
 

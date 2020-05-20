@@ -3540,14 +3540,15 @@ require('custom_module')
   # * type: string
   bucket = "my-bucket"
 
-  # The compression mechanism to use.
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
   #
   # * optional
   # * default: "none"
   # * type: string
-  # * enum: "gzip" or "none"
-  compression = "gzip"
+  # * enum: "none" or "gzip"
   compression = "none"
+  compression = "gzip"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
@@ -3965,7 +3966,7 @@ require('custom_module')
   #
 
   # The compression strategy used to compress the encoded event data before
-  # outputting.
+  # transmission.
   #
   # * optional
   # * default: "none"
@@ -4669,14 +4670,15 @@ require('custom_module')
   # General
   #
 
-  # The compression mechanism to use.
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
   #
   # * optional
   # * default: "none"
   # * type: string
-  # * enum: "gzip" or "none"
-  compression = "gzip"
+  # * enum: "none" or "gzip"
   compression = "none"
+  compression = "gzip"
 
   # The `doc_type` for your index data. This is only relevant for Elasticsearch
   # <= 6.X. If you are using >= 7.0 you do not need to set this option since
@@ -5061,7 +5063,8 @@ require('custom_module')
   # * type: string
   bucket = "my-bucket"
 
-  # The compression mechanism to use.
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
   #
   # * optional
   # * default: "none"
@@ -6217,7 +6220,7 @@ require('custom_module')
   #
 
   # The compression strategy used to compress the encoded event data before
-  # outputting.
+  # transmission.
   #
   # * optional
   # * default: "none"
@@ -6503,7 +6506,7 @@ require('custom_module')
   #
 
   # The compression strategy used to compress the encoded event data before
-  # outputting.
+  # transmission.
   #
   # * optional
   # * default: "none"
@@ -6870,7 +6873,8 @@ require('custom_module')
   # * type: string
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
-  # Compression codec to use for compressing message sets
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
   #
   # * optional
   # * default: "none"
@@ -7703,7 +7707,7 @@ require('custom_module')
   #
 
   # The compression strategy used to compress the encoded event data before
-  # outputting.
+  # transmission.
   #
   # * optional
   # * default: "none"
@@ -8586,7 +8590,7 @@ require('custom_module')
   #
 
   # The compression strategy used to compress the encoded event data before
-  # outputting.
+  # transmission.
   #
   # * optional
   # * default: "none"

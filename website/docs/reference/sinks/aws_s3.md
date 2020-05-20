@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-19"
+last_modified_on: "2020-05-20"
 delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
@@ -395,8 +395,8 @@ The behavior when the buffer becomes full.
 <Field
   common={true}
   defaultValue={"none"}
-  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
-  examples={["gzip","none"]}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
+  examples={["none","gzip"]}
   groups={[]}
   name={"compression"}
   path={null}
@@ -410,7 +410,8 @@ The behavior when the buffer becomes full.
 
 ### compression
 
-The compression mechanism to use.
+The compression strategy used to compress the encoded event data before
+transmission.
 
 
 
@@ -1411,6 +1412,7 @@ You can learn more about the complete syntax in the
 [urls.aws_s3_sse]: https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingServerSideEncryption.html
 [urls.aws_s3_storage_classes]: https://aws.amazon.com/s3/storage-classes/
 [urls.aws_s3_tags]: https://docs.aws.amazon.com/AmazonS3/latest/user-guide/add-object-tags.html
+[urls.gzip]: https://www.gzip.org/
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.issue_1694]: https://github.com/timberio/vector/issues/1694
 [urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3

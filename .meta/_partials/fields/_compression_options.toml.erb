@@ -1,0 +1,18 @@
+<%- options ||= {} -%>
+<%- enum = {
+    "none" => "No compression.",
+    "gzip" => "[Gzip][urls.gzip] standard DEFLATE compression."
+}.merge(enum || {}) -%>
+
+[<%= namespace %>.compression]
+type = "string"
+common = true
+default = "none"
+description = """\
+The compression strategy used to compress the encoded event data before \
+transmission.\
+"""
+<%= options.to_toml %>
+
+[<%= namespace %>.compression.enum]
+<%= enum.to_toml %>

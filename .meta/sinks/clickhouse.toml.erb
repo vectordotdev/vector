@@ -77,19 +77,12 @@ relevant_when = {strategy = "basic"}
 required = true
 description = "The basic authentication user name."
 
-[sinks.clickhouse.options.compression]
-type = "string"
-category = "Requests"
-common = true
-default = "none"
-description = """\
-The compression strategy used to compress the encoded event data before \
-outputting.\
-"""
-
-[sinks.clickhouse.options.compression.enum]
-none = "The payload will not be compressed."
-gzip = "The payload will be compressed in [Gzip][urls.gzip] format before being sent."
+<%= render("_partials/fields/_compression_options.toml",
+  namespace: "sinks.clickhouse.options",
+  options: {
+    "category" => "Requests"
+  }
+) %>
 
 [sinks.clickhouse.options.host]
 type = "string"

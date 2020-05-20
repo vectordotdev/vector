@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-19"
+last_modified_on: "2020-05-20"
 delivery_guarantee: "at_least_once"
 component_title: "Humio Logs"
 description: "The Vector `humio_logs` sink batches `log` events to Humio via the HEC API."
@@ -291,7 +291,7 @@ The behavior when the buffer becomes full.
 <Field
   common={true}
   defaultValue={"none"}
-  enumValues={{"none":"The payload will not be compressed.","gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
   examples={["none","gzip"]}
   groups={[]}
   name={"compression"}
@@ -307,7 +307,7 @@ The behavior when the buffer becomes full.
 ### compression
 
 The compression strategy used to compress the encoded event data before
-outputting.
+transmission.
 
 
 
