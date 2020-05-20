@@ -53,6 +53,7 @@ description = "The authentication strategy to use."
 
 [sinks.http.options.auth.children.strategy.enum]
 basic = "The [basic authentication strategy][urls.basic_auth]."
+bearer = "The bearer token authentication strategy."
 
 [sinks.http.options.auth.children.password]
 type = "string"
@@ -67,6 +68,13 @@ examples = ["${HTTP_USERNAME}", "username"]
 required = true
 relevant_when = {strategy = "basic"}
 description = "The basic authentication user name."
+
+[sinks.http.options.auth.children.token]
+type = "string"
+examples = ["${API_TOKEN}", "xyz123"]
+required = true
+relevant_when = {strategy = "bearer"}
+description = "The token to use for bearer authentication"
 
 [sinks.http.options.compression]
 type = "string"

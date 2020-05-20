@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-14"
 delivery_guarantee: "at_least_once"
 component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
@@ -73,6 +73,7 @@ The Vector `loki` sink
   # Auth
   auth.password = "${LOKI_PASSWORD}" # required, required when strategy = "basic"
   auth.strategy = "basic" # required
+  auth.token = "${API_TOKEN}" # required, required when strategy = "bearer"
   auth.user = "${LOKI_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
@@ -166,8 +167,8 @@ must be set to your `instanceId`.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
-  examples={["basic"]}
+  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth].","bearer":"The bearer token authentication strategy."}}
+  examples={["basic","bearer"]}
   groups={[]}
   name={"strategy"}
   path={"auth"}
@@ -182,6 +183,29 @@ must be set to your `instanceId`.
 #### strategy
 
 The authentication strategy to use.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${API_TOKEN}","xyz123"]}
+  groups={[]}
+  name={"token"}
+  path={"auth"}
+  relevantWhen={{"strategy":"bearer"}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### token
+
+The token to use for bearer authentication
 
 
 

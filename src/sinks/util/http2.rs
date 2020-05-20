@@ -354,16 +354,22 @@ impl RetryLogic for HttpRetryLogic {
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum Auth {
     Basic { user: String, password: String },
+    Bearer { token: String },
 }
 
 impl Auth {
     pub fn apply<B>(&self, req: &mut Request<B>) {
+        use headers03::HeaderMapExt;
+
         match &self {
             Auth::Basic { user, password } => {
-                use headers03::HeaderMapExt;
                 let auth = headers03::Authorization::basic(&user, &password);
                 req.headers_mut().typed_insert(auth);
             }
+            Auth::Bearer { token } => match headers03::Authorization::bearer(&token) {
+                Ok(auth) => req.headers_mut().typed_insert(auth),
+                Err(error) => error!(message = "invalid bearer token", %token, %error),
+            },
         }
     }
 }
