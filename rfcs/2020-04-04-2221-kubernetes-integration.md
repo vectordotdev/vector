@@ -1042,7 +1042,7 @@ We have a matrix of concerns, we'd like to ensure Vectors works properly with.
     - bare `kubeadm`
     - [OKD](https://www.okd.io/) (deploys OpenShift Origin)
     - [Rancher Kubernetes Engine](https://rancher.com/products/rke/)
-    - [Metal3](http://metal3.io/)
+    - [Metal3](https://metal3.io/)
     - [Project Atomic Kubernetes](https://www.projectatomic.io/docs/kubernetes/)
     - [Canonical Charmed Kubernetes](https://ubuntu.com/kubernetes/install#multi-node)
     - [Kubernetes on DC/OS](https://github.com/mesosphere/dcos-kubernetes-quickstart)
@@ -1713,7 +1713,7 @@ See [motivation](#motivation).
 [kustomize]: https://github.com/kubernetes-sigs/kustomize
 [logdna k8s integration]: https://docs.logdna.com/docs/kubernetes
 [logdna_daemonset]: https://raw.githubusercontent.com/logdna/logdna-agent/master/logdna-agent-ds.yaml
-[man_7_capabilities]: http://man7.org/linux/man-pages/man7/capabilities.7.html
+[man_7_capabilities]: https://man7.org/linux/man-pages/man7/capabilities.7.html
 [metrics-server]: https://github.com/kubernetes-sigs/metrics-server
 [netdata]: https://github.com/netdata/netdata
 [pr#2134]: https://github.com/timberio/vector/pull/2134
