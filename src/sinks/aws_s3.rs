@@ -321,16 +321,8 @@ fn build_request(
         }
     };
 
-    let extension = extension.unwrap_or_else(|| {
-        match compression {
-            Compression::None => "log",
-            Compression::Gzip => "log.gz",
-        }
-        .into()
-    });
-
+    let extension = extension.unwrap_or_else(|| compression.extension().into());
     let key = String::from_utf8_lossy(&key[..]).into_owned();
-
     let key = format!("{}{}.{}", key, filename, extension);
 
     debug!(

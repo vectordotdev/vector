@@ -21,8 +21,15 @@ pub enum Compression {
 impl Compression {
     pub fn content_encoding(&self) -> Option<&'static str> {
         match self {
-            Self::Gzip => Some("gzip"),
             Self::None => None,
+            Self::Gzip => Some("gzip"),
+        }
+    }
+
+    pub fn extension(&self) -> &'static str {
+        match self {
+            Self::None => "log",
+            Self::Gzip => "log.gz",
         }
     }
 }
