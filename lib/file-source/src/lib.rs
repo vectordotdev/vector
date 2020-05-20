@@ -8,7 +8,7 @@ mod file_watcher;
 mod metadata_ext;
 pub mod paths_provider;
 
-pub use self::file_server::{FileServer, Fingerprinter};
+pub use self::file_server::{FileServer, Fingerprinter, Shutdown as FileServerShutdown};
 
 type FileFingerprint = u64;
 type FilePosition = u64;
