@@ -62,6 +62,7 @@ description = "The authentication strategy to use."
 
 [sinks.clickhouse.options.auth.children.strategy.enum]
 basic = "The [basic authentication strategy][urls.basic_auth]."
+bearer = "The bearer token authentication strategy."
 
 [sinks.clickhouse.options.auth.children.password]
 type = "string"
@@ -76,6 +77,13 @@ examples = ["${CLICKHOUSE_USERNAME}", "username"]
 relevant_when = {strategy = "basic"}
 required = true
 description = "The basic authentication user name."
+
+[sinks.clickhouse.options.auth.children.token]
+type = "string"
+examples = ["${API_TOKEN}", "xyz123"]
+required = true
+relevant_when = {strategy = "bearer"}
+description = "The token to use for bearer authentication"
 
 [sinks.clickhouse.options.compression]
 type = "string"

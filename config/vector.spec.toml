@@ -3887,8 +3887,17 @@ require('custom_module')
     #
     # * required
     # * type: string
-    # * must be: "basic"
+    # * enum: "basic" or "bearer"
     strategy = "basic"
+    strategy = "bearer"
+
+    # The token to use for bearer authentication
+    #
+    # * required
+    # * type: string
+    # * required when strategy = "bearer"
+    token = "${API_TOKEN}"
+    token = "xyz123"
 
     # The basic authentication user name.
     #
@@ -6138,8 +6147,17 @@ require('custom_module')
     #
     # * required
     # * type: string
-    # * must be: "basic"
+    # * enum: "basic" or "bearer"
     strategy = "basic"
+    strategy = "bearer"
+
+    # The token to use for bearer authentication
+    #
+    # * required
+    # * type: string
+    # * required when strategy = "bearer"
+    token = "${API_TOKEN}"
+    token = "xyz123"
 
     # The basic authentication user name.
     #
@@ -7311,8 +7329,17 @@ require('custom_module')
     #
     # * required
     # * type: string
-    # * must be: "basic"
+    # * enum: "basic" or "bearer"
     strategy = "basic"
+    strategy = "bearer"
+
+    # The token to use for bearer authentication
+    #
+    # * required
+    # * type: string
+    # * required when strategy = "bearer"
+    token = "${API_TOKEN}"
+    token = "xyz123"
 
     # The basic authentication user name. If using GrafanaLab's hosted Loki then
     # this must be set to your Grafana.com api key.
