@@ -8,6 +8,7 @@ use nix::{
 use std::{
     fs::OpenOptions,
     io::Write,
+    net::SocketAddr,
     path::PathBuf,
     process::Command,
     thread::sleep,
@@ -27,16 +28,23 @@ const STDIO_CONFIG: &'static str = r#"
         encoding = "text"
 "#;
 
-const PROMETHEUS_CONFIG: &'static str = r#"
+const PROMETHEUS_SINK_CONFIG: &'static str = r#"
     data_dir = "${VECTOR_DATA_DIR}"
 
     [sources.in]
-        type = "prometheus"
-        hosts = ["http://${VECTOR_LOCALHOST_TEST_ADDRESS}"]
+        type = "stdin"
+
+    [transforms.log_to_metric]
+        type = "log_to_metric"
+        inputs = ["in"]
+
+        [[transforms.log_to_metric.metrics]]
+          type = "histogram"
+          field = "time"
 
     [sinks.out]
         type = "prometheus"
-        inputs = ["in"]
+        inputs = ["log_to_metric"]
         address = "${VECTOR_TEST_ADDRESS}"
         namespace = "service"
 "#;
@@ -63,8 +71,8 @@ fn create_directory() -> PathBuf {
     path
 }
 
-fn source_vector(source: &str) -> Command {
-    let config = format!(
+fn source_config(source: &str) -> String {
+    format!(
         r#"
 data_dir = "${{VECTOR_DATA_DIR}}"
 
@@ -77,29 +85,34 @@ data_dir = "${{VECTOR_DATA_DIR}}"
     print_amount = 10000
 "#,
         source
-    );
-
-    run_vector(config.as_str())
+    )
 }
 
-fn run_vector(config: &str) -> Command {
-    let address = next_addr();
+fn source_vector(source: &str) -> Command {
+    vector(source_config(source).as_str())
+}
+
+fn vector(config: &str) -> Command {
+    vector_with_address(config, next_addr())
+}
+
+fn vector_with_address(config: &str, address: SocketAddr) -> Command {
     let mut cmd = Command::cargo_bin("vector").unwrap();
     cmd.arg("-c")
         .arg(create_file(config))
         .arg("--quiet")
         .env("VECTOR_DATA_DIR", create_directory())
         .env("VECTOR_TEST_UNIX_PATH", temp_file())
-        .env("VECTOR_TEST_ADDRESS", format!("{}", address))
-        .env(
-            "VECTOR_LOCALHOST_TEST_ADDRESS",
-            format!("localhost:{}", address.port()),
-        );
+        .env("VECTOR_TEST_ADDRESS", format!("{}", address));
 
     cmd
 }
 
-fn test_timely_shutdown(mut cmd: Command) {
+fn test_timely_shutdown(cmd: Command) {
+    test_timely_shutdown_with_sub(cmd, || ());
+}
+
+fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce()) {
     let mut vector = cmd.stdin(std::process::Stdio::piped()).spawn().unwrap();
 
     // Give vector time to start.
@@ -107,6 +120,9 @@ fn test_timely_shutdown(mut cmd: Command) {
 
     // Check if vector is still running
     assert_eq!(None, vector.try_wait().unwrap(), "Vector exited too early.");
+
+    // Run sub while this vector is running.
+    sub();
 
     // Signal shutdown
     kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
@@ -201,7 +217,18 @@ fn timely_shutdown_journald() {
 
 #[test]
 fn timely_shutdown_prometheus() {
-    test_timely_shutdown(run_vector(PROMETHEUS_CONFIG));
+    let address = next_addr();
+    test_timely_shutdown_with_sub(vector_with_address(PROMETHEUS_SINK_CONFIG, address), || {
+        test_timely_shutdown(vector_with_address(
+            source_config(
+                r#"
+        type = "prometheus"
+        hosts = ["http://${VECTOR_TEST_ADDRESS}"]"#,
+            )
+            .as_str(),
+            address,
+        ));
+    });
 }
 
 #[test]

@@ -1,6 +1,7 @@
 use crate::{
     dns::Resolver,
     event::{self, Event, LogEvent, Value},
+    internal_events::{SplunkEventEncodeError, SplunkEventSent},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
@@ -159,9 +160,18 @@ impl HttpSink for HecSinkConfig {
             body["sourcetype"] = json!(sourcetype);
         }
 
-        serde_json::to_vec(&body)
-            .map_err(|e| error!("Error encoding json body: {}", e))
-            .ok()
+        match serde_json::to_vec(&body) {
+            Ok(value) => {
+                emit!(SplunkEventSent {
+                    byte_size: value.len()
+                });
+                Some(value)
+            }
+            Err(e) => {
+                emit!(SplunkEventEncodeError { error: e });
+                None
+            }
+        }
     }
 
     fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
@@ -685,7 +695,7 @@ mod integration_tests {
             .build()
             .unwrap();
 
-        // http://docs.splunk.com/Documentation/Splunk/7.2.1/RESTREF/RESTsearch#search.2Fjobs
+        // https://docs.splunk.com/Documentation/Splunk/7.2.1/RESTREF/RESTsearch#search.2Fjobs
         let search_query = match index {
             Some(index) => format!("search index={}", index),
             None => "search *".into(),

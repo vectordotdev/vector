@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-14"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
@@ -683,7 +683,7 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["topic-1234"]}
+  examples={["topic-1234","logs-{{unit}}-%Y-%m-%d"]}
   groups={[]}
   name={"topic"}
   path={null}
