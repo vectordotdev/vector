@@ -59,11 +59,15 @@ impl<PP> FileServer<PP>
 where
     PP: PathsProvider,
 {
-    pub fn run(
+    pub fn run<C>(
         self,
-        mut chans: impl Sink<(Bytes, String), Error = ()> + Unpin,
+        mut chans: C,
         mut shutdown: impl Future + Unpin,
-    ) {
+    ) -> Result<Shutdown, <C as Sink<(Bytes, String)>>::Error>
+    where
+        C: Sink<(Bytes, String)> + Unpin,
+        <C as Sink<(Bytes, String)>>::Error: std::error::Error,
+    {
         let mut line_buffer = Vec::new();
         let mut fingerprint_buffer = Vec::new();
 
@@ -233,11 +237,14 @@ where
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
             fp_map.retain(|_file_id, watcher| !watcher.dead());
 
-            let mut stream = stream::iter(lines.drain(..).map(Result::<_, ()>::Ok));
+            let mut stream = stream::iter(lines.drain(..).map(Ok));
             let result = block_on(chans.send_all(&mut stream));
-            if result.is_err() {
-                debug!("Output channel closed.");
-                return;
+            match result {
+                Ok(()) => {}
+                Err(error) => {
+                    error!(message = "output channel closed", ?error);
+                    return Err(error);
+                }
             }
 
             // When no lines have been read we kick the backup_cap up by twice,
@@ -265,7 +272,7 @@ where
                 shutdown,
                 delay_for(time::Duration::from_millis(backoff as u64)),
             )) {
-                Either::Left((_, _)) => return,
+                Either::Left((_, _)) => return Ok(Shutdown),
                 Either::Right((_, future)) => shutdown = future,
             }
         }
@@ -298,6 +305,14 @@ where
         };
     }
 }
+
+/// A sentinel type to signal that file server was gracefully shut down.
+///
+/// The purpose of this type is to clarify the semantics of the result values
+/// returned from the [`FileServer::run`] for both the users of the file server,
+/// and the implementors.
+#[derive(Debug)]
+pub struct Shutdown;
 
 pub struct Checkpointer {
     directory: PathBuf,
