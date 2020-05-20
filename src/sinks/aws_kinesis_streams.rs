@@ -1,6 +1,7 @@
 use crate::{
     dns::Resolver,
     event::{self, Event},
+    internal_events::AwsKinesisStreamsEventSent,
     region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -251,6 +252,9 @@ fn encode_event(
 
     let data = Bytes::from(data);
 
+    emit!(AwsKinesisStreamsEventSent {
+        byte_size: data.len()
+    });
     Some(PutRecordsRequestEntry {
         data,
         partition_key,

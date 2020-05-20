@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
+    internal_events::{JsonEventProcessed, JsonFailedParse},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -74,16 +75,16 @@ impl Transform for JsonParser {
         let log = event.as_mut_log();
         let to_parse = log.get(&self.field).map(|s| s.as_bytes());
 
+        emit!(JsonEventProcessed);
+
         let parsed = to_parse
             .and_then(|to_parse| {
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
-                        warn!(
-                            message = "Event failed to parse as JSON",
-                            field = self.field.as_ref(),
-                            %error,
-                            rate_limit_secs = 30
-                        )
+                        emit!(JsonFailedParse {
+                            field: &self.field,
+                            error: error
+                        })
                     })
                     .ok()
             })
