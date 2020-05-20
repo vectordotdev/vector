@@ -185,16 +185,6 @@ services:
         "./target/x86_64-unknown-linux-musl/debug/vector validate --topology --deny-warnings ./config/examples/*.toml",
       ]
 
-  check-blog:
-    build:
-      context: .
-      dockerfile: scripts/ci-docker-images/checker/Dockerfile
-    volumes:
-      - $PWD:$PWD
-    working_dir: $PWD
-    user: $USER
-    command: ./scripts/check-blog-signatures.rb
-
   check-scripts:
     build:
       context: .

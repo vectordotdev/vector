@@ -25,14 +25,13 @@ help:
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-46s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-##@ Default
-
-all: check build-all package-all test-docker test-behavior verify ## Run all tests, checks, and verifications
-
 ##@ Building
 
 build: ## Build the project natively in release mode
-	$(RUN) build
+	cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
+
+build-dev: ## Build the project natively in development mode
+	cargo build --no-default-features --features ${DEFAULT_FEATURES}
 
 build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
@@ -45,12 +44,12 @@ build-armv7-unknown-linux-musleabihf: load-qemu-binfmt ## Build the project in r
 build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build the project in release mode for the aarch64 architecture
 	$(RUN) build-aarch64-unknown-linux-musl
 
-##@ Developing
+##@ Testing
 
-bench: build ## Run benchmarks in /benches
-	$(RUN) bench
+test:
+	cargo test --no-default-features --features ${DEFAULT_FEATURES}
 
-test: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
+test-all: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
 
 test-behavior: build ## Runs behaviorial tests
 	$(RUN) test-behavior
@@ -95,26 +94,23 @@ test-integration-kubernetes: ## Runs Kubernetes integration tests
 test-shutdown: ## Runs shutdown tests
 	$(RUN) test-shutdown
 
-test-unit: ## Runs unit tests, tests which do not require additional services to be present
-	$(RUN) test-unit
+##@ Benching
+
+bench: build ## Run benchmarks in /benches
+	cargo bench --no-default-features --features ${DEFAULT_FEATURES}
 
 ##@ Checking
 
-check: check-all ## Default target, check everything
+check:
+	cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
 
-check-all: check-code check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
-
-check-code: ## Check code
-	$(RUN) check-code
+check-all: check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
 
 check-component-features: ## Check that all component features are setup properly
 	$(RUN) check-component-features
 
-check-fmt: ## Check that all files are formatted properly
-	$(RUN) check-fmt
-
 check-style: ## Check that all files are styled properly
-	$(RUN) check-style
+	./scripts/check-style.sh
 
 check-markdown: ## Check that markdown is styled properly
 	$(RUN) check-markdown
@@ -127,9 +123,6 @@ check-version: ## Check that Vector's version is correct accounting for recent c
 
 check-examples: build ## Check that the config/exmaples files are valid
 	$(RUN) check-examples
-
-check-blog: ## Check that all blog posts are signed and valid
-	$(RUN) check-blog
 
 check-scripts: ## Check that scipts do not have common mistakes
 	$(RUN) check-scripts
@@ -276,10 +269,10 @@ build-ci-docker-images: ## Rebuilds all Docker images used in CI
 	@scripts/build-ci-docker-images.sh
 
 clean: ## Clean everything
-	$(RUN) clean
+	cargo clean
 
-fmt: ## Format code
-	$(RUN) fmt
+fmt: check-style ## Format code
+	cargo fmt
 
 init-target-dir: ## Create target directory owned by the current user
 	$(RUN) init-target-dir
