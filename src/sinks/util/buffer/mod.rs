@@ -40,11 +40,12 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
-    pub fn new(gzip: bool) -> Self {
-        let inner = if gzip {
-            InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::fast()))
-        } else {
-            InnerBuffer::Plain(Vec::new())
+    pub fn new(compression: Compression) -> Self {
+        let inner = match compression {
+            Compression::None => InnerBuffer::Plain(Vec::new()),
+            Compression::Gzip => {
+                InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::fast()))
+            }
         };
         Self {
             inner,
@@ -126,7 +127,7 @@ impl Batch for Buffer {
 
 #[cfg(test)]
 mod test {
-    use super::Buffer;
+    use super::{Buffer, Compression};
     use crate::buffers::Acker;
     use crate::sinks::util::{BatchSettings, BatchSink};
     use crate::test_util::runtime;
@@ -155,7 +156,7 @@ mod test {
         });
         let buffered = BatchSink::with_executor(
             svc,
-            Buffer::new(true),
+            Buffer::new(Compression::Gzip),
             BatchSettings {
                 timeout: Duration::from_secs(0),
                 size: 1000,

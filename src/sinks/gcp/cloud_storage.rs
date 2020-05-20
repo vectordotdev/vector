@@ -4,11 +4,12 @@ use crate::{
     serde::to_string,
     sinks::{
         util::{
+            self,
             encoding::{EncodingConfig, EncodingConfiguration},
             http::{HttpClient, HttpClientFuture},
             retries::{RetryAction, RetryLogic},
-            BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
-            TowerRequestConfig,
+            BatchBytesConfig, Buffer, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+            ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
@@ -225,7 +226,10 @@ impl GcsSink {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
-        let gzip = config.compression == Compression::Gzip;
+        let compression = match config.compression {
+            Compression::None => util::Compression::None,
+            Compression::Gzip => util::Compression::Gzip,
+        };
         let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
 
         let key_prefix = if let Some(kp) = &config.key_prefix {
@@ -241,9 +245,9 @@ impl GcsSink {
             .settings(request, GcsRetryLogic)
             .service(self);
 
-        let buffer = PartitionBuffer::new(Buffer::new(gzip));
+        let buffer = PartitionBuffer::new(Buffer::new(compression));
 
-        let sink = crate::sinks::util::PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+        let sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
             .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 

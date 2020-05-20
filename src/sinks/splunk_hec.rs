@@ -87,7 +87,7 @@ impl SinkConfig for HecSinkConfig {
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            Buffer::new(self.is_gzip()),
+            Buffer::new(self.compression),
             request,
             batch,
             tls_settings,
@@ -185,12 +185,6 @@ impl HttpSink for HecSinkConfig {
         builder.header("Authorization", token.clone());
 
         builder.body(events).unwrap()
-    }
-}
-
-impl HecSinkConfig {
-    fn is_gzip(&self) -> bool {
-        self.compression == Compression::Gzip
     }
 }
 

@@ -60,15 +60,13 @@ pub enum Encoding {
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let gzip = self.compression == Compression::Gzip;
-
         let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            Buffer::new(gzip),
+            Buffer::new(self.compression),
             request,
             batch,
             tls_settings,

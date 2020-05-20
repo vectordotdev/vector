@@ -163,7 +163,6 @@ impl S3Sink {
         let encoding = config.encoding.clone();
 
         let compression = config.compression;
-        let gzip = config.compression == Compression::Gzip;
         let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
         let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
         let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
@@ -199,7 +198,7 @@ impl S3Sink {
             .settings(request, S3RetryLogic)
             .service(s3);
 
-        let buffer = PartitionBuffer::new(Buffer::new(gzip));
+        let buffer = PartitionBuffer::new(Buffer::new(config.compression));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))

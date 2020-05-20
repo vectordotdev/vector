@@ -100,15 +100,14 @@ impl SinkConfig for ElasticSearchConfig {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let healthcheck = healthcheck(cx.resolver(), &common)?;
 
+        let compression = common.compression;
         let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = common.tls_settings.clone();
 
-        let gzip = common.compression == Compression::Gzip;
-
         let sink = BatchedHttpSink::with_retry_logic(
             common,
-            Buffer::new(gzip),
+            Buffer::new(compression),
             ElasticSearchRetryLogic,
             request,
             batch,

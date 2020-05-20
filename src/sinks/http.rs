@@ -106,15 +106,15 @@ impl SinkConfig for HttpSinkConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
 
         let mut config = self.clone();
-
         config.uri = build_uri(config.uri.clone()).into();
-        let gzip = config.compression == Compression::Gzip;
+
+        let compression = config.compression;
         let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let sink = BatchedHttpSink::new(
             config,
-            Buffer::new(gzip),
+            Buffer::new(compression),
             request,
             batch,
             Some(tls.clone()),

@@ -709,7 +709,7 @@ where
 mod tests {
     use super::*;
     use crate::buffers::Acker;
-    use crate::sinks::util::{buffer::partition::Partition, BatchSettings, Buffer};
+    use crate::sinks::util::{buffer::partition::Partition, BatchSettings, Buffer, Compression};
     use crate::test_util::runtime;
     use bytes::Bytes;
     use futures01::{future, Sink};
@@ -944,8 +944,13 @@ mod tests {
 
             future::ok::<_, std::io::Error>(())
         });
-        let buffered =
-            BatchSink::with_executor(svc, Buffer::new(false), SETTINGS, acker, rt.executor());
+        let buffered = BatchSink::with_executor(
+            svc,
+            Buffer::new(Compression::None),
+            SETTINGS,
+            acker,
+            rt.executor(),
+        );
 
         let input = vec![
             vec![0, 1, 2],
