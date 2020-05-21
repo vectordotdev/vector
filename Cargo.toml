@@ -142,6 +142,7 @@ strip-ansi-escapes = { version = "0.1.0"}
 colored = "1.9"
 warp = { package = "warp", version = "0.2", default-features = false, optional = true }
 evmap = { version = "7", features = ["bytes"], optional = true }
+evmap10 = { package = "evmap", version = "10", features = ["bytes"], optional = true }
 logfmt = { version = "0.0.2", optional = true }
 notify = "4.0.14"
 once_cell = "1.3"
@@ -231,7 +232,7 @@ wasm-timings = ["wasm"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
-kubernetes = ["k8s-openapi"]
+kubernetes = ["k8s-openapi", "evmap10"]
 
 # Sources
 sources = [
