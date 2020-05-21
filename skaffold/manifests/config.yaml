@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-config
+data:
+  vector.toml: |
+    [sinks.stdout]
+        type = "console"
+        inputs = ["kubernetes_logs"]
+        target = "stdout"
+        encoding = "json"

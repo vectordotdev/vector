@@ -1,0 +1,10 @@
+# This is a part of out skaffold setup for development.
+# Do not use in production.
+
+namespace: vector
+
+resources:
+  - distribution/kubernetes/vector-global.yaml
+  - skaffold/manifests/namespace.yaml
+  - skaffold/manifests/config.yaml
+  - distribution/kubernetes/vector-namespaced.yaml
