@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 component_title: "AWS EC2 Metadata"
 description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events, allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
@@ -154,7 +154,7 @@ Prepend a namespace to each field's key.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >

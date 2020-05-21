@@ -17,7 +17,7 @@ through_description = "[standard input (STDIN)][urls.stdin]"
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "stdin") %>
 
 [sources.stdin.options.max_length]
-type = "int"
+type = "uint"
 default = 102400
 unit = "bytes"
 description = "The maxiumum bytes size of a message before it is discarded."

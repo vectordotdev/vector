@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "at_least_once"
 component_title: "File"
 description: "The Vector `file` sink streams `log` events to a file."
@@ -224,7 +224,7 @@ Enables/disables the sink healthcheck upon start.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >

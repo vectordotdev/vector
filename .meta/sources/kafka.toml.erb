@@ -65,7 +65,7 @@ option for explanation.\
 """
 
 [sources.kafka.options.session_timeout_ms]
-type = "int"
+type = "uint"
 examples = [5000, 10000]
 default = 10000
 unit = "milliseconds"
@@ -74,7 +74,7 @@ The Kafka session timeout in milliseconds.
 """
 
 [sources.kafka.options.socket_timeout_ms]
-type = "int"
+type = "uint"
 examples = [30000, 60000]
 default = 60000
 unit = "milliseconds"
@@ -83,7 +83,7 @@ Default timeout for network requests.
 """
 
 [sources.kafka.options.fetch_wait_max_ms]
-type = "int"
+type = "uint"
 examples = [50, 100]
 default = 100
 unit = "milliseconds"
