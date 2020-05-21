@@ -26,8 +26,10 @@ pub mod proto {
 
 pub static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 
+pub const PARTIAL_STR: &str = "_partial"; // TODO: clean up the _STR suffix after we get rid of atoms
+
 lazy_static! {
-    pub static ref PARTIAL: Atom = Atom::from("_partial");
+    pub static ref PARTIAL: Atom = Atom::from(PARTIAL_STR);
     static ref LOG_SCHEMA_DEFAULT: LogSchema = LogSchema {
         message_key: Atom::from("message"),
         timestamp_key: Atom::from("timestamp"),

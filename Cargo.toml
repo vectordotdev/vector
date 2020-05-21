@@ -270,7 +270,7 @@ sources-stdin = ["bytesize"]
 sources-syslog = ["sources-socket", "syslog_loose"]
 sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-vector = ["sources-socket"]
-sources-kubernetes-logs = ["kubernetes"]
+sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-json_parser", "transforms-regex_parser"]
 
 # Transforms
 transforms = [

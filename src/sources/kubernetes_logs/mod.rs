@@ -5,4 +5,5 @@
 #![deny(missing_docs)]
 
 mod k8s_paths_provider;
+mod parser;
 mod path_helpers;
