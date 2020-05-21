@@ -8,7 +8,7 @@ groups = <%= groups.to_toml %>
 description = "Configures the sink request behavior."
 
 [<%= namespace %>.request.children.in_flight_limit]
-type = "int"
+type = "uint"
 common = true
 default = <%= in_flight_limit %>
 groups = <%= groups.to_toml %>
@@ -16,7 +16,7 @@ unit = "requests"
 description = "The maximum number of in-flight requests allowed at any given time."
 
 [<%= namespace %>.request.children.rate_limit_duration_secs]
-type = "int"
+type = "uint"
 common = true
 default = <%= rate_limit_duration_secs %>
 groups = <%= groups.to_toml %>
@@ -24,14 +24,14 @@ unit = "seconds"
 description = "The time window, in seconds, used for the `rate_limit_num` option."
 
 [<%= namespace %>.request.children.rate_limit_num]
-type = "int"
+type = "uint"
 common = true
 default = <%= rate_limit_num %>
 groups = <%= groups.to_toml %>
 description = "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 
 [<%= namespace %>.request.children.retry_attempts]
-type = "int"
+type = "uint"
 common = false
 default = <%= retry_attempts %>
 groups = <%= groups.to_toml %>
@@ -41,7 +41,7 @@ for all intents and purposes, represents an infinite number of retries.\
 """
 
 [<%= namespace %>.request.children.retry_initial_backoff_secs]
-type = "int"
+type = "uint"
 common = false
 default = <%= retry_initial_backoff_secs %>
 groups = <%= groups.to_toml %>
@@ -53,7 +53,7 @@ to select future backoffs.\
 """
 
 [<%= namespace %>.request.children.retry_max_duration_secs]
-type = "int"
+type = "uint"
 common = false
 default = <%= retry_max_duration_secs %>
 groups = <%= groups.to_toml %>
@@ -61,7 +61,7 @@ unit = "seconds"
 description = "The maximum amount of time, in seconds, to wait between retries."
 
 [<%= namespace %>.request.children.timeout_secs]
-type = "int"
+type = "uint"
 common = true
 default = <%= timeout_secs %>
 groups = <%= groups.to_toml %>

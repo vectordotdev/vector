@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "at_least_once"
 component_title: "Papertrail"
 description: "The Vector `papertrail` sink streams `log` events to Papertrail via Syslog."
@@ -113,7 +113,7 @@ Configures the sink specific buffer behavior.
   relevantWhen={{"type":"memory"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"events"}
   warnings={[]}
   >
@@ -136,7 +136,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   relevantWhen={{"type":"disk"}}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >

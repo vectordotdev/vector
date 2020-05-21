@@ -31,7 +31,7 @@ default = true
 description = "Include only entries from the current boot."
 
 [sources.journald.options.batch_size]
-type = "int"
+type = "uint"
 default = 16
 description = """\
 The systemd journal is read in batches, and a checkpoint is set at the \

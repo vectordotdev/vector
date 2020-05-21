@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "best_effort"
 component_title: "Vector"
 description: "The Vector `vector` source ingests data through another upstream `vector` sink and outputs `log` and `metric` events."
@@ -114,7 +114,7 @@ include a port.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >

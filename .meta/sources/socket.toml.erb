@@ -71,7 +71,7 @@ be globally set via the \
 """
 
 [sources.socket.options.max_length]
-type = "int"
+type = "uint"
 common = true
 default = 102400
 groups = ["tcp", "udp", "unix"]
@@ -81,7 +81,7 @@ The maximum bytes size of incoming messages before they are discarded.\
 """
 
 [sources.socket.options.shutdown_timeout_secs]
-type = "int"
+type = "uint"
 default = 30
 groups = ["tcp"]
 relevant_when = {mode = "tcp"}

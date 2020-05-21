@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 component_title: "Dedupe events"
 description: "The Vector `dedupe` transform accepts and outputs `log` events, allowing you to prevent duplicate Events from being outputted by using an LRU cache."
 event_types: ["log"]
@@ -100,7 +100,7 @@ Options controlling how we cache recent Events for future duplicate checking.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >

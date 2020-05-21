@@ -22,7 +22,7 @@ examples = [["Line 1", "Line 2"]]
 description = "The list of lines to output."
 
 [sources.generator.options.count]
-type = "int"
+type = "uint"
 required = false
 default = "infinite"
 description = "The number of times to repeat outputting the `lines`."
@@ -30,7 +30,7 @@ description = "The number of times to repeat outputting the `lines`."
 [sources.generator.options.batch_interval]
 type = "float"
 required = false
-examples = [ 1.0 ]
+examples = [1.0]
 description = """\
 The amount of time, in seconds, to pause between each batch of output lines. \
 If not set, there will be no delay.\

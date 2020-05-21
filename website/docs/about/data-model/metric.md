@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 title: Metric Event
 description: A detailed guide on Vector's internal metric data model.
 ---
@@ -221,7 +221,7 @@ The buckets contained within this histogram.
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -244,7 +244,7 @@ The total number of values contained within the histogram.
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={"[int]"}
+  type={"[uint]"}
   unit={null}
   warnings={[]}
   >
@@ -318,7 +318,7 @@ quantiles over a sliding time window.
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -484,7 +484,7 @@ A distribution represents a distribution of sampled values.
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={"[int]"}
+  type={"[uint]"}
   unit={null}
   warnings={[]}
   >

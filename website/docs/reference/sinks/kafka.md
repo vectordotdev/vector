@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-14"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
@@ -167,7 +167,7 @@ Configures the sink specific buffer behavior.
   relevantWhen={{"type":"memory"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"events"}
   warnings={[]}
   >
@@ -190,7 +190,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   relevantWhen={{"type":"disk"}}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -499,7 +499,7 @@ The options and their values. Accepts `string` values.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -522,7 +522,7 @@ Local message timeout.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >

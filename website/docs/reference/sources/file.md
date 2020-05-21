@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
@@ -204,7 +204,7 @@ Configuration for how the file source should identify files.
   relevantWhen={{"strategy":"checksum"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -228,7 +228,7 @@ fingerprint.
   relevantWhen={{"strategy":"checksum"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -279,7 +279,7 @@ The strategy used to uniquely identify files. This is important for
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"milliseconds"}
   warnings={[]}
   >
@@ -328,7 +328,7 @@ option][docs.reference.global-options#host_key].
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -374,7 +374,7 @@ Array of file patterns to include. [Globbing](#globbing) is supported.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -398,7 +398,7 @@ protects against malformed lines or tailing incorrect files.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -514,7 +514,7 @@ Start regex pattern to look for as a beginning of the message.
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"milliseconds"}
   warnings={[]}
   >
