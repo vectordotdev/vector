@@ -228,6 +228,10 @@ leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
 wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm", "anyhow"]
 wasm-timings = ["wasm"]
 
+# Enables kubernetes dependencies and shared code. Kubernetes-related sources,
+# transforms and sinks should depend on this feature.
+kubernetes = []
+
 # Sources
 sources = [
   "sources-docker",
