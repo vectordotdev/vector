@@ -171,6 +171,7 @@
             "bool",
             "float",
             "int",
+            "uint",
             "string",
             "struct",
             "table",

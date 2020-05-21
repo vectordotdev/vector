@@ -70,13 +70,13 @@ required = true
 description = "The Kafka topic name to write events to."
 
 [sinks.kafka.options.socket_timeout_ms]
-type = "int"
+type = "uint"
 examples = [30000, 90000]
 default = 60000
 description = "Default timeout for network requests."
 
 [sinks.kafka.options.message_timeout_ms]
-type = "int"
+type = "uint"
 examples = [150000, 450000]
 default = 300000
 description = "Local message timeout."

@@ -8,7 +8,7 @@ groups = <%= groups.to_toml %>
 description = "Configures the sink specific buffer behavior."
 
 [<%= namespace %>.buffer.children.max_events]
-type = "int"
+type = "uint"
 common = true
 default = 500
 groups = <%= groups.to_toml %>
@@ -19,7 +19,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.\
 """
 
 [<%= namespace %>.buffer.children.max_size]
-type = "int"
+type = "uint"
 common = false
 examples = [104900000]
 groups = <%= groups.to_toml %>

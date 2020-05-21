@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
@@ -129,7 +129,7 @@ Configures the sink batching behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"events"}
   warnings={[]}
   >
@@ -152,7 +152,7 @@ The maximum size of a batch, in events, before it is flushed.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
