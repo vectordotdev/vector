@@ -1,3 +1,4 @@
+pub use super::retries::{RetryAction, RetryLogic};
 use crate::Error;
 use futures::FutureExt;
 use std::{
@@ -9,27 +10,6 @@ use std::{
 };
 use tokio::time::{delay_for, Delay};
 use tower03::{retry::Policy, timeout::error::Elapsed};
-
-pub enum RetryAction {
-    /// Indicate that this request should be retried with a reason
-    Retry(String),
-    /// Indicate that this request should not be retried with a reason
-    DontRetry(String),
-    /// Indicate that this request should not be retried but the request was successful
-    Successful,
-}
-
-pub trait RetryLogic: Clone {
-    type Error: std::error::Error + Send + Sync + 'static;
-    type Response;
-
-    fn is_retriable_error(&self, error: &Self::Error) -> bool;
-
-    fn should_retry_response(&self, _response: &Self::Response) -> RetryAction {
-        // Treat the default as the request is successful
-        RetryAction::Successful
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct FixedRetryPolicy<L> {
@@ -155,32 +135,6 @@ impl<L: RetryLogic> Future for RetryPolicyFuture<L> {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         futures::ready!(self.delay.poll_unpin(cx));
         Poll::Ready(self.policy.clone())
-    }
-}
-
-impl RetryAction {
-    pub fn is_retryable(&self) -> bool {
-        if let RetryAction::Retry(_) = &self {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_not_retryable(&self) -> bool {
-        if let RetryAction::DontRetry(_) = &self {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_successful(&self) -> bool {
-        if let RetryAction::Successful = &self {
-            true
-        } else {
-            false
-        }
     }
 }
 
