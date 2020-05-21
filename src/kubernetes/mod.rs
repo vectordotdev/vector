@@ -21,3 +21,4 @@
 #![warn(missing_docs)]
 
 pub mod client;
+pub mod multi_response_decoder;

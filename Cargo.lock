@@ -1863,6 +1863,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "k8s-openapi"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96affb18356fc998baa692c2185d198095ffdf6e6fff3bc9efb4927952f86851"
+dependencies = [
+ "base64 0.11.0",
+ "bytes 0.5.4",
+ "chrono",
+ "http 0.2.1",
+ "percent-encoding 2.1.0",
+ "serde",
+ "serde-value",
+ "serde_json",
+ "url 2.1.1",
+]
+
+[[package]]
 name = "kernel32-sys"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2796,6 +2813,15 @@ dependencies = [
  "openssl-src",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "ordered-float"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3741934be594d77de1c8461ebcbbe866f585ea616a9753aa78f2bdc69f0e4579"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
@@ -3958,6 +3984,16 @@ checksum = "883eee5198ea51720eab8be52a36cf6c0164ac90eea0ed95b649d5e35382404e"
 dependencies = [
  "serde",
  "serde_derive",
+]
+
+[[package]]
+name = "serde-value"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a65a7291a8a568adcae4c10a677ebcedbc6c9cec91c054dee2ce40b0e3290eb"
+dependencies = [
+ "ordered-float",
+ "serde",
 ]
 
 [[package]]
@@ -5467,6 +5503,7 @@ dependencies = [
  "indexmap",
  "inventory",
  "jemallocator",
+ "k8s-openapi",
  "lazy_static 1.4.0",
  "leveldb",
  "libc",
