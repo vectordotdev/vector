@@ -11,8 +11,8 @@ data:
     data_dir = "/vector-data-dir"
 
     # Ingest logs from Kubernetes.
-    [sources.kubernetes]
-        type = "kubernetes"
+    [sources.kubernetes_logs]
+        type = "kubernetes_logs"
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -28,11 +28,11 @@ spec:
     metadata:
       labels:
         name: vector
+        vector.dev/exclude: "true"
     spec:
       containers:
         - name: vector
           image: timberio/vector:latest-alpine
-          imagePullPolicy: Always
           args:
             - --config
             - /etc/vector/*.toml
