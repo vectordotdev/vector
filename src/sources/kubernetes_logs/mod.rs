@@ -3,3 +3,6 @@
 //! at `/var/log/pods` at the host of the k8s node.
 
 #![deny(missing_docs)]
+
+mod k8s_paths_provider;
+mod path_helpers;
