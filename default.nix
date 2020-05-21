@@ -4,6 +4,7 @@ pkgs.buildEnv {
   name = "vector-env";
   paths = with pkgs; [
       bash
+      git
       binutils
       gcc
       cmake
@@ -12,7 +13,7 @@ pkgs.buildEnv {
       openssl
       protobuf
       rdkafka
-      ruby.devEnv
+      bundler
       yarn
       openssl
       perl

@@ -11,11 +11,11 @@ WORKDIR /vector
 # Prebuild
 RUN nix-env -i -f default.nix
 RUN rustup default $RUST_TOOLCHAIN
-WORKDIR /vector/scripts
-RUN bundle install
+RUN bundle update --gemfile=scripts/Gemfile --bundler
+RUN bundle install --gemfile=scripts/Gemfile
 WORKDIR /vector
 
 VOLUME /vector
 VOLUME /vector/target
 VOLUME /root/.cargo
-CMD nix-shell
+CMD nix-shell --pure
