@@ -862,7 +862,7 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   # The key name added to each event representing the current host. This can also
-  # be globally set via the global `host_key` option.
+  # be globally set via the global 'host_key' option.
   #
   # * optional
   # * default: "host"
