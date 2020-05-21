@@ -42,10 +42,10 @@ impl KafkaTlsConfig {
             client.set("ssl.certificate.location", pathbuf_to_string(&path)?);
         }
         if let Some(ref path) = self.options.key_path {
-            client.set("ssl.keystore.location", pathbuf_to_string(&path)?);
+            client.set("ssl.key.location", pathbuf_to_string(&path)?);
         }
         if let Some(ref pass) = self.options.key_pass {
-            client.set("ssl.keystore.password", pass);
+            client.set("ssl.key.password", pass);
         }
         Ok(())
     }

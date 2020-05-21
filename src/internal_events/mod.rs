@@ -1,25 +1,33 @@
+mod add_fields;
+mod aws_kinesis_streams;
 mod blackhole;
 mod elasticsearch;
 mod file;
+mod json;
 #[cfg(feature = "transforms-lua")]
 mod lua;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
 mod regex;
+mod splunk_hec;
 mod syslog;
 mod tcp;
 mod udp;
 mod unix;
 mod vector;
 
+pub use self::add_fields::*;
+pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
+pub use self::json::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
 pub use self::regex::*;
+pub use self::splunk_hec::*;
 pub use self::syslog::*;
 pub use self::tcp::*;
 pub use self::udp::*;

@@ -308,10 +308,11 @@ pub fn file_source(
         let span = info_span!("file_server");
         spawn_blocking(move || {
             let _enter = span.enter();
-            file_server.run(
-                Compat01As03Sink::new(tx.sink_map_err(drop)),
-                shutdown.compat(),
-            );
+            let result = file_server.run(Compat01As03Sink::new(tx), shutdown.compat());
+            // Panic if we encounter any error originating from the file server.
+            // We're at the `spawn_blocking` call, the panic will be caught and
+            // passed to the `JoinHandle` error, similar to the usual threads.
+            result.unwrap();
         })
         .boxed()
         .compat()

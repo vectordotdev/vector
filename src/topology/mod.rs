@@ -504,7 +504,6 @@ impl RunningTopology {
                     output
                         .unbounded_send(fanout::ControlMessage::Remove(name.to_string()))
                         .unwrap();
-                    // std::thread::sleep(std::time::Duration::from_millis(100));
                 }
             }
         }
@@ -515,22 +514,25 @@ impl RunningTopology {
 
         for (sink_name, sink) in &self.config.sinks {
             if sink.inputs.iter().any(|i| i == name) {
-                output
-                    .unbounded_send(fanout::ControlMessage::Add(
-                        sink_name.clone(),
-                        self.inputs[sink_name].get(),
-                    ))
-                    .unwrap();
+                // Sink may have been removed with the new config so it may not be present.
+                if let Some(input) = self.inputs.get(sink_name) {
+                    output
+                        .unbounded_send(fanout::ControlMessage::Add(sink_name.clone(), input.get()))
+                        .unwrap();
+                }
             }
         }
         for (transform_name, transform) in &self.config.transforms {
             if transform.inputs.iter().any(|i| i == name) {
-                output
-                    .unbounded_send(fanout::ControlMessage::Add(
-                        transform_name.clone(),
-                        self.inputs[transform_name].get(),
-                    ))
-                    .unwrap();
+                // Transform may have been removed with the new config so it may not be present.
+                if let Some(input) = self.inputs.get(transform_name) {
+                    output
+                        .unbounded_send(fanout::ControlMessage::Add(
+                            transform_name.clone(),
+                            input.get(),
+                        ))
+                        .unwrap();
+                }
             }
         }
 
@@ -865,5 +867,100 @@ mod source_finished_tests {
 
         rt.block_on(topology.sources_finished().timeout(Duration::from_secs(2)))
             .unwrap();
+    }
+}
+
+#[cfg(all(
+    test,
+    feature = "sinks-blackhole",
+    feature = "sources-stdin",
+    feature = "transforms-json_parser"
+))]
+mod transient_state_tests {
+    use crate::sinks::blackhole::BlackholeConfig;
+    use crate::sources::stdin::StdinConfig;
+    use crate::test_util::runtime;
+    use crate::topology;
+    use crate::topology::config::Config;
+    use crate::transforms::json_parser::JsonParserConfig;
+
+    #[test]
+    fn remove_sink() {
+        let mut rt = runtime();
+
+        let mut old_config = Config::empty();
+        old_config.add_source("in", StdinConfig::default());
+        old_config.add_transform(
+            "trans",
+            &["in"],
+            JsonParserConfig {
+                drop_field: true,
+                ..JsonParserConfig::default()
+            },
+        );
+        old_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
+        old_config.add_sink("out2", &["trans"], BlackholeConfig { print_amount: 1000 });
+
+        let mut new_config = Config::empty();
+        new_config.add_source("in", StdinConfig::default());
+        new_config.add_transform(
+            "trans",
+            &["in"],
+            JsonParserConfig {
+                drop_field: false,
+                ..JsonParserConfig::default()
+            },
+        );
+        new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
+
+        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+
+        assert!(topology
+            .reload_config_and_respawn(new_config, &mut rt, false)
+            .unwrap());
+    }
+
+    #[test]
+    fn remove_transform() {
+        let mut rt = runtime();
+
+        let mut old_config = Config::empty();
+        old_config.add_source("in", StdinConfig::default());
+        old_config.add_transform(
+            "trans1",
+            &["in"],
+            JsonParserConfig {
+                drop_field: true,
+                ..JsonParserConfig::default()
+            },
+        );
+        old_config.add_transform(
+            "trans2",
+            &["trans1"],
+            JsonParserConfig {
+                drop_field: true,
+                ..JsonParserConfig::default()
+            },
+        );
+        old_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
+        old_config.add_sink("out2", &["trans2"], BlackholeConfig { print_amount: 1000 });
+
+        let mut new_config = Config::empty();
+        new_config.add_source("in", StdinConfig::default());
+        new_config.add_transform(
+            "trans1",
+            &["in"],
+            JsonParserConfig {
+                drop_field: false,
+                ..JsonParserConfig::default()
+            },
+        );
+        new_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
+
+        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+
+        assert!(topology
+            .reload_config_and_respawn(new_config, &mut rt, false)
+            .unwrap());
     }
 }
