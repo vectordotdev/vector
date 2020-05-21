@@ -22,3 +22,4 @@
 
 pub mod client;
 pub mod multi_response_decoder;
+pub mod stream;
