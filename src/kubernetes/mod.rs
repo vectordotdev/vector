@@ -20,6 +20,7 @@
 #![cfg(feature = "kubernetes")]
 #![warn(missing_docs)]
 
+pub mod api_watcher;
 pub mod client;
 pub mod multi_response_decoder;
 pub mod stream;
