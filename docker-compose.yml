@@ -76,21 +76,6 @@ services:
     user: $USER
     command: scripts/build.sh
 
-  bench:
-    build:
-      context: .
-      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
-    environment:
-      CARGO_TERM_COLOR: always
-    volumes:
-      - $PWD:$PWD
-      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
-    working_dir: $PWD
-    user: $USER
-    command: cargo bench --all --no-default-features --features default-cmake --target x86_64-unknown-linux-musl
-
   generate:
     build:
       context: .
@@ -102,22 +87,6 @@ services:
     working_dir: $PWD
     user: $USER
     command: ./scripts/generate.rb
-
-  check-code:
-    build:
-      context: .
-      dockerfile: scripts/ci-docker-images/checker/Dockerfile
-    environment:
-      RUSTFLAGS: "-D warnings"
-      CARGO_TERM_COLOR: always
-    volumes:
-      - $PWD:$PWD
-      - ./target/cargo/registry:/opt/rust/cargo/registry
-      - ./target/cargo/git:/opt/rust/cargo/git
-      - ./target/rustup/tmp:/opt/rust/rustup/tmp
-    working_dir: $PWD
-    user: $USER
-    command: scripts/check-code.sh
 
   check-component-features:
     build:
@@ -134,31 +103,6 @@ services:
     working_dir: $PWD
     user: $USER
     command: ./scripts/check-component-features.sh
-
-  check-fmt:
-    build:
-      context: .
-      dockerfile: scripts/ci-docker-images/checker/Dockerfile
-    environment:
-      CARGO_TERM_COLOR: always
-    volumes:
-      - $PWD:$PWD
-      - ./target/cargo/registry:/opt/rust/cargo/registry
-      - ./target/cargo/git:/opt/rust/cargo/git
-      - ./target/rustup/tmp:/opt/rust/rustup/tmp
-    working_dir: $PWD
-    user: $USER
-    command: scripts/check-fmt.sh
-
-  check-style:
-    build:
-      context: .
-      dockerfile: scripts/ci-docker-images/checker/Dockerfile
-    volumes:
-      - $PWD:$PWD
-    working_dir: $PWD
-    user: $USER
-    command: ./scripts/check-style.sh
 
   check-markdown:
     build:
@@ -476,37 +420,12 @@ services:
     user: $USER
     entrypoint: ./scripts/target-graph.sh
 
-  clean:
-    image: ubuntu:18.04
-    volumes:
-      - $PWD:$PWD
-    working_dir: $PWD
-    user: $USER
-    command: ["sh", "-ec", "rm -rf target"]
-
   load-qemu-binfmt:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/loader-qemu-binfmt/Dockerfile
     privileged: true
     command: dpkg-reconfigure qemu-user-binfmt
-
-  test-unit:
-    build:
-      context: .
-      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
-    environment:
-      CARGO_TERM_COLOR: always
-      TEST_LOG: debug
-      RUST_BACKTRACE: full
-    volumes:
-      - $PWD:$PWD
-      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
-    working_dir: $PWD
-    user: $USER
-    command: cargo test --no-default-features --features default-cmake --target x86_64-unknown-linux-musl
 
   test-integration:
     build:

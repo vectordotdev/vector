@@ -2,18 +2,24 @@
 .DEFAULT_GOAL := help
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/run.sh)
 
+export ARG_1 ?= "default_arg"
+
 export USE_CONTAINER ?= docker
+export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
 
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
+	export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
     export DEFAULT_FEATURES = default-msvc
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
+	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
     export DEFAULT_FEATURES = default
 endif
 
 help:
+	@echo "Test: ${ARG_1}"
 	@echo "                                      __   __  __"
 	@echo "                                      \ \ / / / /"
 	@echo "                                       \ V / / / "
@@ -23,7 +29,32 @@ help:
 	@echo ""
 	@echo "---------------------------------------------------------------------------------------"
 	@echo ""
-	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-46s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+	# @awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-46s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+##@ Environment
+
+environment: environment-prepare ## Enter a full Vector dev shell in Docker, binding this folder to the container. (Nix users just `nix-shell` instead)
+	# We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
+	# Instead, we build into the volumes then copy them out.
+	docker run \
+		--rm \
+		--tty \
+		--interactive \
+		--mount type=bind,source=${PWD},target=/vector \
+		--mount type=volume,source=vector-target,target=/vector/target \
+		--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
+		vector/environment
+
+environment-prepare: ## Prepare the Vector dev env.
+	docker build \
+		--tag vector/environment \
+		--build-arg RUST_TOOLCHAIN=${RUST_TOOLCHAIN} \
+		--file scripts/environment/Dockerfile \
+		.
+
+environment-clean: ## Clean the Vector dev env.
+	docker volume rm -f vector-target vector-cargo-cache
+	docker rmi vector/environment
 
 ##@ Building
 
