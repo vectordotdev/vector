@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -151,7 +151,7 @@ initially to bootstrap itself.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"milliseconds"}
   warnings={[]}
   >
@@ -271,7 +271,7 @@ The options and their values. Accepts `string` values.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"milliseconds"}
   warnings={[]}
   >
@@ -294,7 +294,7 @@ The Kafka session timeout in milliseconds.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"milliseconds"}
   warnings={[]}
   >

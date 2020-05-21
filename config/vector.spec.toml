@@ -187,7 +187,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 1000
-  # * type: int
+  # * type: uint
   # * unit: milliseconds
   glob_minimum_cooldown = 1000
 
@@ -195,7 +195,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * no default
-  # * type: int
+  # * type: uint
   # * unit: seconds
   ignore_older = 86400
 
@@ -210,7 +210,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 102400
-  # * type: int
+  # * type: uint
   # * unit: bytes
   max_line_bytes = 102400
 
@@ -261,7 +261,7 @@ dns_servers = ["0.0.0.0:53"]
     #
     # * optional
     # * default: 256
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * relevant when strategy = "checksum"
     fingerprint_bytes = 256
@@ -271,7 +271,7 @@ dns_servers = ["0.0.0.0:53"]
     #
     # * optional
     # * default: 0
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * relevant when strategy = "checksum"
     ignored_header_bytes = 0
@@ -295,7 +295,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 2048
-  # * type: int
+  # * type: uint
   # * unit: bytes
   max_read_bytes = 2048
 
@@ -346,7 +346,7 @@ dns_servers = ["0.0.0.0:53"]
     # the buffered message is guaraneed to be flushed, even if incomplete.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: milliseconds
     timeout_ms = 1000
     timeout_ms = 600000
@@ -365,7 +365,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: "infinite"
-  # * type: int
+  # * type: uint
   count = "infinite"
 
   # The list of lines to output.
@@ -497,7 +497,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 16
-  # * type: int
+  # * type: uint
   batch_size = 16
 
   # Include only entries from the current boot.
@@ -582,7 +582,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 100
-  # * type: int
+  # * type: uint
   # * unit: milliseconds
   fetch_wait_max_ms = 50
   fetch_wait_max_ms = 100
@@ -606,7 +606,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 10000
-  # * type: int
+  # * type: uint
   # * unit: milliseconds
   session_timeout_ms = 5000
   session_timeout_ms = 10000
@@ -615,7 +615,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 60000
-  # * type: int
+  # * type: uint
   # * unit: milliseconds
   socket_timeout_ms = 30000
   socket_timeout_ms = 60000
@@ -786,7 +786,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 15
-  # * type: int
+  # * type: uint
   # * unit: seconds
   scrape_interval_secs = 15
 
@@ -819,7 +819,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 102400
-  # * type: int
+  # * type: uint
   # * unit: bytes
   max_length = 102400
 
@@ -843,7 +843,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 30
-  # * type: int
+  # * type: uint
   # * unit: seconds
   # * relevant when mode = "tcp"
   shutdown_timeout_secs = 30
@@ -1059,7 +1059,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 102400
-  # * type: int
+  # * type: uint
   # * unit: bytes
   max_length = 102400
 
@@ -1091,7 +1091,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 102400
-  # * type: int
+  # * type: uint
   # * unit: bytes
   max_length = 102400
 
@@ -1209,7 +1209,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 30
-  # * type: int
+  # * type: uint
   # * unit: seconds
   shutdown_timeout_secs = 30
 
@@ -1436,7 +1436,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * optional
   # * default: 10
-  # * type: int
+  # * type: uint
   refresh_interval_secs = 10
 
   # The component type. This is a required field that tells Vector which
@@ -1550,7 +1550,7 @@ dns_servers = ["0.0.0.0:53"]
     #
     # * optional
     # * default: 5000
-    # * type: int
+    # * type: uint
     num_events = 5000
 
   #
@@ -2128,7 +2128,7 @@ require('custom_module')
     # Defines the interval at which the timer handler would be executed.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: seconds
     interval_seconds = 1
     interval_seconds = 10
@@ -2389,7 +2389,7 @@ require('custom_module')
   # will be dropped.
   #
   # * required
-  # * type: int
+  # * type: uint
   rate = 10
 
   # The component type. This is a required field that tells Vector which
@@ -2585,7 +2585,7 @@ require('custom_module')
   #
   # * optional
   # * default: 5120000
-  # * type: int
+  # * type: uint
   # * unit: bytes
   # * relevant when mode = "probabilistic"
   cache_size_per_tag = 5120000
@@ -2627,7 +2627,7 @@ require('custom_module')
   #
   # * optional
   # * default: 500
-  # * type: int
+  # * type: uint
   value_limit = 500
 
 # Accepts and outputs `log` events, allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
@@ -2792,7 +2792,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1000
-    # * type: int
+    # * type: uint
     # * unit: events
     max_events = 1000
 
@@ -2800,7 +2800,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -2813,7 +2813,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -2821,7 +2821,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -2889,7 +2889,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -2897,7 +2897,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -2906,7 +2906,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     rate_limit_num = 5
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -2914,7 +2914,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -2923,7 +2923,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -2931,7 +2931,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -2942,7 +2942,7 @@ require('custom_module')
     #
     # * optional
     # * default: 30
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 30
 
@@ -3013,7 +3013,7 @@ require('custom_module')
     #
     # * optional
     # * default: 20
-    # * type: int
+    # * type: uint
     # * unit: events
     max_events = 20
 
@@ -3021,7 +3021,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -3092,7 +3092,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     max_events = 500
 
@@ -3100,7 +3100,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -3113,7 +3113,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -3121,7 +3121,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -3189,7 +3189,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -3197,7 +3197,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -3206,7 +3206,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     rate_limit_num = 5
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -3214,7 +3214,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -3223,7 +3223,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -3231,7 +3231,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -3242,7 +3242,7 @@ require('custom_module')
     #
     # * optional
     # * default: 30
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 30
 
@@ -3312,7 +3312,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     max_events = 500
 
@@ -3320,7 +3320,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -3333,7 +3333,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -3341,7 +3341,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -3409,7 +3409,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -3417,7 +3417,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -3426,7 +3426,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     rate_limit_num = 5
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -3434,7 +3434,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -3443,7 +3443,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -3451,7 +3451,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -3462,7 +3462,7 @@ require('custom_module')
     #
     # * optional
     # * default: 30
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 30
 
@@ -3598,7 +3598,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10490000
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 10490000
 
@@ -3606,7 +3606,7 @@ require('custom_module')
     #
     # * optional
     # * default: 300
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 300
 
@@ -3619,7 +3619,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -3627,7 +3627,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -3735,7 +3735,7 @@ require('custom_module')
     #
     # * optional
     # * default: 50
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 50
 
@@ -3743,7 +3743,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -3752,7 +3752,7 @@ require('custom_module')
     #
     # * optional
     # * default: 250
-    # * type: int
+    # * type: uint
     rate_limit_num = 250
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -3760,7 +3760,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -3769,7 +3769,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -3777,7 +3777,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -3788,7 +3788,7 @@ require('custom_module')
     #
     # * optional
     # * default: 30
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 30
 
@@ -3859,7 +3859,7 @@ require('custom_module')
   # activity.
   #
   # * required
-  # * type: int
+  # * type: uint
   print_amount = 1000
 
   # The component type. This is a required field that tells Vector which
@@ -3918,7 +3918,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1049000
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 1049000
 
@@ -3926,7 +3926,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -3939,7 +3939,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -3947,7 +3947,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -4066,7 +4066,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -4074,7 +4074,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -4083,7 +4083,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     rate_limit_num = 5
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -4091,7 +4091,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -4100,7 +4100,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -4108,7 +4108,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -4119,7 +4119,7 @@ require('custom_module')
     #
     # * optional
     # * default: 30
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 30
 
@@ -4298,7 +4298,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -4306,7 +4306,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -4489,7 +4489,7 @@ require('custom_module')
     #
     # * optional
     # * default: 20
-    # * type: int
+    # * type: uint
     # * unit: events
     max_events = 20
 
@@ -4497,7 +4497,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -4510,7 +4510,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -4518,7 +4518,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -4527,7 +4527,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     rate_limit_num = 5
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -4535,7 +4535,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -4544,7 +4544,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -4552,7 +4552,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -4563,7 +4563,7 @@ require('custom_module')
     #
     # * optional
     # * default: 60
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 60
 
@@ -4623,7 +4623,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10490000
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 10490000
 
@@ -4631,7 +4631,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -4644,7 +4644,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -4652,7 +4652,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -4807,7 +4807,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -4815,7 +4815,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -4824,7 +4824,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     rate_limit_num = 5
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -4832,7 +4832,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -4841,7 +4841,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -4849,7 +4849,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -4860,7 +4860,7 @@ require('custom_module')
     #
     # * optional
     # * default: 60
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 60
 
@@ -4977,7 +4977,7 @@ require('custom_module')
   #
   # * optional
   # * default: "30"
-  # * type: int
+  # * type: uint
   idle_timeout_secs = "30"
 
   # A list of upstream source or transform IDs. See configuration for more info.
@@ -5050,7 +5050,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10485760
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 10485760
 
@@ -5058,7 +5058,7 @@ require('custom_module')
     #
     # * optional
     # * default: 300
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 300
 
@@ -5126,7 +5126,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -5134,7 +5134,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -5242,7 +5242,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -5250,7 +5250,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -5259,7 +5259,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1000
-    # * type: int
+    # * type: uint
     rate_limit_num = 1000
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -5267,7 +5267,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -5276,7 +5276,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -5284,7 +5284,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -5295,7 +5295,7 @@ require('custom_module')
     #
     # * optional
     # * default: 60
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 60
 
@@ -5429,7 +5429,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10485760
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 10485760
 
@@ -5437,7 +5437,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -5450,7 +5450,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -5458,7 +5458,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -5518,7 +5518,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -5526,7 +5526,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -5535,7 +5535,7 @@ require('custom_module')
     #
     # * optional
     # * default: 100
-    # * type: int
+    # * type: uint
     rate_limit_num = 100
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -5543,7 +5543,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -5552,7 +5552,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -5560,7 +5560,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -5571,7 +5571,7 @@ require('custom_module')
     #
     # * optional
     # * default: 60
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 60
 
@@ -5644,7 +5644,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5242880
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 5242880
 
@@ -5652,7 +5652,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -5754,7 +5754,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -5762,7 +5762,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -5822,7 +5822,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -5830,7 +5830,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -5839,7 +5839,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1000
-    # * type: int
+    # * type: uint
     rate_limit_num = 1000
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -5847,7 +5847,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -5856,7 +5856,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -5864,7 +5864,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -5875,7 +5875,7 @@ require('custom_module')
     #
     # * optional
     # * default: 60
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 60
 
@@ -6015,7 +6015,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5242880
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 5242880
 
@@ -6023,7 +6023,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -6036,7 +6036,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -6044,7 +6044,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -6076,7 +6076,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -6084,7 +6084,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -6093,7 +6093,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     rate_limit_num = 5
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -6101,7 +6101,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -6110,7 +6110,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -6118,7 +6118,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -6129,7 +6129,7 @@ require('custom_module')
     #
     # * optional
     # * default: 60
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 60
 
@@ -6181,7 +6181,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1049000
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 1049000
 
@@ -6189,7 +6189,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -6202,7 +6202,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -6210,7 +6210,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -6341,7 +6341,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 10
 
@@ -6349,7 +6349,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -6358,7 +6358,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1000
-    # * type: int
+    # * type: uint
     rate_limit_num = 1000
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -6366,7 +6366,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -6375,7 +6375,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -6383,7 +6383,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -6394,7 +6394,7 @@ require('custom_module')
     #
     # * optional
     # * default: 30
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 30
 
@@ -6467,7 +6467,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1049000
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 1049000
 
@@ -6475,7 +6475,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -6488,7 +6488,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -6496,7 +6496,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -6605,7 +6605,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 10
 
@@ -6613,7 +6613,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -6622,7 +6622,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     rate_limit_num = 10
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -6630,7 +6630,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -6639,7 +6639,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -6647,7 +6647,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -6658,7 +6658,7 @@ require('custom_module')
     #
     # * optional
     # * default: 60
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 60
 
@@ -6673,7 +6673,7 @@ require('custom_module')
     #
     # * optional
     # * default: 20
-    # * type: int
+    # * type: uint
     # * unit: events
     max_events = 20
 
@@ -6681,7 +6681,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -6806,7 +6806,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -6814,7 +6814,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -6823,7 +6823,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     rate_limit_num = 5
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -6831,7 +6831,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -6840,7 +6840,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -6848,7 +6848,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -6859,7 +6859,7 @@ require('custom_module')
     #
     # * optional
     # * default: 60
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 60
 
@@ -6916,7 +6916,7 @@ require('custom_module')
   #
   # * optional
   # * default: 300000
-  # * type: int
+  # * type: uint
   message_timeout_ms = 150000
   message_timeout_ms = 450000
 
@@ -6924,7 +6924,7 @@ require('custom_module')
   #
   # * optional
   # * default: 60000
-  # * type: int
+  # * type: uint
   socket_timeout_ms = 30000
   socket_timeout_ms = 90000
 
@@ -6952,7 +6952,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -6960,7 +6960,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -7169,7 +7169,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10490000
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 10490000
 
@@ -7177,7 +7177,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -7190,7 +7190,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -7198,7 +7198,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -7258,7 +7258,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -7266,7 +7266,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -7275,7 +7275,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     rate_limit_num = 5
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -7283,7 +7283,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -7292,7 +7292,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -7300,7 +7300,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -7311,7 +7311,7 @@ require('custom_module')
     #
     # * optional
     # * default: 60
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 60
 
@@ -7365,7 +7365,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10490000
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 10490000
 
@@ -7373,7 +7373,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -7386,7 +7386,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -7394,7 +7394,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -7537,7 +7537,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -7545,7 +7545,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -7554,7 +7554,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     rate_limit_num = 5
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -7562,7 +7562,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -7571,7 +7571,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -7579,7 +7579,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -7590,7 +7590,7 @@ require('custom_module')
     #
     # * optional
     # * default: 60
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 60
 
@@ -7663,7 +7663,7 @@ require('custom_module')
     #
     # * optional
     # * default: 524000
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 524000
 
@@ -7671,7 +7671,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -7684,7 +7684,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -7692,7 +7692,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -7811,7 +7811,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -7819,7 +7819,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -7828,7 +7828,7 @@ require('custom_module')
     #
     # * optional
     # * default: 100
-    # * type: int
+    # * type: uint
     rate_limit_num = 100
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -7836,7 +7836,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -7845,7 +7845,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -7853,7 +7853,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -7864,7 +7864,7 @@ require('custom_module')
     #
     # * optional
     # * default: 30
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 30
 
@@ -7879,7 +7879,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -7887,7 +7887,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -7998,7 +7998,7 @@ require('custom_module')
   #
   # * optional
   # * default: 60
-  # * type: int
+  # * type: uint
   # * unit: seconds
   flush_period_secs = 60
 
@@ -8131,7 +8131,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10490000
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 10490000
 
@@ -8139,7 +8139,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -8152,7 +8152,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -8160,7 +8160,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -8271,7 +8271,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -8279,7 +8279,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -8288,7 +8288,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     rate_limit_num = 5
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -8296,7 +8296,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -8305,7 +8305,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -8313,7 +8313,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -8324,7 +8324,7 @@ require('custom_module')
     #
     # * optional
     # * default: 60
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 60
 
@@ -8388,7 +8388,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -8396,7 +8396,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -8532,7 +8532,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1049000
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 1049000
 
@@ -8540,7 +8540,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -8553,7 +8553,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -8561,7 +8561,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -8706,7 +8706,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 10
 
@@ -8714,7 +8714,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -8723,7 +8723,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     rate_limit_num = 10
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -8731,7 +8731,7 @@ require('custom_module')
     #
     # * optional
     # * default: 18446744073709551615
-    # * type: int
+    # * type: uint
     retry_attempts = 18446744073709551615
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -8740,7 +8740,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -8748,7 +8748,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -8759,7 +8759,7 @@ require('custom_module')
     #
     # * optional
     # * default: 60
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 60
 
@@ -8902,7 +8902,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -8910,7 +8910,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
