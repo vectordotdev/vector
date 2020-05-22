@@ -1,9 +1,11 @@
-{ nixpkgs ? import <nixpkgs> {} }:
+scope@{ pkgs ? import <nixpkgs> {} }:
 
-with nixpkgs;
+let env = (import ./default.nix scope); in
 
-mkShell {
-  PROTOC="${protobuf}/bin/protoc";
-  PROTOC_INCLUDE="${protobuf}/include";
+pkgs.mkShell {
+  PROTOC="${pkgs.protobuf}/bin/protoc";
+  PROTOC_INCLUDE="${pkgs.protobuf}/include";
+  LOCALE_ARCHIVE="${pkgs.glibcLocales}/lib/locale/locale-archive";
+  LC_ALL="en_US.UTF-8";
   buildInputs = [ (import ./default.nix { inherit pkgs; }) ];
 }

@@ -28,19 +28,35 @@ help:
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-46s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-##@ Environment
-
-environment: environment-prepare ## Enter a full Vector dev shell in Docker, binding this folder to the container. (Nix users just `nix-shell` instead)
+##@ Environment (Nix users just `nix-shell` instead)
+define ENVIRONMENT_EXEC
 	# We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
-	# Instead, we build into the volumes then copy them out.
 	docker run \
-		--rm \
-		--tty \
-		--interactive \
-		--mount type=bind,source=${PWD},target=/vector \
-		--mount type=volume,source=vector-target,target=/vector/target \
-		--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
-		vector/environment
+			--rm \
+			--tty \
+			--interactive \
+			--mount type=bind,source=${PWD},target=/vector \
+			--mount type=volume,source=vector-target,target=/vector/target \
+			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
+			--publish 3000:3000 \
+			vector/environment
+endef
+
+environment: environment-prepare ## Enter a full Vector dev shell in Docker, binding this folder to the container.
+	${ENVIRONMENT_EXEC}
+
+environment-check: environment-prepare ## Run `make check` inside the environment.
+	${ENVIRONMENT_EXEC} make check
+
+environment-test: environment-prepare ## Run `make check` inside the environment.
+	${ENVIRONMENT_EXEC} make test
+
+environment-build: environment-prepare ## Run `make build` inside the environment. Then copies the output.
+	${ENVIRONMENT_EXEC} make test
+	TEMP_ID=$(docker run -d -v vector-target:/vector-target busybox true)
+	docker cp TEMP_ID:/vector-target target
+	docker rm -f ${TEMP_ID}
+
 
 environment-prepare: ## Prepare the Vector dev env.
 	docker build \
