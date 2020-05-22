@@ -216,19 +216,12 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
         .as_mut_log()
         .insert(event::log_schema().source_type_key(), "syslog");
 
-    match (parsed.hostname, default_host) {
-        (Some(parsed_hostname), Some(default_host)) => {
-            event.as_mut_log().insert(host_key, parsed_hostname.clone());
-            event.as_mut_log().insert("source_ip", default_host);
-        },
-        (Some(parsed_hostname), None) => {
-            event.as_mut_log().insert(host_key, parsed_hostname.clone());
-        },
-        (None, Some(default_host)) => {
-            event.as_mut_log().insert(host_key, default_host.clone());
-            event.as_mut_log().insert("source_ip", default_host);
-        },
-        (None, None) => (),
+    if let Some(default_host) = default_host.clone() {
+        event.as_mut_log().insert("source_ip", default_host);
+    }
+
+    if let Some(parsed_host) = parsed.hostname.map(Bytes::from).or(default_host) {
+        event.as_mut_log().insert(host_key, parsed_host);
     }
 
     let timestamp = parsed
