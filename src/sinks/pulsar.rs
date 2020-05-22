@@ -205,7 +205,7 @@ mod tests {
     fn pulsar_event_text() {
         let msg = "hello_world".to_owned();
         let evt = Event::from(msg.clone());
-        let event = encode_event(evt, &EncodingConfig::from(Encoding::Json)).unwrap();
+        let event = encode_event(evt, &EncodingConfig::from(Encoding::Text)).unwrap();
 
         assert_eq!(&event[..], msg.as_bytes());
     }
