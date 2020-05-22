@@ -196,7 +196,7 @@ mod tests {
         let msg = "hello_world".to_owned();
         let mut evt = Event::from(msg.clone());
         evt.as_mut_log().insert("key", "value");
-        let result = encode_event(evt, Encoding::Json).unwrap();
+        let result = encode_event(evt, &EncodingConfig::from(Encoding::Json)).unwrap();
         let map: HashMap<String, String> = serde_json::from_slice(&result[..]).unwrap();
         assert_eq!(msg, map[&event::log_schema().message_key().to_string()]);
     }
@@ -205,7 +205,7 @@ mod tests {
     fn pulsar_event_text() {
         let msg = "hello_world".to_owned();
         let evt = Event::from(msg.clone());
-        let event = encode_event(evt, Encoding::Text).unwrap();
+        let event = encode_event(evt, &EncodingConfig::from(Encoding::Json)).unwrap();
 
         assert_eq!(&event[..], msg.as_bytes());
     }
