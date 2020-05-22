@@ -160,14 +160,14 @@ impl Sink for PulsarSink {
 
 fn encode_event(item: Event, encoding: &EncodingConfig<Encoding>) -> crate::Result<Vec<u8>> {
     let log = item.into_log();
-    let data = match enc.codec() {
+
+    Ok(match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log)?,
         Encoding::Text => log
             .get(&event::log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
-    };
-    Ok(data)
+    })
 }
 
 fn healthcheck(config: PulsarSinkConfig, pulsar: Pulsar) -> super::Healthcheck {
