@@ -6,4 +6,7 @@
 
 mod k8s_paths_provider;
 mod parser;
+mod partial_events_merger;
 mod path_helpers;
+
+const FILE_KEY: &str = "file";
