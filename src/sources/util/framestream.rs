@@ -340,3 +340,168 @@ tokio01::net::{UdpFramed, UdpSocket}
 
 
 //TODO: TCP
+
+
+#[cfg(test)]
+mod test {
+    use futures01::{sync::mpsc, Future, IntoFuture, Sink, Stream};
+    #[cfg(unix)]
+    use std::path::PathBuf;
+    use tokio01::{
+        self,
+        codec::{Framed, length_delimited},
+    };
+    use tokio_uds::UnixStream;
+    use bytes::{Bytes, BytesMut};
+    use super::{build_framestream_unix_source, ControlField, ControlHeader};
+    use crate::{
+        event::{self, Event},
+        shutdown::ShutdownSignal,
+        runtime,
+    };
+    use crate::test_util::{collect_n, collect_n_stream};
+
+    fn build_event_bytes(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+        let mut event = Event::from(frame);
+        event
+            .as_mut_log()
+            .insert(event::log_schema().source_type_key(), "framestream");
+        if let Some(host) = received_from {
+            event.as_mut_log().insert(host_key, host);
+        }
+        Some(event)
+    }
+
+    fn init_framstream_unix(content_type: String, sender: mpsc::Sender<event::Event>) -> (PathBuf, runtime::Runtime) {
+        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+
+        let server = build_framestream_unix_source(
+            in_path.clone(),
+            bytesize::kib(100u64) as usize,
+            "test_framestream".to_string(),
+            content_type,
+            ShutdownSignal::noop(),
+            sender,
+            build_event_bytes,
+        );
+
+        let mut rt = runtime::Runtime::new().unwrap();
+        rt.spawn(server);
+
+        // Wait for server to accept traffic
+        while let Err(_) = std::os::unix::net::UnixStream::connect(&in_path) {}
+
+        (in_path, rt)
+    }
+
+    fn make_unix_stream(path: PathBuf) -> Framed<UnixStream, length_delimited::LengthDelimitedCodec> {
+        let socket = UnixStream::connect(&path)
+            .map_err(|e| panic!("{:}", e))
+            .wait()
+            .unwrap();
+        Framed::new(socket, length_delimited::Builder::new().new_codec())
+    }
+
+    fn send_data_frames<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>>(sock_sink: S, frames: Vec<Bytes>) -> S {
+        let stream = futures01::stream::iter_ok::<_, std::io::Error>(frames.into_iter());
+        //send and send_all consume the sink
+        sock_sink.send_all(stream).into_future().wait().unwrap().0
+    }
+
+    fn send_control_frame<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>>(sock_sink: S, frame: Bytes) -> S {
+        send_data_frames(sock_sink, vec![Bytes::new(), frame]) //send empty frame to say we are control frame
+    }
+
+    fn create_ready_frame(content_types: Vec<Bytes>) -> Bytes {
+        let mut ready_msg = Bytes::new();
+        ready_msg.extend(&ControlHeader::Ready.to_u32().to_be_bytes());
+        for content_type in content_types {
+            ready_msg.extend(&ControlField::ContentType.to_u32().to_be_bytes());
+            ready_msg.extend(&(content_type.len() as u32).to_be_bytes());
+            ready_msg.extend(content_type.clone());
+        }
+        ready_msg
+    }
+
+    fn assert_accept_frame(frame: &mut BytesMut, expected_content_type: Bytes) {
+        //frame should start with 4 bytes saying ACCEPT
+
+        assert_eq!(
+            &frame[..4],
+            &ControlHeader::Accept.to_u32().to_be_bytes(),
+        );
+        frame.advance(4);
+        //next should be content type field
+        assert_eq!(
+            &frame[..4],
+            &ControlField::ContentType.to_u32().to_be_bytes(),
+        );
+        frame.advance(4);
+        //next should be length of content_type
+        assert_eq!(
+            &frame[..4],
+            &(expected_content_type.len() as u32).to_be_bytes(),
+        );
+        frame.advance(4);
+        //rest should be content type
+        assert_eq!(&frame[..], &expected_content_type[..]);
+    }
+    
+
+    #[test]
+    fn normal_framestream() {
+        let (tx, rx) = mpsc::channel(2);
+        let (path, mut rt) = init_framstream_unix(
+            "test_content".to_string(),
+            tx,
+        );
+        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).split();
+
+        //1 - send READY frame (with content_type)
+        let content_type = Bytes::from(&b"test_content"[..]);
+        let ready_msg = create_ready_frame(vec![content_type.clone()]);
+        sock_sink = send_control_frame(sock_sink, ready_msg);
+        
+        //2 - wait for ACCEPT frame
+        let (mut frame_vec, tmp_stream) = rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
+        sock_stream = tmp_stream;
+        //take second element, because first will be empty (signifying control frame)
+        assert_accept_frame(&mut frame_vec[1], content_type);
+
+        //3 - send START frame
+        sock_sink = send_control_frame(sock_sink, Bytes::from(&ControlHeader::Start.to_u32().to_be_bytes()[..]));
+
+        //4 - send data
+        sock_sink = send_data_frames(sock_sink, vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])]);
+        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
+
+        //5 - send STOP frame
+        let _ = send_control_frame(sock_sink, Bytes::from(&ControlHeader::Stop.to_u32().to_be_bytes()[..]));
+
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "hello".into(),
+        );
+        assert_eq!(
+            events[1].as_log()[&event::log_schema().message_key()],
+            "world".into(),
+        );
+
+        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+    }
+
+    #[test]
+    fn multiple_content_types() {
+        //TODO: more framestream tests
+    }
+
+    #[test]
+    fn wrong_content_type() {
+        //TODO: more framestream tests
+    }
+
+    #[test]
+    fn data_too_soon() {
+        //TODO: more framestream tests
+    }
+}
