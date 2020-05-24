@@ -475,6 +475,8 @@ fn open_config(path: &Path) -> Option<File> {
 }
 
 fn validate(opts: &Validate) -> exitcode::ExitCode {
+    use futures::compat::Future01CompatExt;
+
     // Print constants,functions
     let error_intro = "   x";
     let warning_intro = "   ~";
@@ -483,8 +485,8 @@ fn validate(opts: &Validate) -> exitcode::ExitCode {
             println!("  {} {}", intro, error);
         }
     };
-    let print_success = |message| println!("√ {}", message);
-    let print_title = |title| println!("- {}", title);
+    let print_success = |message: &str| println!("√ {}", message);
+    let print_title = |title| println!("- {}", title); // TODO: Maybe add ------ beneth it
     let print_warnings = |warnings| {
         let intro = if opts.deny_warnings {
             error_intro
@@ -494,6 +496,7 @@ fn validate(opts: &Validate) -> exitcode::ExitCode {
         print_sub(intro, warnings);
     };
     let print_errors = |errors| print_sub(error_intro, errors);
+    let print_error = |error| println!("{} {}", error_intro, error);
 
     // Prepare paths
     let paths = if let Some(paths) = prepare_config_paths(opts.paths.clone()) {
@@ -563,12 +566,12 @@ fn validate(opts: &Validate) -> exitcode::ExitCode {
     // Validate configuration of components
 
     event::LOG_SCHEMA
-        .set(config.global.log_schema.clone())
+        .set(full_config.global.log_schema.clone())
         .expect("Couldn't set schema");
 
     let mut rt = runtime::Runtime::with_thread_count(1).expect("Unable to create async runtime");
     let diff = topology::ConfigDiff::initial(&full_config);
-    let pieces = match topology::builder::build_pieces(&full_config, &diff, rt.executor()) {
+    let mut pieces = match topology::builder::build_pieces(&full_config, &diff, rt.executor()) {
         Ok((pieces, warnings)) => {
             if warnings.is_empty() {
                 pieces
@@ -622,11 +625,39 @@ fn validate(opts: &Validate) -> exitcode::ExitCode {
 
     // Validate healthchecks
     if !opts.no_healthchecks {
-        let result = topology::start_validated(config, diff, pieces, &mut rt, opts.require_healthy);
-        let (topology, mut graceful_crash) = result.unwrap_or_else(|| {
-            std::process::exit(exitcode::CONFIG);
-        });
+        let healthchecks = topology::take_healthchecks(&diff, &mut pieces);
+        if !healthchecks.is_empty() {
+            print_title("Health checks");
+            // We are running health checks in serial so it's easier for the users
+            // to parse which errors/warnings/etc. belong to which healthcheck.
+            let mut success = true;
+            for (name, healthcheck) in healthchecks {
+                let mut failed = |error| {
+                    success = false;
+                    print_error(error);
+                };
+                let handle = rt.spawn_handle(healthcheck.compat());
+                match rt.block_on_std(handle) {
+                    Ok(Ok(())) => print_success(name.as_str()),
+                    Ok(Err(())) => failed(name),
+                    Err(error) if error.is_cancelled() => {
+                        failed(format!("for {} was cancelled", name))
+                    }
+                    Err(_) => failed(format!("for {} has panicked", name)),
+                }
+            }
+            if !success {
+                return exitcode::CONFIG;
+            }
+        }
     }
+
+    if topology::start_validated(full_config, diff, pieces, &mut rt, false).is_none() {
+        print_error("Topology failed to start".to_owned());
+        return exitcode::CONFIG;
+    }
+
+    println!("Validated");
 
     exitcode::OK
 }
