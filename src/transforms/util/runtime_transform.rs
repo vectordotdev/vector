@@ -113,7 +113,6 @@ where
                 .map(move |msg| -> Vec<Event> {
                     let mut acc = Vec::new(); // TODO: create a stream adaptor to avoid buffering all events
                     if is_shutdown {
-                        info!("return acc: {}", is_shutdown);
                         return acc;
                     }
                     match msg {
