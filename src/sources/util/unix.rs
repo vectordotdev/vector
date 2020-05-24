@@ -1,6 +1,6 @@
 use crate::{
-    emit, event::Event, internal_events::UnixSocketError, shutdown::ShutdownSignal,
-    sources::Source, stream::StreamExt,
+    async_read::AsyncAllowReadExt, emit, event::Event, internal_events::UnixSocketError,
+    shutdown::ShutdownSignal, sources::Source, stream::StreamExt,
 };
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
@@ -62,15 +62,17 @@ pub fn build_unix_source(
                 let build_event = build_event.clone();
                 let received_from: Option<Bytes> =
                     path.map(|p| p.to_string_lossy().into_owned().into());
-                let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
-                    .take_until(shutdown.clone())
-                    .filter_map(move |line| build_event(&host_key, received_from.clone(), &line))
-                    .map_err(move |error| {
-                        emit!(UnixSocketError {
-                            error,
-                            path: &listen_path,
-                        });
+                let lines_in = FramedRead::new(
+                    socket.allow_read_until(shutdown.clone()),
+                    LinesCodec::new_with_max_length(max_length),
+                )
+                .filter_map(move |line| build_event(&host_key, received_from.clone(), &line))
+                .map_err(move |error| {
+                    emit!(UnixSocketError {
+                        error,
+                        path: &listen_path,
                     });
+                });
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
                 tokio01::spawn(handler.instrument(span))

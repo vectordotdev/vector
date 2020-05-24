@@ -18,6 +18,7 @@ pub mod expiring_hash_map;
 pub mod generate;
 #[macro_use]
 pub mod internal_events;
+pub mod async_read;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod list;

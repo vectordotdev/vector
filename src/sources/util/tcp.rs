@@ -2,23 +2,21 @@ use crate::{
     internal_events::TcpConnectionError,
     shutdown::ShutdownSignal,
     stream::StreamExt,
-    tls::{MaybeTlsListener, MaybeTlsSettings},
+    tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     Event,
 };
 use bytes::Bytes;
-use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{future, stream, sync::mpsc, Async, Future, Sink, Stream};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{
     fmt, io,
-    net::SocketAddr,
+    net::{Shutdown, SocketAddr},
     time::{Duration, Instant},
 };
-use stream_cancel::Tripwire;
 use tokio01::{
     codec::{Decoder, FramedRead},
-    net::TcpListener,
-    prelude::AsyncRead,
+    net::{TcpListener, TcpStream},
     reactor::Handle,
     timer,
 };
@@ -97,9 +95,8 @@ pub trait TcpSource: Clone + Send + 'static {
                 )
             );
 
-            let (trigger, tripwire) = Tripwire::new();
-            let tripwire = tripwire.select2(shutdown.clone());
-            let tripwire = tripwire
+            let tripwire = shutdown
+                .clone()
                 .and_then(move |_| {
                     timer::Delay::new(Instant::now() + Duration::from_secs(shutdown_timeout_secs))
                         .map_err(|err| panic!("Timer error: {:?}", err))
@@ -108,7 +105,7 @@ pub trait TcpSource: Clone + Send + 'static {
 
             let future = listener
                 .incoming()
-                .take_until(shutdown)
+                .take_until(shutdown.clone())
                 .map_err(|error| {
                     error!(
                         message = "failed to accept socket",
@@ -136,11 +133,18 @@ pub trait TcpSource: Clone + Send + 'static {
                     span.in_scope(|| {
                         let peer_addr = socket.peer_addr();
                         debug!(message = "accepted a new connection", %peer_addr);
-                        handle_stream(span.clone(), socket, source, tripwire, host, out.clone())
+                        handle_stream(
+                            span.clone(),
+                            shutdown.clone(),
+                            socket,
+                            source,
+                            tripwire,
+                            host,
+                            out.clone(),
+                        )
                     });
                     Ok(())
-                })
-                .inspect(|_| trigger.cancel());
+                });
             future::Either::A(future)
         });
 
@@ -150,24 +154,55 @@ pub trait TcpSource: Clone + Send + 'static {
 
 fn handle_stream(
     span: Span,
-    socket: impl AsyncRead + Send + 'static,
+    shutdown: ShutdownSignal,
+    socket: MaybeTlsIncomingStream<TcpStream>,
     source: impl TcpSource,
     tripwire: impl Future<Item = (), Error = ()> + Send + 'static,
     host: Bytes,
     out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
 ) {
-    let handler = FramedRead::new(socket, source.decoder())
-        .take_until(tripwire)
-        .filter_map(move |frame| {
-            let host = host.clone();
-            source.build_event(frame, host)
-        })
-        .map_err(|error| {
-            emit!(TcpConnectionError { error });
-        })
-        .forward(out)
-        .map(|_| debug!("connection closed."))
-        .map_err(|_| warn!("Error received while processing TCP source"));
+    let mut shutdown = Some(shutdown);
+    let mut token = None;
+    let mut reader = FramedRead::new(socket, source.decoder());
+    let handler = stream::poll_fn(move || {
+        // Gracefull shutdown procedure
+        if let Some(future) = shutdown.as_mut() {
+            match future.poll() {
+                Ok(Async::Ready(tk)) => {
+                    debug!("Start gracefull shutdown");
+                    // Close our write part of TCP socket to signal the other side
+                    // that it should stop writing and close the channel.
+                    if let Some(socket) = reader.get_ref().get_ref() {
+                        if let Err(error)=socket.shutdown(Shutdown::Write){
+                            warn!(message = "Failed in signalling to the other side to close the TCP channel.",%error);
+                        }
+                    } else {
+                        // Connection hasn't yet been established so we are done here.
+                        debug!("Closing connection that hasn't yet been fully established.");
+                        return Ok(Async::Ready(None));
+                    }
+                    token = Some(tk);
+                    shutdown = None;
+                }
+                Err(()) => shutdown = None,
+                Ok(Async::NotReady) => (),
+            }
+        }
+
+        // Actual work
+        reader.poll()
+    })
+    .take_until(tripwire)
+    .filter_map(move |frame| {
+        let host = host.clone();
+        source.build_event(frame, host)
+    })
+    .map_err(|error| {
+        emit!(TcpConnectionError { error });
+    })
+    .forward(out)
+    .map(|_| debug!("connection closed."))
+    .map_err(|_| warn!("Error received while processing TCP source"));
     tokio01::spawn(handler.instrument(span));
 }
 

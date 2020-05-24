@@ -2,6 +2,7 @@
 
 use futures01::{Future, Sink};
 use prost::Message;
+use std::sync::atomic::Ordering;
 use tempfile::tempdir;
 use tracing::trace;
 use vector::event;
@@ -67,12 +68,9 @@ fn test_buffering() {
         .send_all(input_events_stream);
     let _ = rt.block_on(send).unwrap();
 
-    // A race caused by `rt.block_on(send).unwrap()` is handled here. For some
-    // reason, at times less events than were sent actually arrive to the
-    // `source`.
-    // We mitigate that by waiting on the event counter provided by our source
-    // mock.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    // There was a race caused by a channel in the mock source, and this
+    // check is here to ensure it's really gone.
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     // Give the topology some time to process the received data and simulate
     // a crash.
@@ -109,12 +107,9 @@ fn test_buffering() {
 
     let output_events = test_util::receive_events(out_rx);
 
-    // A race caused by `rt.block_on(send).unwrap()` is handled here. For some
-    // reason, at times less events than were sent actually arrive to the
-    // `source`.
-    // We mitigate that by waiting on the event counter provided by our source
-    // mock.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    // There was a race caused by a channel in the mock source, and this
+    // check is here to ensure it's really gone.
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     terminate_gracefully(rt, topology);
 
@@ -170,12 +165,9 @@ fn test_max_size() {
         .send_all(input_events_stream);
     let _ = rt.block_on(send).unwrap();
 
-    // A race caused by `rt.block_on(send).unwrap()` is handled here. For some
-    // reason, at times less events than were sent actually arrive to the
-    // `source`.
-    // We mitigate that by waiting on the event counter provided by our source
-    // mock.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    // There was a race caused by a channel in the mock source, and this
+    // check is here to ensure it's really gone.
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     // Give the topology some time to process the received data and simulate
     // a crash.
@@ -311,12 +303,9 @@ fn test_reclaim_disk_space() {
         .send_all(input_events_stream);
     let _ = rt.block_on(send).unwrap();
 
-    // A race caused by `rt.block_on(send).unwrap()` is handled here. For some
-    // reason, at times less events than were sent actually arrive to the
-    // `source`.
-    // We mitigate that by waiting on the event counter provided by our source
-    // mock.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    // There was a race caused by a channel in the mock source, and this
+    // check is here to ensure it's really gone.
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     // Give the topology some time to process the received data and simulate
     // a crash.
@@ -355,12 +344,9 @@ fn test_reclaim_disk_space() {
 
     let output_events = test_util::receive_events(out_rx);
 
-    // A race caused by `rt.block_on(send).unwrap()` is handled here. For some
-    // reason, at times less events than were sent actually arrive to the
-    // `source`.
-    // We mitigate that by waiting on the event counter provided by our source
-    // mock.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    // There was a race caused by a channel in the mock source, and this
+    // check is here to ensure it's really gone.
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     terminate_gracefully(rt, topology);
 

@@ -198,8 +198,20 @@ impl Sink for TcpSink {
                         Ok(AsyncSink::NotReady(line))
                     }
                     Ok(0) => {
-                        emit!(TcpConnectionShutdown {});
-                        self.state = TcpSinkState::Disconnected;
+                        // Maybe this is only a sign to close the channel,
+                        // in which case we should try to flush our buffers
+                        // before disconnecting.
+                        match connection.poll_complete() {
+                            // Flush done so we can safely disconnect, or
+                            // error in which case we have really been
+                            // disconnected.
+                            Ok(Async::Ready(())) | Err(_) => {
+                                emit!(TcpConnectionShutdown {});
+                                self.state = TcpSinkState::Disconnected;
+                            }
+                            Ok(Async::NotReady) => (),
+                        }
+
                         Ok(AsyncSink::NotReady(line))
                     }
                     _ => {
