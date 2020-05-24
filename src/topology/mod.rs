@@ -83,7 +83,7 @@ pub fn start_validated(
 }
 
 pub fn validate(config: &Config, diff: &ConfigDiff, exec: runtime::TaskExecutor) -> Option<Pieces> {
-    match builder::build_pieces(config, diff, exec) {
+    match builder::check_build(config, diff, exec) {
         Err(errors) => {
             for error in errors {
                 error!("Configuration error: {}", error);
@@ -102,9 +102,11 @@ pub fn validate(config: &Config, diff: &ConfigDiff, exec: runtime::TaskExecutor)
 pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(String, Task)> {
     (&diff.sinks.to_change | &diff.sinks.to_add)
         .into_iter()
-        .map(|name| {
-            let task = pieces.healthchecks.remove(&name).unwrap();
-            (name, task)
+        .filter_map(|name| {
+            pieces
+                .healthchecks
+                .remove(&name)
+                .map(move |task| (name, task))
         })
         .collect()
 }

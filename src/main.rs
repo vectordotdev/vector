@@ -88,11 +88,11 @@ enum SubCommand {
 #[structopt(rename_all = "kebab-case")]
 struct Validate {
     /// Disables topology check
-    #[structopt(short, long)]
+    #[structopt(long)]
     no_topology: bool,
 
     /// Disables healthcheck check
-    #[structopt(short, long)]
+    #[structopt(long)]
     no_healthchecks: bool,
 
     /// Fail validation on warnings
@@ -160,8 +160,13 @@ fn main() {
     let opts = root_opts.root;
     let sub_command = root_opts.sub_command;
 
-    let level = match opts.quiet {
-        0 => match opts.verbose {
+    let (quiet_level, verbose_level) = match sub_command {
+        Some(SubCommand::Validate(_)) if opts.verbose == 0 => (opts.quiet + 1, opts.verbose),
+        Some(SubCommand::Validate(_)) => (opts.quiet, opts.verbose - 1),
+        _ => (opts.quiet, opts.verbose),
+    };
+    let level = match quiet_level {
+        0 => match verbose_level {
             0 => "info",
             1 => "debug",
             2..=255 => "trace",
@@ -207,7 +212,7 @@ fn main() {
 
     sub_command.map(|s| {
         std::process::exit(match s {
-            SubCommand::Validate(v) => validate(&v),
+            SubCommand::Validate(v) => validate(&v, color),
             SubCommand::List(l) => list::cmd(&l),
             SubCommand::Test(t) => unit_test::cmd(&t),
             SubCommand::Generate(g) => generate::cmd(&g),
@@ -456,55 +461,100 @@ fn open_config(path: &Path) -> Option<File> {
     }
 }
 
-fn validate(opts: &Validate) -> exitcode::ExitCode {
+fn validate(opts: &Validate, color: bool) -> exitcode::ExitCode {
+    use colored::*;
     use futures::compat::Future01CompatExt;
 
     // Print constants,functions
-    let error_intro = "   x";
-    let warning_intro = "   ~";
-    let print_sub = |intro, errors| {
-        for error in errors {
-            println!("  {} {}", intro, error);
+    let max_line_width = std::cell::Cell::new(0);
+    let print_space = std::cell::Cell::new(false);
+    let print = |print: String| {
+        max_line_width.set(
+            print
+                .lines()
+                .map(|line| {
+                    String::from_utf8_lossy(&strip_ansi_escapes::strip(line).unwrap())
+                        .chars()
+                        .count()
+                })
+                .max()
+                .unwrap_or(0)
+                .max(max_line_width.get()),
+        );
+        print_space.set(true);
+        print!("{}", print)
+    };
+    let space = || {
+        if print_space.get() {
+            print_space.set(false);
+            println!();
         }
     };
-    let print_success = |message: &str| println!("√ {}", message);
-    let print_title = |title| println!("- {}", title); // TODO: Maybe add ------ beneth it
+    let print_sub = |intro, errors| {
+        for error in errors {
+            print(format!("{} {}\n", intro, error));
+        }
+        space();
+    };
+
+    let print_title = |title: &str| {
+        space();
+        print(format!("{}\n{:-<width$}\n", title, "", width = title.len()))
+    };
+
+    let error_intro = if color {
+        format!("{}", "x".red())
+    } else {
+        "x".to_owned()
+    };
+    let warning_intro = if color {
+        format!("{}", "~".yellow())
+    } else {
+        "~".to_owned()
+    };
+    let success_intro = if color {
+        format!("{}", "√".green())
+    } else {
+        "√".to_owned()
+    };
+    let print_errors = |errors| print_sub(&error_intro, errors);
+    let print_error = |error| print(format!("{} {}\n", error_intro, error));
+    let print_warning = |warning| print(format!("{} {}\n", warning_intro, warning));
     let print_warnings = |warnings| {
         let intro = if opts.deny_warnings {
-            error_intro
+            &error_intro
         } else {
-            warning_intro
+            &warning_intro
         };
         print_sub(intro, warnings);
     };
-    let print_errors = |errors| print_sub(error_intro, errors);
-    let print_error = |error| println!("{} {}", error_intro, error);
+    let print_success = |message: &str| print(format!("{} {}\n", success_intro, message));
 
     // Prepare paths
     let paths = if let Some(paths) = prepare_config_paths(opts.paths.clone()) {
         paths
     } else {
-        println!("x No config file paths");
+        print_error("No config file paths".to_owned());
         return exitcode::CONFIG;
     };
+
+    let mut validated = true;
 
     // Validate configuration files
     let mut success = true;
     let mut full_config = vector::topology::Config::empty();
     for config_path in paths {
-        let mut failed = || {
-            success = false;
-            println!("# Config: {:?}", &config_path);
-        };
-
         let file = match File::open(&config_path) {
             Ok(file) => file,
             Err(error) => {
-                failed();
+                success = false;
                 if let std::io::ErrorKind::NotFound = error.kind() {
-                    println!("{} File not found", error_intro);
+                    print_error(format!("File {:?} not found", config_path));
                 } else {
-                    println!("{} Error opening file: {:?}", error_intro, error);
+                    print_error(format!(
+                        "Failed opening file {:?} with error {:?}",
+                        config_path, error
+                    ));
                 }
                 continue;
             }
@@ -515,38 +565,42 @@ fn validate(opts: &Validate) -> exitcode::ExitCode {
             path = ?config_path
         );
 
-        let mut sub_failed = |title, errors| {
-            failed();
-            print_title(title);
+        let mut sub_failed = |title: String, errors| {
+            success = false;
+            print_title(title.as_str());
             print_errors(errors);
         };
 
         let mut config = match vector::topology::Config::load(file) {
             Ok(config) => config,
             Err(errors) => {
-                sub_failed("Failed to parse file", errors);
+                sub_failed(format!("Failed to parse {:?}", config_path), errors);
                 continue;
             }
         };
 
         if let Err(errors) = config.expand_macros() {
-            sub_failed("Failed to expand macros", errors);
+            sub_failed(
+                format!("Failed to expand macros in {:?}", config_path),
+                errors,
+            );
             continue;
         }
 
         if let Err(errors) = full_config.append(config) {
-            sub_failed("Failed in merging config", errors);
+            sub_failed(format!("Failed to merge config {:?}", config_path), errors);
             continue;
         }
 
-        debug!(
-            message = "Validation successful",
-            path = ?config_path
-        );
+        print_success(format!("Loaded {:?}", &config_path).as_str());
+    }
+    validated &= success;
+
+    if !success {
+        return exitcode::CONFIG;
     }
 
     // Validate configuration of components
-
     event::LOG_SCHEMA
         .set(full_config.global.log_schema.clone())
         .expect("Couldn't set schema");
@@ -554,29 +608,52 @@ fn validate(opts: &Validate) -> exitcode::ExitCode {
     let mut rt = runtime::Runtime::with_thread_count(1).expect("Unable to create async runtime");
     let diff = topology::ConfigDiff::initial(&full_config);
     let mut pieces = match topology::builder::build_pieces(&full_config, &diff, rt.executor()) {
-        Ok((pieces, warnings)) => {
-            if warnings.is_empty() {
-                pieces
-            } else {
-                print_title("Component warnings");
-                print_warnings(warnings);
-                if opts.deny_warnings {
-                    return exitcode::CONFIG;
-                }
-                pieces
-            }
-        }
+        Ok(pieces) => pieces,
         Err(errors) => {
             print_title("Component errors");
             print_errors(errors);
             return exitcode::CONFIG;
         }
     };
+    print_success("Configuration options");
 
-    if success {
-        print_success("Configuration options are valid");
-    } else {
-        return exitcode::CONFIG;
+    // Validate healthchecks
+    let healthchecks = topology::take_healthchecks(&diff, &mut pieces);
+    if !opts.no_healthchecks && !healthchecks.is_empty() {
+        print_title("Health checks");
+        // We are running health checks in serial so it's easier for the users
+        // to parse which errors/warnings/etc. belong to which healthcheck.
+        let mut success = true;
+        for (name, healthcheck) in healthchecks {
+            let mut failed = |error| {
+                success = false;
+                print_error(error);
+            };
+
+            let handle = rt.spawn_handle(healthcheck.compat());
+            match rt.block_on_std(handle) {
+                Ok(Ok(())) => {
+                    if full_config
+                        .sinks
+                        .get(&name)
+                        .expect("Sink not present")
+                        .healthcheck
+                    {
+                        print_success(format!("`{}`", name.as_str()).as_str());
+                    } else {
+                        print_warning(format!("Health check disabled for `{}`", name));
+                    }
+                }
+                Ok(Err(())) => failed(format!("Health check for `{}` failed", name.as_str())),
+                Err(error) if error.is_cancelled() => failed(format!(
+                    "Health check for `{}` was cancelled",
+                    name.as_str()
+                )),
+                Err(_) => failed(format!("Health check for `{}` panicked", name.as_str())),
+            }
+        }
+        validated &= success;
+        space();
     }
 
     // Validate topology
@@ -599,49 +676,26 @@ fn validate(opts: &Validate) -> exitcode::ExitCode {
         };
 
         if success {
-            print_success("Configuration topology is valid");
-        } else {
-            return exitcode::CONFIG;
-        }
-    }
-
-    // Validate healthchecks
-    if !opts.no_healthchecks {
-        let healthchecks = topology::take_healthchecks(&diff, &mut pieces);
-        if !healthchecks.is_empty() {
-            print_title("Health checks");
-            // We are running health checks in serial so it's easier for the users
-            // to parse which errors/warnings/etc. belong to which healthcheck.
-            let mut success = true;
-            for (name, healthcheck) in healthchecks {
-                let mut failed = |error| {
-                    success = false;
-                    print_error(error);
-                };
-                let handle = rt.spawn_handle(healthcheck.compat());
-                match rt.block_on_std(handle) {
-                    Ok(Ok(())) => print_success(name.as_str()),
-                    Ok(Err(())) => failed(name),
-                    Err(error) if error.is_cancelled() => {
-                        failed(format!("for {} was cancelled", name))
-                    }
-                    Err(_) => failed(format!("for {} has panicked", name)),
-                }
-            }
-            if !success {
-                return exitcode::CONFIG;
+            if topology::start_validated(full_config, diff, pieces, &mut rt, false).is_some() {
+                print_success("Configuration topology");
+            } else {
+                print_error("Topology failed to start".to_owned());
             }
         }
+        validated &= success;
     }
 
-    if topology::start_validated(full_config, diff, pieces, &mut rt, false).is_none() {
-        print_error("Topology failed to start".to_owned());
-        return exitcode::CONFIG;
+    if validated {
+        println!(
+            "{:-^width$}\n{:>width$}",
+            "",
+            "Validated".green(),
+            width = max_line_width.get()
+        );
+        exitcode::OK
+    } else {
+        exitcode::CONFIG
     }
-
-    println!("Validated");
-
-    exitcode::OK
 }
 
 #[allow(unused)]
