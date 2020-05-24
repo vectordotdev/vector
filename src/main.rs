@@ -36,10 +36,6 @@ struct RootOpts {
     #[structopt(short, long)]
     require_healthy: bool,
 
-    /// Exit on startup after config verification and optional healthchecks are run
-    #[structopt(short, long)]
-    dry_run: bool,
-
     /// Number of threads to use for processing (default is number of available cores)
     #[structopt(short, long)]
     threads: Option<usize>,
@@ -270,29 +266,15 @@ fn main() {
         arch = built_info::CFG_TARGET_ARCH
     );
 
-    if opts.dry_run {
-        info!("Dry run enabled, exiting after config validation.");
-    }
-
     let diff = topology::ConfigDiff::initial(&config);
     let pieces = topology::validate(&config, &diff, rt.executor()).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 
-    if opts.dry_run && !opts.require_healthy {
-        info!("Config validated, exiting.");
-        std::process::exit(exitcode::OK);
-    }
-
     let result = topology::start_validated(config, diff, pieces, &mut rt, opts.require_healthy);
     let (topology, mut graceful_crash) = result.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
-
-    if opts.dry_run {
-        info!("Healthchecks passed, exiting.");
-        std::process::exit(exitcode::OK);
-    }
 
     #[cfg(unix)]
     {
