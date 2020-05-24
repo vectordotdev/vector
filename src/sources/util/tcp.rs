@@ -145,7 +145,6 @@ pub trait TcpSource: Clone + Send + 'static {
                     });
                     Ok(())
                 });
-            // .inspect(|_| trigger.cancel());
             future::Either::A(future)
         });
 
