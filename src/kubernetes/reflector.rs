@@ -67,7 +67,10 @@ where
     <W as Watcher>::StreamError: Unpin,
 {
     /// Run the watch loop and drive the state updates via `state_writer`.
-    pub async fn run(&mut self) -> Result<Infallible, Error<W>> {
+    pub async fn run(
+        &mut self,
+    ) -> Result<Infallible, Error<<W as Watcher>::InvocationError, <W as Watcher>::StreamError>>
+    {
         // We're taking over the `self.state_writer`, clear it.
         self.state_writer.purge();
         // Propagate the purge and ensure we initialize readers for the first
@@ -213,22 +216,23 @@ where
 
 /// Errors that can occur while watching.
 #[derive(Debug, Snafu)]
-pub enum Error<W>
+pub enum Error<I, S>
 where
-    W: Watcher,
+    I: std::error::Error + 'static,
+    S: std::error::Error + 'static,
 {
     /// Returned when the watch invocation (HTTP request) failed.
     #[snafu(display("watch invocation failed"))]
     Invocation {
         /// The underlying invocation error.
-        source: <W as Watcher>::InvocationError,
+        source: I,
     },
 
     /// Returned when the stream failed with an error.
     #[snafu(display("streaming error"))]
     Streaming {
         /// The underlying stream error.
-        source: <W as Watcher>::StreamError,
+        source: S,
     },
 }
 
