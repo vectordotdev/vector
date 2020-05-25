@@ -3,6 +3,7 @@
 use super::{
     client::Client,
     stream as k8s_stream,
+    watch_request_builder::WatchRequestBuilder,
     watcher::{self, Watcher},
 };
 use futures::{
@@ -11,38 +12,54 @@ use futures::{
 };
 use http::StatusCode;
 use hyper::Error as BodyError;
-use k8s_openapi::{api::core::v1::Pod, WatchOptional, WatchResponse};
+use k8s_openapi::{WatchOptional, WatchResponse};
 use snafu::{ResultExt, Snafu};
 
-// TODO: abstract around the request builder.
-// The `Pod::watch_pod_for_all_namespaces` is currently hardcoded - but we
-// can use this with other resource types too, and we'll probably have to
-// add support for watching namespaces later on.
-
 /// A simple watcher atop of the Kubernetes API [`Client`].
-pub struct ApiWatcher {
+pub struct ApiWatcher<B>
+where
+    B: 'static,
+{
     client: Client,
+    request_builder: B,
 }
 
-impl ApiWatcher {
+impl<B> ApiWatcher<B>
+where
+    B: 'static,
+{
     /// Create a new [`ApiWatcher`].
-    pub fn new(client: Client) -> Self {
-        Self { client }
+    pub fn new(client: Client, request_builder: B) -> Self {
+        Self {
+            client,
+            request_builder,
+        }
     }
 }
 
-impl ApiWatcher {
+impl<B> ApiWatcher<B>
+where
+    B: 'static + WatchRequestBuilder,
+    <B as WatchRequestBuilder>::Object: Send + Unpin,
+{
     async fn invoke(
         &mut self,
         watch_optional: WatchOptional<'_>,
     ) -> Result<
-        impl Stream<Item = Result<WatchResponse<Pod>, k8s_stream::Error<BodyError>>> + 'static,
+        impl Stream<
+                Item = Result<
+                    WatchResponse<<B as WatchRequestBuilder>::Object>,
+                    k8s_stream::Error<BodyError>,
+                >,
+            > + 'static,
         watcher::invocation::Error<invocation::Error>,
     > {
         // Prepare request.
-        let (request, _) = Pod::watch_pod_for_all_namespaces(watch_optional)
+        let request = self
+            .request_builder
+            .build(watch_optional)
             .context(invocation::RequestPreparation)?;
-        trace!(message = "Request prepared", ?request);
+        trace!(message = "request prepared", ?request);
 
         // Send request, get response.
         let response = self
@@ -50,7 +67,7 @@ impl ApiWatcher {
             .send(request)
             .await
             .context(invocation::Request)?;
-        trace!(message = "Got response", ?response);
+        trace!(message = "got response", ?response);
 
         // Handle response status code.
         let status = response.status();
@@ -73,7 +90,10 @@ impl ApiWatcher {
         &mut self,
         watch_optional: WatchOptional<'_>,
     ) -> Result<
-        BoxStream<'static, Result<WatchResponse<Pod>, k8s_stream::Error<BodyError>>>,
+        BoxStream<
+            'static,
+            Result<WatchResponse<<B as WatchRequestBuilder>::Object>, k8s_stream::Error<BodyError>>,
+        >,
         watcher::invocation::Error<invocation::Error>,
     > {
         let stream = self.invoke(watch_optional).await?;
@@ -81,8 +101,12 @@ impl ApiWatcher {
     }
 }
 
-impl Watcher for ApiWatcher {
-    type Object = Pod;
+impl<B> Watcher for ApiWatcher<B>
+where
+    B: 'static + WatchRequestBuilder + Send,
+    <B as WatchRequestBuilder>::Object: Send + Unpin,
+{
+    type Object = <B as WatchRequestBuilder>::Object;
 
     type InvocationError = invocation::Error;
 

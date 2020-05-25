@@ -24,6 +24,7 @@ use evmap10::{self as evmap};
 use file_source::{FileServer, FileServerShutdown, Fingerprinter};
 use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use futures01::sync::mpsc;
+use k8s_openapi::api::core::v1::Pod;
 use k8s_paths_provider::K8sPathsProvider;
 use pod_metadata_annotator::PodMetadataAnnotator;
 use serde::{Deserialize, Serialize};
@@ -131,7 +132,7 @@ impl Source {
         let field_selector = format!("spec.nodeName={}", self_node_name);
         let label_selector = "vector.dev/exclude!=true".to_owned();
 
-        let watcher = k8s::api_watcher::ApiWatcher::new(client);
+        let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
         let (state_reader, state_writer) = evmap::new();
 
         let mut reflector = k8s::reflector::Reflector::new(
