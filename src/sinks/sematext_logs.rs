@@ -57,7 +57,7 @@ impl SinkConfig for SematextLogsConfig {
 
         let (sink, healthcheck) = ElasticSearchConfig {
             host,
-            compression: Some(Compression::None),
+            compression: Compression::None,
             doc_type: Some("logs".to_string()),
             index: Some(self.token.clone()),
             batch: self.batch.clone(),

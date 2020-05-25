@@ -254,7 +254,7 @@ The behavior when the buffer becomes full.
 <Field
   common={true}
   defaultValue={"none"}
-  enumValues={{"none":"No compression","gzip":"[Gzip](https://www.gnu.org/software/gzip/) standard DEFLATE compression","lz4":"High speed [LZ4 compression](https://lz4.github.io/lz4/)","snappy":"High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression.","zstd":"[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."}}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression.","lz4":"High speed [LZ4 compression][urls.lz4].","snappy":"High speed [Snappy compression][urls.snappy], developed by Google. Slower than [LZ4][urls.lz4] but higher compression.","zstd":"[Zstandard compression][urls.zstd], developed at Facebook. Faster than [Gzip][urls.gzip] at similar compression ratios."}}
   examples={["none","gzip","lz4","snappy","zstd"]}
   groups={[]}
   name={"compression"}
@@ -269,7 +269,8 @@ The behavior when the buffer becomes full.
 
 ### compression
 
-Compression codec to use for compressing message sets
+The compression strategy used to compress the encoded event data before
+transmission.
 
 
 
@@ -791,9 +792,13 @@ this dependency is packaged with Vector, meaning you do not need to install it.
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+[urls.gzip]: https://www.gzip.org/
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.kafka]: https://kafka.apache.org/
 [urls.kafka_protocol]: https://kafka.apache.org/protocol
 [urls.librdkafka]: https://github.com/edenhill/librdkafka
 [urls.librdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+[urls.lz4]: https://lz4.github.io/lz4/
 [urls.openssl]: https://www.openssl.org/
+[urls.snappy]: https://google.github.io/snappy/
+[urls.zstd]: https://zstd.net

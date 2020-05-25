@@ -35,7 +35,8 @@ pub struct KafkaSinkConfig {
     topic: String,
     key_field: Option<Atom>,
     encoding: EncodingConfigWithDefault<Encoding>,
-    compression: Option<KafkaCompression>,
+    #[serde(default)]
+    compression: KafkaCompression,
     tls: Option<KafkaTlsConfig>,
     #[serde(default = "default_socket_timeout_ms")]
     socket_timeout_ms: u64,
@@ -102,10 +103,7 @@ impl KafkaSinkConfig {
         if let Some(tls) = &self.tls {
             tls.apply(&mut client_config)?;
         }
-        client_config.set(
-            "compression.codec",
-            &to_string(self.compression.unwrap_or_default()),
-        );
+        client_config.set("compression.codec", &to_string(self.compression));
         client_config.set("socket.timeout.ms", &self.socket_timeout_ms.to_string());
         client_config.set("message.timeout.ms", &self.message_timeout_ms.to_string());
         if let Some(ref librdkafka_options) = self.librdkafka_options {
@@ -335,7 +333,7 @@ mod integration_test {
         let config = KafkaSinkConfig {
             bootstrap_servers: "localhost:9092".into(),
             topic: topic.clone(),
-            compression: None,
+            compression: KafkaCompression::None,
             encoding: EncodingConfigWithDefault::from(Encoding::Text),
             key_field: None,
             tls: None,
@@ -390,29 +388,25 @@ mod integration_test {
 
     #[test]
     fn kafka_happy_path_gzip() {
-        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Gzip));
+        kafka_happy_path("localhost:9092", None, KafkaCompression::Gzip);
     }
 
     #[test]
     fn kafka_happy_path_lz4() {
-        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Lz4));
+        kafka_happy_path("localhost:9092", None, KafkaCompression::Lz4);
     }
 
     #[test]
     fn kafka_happy_path_snappy() {
-        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Snappy));
+        kafka_happy_path("localhost:9092", None, KafkaCompression::Snappy);
     }
 
     #[test]
     fn kafka_happy_path_zstd() {
-        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Zstd));
+        kafka_happy_path("localhost:9092", None, KafkaCompression::Zstd);
     }
 
-    fn kafka_happy_path(
-        server: &str,
-        tls: Option<KafkaTlsConfig>,
-        compression: Option<KafkaCompression>,
-    ) {
+    fn kafka_happy_path(server: &str, tls: Option<KafkaTlsConfig>, compression: KafkaCompression) {
         let topic = format!("test-{}", random_string(10));
 
         let tls_enabled = tls.as_ref().map(|tls| tls.enabled()).unwrap_or(false);

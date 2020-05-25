@@ -463,8 +463,8 @@ The behavior when the buffer becomes full.
 <Field
   common={true}
   defaultValue={"none"}
-  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
-  examples={["gzip","none"]}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
+  examples={["none","gzip"]}
   groups={[]}
   name={"compression"}
   path={null}
@@ -478,7 +478,8 @@ The behavior when the buffer becomes full.
 
 ### compression
 
-The compression mechanism to use.
+The compression strategy used to compress the encoded event data before
+transmission.
 
 
 
@@ -1389,6 +1390,7 @@ You can learn more about the complete syntax in the
 [urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
 [urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcp_authentication_service_account]: https://cloud.google.com/docs/authentication/production#obtaining_and_providing_service_account_credentials_manually
+[urls.gzip]: https://www.gzip.org/
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
 [urls.openssl]: https://www.openssl.org/

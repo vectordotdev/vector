@@ -30,19 +30,14 @@ write_to_description = "[Apache Kafka][urls.kafka] via the [Kafka protocol][urls
 
 <%= render("_partials/fields/_kafka_options.toml", namespace: "sinks.kafka.options") %>
 
-[sinks.kafka.options.compression]
-type = "string"
-common = true
-default = "none"
-required = false
-description = "Compression codec to use for compressing message sets"
-
-[sinks.kafka.options.compression.enum]
-none = "No compression"
-gzip = "[Gzip](https://www.gnu.org/software/gzip/) standard DEFLATE compression"
-lz4 = "High speed [LZ4 compression](https://lz4.github.io/lz4/)"
-snappy = "High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression."
-zstd = "[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."
+<%= render("_partials/fields/_compression_options.toml",
+  namespace: "sinks.kafka.options",
+  enum: {
+    "lz4" => "High speed [LZ4 compression][urls.lz4].",
+    "snappy" => "High speed [Snappy compression][urls.snappy], developed by Google. Slower than [LZ4][urls.lz4] but higher compression.",
+    "zstd" => "[Zstandard compression][urls.zstd], developed at Facebook. Faster than [Gzip][urls.gzip] at similar compression ratios."
+  }
+) %>
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.kafka.options",

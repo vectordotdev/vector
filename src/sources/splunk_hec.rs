@@ -772,7 +772,7 @@ mod tests {
             host: format!("http://{}", address),
             token: TOKEN.to_owned(),
             encoding: encoding.into(),
-            compression: Some(compression),
+            compression,
             ..HecSinkConfig::default()
         }
         .build(SinkContext::new_test(exec))

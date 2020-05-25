@@ -43,7 +43,8 @@ pub struct HttpSinkConfig {
     pub healthcheck_uri: Option<UriSerde>,
     pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
-    pub compression: Option<Compression>,
+    #[serde(default)]
+    pub compression: Compression,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -105,18 +106,15 @@ impl SinkConfig for HttpSinkConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
 
         let mut config = self.clone();
-
         config.uri = build_uri(config.uri.clone()).into();
-        let gzip = match config.compression.unwrap_or(Compression::None) {
-            Compression::None => false,
-            Compression::Gzip => true,
-        };
+
+        let compression = config.compression;
         let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let sink = BatchedHttpSink::new(
             config,
-            Buffer::new(gzip),
+            Buffer::new(compression),
             request,
             batch,
             Some(tls.clone()),
@@ -212,8 +210,8 @@ impl HttpSink for HttpSinkConfig {
             }
         };
 
-        if let Some(Compression::Gzip) = &self.compression {
-            builder.header("Content-Encoding", "gzip");
+        if let Some(ce) = self.compression.content_encoding() {
+            builder.header("Content-Encoding", ce);
         }
 
         if let Some(headers) = &self.headers {
