@@ -6673,7 +6673,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10490000
-    # * type: int
+    # * type: uint
     # * unit: bytes
     max_size = 10490000
 
@@ -6681,7 +6681,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 1
 
@@ -6757,7 +6757,7 @@ require('custom_module')
     #
     # * optional
     # * default: 500
-    # * type: int
+    # * type: uint
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
@@ -6765,7 +6765,7 @@ require('custom_module')
     # The maximum size of the buffer on the disk.
     #
     # * required
-    # * type: int
+    # * type: uint
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
@@ -6883,7 +6883,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     # * unit: requests
     in_flight_limit = 5
 
@@ -6891,7 +6891,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     rate_limit_duration_secs = 1
 
@@ -6900,7 +6900,7 @@ require('custom_module')
     #
     # * optional
     # * default: 5
-    # * type: int
+    # * type: uint
     rate_limit_num = 5
 
     # The maximum number of retries to make for failed requests. The default, for
@@ -6908,7 +6908,7 @@ require('custom_module')
     #
     # * optional
     # * default: -1
-    # * type: int
+    # * type: uint
     retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
@@ -6917,7 +6917,7 @@ require('custom_module')
     #
     # * optional
     # * default: 1
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
@@ -6925,7 +6925,7 @@ require('custom_module')
     #
     # * optional
     # * default: 10
-    # * type: int
+    # * type: uint
     # * unit: seconds
     retry_max_duration_secs = 10
 
@@ -6936,7 +6936,7 @@ require('custom_module')
     #
     # * optional
     # * default: 60
-    # * type: int
+    # * type: uint
     # * unit: seconds
     timeout_secs = 60
 
