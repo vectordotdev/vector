@@ -1,4 +1,4 @@
-# RFC 2221 - 2020-04-04 - Kubernetes Integration
+# RFC 2685 - 2020-04-04 - Kubernetes Integration
 
 Vector's `Makefile` serves a variety of purposes, and this RFC attempts to tame the complexity of common dev tasks, improving contributor and team member experience.
 
