@@ -431,6 +431,9 @@
 - name: "sink: humio_logs"
   description: Anything `humio_logs` sink related
   color: 4ddbfb
+- name: "sink: influxdb_logs"
+  description: Anything `influxdb_logs` sink related
+  color: 4ddbfb
 - name: "sink: influxdb_metrics"
   description: Anything `influxdb_metrics` sink related
   color: 4ddbfb

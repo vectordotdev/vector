@@ -356,6 +356,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/platforms/docker/influxdb_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/influxdb_logs.md",
+          "series_position": null,
+          "title": "Send logs from Docker to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/platforms/docker/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/kafka.md",
@@ -559,6 +568,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/http/humio_logs.md",
           "series_position": null,
           "title": "Send logs from HTTP to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/influxdb_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/influxdb_logs.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to InfluxDB"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -779,6 +797,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/journald/influxdb_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/influxdb_logs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/journald/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/kafka.md",
@@ -991,6 +1018,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/kafka/humio_logs.md",
           "series_position": null,
           "title": "Send logs from Kafka to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/influxdb_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/influxdb_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to InfluxDB"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1211,6 +1247,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/stdin/influxdb_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/influxdb_logs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/stdin/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/kafka.md",
@@ -1423,6 +1468,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/splunk_hec/humio_logs.md",
           "series_position": null,
           "title": "Send logs from Splunk HEC to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/influxdb_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/influxdb_logs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to InfluxDB"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1643,6 +1697,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/syslog/influxdb_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/influxdb_logs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/syslog/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/kafka.md",
@@ -1855,6 +1918,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/socket/humio_logs.md",
           "series_position": null,
           "title": "Send logs from a TCP, UDP, or UDS socket to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/influxdb_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/influxdb_logs.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to InfluxDB"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2075,6 +2147,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/file/influxdb_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/influxdb_logs.md",
+          "series_position": null,
+          "title": "Send logs from a file to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/file/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/kafka.md",
@@ -2287,6 +2368,15 @@ module.exports = {
           "path": "website/guides/integrate/sinks/humio_logs.md",
           "series_position": null,
           "title": "Send logs to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/influxdb_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/influxdb_logs.md",
+          "series_position": null,
+          "title": "Send logs to InfluxDB"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -30725,6 +30815,47 @@ module.exports = {
 
       ],
       "write_to_description": "Humio via the HEC API"
+    },
+    "influxdb_logs": {
+      "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  bucket = \"vector-bucket\" # required\n  database = \"vector-database\" # required\n  endpoint = \"http://localhost:8086/\" # required\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required\n  type = \"influxdb_logs\" # required\n\n  # Auth\n  org = \"my-org\" # required\n  token = \"${INFLUXDB_TOKEN}\" # required"
+      },
+      "delivery_guarantee": "at_least_once",
+      "description": "InfluxDB is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics.",
+      "event_types": [
+        "log"
+      ],
+      "features": [
+        "Send structured logs to InfluxDB v1 or v2.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Automatically aggregate metrics at the edge for improved performance."
+      ],
+      "function_category": "transmit",
+      "id": "influxdb_logs_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/influxdb.svg",
+      "name": "influxdb_logs",
+      "noun": "InfluxDB",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+        "InfluxData"
+      ],
+      "short_description": "Batches log events to InfluxDB using v1 or v2 HTTP API.",
+      "status": "beta",
+      "title": "InfluxDB Logs",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ],
+      "write_to_description": "InfluxDB using v1 or v2 HTTP API"
     },
     "influxdb_metrics": {
       "beta": true,

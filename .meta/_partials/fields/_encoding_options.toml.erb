@@ -1,9 +1,11 @@
+<%- groups ||= [] -%>
 <%- common ||= false %>
 <%- default ||= nil %>
 [<%= namespace %>.encoding]
 type = "table"
 common = <%= (encodings.any?).to_toml %>
 required = <%= (encodings.any? && default.nil?).to_toml %>
+groups = <%= groups.to_toml %>
 description = """\
 Configures the encoding specific sink behavior.\
 """
@@ -17,6 +19,7 @@ Configures the encoding specific sink behavior.\
   <%- else -%>
   required = true
   <%- end -%>
+  groups = <%= groups.to_toml %>
   description = """\
   The encoding codec used to serialize the events before outputting.\
   """
@@ -32,6 +35,7 @@ type = "[string]"
 common = <%= common == true || (common.is_a?(Array) && common.include?("only_fields")) %>
 examples = [["timestamp", "message", "host"]]
 required = false
+groups = <%= groups.to_toml %>
 description = """\
 Limit the sink to only encoding the specified labels.\
 """
@@ -41,6 +45,7 @@ type = "[string]"
 common = <%= common == true || (common.is_a?(Array) && common.include?("except_fields")) %>
 examples = [["timestamp", "message", "host"]]
 required = false
+groups = <%= groups.to_toml %>
 description = """\
 Prevent the sink from encoding the specified labels.\
 """
@@ -50,6 +55,7 @@ type = "string"
 common = <%= common == true || (common.is_a?(Array) && common.include?("timestamp_format")) %>
 default = "rfc3339"
 required = false
+groups = <%= groups.to_toml %>
 description = "How to format event timestamps."
 
 [<%= namespace %>.encoding.children.timestamp_format.enum]
