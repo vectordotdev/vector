@@ -6,7 +6,7 @@ use crate::sinks::influxdb::{
 };
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
-use crate::sinks::util::{BatchBytesConfig, Buffer, TowerRequestConfig};
+use crate::sinks::util::{BatchBytesConfig, Buffer, Compression, TowerRequestConfig};
 use crate::sinks::Healthcheck;
 use crate::{
     event::{log_schema, Event},
@@ -99,8 +99,15 @@ impl SinkConfig for InfluxDBLogsConfig {
             tags,
         };
 
-        let sink = BatchedHttpSink::new(sink, Buffer::new(false), request, batch, None, &cx)
-            .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}", e));
+        let sink = BatchedHttpSink::new(
+            sink,
+            Buffer::new(Compression::None),
+            request,
+            batch,
+            None,
+            &cx,
+        )
+        .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}", e));
 
         Ok((Box::new(sink), healthcheck))
     }
