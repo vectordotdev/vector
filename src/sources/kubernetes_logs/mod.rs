@@ -200,15 +200,18 @@ impl Source {
         use std::future::Future;
         use std::pin::Pin;
         let list: Vec<Pin<Box<dyn Future<Output = ()> + Send>>> = vec![
-            Box::pin(reflector_process.map(|_| todo!())),
+            Box::pin(reflector_process.map(|result| match result {
+                Ok(_val) => info!(message = "reflector process completed gracefully"),
+                Err(error) => error!(message = "reflector process exited with an error", ?error),
+            })),
             Box::pin(file_server_join_handle.map(|result| match result {
                 Ok(FileServerShutdown) => info!(message = "file server completed gracefully"),
                 Err(error) => error!(message = "file server exited with an error", ?error),
             })),
             Box::pin(event_processing_loop.map(|result| {
                 match result {
-                    Ok(_) => info!(message = "event_processing_loop ok"),
-                    Err(_) => error!(message = "event_processing_loop err"),
+                    Ok(()) => info!(message = "event processing loop completed gracefully"),
+                    Err(_error) => error!(message = "event processing loop exited with an error"),
                 };
             })),
         ];
