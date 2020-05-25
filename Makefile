@@ -31,7 +31,9 @@ help:
 ##@ Environment (Nix users just `nix-shell` instead)
 define ENVIRONMENT_EXEC
 	# We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
+	@mkdir -p target
 	docker run \
+			--name vector-environment \
 			--rm \
 			--tty \
 			--interactive \
@@ -51,11 +53,26 @@ environment-check: environment-prepare ## Run `make check` inside the environmen
 environment-test: environment-prepare ## Run `make check` inside the environment.
 	${ENVIRONMENT_EXEC} make test
 
+environment-bench: environment-prepare ## Run `make check` inside the environment.
+	${ENVIRONMENT_EXEC} make bench
+
+environment-generate: environment-prepare ## Run `make check` inside the environment.
+	${ENVIRONMENT_EXEC} make generate
+
+environment-fmt: environment-prepare ## Run `make check` inside the environment.
+	${ENVIRONMENT_EXEC} make fmt
+
 environment-build: environment-prepare ## Run `make build` inside the environment. Then copies the output.
-	${ENVIRONMENT_EXEC} make test
-	TEMP_ID=$(docker run -d -v vector-target:/vector-target busybox true)
-	docker cp TEMP_ID:/vector-target target
-	docker rm -f ${TEMP_ID}
+	${ENVIRONMENT_EXEC} make build
+	@docker rm -f vector-build-outputs || true
+	mkdir -p ./target/debug
+	docker run \
+		-d \
+		-v vector-target:/target \
+		--name vector-build-outputs \
+		busybox true
+	docker cp vector-build-outputs:/target/debug/vector ./target/debug/
+	@docker rm -f vector-build-outputs
 
 
 environment-prepare: ## Prepare the Vector dev env.

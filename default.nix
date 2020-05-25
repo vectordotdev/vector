@@ -9,7 +9,7 @@ pkgs.buildEnv {
       binutils
       gcc
       cmake
-      rustup 
+      rustup
       pkg-config
       openssl
       protobuf
