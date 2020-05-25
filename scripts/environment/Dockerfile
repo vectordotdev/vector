@@ -1,4 +1,4 @@
-FROM nixos/nix
+FROM docker.io/nixos/nix
 ARG RUST_TOOLCHAIN
 
 RUN nix-channel --add https://nixos.org/channels/nixpkgs-unstable nixpkgs

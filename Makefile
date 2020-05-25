@@ -2,7 +2,10 @@
 .DEFAULT_GOAL := help
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/run.sh)
 
-export USE_CONTAINER ?= docker
+export container-tool ?= docker
+# Deprecated
+export USE_CONTAINER ?= $(container-tool)
+
 export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
 
 # Begin OS detection
@@ -32,7 +35,7 @@ help:
 define ENVIRONMENT_EXEC
 	# We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
 	@mkdir -p target
-	docker run \
+	$(container-tool) run \
 			--name vector-environment \
 			--rm \
 			--tty \
@@ -64,27 +67,27 @@ environment-fmt: environment-prepare ## Run `make check` inside the environment.
 
 environment-build: environment-prepare ## Run `make build` inside the environment. Then copies the output.
 	${ENVIRONMENT_EXEC} make build
-	@docker rm -f vector-build-outputs || true
+	@$(container-tool) rm -f vector-build-outputs || true
 	mkdir -p ./target/debug
-	docker run \
+	$(container-tool) run \
 		-d \
 		-v vector-target:/target \
 		--name vector-build-outputs \
 		busybox true
-	docker cp vector-build-outputs:/target/debug/vector ./target/debug/
-	@docker rm -f vector-build-outputs
+	$(container-tool) cp vector-build-outputs:/target/debug/vector ./target/debug/
+	@$(container-tool) rm -f vector-build-outputs
 
 
 environment-prepare: ## Prepare the Vector dev env.
-	docker build \
+	$(container-tool) build \
 		--tag vector/environment \
 		--build-arg RUST_TOOLCHAIN=${RUST_TOOLCHAIN} \
 		--file scripts/environment/Dockerfile \
 		.
 
 environment-clean: ## Clean the Vector dev env.
-	docker volume rm -f vector-target vector-cargo-cache
-	docker rmi vector/environment
+	$(container-tool) volume rm -f vector-target vector-cargo-cache
+	$(container-tool) rmi vector/environment
 
 ##@ Building
 
