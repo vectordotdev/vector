@@ -169,7 +169,7 @@ impl Source {
             let _enter = span.enter();
             let result =
                 file_server.run(file_source_tx, futures::compat::Compat01As03::new(shutdown));
-            result.unwrap()
+            result.expect("file server exited with an error")
         });
 
         let mut parser = parser::build();
@@ -218,10 +218,10 @@ impl Source {
         let mut futs: futures::stream::FuturesUnordered<_> = list.into_iter().collect();
 
         while let Some(()) = futs.next().await {
-            trace!("another future complete");
+            trace!(message = "another future complete");
         }
 
-        info!("Done");
+        info!(message = "done");
         Ok(())
     }
 }
