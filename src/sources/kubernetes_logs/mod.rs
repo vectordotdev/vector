@@ -120,6 +120,7 @@ impl Source {
     async fn run<O>(self, out: O, shutdown: ShutdownSignal) -> crate::Result<()>
     where
         O: Sink<Event> + Send,
+        <O as Sink<Event>>::Error: std::error::Error,
     {
         let Self {
             client,
@@ -211,7 +212,10 @@ impl Source {
             Box::pin(event_processing_loop.map(|result| {
                 match result {
                     Ok(()) => info!(message = "event processing loop completed gracefully"),
-                    Err(_error) => error!(message = "event processing loop exited with an error"),
+                    Err(error) => error!(
+                        message = "event processing loop exited with an error",
+                        ?error
+                    ),
                 };
             })),
         ];
