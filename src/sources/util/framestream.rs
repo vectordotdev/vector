@@ -45,6 +45,7 @@ enum ControlState {
     Stopped,
 }
 
+#[derive(Copy, Clone)]
 enum ControlHeader {
     Accept,
     Start,
@@ -143,7 +144,7 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
             ControlState::ReadingControlReady => {
                 match header {
                     ControlHeader::Ready => {
-                        let content_type = self.process_content_type(&mut frame)?;
+                        let content_type = self.process_fields(header, &mut frame)?.unwrap();
                         self.send_control_frame(Self::make_frame(ControlHeader::Accept, Some(content_type)));
                         self.state.control_state = ControlState::ReadingControlStart; //waiting for a START control frame
                     },
@@ -153,7 +154,10 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
             ControlState::ReadingControlStart => {
                 match header {
                     ControlHeader::Start => {
-                        self.state.control_state = ControlState::ReadingData; //just change state
+                        //check for content type
+                        let _ = self.process_fields(header, &mut frame)?;
+                        //if didn't error, then we are ok to change state
+                        self.state.control_state = ControlState::ReadingData;
                     },
                     _ => error!("Got wrong control frame, expected START"),
                 }
@@ -161,6 +165,8 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
             ControlState::ReadingData => {
                 match header {
                     ControlHeader::Stop => {
+                        //check there aren't any fields
+                        let _ = self.process_fields(header, &mut frame)?;
                         self.send_control_frame(Self::make_frame(ControlHeader::Finish, None)); //send FINISH frame
                         self.state.control_state = ControlState::Stopped; //stream is now done
                     },
@@ -172,7 +178,49 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
         Ok(())
     }
 
-    fn process_content_type(&self, frame: &mut Bytes) -> Result<String, ()> {
+    fn process_fields(&mut self, header: ControlHeader, frame: &mut Bytes) -> Result<Option<String>, ()> {
+        match header {
+            ControlHeader::Ready => {
+                //should provide 1+ content types
+                //should match expected content type
+                let is_start_frame = false;
+                let content_type = self.process_content_type(frame, is_start_frame)?;
+                Ok(Some(content_type))
+            },
+            ControlHeader::Start => {
+                //can take one or zero content types
+                if frame.len() == 0 {
+                    Ok(None)
+                } else {
+                    //should match expected content type
+                    let is_start_frame = true;
+                    let content_type = self.process_content_type(frame, is_start_frame)?;
+                    Ok(Some(content_type))
+                }
+            },
+            ControlHeader::Stop => {
+                //check that there are no fields
+                if frame.len() != 0 {
+                    error!("Unexpected fields in STOP header");
+                    Err(())
+                } else {
+                    Ok(None)
+                }
+            },
+            _ => {
+                error!("Unexpected control header value {:?}", header.to_u32());
+                Err(())
+            }
+        }
+    }
+
+    fn process_content_type(&self, frame: &mut Bytes, is_start_frame: bool) -> Result<String, ()> {
+        if frame.len() == 0 {
+            error!("No fields in control frame");
+            return Err(())
+        }
+
+        let mut content_types = vec![];
         while frame.len() > 0 {
             //4 bytes of ControlField
             let field_val = advance_u32(frame)?;
@@ -182,14 +230,24 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
                     //4 bytes giving length of content type
                     let field_len = advance_u32(frame)? as usize;
                     let content_type = std::str::from_utf8(&frame[..field_len]).unwrap();
-                    if content_type == self.expected_content_type {
-                        return Ok(content_type.to_string());
-                    }
+                    content_types.push(content_type.to_string());
+                    frame.advance(field_len);
                 }
             }   
         }
 
-        error!("Content types did not match up.");
+        if is_start_frame && content_types.len() > 1 {
+            error!("START control frame can only have one content-type provided (got {})", content_types.len());
+            return Err(());
+        }
+
+        for content_type in &content_types {
+            if *content_type == self.expected_content_type {
+                return Ok(content_type.clone());
+            }
+        }
+
+        error!("Content types did not match up. Expected {} got {:?}", self.expected_content_type, content_types);
         Err(())
     }
 
@@ -466,6 +524,7 @@ mod test {
         let (mut frame_vec, tmp_stream) = rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
         sock_stream = tmp_stream;
         //take second element, because first will be empty (signifying control frame)
+        assert_eq!(frame_vec[0].len(), 0);
         assert_accept_frame(&mut frame_vec[1], content_type);
 
         //3 - send START frame
@@ -492,7 +551,27 @@ mod test {
 
     #[test]
     fn multiple_content_types() {
-        //TODO: more framestream tests
+        let (tx, _) = mpsc::channel(2);
+        let (path, mut rt) = init_framstream_unix(
+            "test_content".to_string(),
+            tx,
+        );
+        let (sock_sink, mut sock_stream) = make_unix_stream(path).split();
+
+        //1 - send READY frame (with content_type)
+        let content_type = Bytes::from(&b"test_content"[..]);
+        let ready_msg = create_ready_frame(vec![Bytes::from(&b"test_content2"[..]), content_type.clone()]); //can have multiple content types
+        let _ = send_control_frame(sock_sink, ready_msg);
+        
+        //2 - wait for ACCEPT frame
+        let (mut frame_vec, tmp_stream) = rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
+        sock_stream = tmp_stream;
+
+        //take second element, because first will be empty (signifying control frame)
+        assert_eq!(frame_vec[0].len(), 0);
+        assert_accept_frame(&mut frame_vec[1], content_type);
+
+        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
     }
 
     #[test]
