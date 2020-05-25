@@ -38,6 +38,7 @@ impl FrameStreamState {
     }
 }
 
+#[derive(PartialEq, Debug)]
 enum ControlState {
     ReadingControlReady,
     ReadingControlStart,
@@ -129,9 +130,15 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
                 self.state.expect_control_frame = false;
                 let _ = self.handle_control_frame(frame);
                 None
-            } else { 
-                emit!(UnixSocketEventReceived { byte_size: frame.len() });
-                Some(frame) //return data frame
+            } else { //data frame
+                if self.state.control_state == ControlState::ReadingData {
+                    emit!(UnixSocketEventReceived { byte_size: frame.len() });
+                    Some(frame) //return data frame
+                } else {
+                    error!("Received a data frame while in state {:?}", self.state.control_state);
+                    None
+                }
+                
             }
         }
     }
@@ -576,11 +583,77 @@ mod test {
 
     #[test]
     fn wrong_content_type() {
-        //TODO: more framestream tests
+        let (tx, _) = mpsc::channel(2);
+        let (path, mut rt) = init_framstream_unix(
+            "test_content".to_string(),
+            tx,
+        );
+        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).split();
+
+        //1 - send READY frame (with WRONG content_type)
+        let ready_msg = create_ready_frame(vec![Bytes::from(&b"test_content2"[..])]); //can have multiple content types
+        sock_sink = send_control_frame(sock_sink, ready_msg);
+
+        //2 - send READY frame (with RIGHT content_type)
+        let content_type = Bytes::from(&b"test_content"[..]);
+        let ready_msg = create_ready_frame(vec![content_type.clone()]);
+        let _ = send_control_frame(sock_sink, ready_msg);
+        
+        //3 - wait for ACCEPT frame
+        let (mut frame_vec, tmp_stream) = rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
+        sock_stream = tmp_stream;
+
+        //take second element, because first will be empty (signifying control frame)
+        assert_eq!(frame_vec[0].len(), 0);
+        assert_accept_frame(&mut frame_vec[1], content_type);
+
+        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
     }
 
     #[test]
     fn data_too_soon() {
-        //TODO: more framestream tests
+        let (tx, rx) = mpsc::channel(2);
+        let (path, mut rt) = init_framstream_unix(
+            "test_content".to_string(),
+            tx,
+        );
+        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).split();
+
+        //1 - send data frame (too soon!)
+        sock_sink = send_data_frames(sock_sink, vec![Bytes::from(&"bad"[..]), Bytes::from(&"data"[..])]);
+
+        //2 - send READY frame (with content_type)
+        let content_type = Bytes::from(&b"test_content"[..]);
+        let ready_msg = create_ready_frame(vec![content_type.clone()]);
+        sock_sink = send_control_frame(sock_sink, ready_msg);
+        
+        //3 - wait for ACCEPT frame
+        let (mut frame_vec, tmp_stream) = rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
+        sock_stream = tmp_stream;
+
+        //take second element, because first will be empty (signifying control frame)
+        assert_eq!(frame_vec[0].len(), 0);
+        assert_accept_frame(&mut frame_vec[1], content_type);
+
+        //4 - send START frame
+        sock_sink = send_control_frame(sock_sink, Bytes::from(&ControlHeader::Start.to_u32().to_be_bytes()[..]));
+
+        //5 - send data (will go through)
+        sock_sink = send_data_frames(sock_sink, vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])]);
+        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
+
+        //6 - send STOP frame
+        let _ = send_control_frame(sock_sink, Bytes::from(&ControlHeader::Stop.to_u32().to_be_bytes()[..]));
+
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "hello".into(),
+        );
+        assert_eq!(
+            events[1].as_log()[&event::log_schema().message_key()],
+            "world".into(),
+        );
+
+        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
     }
 }
