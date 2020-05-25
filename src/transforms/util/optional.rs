@@ -1,4 +1,4 @@
-//! Chain transforms.
+//! Optional transform.
 
 #![deny(missing_docs)]
 
