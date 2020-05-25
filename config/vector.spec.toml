@@ -6662,6 +6662,284 @@ require('custom_module')
     # * unit: seconds
     timeout_secs = 60
 
+# Batches `log` events to InfluxDB using v1 or v2 HTTP API.
+[sinks.influxdb_logs]
+  #
+  # Batch
+  #
+
+  [sinks.influxdb_logs.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * optional
+    # * default: 10490000
+    # * type: int
+    # * unit: bytes
+    max_size = 10490000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # General
+  #
+
+  # The destination bucket for writes into InfluxDB 2.
+  #
+  # * required
+  # * type: string
+  bucket = "vector-bucket"
+  bucket = "4d2225e4d3d49f75"
+
+  # Sets the target database for the write into InfluxDB 1.
+  #
+  # * required
+  # * type: string
+  database = "vector-database"
+  database = "iot-store"
+
+  # InfluxDB endpoint to send metrics to.
+  #
+  # * required
+  # * type: string
+  endpoint = "http://localhost:8086/"
+  endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com"
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # A prefix that will be added to all metric names.
+  #
+  # * required
+  # * type: string
+  namespace = "service"
+
+  # A set of additional fields that will be attached to each LineProtocol as a
+  # tag. Note: If the set of tag values has high cardinality this also increase
+  # cardinality in InfluxDB.
+  #
+  # * optional
+  # * no default
+  # * type: [string]
+  tags = ["field1", "parent.child_field"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "influxdb_logs"
+  type = "influxdb_logs"
+
+  #
+  # Buffer
+  #
+
+  [sinks.influxdb_logs.buffer]
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Persistence
+  #
+
+  # Sets the write consistency for the point for InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  consistency = "any"
+  consistency = "one"
+  consistency = "quorum"
+  consistency = "all"
+
+  # Sets the target retention policy for the write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  retention_policy_name = "autogen"
+  retention_policy_name = "one_day_only"
+
+  #
+  # Encoding
+  #
+
+  [sinks.influxdb_logs.encoding]
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
+  #
+  # Auth
+  #
+
+  # Specifies the destination organization for writes into InfluxDB 2.
+  #
+  # * required
+  # * type: string
+  org = "my-org"
+  org = "33f2cff0a28e5b63"
+
+  # Sets the password for authentication if you’ve enabled authentication for the
+  # write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  password = "${INFLUXDB_PASSWORD}"
+  password = "influxdb4ever"
+
+  # Authentication token for InfluxDB 2.
+  #
+  # * required
+  # * type: string
+  token = "${INFLUXDB_TOKEN}"
+  token = "ef8d5de700e7989468166c40fc8a0ccd"
+
+  # Sets the username for authentication if you’ve enabled authentication for the
+  # write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  username = "todd"
+  username = "vector-source"
+
+  #
+  # Request
+  #
+
+  [sinks.influxdb_logs.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    # * unit: requests
+    in_flight_limit = 5
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
+    #
+    # * optional
+    # * default: -1
+    # * type: int
+    retry_attempts = -1
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
 # Batches `metric` events to InfluxDB using v1 or v2 HTTP API.
 [sinks.influxdb_metrics]
   #

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-04-30"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
@@ -452,6 +452,7 @@ features one has to pass a comma-separated list of component features.
 | `sinks-honeycomb` | Enables building of [`honeycomb` sink][docs.sinks.honeycomb].  |
 | `sinks-http` | Enables building of [`http` sink][docs.sinks.http].  |
 | `sinks-humio_logs` | Enables building of [`humio_logs` sink][docs.sinks.humio_logs].  |
+| `sinks-influxdb_logs` | Enables building of [`influxdb_logs` sink][docs.sinks.influxdb_logs].  |
 | `sinks-influxdb_metrics` | Enables building of [`influxdb_metrics` sink][docs.sinks.influxdb_metrics].  |
 | `sinks-kafka` | Enables building of [`kafka` sink][docs.sinks.kafka].  Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled.  |
 | `sinks-logdna` | Enables building of [`logdna` sink][docs.sinks.logdna].  |
@@ -494,6 +495,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sinks.honeycomb]: /docs/reference/sinks/honeycomb/
 [docs.sinks.http]: /docs/reference/sinks/http/
 [docs.sinks.humio_logs]: /docs/reference/sinks/humio_logs/
+[docs.sinks.influxdb_logs]: /docs/reference/sinks/influxdb_logs/
 [docs.sinks.influxdb_metrics]: /docs/reference/sinks/influxdb_metrics/
 [docs.sinks.kafka]: /docs/reference/sinks/kafka/
 [docs.sinks.logdna]: /docs/reference/sinks/logdna/

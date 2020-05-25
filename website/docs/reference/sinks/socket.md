@@ -43,6 +43,10 @@ The Vector `socket` sink
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # Encoding
+  encoding.codec = "json" # required
+
+  # General
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
   mode = "tcp" # required
 ```
@@ -57,6 +61,12 @@ The Vector `socket` sink
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
+
+  # Encoding
+  encoding.codec = "json" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
   # General
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
@@ -77,6 +87,10 @@ The Vector `socket` sink
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # Encoding
+  encoding.codec = "json" # required
+
+  # General
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
   mode = "udp" # required
 ```
@@ -92,6 +106,12 @@ The Vector `socket` sink
   buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
+  # Encoding
+  encoding.codec = "json" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
+
   # General
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
   mode = "udp" # required
@@ -102,6 +122,10 @@ The Vector `socket` sink
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # Encoding
+  encoding.codec = "json" # required
+
+  # General
   mode = "unix" # required
   path = "/path/to/socket" # required, required when mode = "unix"
 ```
@@ -116,6 +140,12 @@ The Vector `socket` sink
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
+
+  # Encoding
+  encoding.codec = "json" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
   # General
   mode = "unix" # required
@@ -271,7 +301,7 @@ The behavior when the buffer becomes full.
   defaultValue={null}
   enumValues={null}
   examples={[]}
-  groups={[]}
+  groups={["tcp","udp","unix"]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
@@ -293,7 +323,7 @@ Configures the encoding specific sink behavior.
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","text"]}
-  groups={[]}
+  groups={["tcp","udp","unix"]}
   name={"codec"}
   path={"encoding"}
   relevantWhen={null}
@@ -316,7 +346,7 @@ The encoding codec used to serialize the events before outputting.
   defaultValue={null}
   enumValues={null}
   examples={[["timestamp","message","host"]]}
-  groups={[]}
+  groups={["tcp","udp","unix"]}
   name={"except_fields"}
   path={"encoding"}
   relevantWhen={null}
@@ -339,7 +369,7 @@ Prevent the sink from encoding the specified labels.
   defaultValue={null}
   enumValues={null}
   examples={[["timestamp","message","host"]]}
-  groups={[]}
+  groups={["tcp","udp","unix"]}
   name={"only_fields"}
   path={"encoding"}
   relevantWhen={null}
@@ -362,7 +392,7 @@ Limit the sink to only encoding the specified labels.
   defaultValue={"rfc3339"}
   enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
   examples={["rfc3339","unix"]}
-  groups={[]}
+  groups={["tcp","udp","unix"]}
   name={"timestamp_format"}
   path={"encoding"}
   relevantWhen={null}

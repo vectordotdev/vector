@@ -1,26 +1,27 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-05-04"
 delivery_guarantee: "at_least_once"
-component_title: "InfluxDB Metrics"
-description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
-event_types: ["metric"]
+component_title: "InfluxDB Logs"
+description: "The Vector `influxdb_logs` sink batches `log` events to InfluxDB using v1 or v2 HTTP API."
+event_types: ["log"]
 function_category: "transmit"
-issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+influxdb_metrics%22
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+influxdb_logs%22
 operating_systems: ["Linux","MacOS","Windows"]
-sidebar_label: "influxdb_metrics|[\"metric\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sinks/influxdb/metrics.rs
+sidebar_label: "influxdb_logs|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/influxdb/logs.rs
 status: "beta"
-title: "InfluxDB Metrics Sink"
+title: "InfluxDB Logs Sink"
 unsupported_operating_systems: []
 ---
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The Vector `influxdb_metrics` sink
-[batches](#buffers--batches) [`metric`][docs.data-model.metric] events to
+The Vector `influxdb_logs` sink
+[batches](#buffers--batches) [`log`][docs.data-model.log] events to
 [InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or
 [v2][urls.influxdb_http_api_v2] HTTP API.
 
@@ -29,7 +30,7 @@ The Vector `influxdb_metrics` sink
 
      To make changes please edit the template located at:
 
-     website/docs/reference/sinks/influxdb_metrics.md.erb
+     website/docs/reference/sinks/influxdb_logs.md.erb
 -->
 
 ## Configuration
@@ -43,7 +44,7 @@ The Vector `influxdb_metrics` sink
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
-  type = "influxdb_metrics" # required
+  type = "influxdb_logs" # required
   inputs = ["my-source-or-transform-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com" # required
   namespace = "service" # required
@@ -65,20 +66,32 @@ The Vector `influxdb_metrics` sink
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
-  type = "influxdb_metrics" # required
+  type = "influxdb_logs" # required
   inputs = ["my-source-or-transform-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com" # required
   namespace = "service" # required
   database = "vector-database" # required
   healthcheck = true # optional, default
+  tags = ["field1", "parent.child_field"] # optional, no default
 
   # Auth
   password = "${INFLUXDB_PASSWORD}" # optional, no default
   username = "todd" # optional, no default
 
   # Batch
-  batch.max_events = 20 # optional, default, events
+  batch.max_size = 10490000 # optional, default, bytes
   batch.timeout_secs = 1 # optional, default, seconds
+
+  # Buffer
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.when_full = "block" # optional, default
+
+  # Encoding
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
   # Persistence
   consistency = "any" # optional, no default
@@ -88,7 +101,7 @@ The Vector `influxdb_metrics` sink
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 5 # optional, default
-  request.retry_attempts = 18446744073709551615 # optional, default
+  request.retry_attempts = -1 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
@@ -100,7 +113,7 @@ The Vector `influxdb_metrics` sink
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
-  type = "influxdb_metrics" # required
+  type = "influxdb_logs" # required
   inputs = ["my-source-or-transform-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
   namespace = "service" # required
@@ -118,26 +131,38 @@ The Vector `influxdb_metrics` sink
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
-  type = "influxdb_metrics" # required
+  type = "influxdb_logs" # required
   inputs = ["my-source-or-transform-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
   namespace = "service" # required
   bucket = "vector-bucket" # required
   healthcheck = true # optional, default
+  tags = ["field1", "parent.child_field"] # optional, no default
 
   # Auth
   org = "my-org" # required
   token = "${INFLUXDB_TOKEN}" # required
 
   # Batch
-  batch.max_events = 20 # optional, default, events
+  batch.max_size = 10490000 # optional, default, bytes
   batch.timeout_secs = 1 # optional, default, seconds
+
+  # Buffer
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.when_full = "block" # optional, default
+
+  # Encoding
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
   # Request
   request.in_flight_limit = 5 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 5 # optional, default
-  request.retry_attempts = 18446744073709551615 # optional, default
+  request.retry_attempts = -1 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
@@ -171,24 +196,24 @@ Configures the sink batching behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={20}
+  defaultValue={10490000}
   enumValues={null}
-  examples={[20]}
+  examples={[10490000]}
   groups={["v1","v2"]}
-  name={"max_events"}
+  name={"max_size"}
   path={"batch"}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"uint"}
-  unit={"events"}
+  type={"int"}
+  unit={"bytes"}
   warnings={[]}
   >
 
-#### max_events
+#### max_size
 
-The maximum size of a batch, in events, before it is flushed.
-
+The maximum size of a batch, in bytes, before it is flushed.
+ See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -203,7 +228,7 @@ The maximum size of a batch, in events, before it is flushed.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"uint"}
+  type={"int"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -211,7 +236,7 @@ The maximum size of a batch, in events, before it is flushed.
 #### timeout_secs
 
 The maximum age of a batch before it is flushed.
-
+ See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -239,6 +264,123 @@ The maximum age of a batch before it is flushed.
 The destination bucket for writes into InfluxDB 2.
 
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={["v1","v2"]}
+  name={"buffer"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### buffer
+
+Configures the sink specific buffer behavior.
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={500}
+  enumValues={null}
+  examples={[500]}
+  groups={["v1","v2"]}
+  name={"max_events"}
+  path={"buffer"}
+  relevantWhen={{"type":"memory"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  warnings={[]}
+  >
+
+#### max_events
+
+The maximum number of [events][docs.data-model] allowed in the buffer.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[104900000]}
+  groups={["v1","v2"]}
+  name={"max_size"}
+  path={"buffer"}
+  relevantWhen={{"type":"disk"}}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+#### max_size
+
+The maximum size of the buffer on the disk.
+ See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={["v1","v2"]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"block"}
+  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
+  examples={["block","drop_newest"]}
+  groups={["v1","v2"]}
+  name={"when_full"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### when_full
+
+The behavior when the buffer becomes full.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -285,6 +427,100 @@ Sets the write consistency for the point for InfluxDB 1.
 Sets the target database for the write into InfluxDB 1.
 
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={["v1","v2"]}
+  name={"encoding"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### encoding
+
+Configures the encoding specific sink behavior.
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={["v1","v2"]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={["v1","v2"]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={["v1","v2"]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -436,7 +672,7 @@ Configures the sink request behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"uint"}
+  type={"int"}
   unit={"requests"}
   warnings={[]}
   >
@@ -459,7 +695,7 @@ The maximum number of in-flight requests allowed at any given time.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"uint"}
+  type={"int"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -482,7 +718,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"uint"}
+  type={"int"}
   unit={null}
   warnings={[]}
   >
@@ -497,16 +733,16 @@ time window.
 </Field>
 <Field
   common={false}
-  defaultValue={18446744073709551615}
+  defaultValue={-1}
   enumValues={null}
-  examples={[18446744073709551615]}
+  examples={[-1]}
   groups={["v1","v2"]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"uint"}
+  type={"int"}
   unit={null}
   warnings={[]}
   >
@@ -530,7 +766,7 @@ intents and purposes, represents an infinite number of retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"uint"}
+  type={"int"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -555,7 +791,7 @@ to select future backoffs.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"uint"}
+  type={"int"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -578,7 +814,7 @@ The maximum amount of time, in seconds, to wait between retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"uint"}
+  type={"int"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -589,7 +825,7 @@ The maximum time a request can take before being aborted. It is highly
 recommended that you do not lower value below the service's internal timeout,
 as this could create orphaned requests, pile on retries, and result in
 duplicate data downstream.
-
+ See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -616,6 +852,31 @@ duplicate data downstream.
 
 Sets the target retention policy for the write into InfluxDB 1.
 
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["field1","parent.child_field"]]}
+  groups={["v1","v2"]}
+  name={"tags"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### tags
+
+A set of additional fields that will be attached to each LineProtocol as a tag.
+Note: If the set of tag values has high cardinality this also increase
+cardinality in InfluxDB.
+ See [Mapping Log Event into Line Protocol](#mapping-log-event-into-line-protocol) for more info.
 
 
 </Field>
@@ -671,6 +932,23 @@ write into InfluxDB 1.
 
 ## How It Works
 
+### Buffers & Batches
+
+<SVG src="/img/buffers-and-batches-serial.svg" />
+
+The `influxdb_logs` sink buffers & batches data as
+shown in the diagram above. You'll notice that Vector treats these concepts
+differently, instead of treating them as global concepts, Vector treats them
+as sink specific concepts. This isolates sinks, ensuring services disruptions
+are contained and [delivery guarantees][docs.guarantees] are honored.
+
+*Batches* are flushed when 1 of 2 conditions are met:
+
+1. The batch age meets or exceeds the configured [`timeout_secs`](#timeout_secs).
+2. The batch size meets or exceeds the configured [`max_size`](#max_size).
+
+*Buffers* are controlled via the [`buffer.*`](#buffer) options.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -701,20 +979,44 @@ vector --config /etc/vector/vector.toml --require-healthy
 If you'd like to disable health checks for this sink you can set the
 `healthcheck` option to `false`.
 
-### Metric Types
+### Mapping Log Event into Line Protocol
 
 InfluxDB uses [line protocol][urls.influxdb_line_protocol] to write data points. It is a text-based format that provides the measurement, tag set, field set, and timestamp of a data point.
 
-The following matrix outlines how Vector metric types are mapped into InfluxDB Line Protocol fields.
+A `Log Event` event contains an arbitrary set of fields (key/value pairs) that describe the event.
 
-| Vector Metrics | Line Protocol Fields                             | Example                                                                                                                                                   |
-|----------------|--------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Counter        | value                                            | `ns.total,metric_type=counter value=1.5 1542182950000000011`                                                                                              |
-| Gauge          | value                                            | `ns.meter,metric_type=gauge,normal_tag=value,true_tag=true value=-1.5 1542182950000000011`                                                                |
-| Set            | value                                            | `ns.users,metric_type=set,normal_tag=value,true_tag=true value=2 154218295000000001`                                                                      |
-| Histogram      | buckets, count, sum                              | `ns.requests,metric_type=histogram,normal_tag=value,true_tag=true bucket_1=1i,bucket_2.1=2i,bucket_3=3i,count=6i,sum=12.5 1542182950000000011`            |
-| Summary        | quantiles, count, sum                            | `ns.requests_sum,metric_type=summary,normal_tag=value,true_tag=true count=6i,quantile_0.01=1.5,quantile_0.5=2,quantile_0.99=3,sum=12 1542182950000000011` |
-| Distribution   | min, max, median, avg, sum, count, quantile 0.95 | `ns.sparse_stats,metric_type=distribution avg=3,count=10,max=4,median=3,min=1,quantile_0.95=4,sum=30 1542182950000000011`                                 |
+The following matrix outlines how Log Event fields are mapped into InfluxDB Line Protocol:
+
+| Field         | Line Protocol     |                                                                                                                                                 |
+|---------------|-------------------|
+| host          | tag               |
+| message       | field             |
+| source_type   | tag               |
+| timestamp     | timestamp         |
+| [custom-key]  | field             |
+
+The default behaviour could be overridden by a [`tags`](#tags) configuration.
+
+#### Mapping example
+
+The following example shows how is `Log Event` mapped into `Line Protocol`:
+
+##### Log Event
+
+```js
+{
+  "host": "my.host.com",
+  "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
+  "timestamp": "2019-11-01T21:15:47+00:00",
+  "custom_field": "custom_value"
+}
+```
+
+##### Line Protocol
+
+```influxdb_line_protocol
+ns.vector,host=my.host.com,metric_type=logs custom_field="custom_value",message="<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar" 1572642947000000000
+```
 
 ### Rate Limits
 
@@ -728,7 +1030,7 @@ any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issue][urls.new_influxdb_metrics_sink_issue].
+with the Vector team by [opening an issue][urls.new_influxdb_logs_sink_issue].
 
 ### Retry Policy
 
@@ -739,10 +1041,12 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model.metric]: /docs/about/data-model/metric/
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
+[docs.guarantees]: /docs/about/guarantees/
 [urls.influxdb]: https://www.influxdata.com/products/influxdb-overview/
 [urls.influxdb_authentication_token]: https://v2.docs.influxdata.com/v2.0/security/tokens/
 [urls.influxdb_http_api_v1]: https://docs.influxdata.com/influxdb/latest/tools/api/#write-http-endpoint
 [urls.influxdb_http_api_v2]: https://v2.docs.influxdata.com/v2.0/api/#tag/Write
 [urls.influxdb_line_protocol]: https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
-[urls.new_influxdb_metrics_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+influxdb_metrics
+[urls.new_influxdb_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+influxdb_logs

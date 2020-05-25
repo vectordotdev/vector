@@ -1,0 +1,79 @@
+<%- component = metadata.sinks.influxdb_logs -%>
+
+<%= component_header(component) %>
+
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
+## Configuration
+
+<%= component_config_example(component) %>
+
+<%= fields(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= fields(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
+
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
+
+<%- end -%>
+## How It Works [[sort]]
+
+### Mapping Log Event into Line Protocol
+
+InfluxDB uses [line protocol][urls.influxdb_line_protocol] to write data points. It is a text-based format that provides the measurement, tag set, field set, and timestamp of a data point.
+
+A `Log Event` event contains an arbitrary set of fields (key/value pairs) that describe the event.
+
+The following matrix outlines how Log Event fields are mapped into InfluxDB Line Protocol:
+
+| Field         | Line Protocol     |                                                                                                                                                 |
+|---------------|-------------------|
+| host          | tag               |
+| message       | field             |
+| source_type   | tag               |
+| timestamp     | timestamp         |
+| [custom-key]  | field             |
+
+The default behaviour could be overridden by a `tags` configuration.
+
+#### Mapping example
+
+The following example shows how is `Log Event` mapped into `Line Protocol`:
+
+##### Log Event
+
+```js
+{
+  "host": "my.host.com",
+  "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
+  "timestamp": "2019-11-01T21:15:47+00:00",
+  "custom_field": "custom_value"
+}
+```
+
+##### Line Protocol
+
+```influxdb_line_protocol
+ns.vector,host=my.host.com,metric_type=logs custom_field="custom_value",message="<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar" 1572642947000000000
+```
+
+<%= component_sections(component) %>
+
+
