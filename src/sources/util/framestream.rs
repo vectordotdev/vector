@@ -30,21 +30,23 @@ struct FrameStreamReader<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> {
 struct FrameStreamState {
     expect_control_frame: bool,
     control_state: ControlState,
+    is_bidirectional: bool,
 }
 impl FrameStreamState {
     fn new() -> Self {
         FrameStreamState {
             expect_control_frame: false,
-            //first control frame should be READY
-            control_state: ControlState::ReadingControlReady,
+            //first control frame should be READY (if bidirectional -- if unidirectional first will be START)
+            control_state: ControlState::Initial,
+            is_bidirectional: true, //assume
         }
     }
 }
 
 #[derive(PartialEq, Debug)]
 enum ControlState {
-    ReadingControlReady,
-    ReadingControlStart,
+    Initial,
+    GotReady,
     ReadingData,
     Stopped,
 }
@@ -156,17 +158,24 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
 
         //match current state to received header
         match self.state.control_state {
-            ControlState::ReadingControlReady => {
+            ControlState::Initial => {
                 match header {
                     ControlHeader::Ready => {
                         let content_type = self.process_fields(header, &mut frame)?.unwrap();
                         self.send_control_frame(Self::make_frame(ControlHeader::Accept, Some(content_type)));
-                        self.state.control_state = ControlState::ReadingControlStart; //waiting for a START control frame
+                        self.state.control_state = ControlState::GotReady; //waiting for a START control frame
                     },
+                    ControlHeader::Start => {
+                        //check for content type
+                        let _ = self.process_fields(header, &mut frame)?;
+                        //if didn't error, then we are ok to change state
+                        self.state.control_state = ControlState::ReadingData;
+                        self.state.is_bidirectional = false; //if first message was START then we are unidirectional (no responses)
+                    }
                     _ => error!("Got wrong control frame, expected READY"),
                 }
             },
-            ControlState::ReadingControlStart => {
+            ControlState::GotReady => {
                 match header {
                     ControlHeader::Start => {
                         //check for content type
@@ -182,7 +191,10 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
                     ControlHeader::Stop => {
                         //check there aren't any fields
                         let _ = self.process_fields(header, &mut frame)?;
-                        self.send_control_frame(Self::make_frame(ControlHeader::Finish, None)); //send FINISH frame
+                        if self.state.is_bidirectional {
+                            //send FINISH frame -- but only if we are bidirectional
+                            self.send_control_frame(Self::make_frame(ControlHeader::Finish, None));
+                        }
                         self.state.control_state = ControlState::Stopped; //stream is now done
                     },
                     _ => error!("Got wrong control frame, expected STOP"),
@@ -492,15 +504,18 @@ mod test {
         send_data_frames(sock_sink, vec![Bytes::new(), frame]) //send empty frame to say we are control frame
     }
 
-    fn create_ready_frame(content_types: Vec<Bytes>) -> Bytes {
-        let mut ready_msg = Bytes::new();
-        ready_msg.extend(&ControlHeader::Ready.to_u32().to_be_bytes());
+    fn create_control_frame(header: ControlHeader) -> Bytes {
+        Bytes::from(&header.to_u32().to_be_bytes()[..])
+    }
+
+    fn create_control_frame_with_content(header: ControlHeader, content_types: Vec<Bytes>) -> Bytes {
+        let mut frame = create_control_frame(header);
         for content_type in content_types {
-            ready_msg.extend(&ControlField::ContentType.to_u32().to_be_bytes());
-            ready_msg.extend(&(content_type.len() as u32).to_be_bytes());
-            ready_msg.extend(content_type.clone());
+            frame.extend(&ControlField::ContentType.to_u32().to_be_bytes());
+            frame.extend(&(content_type.len() as u32).to_be_bytes());
+            frame.extend(content_type.clone());
         }
-        ready_msg
+        frame
     }
 
     fn assert_accept_frame(frame: &mut BytesMut, expected_content_type: Bytes) {
@@ -539,7 +554,7 @@ mod test {
 
         //1 - send READY frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
-        let ready_msg = create_ready_frame(vec![content_type.clone()]);
+        let ready_msg = create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
         sock_sink = send_control_frame(sock_sink, ready_msg);
         
         //2 - wait for ACCEPT frame
@@ -550,14 +565,14 @@ mod test {
         assert_accept_frame(&mut frame_vec[1], content_type);
 
         //3 - send START frame
-        sock_sink = send_control_frame(sock_sink, Bytes::from(&ControlHeader::Start.to_u32().to_be_bytes()[..]));
+        sock_sink = send_control_frame(sock_sink, create_control_frame(ControlHeader::Start));
 
         //4 - send data
         sock_sink = send_data_frames(sock_sink, vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])]);
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
         //5 - send STOP frame
-        let _ = send_control_frame(sock_sink, Bytes::from(&ControlHeader::Stop.to_u32().to_be_bytes()[..]));
+        let _ = send_control_frame(sock_sink, create_control_frame(ControlHeader::Stop));
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -582,7 +597,7 @@ mod test {
 
         //1 - send READY frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
-        let ready_msg = create_ready_frame(vec![Bytes::from(&b"test_content2"[..]), content_type.clone()]); //can have multiple content types
+        let ready_msg = create_control_frame_with_content(ControlHeader::Ready, vec![Bytes::from(&b"test_content2"[..]), content_type.clone()]); //can have multiple content types
         let _ = send_control_frame(sock_sink, ready_msg);
         
         //2 - wait for ACCEPT frame
@@ -606,12 +621,12 @@ mod test {
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).split();
 
         //1 - send READY frame (with WRONG content_type)
-        let ready_msg = create_ready_frame(vec![Bytes::from(&b"test_content2"[..])]); //can have multiple content types
+        let ready_msg = create_control_frame_with_content(ControlHeader::Ready, vec![Bytes::from(&b"test_content2"[..])]); //can have multiple content types
         sock_sink = send_control_frame(sock_sink, ready_msg);
 
         //2 - send READY frame (with RIGHT content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
-        let ready_msg = create_ready_frame(vec![content_type.clone()]);
+        let ready_msg = create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
         let _ = send_control_frame(sock_sink, ready_msg);
         
         //3 - wait for ACCEPT frame
@@ -639,7 +654,7 @@ mod test {
 
         //2 - send READY frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
-        let ready_msg = create_ready_frame(vec![content_type.clone()]);
+        let ready_msg = create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
         sock_sink = send_control_frame(sock_sink, ready_msg);
         
         //3 - wait for ACCEPT frame
@@ -651,14 +666,14 @@ mod test {
         assert_accept_frame(&mut frame_vec[1], content_type);
 
         //4 - send START frame
-        sock_sink = send_control_frame(sock_sink, Bytes::from(&ControlHeader::Start.to_u32().to_be_bytes()[..]));
+        sock_sink = send_control_frame(sock_sink, create_control_frame(ControlHeader::Start));
 
         //5 - send data (will go through)
         sock_sink = send_data_frames(sock_sink, vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])]);
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
         //6 - send STOP frame
-        let _ = send_control_frame(sock_sink, Bytes::from(&ControlHeader::Stop.to_u32().to_be_bytes()[..]));
+        let _ = send_control_frame(sock_sink, create_control_frame(ControlHeader::Stop));
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -670,5 +685,38 @@ mod test {
         );
 
         std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+    }
+
+    #[test]
+    fn unidirectional_framestream() {
+        let (tx, rx) = mpsc::channel(2);
+        let (path, mut rt) = init_framstream_unix(
+            "test_content".to_string(),
+            tx,
+        );
+        let (mut sock_sink, _) = make_unix_stream(path).split();
+
+        //1 - send START frame (with content_type)
+        let content_type = Bytes::from(&b"test_content"[..]);
+        let start_msg = create_control_frame_with_content(ControlHeader::Start, vec![content_type.clone()]);
+        sock_sink = send_control_frame(sock_sink, start_msg);
+
+        //4 - send data
+        sock_sink = send_data_frames(sock_sink, vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])]);
+        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
+
+        //5 - send STOP frame
+        let _ = send_control_frame(sock_sink, create_control_frame(ControlHeader::Stop));
+
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "hello".into(),
+        );
+        assert_eq!(
+            events[1].as_log()[&event::log_schema().message_key()],
+            "world".into(),
+        );
+
+        // std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
     }
 }
