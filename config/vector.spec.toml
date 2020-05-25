@@ -61,15 +61,6 @@ dns_servers = ["0.0.0.0:53"]
   host_key = "instance"
   host_key = "machine"
 
-  # The key under which Kubernetes related fields are nested.
-  #
-  # * optional
-  # * default: "kubernetes"
-  # * type: string
-  kubernetes_key = "kubernetes"
-  kubernetes_key = "kube"
-  kubernetes_key = "k8s"
-
   # The key used to hold the log message. See the log data model page for more
   # info.
   #
