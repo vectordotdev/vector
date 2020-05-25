@@ -308,6 +308,9 @@ mod tests {
         }
     }
 
+    // A type alias to add expressiveness.
+    type StateSnapshot = Vec<Pod>;
+
     // A helper enum to encode expected mock watcher invocation.
     enum ExpInvRes {
         Stream(Vec<WatchEvent<Pod>>),
@@ -350,10 +353,9 @@ mod tests {
 
     // A helper function to run a flow test.
     // Use this to test various flows without an actual test repetition.
-    // TODO: add intermediate state assertions to validate caching properties.
     fn run_flow_test(
-        invocations: Vec<(Option<String>, ExpInvRes)>,
-        expected_resulting_state: Vec<Pod>,
+        invocations: Vec<(StateSnapshot, Option<String>, ExpInvRes)>,
+        expected_resulting_state: StateSnapshot,
     ) {
         // Prepare the test flow.
         let (state_reader, state_writer) = evmap10::new();
@@ -364,9 +366,16 @@ mod tests {
         let mut flow_invocations = invocations.into_iter();
 
         let mock_logic = move |watch_optional: WatchOptional<'_>| {
-            if let Some((expected_resource_version, expected_invocation_response)) =
-                flow_invocations.next()
+            if let Some((
+                expected_state_before_op,
+                expected_resource_version,
+                expected_invocation_response,
+            )) = flow_invocations.next()
             {
+                // Assert the state prior to the operation.
+                let state: StateSnapshot = gather_state(&assertion_state_reader);
+                assert_eq!(state, expected_state_before_op);
+
                 assert_eq!(
                     expected_resource_version,
                     watch_optional.resource_version.map(ToOwned::to_owned) // work around the borrow checker issues
@@ -383,7 +392,7 @@ mod tests {
                 return Ok(move || responses_iter.next().map(|val| Ok(WatchResponse::Ok(val))));
             }
 
-            let resulting_state: Vec<Pod> = gather_state(&assertion_state_reader);
+            let resulting_state: StateSnapshot = gather_state(&assertion_state_reader);
             assert_eq!(resulting_state, flow_expected_resulting_state);
 
             Err(watcher::invocation::Error::other(InvocationError))
@@ -403,7 +412,7 @@ mod tests {
             result.unwrap_err();
 
             // Assert the state after the reflector exit.
-            let resulting_state: Vec<Pod> = gather_state(&state_reader);
+            let resulting_state: StateSnapshot = gather_state(&state_reader);
             assert_eq!(resulting_state, expected_resulting_state);
 
             // Explicitly drop the reflector at the very end.
@@ -420,6 +429,7 @@ mod tests {
 
         let invocations = vec![
             (
+                vec![],
                 None,
                 ExpInvRes::Stream(vec![
                     WatchEvent::Added(make_pod("uid0", "10")),
@@ -427,6 +437,7 @@ mod tests {
                 ]),
             ),
             (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 Some("15".to_owned()),
                 ExpInvRes::Stream(vec![
                     WatchEvent::Modified(make_pod("uid0", "20")),
@@ -434,10 +445,20 @@ mod tests {
                 ]),
             ),
             (
+                vec![
+                    make_pod("uid0", "20"),
+                    make_pod("uid1", "15"),
+                    make_pod("uid2", "25"),
+                ],
                 Some("25".to_owned()),
                 ExpInvRes::Stream(vec![WatchEvent::Bookmark(make_pod_bookmark("50"))]),
             ),
             (
+                vec![
+                    make_pod("uid0", "20"),
+                    make_pod("uid1", "15"),
+                    make_pod("uid2", "25"),
+                ],
                 Some("50".to_owned()),
                 ExpInvRes::Stream(vec![
                     WatchEvent::Deleted(make_pod("uid2", "55")),
@@ -458,14 +479,20 @@ mod tests {
 
         let invocations = vec![
             (
+                vec![],
                 None,
                 ExpInvRes::Stream(vec![
                     WatchEvent::Added(make_pod("uid0", "10")),
                     WatchEvent::Added(make_pod("uid1", "15")),
                 ]),
             ),
-            (Some("15".to_owned()), ExpInvRes::Desync),
             (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                Some("15".to_owned()),
+                ExpInvRes::Desync,
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 None,
                 ExpInvRes::Stream(vec![
                     WatchEvent::Added(make_pod("uid20", "1000")),
@@ -473,6 +500,7 @@ mod tests {
                 ]),
             ),
             (
+                vec![make_pod("uid20", "1000"), make_pod("uid21", "1005")],
                 Some("1005".to_owned()),
                 ExpInvRes::Stream(vec![WatchEvent::Modified(make_pod("uid21", "1010"))]),
             ),
