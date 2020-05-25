@@ -6571,7 +6571,7 @@ require('custom_module')
   # The optional host to send Humio logs to.
   #
   # * optional
-  # * no default
+  # * default: "https://cloud.humio.com"
   # * type: string
   host = "http://myhumiohost.com"
 
