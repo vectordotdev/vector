@@ -436,7 +436,7 @@ The behavior when the buffer becomes full.
 <Field
   common={true}
   defaultValue={"none"}
-  enumValues={{"none":"The payload will not be compressed.","gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
   examples={["none","gzip"]}
   groups={[]}
   name={"compression"}
@@ -452,7 +452,7 @@ The behavior when the buffer becomes full.
 ### compression
 
 The compression strategy used to compress the encoded event data before
-outputting.
+transmission.
 
 
 

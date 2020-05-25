@@ -85,19 +85,13 @@ required = true
 relevant_when = {strategy = "bearer"}
 description = "The token to use for bearer authentication"
 
-[sinks.clickhouse.options.compression]
-type = "string"
-category = "requests"
-common = true
-default = "none"
-description = """\
-The compression strategy used to compress the encoded event data before \
-outputting.\
-"""
-
-[sinks.clickhouse.options.compression.enum]
-none = "The payload will not be compressed."
-gzip = "The payload will be compressed in [Gzip][urls.gzip] format before being sent."
+<%= render("_partials/fields/_compression_options.toml",
+  namespace: "sinks.clickhouse.options",
+  options: {
+    "category" => "Requests",
+    "default" => "gzip"
+  }
+) %>
 
 [sinks.clickhouse.options.host]
 type = "string"

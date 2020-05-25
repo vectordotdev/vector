@@ -6,7 +6,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto, BatchBytesConfig, Buffer, PartitionBatchSink, PartitionBuffer,
+        rusoto, BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
         PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
@@ -51,6 +51,7 @@ pub struct S3SinkConfig {
         default
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
+    #[serde(default = "Compression::default_gzip")]
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -124,15 +125,6 @@ pub enum Encoding {
     Ndjson,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Compression {
-    #[derivative(Default)]
-    Gzip,
-    None,
-}
-
 inventory::submit! {
     SinkDescription::new::<S3SinkConfig>("aws_s3")
 }
@@ -170,10 +162,7 @@ impl S3Sink {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
-        let compression = match config.compression {
-            Compression::Gzip => true,
-            Compression::None => false,
-        };
+        let compression = config.compression;
         let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
         let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
         let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
@@ -209,7 +198,7 @@ impl S3Sink {
             .settings(request, S3RetryLogic)
             .service(s3);
 
-        let buffer = PartitionBuffer::new(Buffer::new(compression));
+        let buffer = PartitionBuffer::new(Buffer::new(config.compression));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
@@ -314,7 +303,7 @@ fn build_request(
     time_format: String,
     extension: Option<String>,
     uuid: bool,
-    gzip: bool,
+    compression: Compression,
     bucket: String,
     options: S3Options,
 ) -> Request {
@@ -332,10 +321,8 @@ fn build_request(
         }
     };
 
-    let extension = extension.unwrap_or_else(|| if gzip { "log.gz".into() } else { "log".into() });
-
+    let extension = extension.unwrap_or_else(|| compression.extension().into());
     let key = String::from_utf8_lossy(&key[..]).into_owned();
-
     let key = format!("{}{}.{}", key, filename, extension);
 
     debug!(
@@ -349,7 +336,7 @@ fn build_request(
         body: inner,
         bucket,
         key,
-        content_encoding: if gzip { Some("gzip".to_string()) } else { None },
+        content_encoding: compression.content_encoding().map(|ce| ce.to_string()),
         options,
     }
 }
@@ -489,7 +476,7 @@ mod tests {
             "date".into(),
             Some("ext".into()),
             false,
-            false,
+            Compression::None,
             "bucket".into(),
             S3Options::default(),
         );
@@ -500,7 +487,7 @@ mod tests {
             "date".into(),
             None,
             false,
-            false,
+            Compression::None,
             "bucket".into(),
             S3Options::default(),
         );
@@ -511,7 +498,7 @@ mod tests {
             "date".into(),
             None,
             false,
-            true,
+            Compression::Gzip,
             "bucket".into(),
             S3Options::default(),
         );
@@ -522,7 +509,7 @@ mod tests {
             "date".into(),
             None,
             true,
-            true,
+            Compression::Gzip,
             "bucket".into(),
             S3Options::default(),
         );

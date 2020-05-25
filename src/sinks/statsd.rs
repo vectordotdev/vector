@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     event::metric::{MetricKind, MetricValue},
     event::Event,
-    sinks::util::{BatchBytesConfig, BatchSink, Buffer},
+    sinks::util::{BatchBytesConfig, BatchSink, Buffer, Compression},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::{future, stream::iter_ok, Future, Poll, Sink};
@@ -92,7 +92,7 @@ impl StatsdSvc {
 
         let svc = ServiceBuilder::new().service(service);
 
-        let sink = BatchSink::new(svc, Buffer::new(false), batch, acker)
+        let sink = BatchSink::new(svc, Buffer::new(Compression::None), batch, acker)
             .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
             .with_flat_map(move |event| iter_ok(encode_event(event, &namespace)));
 

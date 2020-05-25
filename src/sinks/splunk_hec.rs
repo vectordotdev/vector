@@ -42,7 +42,8 @@ pub struct HecSinkConfig {
         default
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
-    pub compression: Option<Compression>,
+    #[serde(default)]
+    pub compression: Compression,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     #[serde(default)]
@@ -87,7 +88,7 @@ impl SinkConfig for HecSinkConfig {
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            Buffer::new(self.is_gzip()),
+            Buffer::new(self.compression),
             request,
             batch,
             tls_settings,
@@ -187,19 +188,13 @@ impl HttpSink for HecSinkConfig {
 
         builder.header("Content-Type", "application/json");
 
-        if self.is_gzip() {
-            builder.header("Content-Encoding", "gzip");
+        if let Some(ce) = self.compression.content_encoding() {
+            builder.header("Content-Encoding", ce);
         }
 
         builder.header("Authorization", token.clone());
 
         builder.body(events).unwrap()
-    }
-}
-
-impl HecSinkConfig {
-    fn is_gzip(&self) -> bool {
-        matches!(&self.compression, Some(Compression::Gzip))
     }
 }
 
@@ -725,7 +720,7 @@ mod integration_tests {
             host: "http://localhost:8088/".into(),
             token: get_token(),
             host_key: "host".into(),
-            compression: Some(Compression::None),
+            compression: Compression::None,
             encoding: encoding.into(),
             batch: BatchBytesConfig {
                 max_size: Some(1),

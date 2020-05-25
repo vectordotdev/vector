@@ -59,8 +59,8 @@ The Vector `clickhouse` sink
   host = "http://localhost:8123" # required
   table = "mytable" # required
 
-  # requests
-  compression = "none" # optional, default
+  # Requests
+  compression = "gzip" # optional, default
 ```
 
 </TabItem>
@@ -106,8 +106,8 @@ The Vector `clickhouse` sink
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 30 # optional, default, seconds
 
-  # requests
-  compression = "none" # optional, default
+  # Requests
+  compression = "gzip" # optional, default
 
   # TLS
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
@@ -429,8 +429,8 @@ The behavior when the buffer becomes full.
 </Field>
 <Field
   common={true}
-  defaultValue={"none"}
-  enumValues={{"none":"The payload will not be compressed.","gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
+  defaultValue={"gzip"}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
   examples={["none","gzip"]}
   groups={[]}
   name={"compression"}
@@ -446,7 +446,7 @@ The behavior when the buffer becomes full.
 ### compression
 
 The compression strategy used to compress the encoded event data before
-outputting.
+transmission.
 
 
 

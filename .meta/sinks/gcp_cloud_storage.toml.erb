@@ -145,15 +145,9 @@ description = "The filename extension to use in the object name."
   encodings: ["ndjson", "text"]
 ) %>
 
-[sinks.gcp_cloud_storage.options.compression]
-type = "string"
-common = true
-required = true
-description = "The compression mechanism to use."
-
-[sinks.gcp_cloud_storage.options.compression.enum]
-gzip = "GZIP compression"
-none = "No compression"
+<%= render("_partials/fields/_compression_options.toml",
+  namespace: "sinks.gcp_cloud_storage.options"
+) %>
 
 <%= render(
   "_partials/fields/_tls_connector_options.toml",

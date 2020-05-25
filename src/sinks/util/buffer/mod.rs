@@ -9,11 +9,33 @@ pub mod partition;
 
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Derivative, Copy, Clone, Eq, PartialEq)]
+#[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Compression {
+    #[derivative(Default)]
     None,
     Gzip,
+}
+
+impl Compression {
+    pub fn default_gzip() -> Compression {
+        Compression::Gzip
+    }
+
+    pub fn content_encoding(&self) -> Option<&'static str> {
+        match self {
+            Self::None => None,
+            Self::Gzip => Some("gzip"),
+        }
+    }
+
+    pub fn extension(&self) -> &'static str {
+        match self {
+            Self::None => "log",
+            Self::Gzip => "log.gz",
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -29,11 +51,12 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
-    pub fn new(gzip: bool) -> Self {
-        let inner = if gzip {
-            InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::fast()))
-        } else {
-            InnerBuffer::Plain(Vec::new())
+    pub fn new(compression: Compression) -> Self {
+        let inner = match compression {
+            Compression::None => InnerBuffer::Plain(Vec::new()),
+            Compression::Gzip => {
+                InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::fast()))
+            }
         };
         Self {
             inner,
@@ -115,7 +138,7 @@ impl Batch for Buffer {
 
 #[cfg(test)]
 mod test {
-    use super::Buffer;
+    use super::{Buffer, Compression};
     use crate::buffers::Acker;
     use crate::sinks::util::{BatchSettings, BatchSink};
     use crate::test_util::runtime;
@@ -144,7 +167,7 @@ mod test {
         });
         let buffered = BatchSink::with_executor(
             svc,
-            Buffer::new(true),
+            Buffer::new(Compression::Gzip),
             BatchSettings {
                 timeout: Duration::from_secs(0),
                 size: 1000,

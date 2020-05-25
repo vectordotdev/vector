@@ -39,7 +39,8 @@ pub struct ElasticSearchConfig {
     pub index: Option<String>,
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
-    pub compression: Option<Compression>,
+    #[serde(default)]
+    pub compression: Compression,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -99,15 +100,14 @@ impl SinkConfig for ElasticSearchConfig {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let healthcheck = healthcheck(cx.resolver(), &common)?;
 
+        let compression = common.compression;
         let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = common.tls_settings.clone();
 
-        let gzip = common.compression == Compression::Gzip;
-
         let sink = BatchedHttpSink::with_retry_logic(
             common,
-            Buffer::new(gzip),
+            Buffer::new(compression),
             ElasticSearchRetryLogic,
             request,
             batch,
@@ -153,6 +153,8 @@ enum ParseError {
     AWSCredentialsProviderFailed { source: CredentialsError },
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
+    #[snafu(display("Compression can not be used with AWS hosted Elasticsearch"))]
+    AWSCompressionNotAllowed,
 }
 
 impl HttpSink for ElasticSearchCommon {
@@ -224,8 +226,8 @@ impl HttpSink for ElasticSearchCommon {
         } else {
             builder.header("Content-Type", "application/x-ndjson");
 
-            if self.compression == Compression::Gzip {
-                builder.header("Content-Encoding", "gzip");
+            if let Some(ce) = self.compression.content_encoding() {
+                builder.header("Content-Encoding", ce);
             }
 
             if let Some(headers) = &self.config.headers {
@@ -326,13 +328,11 @@ impl ElasticSearchCommon {
             }
         };
 
-        // Only apply compression if explicitly selected and we are
-        // running with no AWS credentials.
-        let compression = match (&credentials, config.compression) {
-            (Some(_), _) => Compression::None,
-            (_, None) => Compression::None,
-            (None, Some(c)) => c,
-        };
+        // Only allow compression if we are running with no AWS credentials.
+        let compression = config.compression;
+        if credentials.is_some() && compression != Compression::None {
+            return Err(ParseError::AWSCompressionNotAllowed.into());
+        }
 
         let index = if let Some(idx) = &config.index {
             Template::from(idx.as_str())
@@ -531,7 +531,7 @@ mod integration_tests {
             index: Some(index.clone()),
             doc_type: Some("log_lines".into()),
             id_key: Some("my_id".into()),
-            compression: Some(Compression::None),
+            compression: Compression::None,
             ..config()
         };
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
@@ -582,7 +582,7 @@ mod integration_tests {
             ElasticSearchConfig {
                 host: "http://localhost:9200".into(),
                 doc_type: Some("log_lines".into()),
-                compression: Some(Compression::None),
+                compression: Compression::None,
                 ..config()
             },
             false,
@@ -595,7 +595,7 @@ mod integration_tests {
             ElasticSearchConfig {
                 host: "https://localhost:9201".into(),
                 doc_type: Some("log_lines".into()),
-                compression: Some(Compression::None),
+                compression: Compression::None,
                 tls: Some(TlsOptions {
                     ca_path: Some("tests/data/Vector_CA.crt".into()),
                     ..Default::default()
@@ -624,7 +624,7 @@ mod integration_tests {
             ElasticSearchConfig {
                 host: "http://localhost:9200".into(),
                 doc_type: Some("log_lines".into()),
-                compression: Some(Compression::None),
+                compression: Compression::None,
                 ..config()
             },
             true,

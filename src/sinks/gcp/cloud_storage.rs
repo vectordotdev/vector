@@ -7,8 +7,8 @@ use crate::{
             encoding::{EncodingConfig, EncodingConfiguration},
             http::{HttpClient, HttpClientFuture},
             retries::{RetryAction, RetryLogic},
-            BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
-            TowerRequestConfig,
+            BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
+            PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
@@ -62,6 +62,7 @@ pub struct GcsSinkConfig {
     filename_append_uuid: Option<bool>,
     filename_extension: Option<String>,
     encoding: EncodingConfig<Encoding>,
+    #[serde(default)]
     compression: Compression,
     #[serde(default)]
     batch: BatchBytesConfig,
@@ -84,7 +85,7 @@ fn default_config(e: Encoding) -> GcsSinkConfig {
         filename_append_uuid: Default::default(),
         filename_extension: Default::default(),
         encoding: e.into(),
-        compression: Default::default(),
+        compression: Compression::Gzip,
         batch: Default::default(),
         request: Default::default(),
         auth: Default::default(),
@@ -136,30 +137,6 @@ impl Encoding {
         match self {
             Self::Text => "text/plain",
             Self::Ndjson => "application/x-ndjson",
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Copy, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-enum Compression {
-    #[derivative(Default)]
-    Gzip,
-    None,
-}
-
-impl Compression {
-    fn content_encoding(&self) -> Option<&'static str> {
-        match self {
-            Self::Gzip => Some("gzip"),
-            Self::None => None,
-        }
-    }
-    fn extension(&self) -> &'static str {
-        match self {
-            Self::Gzip => "log.gz",
-            Self::None => "log",
         }
     }
 }
@@ -218,10 +195,6 @@ impl GcsSink {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
-        let compression = match config.compression {
-            Compression::Gzip => true,
-            Compression::None => false,
-        };
         let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
 
         let key_prefix = if let Some(kp) = &config.key_prefix {
@@ -237,9 +210,9 @@ impl GcsSink {
             .settings(request, GcsRetryLogic)
             .service(self);
 
-        let buffer = PartitionBuffer::new(Buffer::new(compression));
+        let buffer = PartitionBuffer::new(Buffer::new(config.compression));
 
-        let sink = crate::sinks::util::PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+        let sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
             .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
@@ -538,7 +511,7 @@ mod tests {
             filename_time_format: Some("date".into()),
             filename_extension: extension.map(Into::into),
             filename_append_uuid: Some(uuid),
-            compression: compression,
+            compression,
             ..default_config(Encoding::Ndjson)
         })
         .expect("Could not create request settings")
