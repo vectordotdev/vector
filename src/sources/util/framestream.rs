@@ -18,6 +18,9 @@ use tokio_uds::UnixListener;
 use tracing::field;
 use tracing_futures::Instrument;
 
+const FSTRM_CONTROL_FRAME_LENGTH_MAX: usize = 512;
+const FSTRM_CONTROL_FIELD_CONTENT_TYPE_LENGTH_MAX: usize = 256;
+
 struct FrameStreamReader<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> {
     response_sink: Option<S>,
     expected_content_type: String,
@@ -144,6 +147,11 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
     }
 
     fn handle_control_frame(&mut self, mut frame: Bytes) -> Result<(), ()> {
+        //enforce maximum control frame size
+        if frame.len() > FSTRM_CONTROL_FRAME_LENGTH_MAX {
+            error!("Control frame is too long.");
+        }
+
         let header = ControlHeader::from_u32(advance_u32(&mut frame)?)?;
 
         //match current state to received header
@@ -236,6 +244,13 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
                 ControlField::ContentType => {
                     //4 bytes giving length of content type
                     let field_len = advance_u32(frame)? as usize;
+
+                    //enforce limit on content type string
+                    if field_len > FSTRM_CONTROL_FIELD_CONTENT_TYPE_LENGTH_MAX {
+                        error!("Content-Type string is too long");
+                        return Err(());
+                    }
+
                     let content_type = std::str::from_utf8(&frame[..field_len]).unwrap();
                     content_types.push(content_type.to_string());
                     frame.advance(field_len);
