@@ -44,6 +44,9 @@ mv "vector-$TARGET/bin/vector" "$PROJECT_ROOT/target/$TARGET/release"
 popd
 rm -rf "$td"
 
+# Display disk space
+df -h
+
 #
 # Package
 #
