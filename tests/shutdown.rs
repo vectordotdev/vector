@@ -336,3 +336,45 @@ fn timely_shutdown_internal_metrics() {
     type = "internal_metrics""#,
     ));
 }
+
+#[test]
+fn timely_shutdown_lua_timer() {
+    test_timely_shutdown(vector(
+        r#"
+[sources.source]
+   type = "stdin"
+
+[transforms.transform]
+  type = "lua"
+  inputs = ["source"]
+  version = "2"
+
+  hooks.process = "process"
+
+  timers = [
+  {interval_seconds = 5, handler = "timer_handler"}
+  ]
+
+  source = """
+    function process(event, emit)
+      emit(event)
+    end
+
+    function timer_handler(emit)
+      event = {
+        log = {
+          message = "Heartbeat",
+        }
+      }
+      return event
+    end
+  """
+
+[sinks.sink]
+  type = "console"
+  inputs = ["transform"]
+  encoding = "text"
+  target = "stdout"
+"#,
+    ));
+}

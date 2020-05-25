@@ -1,4 +1,4 @@
-use crate::{event::Event, transforms::Transform};
+use crate::{event::Event, stream::StreamExt, transforms::Transform};
 use futures01::{stream, Future, Stream as FutureStream};
 use std::time::Duration;
 use tokio01::timer::Interval;
@@ -97,7 +97,7 @@ where
 
                     init_msg
                         .chain(first_event)
-                        .chain(rest_events_and_shutdown_msg.select(timer_msgs))
+                        .chain(rest_events_and_shutdown_msg.weak_select(timer_msgs))
                 })
                 .map_err(|_| ())
                 .into_stream()
