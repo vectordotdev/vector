@@ -1,4 +1,4 @@
-//! Shared state bits for watch implementations.
+//! A resource version types to ensure proper usage protocol.
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent};
 use k8s_openapi::Metadata;
