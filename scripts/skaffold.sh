@@ -12,10 +12,6 @@ cat <<EOF >target/debug/.dockerignore
 !vector
 EOF
 
-# Configure docker (and skaffold) to use minikube docker host.
-# shellcheck source=minikube-docker-env.sh disable=SC1091
-. scripts/minikube-docker-env.sh
-
 # Watch for changes in he background and rebuild the vector binary.
 cargo watch -x build &
 
