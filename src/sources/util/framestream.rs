@@ -6,13 +6,14 @@ use crate::{
     stream::StreamExt,
 };
 use bytes::Bytes;
-use futures01::{future, sync::mpsc, Future, IntoFuture, Sink, Stream};
+use futures01::{future, sync::mpsc, Future, Sink, Stream};
 #[cfg(unix)]
 use std::path::PathBuf;
 use std::convert::TryInto;
 use tokio01::{
     self,
     codec::{Framed, length_delimited},
+    sync::lock::Lock,
 };
 use tokio_uds::UnixListener;
 use tracing::field;
@@ -21,8 +22,10 @@ use tracing_futures::Instrument;
 const FSTRM_CONTROL_FRAME_LENGTH_MAX: usize = 512;
 const FSTRM_CONTROL_FIELD_CONTENT_TYPE_LENGTH_MAX: usize = 256;
 
-struct FrameStreamReader<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> {
-    response_sink: Option<S>,
+pub type FrameStreamSink = Box<dyn Sink<SinkItem = Bytes, SinkError = std::io::Error> + Send>;
+
+struct FrameStreamReader{
+    response_sink: Lock<Option<FrameStreamSink>>,
     expected_content_type: String,
     state: FrameStreamState,
 }
@@ -116,10 +119,10 @@ fn advance_u32(b: &mut Bytes) -> Result<u32, ()> {
     Ok(u32::from_be_bytes(a[..].try_into().unwrap()))
 }
 
-impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> {
-    pub fn new(response_sink: S, expected_content_type: String) -> Self {
+impl FrameStreamReader {
+    pub fn new(response_sink: FrameStreamSink, expected_content_type: String) -> Self {
         FrameStreamReader {
-            response_sink: Some(response_sink),
+            response_sink: Lock::new(Some(response_sink)),
             expected_content_type,
             state: FrameStreamState::new(),
         }
@@ -300,13 +303,16 @@ impl<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>> FrameStreamReader<S> 
         let empty_frame = Bytes::from(&b""[..]); //send empty frame to say we are control frame
         let stream = futures01::stream::iter_ok::<_, std::io::Error>(vec![empty_frame, frame].into_iter());
 
-        //send and send_all consume the sink
-        let mut tmp_sink = self.response_sink.take().unwrap();
-        //get the sink back as first element of tuple
-        tmp_sink = tmp_sink.send_all(stream).into_future().wait().unwrap().0; //TODO: better way than .wait().unwrap() (?)
-        self.response_sink = Some(tmp_sink);
+        self.response_sink.poll_lock().map(|mut sink| {
+            //send and send_all consume the sink so need to use Option so we can .take()
+            //get the sink back as first element of tuple
+            let handler = sink.take().unwrap().send_all(stream).and_then(move |(same_sink, _stream)| {
+                *sink = Some(same_sink);
+                futures01::done(Ok(()))
+            }).map_err(|_e| ());
+            tokio01::spawn(handler);
+        });
     }
-
 }
 
 
@@ -362,7 +368,7 @@ pub fn build_framestream_unix_source(
                     path.map(|p| p.to_string_lossy().into_owned().into());
                 
                 let (sock_sink, sock_stream) = Framed::new(socket, length_delimited::Builder::new().max_frame_length(max_length).new_codec()).split();
-                let mut fs_reader = FrameStreamReader::new(sock_sink, content_type);
+                let mut fs_reader = FrameStreamReader::new(Box::new(sock_sink), content_type);
                 let events = sock_stream.take_until(shutdown.clone())
                     .filter_map(move |frame| {
                         match fs_reader.handle_frame(Bytes::from(frame)) {
