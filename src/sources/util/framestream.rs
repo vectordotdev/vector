@@ -383,57 +383,6 @@ pub fn build_framestream_unix_source(
     }))
 }
 
-/*
-use super::{SocketListenAddr, TcpSource};
-use std::net::SocketAddr;
-tokio01::net::{UdpFramed, UdpSocket}
-*/
-
-//TODO: udp
-
-// pub fn udp(
-//     addr: SocketAddr,
-//     _max_length: usize,
-//     host_key: String,
-//     shutdown: ShutdownSignal,
-//     out: mpsc::Sender<Event>,
-// ) -> super::Source {
-//     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
-
-//     Box::new(
-//         future::lazy(move || {
-//             let socket = UdpSocket::bind(&addr).expect("failed to bind to udp listener socket");
-
-//             info!(
-//                 message = "listening.",
-//                 addr = &field::display(addr),
-//                 r#type = "udp"
-//             );
-
-//             future::ok(socket)
-//         })
-//         .and_then(move |socket| {
-//             let host_key = host_key.clone();
-
-//             let (sock_sink, sock_stream) = UdpFramed::new(socket, length_delimited::Builder::new().max_frame_length(max_length).new_codec()).split();
-//             let bytes_sink = sock_sink.with(|frame| Ok((frame, addr)).into_future()); //add the SocketAddr to the item (UdpFramed::Item is (Bytes, SocketAddr))
-
-//             let fs_reader = FrameStreamReader::new(bytes_sink, host_key, Some(addr.to_string().into()));
-
-//             let lines_in = sock_stream
-//                 .take_until(shutdown)
-//                 .filter_map(move |(frame, addr)| fs_reader.handle_frame(Bytes::from(frame)))
-//                 .map_err(|error| panic!("TODO") emit!(SyslogUdpReadError { error })); //needs changing
-
-//             lines_in.forward(out).map(|_| info!("finished sending"))
-//         }),
-//     )
-// }
-
-
-//TODO: TCP
-
-
 #[cfg(test)]
 mod test {
     use futures01::{sync::mpsc, Future, IntoFuture, Sink, Stream};
