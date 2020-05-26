@@ -15,13 +15,17 @@ impl State {
     }
 
     /// Update the resource version from a candidate obtained earlier.
-    pub fn update(&mut self, candidate: Candidate) {
-        self.0 = Some(candidate.0);
+    ///
+    /// Returns the previous state.
+    pub fn update(&mut self, candidate: Candidate) -> Option<String> {
+        self.0.replace(candidate.0)
     }
 
     /// Reset the resource version. Use in case of a desync.
-    pub fn reset(&mut self) {
-        self.0 = None;
+    ///
+    /// Returns the previous state.
+    pub fn reset(&mut self) -> Option<String> {
+        self.0.take()
     }
 
     /// Get the current resource version value.
