@@ -4,7 +4,7 @@ use crate::{
         self,
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::{tcp_healthcheck, TcpSink},
-        uri::UriSerde,
+        uri2::UriSerde,
         Encoding,
     },
     tls::{MaybeTlsSettings, TlsConfig},
