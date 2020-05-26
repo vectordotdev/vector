@@ -66,9 +66,8 @@ impl SourceConfig for DnstapConfig {
             self.content_type(),
             shutdown,
             out,
-            handle_event
+            handle_event,
         ))
-        
     }
 
     fn output_type(&self) -> DataType {
@@ -117,7 +116,6 @@ fn handle_event(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> O
             println!("Response: {:?}", response);
         }
     }
-
 
     //TODO: decode dns info
 

@@ -7,12 +7,12 @@ use crate::{
 };
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use std::convert::TryInto;
 #[cfg(unix)]
 use std::path::PathBuf;
-use std::convert::TryInto;
 use tokio01::{
     self,
-    codec::{Framed, length_delimited},
+    codec::{length_delimited, Framed},
     sync::lock::Lock,
 };
 use tokio_uds::UnixListener;
@@ -24,7 +24,7 @@ const FSTRM_CONTROL_FIELD_CONTENT_TYPE_LENGTH_MAX: usize = 256;
 
 pub type FrameStreamSink = Box<dyn Sink<SinkItem = Bytes, SinkError = std::io::Error> + Send>;
 
-struct FrameStreamReader{
+struct FrameStreamReader {
     response_sink: Lock<Option<FrameStreamSink>>,
     expected_content_type: String,
     state: FrameStreamState,
@@ -74,7 +74,7 @@ impl ControlHeader {
             _ => {
                 error!("Don't know header value {} (expected 0x01 - 0x05)", val);
                 Err(())
-            },
+            }
         }
     }
 
@@ -100,7 +100,7 @@ impl ControlField {
             _ => {
                 error!("Don't know field type {} (expected 0x01)", val);
                 Err(())
-            },
+            }
         }
     }
     fn to_u32(self) -> u32 {
@@ -138,15 +138,20 @@ impl FrameStreamReader {
                 self.state.expect_control_frame = false;
                 let _ = self.handle_control_frame(frame);
                 None
-            } else { //data frame
+            } else {
+                //data frame
                 if self.state.control_state == ControlState::ReadingData {
-                    emit!(UnixSocketEventReceived { byte_size: frame.len() });
+                    emit!(UnixSocketEventReceived {
+                        byte_size: frame.len()
+                    });
                     Some(frame) //return data frame
                 } else {
-                    error!("Received a data frame while in state {:?}", self.state.control_state);
+                    error!(
+                        "Received a data frame while in state {:?}",
+                        self.state.control_state
+                    );
                     None
                 }
-                
             }
         }
     }
@@ -165,9 +170,12 @@ impl FrameStreamReader {
                 match header {
                     ControlHeader::Ready => {
                         let content_type = self.process_fields(header, &mut frame)?.unwrap();
-                        self.send_control_frame(Self::make_frame(ControlHeader::Accept, Some(content_type)));
+                        self.send_control_frame(Self::make_frame(
+                            ControlHeader::Accept,
+                            Some(content_type),
+                        ));
                         self.state.control_state = ControlState::GotReady; //waiting for a START control frame
-                    },
+                    }
                     ControlHeader::Start => {
                         //check for content type
                         let _ = self.process_fields(header, &mut frame)?;
@@ -177,7 +185,7 @@ impl FrameStreamReader {
                     }
                     _ => error!("Got wrong control frame, expected READY"),
                 }
-            },
+            }
             ControlState::GotReady => {
                 match header {
                     ControlHeader::Start => {
@@ -185,10 +193,10 @@ impl FrameStreamReader {
                         let _ = self.process_fields(header, &mut frame)?;
                         //if didn't error, then we are ok to change state
                         self.state.control_state = ControlState::ReadingData;
-                    },
+                    }
                     _ => error!("Got wrong control frame, expected START"),
                 }
-            },
+            }
             ControlState::ReadingData => {
                 match header {
                     ControlHeader::Stop => {
@@ -199,16 +207,20 @@ impl FrameStreamReader {
                             self.send_control_frame(Self::make_frame(ControlHeader::Finish, None));
                         }
                         self.state.control_state = ControlState::Stopped; //stream is now done
-                    },
+                    }
                     _ => error!("Got wrong control frame, expected STOP"),
                 }
-            },
+            }
             ControlState::Stopped => error!("Unexpected control frame, current state is STOPPED"),
         };
         Ok(())
     }
 
-    fn process_fields(&mut self, header: ControlHeader, frame: &mut Bytes) -> Result<Option<String>, ()> {
+    fn process_fields(
+        &mut self,
+        header: ControlHeader,
+        frame: &mut Bytes,
+    ) -> Result<Option<String>, ()> {
         match header {
             ControlHeader::Ready => {
                 //should provide 1+ content types
@@ -216,7 +228,7 @@ impl FrameStreamReader {
                 let is_start_frame = false;
                 let content_type = self.process_content_type(frame, is_start_frame)?;
                 Ok(Some(content_type))
-            },
+            }
             ControlHeader::Start => {
                 //can take one or zero content types
                 if frame.len() == 0 {
@@ -227,7 +239,7 @@ impl FrameStreamReader {
                     let content_type = self.process_content_type(frame, is_start_frame)?;
                     Ok(Some(content_type))
                 }
-            },
+            }
             ControlHeader::Stop => {
                 //check that there are no fields
                 if frame.len() != 0 {
@@ -236,7 +248,7 @@ impl FrameStreamReader {
                 } else {
                     Ok(None)
                 }
-            },
+            }
             _ => {
                 error!("Unexpected control header value {:?}", header.to_u32());
                 Err(())
@@ -247,7 +259,7 @@ impl FrameStreamReader {
     fn process_content_type(&self, frame: &mut Bytes, is_start_frame: bool) -> Result<String, ()> {
         if frame.len() == 0 {
             error!("No fields in control frame");
-            return Err(())
+            return Err(());
         }
 
         let mut content_types = vec![];
@@ -270,11 +282,14 @@ impl FrameStreamReader {
                     content_types.push(content_type.to_string());
                     frame.advance(field_len);
                 }
-            }   
+            }
         }
 
         if is_start_frame && content_types.len() > 1 {
-            error!("START control frame can only have one content-type provided (got {})", content_types.len());
+            error!(
+                "START control frame can only have one content-type provided (got {})",
+                content_types.len()
+            );
             return Err(());
         }
 
@@ -284,7 +299,10 @@ impl FrameStreamReader {
             }
         }
 
-        error!("Content types did not match up. Expected {} got {:?}", self.expected_content_type, content_types);
+        error!(
+            "Content types did not match up. Expected {} got {:?}",
+            self.expected_content_type, content_types
+        );
         Err(())
     }
 
@@ -301,20 +319,25 @@ impl FrameStreamReader {
 
     fn send_control_frame(&mut self, frame: Bytes) {
         let empty_frame = Bytes::from(&b""[..]); //send empty frame to say we are control frame
-        let stream = futures01::stream::iter_ok::<_, std::io::Error>(vec![empty_frame, frame].into_iter());
+        let stream =
+            futures01::stream::iter_ok::<_, std::io::Error>(vec![empty_frame, frame].into_iter());
 
         self.response_sink.poll_lock().map(|mut sink| {
             //send and send_all consume the sink so need to use Option so we can .take()
             //get the sink back as first element of tuple
-            let handler = sink.take().unwrap().send_all(stream).and_then(move |(same_sink, _stream)| {
-                *sink = Some(same_sink);
-                futures01::done(Ok(()))
-            }).map_err(|_e| ());
+            let handler = sink
+                .take()
+                .unwrap()
+                .send_all(stream)
+                .and_then(move |(same_sink, _stream)| {
+                    *sink = Some(same_sink);
+                    futures01::done(Ok(()))
+                })
+                .map_err(|_e| ());
             tokio01::spawn(handler);
         });
     }
 }
-
 
 /**
  * Based off of the build_unix_source function.
@@ -366,16 +389,23 @@ pub fn build_framestream_unix_source(
                 };
                 let received_from: Option<Bytes> =
                     path.map(|p| p.to_string_lossy().into_owned().into());
-                
-                let (sock_sink, sock_stream) = Framed::new(socket, length_delimited::Builder::new().max_frame_length(max_length).new_codec()).split();
+
+                let (sock_sink, sock_stream) = Framed::new(
+                    socket,
+                    length_delimited::Builder::new()
+                        .max_frame_length(max_length)
+                        .new_codec(),
+                )
+                .split();
                 let mut fs_reader = FrameStreamReader::new(Box::new(sock_sink), content_type);
-                let events = sock_stream.take_until(shutdown.clone())
-                    .filter_map(move |frame| {
-                        match fs_reader.handle_frame(Bytes::from(frame)) {
+                let events = sock_stream
+                    .take_until(shutdown.clone())
+                    .filter_map(
+                        move |frame| match fs_reader.handle_frame(Bytes::from(frame)) {
                             Some(f) => build_event(&host_key, received_from.clone(), f),
                             None => None,
-                        }
-                    })
+                        },
+                    )
                     .map_err(move |error| {
                         emit!(UnixSocketError {
                             error,
@@ -391,24 +421,28 @@ pub fn build_framestream_unix_source(
 
 #[cfg(test)]
 mod test {
+    use super::{build_framestream_unix_source, ControlField, ControlHeader};
+    use crate::test_util::{collect_n, collect_n_stream};
+    use crate::{
+        event::{self, Event},
+        runtime,
+        shutdown::ShutdownSignal,
+    };
+    use bytes::{Bytes, BytesMut};
     use futures01::{sync::mpsc, Future, IntoFuture, Sink, Stream};
     #[cfg(unix)]
     use std::path::PathBuf;
     use tokio01::{
         self,
-        codec::{Framed, length_delimited},
+        codec::{length_delimited, Framed},
     };
     use tokio_uds::UnixStream;
-    use bytes::{Bytes, BytesMut};
-    use super::{build_framestream_unix_source, ControlField, ControlHeader};
-    use crate::{
-        event::{self, Event},
-        shutdown::ShutdownSignal,
-        runtime,
-    };
-    use crate::test_util::{collect_n, collect_n_stream};
 
-    fn build_event_bytes(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+    fn build_event_bytes(
+        host_key: &str,
+        received_from: Option<Bytes>,
+        frame: Bytes,
+    ) -> Option<Event> {
         let mut event = Event::from(frame);
         event
             .as_mut_log()
@@ -419,7 +453,10 @@ mod test {
         Some(event)
     }
 
-    fn init_framstream_unix(content_type: String, sender: mpsc::Sender<event::Event>) -> (PathBuf, runtime::Runtime) {
+    fn init_framstream_unix(
+        content_type: String,
+        sender: mpsc::Sender<event::Event>,
+    ) -> (PathBuf, runtime::Runtime) {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
 
         let server = build_framestream_unix_source(
@@ -441,7 +478,9 @@ mod test {
         (in_path, rt)
     }
 
-    fn make_unix_stream(path: PathBuf) -> Framed<UnixStream, length_delimited::LengthDelimitedCodec> {
+    fn make_unix_stream(
+        path: PathBuf,
+    ) -> Framed<UnixStream, length_delimited::LengthDelimitedCodec> {
         let socket = UnixStream::connect(&path)
             .map_err(|e| panic!("{:}", e))
             .wait()
@@ -449,13 +488,19 @@ mod test {
         Framed::new(socket, length_delimited::Builder::new().new_codec())
     }
 
-    fn send_data_frames<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>>(sock_sink: S, frames: Vec<Bytes>) -> S {
+    fn send_data_frames<S: Sink<SinkItem = Bytes, SinkError = std::io::Error>>(
+        sock_sink: S,
+        frames: Vec<Bytes>,
+    ) -> S {
         let stream = futures01::stream::iter_ok::<_, std::io::Error>(frames.into_iter());
         //send and send_all consume the sink
         sock_sink.send_all(stream).into_future().wait().unwrap().0
     }
 
-    fn send_control_frame<S:Sink<SinkItem = Bytes, SinkError = std::io::Error>>(sock_sink: S, frame: Bytes) -> S {
+    fn send_control_frame<S: Sink<SinkItem = Bytes, SinkError = std::io::Error>>(
+        sock_sink: S,
+        frame: Bytes,
+    ) -> S {
         send_data_frames(sock_sink, vec![Bytes::new(), frame]) //send empty frame to say we are control frame
     }
 
@@ -463,7 +508,10 @@ mod test {
         Bytes::from(&header.to_u32().to_be_bytes()[..])
     }
 
-    fn create_control_frame_with_content(header: ControlHeader, content_types: Vec<Bytes>) -> Bytes {
+    fn create_control_frame_with_content(
+        header: ControlHeader,
+        content_types: Vec<Bytes>,
+    ) -> Bytes {
         let mut frame = create_control_frame(header);
         for content_type in content_types {
             frame.extend(&ControlField::ContentType.to_u32().to_be_bytes());
@@ -476,10 +524,7 @@ mod test {
     fn assert_accept_frame(frame: &mut BytesMut, expected_content_type: Bytes) {
         //frame should start with 4 bytes saying ACCEPT
 
-        assert_eq!(
-            &frame[..4],
-            &ControlHeader::Accept.to_u32().to_be_bytes(),
-        );
+        assert_eq!(&frame[..4], &ControlHeader::Accept.to_u32().to_be_bytes(),);
         frame.advance(4);
         //next should be content type field
         assert_eq!(
@@ -496,24 +541,22 @@ mod test {
         //rest should be content type
         assert_eq!(&frame[..], &expected_content_type[..]);
     }
-    
 
     #[test]
     fn normal_framestream() {
         let (tx, rx) = mpsc::channel(2);
-        let (path, mut rt) = init_framstream_unix(
-            "test_content".to_string(),
-            tx,
-        );
+        let (path, mut rt) = init_framstream_unix("test_content".to_string(), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).split();
 
         //1 - send READY frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
-        let ready_msg = create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
+        let ready_msg =
+            create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
         sock_sink = send_control_frame(sock_sink, ready_msg);
-        
+
         //2 - wait for ACCEPT frame
-        let (mut frame_vec, tmp_stream) = rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
+        let (mut frame_vec, tmp_stream) =
+            rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
         sock_stream = tmp_stream;
         //take second element, because first will be empty (signifying control frame)
         assert_eq!(frame_vec[0].len(), 0);
@@ -523,7 +566,10 @@ mod test {
         sock_sink = send_control_frame(sock_sink, create_control_frame(ControlHeader::Start));
 
         //4 - send data
-        sock_sink = send_data_frames(sock_sink, vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])]);
+        sock_sink = send_data_frames(
+            sock_sink,
+            vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])],
+        );
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
         //5 - send STOP frame
@@ -544,19 +590,20 @@ mod test {
     #[test]
     fn multiple_content_types() {
         let (tx, _) = mpsc::channel(2);
-        let (path, mut rt) = init_framstream_unix(
-            "test_content".to_string(),
-            tx,
-        );
+        let (path, mut rt) = init_framstream_unix("test_content".to_string(), tx);
         let (sock_sink, mut sock_stream) = make_unix_stream(path).split();
 
         //1 - send READY frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
-        let ready_msg = create_control_frame_with_content(ControlHeader::Ready, vec![Bytes::from(&b"test_content2"[..]), content_type.clone()]); //can have multiple content types
+        let ready_msg = create_control_frame_with_content(
+            ControlHeader::Ready,
+            vec![Bytes::from(&b"test_content2"[..]), content_type.clone()],
+        ); //can have multiple content types
         let _ = send_control_frame(sock_sink, ready_msg);
-        
+
         //2 - wait for ACCEPT frame
-        let (mut frame_vec, tmp_stream) = rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
+        let (mut frame_vec, tmp_stream) =
+            rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
         sock_stream = tmp_stream;
 
         //take second element, because first will be empty (signifying control frame)
@@ -569,23 +616,25 @@ mod test {
     #[test]
     fn wrong_content_type() {
         let (tx, _) = mpsc::channel(2);
-        let (path, mut rt) = init_framstream_unix(
-            "test_content".to_string(),
-            tx,
-        );
+        let (path, mut rt) = init_framstream_unix("test_content".to_string(), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).split();
 
         //1 - send READY frame (with WRONG content_type)
-        let ready_msg = create_control_frame_with_content(ControlHeader::Ready, vec![Bytes::from(&b"test_content2"[..])]); //can have multiple content types
+        let ready_msg = create_control_frame_with_content(
+            ControlHeader::Ready,
+            vec![Bytes::from(&b"test_content2"[..])],
+        ); //can have multiple content types
         sock_sink = send_control_frame(sock_sink, ready_msg);
 
         //2 - send READY frame (with RIGHT content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
-        let ready_msg = create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
+        let ready_msg =
+            create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
         let _ = send_control_frame(sock_sink, ready_msg);
-        
+
         //3 - wait for ACCEPT frame
-        let (mut frame_vec, tmp_stream) = rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
+        let (mut frame_vec, tmp_stream) =
+            rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
         sock_stream = tmp_stream;
 
         //take second element, because first will be empty (signifying control frame)
@@ -598,22 +647,24 @@ mod test {
     #[test]
     fn data_too_soon() {
         let (tx, rx) = mpsc::channel(2);
-        let (path, mut rt) = init_framstream_unix(
-            "test_content".to_string(),
-            tx,
-        );
+        let (path, mut rt) = init_framstream_unix("test_content".to_string(), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).split();
 
         //1 - send data frame (too soon!)
-        sock_sink = send_data_frames(sock_sink, vec![Bytes::from(&"bad"[..]), Bytes::from(&"data"[..])]);
+        sock_sink = send_data_frames(
+            sock_sink,
+            vec![Bytes::from(&"bad"[..]), Bytes::from(&"data"[..])],
+        );
 
         //2 - send READY frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
-        let ready_msg = create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
+        let ready_msg =
+            create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
         sock_sink = send_control_frame(sock_sink, ready_msg);
-        
+
         //3 - wait for ACCEPT frame
-        let (mut frame_vec, tmp_stream) = rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
+        let (mut frame_vec, tmp_stream) =
+            rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
         sock_stream = tmp_stream;
 
         //take second element, because first will be empty (signifying control frame)
@@ -624,7 +675,10 @@ mod test {
         sock_sink = send_control_frame(sock_sink, create_control_frame(ControlHeader::Start));
 
         //5 - send data (will go through)
-        sock_sink = send_data_frames(sock_sink, vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])]);
+        sock_sink = send_data_frames(
+            sock_sink,
+            vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])],
+        );
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
         //6 - send STOP frame
@@ -645,19 +699,20 @@ mod test {
     #[test]
     fn unidirectional_framestream() {
         let (tx, rx) = mpsc::channel(2);
-        let (path, mut rt) = init_framstream_unix(
-            "test_content".to_string(),
-            tx,
-        );
+        let (path, mut rt) = init_framstream_unix("test_content".to_string(), tx);
         let (mut sock_sink, _) = make_unix_stream(path).split();
 
         //1 - send START frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
-        let start_msg = create_control_frame_with_content(ControlHeader::Start, vec![content_type.clone()]);
+        let start_msg =
+            create_control_frame_with_content(ControlHeader::Start, vec![content_type.clone()]);
         sock_sink = send_control_frame(sock_sink, start_msg);
 
         //4 - send data
-        sock_sink = send_data_frames(sock_sink, vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])]);
+        sock_sink = send_data_frames(
+            sock_sink,
+            vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])],
+        );
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
         //5 - send STOP frame
