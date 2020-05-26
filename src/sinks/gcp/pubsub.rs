@@ -1,24 +1,25 @@
-use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
+use super::{healthcheck_response2, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::Event,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
-            BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            http2::{BatchedHttpSink, HttpClient, HttpSink},
+            service2::TowerRequestConfig,
+            BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
         },
-        Healthcheck, RouterSink, UriParseError,
+        Healthcheck, RouterSink, UriParseError2,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{Future, Sink};
-use http::Uri;
-use hyper::{Body, Method, Request};
+use futures::{FutureExt, TryFutureExt};
+use futures01::Sink;
+use http02::{Method, Request, Uri};
+use hyper13::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
-use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -68,7 +69,14 @@ impl SinkConfig for PubsubConfig {
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 
-        let healthcheck = sink.healthcheck(&cx, &tls_settings)?;
+        let healthcheck = healthcheck(
+            cx.clone(),
+            sink.uri("")?,
+            tls_settings.clone(),
+            sink.creds.clone(),
+        )
+        .boxed()
+        .compat();
 
         let sink = BatchedHttpSink::new(
             sink,
@@ -80,7 +88,7 @@ impl SinkConfig for PubsubConfig {
         )
         .sink_map_err(|e| error!("Fatal gcp pubsub sink error: {}", e));
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -124,32 +132,13 @@ impl PubsubSink {
         })
     }
 
-    fn healthcheck(&self, cx: &SinkContext, tls: &TlsSettings) -> crate::Result<Healthcheck> {
-        let uri = self.uri("")?;
-        let mut request = Request::get(uri).body(Body::empty()).unwrap();
-        if let Some(creds) = self.creds.as_ref() {
-            creds.apply(&mut request);
-        }
-
-        let mut client = HttpClient::new(cx.resolver(), tls.clone())?;
-        let creds = self.creds.clone();
-        let healthcheck = client
-            .call(request)
-            .map_err(Into::into)
-            .and_then(healthcheck_response(
-                creds,
-                HealthcheckError::TopicNotFound.into(),
-            ));
-        Ok(Box::new(healthcheck))
-    }
-
     fn uri(&self, suffix: &str) -> crate::Result<Uri> {
         let mut uri = format!("{}{}", self.uri_base, suffix);
         if let Some(key) = &self.api_key {
             uri = format!("{}?key={}", uri, key);
         }
         uri.parse::<Uri>()
-            .context(UriParseError)
+            .context(UriParseError2)
             .map_err(Into::into)
     }
 }
@@ -166,22 +155,38 @@ impl HttpSink for PubsubSink {
         Some(json!({ "data": base64::encode(&json) }))
     }
 
-    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
         let body = json!({ "messages": events });
         let body = serde_json::to_vec(&body).unwrap();
 
-        let mut builder = hyper::Request::builder();
-        builder.method(Method::POST);
-        builder.uri(self.uri(":publish").unwrap());
-        builder.header("Content-Type", "application/json");
+        let builder = Request::builder()
+            .method(Method::POST)
+            .uri(self.uri(":publish").unwrap())
+            .header("Content-Type", "application/json");
 
         let mut request = builder.body(body).unwrap();
         if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
+            creds.apply2(&mut request);
         }
 
         request
     }
+}
+
+async fn healthcheck(
+    cx: SinkContext,
+    uri: Uri,
+    tls: TlsSettings,
+    creds: Option<GcpCredentials>,
+) -> crate::Result<()> {
+    let mut request = Request::get(uri).body(Body::empty()).unwrap();
+    if let Some(creds) = creds.as_ref() {
+        creds.apply2(&mut request);
+    }
+
+    let mut client = HttpClient::new(cx.resolver(), tls.clone())?;
+    let response = client.send(request).await?;
+    healthcheck_response2(creds, HealthcheckError::TopicNotFound.into())(response)
 }
 
 #[cfg(test)]
