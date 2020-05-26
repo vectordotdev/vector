@@ -4,8 +4,7 @@ use crate::{
     sinks::util::{
         http2::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
-        uri2::UriSerde,
-        BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
+        BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, UriSerde,
     },
     tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},

@@ -19,7 +19,6 @@ pub mod udp;
 #[cfg(all(feature = "sinks-socket", unix))]
 pub mod unix;
 pub mod uri;
-pub mod uri2;
 
 use crate::event::{self, Event};
 use bytes::Bytes;
