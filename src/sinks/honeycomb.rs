@@ -1,14 +1,17 @@
 use crate::{
     dns::Resolver,
     event::{log_schema, Event, Value},
-    sinks::util::http::{BatchedHttpSink, HttpClient, HttpSink},
-    sinks::util::{BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde},
+    sinks::util::{
+        http2::{BatchedHttpSink, HttpClient, HttpSink},
+        service2::TowerRequestConfig,
+        BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, UriSerde,
+    },
     tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{compat::Future01CompatExt, TryFutureExt};
-use futures01::{Sink, Stream};
-use http::{Request, StatusCode, Uri};
+use futures::TryFutureExt;
+use futures01::Sink;
+use http02::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -85,11 +88,9 @@ impl HttpSink for HoneycombConfig {
         }))
     }
 
-    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
         let uri = self.build_uri();
-        let mut request = Request::post(uri);
-
-        request.header("X-Honeycomb-Team", self.api_key.clone());
+        let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
 
         let buf = serde_json::to_vec(&events).unwrap();
 
@@ -101,20 +102,20 @@ impl HoneycombConfig {
     fn build_uri(&self) -> Uri {
         let uri = format!("{}/{}", HOST.clone(), self.dataset);
 
-        uri.parse::<http::Uri>()
+        uri.parse::<http02::Uri>()
             .expect("This should be a valid uri")
     }
 }
 
-async fn healthcheck(config: HoneycombConfig, resolver: Resolver) -> Result<(), crate::Error> {
+async fn healthcheck(config: HoneycombConfig, resolver: Resolver) -> crate::Result<()> {
     let mut client = HttpClient::new(resolver, TlsSettings::from_options(&None)?)?;
 
-    let req = config.build_request(Vec::new()).map(hyper::Body::from);
+    let req = config.build_request(Vec::new()).map(hyper13::Body::from);
 
     let res = client.send(req).await?;
 
     let status = res.status();
-    let body = res.into_body().concat2().compat().await?;
+    let body = hyper13::body::to_bytes(res.into_body()).await?;
 
     if status == StatusCode::BAD_REQUEST {
         Ok(())

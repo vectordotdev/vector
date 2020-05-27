@@ -2,11 +2,12 @@ use crate::{
     sinks::http::{HttpMethod, HttpSinkConfig},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        BatchBytesConfig, Compression, TowerRequestConfig,
+        service2::TowerRequestConfig,
+        BatchBytesConfig, Compression,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use http::Uri;
+use http02::Uri;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -300,7 +301,7 @@ mod tests {
         nr_config.license_key = Some("foo".to_owned());
         let mut http_config = nr_config.create_config().unwrap();
         http_config.uri = format!("http://{}/fake_nr", in_addr)
-            .parse::<http::Uri>()
+            .parse::<http02::Uri>()
             .unwrap()
             .into();
 

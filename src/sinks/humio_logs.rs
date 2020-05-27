@@ -1,6 +1,8 @@
 use crate::{
     sinks::splunk_hec::{self, HecSinkConfig},
-    sinks::util::{encoding::EncodingConfigWithDefault, BatchBytesConfig, TowerRequestConfig},
+    sinks::util::{
+        encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchBytesConfig,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -80,7 +82,7 @@ impl HumioLogsConfig {
 mod tests {
     use super::*;
     use crate::event::Event;
-    use crate::sinks::util::{http::HttpSink, test::load_sink};
+    use crate::sinks::util::{http2::HttpSink, test::load_sink};
     use chrono::Utc;
     use serde::Deserialize;
 

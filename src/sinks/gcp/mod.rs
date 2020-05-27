@@ -119,6 +119,16 @@ impl GcpCredentials {
             .insert(AUTHORIZATION, HeaderValue::from_str(&value).unwrap());
     }
 
+    pub fn apply2<T>(&self, request: &mut http02::Request<T>) {
+        use http02::header::{HeaderValue, AUTHORIZATION};
+
+        let token = self.token.read().unwrap();
+        let value = format!("{} {}", token.token_type(), token.access_token());
+        request
+            .headers_mut()
+            .insert(AUTHORIZATION, HeaderValue::from_str(&value).unwrap());
+    }
+
     fn regenerate_token(&self) -> crate::Result<()> {
         let token = match &self.creds {
             Some(creds) => {
@@ -174,6 +184,29 @@ pub fn healthcheck_response(
         StatusCode::FORBIDDEN => Err(GcpError::InvalidCredentials0.into()),
         StatusCode::NOT_FOUND => Err(not_found_error),
         status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+    }
+}
+
+// Use this to map a healthcheck response, as it handles setting up the renewal task.
+pub fn healthcheck_response2(
+    creds: Option<GcpCredentials>,
+    not_found_error: crate::Error,
+) -> impl FnOnce(http02::Response<hyper13::Body>) -> crate::Result<()> {
+    use http02::StatusCode;
+
+    move |response| match response.status() {
+        StatusCode::OK => {
+            // If there are credentials configured, the
+            // generated OAuth token needs to be periodically
+            // regenerated. Since the health check runs at
+            // startup, after a successful health check is a
+            // good place to create the regeneration task.
+            creds.map(|creds| creds.spawn_regenerate_token());
+            Ok(())
+        }
+        StatusCode::FORBIDDEN => Err(GcpError::InvalidCredentials0.into()),
+        StatusCode::NOT_FOUND => Err(not_found_error),
+        status => Err(HealthcheckError::UnexpectedStatus2 { status }.into()),
     }
 }
 

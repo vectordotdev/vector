@@ -1,4 +1,4 @@
-use http::Uri;
+use http02::Uri;
 use serde::{
     de::{Error, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,

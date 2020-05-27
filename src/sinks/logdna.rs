@@ -1,17 +1,18 @@
 use crate::{
     dns::Resolver,
     event::{self, Event},
-    sinks::util::http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
     sinks::util::{
-        encoding::EncodingConfigWithDefault, BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
-        TowerRequestConfig, UriSerde,
+        encoding::EncodingConfigWithDefault,
+        http2::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+        service2::TowerRequestConfig,
+        BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, UriSerde,
     },
     tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::TryFutureExt;
+use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
-use http::{Request, Uri};
+use http02::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::SystemTime;
@@ -75,9 +76,9 @@ impl SinkConfig for LogdnaConfig {
         )
         .sink_map_err(|e| error!("Fatal logdna sink error: {}", e));
 
-        let healthcheck = Box::new(Box::pin(healthcheck(self.clone(), cx.resolver())).compat());
+        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -131,7 +132,7 @@ impl HttpSink for LogdnaConfig {
         Some(map.into())
     }
 
-    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
         let mut query = url::form_urlencoded::Serializer::new(String::new());
 
         let now = SystemTime::now()
@@ -188,17 +189,17 @@ impl LogdnaConfig {
 
         let uri = format!("{}{}?{}", host, PATH, query);
 
-        uri.parse::<http::Uri>()
+        uri.parse::<http02::Uri>()
             .expect("This should be a valid uri")
     }
 }
 
-async fn healthcheck(config: LogdnaConfig, resolver: Resolver) -> Result<(), crate::Error> {
+async fn healthcheck(config: LogdnaConfig, resolver: Resolver) -> crate::Result<()> {
     let uri = config.build_uri("");
 
     let mut client = HttpClient::new(resolver, TlsSettings::from_options(&None)?)?;
 
-    let req = Request::post(uri).body(hyper::Body::empty()).unwrap();
+    let req = Request::post(uri).body(hyper13::Body::empty()).unwrap();
 
     let res = client.send(req).await?;
 
@@ -206,7 +207,7 @@ async fn healthcheck(config: LogdnaConfig, resolver: Resolver) -> Result<(), cra
         return Err(format!("Server returned a server error").into());
     }
 
-    if res.status() == http::StatusCode::FORBIDDEN {
+    if res.status() == StatusCode::FORBIDDEN {
         return Err(format!("Token is not valid, 403 returned.").into());
     }
 
@@ -273,7 +274,7 @@ mod tests {
         let addr = test_util::next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        let host = format!("http://{}", addr).parse::<http::Uri>().unwrap();
+        let host = format!("http://{}", addr).parse::<http02::Uri>().unwrap();
         config.host = Some(host.into());
 
         let (sink, _) = config.build(cx).unwrap();

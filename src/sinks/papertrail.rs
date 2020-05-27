@@ -3,8 +3,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::{tcp_healthcheck, TcpSink},
-        uri::UriSerde,
-        Encoding,
+        Encoding, UriSerde,
     },
     tls::{MaybeTlsSettings, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
