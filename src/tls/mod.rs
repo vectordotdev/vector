@@ -46,6 +46,8 @@ pub enum TlsError {
     TlsIdentityError { source: ErrorStack },
     #[snafu(display("Could not export identity to DER: {}", source))]
     DerExportError { source: ErrorStack },
+    #[snafu(display("Identity certificate is missing a key"))]
+    MissingKey,
     #[snafu(display("Could not parse certificate in {:?}: {}", filename, source))]
     CertificateParseError {
         filename: PathBuf,
