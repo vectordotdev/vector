@@ -323,7 +323,7 @@ mod integration_test {
 
     #[test]
     fn kafka_happy_path_plaintext() {
-        kafka_happy_path("localhost:9092", None, None);
+        kafka_happy_path("localhost:9092", None, KafkaCompression::None);
     }
 
     #[test]
@@ -364,7 +364,7 @@ mod integration_test {
                     ..Default::default()
                 },
             }),
-            None,
+            KafkaCompression::None,
         );
     }
 
@@ -382,7 +382,7 @@ mod integration_test {
                     ..Default::default()
                 },
             }),
-            None,
+            KafkaCompression::None,
         );
     }
 
