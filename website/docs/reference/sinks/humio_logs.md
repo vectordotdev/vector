@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-05-25"
 delivery_guarantee: "at_least_once"
 component_title: "Humio Logs"
 description: "The Vector `humio_logs` sink batches `log` events to Humio via the HEC API."
@@ -61,7 +61,7 @@ The Vector `humio_logs` sink
   type = "humio_logs" # required
   inputs = ["my-source-or-transform-id"] # required
   healthcheck = true # optional, default
-  host = "http://myhumiohost.com" # optional, no default
+  host = "https://cloud.humio.com" # optional, default
   token = "${HUMIO_TOKEN}" # required
 
   # Batch
@@ -424,7 +424,7 @@ Enables/disables the sink healthcheck upon start.
 </Field>
 <Field
   common={false}
-  defaultValue={null}
+  defaultValue={"https://cloud.humio.com"}
   enumValues={null}
   examples={["http://myhumiohost.com"]}
   groups={[]}

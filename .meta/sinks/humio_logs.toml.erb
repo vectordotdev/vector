@@ -56,8 +56,8 @@ description = "Your Humio ingestion token."
 
 [sinks.humio_logs.options.host]
 type = "string"
+default = "https://cloud.humio.com"
 examples = ["http://myhumiohost.com"]
-required = false
 description = "The optional host to send Humio logs to."
 
 <%= render("_partials/fields/_encoding_options.toml",
