@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-25"
 title: Global Options
 description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---
@@ -28,7 +28,6 @@ dns_servers = ["0.0.0.0:53"] # optional, no default
 
 # Log schema
 log_schema.host_key = "host" # optional, default
-log_schema.kubernetes_key = "kubernetes" # optional, default
 log_schema.message_key = "message" # optional, default
 log_schema.source_type_key = "source_type" # optional, default
 log_schema.timestamp_key = "timestamp" # optional, default
@@ -129,29 +128,6 @@ model page][docs.data-model.log] for more info.
 
 The key used to hold the log host. See the [log data model
 page][docs.data-model.log#host] for more info.
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={"kubernetes"}
-  enumValues={null}
-  examples={["kubernetes","kube","k8s"]}
-  groups={[]}
-  name={"kubernetes_key"}
-  path={"log_schema"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### kubernetes_key
-
-The key under which Kubernetes related fields are nested.
 
 
 

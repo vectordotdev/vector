@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-25"
 title: Log Event
 description: A detailed guide on Vector's internal log data model.
 ---
@@ -144,7 +144,7 @@ source-level `message_key` option for relevant sources.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["file","socket","http","kubernetes"]}
+  examples={["file","socket","http"]}
   groups={[]}
   name={"source_type"}
   path={null}
