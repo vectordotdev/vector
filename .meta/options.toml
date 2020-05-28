@@ -51,12 +51,6 @@ The key used to represent when the log was generated. See the \
 [log data model page][docs.data-model.log#timestamp] for more info.\
 """
 
-[options.log_schema.children.kubernetes_key]
-type = "string"
-default = "kubernetes"
-examples = ["kubernetes", "kube", "k8s"]
-description = "The key under which Kubernetes related fields are nested."
-
 [options.log_schema.children.source_type_key]
 type = "string"
 default = "source_type"
