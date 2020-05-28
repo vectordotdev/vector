@@ -108,11 +108,10 @@ pub enum Value {
 
 Differences are:
 
-- `Event` uses a `BTreeMap` , where `serde_json`'s `Map` type is only `BTreeMap` when the `preserve_order` feature flag is turned off. We do not enable this, feature, so they are equivalent.
-- A `Bytes` type in our `Value` type exists because `serde_json::value::Value` and most JSON implementations support this type through the `String` type, which isn't ideal for applying `Bytes` related functions on. We hold this special `Bytes` variant to support better in-pipeline processing for Vector.
+- A `Bytes` type in our `Value` type exists because `serde_json::value::Value` and most JSON implementations support this type through the `String` type, which isn't ideal for applying `Bytes` related functions to. We hold this special `Bytes` variant to support better in-pipeline processing for Vector.
 - Our `Value` type lacks a `String` variant, using the `Bytes` variant instead, preventing us from having optimized `String` operations.
 - A `Timestamp` type in our `Value` type exists for largely the same reason the `Bytes` variant exists: Optimize in-pipeline processing.
-- A `Float` and `Integer` type exist where `serde_json::value::Value::Number` exists also exist for optimizing in-pipeline processing.
+- Separate `Float` and `Integer` type exist whereas `serde_json::value::Value::Number`, also for optimizing in-pipeline processing.
 
 ### `LogEvent` API Functionality of Note
 
@@ -147,7 +146,7 @@ impl LogEvent {
 }
 ```
 
-Many of these APIs offer functionality ***coarsely similar*** to a `FlatMap`. These APIs were added ad-hoc, as needed over time, and were not designed intentionally to all fit together. In addition, some changes were added unobtrusively to aid in the migration path.
+Many of these APIs offer functionality ***coarsely similar*** to a `FlatMap`. These APIs were added ad-hoc, as needed over time, and were not designed intentionally to all fit together. In addition, some changes were added unobtrusively to aid in the migration path, such as `insert_path` and `insert_flat`, or the differing outputs of `keys` and `all_fields`.
 
 ### Example `LogEvent` Lifetimes
 
@@ -161,13 +160,13 @@ There is no guide accompanying this RFC, it only minimally touches user facing s
 
 # Doc Level Proposal
 
-Insert into [Log Event](https://vector.dev/docs/about/data-model/log/#types)'s [Types](https://vector.dev/docs/about/data-model/log/#types) section
+> **Placement:** Insert into [Log Event](https://vector.dev/docs/about/data-model/log/#types)'s [Types](https://vector.dev/docs/about/data-model/log/#types) section
 
 ### Bytes
 
-An arbitrary sequence of bytes (not necessarily UTF-8), bounded by system memory. If Vector is unable to parse a String as UTF-8 bytes, it will use this instead of mutating the String to make it UTF-8.
+An arbitrary sequence of bytes (not necessarily UTF-8), bounded by system memory.
 
-Modify the [Coercer transform](https://vector.dev/docs/reference/transforms/coercer/#field-name) Types section.
+> **Placement:** Modify the [Coercer transform](https://vector.dev/docs/reference/transforms/coercer/#field-name) Types section.
 
 ```bash
 Enum, must be one of: "bool" "float" "int" "string" "timestamp", "bytes"
@@ -181,11 +180,11 @@ In the [WASM transform](https://github.com/timberio/vector/pull/2006/files) our 
 
 This RFC ultimately proposes the following steps:
 
-1. Rename `Value::Bytes` to `Value::String` .
-2. Add `Value::Bytes`.
-3. Significant UX improvements on `LogEvent`, particularly turning JSON ↔ `LogEvent`.
+1. Rename `Value::Bytes` to `Value::String`.
+2. Add `Value::Bytes`. (Unused for now -- to be used later in raw codecs and WASM)
+3. Add UX improvements on `LogEvent`, particularly turning JSON into or from `LogEvent`.
 4. Refactor the `PathIter` to make `vector::Event::Path` type.
-5. Significant UX improvements on `Path` , particularly an internal `String` ↔ `Path` with an `Into` that does not do path parsing, as well as a `Path::new(s: String)` that does.
+5. Add UX improvements on `Path` , particularly an internal `String` ↔ `Path` with an `Into` that does not do path parsing, as well as a `Path::build(s: String)` that does.
 6. Refactor all `LogEvent` to accept `Into<Path>` values.
     1. Remove obsolete functionality like `insert_path` and `remove_prune` since the new `Path` type covers this.
     2. Refactor the `keys` function to return an `Iterator<Path>`
@@ -202,7 +201,7 @@ The changes to `Path` and `PathIter` may lead to confusion or footgunning. We **
 
 Supporting `Value::Bytes` means we may take on additional maintenance burden and have to make new transforms that deal with bytes.
 
-Some naming/API changes, producing a mental burden on our developers.
+Some naming/API changes, may produce a small mental burden on our developers, but our team can communicate and overcome this.
 
 # Rationale & Alternatives
 
