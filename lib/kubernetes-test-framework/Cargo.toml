@@ -1,0 +1,11 @@
+[package]
+name = "kubernetes-test-framework"
+version = "0.1.0"
+authors = ["MOZGIII <mike-n@narod.ru>"]
+edition = "2018"
+description = "Kubernetes Test Framework used to test Vector in Kubernetes"
+
+[dependencies]
+k8s-openapi = { version = "0.9", default-features = false, features = ["v1_15"] }
+serde_json = "1"
+tempfile = "3"

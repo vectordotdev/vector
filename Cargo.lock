@@ -1908,6 +1908,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "kubernetes-test-framework"
+version = "0.1.0"
+dependencies = [
+ "k8s-openapi",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "lazy_static"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"

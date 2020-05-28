@@ -31,6 +31,7 @@ members = [
   "lib/file-source",
   "lib/tracing-limit",
   "lib/vector-wasm",
+  "lib/kubernetes-test-framework",
 ]
 
 [dependencies]
