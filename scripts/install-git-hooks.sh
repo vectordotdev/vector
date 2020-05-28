@@ -3,8 +3,10 @@ set -euo pipefail
 
 MODE="${1:-"all"}"
 
-mkdir -p "$(git rev-parse --git-dir)/hooks"
+GIT_DIR="$(git rev-parse --git-dir)"
+
+mkdir -p "$GIT_DIR/hooks"
 
 if [[ "$MODE" == "all" || "$MODE" == "signoff" ]]; then
-  cp scripts/signoff-git-hook.sh "$(git rev-parse --git-dir)/hooks/commit-msg"
+  cp scripts/signoff-git-hook.sh "$GIT_DIR/hooks/commit-msg"
 fi
