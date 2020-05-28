@@ -70,7 +70,7 @@ Before we explore how to improve `LogEvent`, we must make sure we're familiar wi
 
 ### `LogEvent` Internal Structure
 
-It's current implementation meets our needs currently from several ergonomics angles (notably the flattening code), but it we must twist it in several painful ways to work with it (notably buffers to flatmaps to `BTree` style APIs).
+The `LogEvent` currently meets our needs from several ergonomics angles (notably the flattening code), but we often must twist it in painful ways to work with it (notably buffers to flatmaps to `BTree` style APIs).
 
 ```rust
 //! src/event/mod.rs
