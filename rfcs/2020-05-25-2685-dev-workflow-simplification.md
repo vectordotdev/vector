@@ -1,4 +1,4 @@
-# RFC 2685 - 2020-04-04 - Kubernetes Integration
+# RFC 2685 - 2020-05-28 - Dev Workflow Simplification
 
 Vector's `Makefile` serves a variety of purposes, and this RFC attempts to tame the complexity of common dev tasks, improving contributor and team member experience.
 
@@ -34,7 +34,7 @@ This is ideal for users who want it to "Just work" and just want to start contri
 
 ```bash
 # Optional: Only if you use `podman`
-export container-tool="podman"
+export CONTAINER_TOOL="podman"
 ```
 
 By default, `make environment` style tasks will do a `docker pull` from Github's container repository, you can **optionally** build your own environment while you make your morning coffee ☕:
@@ -44,41 +44,49 @@ By default, `make environment` style tasks will do a `docker pull` from Github's
 make environment-prepare
 ```
 
-Now that you have your coffee, you can run any of the following:
+Now that you have your coffee, you can enter the shell!
 
 ```bash
 # Enter a shell with optimized mounts for interactive processes.
 # Inside here, you can use Vector like you have full toolchain (See below!)
 make environment
-# Add extra cli opts
-make enviroment cli-opts="--publish 3000:2000"
-# Validate your code can compile
-make enviroment-check
-# Validate your code actually does compile (in dev mode)
-make environment-build-dev
-# Validate your test pass
-make environment-test scope="sources::example"
-# Validate tests (that do not require other services) pass
-make environment-test
-# Validate your tests pass (starting required services in Docker)
-make environment-test-integration scope="sources::example"
-# Validate your tests pass against a live service.
-make environment-test-integration scope="sources::example" autospawn=false
-# Validate all tests pass (starting required services in Docker)
-make environment-test-integration
-# Run your benchmarks
-make environment-bench scope="transforms::example"
-# Rebuild Vector's metadata
-make environment-generate
-# Serve the website on port 3000
-make environment-website
-# Format your code before pushing!
-make environment-fmt
 # Try out a specific container tool. (Docker/Podman)
-make environment container-tool="podman"
+make environment CONTAINER_TOOL="podman"
+# Add extra cli opts
+make environment CLI_OPTS="--publish 3000:2000"
 ```
 
-We use explicit environment opt-in as many contributors choose to keep their Rust toolchain local, and use `make environment-generate` etc.
+Now you can use the jobs detailed in **"Bring your own toolbox"** below. 
+
+Want to run from outside of the environment? Clever. You can run any of the following:
+
+```bash
+
+# Validate your code can compile
+make check ENVIRONMENT=true
+# Validate your code actually does compile (in dev mode)
+make build-dev ENVIRONMENT=true
+# Validate your test pass
+make test SCOPE="sources::example" ENVIRONMENT=true
+# Validate tests (that do not require other services) pass
+make test ENVIRONMENT=true
+# Validate your tests pass (starting required services in Docker)
+make test-integration SCOPE="sources::example" ENVIRONMENT=true
+# Validate your tests pass against a live service.
+make test-integration SCOPE="sources::example" autospawn=false ENVIRONMENT=true
+# Validate all tests pass (starting required services in Docker)
+make test-integration ENVIRONMENT=true
+# Run your benchmarks
+make bench SCOPE="transforms::example" ENVIRONMENT=true
+# Rebuild Vector's metadata
+make generate ENVIRONMENT=true
+# Serve the website on port 3000
+make website ENVIRONMENT=true
+# Format your code before pushing!
+make fmt ENVIRONMENT=true
+```
+
+We use explicit environment opt-in as many contributors choose to keep their Rust toolchain local, and use `make generate ENVIRONMENT=true` etc.
 
 ### Using Nix
 
@@ -90,7 +98,7 @@ If you don't have Nix yet, [install it](https://nixos.org/download.html):
 
 ```bash
 curl -L [https://nixos.org/nix/install](https://nixos.org/nix/install) | sh
-# Hesitating? Uninstalling is just `rm -rf /nix`
+# Hesitating? Uninstalling is just `rm -rf /nix && rm -rf ~/.nix-*` then remove the import from `.bash_profile`
 ```
 
 Next, run `nix-shell` from the Vector directory.
@@ -132,31 +140,38 @@ If you find yourself needing to run something (such as `make generate`) inside t
 
 We're interested in reducing our dependencies if simple options exist. Got an idea? Try it out, we'd to hear of your successes and failures!
 
-In order to do your development on Vector, you'll primarily use a few commands, ordered from most to least frequently run:
+In order to do your development on Vector, you'll primarily use a few commands, such as `cargo` and `make` tasks you can use ordered from most to least frequently run:
 
 ```bash
 # Validate your code can compile
+cargo check
 make check
 # Validate your code actually does compile (in dev mode)
+cargo build
 make build-dev
 # Validate your test pass
+cargo test sources::example
 make test scope="sources::example"
 # Validate tests (that do not require other services) pass
+cargo test
 make test
 # Validate your tests pass (starting required services in Docker)
 make test-integration scope="sources::example" autospawn=false
 # Validate your tests pass against a live service.
 make test-integration scope="sources::example" autospawn=false
+cargo test --features docker sources::example
 # Validate all tests pass (starting required services in Docker)
 make test-integration
 # Run your benchmarks
 make bench scope="transforms::example"
+cargo bench transforms::example
 # Rebuild Vector's metadata
 make generate
 # Serve the website on port 3000
 make website
 # Format your code before pushing!
 make fmt
+cargo fmt
 ```
 
 If you run `make` you'll see a full list of all our tasks. Some of these will start Docker containers, sign commits, or even make releases. These are not common development commands and your mileage may vary.
@@ -206,12 +221,6 @@ There are tools like `hab` (from the Habitat project) and `packer` that can be u
 - It's **not backwards compatible**, meaning users who depend on the current `docker-compose` system might experience frustration.
 
 ## Outstanding Questions
-
-- Nix has support for Carnix/Bundix etc that allow us to manage some or all of our package dependencies with Nix. We may wish to evaluate using these more in the future when we are more comfortable with Nix.
-- Should we alter our exiting podman support? Right now it's behind the `USE_CONTAINERS` , should we have a `container_technology` or something?
-- Mac support is untested. (But should be improved)
-
- **TODO:** Ana has asked for a test
 
 - Windows/Mac/FreeBSD builds via `make build` et all will produce native binaries natively, we should be review those docs.
 - This RFC does not scope in integration tests beyond letting the `environment` run them. We may find motivation to explore a more ***slick*** solution in the future.
