@@ -10,6 +10,7 @@ use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use std::convert::TryInto;
 #[cfg(unix)]
 use std::path::PathBuf;
+use std::fs;
 use tokio01::{
     self,
     codec::{length_delimited, Framed},
@@ -358,6 +359,17 @@ pub fn build_framestream_unix_source(
         + 'static,
 ) -> Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
+
+    //check if the path already exists (and try to delete it)
+    match fs::metadata(&path) {
+        Ok(_) => {
+            //exists, so try to delete it
+            info!(message = "deleting file", ?path);
+            fs::remove_file(&path).expect("failed to delete existing socket");
+        },
+        Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {}, //doesn't exist, do nothing
+        Err(e) => error!("failed to bind to listener socket; error = {:?}", e),
+    };
 
     Box::new(future::lazy(move || {
         let listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
