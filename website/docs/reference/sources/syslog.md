@@ -383,10 +383,12 @@ will not request a certificate from the client.
   "appname": "app-name",
   "facility": "1",
   "host": "my.host.com",
+  "hostname": "my.host.com",
   "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
   "msgid": "ID47",
   "procid": "8710",
   "severity": "notice",
+  "source_ip": "127.0.0.1",
   "timestamp": "2019-11-01T21:15:47+00:00",
   "version": 1,
   "custom_field1": "custom value 1"
@@ -464,6 +466,30 @@ the key will not be added.
 The hostname extracted from the Syslog line. If a hostname is not found, then
 Vector will use the upstream hostname. In the case where [`mode`](#mode) = `"unix"` the
 socket path will be used. This key can be renamed via the [`host_key`](#host_key) option.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["my.host.com"]}
+  groups={[]}
+  name={"hostname"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### hostname
+
+The hostname extracted from the Syslog line. (`host` is also this value if it
+exists in the log.)
 
 
 
@@ -567,6 +593,30 @@ the key will not be added.
   common={true}
   defaultValue={null}
   enumValues={null}
+  examples={["127.0.0.1"]}
+  groups={[]}
+  name={"source_ip"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### source_ip
+
+The upstream hostname. In the case where [`mode`](#mode) = `"unix"` the socket path will
+be used. (`host` is also this value if [`hostname`](#hostname) does not exist in the log.)
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   groups={[]}
   name={"timestamp"}
@@ -653,6 +703,8 @@ A `log` event will be produced with the following structure:
   "facility": "user",
   "timestamp": "2020-03-13T20:45:38.119Z",
   "host": "dynamicwireless.name", // controlled via the [`host_key`](#host_key) option,
+  "source_ip": "127.0.0.1",
+  "hostname": "dynamicwireless.name"
   "appname": "non",
   "procid": "2426",
   "msgid": "ID931",
