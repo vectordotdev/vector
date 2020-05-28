@@ -196,6 +196,7 @@ tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
 assert_cmd = "1.0"
 reqwest = { version = "0.10.6", features = ["json"] }
+kubernetes-test-framework = { version = "0.1", path = "lib/kubernetes-test-framework" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -432,7 +433,6 @@ kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
-kubernetes-integration-tests = ["sources-kubernetes-logs"]
 
 shutdown-tests = ["sources","sinks-console","sinks-prometheus","sinks-blackhole","unix","rdkafka","transforms-log_to_metric","transforms-lua"]
 disable-resolv-conf = []
