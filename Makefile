@@ -311,4 +311,4 @@ version: ## Get the current Vector version
 	$(RUN) version
 
 git-hooks: ## Add Vector-local git hooks for commit sign-off
-	$(RUN) scripts/install-git-hooks.sh
+	@scripts/install-git-hooks.sh
