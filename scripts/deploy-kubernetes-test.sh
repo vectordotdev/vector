@@ -55,7 +55,7 @@ up() {
     $VECTOR_TEST_KUBECTL create --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONIFGS_FILE"
   fi
 
-  sed "s|timerio/vector:latest|$CONTAINER_IMAGE|" < "distribution/kubernetes/vector-namespaced.yaml" \
+  sed 's|image: timberio/vector:[^$]*$'"|image: $CONTAINER_IMAGE|" < "distribution/kubernetes/vector-namespaced.yaml" \
     | $VECTOR_TEST_KUBECTL create --namespace "$NAMESPACE" -f -
 }
 
