@@ -33,6 +33,7 @@ pub struct SyslogConfig {
     pub mode: Mode,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
+    /// The host key of the log. (This differs from `hostname`)
     pub host_key: Option<String>,
 }
 
@@ -215,10 +216,12 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
         .as_mut_log()
         .insert(event::log_schema().source_type_key(), "syslog");
 
-    if let Some(host) = &parsed.hostname {
-        event.as_mut_log().insert(host_key, host.clone());
-    } else if let Some(default_host) = default_host {
-        event.as_mut_log().insert(host_key, default_host);
+    if let Some(default_host) = default_host.clone() {
+        event.as_mut_log().insert("source_ip", default_host);
+    }
+
+    if let Some(parsed_host) = parsed.hostname.map(Bytes::from).or(default_host) {
+        event.as_mut_log().insert(host_key, parsed_host);
     }
 
     let timestamp = parsed
@@ -242,6 +245,9 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
 fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
     let log = event.as_mut_log();
 
+    if let Some(host) = parsed.hostname {
+        log.insert("hostname", host);
+    }
     if let Some(severity) = parsed.severity {
         log.insert("severity", severity.as_str());
     }
