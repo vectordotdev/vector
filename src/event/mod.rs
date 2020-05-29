@@ -32,7 +32,6 @@ lazy_static! {
         message_key: Atom::from("message"),
         timestamp_key: Atom::from("timestamp"),
         host_key: Atom::from("host"),
-        kubernetes_key: Atom::from("kubernetes"),
         source_type_key: Atom::from("source_type"),
     };
 }
@@ -228,8 +227,6 @@ pub struct LogSchema {
     #[serde(default = "LogSchema::default_host_key")]
     #[getset(get = "pub", set = "pub(crate)")]
     host_key: Atom,
-    #[getset(get = "pub", set = "pub(crate)")]
-    kubernetes_key: Atom,
     #[serde(default = "LogSchema::default_source_type_key")]
     #[getset(get = "pub", set = "pub(crate)")]
     source_type_key: Atom,
@@ -241,7 +238,6 @@ impl Default for LogSchema {
             message_key: Atom::from("message"),
             timestamp_key: Atom::from("timestamp"),
             host_key: Atom::from("host"),
-            kubernetes_key: Atom::from("kubernetes"),
             source_type_key: Atom::from("source_type"),
         }
     }

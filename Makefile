@@ -94,7 +94,7 @@ test-integration-splunk: ## Runs Splunk integration tests
 PACKAGE_DEB_USE_CONTAINER ?= "$(USE_CONTAINER)"
 test-integration-kubernetes: ## Runs Kubernetes integration tests
 	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" USE_CONTAINER=none $(RUN) test-integration-kubernetes
-	
+
 test-shutdown: ## Runs shutdown tests
 	$(RUN) test-shutdown
 
@@ -309,3 +309,6 @@ target-graph: ## Display dependencies between targets in this Makefile
 
 version: ## Get the current Vector version
 	$(RUN) version
+
+git-hooks: ## Add Vector-local git hooks for commit sign-off
+	@scripts/install-git-hooks.sh
