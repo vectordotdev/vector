@@ -65,7 +65,12 @@ impl SinkConfig for HumioLogsConfig {
 
 impl HumioLogsConfig {
     fn build_hec_config(&self) -> HecSinkConfig {
-        let host = self.host.clone().unwrap_or_else(|| HOST.to_string());
+        let mut host = self.host.clone().unwrap_or_else(|| HOST.to_string());
+
+        if host.ends_with('/') {
+            host.pop();
+        }
+
 
         HecSinkConfig {
             token: self.token.clone(),
