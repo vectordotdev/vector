@@ -8,7 +8,16 @@ use std::convert::TryInto;
 use vector_wasm::Registration;
 pub use wrapped_for_ffi::ensure_linked;
 
-pub fn emit(vmctx: &mut Vmctx, data: u32, length: u32) -> crate::Result<u32> {
+// Also add any new functions to the `ffi::ensure_linked` function!
+pub const HOSTCALL_LIST: [&str; 5] = [
+    "emit",
+    "register",
+    "raise",
+    "config_size",
+    "config",
+];
+
+pub fn emit(vmctx: &Vmctx, data: u32, length: u32) -> crate::Result<u32> {
     let mut event_buffer = vmctx.get_embed_ctx_mut::<EventBuffer>();
     let heap = vmctx.heap_mut();
     let slice = &heap[data as usize..(length as usize + data as usize)];
@@ -24,7 +33,7 @@ pub fn emit(vmctx: &mut Vmctx, data: u32, length: u32) -> crate::Result<u32> {
     Ok(event_buffer.events.len().try_into()?)
 }
 
-fn register(vmctx: &mut Vmctx, data: u32, length: u32) -> crate::Result<()> {
+fn register(vmctx: &Vmctx, data: u32, length: u32) -> crate::Result<()> {
     let heap = vmctx.heap_mut();
     let slice = &heap[data as usize..(length as usize + data as usize)];
     let value: Registration = serde_json::from_slice(slice).unwrap();
@@ -35,7 +44,7 @@ fn register(vmctx: &mut Vmctx, data: u32, length: u32) -> crate::Result<()> {
     Ok(())
 }
 
-fn raise(vmctx: &mut Vmctx, data: u32, length: u32) -> crate::Result<u32> {
+fn raise(vmctx: &Vmctx, data: u32, length: u32) -> crate::Result<u32> {
     let heap = vmctx.heap_mut();
     let slice = &heap[data as usize..(length as usize + data as usize)];
 
@@ -46,13 +55,13 @@ fn raise(vmctx: &mut Vmctx, data: u32, length: u32) -> crate::Result<u32> {
     Ok(if maybe_error.error.is_some() { 1 } else { 0 })
 }
 
-fn config_size(vmctx: &mut Vmctx) -> crate::Result<u32> {
+fn config_size(vmctx: &Vmctx) -> crate::Result<u32> {
     let config = vmctx.get_embed_ctx::<WasmModuleConfig>();
     let buf = serde_json::to_vec(&*config)?;
     Ok(buf.len().try_into()?)
 }
 
-fn config(vmctx: &mut Vmctx, buffer: u32, length: u32) -> crate::Result<()> {
+fn config(vmctx: &Vmctx, buffer: u32, length: u32) -> crate::Result<()> {
     let config = vmctx.get_embed_ctx::<WasmModuleConfig>();
     let buf = serde_json::to_vec(&*config)?;
 
@@ -64,64 +73,11 @@ fn config(vmctx: &mut Vmctx, buffer: u32, length: u32) -> crate::Result<()> {
 }
 
 /// All functions here must be fully C ABI compatible for wasm32-wasi.
-///
-/// This means that you should:
-///   * Only
 mod wrapped_for_ffi {
     use crate::internal_events;
     use lucet_runtime::{lucet_hostcall, vmctx::Vmctx};
     use std::sync::Once;
     use vector_wasm::Role;
-
-    #[lucet_hostcall]
-    #[no_mangle]
-    pub extern "C" fn register(vmctx: &mut Vmctx, data: u32, length: u32) {
-        let internal_event = internal_events::Hostcall::begin(Role::Transform, "emit");
-        // TODO: Handle error.
-        let ret = super::register(vmctx, data, length).unwrap();
-        internal_event.complete();
-        ret
-    }
-
-    #[lucet_hostcall]
-    #[no_mangle]
-    pub extern "C" fn emit(vmctx: &mut Vmctx, data: u32, length: u32) -> u32 {
-        let internal_event = internal_events::Hostcall::begin(Role::Transform, "register");
-        // TODO: Handle error.
-        let ret = super::emit(vmctx, data, length).unwrap();
-        internal_event.complete();
-        ret
-    }
-
-    #[lucet_hostcall]
-    #[no_mangle]
-    pub extern "C" fn raise(vmctx: &mut Vmctx, data: u32, length: u32) -> u32 {
-        let internal_event = internal_events::Hostcall::begin(Role::Transform, "raise");
-        // TODO: Handle error.
-        let ret = super::raise(vmctx, data, length).unwrap();
-        internal_event.complete();
-        ret
-    }
-
-    #[lucet_hostcall]
-    #[no_mangle]
-    pub extern "C" fn config_size(vmctx: &mut Vmctx) -> u32 {
-        let internal_event = internal_events::Hostcall::begin(Role::Transform, "config_size");
-        // TODO: Handle error.
-        let ret = super::config_size(vmctx).unwrap();
-        internal_event.complete();
-        ret
-    }
-
-    #[lucet_hostcall]
-    #[no_mangle]
-    pub extern "C" fn config(vmctx: &mut Vmctx, buffer: u32, length: u32) {
-        let internal_event = internal_events::Hostcall::begin(Role::Transform, "config");
-        // TODO: Handle error.
-        let ret = super::config(vmctx, buffer, length).unwrap();
-        internal_event.complete();
-        ret
-    }
 
     static HOSTCALL_API_INIT: Once = Once::new();
 
@@ -131,6 +87,7 @@ mod wrapped_for_ffi {
     #[doc(hidden)]
     pub extern "C" fn ensure_linked() {
         use std::ptr::read_volatile;
+        // Also add any new functions to the `super::HOSTCALL_LIST` const!
         HOSTCALL_API_INIT.call_once(|| unsafe {
             read_volatile(emit as *const extern "C" fn());
             read_volatile(raise as *const extern "C" fn());
@@ -139,5 +96,55 @@ mod wrapped_for_ffi {
             lucet_wasi::export_wasi_funcs();
             lucet_runtime::lucet_internal_ensure_linked();
         });
+    }
+
+    #[lucet_hostcall]
+    #[no_mangle]
+    pub extern "C" fn register(vmctx: &Vmctx, data: u32, length: u32) {
+        let internal_event = internal_events::Hostcall::begin(Role::Transform, "emit");
+        // TODO: Handle error.
+        let ret = super::register(vmctx, data, length).unwrap();
+        internal_event.complete();
+        ret
+    }
+
+    #[lucet_hostcall]
+    #[no_mangle]
+    pub extern "C" fn emit(vmctx: &Vmctx, data: u32, length: u32) -> u32 {
+        let internal_event = internal_events::Hostcall::begin(Role::Transform, "register");
+        // TODO: Handle error.
+        let ret = super::emit(vmctx, data, length).unwrap();
+        internal_event.complete();
+        ret
+    }
+
+    #[lucet_hostcall]
+    #[no_mangle]
+    pub extern "C" fn raise(vmctx: &Vmctx, data: u32, length: u32) -> u32 {
+        let internal_event = internal_events::Hostcall::begin(Role::Transform, "raise");
+        // TODO: Handle error.
+        let ret = super::raise(vmctx, data, length).unwrap();
+        internal_event.complete();
+        ret
+    }
+
+    #[lucet_hostcall]
+    #[no_mangle]
+    pub extern "C" fn config_size(vmctx: &Vmctx) -> u32 {
+        let internal_event = internal_events::Hostcall::begin(Role::Transform, "config_size");
+        // TODO: Handle error.
+        let ret = super::config_size(vmctx).unwrap();
+        internal_event.complete();
+        ret
+    }
+
+    #[lucet_hostcall]
+    #[no_mangle]
+    pub extern "C" fn config(vmctx: &Vmctx, buffer: u32, length: u32) {
+        let internal_event = internal_events::Hostcall::begin(Role::Transform, "config");
+        // TODO: Handle error.
+        let ret = super::config(vmctx, buffer, length).unwrap();
+        internal_event.complete();
+        ret
     }
 }

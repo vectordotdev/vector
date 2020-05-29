@@ -95,8 +95,10 @@ fn compile(
     let input = input.as_ref();
     let fingerprint = Fingerprint::new(input)?;
 
-    let mut bindings = lucet_wasi::bindings();
-    bindings.extend(&Bindings::from_str(include_str!("hostcall/bindings.json"))?)?;
+    let mut bindings = Bindings::empty();
+    bindings.extend(&lucet_wasi::bindings())?;
+    bindings.extend(&Bindings::env(hostcall::HOSTCALL_LIST.iter().cloned().map(|f| (String::from(f), String::from(f))).collect()))?;
+
     Lucetc::new(input)
         .with_bindings(bindings)
         .shared_object_file(output)?;
