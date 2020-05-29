@@ -56,7 +56,7 @@ make environment CONTAINER_TOOL="podman"
 make environment CLI_OPTS="--publish 3000:2000"
 ```
 
-Now you can use the jobs detailed in **"Bring your own toolbox"** below. 
+Now you can use the jobs detailed in **"Bring your own toolbox"** below.
 
 Want to run from outside of the environment? Clever. You can run any of the following:
 
@@ -120,7 +120,7 @@ direnv: using nix
 cdirenv: export +AR +AS +CC +CONFIG_SHELL +CXX +HOST_PATH +IN_NIX_SHELL +LC_ALL +LD +NIX_BINTOOLS +NIX_BINTOOLS_WRAPPER_x86_64_unknown_linux_gnu_TARGET_HOST +NIX_BUILD_CORES +NIX_BUILD_TOP +NIX_CC +NIX_CC_WRAPPER_x86_64_unknown_linux_gnu_TARGET_HOST +NIX_CFLAGS_COMPILE +NIX_ENFORCE_NO_NATIVE +NIX_HARDENING_ENABLE +NIX_INDENT_MAKE +NIX_LDFLAGS +NIX_STORE +NM +OBJCOPY +OBJDUMP +PROTOC +PROTOC_INCLUDE +RANLIB +READELF +SIZE +SOURCE_DATE_EPOCH +STRINGS +STRIP +TEMP +TEMPDIR +TMP +TMPDIR +buildInputs +builder +configureFlags +depsBuildBuild +depsBuildBuildPropagated +depsBuildTarget +depsBuildTargetPropagated +depsHostHost +depsHostHostPropagated +depsTargetTarget +depsTargetTargetPropagated +doCheck +doInstallCheck +name +nativeBuildInputs +nobuildPhase +out +outputs +patches +phases +propagatedBuildInputs +propagatedNativeBuildInputs +shell +shellHook +stdenv +strictDeps +system ~LOCALE_ARCHIVE ~PATH
 ```
 
-Now you can use the jobs detailed in **"Bring your own toolbox"** below. 
+Now you can use the jobs detailed in **"Bring your own toolbox"** below.
 
 ### Bring your own toolbox
 
