@@ -8,7 +8,8 @@ pkgs.buildEnv {
       direnv
       binutils
       stdenv
-      bash
+      bashInteractive
+      cacert
       gcc
       cmake
       rustup
@@ -30,15 +31,14 @@ pkgs.buildEnv {
       autoconf
     ]  ++ stdenv.lib.optional stdenv.isDarwin [ Security libiconv ];
     passthru = {
-        shellHook = ''
-            export PROTOC="${pkgs.protobuf}/bin/protoc";
-            export PROTOC_INCLUDE="${pkgs.protobuf}/include";
-            export LOCALE_ARCHIVE="${pkgs.glibcLocales}/lib/locale/locale-archive";
-            export LC_ALL="en_US.UTF-8";
-        '';
-        PROTOC="${pkgs.protobuf}/bin/protoc";
-        PROTOC_INCLUDE="${pkgs.protobuf}/include";
-        LOCALE_ARCHIVE="${pkgs.glibcLocales}/lib/locale/locale-archive";
-        LC_ALL="en_US.UTF-8";
+        PROTOC = "${pkgs.protobuf}/bin/protoc";
+        PROTOC_INCLUDE = "${pkgs.protobuf}/include";
+        LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
+        LC_ALL = "en_US.UTF-8";
+        OPENSSL_DIR = "${pkgs.openssl.dev}";
+        OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
+        SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+        GIT_SSL_CAINFO = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+        CURL_CA_BUNDLE = "${pkgs.cacert}/etc/ca-bundle.crt";
     };
 }

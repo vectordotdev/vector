@@ -1,4 +1,4 @@
 #! /usr/bin/env nix-shell
-#! nix-shell /vector/shell.nix -i bash
+#! nix-shell --pure /vector/shell.nix -i bash
 
 exec "$@"

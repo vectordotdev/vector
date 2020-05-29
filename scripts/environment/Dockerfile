@@ -1,26 +1,32 @@
-FROM docker.io/nixos/nix
-ARG RUST_TOOLCHAIN
+ARG BASEIMAGE_TAG="latest"
 
+# Bootstrap
+FROM docker.io/nixos/nix:$BASEIMAGE_TAG
 RUN nix-channel --add https://nixos.org/channels/nixpkgs-unstable nixpkgs
-RUN nix-channel --update
 
+# Setup the env
 RUN mkdir -p vector/scripts
-ADD default.nix shell.nix .envrc /vector/
+ADD default.nix shell.nix rust-toolchain .envrc /vector/
 ADD scripts/Gemfile scripts/Gemfile.lock /vector/scripts/
 WORKDIR /vector
-# Prebuild
-RUN nix run -c rustup default $RUST_TOOLCHAIN
+SHELL [ "/usr/bin/env", "nix-shell", "/vector/shell.nix", "--run" ]
+RUN echo "Installing env..."
+
+# Setup the toolchain
+RUN rustup default $(cat rust-toolchain)
 WORKDIR /vector/scripts
-RUN nix run -f ../default.nix -c bundle update --bundler
-RUN nix run -f ../default.nix -c bundle install
+RUN bundle update --bundler
+RUN bundle install
 WORKDIR /vector/website
-RUN nix run -f ../default.nix -c yarn
+RUN yarn
 WORKDIR /vector
 
+# Declare volumes
 VOLUME /vector
 VOLUME /vector/target
 VOLUME /root/.cargo
-RUN nix-env --install --file default.nix
+
+# Prepare for use
 ADD ./scripts/environment/entrypoint.sh /
 ENTRYPOINT [ "/entrypoint.sh" ]
 CMD [ "bash" ]

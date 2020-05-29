@@ -7,5 +7,10 @@ pkgs.mkShell {
   PROTOC_INCLUDE="${pkgs.protobuf}/include";
   LOCALE_ARCHIVE="${pkgs.glibcLocales}/lib/locale/locale-archive";
   LC_ALL="en_US.UTF-8";
+  OPENSSL_DIR="${pkgs.openssl.dev}";
+  OPENSSL_LIB_DIR="${pkgs.openssl.out}/lib";
+  SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+  GIT_SSL_CAINFO = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"; 
+
   buildInputs = [ (import ./default.nix { inherit pkgs; }) ];
 }

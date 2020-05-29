@@ -3,14 +3,6 @@
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/run.sh)
 GIT_REVISION := $(shell git rev-parse --verify HEAD)
 
-export CONTAINER_TOOL ?= docker
-export ENVIRONMENT ?= false
-export ENVIRONMENT_TAG = docker.pkg.github.com/timberio/vector/environment
-# Deprecated
-export USE_CONTAINER ?= $(CONTAINER_TOOL)
-
-export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
-
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
@@ -21,6 +13,12 @@ else
 	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
     export DEFAULT_FEATURES = default
 endif
+
+export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
+export CONTAINER_TOOL ?= docker
+export ENVIRONMENT ?= false
+export ENVIRONMENT_UPSTREAM = docker.pkg.github.com/timberio/vector/environment
+export USE_CONTAINER ?= $(CONTAINER_TOOL) # Deprecated
 
 help:
 	@echo "                                      __   __  __"
@@ -48,7 +46,7 @@ define ENVIRONMENT_EXEC
 			--mount type=volume,source=vector-target,target=/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			--publish 3000:3000 \
-			$(ENVIRONMENT_TAG):$(GIT_REVISION)
+			$(ENVIRONMENT_UPSTREAM):$(GIT_REVISION)
 endef
 
 environment: environment-prepare ## Enter a full Vector dev shell in Docker, binding this folder to the container.
@@ -56,19 +54,18 @@ environment: environment-prepare ## Enter a full Vector dev shell in Docker, bin
 
 environment-prepare: ## Prepare the Vector dev env.
 	$(CONTAINER_TOOL) build \
-		--tag $(ENVIRONMENT_TAG):$(GIT_REVISION) \
-		--build-arg RUST_TOOLCHAIN=${RUST_TOOLCHAIN} \
+		--tag $(ENVIRONMENT_UPSTREAM):$(GIT_REVISION) \
+		--build-arg BASEIMAGE_TAG=2.3.4 \
 		--file scripts/environment/Dockerfile \
 		.
-	$(CONTAINER_TOOL) tag $(ENVIRONMENT_TAG):$(GIT_REVISION) $(ENVIRONMENT_TAG):latest
+	$(CONTAINER_TOOL) tag $(ENVIRONMENT_UPSTREAM):$(GIT_REVISION) $(ENVIRONMENT_UPSTREAM):latest
 
 environment-clean: ## Clean the Vector dev env.
 	$(CONTAINER_TOOL) volume rm -f vector-target vector-cargo-cache
-	$(CONTAINER_TOOL) rmi vector/environment
+	$(CONTAINER_TOOL) rmi $(ENVIRONMENT_UPSTREAM):$(GIT_REVISION)
 
 environment-push: environment-prepare ## Publish a new version of the docker image.
-	$(CONTAINER_TOOL) tag $(ENVIRONMENT_TAG) $(ENVIRONMENT_TAG):$(GIT_REVISION)
-	$(CONTAINER_TOOL) push $(ENVIRONMENT_TAG):$(GIT_REVISION)
+	$(CONTAINER_TOOL) push $(ENVIRONMENT_UPSTREAM):$(GIT_REVISION)
 
 ##@ Building
 build: ## Build the project in release mode (Use `ENVIRONMENT=true` to run in a container)
@@ -173,7 +170,7 @@ test-shutdown: ## Runs shutdown tests
 
 ##@ Benching
 
-bench: build ## Run benchmarks in /benches (Use `ENVIRONMENT=true` to run in a container)
+bench: ## Run benchmarks in /benches (Use `ENVIRONMENT=true` to run in a container)
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make bench
 else
