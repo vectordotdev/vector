@@ -1,3 +1,4 @@
+use super::auto_concurrency::{AutoConcurrencyLimit, AutoConcurrencyLimitLayer};
 use super::retries2::{FixedRetryPolicy, RetryLogic};
 use super::sink::Response;
 use super::{Batch, BatchSink};
@@ -9,7 +10,7 @@ use std::task::Poll;
 use std::time::Duration;
 use tower03::{
     layer::{util::Stack, Layer},
-    limit::{ConcurrencyLimit, RateLimit},
+    limit::RateLimit,
     retry::Retry,
     timeout::Timeout,
     util::BoxService,
@@ -18,7 +19,7 @@ use tower03::{
 
 pub use compat::TowerCompat;
 
-pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, ConcurrencyLimit<Timeout<S>>>>;
+pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AutoConcurrencyLimit<Timeout<S>>>>;
 pub type TowerBatchedSink<S, B, L, Request> = BatchSink<TowerCompat<Svc<S, L>>, B, Request>;
 
 pub trait ServiceBuilderExt<L> {
@@ -144,7 +145,7 @@ impl TowerRequestSettings {
         let service = ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
-            .concurrency_limit(self.in_flight_limit)
+            .layer(AutoConcurrencyLimitLayer::new(self.in_flight_limit))
             .timeout(self.timeout)
             .service(service);
 
