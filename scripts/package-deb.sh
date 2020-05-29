@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+set -x
 
 # package-deb.sh
 #
@@ -42,6 +43,9 @@ mkdir -p "$PROJECT_ROOT/target/$TARGET/release"
 mv "vector-$TARGET/bin/vector" "$PROJECT_ROOT/target/$TARGET/release"
 popd
 rm -rf "$td"
+
+# Display disk space
+df -h
 
 #
 # Package

@@ -25,7 +25,8 @@ pub struct ClickhouseConfig {
     pub host: String,
     pub table: String,
     pub database: Option<String>,
-    pub compression: Option<Compression>,
+    #[serde(default = "Compression::default_gzip")]
+    pub compression: Compression,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -60,18 +61,13 @@ pub enum Encoding {
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let gzip = match self.compression.unwrap_or(Compression::Gzip) {
-            Compression::None => false,
-            Compression::Gzip => true,
-        };
-
         let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            Buffer::new(gzip),
+            Buffer::new(self.compression),
             request,
             batch,
             tls_settings,
@@ -116,16 +112,14 @@ impl HttpSink for ClickhouseConfig {
 
         let uri = encode_uri(&self.host, database, &self.table).expect("Unable to encode uri");
 
-        let builder = Request::builder()
+        let mut builder = Request::builder()
             .method(Method::POST)
             .uri(uri.clone())
             .header("Content-Type", "application/x-ndjson");
 
-        let builder = if let Compression::Gzip = self.compression.unwrap_or(Compression::Gzip) {
-            builder.header("Content-Encoding", "gzip")
-        } else {
-            builder
-        };
+        if let Some(ce) = self.compression.content_encoding() {
+            builder = builder.header("Content-Encoding", ce);
+        }
 
         let mut request = builder.body(events).unwrap();
 
@@ -262,7 +256,7 @@ mod integration_tests {
         let config = ClickhouseConfig {
             host: host.clone(),
             table: table.clone(),
-            compression: Some(Compression::None),
+            compression: Compression::None,
             batch: BatchBytesConfig {
                 max_size: Some(1),
                 timeout_secs: None,
@@ -305,7 +299,7 @@ mod integration_tests {
         let config = ClickhouseConfig {
             host: host.clone(),
             table: table.clone(),
-            compression: Some(Compression::None),
+            compression: Compression::None,
             encoding,
             batch: BatchBytesConfig {
                 max_size: Some(1),
@@ -422,7 +416,7 @@ compression = "none"
         let config = ClickhouseConfig {
             host: host.clone(),
             table: table.clone(),
-            compression: Some(Compression::None),
+            compression: Compression::None,
             batch: BatchBytesConfig {
                 max_size: Some(1),
                 timeout_secs: None,

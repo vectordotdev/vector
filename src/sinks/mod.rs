@@ -33,8 +33,8 @@ pub mod honeycomb;
 pub mod http;
 #[cfg(feature = "sinks-humio_logs")]
 pub mod humio_logs;
-#[cfg(feature = "sinks-influxdb_metrics")]
-pub mod influxdb_metrics;
+#[cfg(feature = "sinks-influxdb")]
+pub mod influxdb;
 #[cfg(all(feature = "sinks-kafka", feature = "rdkafka"))]
 pub mod kafka;
 #[cfg(feature = "sinks-logdna")]

@@ -3,23 +3,24 @@ use crate::{
     event::{self, Event},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
-        BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
+        http2::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+        service2::TowerRequestConfig,
+        BatchBytesConfig, Buffer, Compression, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{future, Future, Sink};
-use http::{
+use futures::{FutureExt, TryFutureExt};
+use futures01::{future, Sink};
+use http02::{
     header::{self, HeaderName, HeaderValue},
-    Method, Uri,
+    Method, Request, StatusCode, Uri,
 };
-use hyper::{Body, Request};
+use hyper13::Body;
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -43,7 +44,8 @@ pub struct HttpSinkConfig {
     pub healthcheck_uri: Option<UriSerde>,
     pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
-    pub compression: Option<Compression>,
+    #[serde(default)]
+    pub compression: Compression,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -105,18 +107,15 @@ impl SinkConfig for HttpSinkConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
 
         let mut config = self.clone();
-
         config.uri = build_uri(config.uri.clone()).into();
-        let gzip = match config.compression.unwrap_or(Compression::None) {
-            Compression::None => false,
-            Compression::Gzip => true,
-        };
+
+        let compression = config.compression;
         let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let sink = BatchedHttpSink::new(
             config,
-            Buffer::new(gzip),
+            Buffer::new(compression),
             request,
             batch,
             Some(tls.clone()),
@@ -129,8 +128,10 @@ impl SinkConfig for HttpSinkConfig {
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
                 let healthcheck =
-                    healthcheck(healthcheck_uri, self.auth.clone(), cx.resolver(), tls)?;
-                Ok((sink, healthcheck))
+                    healthcheck(healthcheck_uri, self.auth.clone(), cx.resolver(), tls)
+                        .boxed()
+                        .compat();
+                Ok((sink, Box::new(healthcheck)))
             }
             None => Ok((sink, Box::new(future::ok(())))),
         }
@@ -188,37 +189,36 @@ impl HttpSink for HttpSinkConfig {
         Some(body)
     }
 
-    fn build_request(&self, mut body: Self::Output) -> http::Request<Vec<u8>> {
-        let mut builder = hyper::Request::builder();
-
+    fn build_request(&self, mut body: Self::Output) -> http02::Request<Vec<u8>> {
         let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
             HttpMethod::Post => Method::POST,
             HttpMethod::Put => Method::PUT,
         };
-
-        builder.method(method);
-
         let uri: Uri = self.uri.clone().into();
-        builder.uri(uri);
 
-        match self.encoding.codec() {
-            Encoding::Text => builder.header("Content-Type", "text/plain"),
-            Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
+        let ct = match self.encoding.codec() {
+            Encoding::Text => "text/plain",
+            Encoding::Ndjson => "application/x-ndjson",
             Encoding::Json => {
                 body.insert(0, b'[');
                 body.pop(); // remove trailing comma from last record
                 body.push(b']');
-                builder.header("Content-Type", "application/json")
+                "application/json"
             }
         };
 
-        if let Some(Compression::Gzip) = &self.compression {
-            builder.header("Content-Encoding", "gzip");
+        let mut builder = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header("Content-Type", ct);
+
+        if let Some(ce) = self.compression.content_encoding() {
+            builder = builder.header("Content-Encoding", ce);
         }
 
         if let Some(headers) = &self.headers {
             for (header, value) in headers.iter() {
-                builder.header(header.as_str(), value.as_str());
+                builder = builder.header(header.as_str(), value.as_str());
             }
         }
 
@@ -232,12 +232,12 @@ impl HttpSink for HttpSinkConfig {
     }
 }
 
-fn healthcheck(
+async fn healthcheck(
     uri: UriSerde,
     auth: Option<Auth>,
     resolver: Resolver,
     tls_settings: TlsSettings,
-) -> crate::Result<super::Healthcheck> {
+) -> crate::Result<()> {
     let uri = build_uri(uri);
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
@@ -246,20 +246,12 @@ fn healthcheck(
     }
 
     let mut client = HttpClient::new(resolver, tls_settings)?;
+    let response = client.send(request).await?;
 
-    let healthcheck = client
-        .call(request)
-        .map_err(|err| err.into())
-        .and_then(|response| {
-            use hyper::StatusCode;
-
-            match response.status() {
-                StatusCode::OK => Ok(()),
-                status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
-            }
-        });
-
-    Ok(Box::new(healthcheck))
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        status => Err(super::HealthcheckError::UnexpectedStatus2 { status }.into()),
+    }
 }
 
 fn validate_headers(
@@ -286,11 +278,7 @@ fn build_uri(base: UriSerde) -> Uri {
     let base: Uri = base.into();
     Uri::builder()
         .scheme(base.scheme_str().unwrap_or("http"))
-        .authority(
-            base.authority_part()
-                .map(|a| a.as_str())
-                .unwrap_or("127.0.0.1"),
-        )
+        .authority(base.authority().map(|a| a.as_str()).unwrap_or("127.0.0.1"))
         .path_and_query(base.path_and_query().map(|pq| pq.as_str()).unwrap_or(""))
         .build()
         .expect("bug building uri")
@@ -303,7 +291,7 @@ mod tests {
         assert_downcast_matches,
         runtime::Runtime,
         sinks::http::HttpSinkConfig,
-        sinks::util::http::HttpSink,
+        sinks::util::http2::HttpSink,
         test_util::{next_addr, random_lines_with_stream, shutdown_on_idle},
         topology::config::SinkContext,
     };

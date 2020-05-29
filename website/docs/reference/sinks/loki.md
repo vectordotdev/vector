@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "at_least_once"
 component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
@@ -73,6 +73,7 @@ The Vector `loki` sink
   # Auth
   auth.password = "${LOKI_PASSWORD}" # required, required when strategy = "basic"
   auth.strategy = "basic" # required
+  auth.token = "${API_TOKEN}" # required, required when strategy = "bearer"
   auth.user = "${LOKI_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
@@ -166,8 +167,8 @@ must be set to your `instanceId`.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
-  examples={["basic"]}
+  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth].","bearer":"The bearer token authentication strategy."}}
+  examples={["basic","bearer"]}
   groups={[]}
   name={"strategy"}
   path={"auth"}
@@ -182,6 +183,29 @@ must be set to your `instanceId`.
 #### strategy
 
 The authentication strategy to use.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${API_TOKEN}","xyz123"]}
+  groups={[]}
+  name={"token"}
+  path={"auth"}
+  relevantWhen={{"strategy":"bearer"}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### token
+
+The token to use for bearer authentication
 
 
 
@@ -246,7 +270,7 @@ Configures the sink batching behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -269,7 +293,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -317,7 +341,7 @@ Configures the sink specific buffer behavior.
   relevantWhen={{"type":"memory"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"events"}
   warnings={[]}
   >
@@ -340,7 +364,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   relevantWhen={{"type":"disk"}}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -697,7 +721,7 @@ Configures the sink request behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"requests"}
   warnings={[]}
   >
@@ -720,7 +744,7 @@ The maximum number of in-flight requests allowed at any given time.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -743,7 +767,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -767,7 +791,7 @@ time window.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -791,7 +815,7 @@ intents and purposes, represents an infinite number of retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -816,7 +840,7 @@ to select future backoffs.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -839,7 +863,7 @@ The maximum amount of time, in seconds, to wait between retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >

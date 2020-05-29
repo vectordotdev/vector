@@ -4,12 +4,14 @@ use futures01::{future, Sink, Stream};
 use std::convert::Infallible;
 use std::time::Duration;
 use vector::buffers::Acker;
-use vector::sinks::util::{Batch, BatchSettings, BatchSink, Buffer, Partition, PartitionBatchSink};
+use vector::sinks::util::{
+    Batch, BatchSettings, BatchSink, Buffer, Compression, Partition, PartitionBatchSink,
+};
 use vector::test_util::random_lines;
 
 fn batching(
     bench_name: &'static str,
-    gzip: bool,
+    compression: Compression,
     max_size: usize,
     num_events: usize,
     event_len: usize,
@@ -28,7 +30,7 @@ fn batching(
                 let (acker, _) = Acker::new_for_testing();
                 let batch_sink = BatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                    Buffer::new(gzip),
+                    Buffer::new(compression),
                     BatchSettings {
                         size: max_size,
                         timeout: Duration::from_secs(1),
@@ -48,7 +50,7 @@ fn batching(
 
 fn partitioned_batching(
     bench_name: &'static str,
-    gzip: bool,
+    compression: Compression,
     max_size: usize,
     num_events: usize,
     event_len: usize,
@@ -72,7 +74,7 @@ fn partitioned_batching(
                 let (acker, _) = Acker::new_for_testing();
                 let batch_sink = PartitionBatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                    PartitionedBuffer::new(gzip),
+                    PartitionedBuffer::new(compression),
                     BatchSettings {
                         size: max_size,
                         timeout: Duration::from_secs(1),
@@ -95,7 +97,7 @@ fn benchmark_batching(c: &mut Criterion) {
         "batch",
         batching(
             "no compression 10mb with 2mb batches",
-            false,
+            Compression::None,
             2_000_000,
             100_000,
             100,
@@ -103,18 +105,30 @@ fn benchmark_batching(c: &mut Criterion) {
     );
     c.bench(
         "batch",
-        batching("gzip 10mb with 2mb batches", true, 2_000_000, 100_000, 100),
+        batching(
+            "gzip 10mb with 2mb batches",
+            Compression::Gzip,
+            2_000_000,
+            100_000,
+            100,
+        ),
     );
     c.bench(
         "batch",
-        batching("gzip 10mb with 500kb batches", true, 500_000, 100_000, 100),
+        batching(
+            "gzip 10mb with 500kb batches",
+            Compression::Gzip,
+            500_000,
+            100_000,
+            100,
+        ),
     );
 
     c.bench(
         "partitioned_batch",
         partitioned_batching(
             "no compression 10mb with 2mb batches",
-            false,
+            Compression::None,
             2_000_000,
             100_000,
             100,
@@ -122,7 +136,13 @@ fn benchmark_batching(c: &mut Criterion) {
     );
     c.bench(
         "partitioned_batch",
-        partitioned_batching("gzip 10mb with 2mb batches", true, 2_000_000, 100_000, 100),
+        partitioned_batching(
+            "gzip 10mb with 2mb batches",
+            Compression::Gzip,
+            2_000_000,
+            100_000,
+            100,
+        ),
     );
 }
 
@@ -146,9 +166,9 @@ impl Partition<Bytes> for InnerBuffer {
 }
 
 impl PartitionedBuffer {
-    pub fn new(gzip: bool) -> Self {
+    pub fn new(compression: Compression) -> Self {
         Self {
-            inner: Buffer::new(gzip),
+            inner: Buffer::new(compression),
             key: None,
         }
     }

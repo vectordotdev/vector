@@ -6,8 +6,9 @@
 use futures01::{
     future,
     sink::Sink,
+    stream,
     sync::mpsc::{Receiver, Sender},
-    Future, Stream,
+    Async, Future, Stream,
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -20,7 +21,6 @@ use vector::event::{self, metric::MetricValue, Event, Value};
 use vector::shutdown::ShutdownSignal;
 use vector::sinks::{util::StreamSink, Healthcheck, RouterSink};
 use vector::sources::Source;
-use vector::stream::StreamExt;
 use vector::topology::config::{
     DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
     TransformContext,
@@ -108,21 +108,34 @@ impl SourceConfig for MockSourceConfig {
     ) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();
+        let mut recv = wrapped.lock().unwrap().take().unwrap();
+        let mut shutdown = Some(shutdown);
+        let mut token = None;
         let source = future::lazy(move || {
-            wrapped
-                .lock()
-                .unwrap()
-                .take()
-                .unwrap()
-                .take_until(shutdown)
-                .map(move |x| {
-                    if let Some(counter) = &event_counter {
-                        counter.fetch_add(1, Ordering::Relaxed);
+            stream::poll_fn(move || {
+                if let Some(until) = shutdown.as_mut() {
+                    match until.poll() {
+                        Ok(Async::Ready(res)) => {
+                            token = Some(res);
+                            shutdown.take();
+                            recv.close();
+                        }
+                        Err(_) => {
+                            shutdown.take();
+                        }
+                        Ok(Async::NotReady) => {}
                     }
-                    x
-                })
-                .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
-                .map(|_| info!("finished sending"))
+                }
+                recv.poll()
+            })
+            .map(move |x| {
+                if let Some(counter) = &event_counter {
+                    counter.fetch_add(1, Ordering::Relaxed);
+                }
+                x
+            })
+            .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
+            .map(|_| info!("finished sending"))
         });
         Ok(Box::new(source))
     }

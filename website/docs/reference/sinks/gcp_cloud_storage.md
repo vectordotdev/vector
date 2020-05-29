@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
@@ -46,7 +46,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   # General
   type = "gcp_cloud_storage" # required
   inputs = ["my-source-or-transform-id"] # required
-  compression = "gzip" # required
+  compression = "none" # optional, default
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 
@@ -70,7 +70,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   type = "gcp_cloud_storage" # required
   inputs = ["my-source-or-transform-id"] # required
   bucket = "my-bucket" # required
-  compression = "gzip" # required
+  compression = "none" # optional, default
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 
@@ -181,7 +181,7 @@ Configures the sink batching behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -204,7 +204,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -275,7 +275,7 @@ Configures the sink specific buffer behavior.
   relevantWhen={{"type":"memory"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"events"}
   warnings={[]}
   >
@@ -298,7 +298,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   relevantWhen={{"type":"disk"}}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -361,14 +361,14 @@ The behavior when the buffer becomes full.
 </Field>
 <Field
   common={true}
-  defaultValue={null}
-  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
-  examples={["gzip","none"]}
+  defaultValue={"none"}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
+  examples={["none","gzip"]}
   groups={[]}
   name={"compression"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -377,7 +377,8 @@ The behavior when the buffer becomes full.
 
 ### compression
 
-The compression mechanism to use.
+The compression strategy used to compress the encoded event data before
+transmission.
 
 
 
@@ -729,7 +730,7 @@ Configures the sink request behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"requests"}
   warnings={[]}
   >
@@ -752,7 +753,7 @@ The maximum number of in-flight requests allowed at any given time.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -775,7 +776,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -799,7 +800,7 @@ time window.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -823,7 +824,7 @@ intents and purposes, represents an infinite number of retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -848,7 +849,7 @@ to select future backoffs.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -871,7 +872,7 @@ The maximum amount of time, in seconds, to wait between retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -1317,6 +1318,7 @@ You can learn more about the complete syntax in the
 [urls.gcs_custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
 [urls.gcs_predefined_acl]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
 [urls.gcs_storage_classes]: https://cloud.google.com/storage/docs/storage-classes
+[urls.gzip]: https://www.gzip.org/
 [urls.new_gcp_cloud_storage_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_cloud_storage
 [urls.openssl]: https://www.openssl.org/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers

@@ -5,22 +5,22 @@ use crate::{
         Event,
     },
     sinks::util::{
-        http::{BatchedHttpSink, HttpClient, HttpSink},
-        BatchEventsConfig, MetricBuffer, TowerRequestConfig,
+        http2::{BatchedHttpSink, HttpClient, HttpSink},
+        service2::TowerRequestConfig,
+        BatchEventsConfig, MetricBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
-use futures01::{Future, Sink};
-use http::{uri::InvalidUri, StatusCode, Uri};
-use hyper;
+use futures::{FutureExt, TryFutureExt};
+use futures01::Sink;
+use http02::{uri::InvalidUri, Request, StatusCode, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicI64, Ordering::SeqCst};
-use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -107,7 +107,7 @@ inventory::submit! {
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
+        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
 
         let batch = self.batch.unwrap_or(20, 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -124,7 +124,7 @@ impl SinkConfig for DatadogConfig {
         let sink = BatchedHttpSink::new(sink, MetricBuffer::new(), request, batch, None, &cx)
             .sink_map_err(|e| error!("Fatal datadog error: {}", e));
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -144,7 +144,7 @@ impl HttpSink for DatadogSink {
         Some(event)
     }
 
-    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
         let now = Utc::now().timestamp();
         let interval = now - self.last_sent_timestamp.load(SeqCst);
         self.last_sent_timestamp.store(now, SeqCst);
@@ -152,7 +152,7 @@ impl HttpSink for DatadogSink {
         let input = encode_events(events, interval, &self.config.namespace);
         let body = serde_json::to_vec(&input).unwrap();
 
-        http::Request::post(self.uri.clone())
+        Request::post(self.uri.clone())
             .header("Content-Type", "application/json")
             .header("DD-API-KEY", self.config.api_key.clone())
             .body(body)
@@ -163,32 +163,28 @@ impl HttpSink for DatadogSink {
 fn build_uri(host: &str) -> crate::Result<Uri> {
     let uri = format!("{}/api/v1/series", host)
         .parse::<Uri>()
-        .context(super::UriParseError)?;
+        .context(super::UriParseError2)?;
 
     Ok(uri)
 }
 
-fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result<super::Healthcheck> {
+async fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result<()> {
     let uri = format!("{}/api/v1/validate", config.host)
         .parse::<Uri>()
-        .context(super::UriParseError)?;
+        .context(super::UriParseError2)?;
 
-    let request = http::Request::get(uri)
+    let request = Request::get(uri)
         .header("DD-API-KEY", config.api_key)
-        .body(hyper::Body::empty())
+        .body(hyper13::Body::empty())
         .unwrap();
 
     let mut client = HttpClient::new(resolver, None)?;
+    let response = client.send(request).await?;
 
-    let healthcheck = client
-        .call(request)
-        .map_err(|err| err.into())
-        .and_then(|response| match response.status() {
-            StatusCode::OK => Ok(()),
-            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
-        });
-
-    Ok(Box::new(healthcheck))
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        other => Err(super::HealthcheckError::UnexpectedStatus2 { status: other }.into()),
+    }
 }
 
 fn encode_tags(tags: BTreeMap<String, String>) -> Vec<String> {
@@ -376,10 +372,10 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
 mod tests {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
-    use crate::sinks::util::{http::HttpSink, test::load_sink};
+    use crate::sinks::util::{http2::HttpSink, test::load_sink};
     use chrono::offset::TimeZone;
     use chrono::Utc;
-    use http::{Method, Uri};
+    use http02::{Method, Uri};
     use pretty_assertions::assert_eq;
     use std::sync::atomic::AtomicI64;
 

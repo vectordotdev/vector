@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "at_least_once"
 component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."
@@ -59,8 +59,8 @@ The Vector `clickhouse` sink
   host = "http://localhost:8123" # required
   table = "mytable" # required
 
-  # requests
-  compression = "none" # optional, default
+  # Requests
+  compression = "gzip" # optional, default
 ```
 
 </TabItem>
@@ -79,6 +79,7 @@ The Vector `clickhouse` sink
   # Auth
   auth.password = "${CLICKHOUSE_PASSWORD}" # required, required when strategy = "basic"
   auth.strategy = "basic" # required
+  auth.token = "${API_TOKEN}" # required, required when strategy = "bearer"
   auth.user = "${CLICKHOUSE_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
@@ -105,8 +106,8 @@ The Vector `clickhouse` sink
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 30 # optional, default, seconds
 
-  # requests
-  compression = "none" # optional, default
+  # Requests
+  compression = "gzip" # optional, default
 
   # TLS
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
@@ -169,8 +170,8 @@ The basic authentication password.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
-  examples={["basic"]}
+  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth].","bearer":"The bearer token authentication strategy."}}
+  examples={["basic","bearer"]}
   groups={[]}
   name={"strategy"}
   path={"auth"}
@@ -185,6 +186,29 @@ The basic authentication password.
 #### strategy
 
 The authentication strategy to use.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${API_TOKEN}","xyz123"]}
+  groups={[]}
+  name={"token"}
+  path={"auth"}
+  relevantWhen={{"strategy":"bearer"}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### token
+
+The token to use for bearer authentication
 
 
 
@@ -248,7 +272,7 @@ Configures the sink batching behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -271,7 +295,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -319,7 +343,7 @@ Configures the sink specific buffer behavior.
   relevantWhen={{"type":"memory"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"events"}
   warnings={[]}
   >
@@ -342,7 +366,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   relevantWhen={{"type":"disk"}}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -405,8 +429,8 @@ The behavior when the buffer becomes full.
 </Field>
 <Field
   common={true}
-  defaultValue={"none"}
-  enumValues={{"none":"The payload will not be compressed.","gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
+  defaultValue={"gzip"}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
   examples={["none","gzip"]}
   groups={[]}
   name={"compression"}
@@ -422,7 +446,7 @@ The behavior when the buffer becomes full.
 ### compression
 
 The compression strategy used to compress the encoded event data before
-outputting.
+transmission.
 
 
 
@@ -623,7 +647,7 @@ Configures the sink request behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"requests"}
   warnings={[]}
   >
@@ -646,7 +670,7 @@ The maximum number of in-flight requests allowed at any given time.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -669,7 +693,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -693,7 +717,7 @@ time window.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -717,7 +741,7 @@ intents and purposes, represents an infinite number of retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -742,7 +766,7 @@ to select future backoffs.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -765,7 +789,7 @@ The maximum amount of time, in seconds, to wait between retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
