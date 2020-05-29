@@ -135,6 +135,7 @@ scopes:
   - honeycomb sink
   - http sink
   - humio_logs sink
+  - influxdb_logs sink
   - influxdb_metrics sink
   - kafka sink
   - logdna sink

@@ -1,25 +1,26 @@
-use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
+use super::{healthcheck_response2, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::Event,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
-            BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            http2::{BatchedHttpSink, HttpClient, HttpSink},
+            service2::TowerRequestConfig,
+            BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
         },
         Healthcheck, RouterSink,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{Future, Sink};
-use http::{Request, Uri};
-use hyper::Body;
+use futures::{FutureExt, TryFutureExt};
+use futures01::Sink;
+use http02::{Request, Uri};
+use hyper13::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::collections::HashMap;
-use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -117,7 +118,13 @@ impl SinkConfig for StackdriverConfig {
             creds,
         };
 
-        let healthcheck = self.healthcheck(&cx, sink.clone())?;
+        let healthcheck = healthcheck(
+            cx.clone(),
+            sink.clone(),
+            TlsSettings::from_options(&self.tls)?,
+        )
+        .boxed()
+        .compat();
 
         let sink = BatchedHttpSink::new(
             sink,
@@ -129,7 +136,7 @@ impl SinkConfig for StackdriverConfig {
         )
         .sink_map_err(|e| error!("Fatal stackdriver sink error: {}", e));
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -155,7 +162,7 @@ impl HttpSink for StackdriverSink {
         Some(entry)
     }
 
-    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
         let events = serde_json::json!({
             "log_name": self.config.log_name(),
             "entries": events,
@@ -173,30 +180,26 @@ impl HttpSink for StackdriverSink {
             .unwrap();
 
         if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
+            creds.apply2(&mut request);
         }
 
         request
     }
 }
 
+async fn healthcheck(
+    cx: SinkContext,
+    sink: StackdriverSink,
+    tls: TlsSettings,
+) -> crate::Result<()> {
+    let request = sink.build_request(vec![]).map(Body::from);
+
+    let mut client = HttpClient::new(cx.resolver(), tls)?;
+    let response = client.send(request).await?;
+    healthcheck_response2(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
+}
+
 impl StackdriverConfig {
-    fn healthcheck(&self, cx: &SinkContext, sink: StackdriverSink) -> crate::Result<Healthcheck> {
-        let request = sink.build_request(vec![]).map(Body::from);
-
-        let mut client = HttpClient::new(cx.resolver(), TlsSettings::from_options(&self.tls)?)?;
-
-        let healthcheck = client
-            .call(request)
-            .map_err(Into::into)
-            .and_then(healthcheck_response(
-                sink.creds.clone(),
-                HealthcheckError::NotFound.into(),
-            ));
-
-        Ok(Box::new(healthcheck))
-    }
-
     fn log_name(&self) -> String {
         use StackdriverLogName::*;
         match &self.log_name {

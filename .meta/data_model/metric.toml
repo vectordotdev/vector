@@ -98,7 +98,7 @@ The list of values contained within the distribution.\
 """
 
 [data_model.metric.schema.distribution.children.sample_rates]
-type = "[int]"
+type = "[uint]"
 examples = [[12, 43, 25]]
 required = true
 description = """\
@@ -123,7 +123,7 @@ The buckets contained within this histogram.\
 """
 
 [data_model.metric.schema.aggregated_histogram.children.counts]
-type = "[int]"
+type = "[uint]"
 examples = [[1, 5, 25, 2, 5]]
 required = true
 description = """\
@@ -131,7 +131,7 @@ The number of values contained within each bucket.\
 """
 
 [data_model.metric.schema.aggregated_histogram.children.count]
-type = "int"
+type = "uint"
 examples = [54]
 required = true
 description = """\
@@ -173,7 +173,7 @@ The values contained within the summary that align with the `quantiles`.\
 """
 
 [data_model.metric.schema.aggregated_summary.children.count]
-type = "int"
+type = "uint"
 examples = [54]
 required = true
 description = """\

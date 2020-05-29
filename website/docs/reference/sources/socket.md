@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` source ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs `log` events."
@@ -198,7 +198,7 @@ option][docs.reference.global-options#host_key].
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -267,7 +267,7 @@ The unix socket path. *This should be absolute path*.
   relevantWhen={{"mode":"tcp"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >

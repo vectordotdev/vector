@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "best_effort"
 component_title: "Vector"
 description: "The Vector `vector` sink streams `log` and `metric` events to another downstream `vector` source."
@@ -136,7 +136,7 @@ Configures the sink specific buffer behavior.
   relevantWhen={{"type":"memory"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"events"}
   warnings={[]}
   >
@@ -159,7 +159,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   relevantWhen={{"type":"disk"}}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >

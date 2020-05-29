@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."
@@ -53,6 +53,9 @@ HTTP Event Collector][urls.splunk_hec].
 
   # Encoding
   encoding.codec = "json" # required
+
+  # Requests
+  compression = "none" # optional, default
 ```
 
 </TabItem>
@@ -94,6 +97,9 @@ HTTP Event Collector][urls.splunk_hec].
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
+
+  # Requests
+  compression = "none" # optional, default
 
   # TLS
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
@@ -141,7 +147,7 @@ Configures the sink batching behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -164,7 +170,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -212,7 +218,7 @@ Configures the sink specific buffer behavior.
   relevantWhen={{"type":"memory"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"events"}
   warnings={[]}
   >
@@ -235,7 +241,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   relevantWhen={{"type":"disk"}}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -294,6 +300,30 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
+  examples={["none","gzip"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+The compression strategy used to compress the encoded event data before
+transmission.
+
+
 
 </Field>
 <Field
@@ -564,7 +594,7 @@ Configures the sink request behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"requests"}
   warnings={[]}
   >
@@ -587,7 +617,7 @@ The maximum number of in-flight requests allowed at any given time.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -610,7 +640,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -634,7 +664,7 @@ time window.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -658,7 +688,7 @@ intents and purposes, represents an infinite number of retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -683,7 +713,7 @@ to select future backoffs.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -706,7 +736,7 @@ The maximum amount of time, in seconds, to wait between retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -1013,8 +1043,9 @@ options.
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
+[urls.gzip]: https://www.gzip.org/
 [urls.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+splunk_hec
 [urls.openssl]: https://www.openssl.org/
-[urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[urls.splunk_hec]: https://dev.splunk.com/enterprise/docs/dataapps/httpeventcollector/
 [urls.splunk_hec_indexed_fields]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC
 [urls.splunk_hec_setup]: https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector

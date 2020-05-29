@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.9.1"
+version = "0.10.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -199,8 +199,8 @@ assert_cmd = "0.11"
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
 default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain", "rdkafka-plain"]
-# Default features for *-unknown-linux-musl
-default-musl = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake"]
+# Default features for *-unknown-linux-* which make use of `cmake` for dependencies
+default-cmake = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 default-msvc = ["sources", "transforms", "sinks", "vendored", "leveldb-cmake", "rdkafka-cmake"]
 
@@ -326,7 +326,7 @@ sinks = [
   "sinks-honeycomb",
   "sinks-http",
   "sinks-humio_logs",
-  "sinks-influxdb_metrics",
+  "sinks-influxdb",
   "sinks-kafka",
   "sinks-logdna",
   "sinks-loki",
@@ -355,7 +355,7 @@ sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt", "uuid"]
 sinks-honeycomb = ["sinks-http"]
 sinks-http = ["bytesize"]
 sinks-humio_logs = ["sinks-splunk_hec"]
-sinks-influxdb_metrics = []
+sinks-influxdb = ["bytesize"]
 sinks-kafka = []
 sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize"]
@@ -398,13 +398,13 @@ es-integration-tests = ["sinks-elasticsearch"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
-influxdb-integration-tests = ["sinks-influxdb_metrics"]
+influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 
-shutdown-tests = ["sources","sinks-console","sinks-prometheus","sinks-blackhole","unix","rdkafka"]
+shutdown-tests = ["sources","sinks-console","sinks-prometheus","sinks-blackhole","unix","rdkafka","transforms-log_to_metric","transforms-lua"]
 disable-resolv-conf = []
 
 [[bench]]

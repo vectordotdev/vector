@@ -248,7 +248,7 @@ impl InternalEvent for ConcurrencyActual {
 * [TCP congestion control algorithms](https://en.wikipedia.org/wiki/TCP_congestion_control)
 * [Additive Increase/Multiplicative Decrease](https://en.wikipedia.org/wiki/Additive_increase/multiplicative_decrease)
 * [Netflix Technology Blog: Performance Under Load](https://medium.com/@NetflixTechBlog/performance-under-load-3e6fa9a60581)
-* [JINSPIRED - Adaptive Safety Control (archive.org)](https://web.archive.org/web/20130105023839/http://www.jinspired.com/site/jxinsight-opencore-6-4-ea-11-released-adaptive-safety-control)
+* [JINSPIRED - Adaptive Safety Control (archive.org)](https://web.archive.org/web/20130105023839/https://www.jinspired.com/site/jxinsight-opencore-6-4-ea-11-released-adaptive-safety-control)
 
 ## Sales Pitch
 

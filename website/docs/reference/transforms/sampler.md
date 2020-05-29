@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-21"
 component_title: "Sampler"
 description: "The Vector `sampler` transform accepts and outputs `log` events, allowing you to sample events with a configurable rate."
 event_types: ["log"]
@@ -121,7 +121,7 @@ _not_ be sampled.
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >

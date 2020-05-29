@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-05"
+last_modified_on: "2020-05-21"
 delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through Systemd's Journald utility and outputs `log` events."
@@ -86,7 +86,7 @@ utility and outputs [`log`][docs.data-model.log] events.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >

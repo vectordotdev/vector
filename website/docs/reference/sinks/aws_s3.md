@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-24"
 delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
@@ -47,7 +47,7 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   type = "aws_s3" # required
   inputs = ["my-source-or-transform-id"] # required
   bucket = "my-bucket" # required
-  compression = "gzip" # required
+  compression = "gzip" # optional, default
   healthcheck = true # optional, default
   region = "us-east-1" # required, required when endpoint = ""
 
@@ -76,7 +76,7 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   bucket = "my-bucket" # required
-  compression = "gzip" # required
+  compression = "gzip" # optional, default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
   region = "us-east-1" # required, required when endpoint = ""
@@ -214,7 +214,7 @@ Configures the sink batching behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -237,7 +237,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -308,7 +308,7 @@ Configures the sink specific buffer behavior.
   relevantWhen={{"type":"memory"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"events"}
   warnings={[]}
   >
@@ -331,7 +331,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   relevantWhen={{"type":"disk"}}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -394,14 +394,14 @@ The behavior when the buffer becomes full.
 </Field>
 <Field
   common={true}
-  defaultValue={null}
-  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
-  examples={["gzip","none"]}
+  defaultValue={"gzip"}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
+  examples={["none","gzip"]}
   groups={[]}
   name={"compression"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -410,7 +410,8 @@ The behavior when the buffer becomes full.
 
 ### compression
 
-The compression mechanism to use.
+The compression strategy used to compress the encoded event data before
+transmission.
 
 
 
@@ -828,7 +829,7 @@ Configures the sink request behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"requests"}
   warnings={[]}
   >
@@ -851,7 +852,7 @@ The maximum number of in-flight requests allowed at any given time.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -874,7 +875,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -898,7 +899,7 @@ time window.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -922,7 +923,7 @@ intents and purposes, represents an infinite number of retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -947,7 +948,7 @@ to select future backoffs.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -970,7 +971,7 @@ The maximum amount of time, in seconds, to wait between retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -1411,6 +1412,7 @@ You can learn more about the complete syntax in the
 [urls.aws_s3_sse]: https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingServerSideEncryption.html
 [urls.aws_s3_storage_classes]: https://aws.amazon.com/s3/storage-classes/
 [urls.aws_s3_tags]: https://docs.aws.amazon.com/AmazonS3/latest/user-guide/add-object-tags.html
+[urls.gzip]: https://www.gzip.org/
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.issue_1694]: https://github.com/timberio/vector/issues/1694
 [urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
