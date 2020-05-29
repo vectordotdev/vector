@@ -1,9 +1,11 @@
 .PHONY: $(MAKECMDGOALS) all
 .DEFAULT_GOAL := help
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/run.sh)
+GIT_REVISION := $(shell git rev-parse --verify HEAD)
 
 export CONTAINER_TOOL ?= docker
 export ENVIRONMENT ?= false
+export ENVIRONMENT_TAG = docker.pkg.github.com/timberio/vector/environment
 # Deprecated
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
 
@@ -40,12 +42,13 @@ define ENVIRONMENT_EXEC
 			--name vector-environment \
 			--rm \
 			--tty \
+			--init \
 			--interactive \
 			--mount type=bind,source=${PWD},target=/vector \
 			--mount type=volume,source=vector-target,target=/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			--publish 3000:3000 \
-			vector/environment
+			$(ENVIRONMENT_TAG):$(GIT_REVISION)
 endef
 
 environment: environment-prepare ## Enter a full Vector dev shell in Docker, binding this folder to the container.
@@ -53,14 +56,19 @@ environment: environment-prepare ## Enter a full Vector dev shell in Docker, bin
 
 environment-prepare: ## Prepare the Vector dev env.
 	$(CONTAINER_TOOL) build \
-		--tag vector/environment \
+		--tag $(ENVIRONMENT_TAG):$(GIT_REVISION) \
 		--build-arg RUST_TOOLCHAIN=${RUST_TOOLCHAIN} \
 		--file scripts/environment/Dockerfile \
 		.
+	$(CONTAINER_TOOL) tag $(ENVIRONMENT_TAG):$(GIT_REVISION) $(ENVIRONMENT_TAG):latest
 
 environment-clean: ## Clean the Vector dev env.
 	$(CONTAINER_TOOL) volume rm -f vector-target vector-cargo-cache
 	$(CONTAINER_TOOL) rmi vector/environment
+
+environment-push: environment-prepare ## Publish a new version of the docker image.
+	$(CONTAINER_TOOL) tag $(ENVIRONMENT_TAG) $(ENVIRONMENT_TAG):$(GIT_REVISION)
+	$(CONTAINER_TOOL) push $(ENVIRONMENT_TAG):$(GIT_REVISION)
 
 ##@ Building
 build: ## Build the project in release mode (Use `ENVIRONMENT=true` to run in a container)

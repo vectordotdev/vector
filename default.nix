@@ -7,6 +7,8 @@ pkgs.buildEnv {
       bash
       direnv
       binutils
+      stdenv
+      bash
       gcc
       cmake
       rustup
