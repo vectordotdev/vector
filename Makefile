@@ -63,7 +63,7 @@ environment-clean: ## Clean the Vector dev env.
 	$(CONTAINER_TOOL) rmi vector/environment
 
 ##@ Building
-build: ## Build the project in release mode
+build: ## Build the project in release mode (Use `ENVIRONMENT=true` to run in a container)
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make build
 	@$(CONTAINER_TOOL) rm -f vector-build-outputs || true
@@ -79,7 +79,7 @@ else
 	cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
 endif
 
-build-dev: ## Build the project in development mode
+build-dev: ## Build the project in development mode (Use `ENVIRONMENT=true` to run in a container)
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make build-dev
 	@$(CONTAINER_TOOL) rm -f vector-build-outputs || true
@@ -111,7 +111,7 @@ build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in rel
 
 ##@ Testing
 
-test:
+test: ## Run the test suite (Use `ENVIRONMENT=true` to run in a container)
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test
 else
@@ -165,7 +165,7 @@ test-shutdown: ## Runs shutdown tests
 
 ##@ Benching
 
-bench: build ## Run benchmarks in /benches
+bench: build ## Run benchmarks in /benches (Use `ENVIRONMENT=true` to run in a container)
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make bench
 else
@@ -174,7 +174,7 @@ endif
 
 ##@ Checking
 
-check:
+check: ## Run prerequisite code checks (Use `ENVIRONMENT=true` to run in a container)
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make check
 else
@@ -361,12 +361,8 @@ sign-blog: ## Sign newly added blog articles using GPG
 build-ci-docker-images: ## Rebuilds all Docker images used in CI
 	@scripts/build-ci-docker-images.sh
 
-clean: ## Clean everything
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make clean
-else
+clean: environment-clean ## Clean everything
 	cargo clean
-endif
 
 fmt: check-style ## Format code
 ifeq ($(ENVIRONMENT), true)
