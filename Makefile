@@ -3,6 +3,7 @@
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/run.sh)
 
 export CONTAINER_TOOL ?= docker
+export ENVIRONMENT ?= false
 # Deprecated
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
 
@@ -31,7 +32,7 @@ help:
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-46s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-##@ Environment (Nix users just `nix-shell` instead)
+##@ Environment (Nix users use `nix-shell` instead)
 define ENVIRONMENT_EXEC
 	# We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
 	@mkdir -p target
@@ -50,34 +51,6 @@ endef
 environment: environment-prepare ## Enter a full Vector dev shell in Docker, binding this folder to the container.
 	${ENVIRONMENT_EXEC}
 
-environment-check: environment-prepare ## Run `make check` inside the environment.
-	${ENVIRONMENT_EXEC} make check
-
-environment-test: environment-prepare ## Run `make check` inside the environment.
-	${ENVIRONMENT_EXEC} make test
-
-environment-bench: environment-prepare ## Run `make check` inside the environment.
-	${ENVIRONMENT_EXEC} make bench
-
-environment-generate: environment-prepare ## Run `make check` inside the environment.
-	${ENVIRONMENT_EXEC} make generate
-
-environment-fmt: environment-prepare ## Run `make check` inside the environment.
-	${ENVIRONMENT_EXEC} make fmt
-
-environment-build: environment-prepare ## Run `make build` inside the environment. Then copies the output.
-	${ENVIRONMENT_EXEC} make build
-	@$(CONTAINER_TOOL) rm -f vector-build-outputs || true
-	mkdir -p ./target/debug
-	$(CONTAINER_TOOL) run \
-		-d \
-		-v vector-target:/target \
-		--name vector-build-outputs \
-		busybox true
-	$(CONTAINER_TOOL) cp vector-build-outputs:/target/debug/vector ./target/debug/
-	@$(CONTAINER_TOOL) rm -f vector-build-outputs
-
-
 environment-prepare: ## Prepare the Vector dev env.
 	$(CONTAINER_TOOL) build \
 		--tag vector/environment \
@@ -90,12 +63,37 @@ environment-clean: ## Clean the Vector dev env.
 	$(CONTAINER_TOOL) rmi vector/environment
 
 ##@ Building
-
-build: ## Build the project natively in release mode
+build: ## Build the project in release mode
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_EXEC} make build
+	@$(CONTAINER_TOOL) rm -f vector-build-outputs || true
+	@mkdir -p ./target/release
+	$(CONTAINER_TOOL) run \
+		-d \
+		-v vector-target:/target \
+		--name vector-build-outputs \
+		busybox true
+	$(CONTAINER_TOOL) cp vector-build-outputs:/target/release/vector ./target/release/
+	@$(CONTAINER_TOOL) rm -f vector-build-outputs
+else
 	cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
+endif
 
-build-dev: ## Build the project natively in development mode
+build-dev: ## Build the project in development mode
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_EXEC} make build-dev
+	@$(CONTAINER_TOOL) rm -f vector-build-outputs || true
+	@mkdir -p ./target/debug
+	$(CONTAINER_TOOL) run \
+		-d \
+		-v vector-target:/target \
+		--name vector-build-outputs \
+		busybox true
+	$(CONTAINER_TOOL) cp vector-build-outputs:/target/debug/vector ./target/debug/
+	@$(CONTAINER_TOOL) rm -f vector-build-outputs
+else
 	cargo build --no-default-features --features ${DEFAULT_FEATURES}
+endif
 
 build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
@@ -114,7 +112,11 @@ build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in rel
 ##@ Testing
 
 test:
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_EXEC} make test
+else
 	cargo test --no-default-features --features ${DEFAULT_FEATURES}
+endif
 
 test-all: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
 
@@ -164,12 +166,20 @@ test-shutdown: ## Runs shutdown tests
 ##@ Benching
 
 bench: build ## Run benchmarks in /benches
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_EXEC} make bench
+else
 	cargo bench --no-default-features --features ${DEFAULT_FEATURES}
+endif
 
 ##@ Checking
 
 check:
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_EXEC} make check
+else
 	cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
+endif
 
 check-all: check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
 
@@ -177,7 +187,11 @@ check-component-features: ## Check that all component features are setup properl
 	$(RUN) check-component-features
 
 check-style: ## Check that all files are styled properly
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_EXEC} make check-style
+else
 	./scripts/check-style.sh
+endif
 
 check-markdown: ## Check that markdown is styled properly
 	$(RUN) check-markdown
@@ -332,7 +346,11 @@ verify-nixos:  ## Verify that Vector can be built on NixOS
 ##@ Website
 
 generate:  ## Generates files across the repo using the data in /.meta
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_EXEC} make generate
+else
 	bundle exec --gemfile scripts/Gemfile ./scripts/generate.rb
+endif
 
 export ARTICLE ?= true
 sign-blog: ## Sign newly added blog articles using GPG
@@ -344,10 +362,18 @@ build-ci-docker-images: ## Rebuilds all Docker images used in CI
 	@scripts/build-ci-docker-images.sh
 
 clean: ## Clean everything
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_EXEC} make clean
+else
 	cargo clean
+endif
 
 fmt: check-style ## Format code
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_EXEC} make fmt
+else
 	cargo fmt
+endif
 
 init-target-dir: ## Create target directory owned by the current user
 	$(RUN) init-target-dir
