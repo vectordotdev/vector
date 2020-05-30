@@ -243,7 +243,7 @@
     },
     "permission": {
       "type": "object",
-      "description": "A Vector permission, such as a AWS IAM, GCP IAM, or Kubernetes RBAC permission.",
+      "description": "A Vector permission, such as a AWS IAM or GCP IAM.",
       "additionalProperties": false,
       "required": ["description", "name"],
       "properties": {

@@ -589,7 +589,7 @@ where
 
 struct ServiceSink<S, Request> {
     service: S,
-    in_flight: FuturesUnordered<Receiver<Result<(usize, usize), crate::Error>>>,
+    in_flight: FuturesUnordered<Receiver<(usize, usize)>>,
     acker: Acker,
     seq_head: usize,
     seq_tail: usize,
@@ -643,16 +643,25 @@ where
         let response = self
             .service
             .call(req)
-            .map(move |response| {
-                trace!(message = "Response successful.", ?response);
-                (seqno, batch_size)
-            })
             .map_err(Into::into)
-            .then(|res| {
+            .then(move |result| {
+                match result {
+                    Ok(response) => {
+                        trace!(message = "Response successful.", ?response);
+                    }
+                    Err(error) => {
+                        error!(
+                            message = "Request failed.",
+                            %error,
+                        );
+                    }
+                }
+
                 // If the rx end is dropped we still completed
                 // the request so this is a weird case that we can
                 // ignore for now.
-                let _ = tx.send(res);
+                let _ = tx.send((seqno, batch_size));
+
                 Ok::<_, ()>(())
             })
             .instrument(info_span!("request", %request_id));
@@ -665,7 +674,7 @@ where
             match self.in_flight.poll() {
                 Ok(Async::NotReady) => return Ok(Async::NotReady),
                 Ok(Async::Ready(None)) => return Ok(Async::Ready(())),
-                Ok(Async::Ready(Some(Ok((seqno, batch_size))))) => {
+                Ok(Async::Ready(Some((seqno, batch_size)))) => {
                     self.pending_acks.insert(seqno, batch_size);
 
                     let mut num_to_ack = 0;
@@ -676,15 +685,7 @@ where
                     trace!(message = "acking events.", acking_num = num_to_ack);
                     self.acker.ack(num_to_ack);
                 }
-                Ok(Async::Ready(Some(Err(error)))) => {
-                    error!(
-                        message = "Request failed.",
-                        %error,
-                    );
-                    return Err(error);
-                }
-
-                Err(_) => unreachable!("BatchSink service sender dropped"),
+                Err(_) => panic!("ServiceSink service sender dropped"),
             }
         }
     }
@@ -1117,6 +1118,44 @@ mod tests {
 
         let output = sent_requests.lock().unwrap();
         assert_eq!(&*output, &vec![vec![1]]);
+    }
+
+    #[test]
+    fn service_sink_doesnt_propagate_error() {
+        // We need a mock executor here because we need to ensure
+        // that we poll the service futures within the mock clock
+        // context. This allows us to manually advance the time on the
+        // "spawned" futures.
+        let (acker, ack_counter) = Acker::new_for_testing();
+
+        let svc = tower::service_fn(|req: u8| if req == 3 { Err("bad") } else { Ok("good") });
+
+        let mut sink = ServiceSink::new(svc, acker);
+
+        let mut clock = MockClock::new();
+        clock.enter(|_handle| {
+            // send some initial requests
+            let mut fut1 = sink.call(1, 1);
+            let mut fut2 = sink.call(2, 2);
+
+            assert_eq!(ack_counter.load(Relaxed), 0);
+
+            // make sure they all worked
+            assert!(fut1.poll().unwrap().is_ready());
+            assert!(fut2.poll().unwrap().is_ready());
+            assert!(sink.poll_complete().unwrap().is_ready());
+            assert_eq!(ack_counter.load(Relaxed), 3);
+
+            // send one request that will error and one normal
+            let mut fut3 = sink.call(3, 3); // i will error
+            let mut fut4 = sink.call(4, 4);
+
+            // make sure they all "worked"
+            assert!(fut3.poll().unwrap().is_ready());
+            assert!(fut4.poll().unwrap().is_ready());
+            assert!(sink.poll_complete().unwrap().is_ready());
+            assert_eq!(ack_counter.load(Relaxed), 10);
+        });
     }
 
     #[derive(Default, Clone)]

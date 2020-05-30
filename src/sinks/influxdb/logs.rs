@@ -5,15 +5,15 @@ use crate::sinks::influxdb::{
     Field, InfluxDB1Settings, InfluxDB2Settings,
 };
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
-use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
-use crate::sinks::util::{BatchBytesConfig, Buffer, Compression, TowerRequestConfig};
+use crate::sinks::util::http2::{BatchedHttpSink, HttpSink};
+use crate::sinks::util::{service2::TowerRequestConfig, BatchBytesConfig, Buffer, Compression};
 use crate::sinks::Healthcheck;
 use crate::{
     event::{log_schema, Event},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::Sink;
-use http::{Method, Request, Uri};
+use http02::{Method, Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -87,7 +87,7 @@ impl SinkConfig for InfluxDBLogsConfig {
         .unwrap();
 
         let endpoint = self.endpoint.clone();
-        let uri = settings.write_uri(endpoint).unwrap();
+        let uri = settings.write_uri2(endpoint).unwrap();
 
         let token = settings.token();
         let namespace = self.namespace.clone();
@@ -109,7 +109,7 @@ impl SinkConfig for InfluxDBLogsConfig {
         )
         .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}", e));
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -161,14 +161,14 @@ impl HttpSink for InfluxDBLogsSink {
         Some(output.into_bytes())
     }
 
-    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
-        let mut builder = Request::builder();
-        builder.method(Method::POST);
-        builder.uri(&self.uri);
-
-        builder.header("Content-Type", "text/plain");
-        builder.header("Authorization", format!("Token {}", &self.token));
-        builder.body(events).unwrap()
+    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
+        Request::builder()
+            .method(Method::POST)
+            .uri(&self.uri)
+            .header("Content-Type", "text/plain")
+            .header("Authorization", format!("Token {}", &self.token))
+            .body(events)
+            .unwrap()
     }
 }
 
@@ -203,7 +203,7 @@ mod tests {
     use super::*;
     use crate::event::Event;
     use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, ts};
-    use crate::sinks::util::http::HttpSink;
+    use crate::sinks::util::http2::HttpSink;
     use crate::sinks::util::test::build_test_server;
     use crate::test_util;
     use chrono::offset::TimeZone;
