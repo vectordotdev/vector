@@ -91,9 +91,9 @@ struct Validate {
     #[structopt(long)]
     no_topology: bool,
 
-    /// Disables healthcheck check
+    /// Disables environment checks. That includes component checks and health checks.
     #[structopt(long)]
-    no_healthchecks: bool,
+    no_environment: bool,
 
     /// Fail validation on warnings
     #[structopt(short, long)]
@@ -600,62 +600,6 @@ fn validate(opts: &Validate, color: bool) -> exitcode::ExitCode {
         return exitcode::CONFIG;
     }
 
-    // Validate configuration of components
-    event::LOG_SCHEMA
-        .set(full_config.global.log_schema.clone())
-        .expect("Couldn't set schema");
-
-    let mut rt = runtime::Runtime::with_thread_count(1).expect("Unable to create async runtime");
-    let diff = topology::ConfigDiff::initial(&full_config);
-    let mut pieces = match topology::builder::build_pieces(&full_config, &diff, rt.executor()) {
-        Ok(pieces) => pieces,
-        Err(errors) => {
-            print_title("Component errors");
-            print_errors(errors);
-            return exitcode::CONFIG;
-        }
-    };
-    print_success("Configuration options");
-
-    // Validate healthchecks
-    let healthchecks = topology::take_healthchecks(&diff, &mut pieces);
-    if !opts.no_healthchecks && !healthchecks.is_empty() {
-        print_title("Health checks");
-        // We are running health checks in serial so it's easier for the users
-        // to parse which errors/warnings/etc. belong to which healthcheck.
-        let mut success = true;
-        for (name, healthcheck) in healthchecks {
-            let mut failed = |error| {
-                success = false;
-                print_error(error);
-            };
-
-            let handle = rt.spawn_handle(healthcheck.compat());
-            match rt.block_on_std(handle) {
-                Ok(Ok(())) => {
-                    if full_config
-                        .sinks
-                        .get(&name)
-                        .expect("Sink not present")
-                        .healthcheck
-                    {
-                        print_success(format!("`{}`", name.as_str()).as_str());
-                    } else {
-                        print_warning(format!("Health check disabled for `{}`", name));
-                    }
-                }
-                Ok(Err(())) => failed(format!("Health check for `{}` failed", name.as_str())),
-                Err(error) if error.is_cancelled() => failed(format!(
-                    "Health check for `{}` was cancelled",
-                    name.as_str()
-                )),
-                Err(_) => failed(format!("Health check for `{}` panicked", name.as_str())),
-            }
-        }
-        validated &= success;
-        space();
-    }
-
     // Validate topology
     if !opts.no_topology {
         let success = match topology::builder::check(&full_config) {
@@ -676,13 +620,66 @@ fn validate(opts: &Validate, color: bool) -> exitcode::ExitCode {
         };
 
         if success {
-            if topology::start_validated(full_config, diff, pieces, &mut rt, false).is_some() {
-                print_success("Configuration topology");
-            } else {
-                print_error("Topology failed to start".to_owned());
+            print_success("Configuration topology");
+        }
+        validated &= success;
+    }
+
+    // Validate environment
+    if !opts.no_environment {
+        // Validate configuration of components
+        event::LOG_SCHEMA
+            .set(full_config.global.log_schema.clone())
+            .expect("Couldn't set schema");
+
+        let mut rt =
+            runtime::Runtime::with_thread_count(1).expect("Unable to create async runtime");
+        let diff = topology::ConfigDiff::initial(&full_config);
+        let mut pieces = match topology::builder::build_pieces(&full_config, &diff, rt.executor()) {
+            Ok(pieces) => pieces,
+            Err(errors) => {
+                print_title("Component errors");
+                print_errors(errors);
+                return exitcode::CONFIG;
+            }
+        };
+        print_success("Component configuration");
+
+        // Validate health checks
+        let healthchecks = topology::take_healthchecks(&diff, &mut pieces);
+        // We are running health checks in serial so it's easier for the users
+        // to parse which errors/warnings/etc. belong to which healthcheck.
+        let mut success = true;
+        for (name, healthcheck) in healthchecks {
+            let mut failed = |error| {
+                success = false;
+                print_error(error);
+            };
+
+            let handle = rt.spawn_handle(healthcheck.compat());
+            match rt.block_on_std(handle) {
+                Ok(Ok(())) => {
+                    if full_config
+                        .sinks
+                        .get(&name)
+                        .expect("Sink not present")
+                        .healthcheck
+                    {
+                        print_success(format!("Health check `{}`", name.as_str()).as_str());
+                    } else {
+                        print_warning(format!("Health check disabled for `{}`", name));
+                    }
+                }
+                Ok(Err(())) => failed(format!("Health check for `{}` failed", name.as_str())),
+                Err(error) if error.is_cancelled() => failed(format!(
+                    "Health check for `{}` was cancelled",
+                    name.as_str()
+                )),
+                Err(_) => failed(format!("Health check for `{}` panicked", name.as_str())),
             }
         }
         validated &= success;
+        space();
     }
 
     if validated {
