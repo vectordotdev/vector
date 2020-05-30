@@ -230,12 +230,8 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
     }
 }
 
-fn build_uri(mut host: &str, path: &str) -> Result<Uri, http02::uri::InvalidUri> {
-    if host.ends_with('/') {
-        host = &host[0..host.len() - 1];
-    }
-
-    format!("{}{}", host, path).parse::<Uri>()
+fn build_uri(host: &str, path: &str) -> Result<Uri, http02::uri::InvalidUri> {
+    format!("{}{}", host.trim_end_matches('/'), path).parse::<Uri>()
 }
 
 #[cfg(test)]
