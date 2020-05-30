@@ -9,6 +9,7 @@ pkgs.buildEnv {
       binutils
       stdenv
       bashInteractive
+      docker
       cacert
       gcc
       cmake

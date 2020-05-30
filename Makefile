@@ -43,6 +43,7 @@ define ENVIRONMENT_EXEC
 			--init \
 			--interactive \
 			--mount type=bind,source=${PWD},target=/vector \
+			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
 			--mount type=volume,source=vector-target,target=/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			--publish 3000:3000 \
@@ -152,8 +153,13 @@ test-integration-influxdb: ## Runs Kafka integration tests
 test-integration-kafka: ## Runs Kafka integration tests
 	$(RUN) test-integration-kafka
 
-test-integration-loki: ## Runs Loki integration tests
-	$(RUN) test-integration-loki
+test-integration-loki: ## Runs Loki integration tests (Use `ENVIRONMENT=true` to run in a container)
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_EXEC} make test-integration-loki
+else
+	docker-compose up -d dependencies-loki
+	cargo test --no-default-features --features loki-integration-tests
+endif
 
 test-integration-pulsar: ## Runs Pulsar integration tests
 	$(RUN) test-integration-pulsar
