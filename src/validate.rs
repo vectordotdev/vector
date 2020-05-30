@@ -260,11 +260,11 @@ struct Formatter {
     max_line_width: usize,
     /// Can empty line be printed
     print_space: bool,
+    color: bool,
     // Intros
     error_intro: String,
     warning_intro: String,
     success_intro: String,
-    validated: String,
 }
 
 impl Formatter {
@@ -287,22 +287,26 @@ impl Formatter {
             } else {
                 "√".to_owned()
             },
-            validated: if color {
-                format!("{}", "Validated".green())
-            } else {
-                "Validated".to_owned()
-            },
+            color,
         }
     }
 
     /// Final confirmation that validation process was succesfull.
     fn validated(&self) {
-        println!(
-            "{:-^width$}\n{:>width$}",
-            "",
-            self.validated,
-            width = self.max_line_width
-        )
+        println!("{:-^width$}", "", width = self.max_line_width);
+        if self.color {
+            // Coloring needs to be used directly so that print
+            // infrastructure correctly determines length of the
+            // "Validated". Otherwise, ansi escape coloring is
+            // calculated into the length.
+            println!(
+                "{:>width$}",
+                "Validated".green(),
+                width = self.max_line_width
+            );
+        } else {
+            println!("{:>width$}", "Validated", width = self.max_line_width)
+        }
     }
 
     /// Standalone line
