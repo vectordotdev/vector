@@ -95,6 +95,13 @@ struct Validate {
     #[structopt(long)]
     no_environment: bool,
 
+    /// Shorthand for `--no_topology` and `--no_environment` flags. Just `-n` won't disable anything,
+    /// it needs to be used with `t` for `--no_topology`, and or `e` for `--no_environment` in any order.
+    /// Example:
+    /// `-nte` and `-net` both mean `--no_topology` and `--no_environment`
+    #[structopt(short, parse(from_str = NoCheck::from_str), possible_values = &["t", "e","et","te"], default_value)]
+    no: NoCheck,
+
     /// Fail validation on warnings
     #[structopt(short, long)]
     deny_warnings: bool,
@@ -461,6 +468,41 @@ fn open_config(path: &Path) -> Option<File> {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+struct NoCheck {
+    topology: bool,
+    environment: bool,
+}
+impl NoCheck {
+    fn from_str(s: &str) -> Self {
+        Self {
+            topology: s.find('t').is_some(),
+            environment: s.find('e').is_some(),
+        }
+    }
+}
+
+impl Default for NoCheck {
+    fn default() -> Self {
+        NoCheck {
+            topology: false,
+            environment: false,
+        }
+    }
+}
+
+impl std::fmt::Display for NoCheck {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if self.topology {
+            write!(f, "`--no_topology` ")?;
+        }
+        if self.environment {
+            write!(f, "`--no_environment`")?;
+        }
+        Ok(())
+    }
+}
+
 fn validate(opts: &Validate, color: bool) -> exitcode::ExitCode {
     use colored::*;
     use futures::compat::Future01CompatExt;
@@ -601,7 +643,7 @@ fn validate(opts: &Validate, color: bool) -> exitcode::ExitCode {
     }
 
     // Validate topology
-    if !opts.no_topology {
+    if !(opts.no_topology || opts.no.topology) {
         let success = match topology::builder::check(&full_config) {
             Ok(warnings) => {
                 if warnings.is_empty() {
@@ -626,7 +668,7 @@ fn validate(opts: &Validate, color: bool) -> exitcode::ExitCode {
     }
 
     // Validate environment
-    if !opts.no_environment {
+    if !(opts.no_environment || opts.no.environment) {
         // Validate configuration of components
         event::LOG_SCHEMA
             .set(full_config.global.log_schema.clone())
