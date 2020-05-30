@@ -55,19 +55,23 @@ impl NoCheck {
 pub fn validate(opts: &Opts, color: bool) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
-    let config = if let Some(config) = validate_config(opts, &mut fmt) {
-        config
-    } else {
-        return exitcode::CONFIG;
+    let mut validated = true;
+
+    let config = match validate_config(opts, &mut fmt) {
+        Ok(config) => config,
+        Err(Some(config)) => {
+            validated &= false;
+            config
+        }
+        Err(None) => return exitcode::CONFIG,
     };
 
-    let mut validated = true;
     if !(opts.no_topology || opts.no.topology) {
-        validated = validate_topology(opts, &config, &mut fmt);
+        validated &= validate_topology(opts, &config, &mut fmt);
     }
 
     if !(opts.no_environment || opts.no.environment) {
-        validated = validate_environment(&config, &mut fmt);
+        validated &= validate_environment(&config, &mut fmt);
     }
 
     if validated {
@@ -78,23 +82,25 @@ pub fn validate(opts: &Opts, color: bool) -> ExitCode {
     }
 }
 
-fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
+/// Ok if all configs were succesfully validated.
+/// Err Some contains only succesfully validated configs.
+fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Result<Config, Option<Config>> {
     // Prepare paths
     let paths = if let Some(paths) = config_paths::prepare(opts.paths.clone()) {
         paths
     } else {
         fmt.error("No config file paths");
-        return None;
+        return Err(None);
     };
 
     // Validate configuration files
-    let mut validated = true;
+    let to_valdiate = paths.len();
+    let mut validated = 0;
     let mut full_config = Config::empty();
     for config_path in paths {
         let file = match File::open(&config_path) {
             Ok(file) => file,
             Err(error) => {
-                validated = false;
                 if let std::io::ErrorKind::NotFound = error.kind() {
                     fmt.error(format!("File {:?} not found", config_path));
                 } else {
@@ -113,7 +119,6 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         );
 
         let mut sub_failed = |title: String, errors| {
-            validated = false;
             fmt.title(title);
             fmt.sub_error(errors);
         };
@@ -139,13 +144,18 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
             continue;
         }
 
+        validated += 1;
         fmt.success(format!("Loaded {:?}", &config_path));
     }
 
-    if validated {
-        Some(full_config)
+    if to_valdiate == validated {
+        Ok(full_config)
     } else {
-        None
+        if validated > 0 {
+            Err(Some(full_config))
+        } else {
+            Err(None)
+        }
     }
 }
 
