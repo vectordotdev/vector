@@ -2,6 +2,7 @@ use super::batch::Batch;
 use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
+use std::fmt;
 
 pub mod json;
 pub mod metrics;
@@ -16,6 +17,7 @@ pub enum Compression {
     #[derivative(Default)]
     None,
     Gzip,
+    Lz4,
 }
 
 impl Compression {
@@ -27,6 +29,7 @@ impl Compression {
         match self {
             Self::None => None,
             Self::Gzip => Some("gzip"),
+            Self::Lz4 => Some("lz4"),
         }
     }
 
@@ -34,6 +37,7 @@ impl Compression {
         match self {
             Self::None => "log",
             Self::Gzip => "log.gz",
+            Self::Lz4 => "log.lz4",
         }
     }
 }
@@ -44,10 +48,21 @@ pub struct Buffer {
     num_items: usize,
 }
 
-#[derive(Debug)]
 pub enum InnerBuffer {
     Plain(Vec<u8>),
     Gzip(GzEncoder<Vec<u8>>),
+    Lz4(lz4::Encoder<Vec<u8>>),
+}
+
+impl fmt::Debug for InnerBuffer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            InnerBuffer::Plain(_) => "Plain",
+            InnerBuffer::Gzip(_) => "Gzip",
+            InnerBuffer::Lz4(_) => "Lz4",
+        };
+        write!(f, "{}", name)
+    }
 }
 
 impl Buffer {
@@ -56,6 +71,9 @@ impl Buffer {
             Compression::None => InnerBuffer::Plain(Vec::new()),
             Compression::Gzip => {
                 InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::fast()))
+            }
+            Compression::Lz4 => {
+                InnerBuffer::Lz4(lz4::EncoderBuilder::new().build(Vec::new()).unwrap())
             }
         };
         Self {
@@ -73,6 +91,9 @@ impl Buffer {
             InnerBuffer::Gzip(inner) => {
                 inner.write_all(input).unwrap();
             }
+            InnerBuffer::Lz4(inner) => {
+                inner.write_all(input).unwrap();
+            }
         }
     }
 
@@ -82,6 +103,7 @@ impl Buffer {
         match &self.inner {
             InnerBuffer::Plain(inner) => inner.len(),
             InnerBuffer::Gzip(inner) => inner.get_ref().len(),
+            InnerBuffer::Lz4(inner) => inner.writer().len(),
         }
     }
 
@@ -89,6 +111,7 @@ impl Buffer {
         match &self.inner {
             InnerBuffer::Plain(inner) => inner.is_empty(),
             InnerBuffer::Gzip(inner) => inner.get_ref().is_empty(),
+            InnerBuffer::Lz4(inner) => inner.writer().is_empty(),
         }
     }
 }
@@ -114,6 +137,9 @@ impl Batch for Buffer {
             InnerBuffer::Plain(_) => InnerBuffer::Plain(Vec::new()),
             InnerBuffer::Gzip(_) => {
                 InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::default()))
+            },
+            InnerBuffer::Lz4(_) => {
+                InnerBuffer::Lz4(lz4::EncoderBuilder::new().build(Vec::new()).unwrap())
             }
         };
         Self {
@@ -128,6 +154,7 @@ impl Batch for Buffer {
             InnerBuffer::Gzip(inner) => inner
                 .finish()
                 .expect("This can't fail because the inner writer is a Vec"),
+            InnerBuffer::Lz4(inner) => inner.finish().0,
         }
     }
 
