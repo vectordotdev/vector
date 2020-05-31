@@ -289,10 +289,9 @@ mod tests {
     use super::*;
     use crate::{
         assert_downcast_matches,
-        runtime::Runtime,
         sinks::http::HttpSinkConfig,
         sinks::util::http2::HttpSink,
-        test_util::{next_addr, random_lines_with_stream, shutdown_on_idle},
+        test_util::{next_addr, random_lines_with_stream, runtime, shutdown_on_idle},
         topology::config::SinkContext,
     };
     use bytes::Buf;
@@ -382,7 +381,7 @@ mod tests {
         "#;
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let rt = Runtime::new().unwrap();
+        let rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let _ = config.build(cx).unwrap();
@@ -407,7 +406,7 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let (sink, _) = config.build(cx).unwrap();
@@ -470,7 +469,7 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let (sink, _) = config.build(cx).unwrap();
@@ -530,7 +529,7 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let (sink, _) = config.build(cx).unwrap();
