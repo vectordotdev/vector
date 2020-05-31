@@ -945,7 +945,7 @@ fn remove_slash(s: &str) -> &str {
 mod tests {
     use super::*;
     use crate::runtime::Runtime;
-    use crate::test_util::{self, collect_n, runtime, runtime, trace_init};
+    use crate::test_util::{self, collect_n, runtime, trace_init};
     use futures01::future;
 
     static BUXYBOX_IMAGE_TAG: &'static str = "latest";
