@@ -149,7 +149,7 @@ where
     S: Service<Request>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: fmt::Debug,
+    S::Response: Response,
     B: Batch<Output = Request>,
 {
     pub fn new(service: S, batch: B, settings: BatchSettings, acker: Acker) -> Self {
@@ -162,7 +162,7 @@ where
     S: Service<Request>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: fmt::Debug,
+    S::Response: Response,
     B: Batch<Output = Request>,
     E: Executor,
 {
@@ -204,7 +204,7 @@ where
     S: Service<Request>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: fmt::Debug,
+    S::Response: Response,
     B: Batch<Output = Request>,
     E: Executor,
 {
@@ -341,7 +341,7 @@ where
     S: Service<Request>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: fmt::Debug,
+    S::Response: Response,
 {
     pub fn new(service: S, batch: B, settings: BatchSettings, acker: Acker) -> Self {
         PartitionBatchSink::with_executor(
@@ -362,7 +362,7 @@ where
     S: Service<Request>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: fmt::Debug,
+    S::Response: Response,
     E: Executor,
 {
     pub fn with_executor(
@@ -434,7 +434,7 @@ where
     S: Service<Request>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: fmt::Debug,
+    S::Response: Response,
     E: Executor,
 {
     type SinkItem = B::Input;
@@ -603,7 +603,7 @@ where
     S: Service<Request>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: fmt::Debug,
+    S::Response: Response,
 {
     fn new(service: S, acker: Acker) -> Self {
         Self {
@@ -646,8 +646,11 @@ where
             .map_err(Into::into)
             .then(move |result| {
                 match result {
-                    Ok(response) => {
+                    Ok(response) if response.is_success() => {
                         trace!(message = "Response successful.", ?response);
+                    }
+                    Ok(response) => {
+                        error!(message = "Response wasn't successful.", ?response);
                     }
                     Err(error) => {
                         error!(
@@ -703,6 +706,32 @@ where
             .field("seq_tail", &self.seq_tail)
             .field("pending_acks", &self.pending_acks)
             .finish()
+    }
+}
+
+// === Response ===
+
+pub trait Response: fmt::Debug {
+    fn is_success(&self) -> bool {
+        true
+    }
+}
+
+impl Response for () {}
+impl<'a> Response for &'a str {}
+impl Response for rusoto_kinesis::PutRecordsOutput {}
+impl Response for rusoto_s3::PutObjectOutput {}
+impl Response for rusoto_firehose::PutRecordBatchOutput {}
+
+impl<T: fmt::Debug> Response for http::response::Response<T> {
+    fn is_success(&self) -> bool {
+        self.status().is_success()
+    }
+}
+
+impl<T: fmt::Debug> Response for http02::response::Response<T> {
+    fn is_success(&self) -> bool {
+        self.status().is_success()
     }
 }
 
