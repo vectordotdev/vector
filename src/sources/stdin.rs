@@ -191,11 +191,10 @@ fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event;
+    use crate::{event, test_util::runtime};
     use futures01::sync::mpsc;
     use futures01::Async::*;
     use std::io::Cursor;
-    use tokio01::runtime::current_thread::Runtime;
 
     #[test]
     fn stdin_create_event() {
@@ -221,7 +220,7 @@ mod tests {
         let config = StdinConfig::default();
         let buf = Cursor::new(String::from("hello world\nhello world again"));
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let source = stdin_source(buf, config, ShutdownSignal::noop(), tx).unwrap();
 
         rt.block_on(source).unwrap();
