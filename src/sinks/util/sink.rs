@@ -646,7 +646,7 @@ where
             .map_err(Into::into)
             .then(move |result| {
                 match result {
-                    Ok(response) if response.is_success() => {
+                    Ok(response) if response.is_successful() => {
                         trace!(message = "Response successful.", ?response);
                     }
                     Ok(response) => {
@@ -712,7 +712,7 @@ where
 // === Response ===
 
 pub trait Response: fmt::Debug {
-    fn is_success(&self) -> bool {
+    fn is_successful(&self) -> bool {
         true
     }
 }
@@ -728,13 +728,13 @@ impl Response for rusoto_s3::PutObjectOutput {}
 impl Response for rusoto_firehose::PutRecordBatchOutput {}
 
 impl<T: fmt::Debug> Response for http::response::Response<T> {
-    fn is_success(&self) -> bool {
+    fn is_successful(&self) -> bool {
         self.status().is_success()
     }
 }
 
 impl<T: fmt::Debug> Response for http02::response::Response<T> {
-    fn is_success(&self) -> bool {
+    fn is_successful(&self) -> bool {
         self.status().is_success()
     }
 }
