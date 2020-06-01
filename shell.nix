@@ -10,7 +10,8 @@ pkgs.mkShell {
   OPENSSL_DIR="${pkgs.openssl.dev}";
   OPENSSL_LIB_DIR="${pkgs.openssl.out}/lib";
   SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-  GIT_SSL_CAINFO = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"; 
+  GIT_SSL_CAINFO = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+  CURL_CA_BUNDLE = "${pkgs.cacert}/etc/ca-bundle.crt";
 
   buildInputs = [ (import ./default.nix { inherit pkgs; }) ];
 }

@@ -14,6 +14,7 @@ else
     export DEFAULT_FEATURES = default
 endif
 
+export VERBOSE ?= false
 export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
 export CONTAINER_TOOL ?= docker
 export ENVIRONMENT ?= false
@@ -33,10 +34,11 @@ help:
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-46s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Environment (Nix users use `nix-shell` instead)
+# We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
 define ENVIRONMENT_EXEC
-	# We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
+	@echo "Entering environment..."
 	@mkdir -p target
-	$(CONTAINER_TOOL) run \
+	@$(CONTAINER_TOOL) run \
 			--name vector-environment \
 			--rm \
 			--tty \
@@ -47,56 +49,65 @@ define ENVIRONMENT_EXEC
 			--mount type=volume,source=vector-target,target=/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			--publish 3000:3000 \
-			$(ENVIRONMENT_UPSTREAM):$(GIT_REVISION)
+			$(ENVIRONMENT_UPSTREAM)
 endef
 
-environment: environment-prepare ## Enter a full Vector dev shell in Docker, binding this folder to the container.
-	${ENVIRONMENT_EXEC}
-
-environment-prepare: ## Prepare the Vector dev env.
-	$(CONTAINER_TOOL) build \
-		--tag $(ENVIRONMENT_UPSTREAM):$(GIT_REVISION) \
-		--build-arg BASEIMAGE_TAG=2.3.4 \
-		--file scripts/environment/Dockerfile \
-		.
-	$(CONTAINER_TOOL) tag $(ENVIRONMENT_UPSTREAM):$(GIT_REVISION) $(ENVIRONMENT_UPSTREAM):latest
-
-environment-clean: ## Clean the Vector dev env.
-	$(CONTAINER_TOOL) volume rm -f vector-target vector-cargo-cache
-	$(CONTAINER_TOOL) rmi $(ENVIRONMENT_UPSTREAM):$(GIT_REVISION)
-
-environment-push: environment-prepare ## Publish a new version of the docker image.
-	$(CONTAINER_TOOL) push $(ENVIRONMENT_UPSTREAM):$(GIT_REVISION)
-
-##@ Building
-build: ## Build the project in release mode (Use `ENVIRONMENT=true` to run in a container)
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make build
-	@$(CONTAINER_TOOL) rm -f vector-build-outputs || true
+define ENVIRONMENT_COPY_ARTIFACTS
+	@echo "Copying artifacts off volumes... (Docker errors below are totally okay)"
 	@mkdir -p ./target/release
-	$(CONTAINER_TOOL) run \
+	@mkdir -p ./target/debug
+	@mkdir -p ./target/criterion
+	@$(CONTAINER_TOOL) rm -f vector-build-outputs || true
+	@$(CONTAINER_TOOL) run \
 		-d \
 		-v vector-target:/target \
 		--name vector-build-outputs \
 		busybox true
-	$(CONTAINER_TOOL) cp vector-build-outputs:/target/release/vector ./target/release/
+	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/release/vector ./target/release/ || true
+	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/debug/vector ./target/debug/ || true
+	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/criterion ./target/criterion || true
 	@$(CONTAINER_TOOL) rm -f vector-build-outputs
+endef
+
+define ENVIRONMENT_PREPARE
+	@echo "Preparing the environment. This may take a few minutes..."
+	@$(CONTAINER_TOOL) build \
+		$(if $(findstring true,$(VERBOSE)),,--quiet) \
+		--tag $(ENVIRONMENT_UPSTREAM) \
+		--build-arg BASEIMAGE_TAG=2.3.4 \
+		--file scripts/environment/Dockerfile \
+		.
+endef
+
+environment: ## Enter a full Vector dev shell in Docker, binding this folder to the container.
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC}
+
+environment-prepare: ## Prepare the Vector dev env.
+	${ENVIRONMENT_PREPARE}
+
+environment-clean: ## Clean the Vector dev env.
+	@$(CONTAINER_TOOL) volume rm -f vector-target vector-cargo-cache
+	@$(CONTAINER_TOOL) rmi $(ENVIRONMENT_UPSTREAM)
+
+environment-push: environment-prepare ## Publish a new version of the docker image.
+	$(CONTAINER_TOOL) push $(ENVIRONMENT_UPSTREAM)
+
+##@ Building
+build: ## Build the project in release mode (Use `ENVIRONMENT=true` to run in a container)
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make build
+	${ENVIRONMENT_COPY_ARTIFACTS}
 else
 	cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
 endif
 
 build-dev: ## Build the project in development mode (Use `ENVIRONMENT=true` to run in a container)
 ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make build-dev
-	@$(CONTAINER_TOOL) rm -f vector-build-outputs || true
-	@mkdir -p ./target/debug
-	$(CONTAINER_TOOL) run \
-		-d \
-		-v vector-target:/target \
-		--name vector-build-outputs \
-		busybox true
-	$(CONTAINER_TOOL) cp vector-build-outputs:/target/debug/vector ./target/debug/
-	@$(CONTAINER_TOOL) rm -f vector-build-outputs
+	${ENVIRONMENT_COPY_ARTIFACTS}
 else
 	cargo build --no-default-features --features ${DEFAULT_FEATURES}
 endif
@@ -119,7 +130,9 @@ build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in rel
 
 test: ## Run the test suite (Use `ENVIRONMENT=true` to run in a container)
 ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test
+	${ENVIRONMENT_COPY_ARTIFACTS}
 else
 	cargo test --no-default-features --features ${DEFAULT_FEATURES}
 endif
@@ -155,6 +168,7 @@ test-integration-kafka: ## Runs Kafka integration tests
 
 test-integration-loki: ## Runs Loki integration tests (Use `ENVIRONMENT=true` to run in a container)
 ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-loki
 else
 	docker-compose up -d dependencies-loki
@@ -178,7 +192,9 @@ test-shutdown: ## Runs shutdown tests
 
 bench: ## Run benchmarks in /benches (Use `ENVIRONMENT=true` to run in a container)
 ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make bench
+	${ENVIRONMENT_COPY_ARTIFACTS}
 else
 	cargo bench --no-default-features --features ${DEFAULT_FEATURES}
 endif
@@ -187,6 +203,7 @@ endif
 
 check: ## Run prerequisite code checks (Use `ENVIRONMENT=true` to run in a container)
 ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check
 else
 	cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
@@ -199,6 +216,7 @@ check-component-features: ## Check that all component features are setup properl
 
 check-style: ## Check that all files are styled properly
 ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check-style
 else
 	./scripts/check-style.sh
@@ -358,6 +376,7 @@ verify-nixos:  ## Verify that Vector can be built on NixOS
 
 generate:  ## Generates files across the repo using the data in /.meta
 ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make generate
 else
 	bundle exec --gemfile scripts/Gemfile ./scripts/generate.rb
@@ -377,6 +396,7 @@ clean: environment-clean ## Clean everything
 
 fmt: check-style ## Format code
 ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make fmt
 else
 	cargo fmt
