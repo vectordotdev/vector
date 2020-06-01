@@ -265,8 +265,8 @@ jobs:
       - run: make slim-builds
       - run: make test-integration-splunk
 
-  test-integration-kubernetes:
-    name: Integration - Linux, Kubernetes, flaky
+  test-e2e-kubernetes:
+    name: E2E - Linux, Kubernetes, flaky
     # This is an experimental test. Allow it to fail without failing the whole
     # workflow, but keep it executing on every build to gather stats.
     continue-on-error: true
@@ -281,5 +281,17 @@ jobs:
           - v1.14.10
       fail-fast: false
     steps:
-      - name: Temporarily off
-        run: "true"
+      - name: Setup Minikube
+        uses: manusa/actions-setup-minikube@v1.0.2
+        with:
+          minikube version: 'v1.9.2'
+          kubernetes version: '${{ matrix.kubernetes }}'
+          github token: '${{ secrets.GITHUB_TOKEN }}'
+      - name: Checkout
+        uses: actions/checkout@v1
+      - run: USE_CONTAINER=none make slim-builds
+      - run: make test-e2e-kubernetes
+        env:
+          USE_MINIKUBE_DOCKER: "true"
+          CONTAINER_IMAGE_REPO: vector-test
+          PACKAGE_DEB_USE_CONTAINER: docker

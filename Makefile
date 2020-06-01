@@ -282,8 +282,8 @@ ifeq ($(AUTODESPAWN), true)
 endif
 
 PACKAGE_DEB_USE_CONTAINER ?= $(USE_CONTAINER)
-test-integration-kubernetes: ## Runs Kubernetes integration tests (Sorry, no `ENVIRONMENT=true` support)
-	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" USE_CONTAINER=none $(RUN) test-integration-kubernetes
+test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
+	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" USE_CONTAINER=none $(RUN) test-e2e-kubernetes
 
 test-shutdown: ## Runs shutdown tests
 ifeq ($(AUTOSPAWN), true)

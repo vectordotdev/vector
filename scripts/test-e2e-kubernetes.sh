@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# test-integration-kubernetes.sh
+# test-e2e-kubernetes.sh
 #
 # SUMMARY
 #
-#   Run integration tests for Kubernetes components only.
+#   Run E2E tests for Kubernetes.
 
 random-string() {
   local CHARS="abcdefghijklmnopqrstuvwxyz0123456789"
@@ -80,4 +80,4 @@ export CONTAINER_IMAGE
 export KUBE_TEST_DEPLOY_COMMAND="scripts/deploy-kubernetes-test.sh"
 
 # Run the tests.
-cargo test --test kubernetes --no-default-features --features k8s-openapi -- --nocapture
+cargo test --test kubernetes-e2e --no-default-features --features k8s-openapi -- --nocapture
