@@ -6,7 +6,7 @@ use http::Uri;
 use snafu::{ResultExt, Snafu};
 
 impl Config {
-    /// Prepares a config sutable for use when running in k8s cluster.
+    /// Prepares a config suitable for use when running in k8s cluster.
     pub fn in_cluster() -> Result<Self, Error> {
         let host = std::env::var("KUBERNETES_SERVICE_HOST").context(NotInCluster)?;
         let port = std::env::var("KUBERNETES_SERVICE_PORT").context(NotInCluster)?;
