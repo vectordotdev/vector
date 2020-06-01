@@ -8,8 +8,12 @@ use snafu::{ResultExt, Snafu};
 impl Config {
     /// Prepares a config suitable for use when running in k8s cluster.
     pub fn in_cluster() -> Result<Self, Error> {
-        let host = std::env::var("KUBERNETES_SERVICE_HOST").context(NotInCluster)?;
-        let port = std::env::var("KUBERNETES_SERVICE_PORT").context(NotInCluster)?;
+        let host = std::env::var("KUBERNETES_SERVICE_HOST").context(NotInCluster {
+            missing: "KUBERNETES_SERVICE_HOST",
+        })?;
+        let port = std::env::var("KUBERNETES_SERVICE_PORT").context(NotInCluster {
+            missing: "KUBERNETES_SERVICE_PORT",
+        })?;
 
         let base = Uri::builder()
             .scheme("https")
@@ -43,6 +47,9 @@ pub enum Error {
     NotInCluster {
         /// The underlying error.
         source: std::env::VarError,
+
+        /// The field that's missing.
+        missing: &'static str,
     },
 
     /// The token file could not be read successfully.
