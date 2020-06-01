@@ -32,6 +32,9 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tokio::task::spawn_blocking;
 
+/// The key we use for `file` field.
+const FILE_KEY: &str = "file";
+
 /// Configuration for the `kubernetes_logs` source.
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields, default)]
@@ -231,8 +234,6 @@ impl Source {
         Ok(())
     }
 }
-
-const FILE_KEY: &str = "file";
 
 fn create_event(line: bytes05::Bytes, file: String) -> Event {
     let mut event = Event::from(line);
