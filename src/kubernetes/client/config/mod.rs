@@ -3,6 +3,8 @@
 use crate::tls::TlsOptions;
 use http::Uri;
 
+pub mod in_cluster;
+
 /// A k8s client configuration.
 ///
 /// This type is designed to hold all possible variants of the configuration.
@@ -23,5 +25,3 @@ pub struct Config {
     /// The TLS configuration parameters to use at the HTTP client.
     pub tls_options: TlsOptions,
 }
-
-pub mod in_cluster;
