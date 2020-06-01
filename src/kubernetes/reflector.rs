@@ -123,7 +123,7 @@ where
                     }
                 };
 
-                // Prepare a resource version cvandidate so we can update (aka
+                // Prepare a resource version candidate so we can update (aka
                 // commit) it later.
                 let resource_version_candidate =
                     match resource_version::Candidate::from_watch_event(&event) {
