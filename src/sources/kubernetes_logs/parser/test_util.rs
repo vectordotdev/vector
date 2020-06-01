@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 
 /// Build a log event for test purposes.
 ///
-/// The implementation is shared, and therefore consistent consistent across all
+/// The implementation is shared, and therefore consistent across all
 /// the parsers.
 pub fn make_log_event(message: &str, timestamp: &str, stream: &str, is_partial: bool) -> LogEvent {
     let mut log = LogEvent::default();
