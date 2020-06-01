@@ -2,7 +2,6 @@
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent};
 use k8s_openapi::Metadata;
-use std::ops::Deref;
 
 /// Resource version state in the context of a chain of watch requests.
 #[derive(Debug, Clone)]
@@ -30,24 +29,7 @@ impl State {
 
     /// Get the current resource version value.
     pub fn get(&self) -> Option<&str> {
-        self.into()
-    }
-}
-
-impl Deref for State {
-    type Target = Option<String>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'a> From<&'a State> for Option<&'a str> {
-    fn from(val: &'a State) -> Self {
-        match val.0 {
-            Some(ref val) => Some(val.as_str()),
-            None => None,
-        }
+        Some(self.0.as_ref()?.as_str())
     }
 }
 
