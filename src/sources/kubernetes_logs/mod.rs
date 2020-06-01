@@ -43,6 +43,10 @@ pub struct Config {
     /// Required to filter the `Pod`s to only include the ones with the log
     /// files accessible locally.
     self_node_name: String,
+
+    /// Automatically merge partial events.
+    #[serde(default = "crate::serde::default_true")]
+    auto_partial_merge: bool,
 }
 
 inventory::submit! {
@@ -92,6 +96,7 @@ struct Source {
     client: k8s::client::Client,
     self_node_name: String,
     data_dir: PathBuf,
+    auto_partial_merge: bool,
 }
 
 impl Source {
@@ -121,6 +126,7 @@ impl Source {
             client,
             self_node_name,
             data_dir,
+            auto_partial_merge: config.auto_partial_merge,
         })
     }
 
@@ -133,6 +139,7 @@ impl Source {
             client,
             self_node_name,
             data_dir,
+            auto_partial_merge,
         } = self;
 
         let field_selector = format!("spec.nodeName={}", self_node_name);
@@ -182,7 +189,7 @@ impl Source {
         });
 
         let mut parser = parser::build();
-        let mut partial_events_merger = partial_events_merger::build(true);
+        let mut partial_events_merger = partial_events_merger::build(auto_partial_merge);
 
         let events = file_source_rx.map(|(bytes, file)| {
             emit!(KubernetesLogsEventReceived {
