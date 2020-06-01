@@ -47,6 +47,9 @@ pub struct Config {
     /// Automatically merge partial events.
     #[serde(default = "crate::serde::default_true")]
     auto_partial_merge: bool,
+
+    /// Specifies the field names for metadata annotation.
+    annotation_fields: pod_metadata_annotator::FieldsSpec,
 }
 
 inventory::submit! {
@@ -97,6 +100,7 @@ struct Source {
     self_node_name: String,
     data_dir: PathBuf,
     auto_partial_merge: bool,
+    fields_spec: pod_metadata_annotator::FieldsSpec,
 }
 
 impl Source {
@@ -127,6 +131,7 @@ impl Source {
             self_node_name,
             data_dir,
             auto_partial_merge: config.auto_partial_merge,
+            fields_spec: config.annotation_fields.clone(),
         })
     }
 
@@ -140,6 +145,7 @@ impl Source {
             self_node_name,
             data_dir,
             auto_partial_merge,
+            fields_spec,
         } = self;
 
         let field_selector = format!("spec.nodeName={}", self_node_name);
@@ -158,7 +164,7 @@ impl Source {
         let reflector_process = reflector.run();
 
         let paths_provider = K8sPathsProvider::new(state_reader.clone());
-        let annotator = PodMetadataAnnotator::new(state_reader);
+        let annotator = PodMetadataAnnotator::new(state_reader, fields_spec);
 
         // TODO: maybe some of the parameters have to be configurable.
         let file_server = FileServer {
