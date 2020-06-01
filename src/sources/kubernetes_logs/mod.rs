@@ -39,6 +39,9 @@ const FILE_KEY: &str = "file";
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
+    /// The `name` of the Kubernetes `Node` that Vector runs at.
+    /// Required to filter the `Pod`s to only include the ones with the log
+    /// files accessible locally.
     self_node_name: String,
 }
 
