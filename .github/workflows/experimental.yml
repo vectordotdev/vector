@@ -12,24 +12,26 @@ on:
 env:
   VERBOSE: true
   ENVIRONMENT: true
+  ENVIRONMENT_UPSTREAM: ${{ github.sha }}
 
 jobs:
   environment-prepare:
     runs-on: ubuntu-latest
     steps:
       - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull docker.pkg.github.com/timberio/vector/environment:latest
       - uses: actions/checkout@v2
       - run: make environment-prepare
-      - run: docker tag docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-      - run: docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-      - run: docker push docker.pkg.github.com/timberio/vector/environment:latest
+      - run: docker tag docker.pkg.github.com/timberio/vector/environment ${{ env.ENVIRONMENT_UPSTREAM }}
+      - run: docker push ${{ env.ENVIRONMENT_UPSTREAM }}
+
   
   test:
     needs: environment-prepare
     runs-on: ubuntu-latest
     steps:
       - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-      - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - run: docker pull ${{ env.ENVIRONMENT_UPSTREAM }}
       - uses: actions/checkout@v2
       - run: make test
 
@@ -38,6 +40,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-      - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - run: docker pull ${{ env.ENVIRONMENT_UPSTREAM }}
       - uses: actions/checkout@v2
       - run: make bench
