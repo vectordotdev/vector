@@ -8,12 +8,14 @@ on:
       - "**/*.md.erb"
       - ".meta/**"
       - "scripts/generate.rb"
+      - "scripts/generate/**"
 
   pull_request:
     paths:
       - "**/*.md.erb"
       - ".meta/**"
       - "scripts/generate.rb"
+      - "scripts/generate/**"
 
 jobs:
   check:
