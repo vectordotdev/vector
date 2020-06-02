@@ -1,0 +1,19 @@
+name: blog
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "website/blog/**"
+
+  pull_request:
+    paths:
+      - "website/blog/**"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make check-blog
