@@ -7,15 +7,19 @@ on:
     paths:
       - "**/*.md.erb"
       - ".meta/**"
+      - "scripts/Gemfile.lock"
       - "scripts/generate.rb"
       - "scripts/generate/**"
+      - "scripts/util/**"
 
   pull_request:
     paths:
       - "**/*.md.erb"
       - ".meta/**"
+      - "scripts/Gemfile.lock"
       - "scripts/generate.rb"
       - "scripts/generate/**"
+      - "scripts/util/**"
 
 jobs:
   check:
