@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-06-11"
 title: Install Vector From Archives
 sidebar_label: From Archives
 description: Install Vector from pre-compiled archives
@@ -50,7 +50,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.1)', value: 'latest'},
+        { label: 'Latest (0.9.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -108,7 +108,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.1)', value: 'latest'},
+        { label: 'Latest (0.9.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -166,7 +166,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.1)', value: 'latest'},
+        { label: 'Latest (0.9.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -224,7 +224,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.1)', value: 'latest'},
+        { label: 'Latest (0.9.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -275,7 +275,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.1)', value: 'latest'},
+        { label: 'Latest (0.9.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 

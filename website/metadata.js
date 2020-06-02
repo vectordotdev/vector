@@ -3837,358 +3837,41 @@ module.exports = {
     "codename": "",
     "commits": [
       {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-22 14:37:44 +0000",
-        "deletions_count": 4,
-        "description": "Support millisecond and nanosecond timestamps",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 71,
-        "message": "fix(splunk_hec source, splunk_hec sink): Support millisecond and nanosecond timestamps (#2382)",
-        "pr_number": 2382,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "splunk_hec source"
-          },
-          {
-            "component": {
-              "name": "splunk_hec",
-              "type": "sink"
-            },
-            "name": "splunk_hec sink"
-          }
-        ],
-        "sha": "4d76e751febd778887a7432263f77369895cd093",
-        "type": "fix"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-04-22 15:13:54 +0000",
-        "deletions_count": 4,
-        "description": "Handle missing source timestamp",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 30,
-        "message": "fix(journald source): Handle missing source timestamp (#2387)",
-        "pr_number": 2387,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "journald source"
-          }
-        ],
-        "sha": "b1c8421357502e1eca123e98787e7071109620f4",
-        "type": "fix"
-      },
-      {
-        "author": "Ana Hobden",
-        "breaking_change": false,
-        "date": "2020-04-23 15:27:26 +0000",
-        "deletions_count": 49,
-        "description": "`enoding.only_fields` should properly handle parent keys",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 110,
-        "message": "fix(config): `enoding.only_fields` should properly handle parent keys (#2413)",
-        "pr_number": 2413,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "config"
-          }
-        ],
-        "sha": "fc2c77b643e02b86a99cff4c914df06060a49d52",
-        "type": "fix"
-      },
-      {
         "author": "Luke Steensen",
         "breaking_change": false,
-        "date": "2020-04-27 13:31:51 +0000",
-        "deletions_count": 74,
-        "description": "add text encoding",
-        "files_count": 4,
-        "highlight_permalink": null,
-        "insertions_count": 28,
-        "message": "enhancement(humio_logs sink): add text encoding (#2468)",
-        "pr_number": 2468,
-        "scopes": [
-          {
-            "component": {
-              "name": "humio_logs",
-              "type": "sink"
-            },
-            "name": "humio_logs sink"
-          }
-        ],
-        "sha": "48a6d142e9a8ff441d3379cecba7272152b74a72",
-        "type": "enhancement"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-27 20:05:10 +0000",
-        "deletions_count": 3,
-        "description": "Use header auth",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 7,
-        "message": "fix(datadog_metrics sink): Use header auth (#2443)",
-        "pr_number": 2443,
-        "scopes": [
-          {
-            "component": {
-              "name": "datadog_metrics",
-              "type": "sink"
-            },
-            "name": "datadog_metrics sink"
-          }
-        ],
-        "sha": "47bf9f74903162a02f40cd7113c37cfec6bb4303",
-        "type": "fix"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-28 19:08:02 +0000",
-        "deletions_count": 22,
-        "description": "Add indexed fields in `text` encoding",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 67,
-        "message": "fix(splunk_hec sink): Add indexed fields in `text` encoding (#2448)",
-        "pr_number": 2448,
-        "scopes": [
-          {
-            "component": {
-              "name": "splunk_hec",
-              "type": "sink"
-            },
-            "name": "splunk_hec sink"
-          }
-        ],
-        "sha": "332e9711c7a7c414a0ee83257d172c9b79f1244b",
-        "type": "fix"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-28 14:04:02 +0000",
-        "deletions_count": 8,
-        "description": "Treat empty namespaces as not set",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 48,
-        "message": "fix(aws_ec2_metadata transform): Treat empty namespaces as not set (#2479)",
-        "pr_number": 2479,
-        "scopes": [
-          {
-            "component": {
-              "name": "aws_ec2_metadata",
-              "type": "transform"
-            },
-            "name": "aws_ec2_metadata transform"
-          }
-        ],
-        "sha": "fafdc789b26e23075aa6afc1b12622b001f0f5c4",
-        "type": "fix"
-      },
-      {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2020-04-29 11:30:48 +0000",
-        "deletions_count": 31,
-        "description": "Fix handling of standard AWS regions",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 98,
-        "message": "fix(elasticsearch sink): Fix handling of standard AWS regions (#2489)",
-        "pr_number": 2489,
-        "scopes": [
-          {
-            "component": {
-              "name": "elasticsearch",
-              "type": "sink"
-            },
-            "name": "elasticsearch sink"
-          }
-        ],
-        "sha": "4e55cbb5b4879bcd971787089873cd62f7ddc451",
-        "type": "fix"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-29 13:42:40 +0000",
-        "deletions_count": 11,
-        "description": "Fetch system ca certs via schannel on windows",
-        "files_count": 5,
-        "highlight_permalink": null,
-        "insertions_count": 163,
-        "message": "fix(networking): Fetch system ca certs via schannel on windows (#2444)",
-        "pr_number": 2444,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "networking"
-          }
-        ],
-        "sha": "a8fba10bc739fb5f9b54264bab937700e161f5d5",
-        "type": "fix"
-      },
-      {
-        "author": "Evan Cameron",
-        "breaking_change": false,
-        "date": "2020-04-29 15:29:34 +0000",
+        "date": "2020-05-27 11:22:47 +0000",
         "deletions_count": 17,
-        "description": "Move healtcheck consumer creation to boxed future",
+        "description": "ack and don't stop on request errors",
         "files_count": 1,
         "highlight_permalink": null,
-        "insertions_count": 13,
-        "message": "fix(pulsar sink): Move healtcheck consumer creation to boxed future (#2499)",
-        "pr_number": 2499,
+        "insertions_count": 56,
+        "message": "fix(sinks): ack and don't stop on request errors (#2666)",
+        "pr_number": 2666,
         "scopes": [
           {
             "component": {
-              "name": "pulsar",
-              "type": "sink"
             },
-            "name": "pulsar sink"
+            "name": "sinks"
           }
         ],
-        "sha": "9082b1808115bac6dd64f310126fb57754ce315e",
+        "sha": "5b821916cbd6583fa7375cc9daba6bfe2031f4f8",
         "type": "fix"
-      },
-      {
-        "author": "Slawomir Skowron",
-        "breaking_change": false,
-        "date": "2020-04-29 22:26:19 +0000",
-        "deletions_count": 0,
-        "description": "Add `instance-type` field",
-        "files_count": 1,
-        "highlight_permalink": null,
-        "insertions_count": 16,
-        "message": "enhancement(aws_ec2_metadata transform): Add `instance-type` field (#2500)",
-        "pr_number": 2500,
-        "scopes": [
-          {
-            "component": {
-              "name": "aws_ec2_metadata",
-              "type": "transform"
-            },
-            "name": "aws_ec2_metadata transform"
-          }
-        ],
-        "sha": "b2bc1b77ac53b412162a845293487586f66b3007",
-        "type": "enhancement"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-04-30 10:51:02 +0000",
-        "deletions_count": 5,
-        "description": "Use specific error for x509 from system ca",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 10,
-        "message": "fix(security): Use specific error for x509 from system ca (#2507)",
-        "pr_number": 2507,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "security"
-          }
-        ],
-        "sha": "af544f361cc03e31207fcdd5e57104d051fde136",
-        "type": "fix"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-30 12:55:08 +0000",
-        "deletions_count": 114,
-        "description": "Shutdown topology pieces before building new ones",
-        "files_count": 6,
-        "highlight_permalink": null,
-        "insertions_count": 349,
-        "message": "fix(config): Shutdown topology pieces before building new ones (#2449)",
-        "pr_number": 2449,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "config"
-          }
-        ],
-        "sha": "a0d5cf5469045d066bed5ed950187ff6a7612dc4",
-        "type": "fix"
-      },
-      {
-        "author": "Kruno Tomola Fabro",
-        "breaking_change": false,
-        "date": "2020-04-30 13:28:53 +0000",
-        "deletions_count": 34,
-        "description": "Enforce age requirements",
-        "files_count": 2,
-        "highlight_permalink": null,
-        "insertions_count": 195,
-        "message": "enhancement(aws_cloudwatch_logs sink): Enforce age requirements (#2437)",
-        "pr_number": 2437,
-        "scopes": [
-          {
-            "component": {
-              "name": "aws_cloudwatch_logs",
-              "type": "sink"
-            },
-            "name": "aws_cloudwatch_logs sink"
-          }
-        ],
-        "sha": "319a75ddc20060a8aecb2d0e990d3e52b19cc0e5",
-        "type": "enhancement"
-      },
-      {
-        "author": "Binary Logic",
-        "breaking_change": false,
-        "date": "2020-04-30 11:17:14 +0000",
-        "deletions_count": 605,
-        "description": "Check code on Windows",
-        "files_count": 3,
-        "highlight_permalink": null,
-        "insertions_count": 640,
-        "message": "chore(operations): Check code on Windows (#2506)",
-        "pr_number": 2506,
-        "scopes": [
-          {
-            "component": {
-            },
-            "name": "operations"
-          }
-        ],
-        "sha": "fcd5c1893713e08d1ee0f51cdca5aa16686af148",
-        "type": "chore"
       }
     ],
-    "compare_url": "https://github.com/timberio/vector/compare/v0.9.0...v0.9.1",
-    "date": "2020-04-29",
-    "deletions_count": 981,
+    "compare_url": "https://github.com/timberio/vector/compare/v0.9.1...v0.9.2",
+    "date": "2020-06-02",
+    "deletions_count": 17,
     "description": "",
     "highlights": [
 
     ],
-    "insertions_count": 1845,
-    "last_version": "0.9.0",
-    "permalink": "/releases/0.9.1/",
-    "title": "Vector v0.9.1",
+    "insertions_count": 56,
+    "last_version": "0.9.1",
+    "permalink": "/releases/0.9.2/",
+    "title": "Vector v0.9.2",
     "type": "initial dev",
     "type_url": "https://semver.org/#spec-item-4",
-    "version": "0.9.1",
+    "version": "0.9.2",
     "whats_next": [
 
     ]
@@ -30057,6 +29740,49 @@ module.exports = {
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
       "version": "0.9.1",
+      "whats_next": [
+
+      ]
+    },
+    "0.9.2": {
+      "codename": "",
+      "commits": [
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-05-27 11:22:47 +0000",
+          "deletions_count": 17,
+          "description": "ack and don't stop on request errors",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 56,
+          "message": "fix(sinks): ack and don't stop on request errors (#2666)",
+          "pr_number": 2666,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "sinks"
+            }
+          ],
+          "sha": "5b821916cbd6583fa7375cc9daba6bfe2031f4f8",
+          "type": "fix"
+        }
+      ],
+      "compare_url": "https://github.com/timberio/vector/compare/v0.9.1...v0.9.2",
+      "date": "2020-06-02",
+      "deletions_count": 17,
+      "description": "",
+      "highlights": [
+
+      ],
+      "insertions_count": 56,
+      "last_version": "0.9.1",
+      "permalink": "/releases/0.9.2/",
+      "title": "Vector v0.9.2",
+      "type": "initial dev",
+      "type_url": "https://semver.org/#spec-item-4",
+      "version": "0.9.2",
       "whats_next": [
 
       ]
