@@ -9,7 +9,7 @@ on:
         - master
 jobs:
   environment-prepare:
-    runs_on: ubuntu-20.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@2
     - run: make environment-prepare
