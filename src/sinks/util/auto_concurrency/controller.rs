@@ -1,4 +1,5 @@
 use super::semaphore::ShrinkableSemaphore;
+use crate::sinks::util::retries2::RetryLogic;
 use std::cmp::max;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
@@ -24,6 +25,7 @@ struct Inner {
     past_rtt: EWMA,
     next_update: Instant,
     current_rtt: Mean,
+    had_back_pressure: bool,
 }
 
 impl<L> Controller<L> {
@@ -37,6 +39,7 @@ impl<L> Controller<L> {
                 past_rtt: Default::default(),
                 next_update: Instant::now(),
                 current_rtt: Default::default(),
+                had_back_pressure: false,
             })),
         }
     }
@@ -45,23 +48,30 @@ impl<L> Controller<L> {
         self.semaphore.clone().acquire()
     }
 
-    pub(super) fn adjust_to_response(&self, start: Instant) {
-        // Problems:
-        // * adjusts for any response, does not differentiate
+    fn adjust_to_back_pressure(&self, start: Instant, is_back_pressure: bool) {
         let now = Instant::now();
         let rtt = now.saturating_duration_since(start).as_secs_f64();
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
+        if is_back_pressure {
+            inner.had_back_pressure = true;
+        }
 
         let rtt = inner.current_rtt.update(rtt);
         let avg = inner.past_rtt.average();
         if avg > 0.0 && now >= inner.next_update {
             let threshold = avg * THRESHOLD_RATIO;
-            if inner.current > 1 && rtt >= avg + threshold {
+
+            // Back pressure responses, either explicit or implicit due
+            // to increasing response times, trigger a decrease in
+            // concurrency.
+            if inner.current > 1 && (inner.had_back_pressure || rtt >= avg + threshold) {
                 // Decrease (multiplicative) the current concurrency
                 let to_forget = inner.current / 2;
                 self.semaphore.forget_permits(to_forget);
                 inner.current -= to_forget;
-            } else if inner.current < self.max && rtt <= avg {
+            }
+            // Normal quick responses trigger an increase in concurrency.
+            else if inner.current < self.max && !inner.had_back_pressure && rtt <= avg {
                 // Increase (additive) the current concurrency
                 self.semaphore.add_permits(1);
                 inner.current += 1;
@@ -71,7 +81,22 @@ impl<L> Controller<L> {
             inner.next_update = now + Duration::from_secs_f64(new_avg);
         }
 
+        inner.had_back_pressure = false;
         inner.current_rtt.reset();
+    }
+}
+
+impl<L> Controller<L>
+where
+    L: RetryLogic,
+{
+    pub(super) fn adjust_to_response(
+        &self,
+        start: Instant,
+        response: &Result<L::Response, L::Error>,
+    ) {
+        let is_back_pressure = matches!(response, Err(r) if self.logic.is_retriable_error(r));
+        self.adjust_to_back_pressure(start, is_back_pressure)
     }
 }
 

@@ -1,15 +1,19 @@
 use super::controller::Controller;
 use super::future::ResponseFuture;
+use crate::sinks::util::retries2::RetryLogic;
 
 use tower03::Service;
 
 use futures::ready;
-use std::fmt;
-use std::future::Future;
-use std::mem;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::{
+    error::Error,
+    fmt,
+    future::Future,
+    mem,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 use tokio::sync::OwnedSemaphorePermit;
 
 /// Enforces a limit on the concurrent number of requests the underlying
@@ -42,7 +46,8 @@ impl<S, L> AutoConcurrencyLimit<S, L> {
 impl<S, L, Request> Service<Request> for AutoConcurrencyLimit<S, L>
 where
     S: Service<Request>,
-    L: 'static,
+    S::Error: Error + Send + Sync + 'static,
+    L: RetryLogic<Response = S::Response, Error = S::Error>,
 {
     type Response = S::Response;
     type Error = S::Error;
