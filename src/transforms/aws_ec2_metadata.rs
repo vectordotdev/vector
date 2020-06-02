@@ -496,7 +496,7 @@ enum Ec2MetadataError {
 }
 
 #[cfg(test)]
-#[cfg(feature = "aws-ec2-metadata-integration-tests")]
+#[cfg(feature = "aws-integration-tests")]
 mod tests {
     use super::*;
     use crate::{event::Event, test_util::runtime};
@@ -548,7 +548,7 @@ mod tests {
             log.get(&"ami-id".into()),
             Some(&"ami-05f27d4d6770a43d2".into())
         );
-        assert_eq!(log.get(&"instance-type".into()), Some(&"m5a.xlarge".into()));
+        assert_eq!(log.get(&"instance-type".into()), Some(&"t2.micro".into()));
         assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
         assert_eq!(log.get(&"vpc-id".into()), Some(&"mock-vpc-id".into()));
         assert_eq!(log.get(&"subnet-id".into()), Some(&"mock-subnet-id".into()));
