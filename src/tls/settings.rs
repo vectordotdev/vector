@@ -30,8 +30,11 @@ pub struct TlsConfig {
 pub struct TlsOptions {
     pub verify_certificate: Option<bool>,
     pub verify_hostname: Option<bool>,
+    #[serde(alias = "ca_path")]
     pub ca_file: Option<PathBuf>,
+    #[serde(alias = "crt_path")]
     pub crt_file: Option<PathBuf>,
+    #[serde(alias = "key_path")]
     pub key_file: Option<PathBuf>,
     pub key_pass: Option<String>,
 }
