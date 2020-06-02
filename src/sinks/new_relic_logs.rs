@@ -141,8 +141,7 @@ mod tests {
     use super::*;
     use crate::{
         event::Event,
-        runtime::Runtime,
-        test_util::{next_addr, shutdown_on_idle},
+        test_util::{next_addr, runtime, shutdown_on_idle},
         topology::config::SinkConfig,
     };
     use bytes::Buf;
@@ -305,7 +304,7 @@ mod tests {
             .unwrap()
             .into();
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let (sink, _healthcheck) = http_config
             .build(SinkContext::new_test(rt.executor()))

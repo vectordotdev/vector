@@ -369,6 +369,7 @@ impl Auth {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_util::runtime;
     use futures01::{Future, Sink, Stream};
     use http::Method;
     use hyper::service::service_fn;
@@ -438,7 +439,7 @@ mod test {
             .serve(new_service)
             .map_err(|e| eprintln!("server error: {}", e));
 
-        let mut rt = crate::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         rt.spawn(server);
 

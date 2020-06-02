@@ -212,7 +212,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::test_util::{block_on, random_lines_with_stream, random_string};
+    use crate::test_util::{block_on, random_lines_with_stream, random_string, runtime};
     use pulsar::Message;
     use std::{
         sync::atomic::AtomicUsize,
@@ -229,7 +229,7 @@ mod integration_tests {
             auth: None,
         };
         let (acker, ack_counter) = Acker::new_for_testing();
-        let rt = crate::runtime::Runtime::single_threaded().unwrap();
+        let rt = runtime();
 
         let sink = PulsarSink::new(cnf, acker, rt.executor()).unwrap();
 
