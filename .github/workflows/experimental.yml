@@ -19,14 +19,14 @@ jobs:
     - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
     - uses: actions/checkout@v2
     - run: make environment-prepare
-    - run: docker tag docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:$(git rev-parse --verify HEAD)
-    - run: docker push docker.pkg.github.com/timberio/vector/environment:${{ GITHUB_SHA }}
+    - run: docker tag docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+    - run: docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
     - run: docker push docker.pkg.github.com/timberio/vector/environment:latest
   
   test:
     needs: environment-prepare
     runs-on: ubuntu-latest
-    container: docker.pkg.github.com/timberio/vector/environment:${{ GITHUB_SHA }}
+    container: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
     steps:
     - uses: actions/checkout@v2
       with:
@@ -36,7 +36,7 @@ jobs:
   bench:
     needs: environment-prepare
     runs-on: ubuntu-latest
-    container: docker.pkg.github.com/timberio/vector/environment:${{ GITHUB_SHA }}
+    container: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
     steps:
     - uses: actions/checkout@v2
       with:
