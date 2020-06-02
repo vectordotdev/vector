@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
+    - run: sudo apt install --yes docker.io
     - run: make environment-prepare
     - run: docker tag docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:$(git rev-parse --verify HEAD)
     - run: docker push docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:$(git rev-parse --verify HEAD)
