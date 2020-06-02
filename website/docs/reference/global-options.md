@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-25"
+last_modified_on: "2020-06-02"
 title: Global Options
 description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---
@@ -23,7 +23,7 @@ Vector as a whole and set defaults for component options.
 
 ```toml title="vector.toml"
 # General
-data_dir = "/var/lib/vector" # optional, no default
+data_dir = "/var/lib/vector/" # optional, default
 dns_servers = ["0.0.0.0:53"] # optional, no default
 
 # Log schema
@@ -36,9 +36,9 @@ log_schema.timestamp_key = "timestamp" # optional, default
 <Fields filters={true}>
 <Field
   common={false}
-  defaultValue={null}
+  defaultValue={"/var/lib/vector/"}
   enumValues={null}
-  examples={["/var/lib/vector"]}
+  examples={["/var/lib/vector","/var/local/lib/vector/","/home/user/vector/"]}
   groups={[]}
   name={"data_dir"}
   path={null}
