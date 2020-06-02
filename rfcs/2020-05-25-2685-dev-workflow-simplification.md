@@ -103,7 +103,7 @@ curl -L [https://nixos.org/nix/install](https://nixos.org/nix/install) | sh
 
 Next, run `nix-shell` from the Vector directory.
 
-***Wow, you did it!*** Now you can run the commands described in "Bring your own toolbox" now. This has pulled in all the required packages and set required environment variables.
+**_Wow, you did it!_** Now you can run the commands described in "Bring your own toolbox" now. This has pulled in all the required packages and set required environment variables.
 
 Your other programs are there too, so you can run `code .` or `clion .` or whatever and get going like normal.
 
@@ -188,13 +188,13 @@ To help you picture it, common dev `make` tasks such as `make fmt` and `make che
 
 - Start `make`, [calculate](https://github.com/timberio/vector/blob/1d8e88057f68d9cf9292ddc9edb69a7f8d3b3f92/Makefile#L7-L14) the default features
 - [Run](https://github.com/timberio/vector/blob/1d8e88057f68d9cf9292ddc9edb69a7f8d3b3f92/Makefile#L3) the `/scripts/run.sh`. (via shebang this runs `env` which invokes `bash` )
-- Run the  `/scripts/prepare-target-dir.sh` script (via shebang, `env` then `bash`)
-    - This `read` s then `grep`s the `docker-compose` yaml file, [running](https://github.com/timberio/vector/blob/1d8e88057f68d9cf9292ddc9edb69a7f8d3b3f92/scripts/prepare-target-dir.sh#L15-L17) `sed`, `sort`ing, then `uniq` ing the jobs
-    - Make a directory as the current user for each of those.
+- Run the `/scripts/prepare-target-dir.sh` script (via shebang, `env` then `bash`)
+  - This `read` s then `grep`s the `docker-compose` yaml file, [running](https://github.com/timberio/vector/blob/1d8e88057f68d9cf9292ddc9edb69a7f8d3b3f92/scripts/prepare-target-dir.sh#L15-L17) `sed`, `sort`ing, then `uniq` ing the jobs
+  - Make a directory as the current user for each of those.
 - Run the `./scripts/docker-compose-run.sh` script (via shebang, `bash` , no `env` call)
-    - Sets some env vars
-    - Runs a `docker-compose rm` call to remove the existing service (this starts a `python` runtime, which dispatches to `docker`)
-    - Runs `docker-compose up` on the given container.
+  - Sets some env vars
+  - Runs a `docker-compose rm` call to remove the existing service (this starts a `python` runtime, which dispatches to `docker`)
+  - Runs `docker-compose up` on the given container.
 
 At this point what happens differs by job. None of this is particularly slow, **it's just a lot.**
 
@@ -223,13 +223,13 @@ There are tools like `hab` (from the Habitat project) and `packer` that can be u
 ## Outstanding Questions
 
 - Windows/Mac/FreeBSD builds via `make build` et all will produce native binaries natively, we should be review those docs.
-- This RFC does not scope in integration tests beyond letting the `environment` run them. We may find motivation to explore a more ***slick*** solution in the future.
+- This RFC does not scope in integration tests beyond letting the `environment` run them. We may find motivation to explore a more **_slick_** solution in the future.
 
 ## Rationale & Alternatives
 
 Why change what we have?
 
-- Running all these scripts and `docker` commands to run things like `cargo fmt` feels very... *stinky*... to experienced programmers.
+- Running all these scripts and `docker` commands to run things like `cargo fmt` feels very... _stinky_... to experienced programmers.
 - Most of our core team avoids the `Makefile` since it's been deemed not useful.
 - We can reduce some duplication and redirection in the build system (hopefully understanding it better)
 - We get side benefits like better dependency management.
