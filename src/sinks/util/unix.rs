@@ -197,8 +197,7 @@ impl Sink for UnixSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::Runtime;
-    use crate::test_util::{random_lines_with_stream, shutdown_on_idle};
+    use crate::test_util::{random_lines_with_stream, runtime, shutdown_on_idle};
     use futures01::{sync::mpsc, Sink, Stream};
     use stream_cancel::{StreamExt, Tripwire};
     use tokio01::codec::{FramedRead, LinesCodec};
@@ -227,7 +226,7 @@ mod tests {
 
         // Set up Sink
         let config = UnixSinkConfig::new(out_path.clone(), Encoding::Text.into());
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
         let (sink, _healthcheck) = config.build(cx).unwrap();
 

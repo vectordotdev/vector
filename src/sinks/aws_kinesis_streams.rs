@@ -328,8 +328,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         region::RegionOrEndpoint,
-        runtime,
-        test_util::{random_lines_with_stream, random_string},
+        test_util::{random_lines_with_stream, random_string, runtime},
         topology::config::SinkContext,
     };
     use futures01::{Future, Sink};
@@ -361,7 +360,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let sink = KinesisService::new(config, cx).unwrap();

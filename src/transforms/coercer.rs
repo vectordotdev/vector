@@ -103,13 +103,14 @@ mod tests {
     use super::CoercerConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
+        test_util::runtime,
         topology::config::{TransformConfig, TransformContext},
         Event,
     };
     use pretty_assertions::assert_eq;
 
     fn parse_it(extra: &str) -> LogEvent {
-        let rt = crate::runtime::Runtime::single_threaded().unwrap();
+        let rt = runtime();
         let mut event = Event::from("dummy message");
         for &(key, value) in &[
             ("number", "1234"),

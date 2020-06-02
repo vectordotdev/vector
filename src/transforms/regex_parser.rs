@@ -278,12 +278,13 @@ mod tests {
     use super::RegexParserConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
+        test_util::runtime,
         topology::config::{TransformConfig, TransformContext},
         Event,
     };
 
     fn do_transform(event: &str, patterns: &str, config: &str) -> Option<LogEvent> {
-        let rt = crate::runtime::Runtime::single_threaded().unwrap();
+        let rt = runtime();
         let event = Event::from(event);
         let mut parser = toml::from_str::<RegexParserConfig>(&format!(
             r#"

@@ -944,13 +944,13 @@ fn remove_slash(s: &str) -> &str {
 #[cfg(all(test, feature = "docker-integration-tests"))]
 mod tests {
     use super::*;
-    use crate::runtime;
-    use crate::test_util::{self, collect_n, trace_init};
+    use crate::runtime::Runtime;
+    use crate::test_util::{self, collect_n, runtime, trace_init};
     use futures01::future;
 
     static BUXYBOX_IMAGE_TAG: &'static str = "latest";
 
-    fn pull(image: &str, docker: &Docker, rt: &mut runtime::Runtime) {
+    fn pull(image: &str, docker: &Docker, rt: &mut Runtime) {
         let list_option = shiplift::ImageListOptions::builder()
             .filter_name(image)
             .build();
@@ -977,8 +977,8 @@ mod tests {
     fn source<'a, L: Into<Option<&'a str>>>(
         names: &[&str],
         label: L,
-    ) -> (mpsc::Receiver<Event>, runtime::Runtime) {
-        let mut rt = test_util::runtime();
+    ) -> (mpsc::Receiver<Event>, Runtime) {
+        let mut rt = runtime();
         let source = source_with(names, label, &mut rt);
         (source, rt)
     }
@@ -987,7 +987,7 @@ mod tests {
     fn source_with<'a, L: Into<Option<&'a str>>>(
         names: &[&str],
         label: L,
-        rt: &mut runtime::Runtime,
+        rt: &mut Runtime,
     ) -> mpsc::Receiver<Event> {
         source_with_config(
             DockerConfig {
@@ -1000,10 +1000,7 @@ mod tests {
     }
 
     /// None if docker is not present on the system
-    fn source_with_config(
-        config: DockerConfig,
-        rt: &mut runtime::Runtime,
-    ) -> mpsc::Receiver<Event> {
+    fn source_with_config(config: DockerConfig, rt: &mut Runtime) -> mpsc::Receiver<Event> {
         trace_init();
         let (sender, recv) = mpsc::channel(100);
         rt.spawn(
@@ -1029,7 +1026,7 @@ mod tests {
         label: L,
         log: &str,
         docker: &Docker,
-        rt: &mut runtime::Runtime,
+        rt: &mut Runtime,
     ) -> String {
         cmd_container(
             name,
@@ -1047,7 +1044,7 @@ mod tests {
         label: L,
         log: &str,
         docker: &Docker,
-        rt: &mut runtime::Runtime,
+        rt: &mut Runtime,
     ) -> String {
         cmd_container(
             name,
@@ -1068,7 +1065,7 @@ mod tests {
         label: L,
         cmd: Vec<String>,
         docker: &Docker,
-        rt: &mut runtime::Runtime,
+        rt: &mut Runtime,
     ) -> String {
         if let Some(id) = cmd_container_for_real(name, label, cmd, docker, rt) {
             id
@@ -1088,7 +1085,7 @@ mod tests {
         label: L,
         cmd: Vec<String>,
         docker: &Docker,
-        rt: &mut runtime::Runtime,
+        rt: &mut Runtime,
     ) -> Option<String> {
         pull("busybox", docker, rt);
         trace!("Creating container");
@@ -1114,7 +1111,7 @@ mod tests {
     fn container_start(
         id: &str,
         docker: &Docker,
-        rt: &mut runtime::Runtime,
+        rt: &mut Runtime,
     ) -> Result<(), shiplift::errors::Error> {
         trace!("Starting container");
         let future = docker.containers().get(id).start();
@@ -1126,7 +1123,7 @@ mod tests {
     fn container_wait(
         id: &str,
         docker: &Docker,
-        rt: &mut runtime::Runtime,
+        rt: &mut Runtime,
     ) -> Result<(), shiplift::errors::Error> {
         trace!("Waiting container");
         let future = docker.containers().get(id).wait();
@@ -1139,7 +1136,7 @@ mod tests {
     fn container_kill(
         id: &str,
         docker: &Docker,
-        rt: &mut runtime::Runtime,
+        rt: &mut Runtime,
     ) -> Result<(), shiplift::errors::Error> {
         trace!("Waiting container");
         let future = docker.containers().get(id).kill(None);
@@ -1151,13 +1148,13 @@ mod tests {
     fn container_run(
         id: &str,
         docker: &Docker,
-        rt: &mut runtime::Runtime,
+        rt: &mut Runtime,
     ) -> Result<(), shiplift::errors::Error> {
         container_start(id, docker, rt)?;
         container_wait(id, docker, rt)
     }
 
-    fn container_remove(id: &str, docker: &Docker, rt: &mut runtime::Runtime) {
+    fn container_remove(id: &str, docker: &Docker, rt: &mut Runtime) {
         trace!("Removing container");
         let future = docker
             .containers()
@@ -1175,7 +1172,7 @@ mod tests {
         label: L,
         log: &str,
         docker: &Docker,
-        rt: &mut runtime::Runtime,
+        rt: &mut Runtime,
     ) -> String {
         let id = log_container(name, label, log, docker, rt);
         for _ in 0..n {
@@ -1194,7 +1191,7 @@ mod tests {
         label: L,
         log: &str,
         docker: &Docker,
-        rt: &mut runtime::Runtime,
+        rt: &mut Runtime,
     ) -> String {
         let out = source_with(&[name], None, rt);
 

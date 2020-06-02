@@ -261,12 +261,11 @@ mod integration_tests {
     use super::*;
     use crate::{
         region::RegionOrEndpoint,
-        runtime,
         sinks::{
             elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
             util::BatchEventsConfig,
         },
-        test_util::{random_events_with_stream, random_string},
+        test_util::{random_events_with_stream, random_string, runtime},
         topology::config::SinkContext,
     };
     use futures01::Sink;
@@ -305,7 +304,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let sink = KinesisFirehoseService::new(config, cx).unwrap();

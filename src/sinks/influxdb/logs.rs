@@ -519,10 +519,10 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::runtime::Runtime;
     use crate::sinks::influxdb::logs::InfluxDBLogsConfig;
     use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, ORG, TOKEN};
     use crate::sinks::influxdb::InfluxDB2Settings;
+    use crate::test_util::runtime;
     use crate::topology::SinkContext;
     use chrono::Utc;
     use futures01::Sink;
@@ -533,7 +533,7 @@ mod integration_tests {
 
         let ns = format!("ns-{}", Utc::now().timestamp_nanos());
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let config = InfluxDBLogsConfig {

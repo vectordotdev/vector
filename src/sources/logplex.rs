@@ -164,7 +164,7 @@ mod tests {
     use crate::{
         event::{self, Event},
         runtime::Runtime,
-        test_util::{self, collect_n},
+        test_util::{self, collect_n, runtime},
         topology::config::{GlobalOptions, SourceConfig},
     };
     use chrono::{DateTime, Utc};
@@ -208,7 +208,7 @@ mod tests {
     fn logplex_handles_router_log() {
         let body = r#"267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#;
 
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (rx, addr) = source(&mut rt);
 
         assert_eq!(200, send(addr, body));

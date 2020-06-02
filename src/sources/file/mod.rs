@@ -349,10 +349,10 @@ fn create_event(
 mod tests {
     use super::*;
     use crate::{
-        event, runtime,
+        event,
         shutdown::ShutdownSignal,
         sources::file,
-        test_util::{block_on, shutdown_on_idle},
+        test_util::{block_on, runtime, shutdown_on_idle},
         topology::Config,
     };
     use futures01::{Future, Stream};
@@ -492,7 +492,7 @@ mod tests {
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         rt.spawn(source);
 
@@ -553,7 +553,7 @@ mod tests {
         };
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         rt.spawn(source);
 
@@ -622,7 +622,7 @@ mod tests {
         };
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         rt.spawn(source);
 
@@ -694,7 +694,7 @@ mod tests {
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         rt.spawn(source);
 
@@ -741,7 +741,7 @@ mod tests {
 
     #[test]
     fn file_file_key() {
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         // Default
         {
@@ -876,7 +876,7 @@ mod tests {
 
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            let mut rt = runtime::Runtime::new().unwrap();
+            let mut rt = runtime();
             rt.spawn(source);
 
             sleep();
@@ -899,7 +899,7 @@ mod tests {
 
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            let mut rt = runtime::Runtime::new().unwrap();
+            let mut rt = runtime();
             rt.spawn(source);
 
             sleep();
@@ -927,7 +927,7 @@ mod tests {
             };
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            let mut rt = runtime::Runtime::new().unwrap();
+            let mut rt = runtime();
             rt.spawn(source);
 
             sleep();
@@ -964,7 +964,7 @@ mod tests {
 
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            let mut rt = runtime::Runtime::new().unwrap();
+            let mut rt = runtime();
             rt.spawn(source);
 
             let mut file = File::create(&path).unwrap();
@@ -991,7 +991,7 @@ mod tests {
 
             let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            let mut rt = runtime::Runtime::new().unwrap();
+            let mut rt = runtime();
             rt.spawn(source);
 
             let mut file = File::create(&path).unwrap();
@@ -1017,7 +1017,7 @@ mod tests {
         use std::os::unix::io::AsRawFd;
         use std::time::{Duration, SystemTime};
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
         let dir = tempdir().unwrap();
@@ -1115,7 +1115,7 @@ mod tests {
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         rt.spawn(source);
 
@@ -1176,7 +1176,7 @@ mod tests {
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         rt.spawn(source);
 
@@ -1253,7 +1253,7 @@ mod tests {
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         rt.spawn(source);
 
@@ -1344,7 +1344,7 @@ mod tests {
         sleep();
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(source);
 
         sleep();
@@ -1409,7 +1409,7 @@ mod tests {
         sleep();
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(source);
 
         sleep();
@@ -1453,7 +1453,7 @@ mod tests {
         };
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(source);
 
         sleep();

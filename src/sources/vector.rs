@@ -100,7 +100,7 @@ mod test {
             Metric,
         },
         sinks::vector::VectorSinkConfig,
-        test_util::{next_addr, wait_for_tcp, CollectCurrent},
+        test_util::{next_addr, runtime, wait_for_tcp, CollectCurrent},
         tls::{TlsConfig, TlsOptions},
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         Event,
@@ -119,7 +119,7 @@ mod test {
                 tx,
             )
             .unwrap();
-        let mut rt = crate::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(server);
         wait_for_tcp(addr);
 

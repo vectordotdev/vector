@@ -678,16 +678,16 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use crate::runtime::Runtime;
     use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, DATABASE, ORG, TOKEN};
     use crate::sinks::influxdb::{healthcheck, InfluxDB1Settings, InfluxDB2Settings};
+    use crate::test_util::runtime;
     use crate::topology::SinkContext;
 
     #[test]
     fn influxdb2_healthchecks_ok() {
         onboarding_v2();
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
         let endpoint = "http://localhost:9999".to_string();
         let influxdb1_settings = None;
@@ -711,7 +711,7 @@ mod integration_tests {
     fn influxdb2_healthchecks_fail() {
         onboarding_v2();
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
         let endpoint = "http://not_exist:9999".to_string();
         let influxdb1_settings = None;
@@ -732,7 +732,7 @@ mod integration_tests {
 
     #[test]
     fn influxdb1_healthchecks_ok() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
         let endpoint = "http://localhost:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
@@ -756,7 +756,7 @@ mod integration_tests {
 
     #[test]
     fn influxdb1_healthchecks_fail() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
         let endpoint = "http://not_exist:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {

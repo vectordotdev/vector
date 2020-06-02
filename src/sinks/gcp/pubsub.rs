@@ -218,7 +218,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         runtime::Runtime,
-        test_util::{block_on, random_events_with_stream, random_string},
+        test_util::{block_on, random_events_with_stream, random_string, runtime},
     };
     use futures01::Sink;
     use reqwest::{Client, Method, Response};
@@ -248,7 +248,7 @@ mod integration_tests {
     fn publish_events() {
         crate::test_util::trace_init();
 
-        let rt = Runtime::new().unwrap();
+        let rt = runtime();
         let (topic, subscription) = create_topic_subscription();
         let (sink, healthcheck) = config_build(&rt, &topic);
 
@@ -275,7 +275,7 @@ mod integration_tests {
 
     #[test]
     fn checks_for_valid_topic() {
-        let rt = Runtime::new().unwrap();
+        let rt = runtime();
         let (topic, _subscription) = create_topic_subscription();
         let topic = format!("BAD{}", topic);
         let (_sink, healthcheck) = config_build(&rt, &topic);

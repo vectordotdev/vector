@@ -286,14 +286,14 @@ impl SourceShutdownCoordinator {
 
 #[cfg(test)]
 mod test {
-    use crate::runtime;
     use crate::shutdown::SourceShutdownCoordinator;
+    use crate::test_util::runtime;
     use futures01::future::Future;
     use std::time::{Duration, Instant};
 
     #[test]
     fn shutdown_coordinator_shutdown_source_clean() {
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         let mut shutdown = SourceShutdownCoordinator::new();
         let name = "test";
 
@@ -310,7 +310,7 @@ mod test {
 
     #[test]
     fn shutdown_coordinator_shutdown_source_force() {
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         let mut shutdown = SourceShutdownCoordinator::new();
         let name = "test";
 

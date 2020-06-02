@@ -716,7 +716,7 @@ fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
 mod tests {
     use super::{parse_timestamp, SplunkConfig};
     use crate::runtime::{Runtime, TaskExecutor};
-    use crate::test_util::{self, collect_n};
+    use crate::test_util::{self, collect_n, runtime};
     use crate::{
         event::{self, Event},
         shutdown::ShutdownSignal,
@@ -783,7 +783,7 @@ mod tests {
         encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         compression: Compression,
     ) -> (Runtime, RouterSink, mpsc::Receiver<Event>) {
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (source, address) = source(&mut rt);
         let (sink, health) = sink(address, encoding, compression, rt.executor());
         assert!(rt.block_on(health).is_ok());
@@ -993,7 +993,7 @@ mod tests {
     #[test]
     fn raw() {
         let message = "raw";
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (source, address) = source(&mut rt);
 
         assert_eq!(200, post(address, "services/collector/raw", message));
@@ -1016,7 +1016,7 @@ mod tests {
 
     #[test]
     fn no_data() {
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (_source, address) = source(&mut rt);
 
         assert_eq!(400, post(address, "services/collector/event", ""));
@@ -1024,7 +1024,7 @@ mod tests {
 
     #[test]
     fn invalid_token() {
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (_source, address) = source(&mut rt);
 
         assert_eq!(
@@ -1042,7 +1042,7 @@ mod tests {
     #[test]
     fn no_autorization() {
         let message = "no_autorization";
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (source, address) = source_with(&mut rt, None);
         let (sink, health) = sink(address, Encoding::Text, Compression::Gzip, rt.executor());
         assert!(rt.block_on(health).is_ok());
@@ -1058,7 +1058,7 @@ mod tests {
     #[test]
     fn partial() {
         let message = r#"{"event":"first"}{"event":"second""#;
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (source, address) = source(&mut rt);
 
         assert_eq!(400, post(address, "services/collector/event", message));
@@ -1081,7 +1081,7 @@ mod tests {
     #[test]
     fn default() {
         let message = r#"{"event":"first","source":"main"}{"event":"second"}{"event":"third","source":"secondary"}"#;
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (source, address) = source(&mut rt);
 
         assert_eq!(200, post(address, "services/collector/event", message));

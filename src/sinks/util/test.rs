@@ -1,5 +1,6 @@
 use crate::{
     runtime::Runtime,
+    test_util::runtime,
     topology::config::{SinkConfig, SinkContext},
 };
 use futures01::{sync::mpsc, Future, Sink, Stream};
@@ -11,7 +12,7 @@ where
     for<'a> T: Deserialize<'a> + SinkConfig,
 {
     let sink_config: T = toml::from_str(config)?;
-    let rt = crate::test_util::runtime();
+    let rt = runtime();
     let cx = SinkContext::new_test(rt.executor());
 
     Ok((sink_config, cx, rt))
