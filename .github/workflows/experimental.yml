@@ -13,6 +13,7 @@ env:
   VERBOSE: true
   ENVIRONMENT: true
   ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+  ENVIRONMENT_AUTOBUILD: false
 
 jobs:
   environment-prepare:

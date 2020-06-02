@@ -19,6 +19,7 @@ export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
 export CONTAINER_TOOL ?= docker
 export ENVIRONMENT ?= false
 export ENVIRONMENT_UPSTREAM = docker.pkg.github.com/timberio/vector/environment
+export ENVIRONMENT_AUTOBUILD = true
 
 # This variables can be used to override the target addresses of unit tests.
 # You can override them, just set it before your make call!
@@ -83,15 +84,23 @@ define ENVIRONMENT_COPY_ARTIFACTS
 	@$(CONTAINER_TOOL) rm -f vector-build-outputs
 endef
 
+
+ifeq ($(ENVIRONMENT_AUTOBUILD), true)
 define ENVIRONMENT_PREPARE
-	@echo "Preparing the environment. This may take a few minutes..."
-	@$(CONTAINER_TOOL) build \
+	@echo "Building the environment. (ENVIRONMENT_AUTOBUILD=true) This may take a few minutes..."
+	$(CONTAINER_TOOL) build \
 		$(if $(findstring true,$(VERBOSE)),,--quiet) \
 		--tag $(ENVIRONMENT_UPSTREAM) \
 		--file scripts/environment/Dockerfile \
 		.
-	@docker network create vector_default || true
+	@$(CONTAINER_TOOL) network create vector_default || true
 endef
+else
+define ENVIRONMENT_PREPARE
+	$(CONTAINER_TOOL) pull $(ENVIRONMENT_UPSTREAM)
+endef
+endif
+
 
 environment: ## Enter a full Vector dev shell in Docker, binding this folder to the container.
 	${ENVIRONMENT_PREPARE}
