@@ -92,9 +92,9 @@ module ConfigWriters
       end
     end
 
-    attr_reader :array, :block, :fields, :group, :key_file, :table_path, :values
+    attr_reader :array, :block, :fields, :group, :key_path, :table_path, :values
 
-    def initialize(fields, array: false, group: nil, key_file: [], table_path: [], values: nil, &block)
+    def initialize(fields, array: false, group: nil, key_path: [], table_path: [], values: nil, &block)
       if !fields.is_a?(Array)
         raise ArgumentError.new("fields must be an array")
       end
@@ -106,7 +106,7 @@ module ConfigWriters
       @array = array
       @fields = fields
       @group = group
-      @key_file = key_file
+      @key_path = key_path
       @table_path = table_path
       @block = block
       @values = values || {}
@@ -121,8 +121,8 @@ module ConfigWriters
     end
 
     private
-      def build_child_writer(fields, array: false, group: nil, key_file: [], table_path: [], values: nil)
-        self.class.new(fields, array: array, group: group, key_file: key_file, table_path: table_path, values: values, &block)
+      def build_child_writer(fields, array: false, group: nil, key_path: [], table_path: [], values: nil)
+        self.class.new(fields, array: array, group: group, key_path: key_path, table_path: table_path, values: values, &block)
       end
 
       def field_tags(field, default: true, enum: true, example: false, optionality: true, relevant_when: true, type: true, short: false, unit: true)
@@ -197,7 +197,7 @@ module ConfigWriters
       end
 
       def full_path
-        table_path + key_file
+        table_path + key_path
       end
   end
 end

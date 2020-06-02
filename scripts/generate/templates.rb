@@ -145,12 +145,12 @@ class Templates
     warnings(component.warnings)
   end
 
-  def config_example(options, array: false, group: nil, key_file: [], table_path: [], &block)
+  def config_example(options, array: false, group: nil, key_path: [], table_path: [], &block)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
     end
 
-    example = ConfigWriters::ExampleWriter.new(options, array: array, group: group, key_file: key_file, table_path: table_path, &block)
+    example = ConfigWriters::ExampleWriter.new(options, array: array, group: group, key_path: key_path, table_path: table_path, &block)
     example.to_toml
   end
 
