@@ -9,9 +9,10 @@ on:
         - master
 jobs:
   environment-prepare:
-    runs_on: ubuntu-latest
+    runs_on: ubuntu-20.04
     steps:
     - uses: actions/checkout@2
     - run: make environment-prepare
-    - run: docker push docker.pkg.github.com/timberio/vector/environment
+    - run: docker tag docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:$(git rev-parse --verify HEAD)
+    - run: docker push docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:$(git rev-parse --verify HEAD)
   
