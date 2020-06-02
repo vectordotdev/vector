@@ -1,4 +1,4 @@
-name: website
+name: markdown
 
 on:
   push:
