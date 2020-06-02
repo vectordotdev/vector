@@ -152,11 +152,7 @@ else
 	cargo test --no-default-features --features ${DEFAULT_FEATURES}
 endif
 
-<<<<<<< HEAD
 test-all: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
-=======
-test: test-behavior test-integration test-unit test-default## Runs all tests, unit, behaviorial, default, and integration.
->>>>>>> master
 
 test-behavior: ## Runs behaviorial tests
 ifeq ($(ENVIRONMENT), true)
@@ -290,7 +286,6 @@ test-shutdown: ## Runs shutdown tests
 
 ##@ Benching
 
-<<<<<<< HEAD
 bench: ## Run benchmarks in /benches (Use `ENVIRONMENT=true` to run in a container)
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
@@ -299,12 +294,6 @@ ifeq ($(ENVIRONMENT), true)
 else
 	cargo bench --no-default-features --features ${DEFAULT_FEATURES}
 endif
-=======
-test-default: ## Runs tests in default feature
-	$(RUN) test-default
-
-##@ Checking
->>>>>>> master
 
 ##@ Checking
 
