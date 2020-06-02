@@ -245,13 +245,17 @@ mod integration_tests {
     use std::time::Duration;
     use tokio01::util::FutureExt;
 
+    fn host_addr() -> String {
+        std::env::var("TEST_INTEGRATION_CLICKHOUSE_ADDR").unwrap_or(String::from("http://localhost:8123"))
+    }
+
     #[test]
     fn insert_events() {
         crate::test_util::trace_init();
         let mut rt = runtime();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = host_addr();
 
         let config = ClickhouseConfig {
             host: host.clone(),
@@ -292,7 +296,7 @@ mod integration_tests {
         let mut rt = runtime();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = host_addr();
         let mut encoding = EncodingConfigWithDefault::default();
         encoding.timestamp_format = Some(TimestampFormat::Unix);
 
@@ -353,7 +357,7 @@ mod integration_tests {
         let mut rt = runtime();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = host_addr();
 
         let config: ClickhouseConfig = toml::from_str(&format!(
             r#"
@@ -411,7 +415,7 @@ compression = "none"
         let mut rt = runtime();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = host_addr();
 
         let config = ClickhouseConfig {
             host: host.clone(),

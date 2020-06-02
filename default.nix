@@ -4,12 +4,16 @@ pkgs.buildEnv {
   name = "vector-env";
   paths = with pkgs; [
       git
+      ping
+      curl
       bash
+      nix
       direnv
       binutils
       stdenv
       bashInteractive
       docker
+      docker-compose
       cacert
       gcc
       cmake
@@ -18,7 +22,8 @@ pkgs.buildEnv {
       openssl
       protobuf
       rdkafka
-      bundler
+      ruby_2_7
+      shellcheck
       docker
       (glibcLocales.override {
         locales = ["en_US.UTF-8"];
@@ -41,5 +46,9 @@ pkgs.buildEnv {
         SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
         GIT_SSL_CAINFO = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
         CURL_CA_BUNDLE = "${pkgs.cacert}/etc/ca-bundle.crt";
+        CARGO_TERM_COLOR = "always";
+        AWS_ACCESS_KEY_ID = "dummy";
+        AWS_SECRET_ACCESS_KEY = "dummy";
+        RUST_BACKTRACE = "full";
     };
 }

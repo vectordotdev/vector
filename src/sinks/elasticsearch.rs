@@ -520,13 +520,21 @@ mod integration_tests {
     use std::fs::File;
     use std::io::Read;
 
+    fn comm_addr(tls: bool) -> String {
+        if tls {
+            std::env::var("TEST_INTEGRATION_ELASTICSEARCH_TLS_ADDR_COMM").unwrap_or(String::from("http://localhost:9201"))
+        } else {
+            std::env::var("TEST_INTEGRATION_ELASTICSEARCH_ADDR_COMM").unwrap_or(String::from("http://localhost:9200"))
+        }
+    }
+
     #[test]
     fn structures_events_correctly() {
         let mut rt = runtime();
 
         let index = gen_index();
         let config = ElasticSearchConfig {
-            host: "http://localhost:9200".into(),
+            host: comm_addr(false).into(),
             index: Some(index.clone()),
             doc_type: Some("log_lines".into()),
             id_key: Some("my_id".into()),
@@ -580,7 +588,7 @@ mod integration_tests {
     fn insert_events_over_http() {
         run_insert_tests(
             ElasticSearchConfig {
-                host: "http://localhost:9200".into(),
+                host: comm_addr(false).into(),
                 doc_type: Some("log_lines".into()),
                 compression: Compression::None,
                 ..config()
@@ -593,7 +601,7 @@ mod integration_tests {
     fn insert_events_over_https() {
         run_insert_tests(
             ElasticSearchConfig {
-                host: "https://localhost:9201".into(),
+                host: comm_addr(true).into(),
                 doc_type: Some("log_lines".into()),
                 compression: Compression::None,
                 tls: Some(TlsOptions {
@@ -622,7 +630,7 @@ mod integration_tests {
     fn insert_events_with_failure() {
         run_insert_tests(
             ElasticSearchConfig {
-                host: "http://localhost:9200".into(),
+                host: comm_addr(false).into(),
                 doc_type: Some("log_lines".into()),
                 compression: Compression::None,
                 ..config()

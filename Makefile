@@ -14,12 +14,24 @@ else
     export DEFAULT_FEATURES = default
 endif
 
+export AUTOSPAWN ?= true
 export VERBOSE ?= false
 export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
 export CONTAINER_TOOL ?= docker
 export ENVIRONMENT ?= false
 export ENVIRONMENT_UPSTREAM = docker.pkg.github.com/timberio/vector/environment
-export USE_CONTAINER ?= $(CONTAINER_TOOL) # Deprecated
+# This variables can be used to override the target addresses of unit tests.
+# You can override them, just set it before your make call!
+export TEST_INTEGRATION_AWS_CLOUDWATCH_ADDR ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),vector_mockwatchlogs_1.vector_default:6000,0.0.0.0:6000)
+export TEST_INTEGRATION_CLICKHOUSE_ADDR ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_clickhouse_1.vector_default:8123,http://0.0.0.0:8123)
+export TEST_INTEGRATION_ELASTICSEARCH_ADDR_COMM ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_elasticsearch_1.vector_default:9200,http://0.0.0.0:9200)
+export TEST_INTEGRATION_ELASTICSEARCH_ADDR_HTTP ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_elasticsearch_1.vector_default:9300,http://0.0.0.0:9300)
+export TEST_INTEGRATION_ELASTICSEARCH_TLS_ADDR_COMM ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),https://vector_elasticsearch-tls_1.vector_default:9201,https://0.0.0.0:9201)
+export TEST_INTEGRATION_ELASTICSEARCH_TLS_ADDR_HTTP ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),https://vector_elasticsearch-tls_1.vector_default:9301,https://0.0.0.0:9301)
+
+ # Deprecated.
+export USE_CONTAINER ?= $(CONTAINER_TOOL)
+
 
 help:
 	@echo "                                      __   __  __"
@@ -44,6 +56,8 @@ define ENVIRONMENT_EXEC
 			--tty \
 			--init \
 			--interactive \
+			--env INSIDE_ENVIRONMENT=true \
+			--network vector_default \
 			--mount type=bind,source=${PWD},target=/vector \
 			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
 			--mount type=volume,source=vector-target,target=/vector/target \
@@ -77,6 +91,7 @@ define ENVIRONMENT_PREPARE
 		--build-arg BASEIMAGE_TAG=2.3.4 \
 		--file scripts/environment/Dockerfile \
 		.
+	@docker network create vector_default || true
 endef
 
 environment: ## Enter a full Vector dev shell in Docker, binding this folder to the container.
@@ -139,47 +154,128 @@ endif
 
 test-all: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
 
-test-behavior: build ## Runs behaviorial tests
-	$(RUN) test-behavior
+test-behavior: ## Runs behaviorial tests
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make test-behavior
+	${ENVIRONMENT_COPY_ARTIFACTS}
+else
+	cargo run -- test tests/behavior/**/*.toml
+endif
 
 test-integration: ## Runs all integration tests
-	$(RUN) test-integration
+test-integration: test-integration-aws test-integration-clickhouse test-integration-docker test-integration-elasticsearch
+test-integration: test-integration-gcp test-integration-influxdb test-integration-kafka test-integration-loki
+test-integration: test-integration-pulsar test-integration-splunk
 
 test-integration-aws: ## Runs Clickhouse integration tests
-	$(RUN) test-integration-aws
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make test-integration-aws
+else
+	docker-compose up -d dependencies-aws
+	cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_logs:: 
+	cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_metrics::
+	cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_firehose::
+	cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_streams::
+	cargo test --no-default-features --features aws-integration-tests ::aws_s3::
+endif
 
-test-integration-clickhouse: ## Runs Clickhouse integration tests
-	$(RUN) test-integration-clickhouse
+test-integration-clickhouse: ## Runs Clickhouse integration testsbv
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make test-integration-clickhouse
+else
+	docker-compose up -d dependencies-clickhouse
+	env | sort
+	cargo test --no-default-features --features clickhouse-integration-tests ::clickhouse::
+endif
 
 test-integration-docker: ## Runs Docker integration tests
-	$(RUN) test-integration-docker
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make test-integration-docker
+else
+	cargo test --no-default-features --features docker-integration-tests ::docker::
+endif
 
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
-	$(RUN) test-integration-elasticsearch
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make test-integration-elasticsearch
+else 
+	if $(AUTOSPAWN); then \
+		docker-compose up -d dependencies-elasticsearch; \
+	fi
+	env | sort
+	cargo test --no-default-features --features es-integration-tests ::elasticsearch::
+endif
 
 test-integration-gcp: ## Runs GCP integration tests
-	$(RUN) test-integration-gcp
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make test-integration-gcp
+else
+	if $(AUTOSPAWN); then \
+		docker-compose up -d dependencies-gcp; \
+	fi
+	cargo test --no-default-features --features gcp-integration-tests ::gcp::
+endif
 
 test-integration-influxdb: ## Runs Kafka integration tests
-	$(RUN) test-integration-influxdb
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make test-integration-influxdb
+else
+	if $(AUTOSPAWN); then \
+		docker-compose up -d dependencies-influxdb; \
+	fi
+	cargo test --no-default-features --features influxdb-integration-tests ::influxdb::integration_tests::
+endif
 
 test-integration-kafka: ## Runs Kafka integration tests
-	$(RUN) test-integration-kafka
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make test-integration-kafka
+else
+	if $(AUTOSPAWN); then \
+		docker-compose up -d dependencies-kafka; \
+	fi
+	cargo test --no-default-features --features kafka-integration-tests ::kafka::
+endif
 
 test-integration-loki: ## Runs Loki integration tests (Use `ENVIRONMENT=true` to run in a container)
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-loki
 else
-	docker-compose up -d dependencies-loki
-	cargo test --no-default-features --features loki-integration-tests
+	if $(AUTOSPAWN); then \
+		docker-compose up -d dependencies-loki; \
+	fi
+	cargo test --no-default-features --features loki-integration-tests ::loki::
 endif
 
 test-integration-pulsar: ## Runs Pulsar integration tests
-	$(RUN) test-integration-pulsar
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make test-integration-pulsar
+else
+	if $(AUTOSPAWN); then \
+		docker-compose up -d dependencies-pulsar; \
+	fi
+	cargo test --no-default-features --features pulsar-integration-tests ::pulsar::
+endif
 
 test-integration-splunk: ## Runs Splunk integration tests
-	$(RUN) test-integration-splunk
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make test-integration-splunk
+else
+	if $(AUTOSPAWN); then \
+		docker-compose up -d dependencies-splunk; \
+	fi
+	cargo test --no-default-features --features splunk-integration-tests ::splunk::
+endif
 
 PACKAGE_DEB_USE_CONTAINER ?= "$(USE_CONTAINER)"
 test-integration-kubernetes: ## Runs Kubernetes integration tests
@@ -223,19 +319,46 @@ else
 endif
 
 check-markdown: ## Check that markdown is styled properly
-	$(RUN) check-markdown
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make check-markdown
+else
+	# TODO: Install markdownlint
+	markdownlint .
+endif
 
 check-generate: ## Check that no files are pending generation
-	$(RUN) check-generate
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make check-generate
+else
+	./scripts/check-generate.sh
+endif
+
 
 check-version: ## Check that Vector's version is correct accounting for recent changes
-	$(RUN) check-version
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make check-version
+else
+	./scripts/check-version.sh
+endif
 
-check-examples: build ## Check that the config/exmaples files are valid
-	$(RUN) check-examples
+check-examples: ## Check that the config/exmaples files are valid
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make check-examples
+else
+	cargo run -- validate --topology --deny-warnings ./config/examples/*.toml
+endif
 
 check-scripts: ## Check that scipts do not have common mistakes
-	$(RUN) check-scripts
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make check-scripts
+else
+	./scripts/check-scripts.sh
+endif
 
 ##@ Packaging
 
