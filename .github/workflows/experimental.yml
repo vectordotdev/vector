@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+  # TODO: We should never do the docker push on a PR.
   pull_request:
     branches:
         - master
@@ -19,6 +20,25 @@ jobs:
     - uses: actions/checkout@v2
     - run: make environment-prepare
     - run: docker tag docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:$(git rev-parse --verify HEAD)
-    - run: docker push docker.pkg.github.com/timberio/vector/environment:$(git rev-parse --verify HEAD)
+    - run: docker push docker.pkg.github.com/timberio/vector/environment:${{ secrets.GITHUB_SHA }}
     - run: docker push docker.pkg.github.com/timberio/vector/environment:latest
   
+  test:
+    needs: environment-prepare
+    runs-on: ubuntu-latest
+    container: docker.pkg.github.com/timberio/vector/environment:${{ secrets.GITHUB_SHA }}
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        path: /vector
+    - run: make test
+
+  bench:
+    needs: environment-prepare
+    runs-on: ubuntu-latest
+    container: docker.pkg.github.com/timberio/vector/environment:${{ secrets.GITHUB_SHA }}
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        path: /vector
+    - run: make bench
