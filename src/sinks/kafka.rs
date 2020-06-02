@@ -360,7 +360,7 @@ mod integration_test {
             Some(KafkaTlsConfig {
                 enabled: Some(true),
                 options: TlsOptions {
-                    ca_path: Some(TEST_CA.into()),
+                    ca_file: Some(TEST_CA.into()),
                     ..Default::default()
                 },
             }),
@@ -375,10 +375,10 @@ mod integration_test {
             Some(KafkaTlsConfig {
                 enabled: Some(true),
                 options: TlsOptions {
-                    ca_path: Some(TEST_CA.into()),
+                    ca_file: Some(TEST_CA.into()),
                     // Dummy key, not actually checked by server
-                    crt_path: Some(TEST_CRT.into()),
-                    key_path: Some(TEST_KEY.into()),
+                    crt_file: Some(TEST_CRT.into()),
+                    key_file: Some(TEST_KEY.into()),
                     ..Default::default()
                 },
             }),

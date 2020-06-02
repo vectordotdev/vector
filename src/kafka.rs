@@ -35,13 +35,13 @@ impl KafkaTlsConfig {
             "security.protocol",
             if self.enabled() { "ssl" } else { "plaintext" },
         );
-        if let Some(ref path) = self.options.ca_path {
+        if let Some(ref path) = self.options.ca_file {
             client.set("ssl.ca.location", pathbuf_to_string(&path)?);
         }
-        if let Some(ref path) = self.options.crt_path {
+        if let Some(ref path) = self.options.crt_file {
             client.set("ssl.certificate.location", pathbuf_to_string(&path)?);
         }
-        if let Some(ref path) = self.options.key_path {
+        if let Some(ref path) = self.options.key_file {
             client.set("ssl.key.location", pathbuf_to_string(&path)?);
         }
         if let Some(ref pass) = self.options.key_pass {

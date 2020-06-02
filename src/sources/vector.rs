@@ -177,8 +177,8 @@ mod test {
                 Some(TlsConfig {
                     enabled: Some(true),
                     options: TlsOptions {
-                        crt_path: Some("tests/data/localhost.crt".into()),
-                        key_path: Some("tests/data/localhost.key".into()),
+                        crt_file: Some("tests/data/localhost.crt".into()),
+                        key_file: Some("tests/data/localhost.key".into()),
                         ..Default::default()
                     },
                 }),

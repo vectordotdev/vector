@@ -30,9 +30,12 @@ pub struct TlsConfig {
 pub struct TlsOptions {
     pub verify_certificate: Option<bool>,
     pub verify_hostname: Option<bool>,
-    pub ca_path: Option<PathBuf>,
-    pub crt_path: Option<PathBuf>,
-    pub key_path: Option<PathBuf>,
+    #[serde(alias = "ca_path")]
+    pub ca_file: Option<PathBuf>,
+    #[serde(alias = "crt_path")]
+    pub crt_file: Option<PathBuf>,
+    #[serde(alias = "key_path")]
+    pub key_file: Option<PathBuf>,
     pub key_pass: Option<String>,
 }
 
@@ -144,10 +147,10 @@ impl TlsSettings {
 
 impl TlsOptions {
     fn load_authorities(&self) -> Result<Vec<X509>> {
-        match &self.ca_path {
+        match &self.ca_file {
             None => Ok(vec![]),
             Some(filename) => {
-                let data = open_read(filename, "certificate")?;
+                let (data, filename) = open_read(filename, "certificate")?;
                 der_or_pem(
                     data,
                     |der| X509::from_der(&der).map(|x509| vec![x509]),
@@ -163,26 +166,29 @@ impl TlsOptions {
     }
 
     fn load_identity(&self) -> Result<Option<IdentityStore>> {
-        match (&self.crt_path, &self.key_path) {
+        match (&self.crt_file, &self.key_file) {
             (None, Some(_)) => Err(TlsError::MissingCrtKeyFile.into()),
             (None, None) => Ok(None),
-            (Some(crt_path), _) => der_or_pem(
-                open_read(crt_path, "certificate")?,
-                |der| self.parse_pkcs12_identity(der),
-                |pem| self.parse_pem_identity(pem, crt_path),
-            ),
+            (Some(filename), _) => {
+                let (data, filename) = open_read(filename, "certificate")?;
+                der_or_pem(
+                    data,
+                    |der| self.parse_pkcs12_identity(der),
+                    |pem| self.parse_pem_identity(pem, &filename),
+                )
+            }
         }
     }
 
     /// Parse identity from a PEM encoded certificate + key pair of files
-    fn parse_pem_identity(&self, pem: String, crt_path: &PathBuf) -> Result<Option<IdentityStore>> {
-        match &self.key_path {
+    fn parse_pem_identity(&self, pem: String, crt_file: &PathBuf) -> Result<Option<IdentityStore>> {
+        match &self.key_file {
             None => Err(TlsError::MissingKey),
-            Some(key_path) => {
-                let name = crt_path.to_string_lossy().to_string();
+            Some(key_file) => {
+                let name = crt_file.to_string_lossy().to_string();
                 let crt = X509::from_pem(pem.as_bytes())
-                    .with_context(|| X509ParseError { filename: crt_path })?;
-                let key = load_key(&key_path, &self.key_pass)?;
+                    .with_context(|| X509ParseError { filename: crt_file })?;
+                let key = load_key(&key_file, &self.key_pass)?;
                 let pkcs12 = Pkcs12::builder()
                     .build("", &name, &key, &crt)
                     .context(Pkcs12Error)?;
@@ -342,7 +348,7 @@ impl From<TlsSettings> for MaybeTlsSettings {
 
 /// Load a private key from a named file
 fn load_key(filename: &Path, pass_phrase: &Option<String>) -> Result<PKey<Private>> {
-    let data = open_read(filename, "key")?;
+    let (data, filename) = open_read(filename, "key")?;
     match pass_phrase {
         None => der_or_pem(
             data,
@@ -374,7 +380,16 @@ fn der_or_pem<T>(data: Vec<u8>, der_fn: impl Fn(Vec<u8>) -> T, pem_fn: impl Fn(S
     }
 }
 
-fn open_read(filename: &Path, note: &'static str) -> Result<Vec<u8>> {
+/// Open the named file and read its entire contents into memory. If the
+/// file "name" contains a PEM start marker, it is assumed to contain
+/// inline data and is used directly instead of opening a file.
+fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> {
+    if let Some(filename) = filename.to_str() {
+        if let Some(_) = filename.find(PEM_START_MARKER) {
+            return Ok((Vec::from(filename), "inline text".into()));
+        }
+    }
+
     let mut text = Vec::<u8>::new();
 
     File::open(filename)
@@ -382,21 +397,23 @@ fn open_read(filename: &Path, note: &'static str) -> Result<Vec<u8>> {
         .read_to_end(&mut text)
         .with_context(|| FileReadFailed { note, filename })?;
 
-    Ok(text)
+    Ok((text, filename.into()))
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    const TEST_PKCS12: &str = "tests/data/localhost.p12";
-    const TEST_PEM_CRT: &str = "tests/data/localhost.crt";
-    const TEST_PEM_KEY: &str = "tests/data/localhost.key";
+    const TEST_PKCS12_PATH: &str = "tests/data/localhost.p12";
+    const TEST_PEM_CRT_PATH: &str = "tests/data/localhost.crt";
+    const TEST_PEM_CRT_BYTES: &[u8] = include_bytes!("../../tests/data/localhost.crt");
+    const TEST_PEM_KEY_PATH: &str = "tests/data/localhost.key";
+    const TEST_PEM_KEY_BYTES: &[u8] = include_bytes!("../../tests/data/localhost.key");
 
     #[test]
     fn from_options_pkcs12() {
         let options = TlsOptions {
-            crt_path: Some(TEST_PKCS12.into()),
+            crt_file: Some(TEST_PKCS12_PATH.into()),
             key_pass: Some("NOPASS".into()),
             ..Default::default()
         };
@@ -409,8 +426,23 @@ mod test {
     #[test]
     fn from_options_pem() {
         let options = TlsOptions {
-            crt_path: Some(TEST_PEM_CRT.into()),
-            key_path: Some(TEST_PEM_KEY.into()),
+            crt_file: Some(TEST_PEM_CRT_PATH.into()),
+            key_file: Some(TEST_PEM_KEY_PATH.into()),
+            ..Default::default()
+        };
+        let settings =
+            TlsSettings::from_options(&Some(options)).expect("Failed to load PEM certificate");
+        assert!(settings.identity.is_some());
+        assert_eq!(settings.authorities.len(), 0);
+    }
+
+    #[test]
+    fn from_options_inline_pem() {
+        let crt = String::from_utf8(TEST_PEM_CRT_BYTES.to_vec()).unwrap();
+        let key = String::from_utf8(TEST_PEM_KEY_BYTES.to_vec()).unwrap();
+        let options = TlsOptions {
+            crt_file: Some(crt.into()),
+            key_file: Some(key.into()),
             ..Default::default()
         };
         let settings =
@@ -422,7 +454,21 @@ mod test {
     #[test]
     fn from_options_ca() {
         let options = TlsOptions {
-            ca_path: Some("tests/data/Vector_CA.crt".into()),
+            ca_file: Some("tests/data/Vector_CA.crt".into()),
+            ..Default::default()
+        };
+        let settings = TlsSettings::from_options(&Some(options))
+            .expect("Failed to load authority certificate");
+        assert!(settings.identity.is_none());
+        assert_eq!(settings.authorities.len(), 1);
+    }
+
+    #[test]
+    fn from_options_inline_ca() {
+        let ca =
+            String::from_utf8(include_bytes!("../../tests/data/Vector_CA.crt").to_vec()).unwrap();
+        let options = TlsOptions {
+            ca_file: Some(ca.into()),
             ..Default::default()
         };
         let settings = TlsSettings::from_options(&Some(options))
@@ -434,7 +480,7 @@ mod test {
     #[test]
     fn from_options_multi_ca() {
         let options = TlsOptions {
-            ca_path: Some("tests/data/Multi_CA.crt".into()),
+            ca_file: Some("tests/data/Multi_CA.crt".into()),
             ..Default::default()
         };
         let settings = TlsSettings::from_options(&Some(options))
@@ -453,7 +499,7 @@ mod test {
     #[test]
     fn from_options_bad_certificate() {
         let options = TlsOptions {
-            key_path: Some(TEST_PEM_KEY.into()),
+            key_file: Some(TEST_PEM_KEY_PATH.into()),
             ..Default::default()
         };
         let error = TlsSettings::from_options(&Some(options))
@@ -461,7 +507,7 @@ mod test {
         assert!(matches!(error, TlsError::MissingCrtKeyFile));
 
         let options = TlsOptions {
-            crt_path: Some(TEST_PEM_CRT.into()),
+            crt_file: Some(TEST_PEM_CRT_PATH.into()),
             ..Default::default()
         };
         let _error = TlsSettings::from_options(&Some(options))
@@ -514,8 +560,8 @@ mod test {
         TlsConfig {
             enabled,
             options: TlsOptions {
-                crt_path: and_some(set_crt, TEST_PEM_CRT.into()),
-                key_path: and_some(set_key, TEST_PEM_KEY.into()),
+                crt_file: and_some(set_crt, TEST_PEM_CRT_PATH.into()),
+                key_file: and_some(set_key, TEST_PEM_KEY_PATH.into()),
                 ..Default::default()
             },
         }

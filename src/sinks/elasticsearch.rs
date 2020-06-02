@@ -597,7 +597,7 @@ mod integration_tests {
                 doc_type: Some("log_lines".into()),
                 compression: Compression::None,
                 tls: Some(TlsOptions {
-                    ca_path: Some("tests/data/Vector_CA.crt".into()),
+                    ca_file: Some("tests/data/Vector_CA.crt".into()),
                     ..Default::default()
                 }),
                 ..config()
