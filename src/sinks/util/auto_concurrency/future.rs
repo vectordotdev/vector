@@ -1,6 +1,7 @@
 //! Future types
 //!
 use super::controller::Controller;
+use crate::sinks::util::retries2::RetryLogic;
 use futures::ready;
 use pin_project::pin_project;
 use std::time::Instant;
@@ -39,16 +40,17 @@ impl<F, L> ResponseFuture<F, L> {
     }
 }
 
-impl<F, L, T, E> Future for ResponseFuture<F, L>
+impl<F, L> Future for ResponseFuture<F, L>
 where
-    F: Future<Output = Result<T, E>>,
+    F: Future<Output = Result<L::Response, L::Error>>,
+    L: RetryLogic,
 {
-    type Output = Result<T, E>;
+    type Output = Result<L::Response, L::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let future = self.project();
         let output = ready!(future.inner.poll(cx));
-        future.controller.adjust_to_response(*future.start);
+        future.controller.adjust_to_response(*future.start, &output);
         Poll::Ready(output)
     }
 }
