@@ -4,8 +4,9 @@ on:
   push:
     branches:
       - master
-    pull_request: {}
-
+  pull_request:
+    branches:
+        - master
 jobs:
   environment-prepare:
     runs_on: ubuntu-latest
