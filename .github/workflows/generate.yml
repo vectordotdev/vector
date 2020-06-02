@@ -1,4 +1,4 @@
-name: markdown
+name: generate
 
 on:
   push:
@@ -7,25 +7,27 @@ on:
     paths:
       - "**/*.md.erb"
       - ".meta/**"
+      - "scripts/Gemfile.lock"
       - "scripts/generate.rb"
-      - "website/**"
+      - "scripts/generate/**"
+      - "scripts/setup.rb"
+      - "scripts/util.rb"
+      - "scripts/util/**"
 
   pull_request:
     paths:
       - "**/*.md.erb"
       - ".meta/**"
+      - "scripts/Gemfile.lock"
       - "scripts/generate.rb"
-      - "website/**"
+      - "scripts/generate/**"
+      - "scripts/setup.rb"
+      - "scripts/util.rb"
+      - "scripts/util/**"
 
 jobs:
-  check-generate:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: make check-generate
-
-  check-blog:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-blog
