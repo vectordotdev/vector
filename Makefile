@@ -53,7 +53,7 @@ define ENVIRONMENT_EXEC
 	@$(CONTAINER_TOOL) run \
 			--name vector-environment \
 			--rm \
-			--tty \
+			$(if $(findstring true,$(ENVIRONMENT_TTY)),,--tty) \
 			--init \
 			--interactive \
 			--env INSIDE_ENVIRONMENT=true \
@@ -95,6 +95,7 @@ endef
 
 environment: ## Enter a full Vector dev shell in Docker, binding this folder to the container.
 	${ENVIRONMENT_PREPARE}
+	@export ENVIRONMENT_TTY=true
 	${ENVIRONMENT_EXEC}
 
 environment-prepare: ## Prepare the Vector dev env.
