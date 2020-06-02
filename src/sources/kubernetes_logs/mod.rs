@@ -161,6 +161,7 @@ impl Source {
             Some(field_selector),
             Some(label_selector),
             std::time::Duration::from_secs(1),
+            Some(std::time::Duration::from_secs(60)),
         );
         let reflector_process = reflector.run();
 

@@ -4,7 +4,10 @@ use super::{
     resource_version,
     watcher::{self, Watcher},
 };
-use futures::{pin_mut, stream::StreamExt};
+use futures::{
+    pin_mut,
+    stream::{Stream, StreamExt},
+};
 use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
     Metadata, WatchOptional, WatchResponse,
@@ -12,9 +15,12 @@ use k8s_openapi::{
 use snafu::Snafu;
 use std::convert::Infallible;
 use std::time::Duration;
-use tokio::time::delay_for;
+use tokio::{
+    select,
+    time::{delay_for, delay_until},
+};
 
-use super::state;
+use super::{delayed_delete::DelayedDelete, state};
 
 /// Watches remote Kubernetes resources and maintains a local representation of
 /// the remote state. "Reflects" the remote state locally.
@@ -33,6 +39,7 @@ where
     label_selector: Option<String>,
     resource_version: resource_version::State,
     pause_between_requests: Duration,
+    delayed_delete: Option<DelayedDelete<<W as Watcher>::Object>>,
 }
 
 impl<W, S> Reflector<W, S>
@@ -48,8 +55,10 @@ where
         field_selector: Option<String>,
         label_selector: Option<String>,
         pause_between_requests: Duration,
+        delay_deletes_for: Option<Duration>,
     ) -> Self {
         let resource_version = resource_version::State::new();
+        let delayed_delete = delay_deletes_for.map(DelayedDelete::new);
         Self {
             watcher,
             state_writer,
@@ -57,6 +66,7 @@ where
             field_selector,
             resource_version,
             pause_between_requests,
+            delayed_delete,
         }
     }
 }
@@ -87,6 +97,9 @@ where
                     // begin arriving, reducing the time durig which the state
                     // has no data.
                     self.resource_version.reset();
+                    if let Some(ref mut delayed_delete) = self.delayed_delete {
+                        delayed_delete.clear();
+                    }
                     self.state_writer.resync();
                     continue;
                 }
@@ -98,46 +111,40 @@ where
             };
 
             pin_mut!(stream);
-            while let Some(response) = stream.next().await {
-                // Any streaming error means the protocol is in an unxpected
-                // state. This is considered a fatal error, do not attempt
-                // to retry and just quit.
-                let response = response.map_err(|source| Error::Streaming { source })?;
-
-                // Unpack the event.
-                let event = match response {
-                    WatchResponse::Ok(event) => event,
-                    WatchResponse::Other(_) => {
-                        // Even though we could parse the response, we didn't
-                        // get the data we expected on the wire.
-                        // According to the rules, we just ignore the unknown
-                        // responses. This may be a newly added piece of data
-                        // our code doesn't know of.
-                        // TODO: add more details on the data here if we
-                        // encounter these messages in practice.
-                        warn!(message = "got unexpected data in the watch response");
-                        continue;
-                    }
-                };
-
-                // Prepare a resource version candidate so we can update (aka
-                // commit) it later.
-                let resource_version_candidate =
-                    match resource_version::Candidate::from_watch_event(&event) {
-                        Some(val) => val,
-                        None => {
-                            // This event doesn't have a resource version, this means
-                            // it's not something we care about.
+            loop {
+                // Obtain an value from the watch stream.
+                let val = if let Some(ref mut delayed_delete) = self.delayed_delete {
+                    // If delayed delete is requested, we perform the delayed
+                    // deletions concurrently with reading items from the watch
+                    // responses stream.
+                    let delayed_delete_deadline = delayed_delete.next_deadline();
+                    select! {
+                        // If we get a delayted delete deadline - process the
+                        // delayed deletes and restart the loop.
+                        _ = async { delay_until(delayed_delete_deadline.unwrap().into()).await }, if delayed_delete_deadline.is_some() => {
+                            delayed_delete.perform(&mut self.state_writer);
                             continue;
                         }
-                    };
+                        // If we got a value from the watch responses stream -
+                        // just pass it outside.
+                        val = stream.next() => val,
+                    }
+                } else {
+                    // Delayed deletes aren't requested, so just wait for the
+                    // next value and pass it outside.
+                    stream.next().await
+                };
 
-                // Process the event.
-                self.process_event(event);
-
-                // Record the resourse version for this event, so when we resume
-                // it won't be redelivered.
-                self.resource_version.update(resource_version_candidate);
+                if let Some(item) = val {
+                    // A new item arrived from the watch response stream
+                    // first - process it.
+                    self.process_stream_item(item)?;
+                } else {
+                    // Response stream has ended.
+                    // Break the watch reading loop so the flow can
+                    // continue an issue a new watch request.
+                    break;
+                }
             }
 
             // For the next pause duration we won't get any updates.
@@ -163,6 +170,54 @@ where
         Ok(stream)
     }
 
+    /// Process an item from the watch response stream.
+    fn process_stream_item(
+        &mut self,
+        item: <<W as Watcher>::Stream as Stream>::Item,
+    ) -> Result<(), Error<<W as Watcher>::InvocationError, <W as Watcher>::StreamError>> {
+        // Any streaming error means the protocol is in an unxpected
+        // state. This is considered a fatal error, do not attempt
+        // to retry and just quit.
+        let response = item.map_err(|source| Error::Streaming { source })?;
+
+        // Unpack the event.
+        let event = match response {
+            WatchResponse::Ok(event) => event,
+            WatchResponse::Other(_) => {
+                // Even though we could parse the response, we didn't
+                // get the data we expected on the wire.
+                // According to the rules, we just ignore the unknown
+                // responses. This may be a newly added piece of data
+                // our code doesn't know of.
+                // TODO: add more details on the data here if we
+                // encounter these messages in practice.
+                warn!(message = "got unexpected data in the watch response");
+                return Ok(());
+            }
+        };
+
+        // Prepare a resource version candidate so we can update (aka commit) it
+        // later.
+        let resource_version_candidate = match resource_version::Candidate::from_watch_event(&event)
+        {
+            Some(val) => val,
+            None => {
+                // This event doesn't have a resource version, this means
+                // it's not something we care about.
+                return Ok(());
+            }
+        };
+
+        // Process the event.
+        self.process_event(event);
+
+        // Record the resourse version for this event, so when we resume
+        // it won't be redelivered.
+        self.resource_version.update(resource_version_candidate);
+
+        Ok(())
+    }
+
     /// Translate received watch event to the state update.
     fn process_event(&mut self, event: WatchEvent<<W as Watcher>::Object>) {
         match event {
@@ -172,7 +227,11 @@ where
             }
             WatchEvent::Deleted(object) => {
                 trace!(message = "got an object event", event = "deleted");
-                self.state_writer.delete(object);
+                if let Some(ref mut delayed_delete) = self.delayed_delete {
+                    delayed_delete.schedule_delete(object);
+                } else {
+                    self.state_writer.delete(object);
+                }
             }
             WatchEvent::Modified(object) => {
                 trace!(message = "got an object event", event = "modified");
@@ -300,8 +359,14 @@ mod tests {
 
         // Prepare watcher and reflector.
         let watcher: MockWatcher<Pod, _> = MockWatcher::new(mock_logic);
-        let mut reflector =
-            Reflector::new(watcher, state_writer, None, None, Duration::from_secs(1));
+        let mut reflector = Reflector::new(
+            watcher,
+            state_writer,
+            None,
+            None,
+            Duration::from_secs(1),
+            None,
+        );
 
         // Acquire an async context to run the relector.
         test_util::block_on_std(async move {
@@ -368,8 +433,14 @@ mod tests {
 
         // Prepare watcher and reflector.
         let watcher: MockWatcher<Pod, _> = MockWatcher::new(mock_logic);
-        let mut reflector =
-            Reflector::new(watcher, state_writer, None, None, Duration::from_secs(1));
+        let mut reflector = Reflector::new(
+            watcher,
+            state_writer,
+            None,
+            None,
+            Duration::from_secs(1),
+            None,
+        );
 
         // Acquire an async context to run the relector.
         test_util::block_on_std(async move {
@@ -519,6 +590,7 @@ mod tests {
             Some("fields".to_owned()),
             Some("labels".to_owned()),
             Duration::from_secs(1),
+            Some(Duration::from_secs(60)),
         );
 
         // Acquire an async context to run the relector.
