@@ -153,6 +153,7 @@ impl Source {
 
         let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
         let (state_reader, state_writer) = evmap::new();
+        let state_writer = k8s::state::evmap::Writer::new(state_writer);
 
         let mut reflector = k8s::reflector::Reflector::new(
             watcher,

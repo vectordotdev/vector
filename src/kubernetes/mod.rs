@@ -27,6 +27,7 @@ pub mod mock_watcher;
 pub mod multi_response_decoder;
 pub mod reflector;
 pub mod resource_version;
+pub mod state;
 pub mod stream;
 pub mod watch_request_builder;
 pub mod watcher;

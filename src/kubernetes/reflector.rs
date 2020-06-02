@@ -1,11 +1,9 @@
 //! Watch and cache the remote Kubernetes API resources.
 
 use super::{
-    hash_value::HashValue,
     resource_version,
     watcher::{self, Watcher},
 };
-use evmap10::WriteHandle;
 use futures::{pin_mut, stream::StreamExt};
 use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
@@ -16,33 +14,37 @@ use std::convert::Infallible;
 use std::time::Duration;
 use tokio::time::delay_for;
 
+use super::state;
+
 /// Watches remote Kubernetes resources and maintains a local representation of
 /// the remote state. "Reflects" the remote state locally.
 ///
 /// Does not expose evented API, but keeps track of the resource versions and
 /// will automatically resume on desync.
-pub struct Reflector<W>
+pub struct Reflector<W, S>
 where
     W: Watcher,
     <W as Watcher>::Object: Metadata<Ty = ObjectMeta>,
+    S: state::Write<Item = <W as Watcher>::Object>,
 {
     watcher: W,
-    state_writer: WriteHandle<String, Value<<W as Watcher>::Object>>,
+    state_writer: S,
     field_selector: Option<String>,
     label_selector: Option<String>,
     resource_version: resource_version::State,
     pause_between_requests: Duration,
 }
 
-impl<W> Reflector<W>
+impl<W, S> Reflector<W, S>
 where
     W: Watcher,
     <W as Watcher>::Object: Metadata<Ty = ObjectMeta>,
+    S: state::Write<Item = <W as Watcher>::Object>,
 {
     /// Create a new [`Cache`].
     pub fn new(
         watcher: W,
-        state_writer: WriteHandle<String, Value<<W as Watcher>::Object>>,
+        state_writer: S,
         field_selector: Option<String>,
         label_selector: Option<String>,
         pause_between_requests: Duration,
@@ -59,24 +61,19 @@ where
     }
 }
 
-impl<W> Reflector<W>
+impl<W, S> Reflector<W, S>
 where
     W: Watcher,
     <W as Watcher>::Object: Metadata<Ty = ObjectMeta> + Unpin + std::fmt::Debug,
     <W as Watcher>::InvocationError: Unpin,
     <W as Watcher>::StreamError: Unpin,
+    S: state::Write<Item = <W as Watcher>::Object>,
 {
     /// Run the watch loop and drive the state updates via `state_writer`.
     pub async fn run(
         &mut self,
     ) -> Result<Infallible, Error<<W as Watcher>::InvocationError, <W as Watcher>::StreamError>>
     {
-        // We're taking over the `self.state_writer`, clear it.
-        self.state_writer.purge();
-        // Propagate the purge and ensure we initialize readers for the first
-        // time.
-        self.state_writer.refresh();
-
         // Start the watch loop.
         loop {
             let invocation_result = self.issue_request().await;
@@ -90,7 +87,7 @@ where
                     // begin arriving, reducing the time durig which the state
                     // has no data.
                     self.resource_version.reset();
-                    self.state_writer.purge();
+                    self.state_writer.resync();
                     continue;
                 }
                 Err(watcher::invocation::Error::Other { source }) => {
@@ -141,9 +138,6 @@ where
                 // Record the resourse version for this event, so when we resume
                 // it won't be redelivered.
                 self.resource_version.update(resource_version_candidate);
-
-                // Flush the changes to the state.
-                self.state_writer.flush();
             }
 
             // For the next pause duration we won't get any updates.
@@ -173,41 +167,20 @@ where
     fn process_event(&mut self, event: WatchEvent<<W as Watcher>::Object>) {
         match event {
             WatchEvent::Added(object) => {
-                if let Some((key, value)) = kv(object) {
-                    trace!(message = "got an object event", uid = ?key, event = "added");
-                    self.state_writer.insert(key, value);
-                } else {
-                    warn!(
-                        message = "got an object event but unable to obtain a key from object",
-                        event = "added",
-                    );
-                }
+                trace!(message = "got an object event", event = "added");
+                self.state_writer.add(object);
             }
             WatchEvent::Deleted(object) => {
-                if let Some((key, _value)) = kv(object) {
-                    trace!(message = "got an object event", uid = ?key, event = "deleted");
-                    self.state_writer.empty(key);
-                } else {
-                    warn!(
-                        message = "got an object event but unable to obtain a key from object",
-                        event = "deleted",
-                    );
-                }
+                trace!(message = "got an object event", event = "deleted");
+                self.state_writer.delete(object);
             }
             WatchEvent::Modified(object) => {
-                if let Some((key, value)) = kv(object) {
-                    trace!(message = "got an object event", uid = ?key, event = "modified");
-                    self.state_writer.update(key, value);
-                } else {
-                    warn!(
-                        message = "got an object event but unable to obtain a key from object",
-                        event = "modified",
-                    );
-                }
+                trace!(message = "got an object event", event = "modified");
+                self.state_writer.update(object);
             }
             WatchEvent::Bookmark(_object) => {
-                // noop
                 trace!(message = "got an object event", event = "bookmark");
+                // noop
             }
             _ => unreachable!("other event types should never reach this code"),
         }
@@ -236,19 +209,12 @@ where
     },
 }
 
-/// An alias to the value used at [`evmap`].
-pub type Value<T> = Box<HashValue<T>>;
-
-/// Build a key value pair for using in [`evmap`].
-fn kv<T: Metadata<Ty = ObjectMeta>>(object: T) -> Option<(String, Value<T>)> {
-    let value = Box::new(HashValue::new(object));
-    let key = value.uid()?.to_owned();
-    Some((key, value))
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{Reflector, Value};
+    use super::{
+        state::evmap::{Value, Writer},
+        Reflector,
+    };
     use crate::{
         kubernetes::mock_watcher::{InvocationError, MockWatcher},
         kubernetes::watcher,
@@ -324,6 +290,7 @@ mod tests {
 
         // Prepare the test flow.
         let (_state_reader, state_writer) = evmap10::new();
+        let state_writer = Writer::new(state_writer);
         let mock_logic = move |_watch_optional: WatchOptional<'_>| {
             if false {
                 return Ok(|| None); // for type inferrence
@@ -359,6 +326,7 @@ mod tests {
     ) {
         // Prepare the test flow.
         let (state_reader, state_writer) = evmap10::new();
+        let state_writer = Writer::new(state_writer);
 
         let assertion_state_reader = state_reader.clone();
         let flow_expected_resulting_state = expected_resulting_state.clone();
@@ -529,6 +497,7 @@ mod tests {
         test_util::trace_init();
 
         let (_state_reader, state_writer) = evmap10::new();
+        let state_writer = Writer::new(state_writer);
         let mock_logic = move |watch_optional: WatchOptional<'_>| {
             assert_eq!(watch_optional.field_selector, Some("fields"));
             assert_eq!(watch_optional.label_selector, Some("labels"));

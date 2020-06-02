@@ -12,12 +12,12 @@ use std::path::PathBuf;
 /// A paths provider implementation that uses the state obtained from the
 /// the k8s API.
 pub struct K8sPathsProvider {
-    pods_state_reader: ReadHandle<String, k8s::reflector::Value<Pod>>,
+    pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
 }
 
 impl K8sPathsProvider {
     /// Create a new [`K8sPathsProvider`].
-    pub fn new(pods_state_reader: ReadHandle<String, k8s::reflector::Value<Pod>>) -> Self {
+    pub fn new(pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>) -> Self {
         Self { pods_state_reader }
     }
 }

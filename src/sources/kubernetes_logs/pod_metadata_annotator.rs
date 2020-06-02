@@ -34,14 +34,14 @@ impl Default for FieldsSpec {
 
 /// Annotate the event with pod metadata.
 pub struct PodMetadataAnnotator {
-    pods_state_reader: ReadHandle<String, k8s::reflector::Value<Pod>>,
+    pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
     fields_spec: FieldsSpec,
 }
 
 impl PodMetadataAnnotator {
     /// Create a new [`PodMetadataAnnotator`].
     pub fn new(
-        pods_state_reader: ReadHandle<String, k8s::reflector::Value<Pod>>,
+        pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
         fields_spec: FieldsSpec,
     ) -> Self {
         Self {
