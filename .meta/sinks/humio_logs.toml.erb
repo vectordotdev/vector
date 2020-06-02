@@ -60,6 +60,13 @@ default = "https://cloud.humio.com"
 examples = ["http://myhumiohost.com"]
 description = "The optional host to send Humio logs to."
 
+<%= render("_partials/fields/_compression_options.toml",
+  namespace: "sinks.humio_logs.options",
+  options: {
+    "category" => "Requests"
+  }
+) %>
+
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.humio_logs.options",
   encodings: ["json", "text"],

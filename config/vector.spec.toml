@@ -6527,6 +6527,20 @@ require('custom_module')
     when_full = "drop_newest"
 
   #
+  # Requests
+  #
+
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
+
+  #
   # Encoding
   #
 
@@ -8001,6 +8015,20 @@ require('custom_module')
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Requests
+  #
+
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
 
   #
   # Encoding
