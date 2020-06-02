@@ -10,6 +10,8 @@ on:
       - "scripts/Gemfile.lock"
       - "scripts/generate.rb"
       - "scripts/generate/**"
+      - "scripts/setup.rb"
+      - "scripts/util.rb"
       - "scripts/util/**"
 
   pull_request:
@@ -19,6 +21,8 @@ on:
       - "scripts/Gemfile.lock"
       - "scripts/generate.rb"
       - "scripts/generate/**"
+      - "scripts/setup.rb"
+      - "scripts/util.rb"
       - "scripts/util/**"
 
 jobs:
