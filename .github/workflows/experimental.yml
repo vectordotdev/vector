@@ -15,9 +15,9 @@ jobs:
   environment-prepare:
     runs-on: ubuntu-latest
     steps:
+    - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
     - uses: actions/checkout@v2
     - run: make environment-prepare
-    - run: docker login https://docker.pkg.github.com -u hoverbear --password-stdin
     - run: docker tag docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:$(git rev-parse --verify HEAD)
     - run: docker push docker.pkg.github.com/timberio/vector/environment:$(git rev-parse --verify HEAD)
     - run: docker push docker.pkg.github.com/timberio/vector/environment:latest
