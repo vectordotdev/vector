@@ -11,9 +11,10 @@ const THRESHOLD_RATIO: f64 = 0.01;
 /// Shared class for `tokio::sync::Semaphore` that manages adjusting the
 /// semaphore size and other associated data.
 #[derive(Clone, Debug)]
-pub(super) struct Controller {
+pub(super) struct Controller<L> {
     semaphore: Arc<ShrinkableSemaphore>,
     max: usize,
+    logic: L,
     inner: Arc<Mutex<Inner>>,
 }
 
@@ -25,11 +26,12 @@ struct Inner {
     current_rtt: Mean,
 }
 
-impl Controller {
-    pub(super) fn new(max: usize, current: usize) -> Self {
+impl<L> Controller<L> {
+    pub(super) fn new(max: usize, logic: L, current: usize) -> Self {
         Self {
             semaphore: Arc::new(ShrinkableSemaphore::new(current)),
             max,
+            logic,
             inner: Arc::new(Mutex::new(Inner {
                 current,
                 past_rtt: Default::default(),
