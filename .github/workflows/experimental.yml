@@ -12,7 +12,7 @@ on:
 env:
   VERBOSE: true
   ENVIRONMENT: true
-  ENVIRONMENT_UPSTREAM: ${{ github.sha }}
+  ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
 
 jobs:
   environment-prepare:
