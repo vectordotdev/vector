@@ -1,7 +1,6 @@
 .PHONY: $(MAKECMDGOALS) all
 .DEFAULT_GOAL := help
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/run.sh)
-GIT_REVISION := $(shell git rev-parse --verify HEAD)
 
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
@@ -20,6 +19,7 @@ export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
 export CONTAINER_TOOL ?= docker
 export ENVIRONMENT ?= false
 export ENVIRONMENT_UPSTREAM = docker.pkg.github.com/timberio/vector/environment
+
 # This variables can be used to override the target addresses of unit tests.
 # You can override them, just set it before your make call!
 export TEST_INTEGRATION_AWS_CLOUDWATCH_ADDR ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),vector_mockwatchlogs_1.vector_default:6000,0.0.0.0:6000)
@@ -88,7 +88,6 @@ define ENVIRONMENT_PREPARE
 	@$(CONTAINER_TOOL) build \
 		$(if $(findstring true,$(VERBOSE)),,--quiet) \
 		--tag $(ENVIRONMENT_UPSTREAM) \
-		--build-arg BASEIMAGE_TAG=2.3.4 \
 		--file scripts/environment/Dockerfile \
 		.
 	@docker network create vector_default || true

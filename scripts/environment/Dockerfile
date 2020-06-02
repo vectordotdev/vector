@@ -1,7 +1,5 @@
-ARG BASEIMAGE_TAG="latest"
-
 # Bootstrap
-FROM docker.io/nixos/nix:$BASEIMAGE_TAG
+FROM docker.io/nixos/nix:2.3.4
 RUN nix-channel --add https://nixos.org/channels/nixpkgs-unstable nixpkgs
 
 # Setup the env
