@@ -1,4 +1,4 @@
-name: website
+name: markdown
 
 on:
   push:
@@ -23,12 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - run: make check-generate
-
-  check-markdown:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@1.0.0
-      - run: make check-markdown
 
   check-blog:
     runs-on: ubuntu-latest
