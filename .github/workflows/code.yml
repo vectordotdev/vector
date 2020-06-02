@@ -4,17 +4,6 @@ on:
   push:
     branches:
       - master
-    paths:
-      - ".github/workflows/code.yml"
-      - "lib/*s"
-      - "proto/**"
-      - "scripts/**"
-      - "src/**"
-      - "tests/**"
-      - "Cargo.lock"
-      - "Cargo.toml"
-      - "docker-compose.yml"
-      - "rust-toolchain"
 
   pull_request:
     paths:
