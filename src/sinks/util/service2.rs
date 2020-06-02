@@ -19,7 +19,7 @@ use tower03::{
 
 pub use compat::TowerCompat;
 
-pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AutoConcurrencyLimit<Timeout<S>>>>;
+pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AutoConcurrencyLimit<Timeout<S>, L>>>;
 pub type TowerBatchedSink<S, B, L, Request> = BatchSink<TowerCompat<Svc<S, L>>, B, Request>;
 
 pub trait ServiceBuilderExt<L> {
@@ -133,7 +133,7 @@ impl TowerRequestSettings {
     // `trait SinkExt` above), as it is missing a bound on the
     // associated types that cannot be expressed in stable Rust.
     where
-        L: RetryLogic<Response = S::Response> + Send + 'static,
+        L: RetryLogic<Response = S::Response>,
         S: Service<Request> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
@@ -141,11 +141,14 @@ impl TowerRequestSettings {
         B: Batch<Output = Request>,
         Request: Send + Clone + 'static,
     {
-        let policy = self.retry_policy(retry_logic);
+        let policy = self.retry_policy(retry_logic.clone());
         let service = ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
-            .layer(AutoConcurrencyLimitLayer::new(self.in_flight_limit))
+            .layer(AutoConcurrencyLimitLayer::new(
+                self.in_flight_limit,
+                retry_logic,
+            ))
             .timeout(self.timeout)
             .service(service);
 

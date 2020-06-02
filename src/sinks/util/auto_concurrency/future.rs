@@ -15,22 +15,22 @@ use tokio::sync::OwnedSemaphorePermit;
 /// Future for the `AutoConcurrencyLimit` service.
 #[pin_project]
 #[derive(Debug)]
-pub struct ResponseFuture<T> {
+pub struct ResponseFuture<F, L> {
     #[pin]
-    inner: T,
+    inner: F,
     // Keep this around so that it is dropped when the future completes
     _permit: OwnedSemaphorePermit,
-    controller: Arc<Controller>,
+    controller: Arc<Controller<L>>,
     start: Instant,
 }
 
-impl<T> ResponseFuture<T> {
+impl<F, L> ResponseFuture<F, L> {
     pub(super) fn new(
-        inner: T,
+        inner: F,
         _permit: OwnedSemaphorePermit,
-        controller: Arc<Controller>,
-    ) -> ResponseFuture<T> {
-        ResponseFuture {
+        controller: Arc<Controller<L>>,
+    ) -> Self {
+        Self {
             inner,
             _permit,
             controller,
@@ -39,7 +39,7 @@ impl<T> ResponseFuture<T> {
     }
 }
 
-impl<F, T, E> Future for ResponseFuture<F>
+impl<F, L, T, E> Future for ResponseFuture<F, L>
 where
     F: Future<Output = Result<T, E>>,
 {

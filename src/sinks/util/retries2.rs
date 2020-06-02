@@ -19,7 +19,7 @@ pub enum RetryAction {
     Successful,
 }
 
-pub trait RetryLogic: Clone {
+pub trait RetryLogic: Clone + Send + Sync + 'static {
     type Error: std::error::Error + Send + Sync + 'static;
     type Response;
 

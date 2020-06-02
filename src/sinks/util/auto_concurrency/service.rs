@@ -16,9 +16,9 @@ use tokio::sync::OwnedSemaphorePermit;
 /// service can handle. Automatically expands and contracts the actual
 /// concurrency limit depending on observed request response behavior.
 #[derive(Debug)]
-pub struct AutoConcurrencyLimit<T> {
-    inner: T,
-    controller: Arc<Controller>,
+pub struct AutoConcurrencyLimit<S, L> {
+    inner: S,
+    controller: Arc<Controller<L>>,
     state: State,
 }
 
@@ -28,24 +28,25 @@ enum State {
     Empty,
 }
 
-impl<T> AutoConcurrencyLimit<T> {
+impl<S, L> AutoConcurrencyLimit<S, L> {
     /// Create a new automated concurrency limiter.
-    pub(crate) fn new(inner: T, max: usize) -> Self {
+    pub(crate) fn new(inner: S, logic: L, max: usize) -> Self {
         AutoConcurrencyLimit {
             inner,
-            controller: Arc::new(Controller::new(max, 1)),
+            controller: Arc::new(Controller::new(max, logic, 1)),
             state: State::Empty,
         }
     }
 }
 
-impl<S, Request> Service<Request> for AutoConcurrencyLimit<S>
+impl<S, L, Request> Service<Request> for AutoConcurrencyLimit<S, L>
 where
     S: Service<Request>,
+    L: 'static,
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future = ResponseFuture<S::Future>;
+    type Future = ResponseFuture<S::Future, L>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         loop {
@@ -77,12 +78,13 @@ where
     }
 }
 
-impl<S> Clone for AutoConcurrencyLimit<S>
+impl<S, L> Clone for AutoConcurrencyLimit<S, L>
 where
     S: Clone,
+    L: Clone,
 {
-    fn clone(&self) -> AutoConcurrencyLimit<S> {
-        AutoConcurrencyLimit {
+    fn clone(&self) -> Self {
+        Self {
             inner: self.inner.clone(),
             controller: self.controller.clone(),
             state: State::Empty,
