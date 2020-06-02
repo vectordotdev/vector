@@ -13,7 +13,7 @@ use crate::{
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
-use http02::{Method, Request, StatusCode, Uri};
+use http02::{Request, StatusCode, Uri};
 use hyper13::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -178,13 +178,9 @@ impl HttpSink for HecSinkConfig {
     }
 
     fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
-        let uri = format!("{}/services/collector/event", self.host)
-            .parse::<Uri>()
-            .expect("Unable to parse URI");
+        let uri = build_uri(&self.host, "/services/collector/event").expect("Unable to parse URI");
 
-        let mut builder = Request::builder()
-            .method(Method::POST)
-            .uri(uri.clone())
+        let mut builder = Request::post(uri)
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Splunk {}", self.token));
 
@@ -205,9 +201,8 @@ enum HealthcheckError {
 }
 
 pub async fn healthcheck(config: HecSinkConfig, resolver: Resolver) -> crate::Result<()> {
-    let uri = format!("{}/services/collector/health/1.0", config.host)
-        .parse::<Uri>()
-        .context(super::UriParseError2)?;
+    let uri =
+        build_uri(&config.host, "/services/collector/health/1.0").context(super::UriParseError2)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", config.token))
@@ -233,6 +228,10 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
         Some(_) => Ok(()),
         None => Err(Box::new(BuildError::UriMissingScheme)),
     }
+}
+
+fn build_uri(host: &str, path: &str) -> Result<Uri, http02::uri::InvalidUri> {
+    format!("{}{}", host.trim_end_matches('/'), path).parse::<Uri>()
 }
 
 #[cfg(test)]
@@ -345,6 +344,14 @@ mod tests {
         assert!(validate_host(&valid).is_ok());
         assert!(validate_host(&invalid_scheme).is_err());
         assert!(validate_host(&invalid_uri).is_err());
+    }
+
+    #[test]
+    fn splunk_build_uri() {
+        let uri = build_uri("http://test.com/", "/a");
+
+        assert!(uri.is_ok());
+        assert_eq!(format!("{}", uri.unwrap()), "http://test.com/a");
     }
 }
 
