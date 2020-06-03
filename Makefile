@@ -20,6 +20,7 @@ export CONTAINER_TOOL ?= docker
 export ENVIRONMENT ?= false
 export ENVIRONMENT_UPSTREAM ?= docker.pkg.github.com/timberio/vector/environment
 export ENVIRONMENT_AUTOBUILD ?= true
+export ENVIRONMENT_TTY ?= false
 
 # This variables can be used to override the target addresses of unit tests.
 # You can override them, just set it before your make call!

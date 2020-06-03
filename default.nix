@@ -50,6 +50,5 @@ pkgs.buildEnv {
         AWS_ACCESS_KEY_ID = "dummy";
         AWS_SECRET_ACCESS_KEY = "dummy";
         RUST_BACKTRACE = "full";
-        ENVIRONMENT_AUTOBUILD = "false";
     };
 }
