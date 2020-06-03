@@ -18,6 +18,8 @@ env:
 jobs:
   environment-prepare:
     runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT_AUTOBUILD: true
     steps:
       - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
       - run: docker pull docker.pkg.github.com/timberio/vector/environment:latest
