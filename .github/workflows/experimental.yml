@@ -20,7 +20,9 @@ jobs:
       - run: docker pull docker.pkg.github.com/timberio/vector/environment:latest
       - uses: actions/checkout@v2
       - run: make environment-prepare
-      - run: docker tag docker.pkg.github.com/timberio/vector/environment ${{ env.ENVIRONMENT_UPSTREAM }}
+      - run: docker tag \
+          docker.pkg.github.com/timberio/vector/environment \
+          docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
       - run: docker push ${{ env.ENVIRONMENT_UPSTREAM }}
 
   
