@@ -722,8 +722,3 @@ services:
     ports:
       - "9999:9999"
     command: influxd --reporting-disabled
-
-networks:
-  default:
-    external:
-      name: environment

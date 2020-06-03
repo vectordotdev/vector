@@ -53,6 +53,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
+      - run: nix run -c rustup component add rustfmt --toolchain 1.43.1-x86_64-unknown-linux-gnu
       - run: nix run -c make check-fmt
 
   check-generate:
@@ -63,6 +64,9 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
+      - run: |
+          cd scripts/
+          bundle install
       - run: nix run -c make check-generate
 
   test-integration-aws:
