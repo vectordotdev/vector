@@ -321,6 +321,14 @@ check-all: check-fmt check-style check-markdown check-generate check-blog check-
 check-component-features: ## Check that all component features are setup properly
 	$(RUN) check-component-features
 
+check-fmt: ## Check that all files are formatted properly
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make check-fmt
+else
+	./scripts/check-fmt.sh
+endif
+
 check-style: ## Check that all files are styled properly
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
