@@ -621,7 +621,7 @@ mod integration_tests {
         run_insert_tests(
             ElasticSearchConfig {
                 auth: Some(ElasticSearchAuth::Aws),
-                host: "http://localhost:4571".into(),
+                host: std::env::var("TEST_INTEGRATION_AWS_ADDR").unwrap_or(String::from("http://localhost:4571")),
                 ..config()
             },
             false,
@@ -739,6 +739,10 @@ mod integration_tests {
                 max_size: Some(1),
                 timeout_secs: None,
             },
+            tls: TlsOptions {
+                verify_hostname: Some(false),
+                ..Default::default()
+            }.into(),
             ..Default::default()
         }
     }

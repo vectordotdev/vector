@@ -24,12 +24,13 @@ export ENVIRONMENT_TTY ?= true
 
 # This variables can be used to override the target addresses of unit tests.
 # You can override them, just set it before your make call!
-export TEST_INTEGRATION_AWS_CLOUDWATCH_ADDR ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),vector_mockwatchlogs_1.vector_default:6000,0.0.0.0:6000)
-export TEST_INTEGRATION_CLICKHOUSE_ADDR ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_clickhouse_1.vector_default:8123,http://0.0.0.0:8123)
-export TEST_INTEGRATION_ELASTICSEARCH_ADDR_COMM ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_elasticsearch_1.vector_default:9200,http://0.0.0.0:9200)
-export TEST_INTEGRATION_ELASTICSEARCH_ADDR_HTTP ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_elasticsearch_1.vector_default:9300,http://0.0.0.0:9300)
-export TEST_INTEGRATION_ELASTICSEARCH_TLS_ADDR_COMM ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),https://vector_elasticsearch-tls_1.vector_default:9201,https://0.0.0.0:9201)
-export TEST_INTEGRATION_ELASTICSEARCH_TLS_ADDR_HTTP ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),https://vector_elasticsearch-tls_1.vector_default:9301,https://0.0.0.0:9301)
+export TEST_INTEGRATION_AWS_ADDR ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_localstack_1:4571,0.0.0.0:6000)
+export TEST_INTEGRATION_AWS_CLOUDWATCH_ADDR ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),vector_mockwatchlogs_1:6000,0.0.0.0:6000)
+export TEST_INTEGRATION_CLICKHOUSE_ADDR ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_clickhouse_1:8123,http://0.0.0.0:8123)
+export TEST_INTEGRATION_ELASTICSEARCH_ADDR_COMM ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_elasticsearch_1:9200,http://0.0.0.0:9200)
+export TEST_INTEGRATION_ELASTICSEARCH_ADDR_HTTP ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_elasticsearch_1:9300,http://0.0.0.0:9300)
+export TEST_INTEGRATION_ELASTICSEARCH_TLS_ADDR_COMM ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),https://vector_elasticsearch-tls_1:9200,https://0.0.0.0:9201)
+export TEST_INTEGRATION_ELASTICSEARCH_TLS_ADDR_HTTP ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),https://vector_elasticsearch-tls_1:9300,https://0.0.0.0:9301)
 
  # Deprecated.
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
@@ -52,7 +53,7 @@ help:
 define ENVIRONMENT_EXEC
 	@echo "Entering environment..."
 	@mkdir -p target
-	@$(CONTAINER_TOOL) network create vector_default || true
+	@$(CONTAINER_TOOL) network create environment || true
 	$(CONTAINER_TOOL) run \
 			--name vector-environment \
 			--rm \
@@ -60,7 +61,9 @@ define ENVIRONMENT_EXEC
 			--init \
 			--interactive \
 			--env INSIDE_ENVIRONMENT=true \
-			--network vector_default \
+			--network environment \
+			--dns-search environment \
+			--hostname vector \
 			--mount type=bind,source=${PWD},target=/vector \
 			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
 			--mount type=volume,source=vector-target,target=/vector/target \
@@ -95,7 +98,7 @@ define ENVIRONMENT_PREPARE
 		--tag $(ENVIRONMENT_UPSTREAM) \
 		--file scripts/environment/Dockerfile \
 		.
-	@$(CONTAINER_TOOL) network create vector_default || true
+	@$(CONTAINER_TOOL) network create environment || true
 endef
 else
 define ENVIRONMENT_PREPARE
@@ -185,11 +188,13 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-integration-aws
 else
 	docker-compose up -d dependencies-aws
-	cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_logs::
-	cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_metrics::
-	cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_firehose::
-	cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_streams::
-	cargo test --no-default-features --features aws-integration-tests ::aws_s3::
+	export TEST_LOG="vector=debug"
+	export RUST_TEST_THREADS=1
+	cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_logs:: -- --nocapture
+	cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_metrics:: -- --nocapture
+	cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_firehose:: -- --nocapture
+	cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_streams:: -- --nocapture
+	cargo test --no-default-features --features aws-integration-tests ::aws_s3:: -- --nocapture
 endif
 
 test-integration-clickhouse: ## Runs Clickhouse integration testsbv
@@ -198,7 +203,9 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-integration-clickhouse
 else
 	docker-compose up -d dependencies-clickhouse
-	cargo test --no-default-features --features clickhouse-integration-tests ::clickhouse::
+	export TEST_LOG="vector=debug"
+	export RUST_TEST_THREADS=1
+	cargo test --no-default-features --features clickhouse-integration-tests ::clickhouse:: -- --nocapture
 endif
 
 test-integration-docker: ## Runs Docker integration tests
@@ -206,7 +213,7 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-docker
 else
-	cargo test --no-default-features --features docker-integration-tests ::docker::
+	cargo test --no-default-features --features docker-integration-tests ::docker:: -- --nocapture
 endif
 
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
@@ -217,7 +224,9 @@ else
 	if $(AUTOSPAWN); then \
 		docker-compose up -d dependencies-elasticsearch; \
 	fi
-	cargo test --no-default-features --features es-integration-tests ::elasticsearch::
+	# export TEST_LOG="vector=debug"
+	# export RUST_TEST_THREADS=1
+	cargo test --no-default-features --features es-integration-tests ::elasticsearch:: -- --nocapture
 endif
 
 test-integration-gcp: ## Runs GCP integration tests
@@ -228,7 +237,9 @@ else
 	if $(AUTOSPAWN); then \
 		docker-compose up -d dependencies-gcp; \
 	fi
-	cargo test --no-default-features --features gcp-integration-tests ::gcp::
+	export TEST_LOG="vector=debug"
+	export RUST_TEST_THREADS=1
+	cargo test --no-default-features --features gcp-integration-tests ::gcp:: -- --nocapture
 endif
 
 test-integration-influxdb: ## Runs Kafka integration tests
@@ -239,7 +250,9 @@ else
 	if $(AUTOSPAWN); then \
 		docker-compose up -d dependencies-influxdb; \
 	fi
-	cargo test --no-default-features --features influxdb-integration-tests ::influxdb::integration_tests::
+	export TEST_LOG="vector=debug"
+	export RUST_TEST_THREADS=1
+	cargo test --no-default-features --features influxdb-integration-tests ::influxdb::integration_tests:: -- --nocapture
 endif
 
 test-integration-kafka: ## Runs Kafka integration tests
@@ -250,7 +263,9 @@ else
 	if $(AUTOSPAWN); then \
 		docker-compose up -d dependencies-kafka; \
 	fi
-	cargo test --no-default-features --features kafka-integration-tests ::kafka::
+	export TEST_LOG="vector=debug"
+	export RUST_TEST_THREADS=1
+	cargo test --no-default-features --features kafka-integration-tests ::kafka:: -- --nocapture
 endif
 
 test-integration-loki: ## Runs Loki integration tests (Use `ENVIRONMENT=true` to run in a container)
@@ -260,8 +275,11 @@ ifeq ($(ENVIRONMENT), true)
 else
 	if $(AUTOSPAWN); then \
 		docker-compose up -d dependencies-loki; \
+		
 	fi
-	cargo test --no-default-features --features loki-integration-tests ::loki::
+	export TEST_LOG="vector=debug"
+	export RUST_TEST_THREADS=1
+	cargo test --no-default-features --features loki-integration-tests ::loki:: -- --nocapture
 endif
 
 test-integration-pulsar: ## Runs Pulsar integration tests
@@ -272,7 +290,7 @@ else
 	if $(AUTOSPAWN); then \
 		docker-compose up -d dependencies-pulsar; \
 	fi
-	cargo test --no-default-features --features pulsar-integration-tests ::pulsar::
+	cargo test --no-default-features --features pulsar-integration-tests ::pulsar:: -- --nocapture
 endif
 
 test-integration-splunk: ## Runs Splunk integration tests
@@ -283,7 +301,7 @@ else
 	if $(AUTOSPAWN); then \
 		docker-compose up -d dependencies-splunk; \
 	fi
-	cargo test --no-default-features --features splunk-integration-tests ::splunk::
+	cargo test --no-default-features --features splunk-integration-tests ::splunk:: -- --nocapture
 endif
 
 PACKAGE_DEB_USE_CONTAINER ?= "$(USE_CONTAINER)"

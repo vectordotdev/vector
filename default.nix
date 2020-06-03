@@ -5,6 +5,7 @@ pkgs.buildEnv {
   paths = with pkgs; [
       git
       ping
+      dnsutils
       curl
       bash
       nix
