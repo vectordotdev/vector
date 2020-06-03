@@ -40,7 +40,7 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix-shell --pure shell.nix --keep INSIDE_ENVIRONMENT --run "make test"
+      - run: nix-shell --pure shell.nix --run "make test"
 
   bench:
     runs-on: ubuntu-latest
@@ -54,7 +54,7 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix-shell --pure shell.nix --keep INSIDE_ENVIRONMENT --run "make bench"
+      - run: nix-shell --pure shell.nix --run "make bench"
 
   check-fmt:
     runs-on: ubuntu-latest
@@ -68,103 +68,158 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix-shell --pure shell.nix --keep INSIDE_ENVIRONMENT --run "make check-fmt"
+      - run: nix-shell --pure shell.nix --run "make check-fmt"
 
-  # check-generate:
-  #   needs: environment-prepare
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-  #     - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  #     - uses: actions/checkout@v2
-  #     - run: make check-generate
+  check-generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            /nix/store
+          key: ${{ runner.os }}-${{ hashFiles('*.nix') }}
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure shell.nix --run "make check-generate"
 
-  # test-integration-aws:
-  #   needs: [environment-prepare, test]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-  #     - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  #     - uses: actions/checkout@v2
-  #     - run: make test-integration-aws
+  test-integration-aws:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            /nix/store
+          key: ${{ runner.os }}-${{ hashFiles('*.nix') }}
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure shell.nix --run "make check-aws"
 
-  # test-integration-clickhouse:
-  #   needs: [environment-prepare, test]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-  #     - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  #     - uses: actions/checkout@v2
-  #     - run: make test-integration-clickhouse
+  test-integration-clickhouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            /nix/store
+          key: ${{ runner.os }}-${{ hashFiles('*.nix') }}
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure shell.nix --run "make check-clickhouse"
 
-  # test-integration-docker:
-  #   needs: [environment-prepare, test]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-  #     - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  #     - uses: actions/checkout@v2
-  #     - run: make test-integration-docker
+  test-integration-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            /nix/store
+          key: ${{ runner.os }}-${{ hashFiles('*.nix') }}
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure shell.nix --run "make check-docker"
 
-  # test-integration-elasticsearch:
-  #   needs: [environment-prepare, test]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-  #     - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  #     - uses: actions/checkout@v2
-  #     - run: make test-integration-elasticsearch
+  test-integration-elasticsearch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            /nix/store
+          key: ${{ runner.os }}-${{ hashFiles('*.nix') }}
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure shell.nix --run "make check-elasticsearch"
 
-  # test-integration-gcp:
-  #   needs: [environment-prepare, test]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-  #     - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  #     - uses: actions/checkout@v2
-  #     - run: make test-integration-gcp
+  test-integration-gcp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            /nix/store
+          key: ${{ runner.os }}-${{ hashFiles('*.nix') }}
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure shell.nix --run "make check-gcp"
 
-  # test-integration-influxdb:
-  #   needs: [environment-prepare, test]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-  #     - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  #     - uses: actions/checkout@v2
-  #     - run: make test-integration-influxdb
+  test-integration-influxdb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            /nix/store
+          key: ${{ runner.os }}-${{ hashFiles('*.nix') }}
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure shell.nix --run "make check-influxdb"
 
-  # test-integration-kafka:
-  #   needs: [environment-prepare, test]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-  #     - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  #     - uses: actions/checkout@v2
-  #     - run: make test-integration-kafka
+  test-integration-kafka:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            /nix/store
+          key: ${{ runner.os }}-${{ hashFiles('*.nix') }}
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure shell.nix --run "make check-kafka"
 
-  # test-integration-loki:
-  #   needs: [environment-prepare, test]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-  #     - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  #     - uses: actions/checkout@v2
-  #     - run: make test-integration-loki
+  test-integration-loki:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            /nix/store
+          key: ${{ runner.os }}-${{ hashFiles('*.nix') }}
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure shell.nix --run "make check-loki"
 
-  # test-integration-pulsar:
-  #   needs: [environment-prepare, test]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-  #     - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  #     - uses: actions/checkout@v2
-  #     - run: make test-integration-pulsar
+  test-integration-pulsar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            /nix/store
+          key: ${{ runner.os }}-${{ hashFiles('*.nix') }}
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure shell.nix --run "make check-pulsar"
 
-  # test-integration-splunk:
-  #   needs: [environment-prepare, test]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-  #     - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  #     - uses: actions/checkout@v2
-  #     - run: make test-integration-splunk
+  test-integration-splunk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            /nix/store
+          key: ${{ runner.os }}-${{ hashFiles('*.nix') }}
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure shell.nix --run "make check-splunk"
