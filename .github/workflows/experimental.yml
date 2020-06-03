@@ -11,9 +11,6 @@ on:
 
 env:
   VERBOSE: true
-  ENVIRONMENT: true
-  ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  ENVIRONMENT_AUTOBUILD: false
 
 jobs:
   environment-prepare:
@@ -34,7 +31,10 @@ jobs:
       - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
       - run: docker pull ${{ env.ENVIRONMENT_UPSTREAM }}
       - uses: actions/checkout@v2
-      - run: make test
+      - run: make ENVIRONMENT=true \
+          ENVIRONMENT_AUTOBUILD=false \
+          ENVIRONMENT_UPSTREAM=docker.pkg.github.com/timberio/vector/environment:${{ github.sha }} \
+          test
 
   bench:
     needs: environment-prepare
@@ -43,4 +43,7 @@ jobs:
       - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
       - run: docker pull ${{ env.ENVIRONMENT_UPSTREAM }}
       - uses: actions/checkout@v2
-      - run: make bench
+      - run: make ENVIRONMENT=true \
+          ENVIRONMENT_AUTOBUILD=false \
+          ENVIRONMENT_UPSTREAM=docker.pkg.github.com/timberio/vector/environment:${{ github.sha }} \
+          bench
