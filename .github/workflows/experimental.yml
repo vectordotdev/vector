@@ -23,8 +23,7 @@ jobs:
       - run: docker pull docker.pkg.github.com/timberio/vector/environment:latest
       - uses: actions/checkout@v2
       - run: make environment-prepare
-      - run: |
-          docker tag docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - run: docker tag docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
       - run: docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
   
   test:
@@ -34,11 +33,7 @@ jobs:
       - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
       - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
       - uses: actions/checkout@v2
-      - run: |
-          export ENVIRONMENT=true
-          export ENVIRONMENT_AUTOBUILD=false
-          export ENVIRONMENT_UPSTREAM=docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-          make test
+      - run: make test
 
   bench:
     needs: environment-prepare
@@ -47,8 +42,4 @@ jobs:
       - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
       - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
       - uses: actions/checkout@v2
-      - run: |
-          export ENVIRONMENT=true
-          export ENVIRONMENT_AUTOBUILD=false
-          export ENVIRONMENT_UPSTREAM=docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-          make bench
+      - run: make bench
