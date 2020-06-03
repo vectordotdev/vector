@@ -20,7 +20,8 @@ jobs:
       - run: docker pull docker.pkg.github.com/timberio/vector/environment:latest
       - uses: actions/checkout@v2
       - run: make environment-prepare
-      - run: docker tag \
+      - run: |
+        docker tag \
           docker.pkg.github.com/timberio/vector/environment \
           docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
       - run: docker push ${{ env.ENVIRONMENT_UPSTREAM }}
@@ -33,7 +34,9 @@ jobs:
       - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
       - run: docker pull ${{ env.ENVIRONMENT_UPSTREAM }}
       - uses: actions/checkout@v2
-      - run: make ENVIRONMENT=true \
+      - run: |
+        make \
+          ENVIRONMENT=true \
           ENVIRONMENT_AUTOBUILD=false \
           ENVIRONMENT_UPSTREAM=docker.pkg.github.com/timberio/vector/environment:${{ github.sha }} \
           test
@@ -45,7 +48,9 @@ jobs:
       - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
       - run: docker pull ${{ env.ENVIRONMENT_UPSTREAM }}
       - uses: actions/checkout@v2
-      - run: make ENVIRONMENT=true \
+      - run: |
+        make \
+          ENVIRONMENT=true \
           ENVIRONMENT_AUTOBUILD=false \
           ENVIRONMENT_UPSTREAM=docker.pkg.github.com/timberio/vector/environment:${{ github.sha }} \
           bench
