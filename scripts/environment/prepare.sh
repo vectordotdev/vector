@@ -5,6 +5,8 @@ rustup default $(cat rust-toolchain)
 cd scripts
 bundle update --bundler
 bundle install
+cd ..
+
 cd website
 yarn
-cd /vector
+cd ..
