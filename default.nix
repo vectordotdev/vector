@@ -30,6 +30,7 @@ pkgs.buildEnv {
         locales = ["en_US.UTF-8"];
       })
       yarn
+      nodejs
       openssl
       perl
       remarshal
