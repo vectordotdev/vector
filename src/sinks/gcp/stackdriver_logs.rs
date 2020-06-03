@@ -21,6 +21,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::collections::HashMap;
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -36,6 +37,7 @@ pub struct StackdriverConfig {
     pub log_id: String,
 
     pub resource: StackdriverResource,
+    pub severity_key: Option<String>,
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
@@ -57,6 +59,7 @@ pub struct StackdriverConfig {
 struct StackdriverSink {
     config: StackdriverConfig,
     creds: Option<GcpCredentials>,
+    severity_key: Option<Atom>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -116,6 +119,10 @@ impl SinkConfig for StackdriverConfig {
         let sink = StackdriverSink {
             config: self.clone(),
             creds,
+            severity_key: self
+                .severity_key
+                .as_ref()
+                .map(|key| Atom::from(key.as_str())),
         };
 
         let healthcheck = healthcheck(
@@ -154,9 +161,12 @@ impl HttpSink for StackdriverSink {
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.config.encoding.apply_rules(&mut event);
+        let mut log = event.into_log();
+        let severity = self.severity_key.as_ref().and_then(|key| log.remove(key));
 
         let entry = serde_json::json!({
-            "jsonPayload": event.into_log(),
+            "jsonPayload": log,
+            "severity": severity,
         });
 
         Some(entry)
@@ -233,6 +243,7 @@ mod tests {
         let sink = StackdriverSink {
             config,
             creds: None,
+            severity_key: None,
         };
 
         let log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
@@ -256,6 +267,7 @@ mod tests {
         let sink = StackdriverSink {
             config,
             creds: None,
+            severity_key: None,
         };
 
         let log1 = LogEvent::from_iter([("message", "hello")].iter().map(|&s| s));

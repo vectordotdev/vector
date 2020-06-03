@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-02"
+last_modified_on: "2020-06-03"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
@@ -64,6 +64,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
   log_id = "vector-logs" # required
   organization_id = "622418129737" # optional, no default
   project_id = "vector-123456" # required
+  severity_key = "severity" # optional, no default
 
   # Batch
   batch.max_size = 5242880 # optional, default, bytes
@@ -849,6 +850,37 @@ For example, Compute Engine VM instances use the labels `projectId`,
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={["severity"]}
+  groups={[]}
+  name={"severity_key"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### severity_key
+
+The field of the log event from which to take the outgoing log's [`severity`](#severity)
+field. The named field is removed from the log event if present, and must be an
+integer between 0 and 800. This could be added by a [`add_fields`
+transform][docs.transforms.add_fields] or extracted from a field from the
+source.
+
+See the [GCP Stackdriver Logging LogSeverity
+description](https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity)
+for more details on the value of the [`severity`](#severity) field.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={[]}
   groups={[]}
   name={"tls"}
@@ -1144,6 +1176,7 @@ options.
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[docs.transforms.add_fields]: /docs/reference/transforms/add_fields/
 [urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
 [urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcp_authentication_service_account]: https://cloud.google.com/docs/authentication/production#obtaining_and_providing_service_account_credentials_manually
