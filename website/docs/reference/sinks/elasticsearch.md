@@ -74,6 +74,7 @@ endpoint][urls.elasticsearch_bulk].
   host = "http://10.24.32.122:9000" # optional, no default
   id_key = "id" # optional, no default
   index = "vector-%F" # optional, default
+  pipeline = "pipeline-name" # optional, no default
 
   # Auth
   auth.password = "${ELASTICSEARCH_PASSWORD}" # required, required when strategy = "basic"
