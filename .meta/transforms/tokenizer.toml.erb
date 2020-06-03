@@ -54,7 +54,7 @@ And the following configuration:
 [transforms.<transform-id>]
 type = "tokenizer"
 field = "message"
-fields = ["remote_addr", "ident", "user_id", "timestamp", "message", "status", "bytes"]
+field_names = ["remote_addr", "ident", "user_id", "timestamp", "message", "status", "bytes"]
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:
