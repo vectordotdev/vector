@@ -2,9 +2,9 @@
 set -e
 
 rustup default $(cat rust-toolchain)
-cd /vector/scripts
+cd scripts
 bundle update --bundler
 bundle install
-cd /vector/website
+cd website
 yarn
 cd /vector

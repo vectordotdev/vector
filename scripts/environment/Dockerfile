@@ -11,6 +11,7 @@ SHELL [ "/usr/bin/env", "nix-shell", "/vector/shell.nix", "--run" ]
 RUN echo "Installing env..."
 
 # Setup the toolchain
+WORKDIR /vector
 RUN ./prepare.sh
 
 # Declare volumes
