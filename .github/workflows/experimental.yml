@@ -41,7 +41,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
-      - run: nix-run -c make test
+      - run: nix run -c make test
 
   bench:
     runs-on: ubuntu-latest
@@ -56,7 +56,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
-      - run: nix-run -c make bench
+      - run: nix run -c make bench
 
   check-fmt:
     runs-on: ubuntu-latest
@@ -71,7 +71,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
-      - run: nix-run -c make check-fmt
+      - run: nix run -c make check-fmt
 
   check-generate:
     runs-on: ubuntu-latest
@@ -86,7 +86,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
-      - run: nix-run -c make check-generate
+      - run: nix run -c make check-generate
 
   test-integration-aws:
     runs-on: ubuntu-latest
@@ -117,7 +117,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
-      - run: nix-run -c make test-integration-clickhouse
+      - run: nix run -c make test-integration-clickhouse
 
   test-integration-docker:
     runs-on: ubuntu-latest
@@ -132,7 +132,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
-      - run: nix-run -c make test-integration-docker
+      - run: nix run -c make test-integration-docker
 
   test-integration-elasticsearch:
     runs-on: ubuntu-latest
@@ -147,7 +147,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
-      - run: nix-run -c make test-integration-elasticsearch
+      - run: nix run -c make test-integration-elasticsearch
 
   test-integration-gcp:
     runs-on: ubuntu-latest
@@ -162,7 +162,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
-      - run: nix-run -c make test-integration-gcp
+      - run: nix run -c make test-integration-gcp
 
   test-integration-influxdb:
     runs-on: ubuntu-latest
@@ -177,7 +177,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
-      - run: nix-run -c make test-integration-influxdb
+      - run: nix run -c make test-integration-influxdb
 
   test-integration-kafka:
     runs-on: ubuntu-latest
@@ -192,7 +192,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
-      - run: nix-run -c make test-integration-kafka
+      - run: nix run -c make test-integration-kafka
 
   test-integration-loki:
     runs-on: ubuntu-latest
@@ -207,7 +207,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
-      - run: nix-run -c make test-integration-loki
+      - run: nix run -c make test-integration-loki
 
   test-integration-pulsar:
     runs-on: ubuntu-latest
@@ -222,7 +222,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
-      - run: nix-run -c make test-integration-pulsar
+      - run: nix run -c make test-integration-pulsar
 
   test-integration-splunk:
     runs-on: ubuntu-latest
@@ -237,4 +237,4 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix run -c echo "Env prep."
-      - run: nix-run -c make test-integration-splunk
+      - run: nix run -c make test-integration-splunk
