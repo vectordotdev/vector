@@ -64,3 +64,93 @@ jobs:
       - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
       - uses: actions/checkout@v2
       - run: make check-generate
+
+  test-integration-aws:
+    needs: environment-prepare
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - uses: actions/checkout@v2
+      - run: make test-integration-aws
+  
+  test-integration-clickhouse:
+    needs: environment-prepare
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - uses: actions/checkout@v2
+      - run: make test-integration-clickhouse
+
+  test-integration-docker:
+    needs: environment-prepare
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - uses: actions/checkout@v2
+      - run: make test-integration-docker
+
+  test-integration-elasticsearch:
+    needs: environment-prepare
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - uses: actions/checkout@v2
+      - run: make test-integration-elasticsearch
+
+  test-integration-gcp:
+    needs: environment-prepare
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - uses: actions/checkout@v2
+      - run: make test-integration-gcp
+
+  test-integration-influxdb:
+    needs: environment-prepare
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - uses: actions/checkout@v2
+      - run: make test-integration-influxdb
+
+  test-integration-kafka:
+    needs: environment-prepare
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - uses: actions/checkout@v2
+      - run: make test-integration-kafka
+
+  test-integration-loki:
+    needs: environment-prepare
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - uses: actions/checkout@v2
+      - run: make test-integration-loki
+
+  test-integration-pulsar:
+    needs: environment-prepare
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - uses: actions/checkout@v2
+      - run: make test-integration-pulsar
+
+  test-integration-splunk:
+    needs: environment-prepare
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - uses: actions/checkout@v2
+      - run: make test-integration-splunk

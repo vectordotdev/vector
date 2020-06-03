@@ -46,16 +46,6 @@ jobs:
       - run: sudo python3 -m pip install remarshal
       - run: make check-component-features
 
-  check-fmt:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: rustup component add rustfmt
-      - run: make check-fmt
-        env:
-          PASS_RUSTFLAGS: "-D warnings"
-          USE_CONTAINER: docker
-
   check-linux:
     runs-on: ubuntu-latest
     steps:
@@ -93,66 +83,6 @@ jobs:
       - uses: actions/checkout@v1
       - run: make test-behavior
 
-  test-integration-aws:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make test-integration-aws
-
-  test-integration-clickhouse:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make test-integration-clickhouse
-
-  test-integration-docker:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make test-integration-docker
-
-  test-integration-elasticsearch:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make test-integration-elasticsearch
-
-  test-integration-gcp:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make test-integration-gcp
-
-  test-integration-influxdb:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make test-integration-influxdb
-
-  test-integration-kafka:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make test-integration-kafka
-
-  test-integration-loki:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make test-integration-loki
-
-  test-integration-pulsar:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make test-integration-pulsar
-
-  test-integration-splunk:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make test-integration-splunk
-
   test-shutdown:
     runs-on: ubuntu-latest
     steps:
@@ -188,17 +118,3 @@ jobs:
           USE_MINIKUBE_DOCKER: "true"
           CONTAINER_IMAGE_REPO: vector-test
           PACKAGE_DEB_USE_CONTAINER: docker
-
-  test-unit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make slim-builds
-      - run: make test-unit
-
-  test-default:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make slim-builds
-      - run: make test-default
