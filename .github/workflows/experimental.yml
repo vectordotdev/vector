@@ -22,7 +22,6 @@ jobs:
       - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@v2
       - run: make environment-prepare
-      - run: docker tag docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
       - run: docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
 
   test:
