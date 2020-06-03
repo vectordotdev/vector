@@ -246,7 +246,8 @@ mod integration_tests {
     use tokio01::util::FutureExt;
 
     fn host_addr() -> String {
-        std::env::var("TEST_INTEGRATION_CLICKHOUSE_ADDR").unwrap_or(String::from("http://localhost:8123"))
+        std::env::var("TEST_INTEGRATION_CLICKHOUSE_ADDR")
+            .unwrap_or(String::from("http://localhost:8123"))
     }
 
     #[test]

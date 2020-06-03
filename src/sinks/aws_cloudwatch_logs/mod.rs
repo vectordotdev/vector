@@ -834,7 +834,8 @@ mod integration_tests {
     const GROUP_NAME: &'static str = "vector-cw";
 
     fn endpoint() -> String {
-        std::env::var("TEST_INTEGRATION_AWS_CLOUDWATCH_ADDR").unwrap_or(String::from("localhost:6000"))
+        std::env::var("TEST_INTEGRATION_AWS_CLOUDWATCH_ADDR")
+            .unwrap_or(String::from("localhost:6000"))
     }
 
     #[test]

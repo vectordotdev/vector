@@ -185,7 +185,7 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-integration-aws
 else
 	docker-compose up -d dependencies-aws
-	cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_logs:: 
+	cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_logs::
 	cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_metrics::
 	cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_firehose::
 	cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_streams::
@@ -198,7 +198,6 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-integration-clickhouse
 else
 	docker-compose up -d dependencies-clickhouse
-	env | sort
 	cargo test --no-default-features --features clickhouse-integration-tests ::clickhouse::
 endif
 
@@ -214,11 +213,10 @@ test-integration-elasticsearch: ## Runs Elasticsearch integration tests
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-elasticsearch
-else 
+else
 	if $(AUTOSPAWN); then \
 		docker-compose up -d dependencies-elasticsearch; \
 	fi
-	env | sort
 	cargo test --no-default-features --features es-integration-tests ::elasticsearch::
 endif
 

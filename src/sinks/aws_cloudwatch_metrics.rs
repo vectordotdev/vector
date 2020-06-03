@@ -443,7 +443,11 @@ mod integration_tests {
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
             namespace: "vector".into(),
-            region: RegionOrEndpoint::with_endpoint(std::env("TEST_INTEGRATION_AWS_CLOUDWATCH_ADDR").unwrap_or("localhost:6000").to_owned()),
+            region: RegionOrEndpoint::with_endpoint(
+                std::env("TEST_INTEGRATION_AWS_CLOUDWATCH_ADDR")
+                    .unwrap_or("localhost:6000")
+                    .to_owned(),
+            ),
             ..Default::default()
         }
     }

@@ -522,9 +522,11 @@ mod integration_tests {
 
     fn comm_addr(tls: bool) -> String {
         if tls {
-            std::env::var("TEST_INTEGRATION_ELASTICSEARCH_TLS_ADDR_COMM").unwrap_or(String::from("http://localhost:9201"))
+            std::env::var("TEST_INTEGRATION_ELASTICSEARCH_TLS_ADDR_COMM")
+                .unwrap_or(String::from("http://localhost:9201"))
         } else {
-            std::env::var("TEST_INTEGRATION_ELASTICSEARCH_ADDR_COMM").unwrap_or(String::from("http://localhost:9200"))
+            std::env::var("TEST_INTEGRATION_ELASTICSEARCH_ADDR_COMM")
+                .unwrap_or(String::from("http://localhost:9200"))
         }
     }
 

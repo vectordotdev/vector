@@ -28,7 +28,7 @@ jobs:
       - run: make environment-prepare
       - run: docker tag docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
       - run: docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  
+
   test:
     needs: environment-prepare
     runs-on: ubuntu-latest
@@ -73,7 +73,7 @@ jobs:
       - run: docker pull docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
       - uses: actions/checkout@v2
       - run: make test-integration-aws
-  
+
   test-integration-clickhouse:
     needs: [environment-prepare, test]
     runs-on: ubuntu-latest
