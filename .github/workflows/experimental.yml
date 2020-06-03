@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v2
       - run: make environment-prepare
       - run: |
-        docker tag docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+          docker tag docker.pkg.github.com/timberio/vector/environment docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
       - run: docker push ${{ env.ENVIRONMENT_UPSTREAM }}
   
   test:
@@ -32,10 +32,10 @@ jobs:
       - run: docker pull ${{ env.ENVIRONMENT_UPSTREAM }}
       - uses: actions/checkout@v2
       - run: |
-        export ENVIRONMENT=true
-        export ENVIRONMENT_AUTOBUILD=false
-        export ENVIRONMENT_UPSTREAM=docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-        make test
+          export ENVIRONMENT=true
+          export ENVIRONMENT_AUTOBUILD=false
+          export ENVIRONMENT_UPSTREAM=docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+          make test
 
   bench:
     needs: environment-prepare
@@ -45,7 +45,7 @@ jobs:
       - run: docker pull ${{ env.ENVIRONMENT_UPSTREAM }}
       - uses: actions/checkout@v2
       - run: |
-        export ENVIRONMENT=true
-        export ENVIRONMENT_AUTOBUILD=false
-        export ENVIRONMENT_UPSTREAM=docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-        make bench
+          export ENVIRONMENT=true
+          export ENVIRONMENT_AUTOBUILD=false
+          export ENVIRONMENT_UPSTREAM=docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+          make bench
