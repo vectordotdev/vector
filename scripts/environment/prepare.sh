@@ -2,6 +2,8 @@
 set -e
 
 rustup default $(cat rust-toolchain)
+rustup component add rustfmt
+
 cd scripts
 bundle update --bundler
 bundle install
