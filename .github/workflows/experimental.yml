@@ -32,7 +32,8 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
+      - run: nix run -c echo "Env installing..."
+      - run: nix run -c bash scripts/environment/prepare.sh
       - run: nix run -c make test
 
   bench:
@@ -42,7 +43,8 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
+      - run: nix run -c echo "Env installing..."
+      - run: nix run -c bash scripts/environment/prepare.sh
       - run: nix run -c make bench
 
   check-fmt:
@@ -52,8 +54,8 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
-      - run: nix run -c rustup component add rustfmt --toolchain 1.43.1-x86_64-unknown-linux-gnu
+      - run: nix run -c echo "Env installing..."
+      - run: nix run -c bash scripts/environment/prepare.sh
       - run: nix run -c make check-fmt
 
   check-generate:
@@ -63,10 +65,7 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
-      - run: |
-          cd scripts/
-          bundle install
+      - run: nix run -c echo "Env installing..."
       - run: nix run -c make check-generate
 
   test-integration-aws:
@@ -76,8 +75,8 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
-      - run: nix run -c echo "Env prep."
+      - run: nix run -c echo "Env installing..."
+      - run: nix run -c bash scripts/environment/prepare.sh
       - run: nix run -c make test-integration-aws
 
   test-integration-clickhouse:
@@ -87,7 +86,8 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
+      - run: nix run -c echo "Env installing..."
+      - run: nix run -c bash scripts/environment/prepare.sh
       - run: nix run -c make test-integration-clickhouse
 
   test-integration-docker:
@@ -97,7 +97,8 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
+      - run: nix run -c echo "Env installing..."
+      - run: nix run -c bash scripts/environment/prepare.sh
       - run: nix run -c make test-integration-docker
 
   test-integration-elasticsearch:
@@ -107,7 +108,8 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
+      - run: nix run -c echo "Env installing..."
+      - run: nix run -c bash scripts/environment/prepare.sh
       - run: nix run -c make test-integration-elasticsearch
 
   test-integration-gcp:
@@ -117,7 +119,8 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
+      - run: nix run -c echo "Env installing..."
+      - run: nix run -c bash scripts/environment/prepare.sh
       - run: nix run -c make test-integration-gcp
 
   test-integration-influxdb:
@@ -127,7 +130,8 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
+      - run: nix run -c echo "Env installing..."
+      - run: nix run -c bash scripts/environment/prepare.sh
       - run: nix run -c make test-integration-influxdb
 
   test-integration-kafka:
@@ -137,7 +141,8 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
+      - run: nix run -c echo "Env installing..."
+      - run: nix run -c bash scripts/environment/prepare.sh
       - run: nix run -c make test-integration-kafka
 
   test-integration-loki:
@@ -147,7 +152,8 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
+      - run: nix run -c echo "Env installing..."
+      - run: nix run -c bash scripts/environment/prepare.sh
       - run: nix run -c make test-integration-loki
 
   test-integration-pulsar:
@@ -157,7 +163,8 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
+      - run: nix run -c echo "Env installing..."
+      - run: nix run -c bash scripts/environment/prepare.sh
       - run: nix run -c make test-integration-pulsar
 
   test-integration-splunk:
@@ -167,5 +174,6 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix run -c echo "Env prep."
+      - run: nix run -c echo "Env installing..."
+      - run: nix run -c bash scripts/environment/prepare.sh
       - run: nix run -c make test-integration-splunk

@@ -11,13 +11,7 @@ SHELL [ "/usr/bin/env", "nix-shell", "/vector/shell.nix", "--run" ]
 RUN echo "Installing env..."
 
 # Setup the toolchain
-RUN rustup default $(cat rust-toolchain)
-WORKDIR /vector/scripts
-RUN bundle update --bundler
-RUN bundle install
-WORKDIR /vector/website
-RUN yarn
-WORKDIR /vector
+RUN ./prepare.sh
 
 # Declare volumes
 VOLUME /vector
