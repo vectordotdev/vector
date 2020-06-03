@@ -225,7 +225,7 @@ impl StackdriverConfig {
 mod tests {
     use super::*;
     use crate::{event::LogEvent, test_util::runtime};
-    use serde_json::value::RawValue;
+    use serde_json::value::{RawValue, Value};
     use std::iter::FromIterator;
 
     #[test]
@@ -243,13 +243,17 @@ mod tests {
         let sink = StackdriverSink {
             config,
             creds: None,
-            severity_key: None,
+            severity_key: Some("anumber".into()),
         };
 
-        let log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
+        let mut log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
+        log.insert(Atom::from("anumber"), Value::from(100));
         let json = sink.encode_event(Event::from(log)).unwrap();
         let body = serde_json::to_string(&json).unwrap();
-        assert_eq!(body, "{\"jsonPayload\":{\"message\":\"hello world\"}}");
+        assert_eq!(
+            body,
+            "{\"jsonPayload\":{\"message\":\"hello world\"},\"severity\":100}"
+        );
     }
 
     #[test]
@@ -297,11 +301,13 @@ mod tests {
             serde_json::json!({
                 "entries": [
                     {
+                        "severity": null,
                         "jsonPayload": {
                             "message": "hello"
                         }
                     },
                     {
+                        "severity": null,
                         "jsonPayload": {
                             "message": "world"
                         }
