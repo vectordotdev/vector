@@ -7,4 +7,6 @@
 !shell.nix
 !default.nix
 !scripts/environment
+!website/package.json
+!website/yarn.lock
 !.envrc

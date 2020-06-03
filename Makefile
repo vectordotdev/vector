@@ -275,7 +275,6 @@ ifeq ($(ENVIRONMENT), true)
 else
 	if $(AUTOSPAWN); then \
 		docker-compose up -d dependencies-loki; \
-		
 	fi
 	export TEST_LOG="vector=debug"
 	export RUST_TEST_THREADS=1
