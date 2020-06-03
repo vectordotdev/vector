@@ -52,10 +52,10 @@ help:
 define ENVIRONMENT_EXEC
 	@echo "Entering environment..."
 	@mkdir -p target
-	@$(CONTAINER_TOOL) run \
+	$(CONTAINER_TOOL) run \
 			--name vector-environment \
 			--rm \
-			$(if $(findstring true,$(ENVIRONMENT_TTY)),,--tty) \
+			$(if $(findstring true,$(ENVIRONMENT_TTY)),--tty,) \
 			--init \
 			--interactive \
 			--env INSIDE_ENVIRONMENT=true \
