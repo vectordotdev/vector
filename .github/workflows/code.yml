@@ -28,24 +28,6 @@ env:
   USE_CONTAINER: none
 
 jobs:
-  check-advisories:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - uses: EmbarkStudios/cargo-deny-action@v1
-        with:
-          command: check advisories
-
-  check-component-features:
-    runs-on: ubuntu-latest
-    env:
-      USE_CONTAINER: none
-    steps:
-      - uses: actions/checkout@v1
-      - run: sudo apt install -y python3-pip python3-setuptools python3-wheel
-      - run: sudo python3 -m pip install remarshal
-      - run: make check-component-features
-
   check-linux:
     runs-on: ubuntu-latest
     steps:
@@ -53,20 +35,6 @@ jobs:
       - run: make check-code
         env:
           PASS_RUSTFLAGS: "-D warnings"
-
-  check-version:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-version
-        env:
-          USE_CONTAINER: docker
-
-  check-scripts:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-scripts
 
   check-windows:
     runs-on: windows-latest
