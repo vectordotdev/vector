@@ -362,8 +362,8 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check-markdown
 else
-	# TODO: Install markdownlint
-	markdownlint .
+	@echo "This requires yarn have been run in the website/ dir!"
+	./website/node_modules/.bin/markdownlint .
 endif
 
 check-generate: ## Check that no files are pending generation
