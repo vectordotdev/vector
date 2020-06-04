@@ -35,6 +35,28 @@ jobs:
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make test"
 
+  test-behavior:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make test-behavior"
+
+  test-shutdown:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make test-shutdown"
+
   test-mac:
     runs-on: macos-latest
     steps:

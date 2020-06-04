@@ -28,14 +28,6 @@ env:
   USE_CONTAINER: none
 
 jobs:
-  check-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make check-code
-        env:
-          PASS_RUSTFLAGS: "-D warnings"
-
   check-windows:
     runs-on: windows-latest
     steps:

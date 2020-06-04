@@ -1,4 +1,4 @@
-name: cancel
+name: Cancel
 
 on: [push]
 
