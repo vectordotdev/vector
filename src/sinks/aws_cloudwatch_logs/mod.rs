@@ -833,11 +833,6 @@ mod integration_tests {
 
     const GROUP_NAME: &'static str = "vector-cw";
 
-    fn endpoint() -> String {
-        std::env::var("TEST_INTEGRATION_AWS_CLOUDWATCH_ADDR")
-            .unwrap_or(String::from("localhost:6000"))
-    }
-
     #[test]
     fn cloudwatch_insert_log_event() {
         let mut rt = runtime();
@@ -847,14 +842,14 @@ mod integration_tests {
 
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: endpoint().into(),
+            endpoint: "http://localhost:6000".into(),
         };
         ensure_group(region.clone());
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: stream_name.clone().into(),
             group_name: GROUP_NAME.into(),
-            region: RegionOrEndpoint::with_endpoint(endpoint().into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
@@ -902,14 +897,14 @@ mod integration_tests {
 
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: endpoint().into(),
+            endpoint: "http://localhost:6000".into(),
         };
         ensure_group(region.clone());
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: stream_name.clone().into(),
             group_name: GROUP_NAME.into(),
-            region: RegionOrEndpoint::with_endpoint(endpoint().into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
@@ -975,14 +970,14 @@ mod integration_tests {
 
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: endpoint().into(),
+            endpoint: "http://localhost:6000".into(),
         };
         ensure_group(region.clone());
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: stream_name.clone().into(),
             group_name: GROUP_NAME.into(),
-            region: RegionOrEndpoint::with_endpoint(endpoint().into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
@@ -1056,13 +1051,13 @@ mod integration_tests {
 
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: endpoint().into(),
+            endpoint: "http://localhost:6000".into(),
         };
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: stream_name.clone().into(),
             group_name: group_name.clone().into(),
-            region: RegionOrEndpoint::with_endpoint(endpoint().into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
@@ -1111,14 +1106,14 @@ mod integration_tests {
 
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: endpoint().into(),
+            endpoint: "http://localhost:6000".into(),
         };
         ensure_group(region.clone());
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: stream_name.clone().into(),
             group_name: group_name.clone().into(),
-            region: RegionOrEndpoint::with_endpoint(endpoint().into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
@@ -1170,7 +1165,7 @@ mod integration_tests {
 
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: endpoint().into(),
+            endpoint: "http://localhost:6000".into(),
         };
 
         let client = create_client(region.clone(), None, resolver).unwrap();
@@ -1179,7 +1174,7 @@ mod integration_tests {
         let config = CloudwatchLogsSinkConfig {
             group_name: GROUP_NAME.into(),
             stream_name: format!("{}-{{{{key}}}}", stream_name).into(),
-            region: RegionOrEndpoint::with_endpoint(endpoint().into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
@@ -1259,14 +1254,14 @@ mod integration_tests {
     fn cloudwatch_healthcheck() {
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: endpoint().into(),
+            endpoint: "http://localhost:6000".into(),
         };
         ensure_group(region);
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: "test-stream".into(),
             group_name: GROUP_NAME.into(),
-            region: RegionOrEndpoint::with_endpoint(endpoint().into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
