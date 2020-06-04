@@ -162,7 +162,11 @@ impl HttpSink for StackdriverSink {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.config.encoding.apply_rules(&mut event);
         let mut log = event.into_log();
-        let severity = self.severity_key.as_ref().and_then(|key| log.remove(key));
+        let severity = self
+            .severity_key
+            .as_ref()
+            .and_then(|key| log.remove(key))
+            .unwrap_or(0.into());
 
         let entry = serde_json::json!({
             "jsonPayload": log,
@@ -301,13 +305,13 @@ mod tests {
             serde_json::json!({
                 "entries": [
                     {
-                        "severity": null,
+                        "severity": 0,
                         "jsonPayload": {
                             "message": "hello"
                         }
                     },
                     {
-                        "severity": null,
+                        "severity": 0,
                         "jsonPayload": {
                             "message": "world"
                         }

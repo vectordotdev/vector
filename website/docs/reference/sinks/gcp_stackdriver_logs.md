@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-03"
+last_modified_on: "2020-06-04"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
@@ -869,6 +869,9 @@ field. The named field is removed from the log event if present, and must be an
 integer between 0 and 800. This could be added by a [`add_fields`
 transform][docs.transforms.add_fields] or extracted from a field from the
 source.
+
+If no severity key is specified, the severity of outgoing records will be set
+to 0 (`DEFAULT`).
 
 See the [GCP Stackdriver Logging LogSeverity
 description](https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity)
