@@ -15,7 +15,6 @@ pkgs.buildEnv {
       docker
       docker-compose
       cacert
-      gcc
       cmake
       rustup
       pkg-config
@@ -34,7 +33,7 @@ pkgs.buildEnv {
       gnumake
       autoconf
     ] ++ stdenv.lib.optional stdenv.isDarwin [ darwin.apple_sdk.frameworks.Security darwin.libiconv ]
-      ++ stdenv.lib.optional stdenv.isLinux [(glibcLocales.override { locales = ["en_US.UTF-8"]; }) ];
+      ++ stdenv.lib.optional stdenv.isLinux [ gcc (glibcLocales.override { locales = ["en_US.UTF-8"]; }) ];
     passthru = {
         PROTOC = "${pkgs.protobuf}/bin/protoc";
         PROTOC_INCLUDE = "${pkgs.protobuf}/include";
