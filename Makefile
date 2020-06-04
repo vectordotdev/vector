@@ -21,6 +21,7 @@ export ENVIRONMENT ?= false
 export ENVIRONMENT_UPSTREAM ?= docker.pkg.github.com/timberio/vector/environment
 export ENVIRONMENT_AUTOBUILD ?= true
 export ENVIRONMENT_TTY ?= true
+export SCOPE ?= ""
 
 # This variables can be used to override the target addresses of unit tests.
 # You can override them, just set it before your make call!
@@ -163,7 +164,7 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test
 	${ENVIRONMENT_COPY_ARTIFACTS}
 else
-	cargo test --no-default-features --features ${DEFAULT_FEATURES}
+	cargo test --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE}
 endif
 
 test-all: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
@@ -308,7 +309,15 @@ test-integration-kubernetes: ## Runs Kubernetes integration tests
 	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" USE_CONTAINER=none $(RUN) test-integration-kubernetes
 
 test-shutdown: ## Runs shutdown tests
-	$(RUN) test-shutdown
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make test-shutdown
+else
+	if $(AUTOSPAWN); then \
+		docker-compose up -d dependencies-kafka; \
+	fi
+	cargo test --features shutdown-tests  --test shutdown -- --test-threads 4
+endif
 
 ##@ Benching
 
@@ -318,7 +327,7 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make bench
 	${ENVIRONMENT_COPY_ARTIFACTS}
 else
-	cargo bench --no-default-features --features ${DEFAULT_FEATURES}
+	cargo bench --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE}
 endif
 
 ##@ Checking
