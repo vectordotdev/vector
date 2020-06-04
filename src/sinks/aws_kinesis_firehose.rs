@@ -6,6 +6,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         rusoto2::{self, AwsCredentialsProvider},
+        sink::Response,
         BatchEventsConfig, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -145,6 +146,8 @@ impl fmt::Debug for KinesisFirehoseService {
             .finish()
     }
 }
+
+impl Response for PutRecordBatchOutput {}
 
 #[derive(Debug, Clone)]
 struct KinesisFirehoseRetryLogic;

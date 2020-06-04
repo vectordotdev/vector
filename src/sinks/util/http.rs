@@ -1,7 +1,7 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     service::{TowerBatchedSink, TowerRequestSettings},
-    Batch, BatchSettings,
+    sink, Batch, BatchSettings,
 };
 use crate::{
     dns::Resolver,
@@ -311,6 +311,12 @@ impl<B> Service<B> for HttpBatchService<B> {
         });
 
         Box::new(fut)
+    }
+}
+
+impl<T: fmt::Debug> sink::Response for http::Response<T> {
+    fn is_successful(&self) -> bool {
+        self.status().is_success()
     }
 }
 
