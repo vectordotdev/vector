@@ -25,9 +25,6 @@ pkgs.buildEnv {
       ruby_2_7
       shellcheck
       docker
-      (glibcLocales.override {
-        locales = ["en_US.UTF-8"];
-      })
       yarn
       nodejs
       openssl
@@ -36,7 +33,8 @@ pkgs.buildEnv {
       snappy
       gnumake
       autoconf
-    ]  ++ stdenv.lib.optional stdenv.isDarwin [ Security libiconv ];
+    ] ++ stdenv.lib.optional stdenv.isDarwin [ Security libiconv ]
+      ++ stdenv.lib.optional stdenv.isLinux [(glibcLocales.override { locales = ["en_US.UTF-8"]; }) ];
     passthru = {
         PROTOC = "${pkgs.protobuf}/bin/protoc";
         PROTOC_INCLUDE = "${pkgs.protobuf}/include";
