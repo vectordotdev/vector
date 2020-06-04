@@ -206,20 +206,20 @@ fn remap_severity(severity: Value) -> Value {
     let n = match severity {
         Value::Integer(n) => n - n % 100,
         Value::Bytes(s) => {
-            let s = String::from_utf8_lossy(&s).to_uppercase();
-            match s {
-                _ if s.starts_with("EMERG") => 800,
-                _ if s.starts_with("ALERT") => 700,
-                _ if s.starts_with("CRIT") => 600,
-                _ if s.starts_with("ERR") => 500,
-                _ if s.starts_with("WARN") => 400,
-                _ if s.starts_with("NOTICE") => 300,
-                _ if s.starts_with("INFO") => 200,
-                _ if s.starts_with("DEBUG") => 100,
-                _ if s.starts_with("DEFAULT") => 0,
-                _ => match s.parse::<usize>() {
-                    Ok(n) => (n - n % 100) as i64,
-                    Err(_) => {
+            let s = String::from_utf8_lossy(&s);
+            match s.parse::<usize>() {
+                Ok(n) => (n - n % 100) as i64,
+                Err(_) => match s.to_uppercase() {
+                    s if s.starts_with("EMERG") => 800,
+                    s if s.starts_with("ALERT") => 700,
+                    s if s.starts_with("CRIT") => 600,
+                    s if s.starts_with("ERR") => 500,
+                    s if s.starts_with("WARN") => 400,
+                    s if s.starts_with("NOTICE") => 300,
+                    s if s.starts_with("INFO") => 200,
+                    s if s.starts_with("DEBUG") => 100,
+                    s if s.starts_with("DEFAULT") => 0,
+                    _ => {
                         warn!(
                             message = "Unknown severity value string, using DEFAULT",
                             value = %s,
