@@ -1,6 +1,6 @@
 use super::{healthcheck_response2, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    event::Event,
+    event::{Event, Value},
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -166,6 +166,7 @@ impl HttpSink for StackdriverSink {
             .severity_key
             .as_ref()
             .and_then(|key| log.remove(key))
+            .map(remap_severity)
             .unwrap_or(0.into());
 
         let entry = serde_json::json!({
@@ -201,6 +202,46 @@ impl HttpSink for StackdriverSink {
     }
 }
 
+fn remap_severity(severity: Value) -> Value {
+    let n = match severity {
+        Value::Integer(n) => n - n % 100,
+        Value::Bytes(s) => {
+            let s = String::from_utf8_lossy(&s).to_uppercase();
+            match s {
+                _ if s.starts_with("EMERG") => 800,
+                _ if s.starts_with("ALERT") => 700,
+                _ if s.starts_with("CRIT") => 600,
+                _ if s.starts_with("ERR") => 500,
+                _ if s.starts_with("WARN") => 400,
+                _ if s.starts_with("NOTICE") => 300,
+                _ if s.starts_with("INFO") => 200,
+                _ if s.starts_with("DEBUG") => 100,
+                _ if s.starts_with("DEFAULT") => 0,
+                _ => match s.parse::<usize>() {
+                    Ok(n) => (n - n % 100) as i64,
+                    Err(_) => {
+                        warn!(
+                            message = "Unknown severity value string, using DEFAULT",
+                            value = %s,
+                            rate_limit_secs = 10
+                        );
+                        0
+                    }
+                },
+            }
+        }
+        value => {
+            warn!(
+                message = "Unknown severity value type, using DEFAULT",
+                ?value,
+                rate_limit_secs = 10
+            );
+            0
+        }
+    };
+    Value::Integer(n)
+}
+
 async fn healthcheck(
     cx: SinkContext,
     sink: StackdriverSink,
@@ -228,8 +269,11 @@ impl StackdriverConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::LogEvent, test_util::runtime};
-    use serde_json::value::{RawValue, Value};
+    use crate::{
+        event::{LogEvent, Value},
+        test_util::runtime,
+    };
+    use serde_json::value::RawValue;
     use std::iter::FromIterator;
 
     #[test]
@@ -250,14 +294,43 @@ mod tests {
             severity_key: Some("anumber".into()),
         };
 
-        let mut log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
-        log.insert(Atom::from("anumber"), Value::from(100));
+        let log = LogEvent::from_iter(
+            [("message", "hello world"), ("anumber", "100")]
+                .iter()
+                .map(|&s| s),
+        );
         let json = sink.encode_event(Event::from(log)).unwrap();
         let body = serde_json::to_string(&json).unwrap();
         assert_eq!(
             body,
             "{\"jsonPayload\":{\"message\":\"hello world\"},\"severity\":100}"
         );
+    }
+
+    #[test]
+    fn severity_remaps_strings() {
+        for &(s, n) in &[
+            ("EMERGENCY", 800), // Handles full upper case
+            ("EMERG", 800),     // Handles abbreviations
+            ("alert", 700),     // Handles lower case
+            ("CrIt1c", 600),    // Handles mixed case and suffixes
+            ("err404", 500),    // Handles lower case and suffixes
+            ("warnings", 400),
+            ("notice", 300),
+            ("info", 200),
+            ("DEBUG2", 100), // Handles upper case and suffixes
+            ("nothing", 0),  // Maps unknown terms to DEFAULT
+            ("123", 100),    // Handles numbers in strings
+            ("-100", 0),     // Maps negatives to DEFAULT
+        ] {
+            assert_eq!(
+                remap_severity(s.into()),
+                Value::Integer(n),
+                "remap_severity({:?}) != {}",
+                s,
+                n
+            );
+        }
     }
 
     #[test]
