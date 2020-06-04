@@ -4,7 +4,6 @@ pkgs.buildEnv {
   name = "vector-env";
   paths = with pkgs; [
       git
-      ping
       dnsutils
       curl
       bash
