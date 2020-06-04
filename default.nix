@@ -32,7 +32,7 @@ pkgs.buildEnv {
       snappy
       gnumake
       autoconf
-    ] ++ stdenv.lib.optional stdenv.isDarwin [ darwin.apple_sdk.frameworks.Security darwin.libiconv ]
+    ] ++ stdenv.lib.optional stdenv.isDarwin [ darwin.cf-private darwin.apple_sdk.frameworks.Security darwin.libiconv ]
       ++ stdenv.lib.optional stdenv.isLinux [ gcc (glibcLocales.override { locales = ["en_US.UTF-8"]; }) ];
     passthru = {
         PROTOC = "${pkgs.protobuf}/bin/protoc";
