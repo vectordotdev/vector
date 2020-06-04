@@ -1,6 +1,7 @@
 //! A state implementation backed by [`evmap10`].
 
 use crate::kubernetes::hash_value::HashValue;
+use async_trait::async_trait;
 use evmap10::WriteHandle;
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
 
@@ -9,14 +10,14 @@ use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
 /// [`crate::kubernetes::Reflector`].
 pub struct Writer<T>
 where
-    T: Metadata<Ty = ObjectMeta>,
+    T: Metadata<Ty = ObjectMeta> + Send,
 {
     inner: WriteHandle<String, Value<T>>,
 }
 
 impl<T> Writer<T>
 where
-    T: Metadata<Ty = ObjectMeta>,
+    T: Metadata<Ty = ObjectMeta> + Send,
 {
     /// Take a [`WriteHandle`], initialize it and return it wrapped with
     /// [`Self`].
@@ -27,9 +28,10 @@ where
     }
 }
 
+#[async_trait]
 impl<T> super::Write for Writer<T>
 where
-    T: Metadata<Ty = ObjectMeta>,
+    T: Metadata<Ty = ObjectMeta> + Send,
 {
     type Item = T;
 
@@ -37,28 +39,28 @@ where
     // within a certain small time window we commit all of them at once.
     // This will improve the state behaivor at resync.
 
-    fn add(&mut self, item: Self::Item) {
+    async fn add(&mut self, item: Self::Item) {
         if let Some((key, value)) = kv(item) {
             self.inner.insert(key, value);
             self.inner.flush();
         }
     }
 
-    fn update(&mut self, item: Self::Item) {
+    async fn update(&mut self, item: Self::Item) {
         if let Some((key, value)) = kv(item) {
             self.inner.update(key, value);
             self.inner.flush();
         }
     }
 
-    fn delete(&mut self, item: Self::Item) {
+    async fn delete(&mut self, item: Self::Item) {
         if let Some((key, _value)) = kv(item) {
             self.inner.empty(key);
             self.inner.flush();
         }
     }
 
-    fn resync(&mut self) {
+    async fn resync(&mut self) {
         self.inner.purge();
         // We do not flush on resync until the next per-item operation
         // arrives.
