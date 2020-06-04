@@ -23,7 +23,7 @@ use rusoto_s3::{
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::collections::BTreeMap;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use tower::{Service, ServiceBuilder};
 use tracing::field;
 use tracing_futures::{Instrument, Instrumented};
@@ -167,11 +167,12 @@ impl S3Sink {
         let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
         let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
 
-        let key_prefix = if let Some(kp) = &config.key_prefix {
-            Template::from(kp.as_str())
-        } else {
-            Template::from("date=%F/")
-        };
+        let key_prefix = config
+            .key_prefix
+            .as_ref()
+            .map(String::as_str)
+            .unwrap_or("date=%F/");
+        let key_prefix = Template::try_from(key_prefix)?;
 
         let region = config.region.clone().try_into()?;
 
@@ -415,7 +416,7 @@ mod tests {
     #[test]
     fn s3_encode_event_text() {
         let message = "hello world".to_string();
-        let batch_time_format = Template::from("date=%F");
+        let batch_time_format = Template::try_from("date=%F").unwrap();
         let bytes = encode_event(
             message.clone().into(),
             &batch_time_format,
@@ -434,7 +435,7 @@ mod tests {
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
 
-        let batch_time_format = Template::from("date=%F");
+        let batch_time_format = Template::try_from("date=%F").unwrap();
         let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
 
         let (bytes, _) = bytes.into_parts();
@@ -450,7 +451,7 @@ mod tests {
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
 
-        let key_prefix = Template::from("{{ key }}");
+        let key_prefix = Template::try_from("{{ key }}").unwrap();
 
         let encoding_config = EncodingConfigWithDefault {
             codec: Encoding::Ndjson,

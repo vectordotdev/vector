@@ -653,13 +653,14 @@ mod tests {
         test_util::runtime,
     };
     use std::collections::HashMap;
+    use std::convert::{TryFrom, TryInto};
     use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn partition_static() {
         let event = Event::from("hello world");
-        let stream = Template::from("stream");
-        let group = "group".into();
+        let stream = Template::try_from("stream").unwrap();
+        let group = "group".try_into().unwrap();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
 
@@ -677,8 +678,8 @@ mod tests {
 
         event.as_mut_log().insert("log_stream", "stream");
 
-        let stream = Template::from("{{log_stream}}");
-        let group = "group".into();
+        let stream = Template::try_from("{{log_stream}}").unwrap();
+        let group = "group".try_into().unwrap();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
 
@@ -696,8 +697,8 @@ mod tests {
 
         event.as_mut_log().insert("log_stream", "stream");
 
-        let stream = Template::from("abcd-{{log_stream}}");
-        let group = "group".into();
+        let stream = Template::try_from("abcd-{{log_stream}}").unwrap();
+        let group = "group".try_into().unwrap();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
 
@@ -715,8 +716,8 @@ mod tests {
 
         event.as_mut_log().insert("log_stream", "stream");
 
-        let stream = Template::from("{{log_stream}}-abcd");
-        let group = "group".into();
+        let stream = Template::try_from("{{log_stream}}-abcd").unwrap();
+        let group = "group".try_into().unwrap();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
 
@@ -732,8 +733,8 @@ mod tests {
     fn partition_no_key_event() {
         let event = Event::from("hello world");
 
-        let stream = Template::from("{{log_stream}}");
-        let group = "group".into();
+        let stream = Template::try_from("{{log_stream}}").unwrap();
+        let group = "group".try_into().unwrap();
 
         let stream_val = partition(event, &group, &stream);
 
