@@ -38,6 +38,8 @@ pub struct NewRelicLogsConfig {
     #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
+    pub compression: Compression,
+    #[serde(default)]
     pub batch: BatchBytesConfig,
 
     #[serde(default)]
@@ -125,7 +127,7 @@ impl NewRelicLogsConfig {
             healthcheck_uri: None,
             auth: None,
             headers: Some(headers),
-            compression: Compression::None,
+            compression: self.compression,
             encoding: self.encoding.clone().without_default(),
 
             batch,
