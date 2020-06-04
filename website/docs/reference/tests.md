@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-04"
+last_modified_on: "2020-06-05"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
@@ -62,10 +62,14 @@ vector test /etc/vector/*.toml
     # Conditions
     conditions.type = "check_fields" # optional, default
     conditions."message.eq" = "this is the content to match against" # example
+    conditions."message.eq" = ["match this", "or this"] # example
     conditions."message.contains" = "foo" # example
+    conditions."message.contains" = ["foo", "bar"] # example
     conditions."environment.ends_with" = "-staging" # example
+    conditions."environment.ends_with" = ["-staging", "-running"] # example
     conditions."message.regex" = " (any|of|these|five|words) " # example
     conditions."environment.starts_with" = "staging-" # example
+    conditions."environment.ends_with" = ["staging-", "running-"] # example
 
     # General
     extract_from = "foo" # required
@@ -113,15 +117,20 @@ vector test /etc/vector/*.toml
     # Conditions
     conditions.type = "check_fields" # optional, default
     conditions."message.eq" = "this is the content to match against" # example
+    conditions."message.eq" = ["match this", "or this"] # example
     conditions."host.exists" = true # example
     conditions."method.neq" = "POST" # example
+    conditions."method.neq" = ["POST", "GET"] # example
     conditions."message.not_contains" = "some phrase to ignore" # example
     conditions."unit.not_starts_with" = "sys-" # example
     conditions."unit.not_ends_with" = ".device" # example
     conditions."message.contains" = "foo" # example
+    conditions."message.contains" = ["foo", "bar"] # example
     conditions."environment.ends_with" = "-staging" # example
+    conditions."environment.ends_with" = ["-staging", "-running"] # example
     conditions."message.regex" = " (any|of|these|five|words) " # example
     conditions."environment.starts_with" = "staging-" # example
+    conditions."environment.ends_with" = ["staging-", "running-"] # example
 
     # General
     extract_from = "foo" # required
@@ -610,7 +619,7 @@ The type of the condition to execute.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"message.eq":"this is the content to match against"}]}
+  examples={[{"message.eq":"this is the content to match against"},{"message.eq":["match this","or this"]}]}
   groups={[]}
   name={"`[field-name]`.eq"}
   path={"outputs.conditions"}
@@ -624,7 +633,8 @@ The type of the condition to execute.
 
 ##### `[field-name]`.eq
 
-Check whether a fields contents exactly matches the value specified.
+Check whether a fields contents exactly matches the value specified.Can also
+provide a list of string (evaluates to true if any match).
 
 
 
@@ -657,7 +667,7 @@ being `true` or `false` respectively.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"method.neq":"POST"}]}
+  examples={[{"method.neq":"POST"},{"method.neq":["POST","GET"]}]}
   groups={[]}
   name={"`[field-name]`.neq"}
   path={"outputs.conditions"}
@@ -671,7 +681,8 @@ being `true` or `false` respectively.
 
 ##### `[field-name]`.neq
 
-Check whether a fields contents does not match the value specified.
+Check whether a fields contents does not match the value specified.Can also
+provide a list of string (evaluates to false if any match).
 
 
 
@@ -703,7 +714,7 @@ Check if the given `[condition]` does not match.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"message.contains":"foo"}]}
+  examples={[{"message.contains":"foo"},{"message.contains":["foo","bar"]}]}
   groups={[]}
   name={"`[field_name]`.contains"}
   path={"outputs.conditions"}
@@ -717,7 +728,8 @@ Check if the given `[condition]` does not match.
 
 ##### `[field_name]`.contains
 
-Checks whether a string field contains a string argument.
+Checks whether a string field contains a string argument.Can also provide a
+list of string (evaluates to true if any match).
 
 
 
@@ -726,7 +738,7 @@ Checks whether a string field contains a string argument.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"environment.ends_with":"-staging"}]}
+  examples={[{"environment.ends_with":"-staging"},{"environment.ends_with":["-staging","-running"]}]}
   groups={[]}
   name={"`[field_name]`.ends_with"}
   path={"outputs.conditions"}
@@ -740,7 +752,8 @@ Checks whether a string field contains a string argument.
 
 ##### `[field_name]`.ends_with
 
-Checks whether a string field ends with a string argument.
+Checks whether a string field ends with a string argument.Can also provide a
+list of string (evaluates to true if any match).
 
 
 
@@ -776,7 +789,7 @@ preferred where possible.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"environment.starts_with":"staging-"}]}
+  examples={[{"environment.starts_with":"staging-"},{"environment.ends_with":["staging-","running-"]}]}
   groups={[]}
   name={"`[field_name]`.starts_with"}
   path={"outputs.conditions"}
@@ -790,7 +803,8 @@ preferred where possible.
 
 ##### `[field_name]`.starts_with
 
-Checks whether a string field starts with a string argument.
+Checks whether a string field starts with a string argument.Can also provide a
+list of string (evaluates to true if any match).
 
 
 

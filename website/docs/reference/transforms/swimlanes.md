@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-04"
+last_modified_on: "2020-06-05"
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events, allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
@@ -46,10 +46,14 @@ events across parallel streams using logical filters.
   [transforms.my_transform_id.lanes.`[swimlane-id]`]
     type = "check_fields" # optional, default
     "message.eq" = "this is the content to match against" # example
+    "message.eq" = ["match this", "or this"] # example
     "message.contains" = "foo" # example
+    "message.contains" = ["foo", "bar"] # example
     "environment.ends_with" = "-staging" # example
+    "environment.ends_with" = ["-staging", "-running"] # example
     "message.regex" = " (any|of|these|five|words) " # example
     "environment.starts_with" = "staging-" # example
+    "environment.ends_with" = ["staging-", "running-"] # example
 ```
 
 </TabItem>
@@ -65,15 +69,20 @@ events across parallel streams using logical filters.
   [transforms.my_transform_id.lanes.`[swimlane-id]`]
     type = "check_fields" # optional, default
     "message.eq" = "this is the content to match against" # example
+    "message.eq" = ["match this", "or this"] # example
     "host.exists" = true # example
     "method.neq" = "POST" # example
+    "method.neq" = ["POST", "GET"] # example
     "message.not_contains" = "some phrase to ignore" # example
     "unit.not_starts_with" = "sys-" # example
     "unit.not_ends_with" = ".device" # example
     "message.contains" = "foo" # example
+    "message.contains" = ["foo", "bar"] # example
     "environment.ends_with" = "-staging" # example
+    "environment.ends_with" = ["-staging", "-running"] # example
     "message.regex" = " (any|of|these|five|words) " # example
     "environment.starts_with" = "staging-" # example
+    "environment.ends_with" = ["staging-", "running-"] # example
 ```
 
 </TabItem>
@@ -153,7 +162,7 @@ The type of the condition to execute.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"message.eq":"this is the content to match against"}]}
+  examples={[{"message.eq":"this is the content to match against"},{"message.eq":["match this","or this"]}]}
   groups={[]}
   name={"`[field-name]`.eq"}
   path={"lanes.`[swimlane-id]`"}
@@ -167,7 +176,8 @@ The type of the condition to execute.
 
 ##### `[field-name]`.eq
 
-Check whether a fields contents exactly matches the value specified.
+Check whether a fields contents exactly matches the value specified.Can also
+provide a list of string (evaluates to true if any match).
 
 
 
@@ -200,7 +210,7 @@ being `true` or `false` respectively.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"method.neq":"POST"}]}
+  examples={[{"method.neq":"POST"},{"method.neq":["POST","GET"]}]}
   groups={[]}
   name={"`[field-name]`.neq"}
   path={"lanes.`[swimlane-id]`"}
@@ -214,7 +224,8 @@ being `true` or `false` respectively.
 
 ##### `[field-name]`.neq
 
-Check whether a fields contents does not match the value specified.
+Check whether a fields contents does not match the value specified.Can also
+provide a list of string (evaluates to false if any match).
 
 
 
@@ -246,7 +257,7 @@ Check if the given `[condition]` does not match.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"message.contains":"foo"}]}
+  examples={[{"message.contains":"foo"},{"message.contains":["foo","bar"]}]}
   groups={[]}
   name={"`[field_name]`.contains"}
   path={"lanes.`[swimlane-id]`"}
@@ -260,7 +271,8 @@ Check if the given `[condition]` does not match.
 
 ##### `[field_name]`.contains
 
-Checks whether a string field contains a string argument.
+Checks whether a string field contains a string argument.Can also provide a
+list of string (evaluates to true if any match).
 
 
 
@@ -269,7 +281,7 @@ Checks whether a string field contains a string argument.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"environment.ends_with":"-staging"}]}
+  examples={[{"environment.ends_with":"-staging"},{"environment.ends_with":["-staging","-running"]}]}
   groups={[]}
   name={"`[field_name]`.ends_with"}
   path={"lanes.`[swimlane-id]`"}
@@ -283,7 +295,8 @@ Checks whether a string field contains a string argument.
 
 ##### `[field_name]`.ends_with
 
-Checks whether a string field ends with a string argument.
+Checks whether a string field ends with a string argument.Can also provide a
+list of string (evaluates to true if any match).
 
 
 
@@ -319,7 +332,7 @@ preferred where possible.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"environment.starts_with":"staging-"}]}
+  examples={[{"environment.starts_with":"staging-"},{"environment.ends_with":["staging-","running-"]}]}
   groups={[]}
   name={"`[field_name]`.starts_with"}
   path={"lanes.`[swimlane-id]`"}
@@ -333,7 +346,8 @@ preferred where possible.
 
 ##### `[field_name]`.starts_with
 
-Checks whether a string field starts with a string argument.
+Checks whether a string field starts with a string argument.Can also provide a
+list of string (evaluates to true if any match).
 
 
 
