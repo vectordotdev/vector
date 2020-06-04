@@ -33,8 +33,12 @@ pkgs.buildEnv {
       gnumake
       autoconf
       jq
-    ] ++ stdenv.lib.optional stdenv.isDarwin [ darwin.cf-private darwin.apple_sdk.frameworks.Security darwin.apple_sdk.frameworks.SecurityFoundation darwin.libiconv ]
-      ++ stdenv.lib.optional stdenv.isLinux [ gcc (glibcLocales.override { locales = ["en_US.UTF-8"]; }) ];
+      libiconv
+    ] ++ (if stdenv.isDarwin then [ 
+      darwin.cf-private darwin.apple_sdk.frameworks.Security darwin.apple_sdk.frameworks.SecurityFoundation ] 
+    else [
+      systemd gcc (glibcLocales.override { locales = ["en_US.UTF-8"]; })
+    ]);
     passthru = {
         PROTOC = "${pkgs.protobuf}/bin/protoc";
         PROTOC_INCLUDE = "${pkgs.protobuf}/include";

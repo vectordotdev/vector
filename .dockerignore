@@ -10,3 +10,4 @@
 !website/package.json
 !website/yarn.lock
 !.envrc
+!tests
