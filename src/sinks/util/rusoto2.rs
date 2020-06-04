@@ -125,7 +125,7 @@ where
         + 'static,
     T::Future: Send + 'static,
 {
-    // Adaptation of https://docs.rs/rusoto_core/0.41.0/src/rusoto_core/request.rs.html#409-522
+    // Adaptation of https://docs.rs/rusoto_core/0.44.0/src/rusoto_core/request.rs.html#314-416
     fn dispatch(
         &self,
         request: SignedRequest,
@@ -142,7 +142,12 @@ where
                 "DELETE" => Method::DELETE,
                 "GET" => Method::GET,
                 "HEAD" => Method::HEAD,
-                v => unimplemented!("method type: {:?}", v),
+                v => {
+                    return Err(HttpDispatchError::new(format!(
+                        "Unsupported HTTP verb {}",
+                        v
+                    )));
+                }
             };
 
             let mut headers = HeaderMap::new();
@@ -150,7 +155,10 @@ where
                 let header_name = match h.0.parse::<HeaderName>() {
                     Ok(name) => name,
                     Err(err) => {
-                        return Err(HttpDispatchError::new(format!("ParseHeader: {}", err)))
+                        return Err(HttpDispatchError::new(format!(
+                            "error parsing header name: {}",
+                            err
+                        )))
                     }
                 };
                 for v in h.1.iter() {
@@ -158,7 +166,7 @@ where
                         Ok(value) => value,
                         Err(err) => {
                             return Err(HttpDispatchError::new(format!(
-                                "HeaderValueParse: {}",
+                                "error parsing header value: {}",
                                 err
                             )))
                         }
@@ -182,7 +190,7 @@ where
                 .method(method)
                 .uri(uri)
                 .body(RusotoBody::from(request.payload))
-                .map_err(|e| format!("RequestBuildingError: {}", e))
+                .map_err(|e| format!("error building request: {}", e))
                 .map_err(HttpDispatchError::new)?;
 
             *request.headers_mut() = headers;
@@ -190,7 +198,7 @@ where
             let response = client
                 .oneshot(request)
                 .await
-                .map_err(|e| HttpDispatchError::new(format!("DispatchError: {}", e)))?;
+                .map_err(|e| HttpDispatchError::new(format!("Error during dispatch: {}", e)))?;
 
             let status = StatusCode::from_u16(response.status().as_u16()).unwrap();
             let headers = response
