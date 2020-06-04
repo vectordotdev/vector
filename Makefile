@@ -375,7 +375,7 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check-version
 else
-	./scripts/check-version.sh
+	./scripts/check-version.rb
 endif
 
 check-examples: ## Check that the config/exmaples files are valid

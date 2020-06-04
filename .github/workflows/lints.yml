@@ -35,7 +35,7 @@ jobs:
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make check-generate"
-  
+
   check-version:
     runs-on: ubuntu-latest
     steps:
@@ -68,7 +68,7 @@ jobs:
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make check-code"
-  
+
   check-code-mac:
     runs-on: macos-latest
     steps:
