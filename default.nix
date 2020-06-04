@@ -41,7 +41,10 @@ pkgs.buildEnv {
     passthru = {
         PROTOC = "${pkgs.protobuf}/bin/protoc";
         PROTOC_INCLUDE = "${pkgs.protobuf}/include";
-        LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
+        LOCALE_ARCHIVE= if pkgs.stdenv.isLinux then
+          "${pkgs.glibcLocales}/lib/locale/locale-archive"
+        else
+          "";
         LC_ALL = "en_US.UTF-8";
         OPENSSL_DIR = "${pkgs.openssl.dev}";
         OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
