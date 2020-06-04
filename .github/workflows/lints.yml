@@ -1,4 +1,4 @@
-name: Experimental Suite
+name: Lint Suite
 
 on:
   push:
