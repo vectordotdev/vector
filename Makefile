@@ -23,16 +23,6 @@ export ENVIRONMENT_AUTOBUILD ?= true
 export ENVIRONMENT_TTY ?= true
 export SCOPE ?= ""
 
-# This variables can be used to override the target addresses of unit tests.
-# You can override them, just set it before your make call!
-export TEST_INTEGRATION_AWS_ADDR ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_localstack_1:4571,0.0.0.0:6000)
-export TEST_INTEGRATION_AWS_CLOUDWATCH_ADDR ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),vector_mockwatchlogs_1:6000,0.0.0.0:6000)
-export TEST_INTEGRATION_CLICKHOUSE_ADDR ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_clickhouse_1:8123,http://0.0.0.0:8123)
-export TEST_INTEGRATION_ELASTICSEARCH_ADDR_COMM ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_elasticsearch_1:9200,http://0.0.0.0:9200)
-export TEST_INTEGRATION_ELASTICSEARCH_ADDR_HTTP ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),http://vector_elasticsearch_1:9300,http://0.0.0.0:9300)
-export TEST_INTEGRATION_ELASTICSEARCH_TLS_ADDR_COMM ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),https://vector_elasticsearch-tls_1:9200,https://0.0.0.0:9201)
-export TEST_INTEGRATION_ELASTICSEARCH_TLS_ADDR_HTTP ?= $(if $(findstring true,$(INSIDE_ENVIRONMENT)),https://vector_elasticsearch-tls_1:9300,https://0.0.0.0:9301)
-
  # Deprecated.
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
 
@@ -62,14 +52,11 @@ define ENVIRONMENT_EXEC
 			--init \
 			--interactive \
 			--env INSIDE_ENVIRONMENT=true \
-			--network environment \
-			--dns-search environment \
-			--hostname vector \
+			--network host \
 			--mount type=bind,source=${PWD},target=/vector \
 			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
 			--mount type=volume,source=vector-target,target=/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
-			--publish 3000:3000 \
 			$(ENVIRONMENT_UPSTREAM)
 endef
 
