@@ -334,7 +334,12 @@ endif
 check-all: check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
 
 check-component-features: ## Check that all component features are setup properly
-	$(RUN) check-component-features
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make check-component-features
+else
+	./scripts/check-component-features.sh
+endif
 
 check-fmt: ## Check that all files are formatted properly
 ifeq ($(ENVIRONMENT), true)
