@@ -24,6 +24,7 @@ pub mod kafka;
 pub mod list;
 pub mod metrics;
 pub mod region;
+pub mod region2;
 pub mod runtime;
 pub mod serde;
 pub mod shutdown;

@@ -1,28 +1,34 @@
 use crate::{
     dns::Resolver,
     event::{self, Event},
-    region::RegionOrEndpoint,
+    region2::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        retries::RetryLogic,
+        retries2::RetryLogic,
         rusoto2::{self, AwsCredentialsProvider},
-        BatchEventsConfig, TowerRequestConfig,
+        service2::TowerRequestConfig,
+        BatchEventsConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use bytes::Bytes;
-use futures01::{stream::iter_ok, Future, Poll, Sink};
+use bytes05::Bytes;
+use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
-use rusoto_core::{Region, RusotoError, RusotoFuture};
-use rusoto_firehose::{
-    DescribeDeliveryStreamInput, KinesisFirehose, KinesisFirehoseClient, PutRecordBatchError,
-    PutRecordBatchInput, PutRecordBatchOutput, Record,
+use rusoto_core44::{Region, RusotoError};
+use rusoto_firehose44::{
+    DescribeDeliveryStreamError, DescribeDeliveryStreamInput, KinesisFirehose,
+    KinesisFirehoseClient, PutRecordBatchError, PutRecordBatchInput, PutRecordBatchOutput, Record,
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{convert::TryInto, fmt};
-use tower::Service;
-use tracing_futures::{Instrument, Instrumented};
+use std::{
+    convert::TryInto,
+    fmt,
+    task::{Context, Poll},
+};
+use tower03::Service;
+use tracing_futures::Instrument;
 
 #[derive(Clone)]
 pub struct KinesisFirehoseService {
@@ -66,9 +72,9 @@ inventory::submit! {
 impl SinkConfig for KinesisFirehoseSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let config = self.clone();
-        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
+        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
         let sink = KinesisFirehoseService::new(config, cx)?;
-        Ok((Box::new(sink), healthcheck))
+        Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -115,10 +121,11 @@ impl KinesisFirehoseService {
 impl Service<Vec<Record>> for KinesisFirehoseService {
     type Response = PutRecordBatchOutput;
     type Error = RusotoError<PutRecordBatchError>;
-    type Future = Instrumented<RusotoFuture<PutRecordBatchOutput, PutRecordBatchError>>;
+    type Future =
+        BoxFuture<'static, Result<PutRecordBatchOutput, RusotoError<PutRecordBatchError>>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
+    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, records: Vec<Record>) -> Self::Future {
@@ -127,14 +134,15 @@ impl Service<Vec<Record>> for KinesisFirehoseService {
             events = %records.len(),
         );
 
+        let client = self.client.clone();
         let request = PutRecordBatchInput {
             records,
             delivery_stream_name: self.config.stream_name.clone(),
         };
 
-        self.client
-            .put_record_batch(request)
-            .instrument(info_span!("request"))
+        Box::pin(
+            async move { client.put_record_batch(request).await }.instrument(info_span!("request")),
+        )
     }
 }
 
@@ -167,36 +175,33 @@ impl RetryLogic for KinesisFirehoseRetryLogic {
 enum HealthcheckError {
     #[snafu(display("DescribeDeliveryStream failed: {}", source))]
     DescribeDeliveryStreamFailed {
-        source: RusotoError<rusoto_firehose::DescribeDeliveryStreamError>,
+        source: RusotoError<DescribeDeliveryStreamError>,
     },
     #[snafu(display("Stream name does not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
 }
 
-fn healthcheck(
-    config: KinesisFirehoseSinkConfig,
-    resolver: Resolver,
-) -> crate::Result<super::Healthcheck> {
+async fn healthcheck(config: KinesisFirehoseSinkConfig, resolver: Resolver) -> crate::Result<()> {
     let client = create_client(config.region.try_into()?, config.assume_role, resolver)?;
     let stream_name = config.stream_name;
 
-    let fut = client
-        .describe_delivery_stream(DescribeDeliveryStreamInput {
-            delivery_stream_name: stream_name.clone(),
-            exclusive_start_destination_id: None,
-            limit: Some(1),
-        })
-        .map_err(|source| HealthcheckError::DescribeDeliveryStreamFailed { source }.into())
-        .and_then(move |res| Ok(res.delivery_stream_description.delivery_stream_name))
-        .and_then(move |name| {
+    let req = client.describe_delivery_stream(DescribeDeliveryStreamInput {
+        delivery_stream_name: stream_name.clone(),
+        exclusive_start_destination_id: None,
+        limit: Some(1),
+    });
+
+    match req.await {
+        Ok(resp) => {
+            let name = resp.delivery_stream_description.delivery_stream_name;
             if name == stream_name {
                 Ok(())
             } else {
                 Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
             }
-        });
-
-    Ok(Box::new(fut))
+        }
+        Err(source) => Err(HealthcheckError::DescribeDeliveryStreamFailed { source }.into()),
+    }
 }
 
 fn create_client(
@@ -269,8 +274,8 @@ mod integration_tests {
         topology::config::SinkContext,
     };
     use futures01::Sink;
-    use rusoto_core::Region;
-    use rusoto_firehose::{
+    use rusoto_core44::Region;
+    use rusoto_firehose44::{
         CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
         KinesisFirehoseClient,
     };
