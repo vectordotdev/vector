@@ -164,7 +164,7 @@ pub struct TowerRequestLayer<L, Request> {
 impl<S, L, Request> tower::layer::Layer<S> for TowerRequestLayer<L, Request>
 where
     S: Service<Request> + Send + Clone + 'static,
-    S::Response: Send + 'static + Response,
+    S::Response: Response + Send + 'static,
     S::Error: Into<crate::Error> + Send + Sync + 'static,
     S::Future: Send + 'static,
     L: RetryLogic<Response = S::Response> + Send + 'static,

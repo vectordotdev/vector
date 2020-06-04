@@ -720,25 +720,6 @@ pub trait Response: fmt::Debug {
 impl Response for () {}
 impl<'a> Response for &'a str {}
 
-#[cfg(feature = "rusoto_kinesis")]
-impl Response for rusoto_kinesis::PutRecordsOutput {}
-#[cfg(feature = "rusoto_s3")]
-impl Response for rusoto_s3::PutObjectOutput {}
-#[cfg(feature = "rusoto_firehose")]
-impl Response for rusoto_firehose::PutRecordBatchOutput {}
-
-impl<T: fmt::Debug> Response for http::response::Response<T> {
-    fn is_successful(&self) -> bool {
-        self.status().is_success()
-    }
-}
-
-impl<T: fmt::Debug> Response for http02::response::Response<T> {
-    fn is_successful(&self) -> bool {
-        self.status().is_success()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
