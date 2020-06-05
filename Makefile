@@ -614,8 +614,13 @@ load-qemu-binfmt: ## Load `binfmt-misc` kernel module which required to use `qem
 signoff: ## Signsoff all previous commits since branch creation
 	$(RUN) signoff
 
-slim-builds: ## Updates the Cargo config to product disk optimized builds, useful for CI
-	$(RUN) slim-builds
+slim-builds: ## Updates the Cargo config to product disk optimized builds (for CI, not for users)
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make slim-builds
+else
+	./scripts/slim-builds.sh
+endif
 
 target-graph: ## Display dependencies between targets in this Makefile
 	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))) && docker-compose run --rm target-graph $(TARGET)
