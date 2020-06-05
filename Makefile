@@ -14,6 +14,7 @@ else
 endif
 
 export AUTOSPAWN ?= true
+export AUTODESPAWN ?= ${AUTOSPAWN}
 export VERBOSE ?= false
 export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
 export CONTAINER_TOOL ?= docker
@@ -185,6 +186,9 @@ else
 	cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_firehose:: -- --nocapture
 	cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_streams:: -- --nocapture
 	cargo test --no-default-features --features aws-integration-tests ::aws_s3:: -- --nocapture
+	if $(AUTODESPAWN); then \
+		docker-compose stop; \
+	fi
 endif
 
 test-integration-clickhouse: ## Runs Clickhouse integration testsbv
@@ -200,6 +204,9 @@ else
 	export TEST_LOG="vector=debug"
 	export RUST_TEST_THREADS=1
 	cargo test --no-default-features --features clickhouse-integration-tests ::clickhouse:: -- --nocapture
+	if $(AUTODESPAWN); then \
+		docker-compose stop; \
+	fi
 endif
 
 test-integration-docker: ## Runs Docker integration tests
@@ -217,11 +224,14 @@ ifeq ($(ENVIRONMENT), true)
 else
 	if $(AUTOSPAWN); then \
 		docker-compose up -d dependencies-elasticsearch; \
-		sleep 5 # Many services are very lazy... Give them a sec... \
+		sleep 20 # Elasticsearch is incredibly slow to start up, be very generous... \
 	fi
 	# export TEST_LOG="vector=debug"
 	# export RUST_TEST_THREADS=1
 	cargo test --no-default-features --features es-integration-tests ::elasticsearch:: -- --nocapture
+	if $(AUTODESPAWN); then \
+		docker-compose stop; \
+	fi
 endif
 
 test-integration-gcp: ## Runs GCP integration tests
@@ -236,6 +246,9 @@ else
 	export TEST_LOG="vector=debug"
 	export RUST_TEST_THREADS=1
 	cargo test --no-default-features --features gcp-integration-tests ::gcp:: -- --nocapture
+	if $(AUTODESPAWN); then \
+		docker-compose stop; \
+	fi
 endif
 
 test-integration-influxdb: ## Runs Kafka integration tests
@@ -250,6 +263,9 @@ else
 	export TEST_LOG="vector=debug"
 	export RUST_TEST_THREADS=1
 	cargo test --no-default-features --features influxdb-integration-tests ::influxdb::integration_tests:: -- --nocapture
+	if $(AUTODESPAWN); then \
+		docker-compose stop; \
+	fi
 endif
 
 test-integration-kafka: ## Runs Kafka integration tests
@@ -264,6 +280,9 @@ else
 	export TEST_LOG="vector=debug"
 	export RUST_TEST_THREADS=1
 	cargo test --no-default-features --features kafka-integration-tests ::kafka:: -- --nocapture
+	if $(AUTODESPAWN); then \
+		docker-compose stop; \
+	fi
 endif
 
 test-integration-loki: ## Runs Loki integration tests (Use `ENVIRONMENT=true` to run in a container)
@@ -278,6 +297,9 @@ else
 	export TEST_LOG="vector=debug"
 	export RUST_TEST_THREADS=1
 	cargo test --no-default-features --features loki-integration-tests ::loki:: -- --nocapture
+	if $(AUTODESPAWN); then \
+		docker-compose stop; \
+	fi
 endif
 
 test-integration-pulsar: ## Runs Pulsar integration tests
@@ -290,6 +312,9 @@ else
 		sleep 5 # Many services are very lazy... Give them a sec... \
 	fi
 	cargo test --no-default-features --features pulsar-integration-tests ::pulsar:: -- --nocapture
+	if $(AUTODESPAWN); then \
+		docker-compose stop; \
+	fi
 endif
 
 test-integration-splunk: ## Runs Splunk integration tests
@@ -302,6 +327,9 @@ else
 		sleep 5 # Many services are very lazy... Give them a sec... \
 	fi
 	cargo test --no-default-features --features splunk-integration-tests ::splunk:: -- --nocapture
+	if $(AUTODESPAWN); then \
+		docker-compose stop; \
+	fi
 endif
 
 PACKAGE_DEB_USE_CONTAINER ?= "$(USE_CONTAINER)"
