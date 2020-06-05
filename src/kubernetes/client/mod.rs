@@ -81,33 +81,26 @@ impl Client {
 
     /// Alters a request according to the client configuraion and sends it.
     pub async fn send<B: Into<Body>>(&mut self, req: Request<B>) -> crate::Result<Response<Body>> {
-        let req = convert_request_body(req);
         let req = self.prepare_request(req);
         self.inner.send(req).await
     }
 
-    fn prepare_request(&self, mut req: Request<Body>) -> Request<Body> {
-        self.adjust_uri(req.uri_mut());
+    fn prepare_request<B: Into<Body>>(&self, req: Request<B>) -> Request<Body> {
+        let (mut parts, body) = req.into_parts();
+        let body = body.into();
 
-        req.headers_mut()
+        parts.uri = self.adjust_uri(parts.uri);
+        parts
+            .headers
             .insert(header::AUTHORIZATION, self.auth_header.clone());
 
-        req
+        Request::from_parts(parts, body)
     }
 
-    // TODO: figure if we can do this more efficiently.
-    fn adjust_uri(&self, uri: &mut Uri) {
-        *uri = Uri::builder()
-            .scheme(self.uri_scheme.clone())
-            .authority(self.uri_authority.clone())
-            .path_and_query(uri.path_and_query().unwrap().clone())
-            .build()
-            .unwrap();
+    fn adjust_uri(&self, uri: Uri) -> Uri {
+        let mut parts = uri.into_parts();
+        parts.scheme = Some(self.uri_scheme.clone());
+        parts.authority = Some(self.uri_authority.clone());
+        Uri::from_parts(parts).unwrap()
     }
-}
-
-fn convert_request_body<B: Into<Body>>(req: Request<B>) -> Request<Body> {
-    let (parts, body) = req.into_parts();
-    let body = body.into();
-    Request::from_parts(parts, body)
 }
