@@ -10,7 +10,7 @@ env:
   ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
 
 jobs:
-  environment:
+  publish-new-environment:
     runs-on: ubuntu-latest
     env:
       ENVIRONMENT_AUTOBUILD: true
