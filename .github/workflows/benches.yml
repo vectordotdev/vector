@@ -1,8 +1,12 @@
 name: Benchmark Suite
 
 on:
-  label:
-    types: [created]
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+        - master
 
 env:
   VERBOSE: true
