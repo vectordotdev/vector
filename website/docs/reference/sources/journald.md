@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-06-05"
 delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through Systemd's Journald utility and outputs `log` events."
@@ -69,6 +69,7 @@ utility and outputs [`log`][docs.data-model.log] events.
   exclude_units = [] # optional, default
   include_units = [] # optional, default
   journalctl_path = "journalctl" # optional, default
+  remap_priority = false # optional, default
 ```
 
 </TabItem>
@@ -217,6 +218,31 @@ them a valid service unit name.
 The full path of the [`journalctl`](#journalctl) executable. If not set, Vector will search
 the path for [`journalctl`](#journalctl).
  See [Communication strategy](#communication-strategy) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"remap_priority"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### remap_priority
+
+If the record from journald contains a `PRIORITY` field, it will be remapped
+into the equivalent syslog priority level name using the standard (abbreviated)
+all-capitals names such as `EMERG` or `ERR`.
+
 
 
 </Field>

@@ -77,6 +77,16 @@ The list of units names to exclude from monitoring. \
 Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.\
 """
 
+[sources.journald.options.remap_priority]
+type = "bool"
+common = false
+default = false
+description = """\
+If the record from journald contains a `PRIORITY` field, it will be remapped into the equivalent \
+syslog priority level name using the standard (abbreviated) all-capitals names such as \
+`EMERG` or `ERR`.\
+"""
+
 [[sources.journald.examples]]
 label = "Generic"
 body = """\

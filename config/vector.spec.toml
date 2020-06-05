@@ -536,6 +536,16 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   journalctl_path = "/usr/local/bin/journalctl"
 
+  # If the record from journald contains a `PRIORITY` field, it will be remapped
+  # into the equivalent syslog priority level name using the standard
+  # (abbreviated) all-capitals names such as `EMERG` or `ERR`.
+  #
+  # * optional
+  # * default: false
+  # * type: bool
+  remap_priority = false
+  remap_priority = true
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
