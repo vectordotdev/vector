@@ -32,3 +32,10 @@ pub mod state;
 pub mod stream;
 pub mod watch_request_builder;
 pub mod watcher;
+
+// Reexports for more elegant public API.
+pub use delayed_delete::DelayedDelete;
+pub use hash_value::HashValue;
+pub use multi_response_decoder::MultiResponseDecoder;
+pub use reflector::Reflector;
+pub use watch_request_builder::WatchRequestBuilder;
