@@ -17,7 +17,7 @@ use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rusoto_core44::{Region, RusotoError};
-use rusoto_firehose44::{
+use rusoto_firehose::{
     DescribeDeliveryStreamError, DescribeDeliveryStreamInput, KinesisFirehose,
     KinesisFirehoseClient, PutRecordBatchError, PutRecordBatchInput, PutRecordBatchOutput, Record,
 };
@@ -278,7 +278,7 @@ mod integration_tests {
     };
     use futures01::Sink;
     use rusoto_core44::Region;
-    use rusoto_firehose44::{
+    use rusoto_firehose::{
         CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
         KinesisFirehoseClient,
     };
