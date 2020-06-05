@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-  # TODO: We should never do the docker push on a PR.
   pull_request:
     branches:
         - master
@@ -22,17 +21,6 @@ jobs:
         with:
           workflow_id: "1463240,1463054"
           access_token: ${{ secrets.GITHUB_TOKEN }}
-
-
-  environment:
-    runs-on: ubuntu-latest
-    env:
-      ENVIRONMENT_AUTOBUILD: true
-    steps:
-      - run: docker login https://docker.pkg.github.com -u hoverbear -p ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/checkout@v2
-      - run: make environment-prepare
-      - run: docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
 
   test:
     runs-on: ubuntu-latest
@@ -188,3 +176,33 @@ jobs:
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make test-integration-splunk"
+
+  test-integration-kubernetes:
+    # This is an experimental test. Allow it to fail without failing the whole
+    # workflow, but keep it executing on every build to gather stats.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        kubernetes:
+          - v1.18.2
+          - v1.17.5
+          - v1.16.9
+          - v1.15.11
+          - v1.14.10
+      fail-fast: false
+    steps:
+      - name: Setup Minikube
+        uses: manusa/actions-setup-minikube@v1.0.2
+        with:
+          minikube version: 'v1.9.2'
+          kubernetes version: '${{ matrix.kubernetes }}'
+          github token: '${{ secrets.GITHUB_TOKEN }}'
+      - name: Checkout
+        uses: actions/checkout@v1
+      - run: make slim-builds
+      - run: make test-integration-kubernetes
+        env:
+          USE_MINIKUBE_DOCKER: "true"
+          CONTAINER_IMAGE_REPO: vector-test
+          PACKAGE_DEB_USE_CONTAINER: docker

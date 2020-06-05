@@ -122,6 +122,15 @@ jobs:
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make check"
 
+  check-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v1
+      - env:
+          USE_CONTAINER: none
+          RUSTFLAGS: "-D warnings"
+        run: cargo check --no-default-features --features default-msvc
+
   check-advisories:
     runs-on: ubuntu-latest
     steps:
