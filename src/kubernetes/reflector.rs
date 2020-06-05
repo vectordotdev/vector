@@ -274,7 +274,7 @@ where
 mod tests {
     use super::{
         state::evmap::{Value, Writer},
-        Reflector,
+        Error, Reflector,
     };
     use crate::{
         kubernetes::{
@@ -728,6 +728,81 @@ mod tests {
             // The only way reflector completes is with an error, but that's ok.
             // In tests we make it exit with an error to complete the test.
             result.unwrap_err();
+
+            // Explicitly drop the reflector at the very end.
+            // Internal evmap is dropped with the reflector, so readers won't
+            // work after drop.
+            drop(reflector);
+        })
+    }
+
+    /// Test that stream error terminates the reflector.
+    #[test]
+    fn test_stream_error() {
+        test_util::trace_init();
+        test_util::block_on_std(async move {
+            // Prepare state.
+            let (state_events_tx, _state_events_rx) = mpsc::channel(0);
+            let (_state_action_tx, state_action_rx) = mpsc::channel(0);
+            let state_writer = state::mock::Writer::new(state_events_tx, state_action_rx);
+
+            // Prepare watcher.
+            let (watcher_events_tx, mut watcher_events_rx) = mpsc::channel(0);
+            let (mut watcher_invocations_tx, watcher_invocations_rx) = mpsc::channel(0);
+            let watcher = MockWatcher::<Pod>::new(watcher_events_tx, watcher_invocations_rx);
+
+            // Prepare reflector.
+            let mut reflector = Reflector::new(
+                watcher,
+                state_writer,
+                None,
+                None,
+                Duration::from_secs(1),
+                None,
+            );
+
+            // Run test logic.
+            let logic = tokio::spawn(async move {
+                // Wait for watcher to request next invocation.
+                assert!(matches!(
+                    watcher_events_rx.next().await.unwrap(),
+                    mock_watcher::ScenarioEvent::Invocation(_)
+                ));
+
+                // Provide watcher with a new stream.
+                let (mut watch_stream_tx, watch_stream_rx) = mpsc::channel(0);
+                watcher_invocations_tx
+                    .send(mock_watcher::ScenarioActionInvocation::Ok(watch_stream_rx))
+                    .await
+                    .unwrap();
+
+                // Wait for watcher to request next item from the stream.
+                assert_eq!(
+                    watcher_events_rx.next().await.unwrap(),
+                    mock_watcher::ScenarioEvent::Stream
+                );
+
+                // Send an error to the stream.
+                watch_stream_tx
+                    .send(mock_watcher::ScenarioActionStream::Err)
+                    .await
+                    .unwrap();
+            });
+
+            // Run the test and wait for an error.
+            let result = reflector.run().await;
+
+            // Join on the logic first, to report logic errors with higher
+            // priority.
+            logic.await.unwrap();
+
+            // Assert that the reflector properly passed the error.
+            assert!(matches!(
+                result.unwrap_err(),
+                Error::Streaming {
+                    source: mock_watcher::StreamError
+                }
+            ));
 
             // Explicitly drop the reflector at the very end.
             // Internal evmap is dropped with the reflector, so readers won't
