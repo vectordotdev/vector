@@ -73,7 +73,7 @@ make test ENVIRONMENT=true
 # Validate your tests pass (starting required services in Docker)
 make test-integration SCOPE="sources::example" ENVIRONMENT=true
 # Validate your tests pass against a live service.
-make test-integration SCOPE="sources::example" autospawn=false ENVIRONMENT=true
+make test-integration SCOPE="sources::example" AUTOSPAWN=false ENVIRONMENT=true
 # Validate all tests pass (starting required services in Docker)
 make test-integration ENVIRONMENT=true
 # Run your benchmarks
