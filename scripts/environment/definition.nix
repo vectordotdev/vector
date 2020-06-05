@@ -66,6 +66,7 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     docker
     docker-compose
     podman
+    podman-compose
   ] ++ (if stdenv.isDarwin then [
     darwin.cf-private
     darwin.apple_sdk.frameworks.CoreServices
