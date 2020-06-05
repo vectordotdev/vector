@@ -200,7 +200,7 @@ jobs:
           github token: '${{ secrets.GITHUB_TOKEN }}'
       - name: Checkout
         uses: actions/checkout@v1
-      - run: make slim-builds
+      - run: USE_CONTAINER=none make slim-builds
       - run: make test-integration-kubernetes
         env:
           USE_MINIKUBE_DOCKER: "true"
