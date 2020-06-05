@@ -177,7 +177,7 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-integration-aws
 else
 	if $(AUTOSPAWN); then \
-		docker-compose up -d dependencies-aws; \
+		$(CONTAINER_TOOL)-compose up -d dependencies-aws; \
 		sleep 5 # Many services are very lazy... Give them a sec... \
 	fi
 	sleep 5 # Many services are very lazy... Give them a sec... \
