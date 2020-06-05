@@ -421,13 +421,4 @@ harness = false
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
-# focus on fast, lean builds
-[profile.dev]
-debug = false
-opt-level = "s" # Binary size
-lto = false # Don't LTO on CI
-# focus on fast, lean builds
-[profile.dev]
-debug = false
-opt-level = "s" # Binary size
-lto = false # Don't LTO on CI
+
