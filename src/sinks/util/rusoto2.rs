@@ -246,7 +246,7 @@ impl HttpBody for RusotoBody {
                 }
             }
             Some(SignedRequestPayload::Stream(stream)) => {
-                let stream = unsafe { Pin::new_unchecked(stream) };
+                let stream = Pin::new(stream);
                 match stream.poll_next(cx) {
                     Poll::Ready(Some(result)) => match result {
                         Ok(buf) => {
