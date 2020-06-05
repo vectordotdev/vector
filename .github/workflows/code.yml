@@ -37,18 +37,6 @@ jobs:
           RUSTFLAGS: "-D warnings"
         run: cargo check --no-default-features --features default-msvc
 
-  test-behavior:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make test-behavior
-
-  test-shutdown:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - run: make test-shutdown
-
   test-integration-kubernetes:
     # This is an experimental test. Allow it to fail without failing the whole
     # workflow, but keep it executing on every build to gather stats.
