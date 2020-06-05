@@ -65,8 +65,6 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     # Container tools
     docker
     docker-compose
-    podman
-    podman-compose
   ] ++ (if stdenv.isDarwin then [
     darwin.cf-private
     darwin.apple_sdk.frameworks.CoreServices
@@ -78,5 +76,8 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     (glibcLocales.override { locales = ["en_US.UTF-8"]; })
     # Testing
     systemd
+    # Container tools
+    podman
+    podman-compose
   ]);
 }
