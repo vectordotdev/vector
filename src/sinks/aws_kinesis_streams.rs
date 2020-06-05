@@ -7,6 +7,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         rusoto::{self, AwsCredentialsProvider},
+        sink::Response,
         BatchEventsConfig, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -144,6 +145,8 @@ impl fmt::Debug for KinesisService {
             .finish()
     }
 }
+
+impl Response for PutRecordsOutput {}
 
 #[derive(Debug, Clone)]
 struct KinesisRetryLogic;

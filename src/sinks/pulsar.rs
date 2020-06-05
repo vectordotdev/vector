@@ -2,6 +2,7 @@ use crate::{
     buffers::Acker,
     event::{self, Event},
     runtime::TaskExecutor,
+    sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::{
@@ -26,7 +27,7 @@ enum BuildError {
 pub struct PulsarSinkConfig {
     address: String,
     topic: String,
-    encoding: Encoding,
+    encoding: EncodingConfigWithDefault<Encoding>,
     auth: Option<AuthConfig>,
 }
 
@@ -36,16 +37,18 @@ pub struct AuthConfig {
     token: String, // <jwt token>
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+#[derivative(Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
+    #[derivative(Default)]
     Text,
     Json,
 }
 
 struct PulsarSink {
     topic: String,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
     producer: Producer,
     pulsar: Pulsar,
     in_flight: FuturesUnordered<MetadataFuture<SendFuture, usize>>,
@@ -97,7 +100,7 @@ impl PulsarSink {
 
         Ok(Self {
             topic: config.topic,
-            encoding: config.encoding,
+            encoding: config.encoding.into(),
             pulsar,
             producer,
             in_flight: FuturesUnordered::new(),
@@ -119,7 +122,7 @@ impl Sink for PulsarSink {
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let message = encode_event(item, self.encoding).map_err(|_| ())?;
+        let message = encode_event(item, &self.encoding).map_err(|_| ())?;
         let fut = self.producer.send(self.topic.clone(), &message[..]);
 
         let seqno = self.seq_head;
@@ -155,16 +158,16 @@ impl Sink for PulsarSink {
     }
 }
 
-fn encode_event(item: Event, enc: Encoding) -> crate::Result<Vec<u8>> {
+fn encode_event(item: Event, encoding: &EncodingConfig<Encoding>) -> crate::Result<Vec<u8>> {
     let log = item.into_log();
-    let data = match enc {
+
+    Ok(match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log)?,
         Encoding::Text => log
             .get(&event::log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
-    };
-    Ok(data)
+    })
 }
 
 fn healthcheck(config: PulsarSinkConfig, pulsar: Pulsar) -> super::Healthcheck {
@@ -193,7 +196,7 @@ mod tests {
         let msg = "hello_world".to_owned();
         let mut evt = Event::from(msg.clone());
         evt.as_mut_log().insert("key", "value");
-        let result = encode_event(evt, Encoding::Json).unwrap();
+        let result = encode_event(evt, &EncodingConfig::from(Encoding::Json)).unwrap();
         let map: HashMap<String, String> = serde_json::from_slice(&result[..]).unwrap();
         assert_eq!(msg, map[&event::log_schema().message_key().to_string()]);
     }
@@ -202,7 +205,7 @@ mod tests {
     fn pulsar_event_text() {
         let msg = "hello_world".to_owned();
         let evt = Event::from(msg.clone());
-        let event = encode_event(evt, Encoding::Text).unwrap();
+        let event = encode_event(evt, &EncodingConfig::from(Encoding::Text)).unwrap();
 
         assert_eq!(&event[..], msg.as_bytes());
     }
