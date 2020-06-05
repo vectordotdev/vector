@@ -13,8 +13,15 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 #[cfg(unix)]
 use std::path::PathBuf;
 use trust_dns_proto::{
-    op::message::Message as TrustDnsMessage, rr::record_data::RData, rr::resource::Record,
-    serialize::binary::BinDecoder,
+    op::{message::Message as TrustDnsMessage, Edns},
+    rr::{
+        dnssec::SupportedAlgorithms,
+        domain::Name,
+        rdata::opt::{EdnsCode, EdnsOption},
+        record_data::RData,
+        resource::Record,
+    },
+    serialize::binary::{BinDecodable, BinDecoder},
 };
 
 mod proto {
@@ -180,9 +187,10 @@ fn handle_event(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> O
         }
 
         if let Some(query_zone) = message.query_zone {
+            let mut decoder: BinDecoder = BinDecoder::new(&query_zone);
             log_event.insert_path(
                 make_event_key("message.query_zone"),
-                String::from_utf8(query_zone).unwrap_or_default(),
+                Name::read(&mut decoder).unwrap().to_utf8(),
             );
         }
 
@@ -246,7 +254,21 @@ fn handle_event(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> O
                 log_event,
                 &concat_event_key_paths(key_prefix, "answer"),
                 &msg,
-            )
+            );
+
+            decode_dns_query_message_authority_section(
+                log_event,
+                &concat_event_key_paths(key_prefix, "authority"),
+                &msg,
+            );
+
+            decode_dns_query_message_additional_section(
+                log_event,
+                &concat_event_key_paths(key_prefix, "additional"),
+                &msg,
+            );
+
+            decode_edns(log_event, &concat_event_key_paths(key_prefix, "opt"), &msg);
         };
     }
 
@@ -277,32 +299,32 @@ fn handle_event(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> O
 
         log_event.insert_path(
             make_event_key_with_prefix(key_prefix, "aa"),
-            dns_message.header().authoritative() as i64,
+            dns_message.header().authoritative() as bool,
         );
 
         log_event.insert_path(
             make_event_key_with_prefix(key_prefix, "tc"),
-            dns_message.header().truncated() as i64,
+            dns_message.header().truncated() as bool,
         );
 
         log_event.insert_path(
             make_event_key_with_prefix(key_prefix, "rd"),
-            dns_message.header().recursion_desired() as i64,
+            dns_message.header().recursion_desired() as bool,
         );
 
         log_event.insert_path(
             make_event_key_with_prefix(key_prefix, "ra"),
-            dns_message.header().recursion_available() as i64,
+            dns_message.header().recursion_available() as bool,
         );
 
         log_event.insert_path(
             make_event_key_with_prefix(key_prefix, "ad"),
-            dns_message.header().authentic_data() as i64,
+            dns_message.header().authentic_data() as bool,
         );
 
         log_event.insert_path(
             make_event_key_with_prefix(key_prefix, "cd"),
-            dns_message.header().checking_disabled() as i64,
+            dns_message.header().checking_disabled() as bool,
         );
 
         log_event.insert_path(
@@ -361,6 +383,148 @@ fn handle_event(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> O
             });
     }
 
+    fn decode_dns_query_message_authority_section(
+        log_event: &mut LogEvent,
+        key_path: &str,
+        dns_message: &TrustDnsMessage,
+    ) {
+        dns_message
+            .name_servers()
+            .iter()
+            .enumerate()
+            .for_each(|(i, record)| {
+                decode_dns_record(
+                    log_event,
+                    &make_indexed_event_key_path(key_path, i as u32),
+                    record,
+                );
+            });
+    }
+
+    fn decode_dns_query_message_additional_section(
+        log_event: &mut LogEvent,
+        key_path: &str,
+        dns_message: &TrustDnsMessage,
+    ) {
+        dns_message
+            .additionals()
+            .iter()
+            .enumerate()
+            .for_each(|(i, record)| {
+                decode_dns_record(
+                    log_event,
+                    &make_indexed_event_key_path(key_path, i as u32),
+                    record,
+                );
+            });
+    }
+
+    fn decode_edns(log_event: &mut LogEvent, key_prefix: &str, dns_message: &TrustDnsMessage) {
+        if let Some(edns) = dns_message.edns() {
+            log_event.insert_path(
+                make_event_key_with_prefix(key_prefix, "extended_rcode"),
+                edns.rcode_high() as i64,
+            );
+            log_event.insert_path(
+                make_event_key_with_prefix(key_prefix, "version"),
+                edns.version() as i64,
+            );
+            log_event.insert_path(
+                make_event_key_with_prefix(key_prefix, "do"),
+                edns.dnssec_ok() as bool,
+            );
+            log_event.insert_path(
+                make_event_key_with_prefix(key_prefix, "udp_max_payload_size"),
+                edns.max_payload() as i64,
+            );
+            decode_edns_options(
+                log_event,
+                &concat_event_key_paths(key_prefix, "options"),
+                edns,
+            );
+        }
+    }
+
+    fn decode_edns_options(log_event: &mut LogEvent, key_path: &str, edns: &Edns) {
+        edns.options()
+            .options()
+            .iter()
+            .enumerate()
+            .for_each(|(i, (code, option))| {
+                match option {
+                    EdnsOption::DAU(algorithms) => decode_edns_opt_dnssec_algorithms(
+                        log_event,
+                        &make_indexed_event_key_path(key_path, i as u32),
+                        code,
+                        algorithms,
+                    ),
+                    EdnsOption::DHU(algorithms) => decode_edns_opt_dnssec_algorithms(
+                        log_event,
+                        &make_indexed_event_key_path(key_path, i as u32),
+                        code,
+                        algorithms,
+                    ),
+                    EdnsOption::N3U(algorithms) => decode_edns_opt_dnssec_algorithms(
+                        log_event,
+                        &make_indexed_event_key_path(key_path, i as u32),
+                        code,
+                        algorithms,
+                    ),
+                    EdnsOption::Unknown(_, opt_data) => decode_edns_opt(
+                        log_event,
+                        &make_indexed_event_key_path(key_path, i as u32),
+                        code,
+                        opt_data,
+                    ),
+                };
+            });
+    }
+
+    fn decode_edns_opt_dnssec_algorithms(
+        log_event: &mut LogEvent,
+        key_prefix: &str,
+        opt_code: &EdnsCode,
+        algorithms: &SupportedAlgorithms,
+    ) {
+        log_event.insert_path(
+            make_event_key_with_prefix(key_prefix, "opt_code"),
+            Into::<u16>::into(*opt_code) as i64,
+        );
+        log_event.insert_path(
+            make_event_key_with_prefix(key_prefix, "opt_name"),
+            format!("{:?}", opt_code),
+        );
+        algorithms.iter().enumerate().for_each(|(i, alg)| {
+            log_event.insert_path(
+                make_event_key_with_index(
+                    &concat_event_key_paths(key_prefix, "supported_algorithms"),
+                    i as u32,
+                ),
+                alg.to_string(),
+            );
+        });
+    }
+
+    fn decode_edns_opt(
+        log_event: &mut LogEvent,
+        key_prefix: &str,
+        opt_code: &EdnsCode,
+        opt_data: &Vec<u8>,
+    ) {
+        log_event.insert_path(
+            make_event_key_with_prefix(key_prefix, "opt_code"),
+            Into::<u16>::into(*opt_code) as i64,
+        );
+        log_event.insert_path(
+            make_event_key_with_prefix(key_prefix, "opt_name"),
+            format!("{:?}", opt_code),
+        );
+        log_event.insert_path(
+            make_event_key_with_prefix(key_prefix, "opt_data"),
+            format_bytes_as_hex_string(&opt_data),
+        );
+    }
+
     fn decode_dns_record(log_event: &mut LogEvent, key_path: &str, record: &Record) {
         log_event.insert_path(
             make_event_key_with_prefix(key_path, "name"),
@@ -368,7 +532,10 @@ fn handle_event(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> O
         );
         log_event.insert_path(
             make_event_key_with_prefix(key_path, "type"),
-            record.record_type().to_string(),
+            match record.rdata() {
+                RData::Unknown { code, rdata: _ } => parse_unknown_record_type(*code),
+                _ => record.record_type().to_string(),
+            },
         );
         log_event.insert_path(
             make_event_key_with_prefix(key_path, "ttl"),
@@ -382,6 +549,24 @@ fn handle_event(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> O
             make_event_key_with_prefix(key_path, "rdata"),
             format_rdata(record.rdata()),
         );
+    }
+
+    fn parse_unknown_record_type(rtype: u16) -> String {
+        match rtype {
+            13 => String::from("HINFO"),
+            20 => String::from("ISDN"),
+            38 => String::from("A6"),
+            39 => String::from("DNAME"),
+            _ => format!("[#{}]", rtype),
+        }
+    }
+
+    fn format_bytes_as_hex_string(bytes: &Vec<u8>) -> String {
+        bytes
+            .iter()
+            .map(|e| format!("{:02X}", e))
+            .collect::<Vec<String>>()
+            .join(".")
     }
 
     fn format_rdata(rdata: &RData) -> String {
@@ -431,13 +616,7 @@ fn handle_event(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> O
                     )
                 }
 
-                _ => rdata
-                    .anything()
-                    .unwrap()
-                    .iter()
-                    .map(|e| format!("{:02X}", e))
-                    .collect::<Vec<String>>()
-                    .join("."),
+                _ => format_bytes_as_hex_string(rdata.anything().unwrap()),
             },
             _ => String::from("unknown yet"),
         }
