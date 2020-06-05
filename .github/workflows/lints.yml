@@ -32,6 +32,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
       - run: nix-shell --pure --run "make check-fmt"
 
   check-generate:
@@ -43,6 +44,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
       - run: nix-shell --pure --run "make check-generate"
 
   check-markdown:
@@ -54,6 +56,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
       - run: nix-shell --pure --run "make check-markdown"
 
   check-component-features:
@@ -65,6 +68,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
       - run: nix-shell --pure --run "make check-component-features"
 
   check-blog:
@@ -76,6 +80,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
       - run: nix-shell --pure --run "make check-blog"
 
   check-version:
@@ -87,6 +92,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
       - run: nix-shell --pure --run "make check-version"
 
   check-scripts:
@@ -98,6 +104,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
       - run: nix-shell --pure --run "make check-scripts"
 
   check-linux:
@@ -109,6 +116,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
       - run: nix-shell --pure --run "make check"
 
   check-mac:
@@ -120,6 +128,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
       - run: nix-shell --pure --run "make check"
 
   check-windows:

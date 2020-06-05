@@ -37,10 +37,12 @@ help:
 	@echo "                                      V E C T O R"
 	@echo ""
 	@echo "---------------------------------------------------------------------------------------"
+	@echo -e "Nix user? You can use \033[0;33m\`direnv allow .\`\033[0m or \033[0;33m\`nix-shell --pure\`\033[0m"
+	@echo -e "Want to use \033[0;33m\`docker\`\033[0m or \033[0;33m\`podman\`\033[0m? See \033[0;33m\`ENVIRONMENT=true\`\033[0m commands. (Default \033[0;33m\`CONTAINER_TOOL=docker\`\033[0m)"
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-46s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-##@ Environment (Nix users use `nix-shell` instead)
+##@ Environment
 # We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
 define ENVIRONMENT_EXEC
 	@echo "Entering environment..."
@@ -94,23 +96,23 @@ endef
 endif
 
 
-environment: ## Enter a full Vector dev shell in Docker, binding this folder to the container.
+environment: ## Enter a full Vector dev shell in $CONTAINER_TOOL, binding this folder to the container.
 	${ENVIRONMENT_PREPARE}
 	@export ENVIRONMENT_TTY=true
 	${ENVIRONMENT_EXEC}
 
-environment-prepare: ## Prepare the Vector dev env.
+environment-prepare: ## Prepare the Vector dev shell using $CONTAINER_TOOL.
 	${ENVIRONMENT_PREPARE}
 
-environment-clean: ## Clean the Vector dev env.
+environment-clean: ## Clean the Vector dev shell using $CONTAINER_TOOL.
 	@$(CONTAINER_TOOL) volume rm -f vector-target vector-cargo-cache
 	@$(CONTAINER_TOOL) rmi $(ENVIRONMENT_UPSTREAM) || true
 
-environment-push: environment-prepare ## Publish a new version of the docker image.
+environment-push: environment-prepare ## Publish a new version of the container image.
 	$(CONTAINER_TOOL) push $(ENVIRONMENT_UPSTREAM)
 
 ##@ Building
-build: ## Build the project in release mode (Use `ENVIRONMENT=true` to run in a container)
+build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make build
@@ -119,7 +121,7 @@ else
 	cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
 endif
 
-build-dev: ## Build the project in development mode (Use `ENVIRONMENT=true` to run in a container)
+build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make build-dev
@@ -142,9 +144,9 @@ build-armv7-unknown-linux-musleabihf: load-qemu-binfmt ## Build static binary in
 build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in release mode for the aarch64 architecture
 	$(RUN) build-aarch64-unknown-linux-musl
 
-##@ Testing
+##@ Testing (Supports `ENVIRONMENT=true`)
 
-test: ## Run the test suite (Use `ENVIRONMENT=true` to run in a container)
+test: ## Run the test suite
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test
@@ -155,7 +157,7 @@ endif
 
 test-all: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
 
-test-behavior: ## Runs behaviorial tests
+test-behavior: ## Runs behaviorial test
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-behavior
@@ -191,7 +193,7 @@ else
 	fi
 endif
 
-test-integration-clickhouse: ## Runs Clickhouse integration testsbv
+test-integration-clickhouse: ## Runs Clickhouse integration tests
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-clickhouse
@@ -285,7 +287,7 @@ else
 	fi
 endif
 
-test-integration-loki: ## Runs Loki integration tests (Use `ENVIRONMENT=true` to run in a container)
+test-integration-loki: ## Runs Loki integration tests
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-loki
@@ -348,9 +350,9 @@ else
 	cargo test --features shutdown-tests  --test shutdown -- --test-threads 4
 endif
 
-##@ Benching
+##@ Benching (Supports `ENVIRONMENT=true`)
 
-bench: ## Run benchmarks in /benches (Use `ENVIRONMENT=true` to run in a container)
+bench: ## Run benchmarks in /benches
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make bench
@@ -359,9 +361,9 @@ else
 	cargo bench --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE}
 endif
 
-##@ Checking
+##@ Checking (Supports `ENVIRONMENT=true`)
 
-check: ## Run prerequisite code checks (Use `ENVIRONMENT=true` to run in a container)
+check: ## Run prerequisite code checks
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check
