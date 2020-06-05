@@ -268,7 +268,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        region::RegionOrEndpoint,
+        region2::RegionOrEndpoint,
         sinks::{
             elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
             util::BatchEventsConfig,
@@ -294,7 +294,8 @@ mod integration_tests {
             endpoint: "http://localhost:4573".into(),
         };
 
-        ensure_stream(region.clone(), stream.clone());
+        let mut rt = runtime();
+        rt.block_on_std(ensure_stream(region, stream.clone()));
 
         let config = KinesisFirehoseSinkConfig {
             stream_name: stream.clone(),
@@ -312,7 +313,6 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let sink = KinesisFirehoseService::new(config, cx).unwrap();
@@ -357,14 +357,14 @@ mod integration_tests {
         }
     }
 
-    fn ensure_stream(region: Region, delivery_stream_name: String) {
+    async fn ensure_stream(region: Region, delivery_stream_name: String) {
         let client = KinesisFirehoseClient::new(region);
 
         let es_config = ElasticsearchDestinationConfiguration {
             index_name: delivery_stream_name.clone(),
-            domain_arn: "doesn't matter".into(),
+            domain_arn: Some("doesn't matter".into()),
             role_arn: "doesn't matter".into(),
-            type_name: "doesn't matter".into(),
+            type_name: Some("doesn't matter".into()),
             ..Default::default()
         };
 
@@ -374,7 +374,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        match client.create_delivery_stream(req).sync() {
+        match client.create_delivery_stream(req).await {
             Ok(_) => (),
             Err(e) => println!("Unable to create the delivery stream {:?}", e),
         };
