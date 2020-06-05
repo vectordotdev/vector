@@ -287,11 +287,11 @@ To build Vector on your own host will require a fairly complete development envi
 
 We keep an up to date list of all dependencies used in our CI environment inside our `default.nix` file. Loosely, you'll need the following:
 
-- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, and `autotools`. (Full list in [`scripts/environment/definition.nix`](./scripts/environment/definition.nix).
-- **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
-- **To build the Website:** Have a working modern Ruby 2.7 and Bundler toolchain available, also `bundle install` in the `scripts/` directory.
-- **To run the Website in Dev:** Have a working `node` environment with `npm`/`yarn`, also run `yarn` from the `website/` directory.
-- **To run `make check-component-features`:** Have `remarshal` installed.
+* **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, and `autotools`. (Full list in [`scripts/environment/definition.nix`](./scripts/environment/definition.nix).
+* **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
+* **To build the Website:** Have a working modern Ruby 2.7 and Bundler toolchain available, also `bundle install` in the `scripts/` directory.
+* **To run the Website in Dev:** Have a working `node` environment with `npm`/`yarn`, also run `yarn` from the `website/` directory.
+* **To run `make check-component-features`:** Have `remarshal` installed.
 
 If you find yourself needing to run something (such as `make generate`) inside the Docker environment described above, that's totally fine, they won't collide or hurt each other. In this case, you'd just run `make environment-generate`.
 
