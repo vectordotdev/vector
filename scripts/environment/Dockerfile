@@ -3,8 +3,9 @@ FROM docker.io/nixos/nix:2.3.4
 RUN nix-channel --add https://nixos.org/channels/nixpkgs-unstable nixpkgs
 
 # Setup the env
-RUN mkdir -p vector/{scripts,website}
+RUN mkdir -p vector/{scripts,website,scripts/environment}
 ADD default.nix shell.nix rust-toolchain .envrc /vector/
+ADD scripts/environment/definition.nix /vector/scripts/environment/
 ADD scripts/Gemfile scripts/Gemfile.lock /vector/scripts/
 ADD website/package.json website/yarn.lock /vector/website/
 WORKDIR /vector

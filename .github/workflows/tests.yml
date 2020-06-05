@@ -70,7 +70,6 @@ jobs:
       - run: nix-shell --run "make test"
 
   bench:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -82,7 +81,6 @@ jobs:
       - run: nix-shell --pure --run "make bench"
 
   test-integration-aws:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -94,7 +92,6 @@ jobs:
       - run: nix-shell --pure --run "make test-integration-aws"
 
   test-integration-clickhouse:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -106,7 +103,6 @@ jobs:
       - run: nix-shell --pure --run "make test-integration-clickhouse"
 
   test-integration-docker:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -118,7 +114,6 @@ jobs:
       - run: nix-shell --pure --run "make test-integration-docker"
 
   test-integration-elasticsearch:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -130,7 +125,6 @@ jobs:
       - run: nix-shell --pure --run "make test-integration-elasticsearch"
 
   test-integration-gcp:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -142,7 +136,6 @@ jobs:
       - run: nix-shell --pure --run "make test-integration-gcp"
 
   test-integration-influxdb:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -154,7 +147,6 @@ jobs:
       - run: nix-shell --pure --run "make test-integration-influxdb"
 
   test-integration-kafka:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -166,7 +158,6 @@ jobs:
       - run: nix-shell --pure --run "make test-integration-kafka"
 
   test-integration-loki:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -178,7 +169,6 @@ jobs:
       - run: nix-shell --pure --run "make test-integration-loki"
 
   test-integration-pulsar:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -190,7 +180,6 @@ jobs:
       - run: nix-shell --pure --run "make test-integration-pulsar"
 
   test-integration-splunk:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
