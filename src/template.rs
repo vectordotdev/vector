@@ -50,17 +50,17 @@ impl TryFrom<&str> for Template {
     type Error = TemplateError;
 
     fn try_from(src: &str) -> Result<Self, Self::Error> {
-        match StrftimeItems::new(src)
-            .filter(|item| matches!(item, Item::Error))
-            .count()
-        {
-            0 => Ok(Template {
+        let (has_error, is_dynamic) = StrftimeItems::new(src).fold((false, false), |pair, item| {
+            (pair.0 || is_error(&item), pair.1 || is_dynamic(&item))
+        });
+        match has_error {
+            true => Err(TemplateError::StrftimeError),
+            false => Ok(Template {
                 src: src.into(),
                 src_bytes: src.into(),
-                has_ts: StrftimeItems::new(src).filter(is_dynamic).count() > 0,
+                has_ts: is_dynamic,
                 has_fields: RE.is_match(src),
             }),
-            _ => Err(TemplateError::StrftimeError),
         }
     }
 }
@@ -81,9 +81,13 @@ impl TryFrom<String> for Template {
     }
 }
 
+fn is_error(item: &Item) -> bool {
+    matches!(item, Item::Error)
+}
+
 fn is_dynamic(item: &Item) -> bool {
     match item {
-        Item::Error => true,
+        Item::Error => false,
         Item::Fixed(_) => true,
         Item::Numeric(_, _) => true,
         Item::Space(_) | Item::OwnedSpace(_) => false,
