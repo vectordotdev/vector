@@ -2,7 +2,7 @@ use crate::{
     internal_events::TcpConnectionError,
     shutdown::ShutdownSignal,
     stream::StreamExt,
-    tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
+    tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings, TlsError},
     Event,
 };
 use bytes::Bytes;
@@ -106,11 +106,12 @@ pub trait TcpSource: Clone + Send + 'static {
             let future = listener
                 .incoming()
                 .take_until(shutdown.clone())
-                .map_err(|error| {
-                    error!(
-                        message = "failed to accept socket",
-                        %error
-                    )
+                .map_err(|error| match &error {
+                    TlsError::Connect { source } => match source.kind() {
+                        io::ErrorKind::NotConnected => (),
+                        _ => error!(message = "failed to accept socket", %error),
+                    },
+                    _ => error!(message = "failed to accept socket", %error),
                 })
                 .for_each(move |socket| {
                     let peer_addr = socket.peer_addr().ip().to_string();
