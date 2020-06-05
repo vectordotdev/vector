@@ -68,6 +68,7 @@ jobs:
       # Note: `--pure` may have issues on Mac due to `Security`
       - run: nix-shell --run "echo 'Env installing...'"
       - run: nix-shell --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
       - run: nix-shell --run "make test"
 
   test-integration-aws:
