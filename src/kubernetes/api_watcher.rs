@@ -74,9 +74,9 @@ where
         if status != StatusCode::OK {
             let source = invocation::Error::BadStatus { status };
             let err = if status == StatusCode::GONE {
-                watcher::invocation::Error::Desync { source }
+                watcher::invocation::Error::desync(source)
             } else {
-                watcher::invocation::Error::Other { source }
+                watcher::invocation::Error::other(source)
             };
             Err(err)?;
         }
@@ -154,7 +154,7 @@ pub mod invocation {
 
     impl From<Error> for watcher::invocation::Error<Error> {
         fn from(source: Error) -> Self {
-            watcher::invocation::Error::Other { source }
+            watcher::invocation::Error::other(source)
         }
     }
 }

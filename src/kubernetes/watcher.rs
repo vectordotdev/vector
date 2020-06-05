@@ -59,11 +59,13 @@ pub mod invocation {
         T: std::error::Error + Send + 'static,
     {
         /// Create an `Error::Desync`.
+        #[inline]
         pub fn desync(source: T) -> Self {
             Self::Desync { source }
         }
 
         /// Create an `Error::Other`.
+        #[inline]
         pub fn other(source: T) -> Self {
             Self::Other { source }
         }
