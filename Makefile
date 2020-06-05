@@ -104,7 +104,7 @@ environment-prepare: ## Prepare the Vector dev env.
 
 environment-clean: ## Clean the Vector dev env.
 	@$(CONTAINER_TOOL) volume rm -f vector-target vector-cargo-cache
-	@$(CONTAINER_TOOL) rmi $(ENVIRONMENT_UPSTREAM)
+	@$(CONTAINER_TOOL) rmi $(ENVIRONMENT_UPSTREAM) || true
 
 environment-push: environment-prepare ## Publish a new version of the docker image.
 	$(CONTAINER_TOOL) push $(ENVIRONMENT_UPSTREAM)

@@ -55,8 +55,11 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     libiconv
     tzdata
   ] ++ (if stdenv.isDarwin then [
-    darwin.cf-private darwin.apple_sdk.frameworks.Security darwin.apple_sdk.frameworks.SecurityFoundation ]
-  else [
+    darwin.cf-private
+    darwin.apple_sdk.frameworks.CoreServices
+    darwin.apple_sdk.frameworks.Security
+    darwin.apple_sdk.frameworks.SecurityFoundation
+  ] else [
     systemd gcc (glibcLocales.override { locales = ["en_US.UTF-8"]; })
   ]);
 }
