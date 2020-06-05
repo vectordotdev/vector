@@ -335,7 +335,7 @@ else
 endif
 
 PACKAGE_DEB_USE_CONTAINER ?= "$(USE_CONTAINER)"
-test-integration-kubernetes: ## Runs Kubernetes integration tests
+test-integration-kubernetes: ## Runs Kubernetes integration tests (Sorry, no `ENVIRONMENT=true` support)
 	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" USE_CONTAINER=none $(RUN) test-integration-kubernetes
 
 test-shutdown: ## Runs shutdown tests
