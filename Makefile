@@ -423,7 +423,7 @@ else
 	./scripts/check-version.rb
 endif
 
-check-examples: ## Check that the config/exmaples files are valid
+check-examples: ## Check that the config/examples files are valid
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check-examples
