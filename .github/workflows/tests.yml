@@ -22,7 +22,7 @@ jobs:
         with:
           workflow_id: "1463240,1463054"
           access_token: ${{ secrets.GITHUB_TOKEN }}
-          
+
 
   environment:
     runs-on: ubuntu-latest

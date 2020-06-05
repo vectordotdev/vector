@@ -566,12 +566,13 @@ build-ci-docker-images: ## Rebuilds all Docker images used in CI
 clean: environment-clean ## Clean everything
 	cargo clean
 
-fmt: check-style ## Format code
+fmt: ## Format code
 ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make fmt
 else
 	cargo fmt
+	./scripts/check-style.sh --fix
 endif
 
 init-target-dir: ## Create target directory owned by the current user
