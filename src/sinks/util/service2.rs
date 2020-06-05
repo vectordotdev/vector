@@ -1,4 +1,5 @@
 use super::retries2::{FixedRetryPolicy, RetryLogic};
+use super::sink::Response;
 use super::{Batch, BatchSettings, BatchSink};
 use crate::buffers::Acker;
 use serde::{Deserialize, Serialize};
@@ -120,7 +121,7 @@ impl TowerRequestSettings {
         L: RetryLogic<Response = S::Response> + Send + 'static,
         S: Service<Request> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
-        S::Response: Send + std::fmt::Debug,
+        S::Response: Send + Response,
         S::Future: Send + 'static,
         B: Batch<Output = Request>,
         Request: Send + Clone + 'static,
@@ -148,7 +149,7 @@ pub struct TowerRequestLayer<L, Request> {
 impl<S, L, Request> Layer<S> for TowerRequestLayer<L, Request>
 where
     S: Service<Request> + Send + Clone + 'static,
-    S::Response: Send + 'static,
+    S::Response: Response + Send + 'static,
     S::Error: Into<crate::Error> + Send + Sync + 'static,
     S::Future: Send + 'static,
     L: RetryLogic<Response = S::Response> + Send + 'static,
