@@ -14,6 +14,16 @@ env:
   ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
 
 jobs:
+  cancel-previous:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: styfle/cancel-workflow-action@0.3.1
+        with:
+          workflow_id: "1463240,1463054"
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+          
+
   environment:
     runs-on: ubuntu-latest
     env:
