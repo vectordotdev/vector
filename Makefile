@@ -189,7 +189,7 @@ else
 	cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_streams:: -- --nocapture
 	cargo test --no-default-features --features aws-integration-tests ::aws_s3:: -- --nocapture
 	if $(AUTODESPAWN); then \
-		docker-compose stop; \
+		$(CONTAINER_TOOL)-compose stop; \
 	fi
 endif
 
@@ -199,7 +199,7 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-integration-clickhouse
 else
 	if $(AUTOSPAWN); then \
-		docker-compose up -d dependencies-clickhouse; \
+		$(CONTAINER_TOOL)-compose up -d dependencies-clickhouse; \
 		sleep 5 # Many services are very lazy... Give them a sec... \
 	fi
 	sleep 5 # Many services are very lazy... Give them a sec... \
@@ -207,7 +207,7 @@ else
 	export RUST_TEST_THREADS=1
 	cargo test --no-default-features --features clickhouse-integration-tests ::clickhouse:: -- --nocapture
 	if $(AUTODESPAWN); then \
-		docker-compose stop; \
+		$(CONTAINER_TOOL)-compose stop; \
 	fi
 endif
 
@@ -225,14 +225,14 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-integration-elasticsearch
 else
 	if $(AUTOSPAWN); then \
-		docker-compose up -d dependencies-elasticsearch; \
+		$(CONTAINER_TOOL)-compose up -d dependencies-elasticsearch; \
 		sleep 20 # Elasticsearch is incredibly slow to start up, be very generous... \
 	fi
 	# export TEST_LOG="vector=debug"
 	# export RUST_TEST_THREADS=1
 	cargo test --no-default-features --features es-integration-tests ::elasticsearch:: -- --nocapture
 	if $(AUTODESPAWN); then \
-		docker-compose stop; \
+		$(CONTAINER_TOOL)-compose stop; \
 	fi
 endif
 
@@ -242,14 +242,14 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-integration-gcp
 else
 	if $(AUTOSPAWN); then \
-		docker-compose up -d dependencies-gcp; \
+		$(CONTAINER_TOOL)-compose up -d dependencies-gcp; \
 		sleep 5 # Many services are very lazy... Give them a sec... \
 	fi
 	export TEST_LOG="vector=debug"
 	export RUST_TEST_THREADS=1
 	cargo test --no-default-features --features gcp-integration-tests ::gcp:: -- --nocapture
 	if $(AUTODESPAWN); then \
-		docker-compose stop; \
+		$(CONTAINER_TOOL)-compose stop; \
 	fi
 endif
 
@@ -259,14 +259,14 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-integration-influxdb
 else
 	if $(AUTOSPAWN); then \
-		docker-compose up -d dependencies-influxdb; \
+		$(CONTAINER_TOOL)-compose up -d dependencies-influxdb; \
 		sleep 5 # Many services are very lazy... Give them a sec... \
 	fi
 	export TEST_LOG="vector=debug"
 	export RUST_TEST_THREADS=1
 	cargo test --no-default-features --features influxdb-integration-tests ::influxdb::integration_tests:: -- --nocapture
 	if $(AUTODESPAWN); then \
-		docker-compose stop; \
+		$(CONTAINER_TOOL)-compose stop; \
 	fi
 endif
 
@@ -276,14 +276,14 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-integration-kafka
 else
 	if $(AUTOSPAWN); then \
-		docker-compose up -d dependencies-kafka; \
+		$(CONTAINER_TOOL)-compose up -d dependencies-kafka; \
 		sleep 5 # Many services are very lazy... Give them a sec... \
 	fi
 	export TEST_LOG="vector=debug"
 	export RUST_TEST_THREADS=1
 	cargo test --no-default-features --features kafka-integration-tests ::kafka:: -- --nocapture
 	if $(AUTODESPAWN); then \
-		docker-compose stop; \
+		$(CONTAINER_TOOL)-compose stop; \
 	fi
 endif
 
@@ -293,14 +293,14 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-integration-loki
 else
 	if $(AUTOSPAWN); then \
-		docker-compose up -d dependencies-loki; \
+		$(CONTAINER_TOOL)-compose up -d dependencies-loki; \
 		sleep 5 # Many services are very lazy... Give them a sec... \
 	fi
 	export TEST_LOG="vector=debug"
 	export RUST_TEST_THREADS=1
 	cargo test --no-default-features --features loki-integration-tests ::loki:: -- --nocapture
 	if $(AUTODESPAWN); then \
-		docker-compose stop; \
+		$(CONTAINER_TOOL)-compose stop; \
 	fi
 endif
 
@@ -310,12 +310,12 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-integration-pulsar
 else
 	if $(AUTOSPAWN); then \
-		docker-compose up -d dependencies-pulsar; \
+		$(CONTAINER_TOOL)-compose up -d dependencies-pulsar; \
 		sleep 5 # Many services are very lazy... Give them a sec... \
 	fi
 	cargo test --no-default-features --features pulsar-integration-tests ::pulsar:: -- --nocapture
 	if $(AUTODESPAWN); then \
-		docker-compose stop; \
+		$(CONTAINER_TOOL)-compose stop; \
 	fi
 endif
 
@@ -325,12 +325,12 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-integration-splunk
 else
 	if $(AUTOSPAWN); then \
-		docker-compose up -d dependencies-splunk; \
+		$(CONTAINER_TOOL)-compose up -d dependencies-splunk; \
 		sleep 5 # Many services are very lazy... Give them a sec... \
 	fi
 	cargo test --no-default-features --features splunk-integration-tests ::splunk:: -- --nocapture
 	if $(AUTODESPAWN); then \
-		docker-compose stop; \
+		$(CONTAINER_TOOL)-compose stop; \
 	fi
 endif
 
@@ -344,10 +344,13 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test-shutdown
 else
 	if $(AUTOSPAWN); then \
-		docker-compose up -d dependencies-kafka; \
+		$(CONTAINER_TOOL)-compose up -d dependencies-kafka; \
 		sleep 5 # Many services are very lazy... Give them a sec... \
 	fi
 	cargo test --features shutdown-tests  --test shutdown -- --test-threads 4
+	if $(AUTODESPAWN); then \
+		$(CONTAINER_TOOL)-compose stop; \
+	fi
 endif
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
