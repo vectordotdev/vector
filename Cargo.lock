@@ -3920,15 +3920,15 @@ dependencies = [
 
 [[package]]
 name = "rusoto_kinesis"
-version = "0.41.0"
+version = "0.44.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f88609598b24779b268f47c0d19780cf4865b0cbccd9f677bae75f7f7c5d4dcb"
+checksum = "c5d81ca868353012878cfc22bca6e9bc13c5f6e586f5e1687ade02d25ad3e5f7"
 dependencies = [
- "bytes 0.4.12",
- "futures 0.1.29",
- "rusoto_core 0.41.0",
+ "async-trait",
+ "bytes 0.5.4",
+ "futures 0.3.4",
+ "rusoto_core 0.44.0",
  "serde",
- "serde_derive",
  "serde_json",
 ]
 
