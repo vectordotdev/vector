@@ -43,6 +43,7 @@ aws_kinesis_streams_service_limits = "https://docs.aws.amazon.com/streams/latest
 aws_kinesis_split_shards = "https://docs.aws.amazon.com/streams/latest/dev/kinesis-using-sdk-java-resharding-split.html"
 aws_regions = "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html"
 aws_s3 = "https://aws.amazon.com/s3/"
+aws_sqs = "https://aws.amazon.com/sqs/"
 aws_s3_acl = "https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html"
 aws_s3_canned_acl = "https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl"
 aws_s3_cross_account_tutorial = "https://docs.aws.amazon.com/AmazonS3/latest/dev/example-walkthroughs-managing-access-example3.html"

@@ -1,0 +1,71 @@
+[sinks.aws_sqs]
+title = "AWS SQS"
+noun = "AWS SQS"
+beta = false
+common = false
+delivery_guarantee = "at_least_once"
+description = """\
+[Amazon SQS][urls.aws_sqs] is a pay-per-use web service \
+for storing messages in transit between computers. \
+Developers use SQS to build distributed applications with \
+decoupled components without having to deal with the overhead \
+of creating and maintaining message queues.
+"""
+egress_method = "batching"
+features = [
+  "Send logs to AWS SQS.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
+function_category = "transmit"
+healthcheck = true
+input_types = ["log"]
+requirements = {}
+service_limits_short_link = "aws_sqs_service_limits"
+service_providers = ["AWS"]
+write_to_description = "[Amazon Web Service's Simple Queue Service][urls.aws_sqs] via the [`SendMessageBatch` API endpoint](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessageBatch.html)"
+
+<%= render("_partials/fields/_aws_env_vars.toml", namespace: "sinks.aws_sqs.env_vars") %>
+
+<%= render("_partials/fields/_aws_options.toml", namespace: "sinks.aws_sqs.options") %>
+
+<%= render("_partials/fields/_component_options.toml", type: "sinks", name: "aws_sqs") %>
+
+<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.aws_sqs.options", common: false, max_events: 10, max_size: nil, timeout_secs: 1) %>
+
+<%= render(
+  "_partials/fields/_buffer_options.toml",
+  namespace: "sinks.aws_sqs.options",
+  common: false
+) %>
+
+<%= render(
+  "_partials/fields/_request_options.toml",
+  namespace: "sinks.aws_sqs.options",
+  common: false,
+  in_flight_limit: 5,
+  rate_limit_duration_secs: 1,
+  rate_limit_num: 5,
+  retry_initial_backoff_secs: 1,
+  retry_max_duration_secs: 10,
+  timeout_secs: 30
+) %>
+
+[sinks.aws_sqs.options.queue_url]
+type = "string"
+common = true
+examples = ["https://sqs.us-east-1.amazonaws.com/account_id/queue_name"]
+required = true
+description = "The queue url of the target SQS Logs queue."
+
+[sinks.aws_sqs.options.fifo]
+type = "bool"
+default = false
+required = false
+description = "Set this to true if the queue is a fifo queue."
+
+<%= render("_partials/fields/_encoding_options.toml",
+  namespace: "sinks.aws_sqs.options",
+  encodings: ["json", "text"]
+) %>
