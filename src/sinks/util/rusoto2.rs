@@ -93,9 +93,9 @@ impl AwsCredentialsProvider {
 impl ProvideAwsCredentials for AwsCredentialsProvider {
     async fn credentials(&self) -> Result<AwsCredentials, CredentialsError> {
         let fut = match self {
-            AwsCredentialsProvider::Default(p) => p.credentials(),
-            AwsCredentialsProvider::Role(p) => p.credentials(),
-            AwsCredentialsProvider::Static(p) => p.credentials(),
+            Self::Default(p) => p.credentials(),
+            Self::Role(p) => p.credentials(),
+            Self::Static(p) => p.credentials(),
         };
         fut.await
     }
