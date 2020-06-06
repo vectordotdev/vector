@@ -72,9 +72,8 @@ inventory::submit! {
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let config = self.clone();
         let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
-        let sink = KinesisFirehoseService::new(config, cx)?;
+        let sink = KinesisFirehoseService::new(self.clone(), cx)?;
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
@@ -93,7 +92,7 @@ impl KinesisFirehoseService {
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
         let client = create_client(
-            config.region.clone().try_into()?,
+            (&config.region).try_into()?,
             config.assume_role.clone(),
             cx.resolver(),
         )?;
@@ -214,7 +213,6 @@ fn create_client(
 ) -> crate::Result<KinesisFirehoseClient> {
     let client = rusoto2::client(resolver)?;
     let creds = AwsCredentialsProvider::new(&region, assume_role)?;
-
     Ok(KinesisFirehoseClient::new_with(client, creds, region))
 }
 
