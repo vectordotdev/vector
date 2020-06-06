@@ -1,5 +1,6 @@
 mod add_fields;
 mod aws_kinesis_streams;
+mod aws_sqs;
 mod blackhole;
 mod elasticsearch;
 mod file;
@@ -18,6 +19,7 @@ mod vector;
 
 pub use self::add_fields::*;
 pub use self::aws_kinesis_streams::*;
+pub use self::aws_sqs::*;
 pub use self::blackhole::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
