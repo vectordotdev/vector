@@ -270,7 +270,7 @@ fn handle(
     buckets: &[f64],
     expired: bool,
     metrics: &IndexSet<MetricEntry>,
-) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+) -> Box<dyn Future<Item = Response<Body>, Error = hyper13::Error> + Send> {
     let mut response = Response::new(Body::empty());
 
     match (req.method(), req.uri().path()) {
