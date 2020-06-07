@@ -8,7 +8,7 @@ use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
 use futures01::{sync::mpsc, Async, Future, Sink, Stream};
-use hyper::{Body, Response, StatusCode};
+use http::StatusCode;
 use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
 use serde_json::{de::IoRead, json, Deserializer, Value as JsonValue};
@@ -18,7 +18,7 @@ use std::{
     net::{Ipv4Addr, SocketAddr},
 };
 use string_cache::DefaultAtom as Atom;
-use warp::{body::FullBody, filters::BoxedFilter, path, Filter, Rejection, Reply};
+use warp::{body::FullBody, filters::BoxedFilter, path, reply::Response, Filter, Rejection, Reply};
 
 // Event fields unique to splunk_hec source
 lazy_static! {
@@ -126,7 +126,7 @@ impl SplunkSource {
         }
     }
 
-    fn event_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response<Body>,)> {
+    fn event_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response,)> {
         warp::post2()
             .and(
                 warp::path::end()
@@ -167,7 +167,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn raw_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response<Body>,)> {
+    fn raw_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response,)> {
         warp::post2()
             .and(
                 (path!("raw" / "1.0").and(warp::path::end()))
@@ -200,7 +200,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn health_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response<Body>,)> {
+    fn health_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response,)> {
         let credentials = self.credentials.clone();
         let authorize =
             warp::header::optional("Authorization").and_then(move |token: Option<String>| {
@@ -236,7 +236,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn options() -> BoxedFilter<(Response<Body>,)> {
+    fn options() -> BoxedFilter<(Response,)> {
         let post = warp::options()
             .and(
                 warp::path::end()
@@ -636,11 +636,11 @@ mod splunk_response {
     }
 }
 
-fn finish_ok(_: ()) -> Response<Body> {
+fn finish_ok(_: ()) -> Response {
     response_json(StatusCode::OK, splunk_response::SUCCESS.as_ref())
 }
 
-fn finish_err(rejection: Rejection) -> Result<(Response<Body>,), Rejection> {
+fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(error) = rejection.find_cause::<ApiError>() {
         Ok((match error {
             ApiError::MissingAuthorization => response_json(
@@ -681,19 +681,19 @@ fn finish_err(rejection: Rejection) -> Result<(Response<Body>,), Rejection> {
 }
 
 /// Response without body
-fn empty_response(code: StatusCode) -> Response<Body> {
+fn empty_response(code: StatusCode) -> Response {
     let mut res = Response::default();
     *res.status_mut() = code;
     res
 }
 
 /// Response with body
-fn response_json(code: StatusCode, body: impl Serialize) -> Response<Body> {
+fn response_json(code: StatusCode, body: impl Serialize) -> Response {
     warp::reply::with_status(warp::reply::json(&body), code).into_response()
 }
 
 /// Error happened during parsing of events
-fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
+fn event_error(text: &str, code: u16, event: usize) -> Response {
     let body = json!({
         "text":text,
         "code":code,
