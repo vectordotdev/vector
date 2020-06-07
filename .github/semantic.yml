@@ -122,6 +122,7 @@ scopes:
   - aws_kinesis_firehose sink
   - aws_kinesis_streams sink
   - aws_s3 sink
+  - aws_sqs sink
   - blackhole sink
   - clickhouse sink
   - console sink

@@ -201,6 +201,8 @@ module.exports = {
             
               "reference/sinks/aws_s3",
             
+              "reference/sinks/aws_sqs",
+            
               "reference/sinks/blackhole",
             
               "reference/sinks/clickhouse",

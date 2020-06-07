@@ -275,6 +275,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/platforms/docker/aws_sqs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/aws_sqs.md",
+          "series_position": null,
+          "title": "Send logs from Docker to AWS SQS"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/platforms/docker/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/pulsar.md",
@@ -487,6 +496,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/http/aws_s3.md",
           "series_position": null,
           "title": "Send logs from HTTP to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/aws_sqs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/aws_sqs.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to AWS SQS"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -716,6 +734,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/journald/aws_sqs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/aws_sqs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to AWS SQS"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/journald/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/pulsar.md",
@@ -937,6 +964,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/kafka/aws_s3.md",
           "series_position": null,
           "title": "Send logs from Kafka to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/aws_sqs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/aws_sqs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to AWS SQS"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1166,6 +1202,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/stdin/aws_sqs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/aws_sqs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to AWS SQS"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/stdin/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/pulsar.md",
@@ -1387,6 +1432,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/splunk_hec/aws_s3.md",
           "series_position": null,
           "title": "Send logs from Splunk HEC to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/aws_sqs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/aws_sqs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to AWS SQS"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1616,6 +1670,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/syslog/aws_sqs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/aws_sqs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to AWS SQS"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/syslog/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/pulsar.md",
@@ -1837,6 +1900,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/socket/aws_s3.md",
           "series_position": null,
           "title": "Send logs from a TCP, UDP, or UDS socket to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/aws_sqs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/aws_sqs.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to AWS SQS"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2066,6 +2138,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/file/aws_sqs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/aws_sqs.md",
+          "series_position": null,
+          "title": "Send logs from a file to AWS SQS"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/file/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/pulsar.md",
@@ -2287,6 +2368,15 @@ module.exports = {
           "path": "website/guides/integrate/sinks/aws_s3.md",
           "series_position": null,
           "title": "Send logs to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/aws_sqs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/aws_sqs.md",
+          "series_position": null,
+          "title": "Send logs to AWS SQS"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -30270,6 +30360,47 @@ module.exports = {
 
       ],
       "write_to_description": "Amazon Web Service's S3 service via the `PutObject` API endpoint"
+    },
+    "aws_sqs": {
+      "beta": false,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"json\" # required\n\n  # General\n  inputs = [\"in\"] # required\n  queue_url = \"https://sqs.us-east-1.amazonaws.com/account_id/queue_name\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  type = \"aws_sqs\" # required"
+      },
+      "delivery_guarantee": "at_least_once",
+      "description": "Amazon SQS is a pay-per-use web service for storing messages in transit between computers. Developers use SQS to build distributed applications with decoupled components without having to deal with the overhead of creating and maintaining message queues.\n",
+      "event_types": [
+        "log"
+      ],
+      "features": [
+        "Send logs to AWS SQS.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
+      "function_category": "transmit",
+      "id": "aws_sqs_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": null,
+      "name": "aws_sqs",
+      "noun": "AWS SQS",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+        "AWS"
+      ],
+      "short_description": "Batches log events to Amazon Web Service's Simple Queue Service via the `SendMessageBatch` API endpoint.",
+      "status": "prod-ready",
+      "title": "AWS SQS",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ],
+      "write_to_description": "Amazon Web Service's Simple Queue Service via the `SendMessageBatch` API endpoint"
     },
     "blackhole": {
       "beta": false,

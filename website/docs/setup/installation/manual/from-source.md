@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-30"
+last_modified_on: "2020-06-07"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
@@ -439,6 +439,7 @@ features one has to pass a comma-separated list of component features.
 | `sinks-aws_kinesis_firehose` | Enables building of [`aws_kinesis_firehose` sink][docs.sinks.aws_kinesis_firehose].  |
 | `sinks-aws_kinesis_streams` | Enables building of [`aws_kinesis_streams` sink][docs.sinks.aws_kinesis_streams].  |
 | `sinks-aws_s3` | Enables building of [`aws_s3` sink][docs.sinks.aws_s3].  |
+| `sinks-aws_sqs` | Enables building of [`aws_sqs` sink][docs.sinks.aws_sqs].  |
 | `sinks-blackhole` | Enables building of [`blackhole` sink][docs.sinks.blackhole].  |
 | `sinks-clickhouse` | Enables building of [`clickhouse` sink][docs.sinks.clickhouse].  |
 | `sinks-console` | Enables building of [`console` sink][docs.sinks.console].  |
@@ -482,6 +483,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sinks.aws_kinesis_firehose]: /docs/reference/sinks/aws_kinesis_firehose/
 [docs.sinks.aws_kinesis_streams]: /docs/reference/sinks/aws_kinesis_streams/
 [docs.sinks.aws_s3]: /docs/reference/sinks/aws_s3/
+[docs.sinks.aws_sqs]: /docs/reference/sinks/aws_sqs/
 [docs.sinks.blackhole]: /docs/reference/sinks/blackhole/
 [docs.sinks.clickhouse]: /docs/reference/sinks/clickhouse/
 [docs.sinks.console]: /docs/reference/sinks/console/

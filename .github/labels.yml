@@ -392,6 +392,9 @@
 - name: "sink: aws_s3"
   description: Anything `aws_s3` sink related
   color: 4ddbfb
+- name: "sink: aws_sqs"
+  description: Anything `aws_sqs` sink related
+  color: 4ddbfb
 - name: "sink: blackhole"
   description: Anything `blackhole` sink related
   color: 4ddbfb
