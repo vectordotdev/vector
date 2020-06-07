@@ -145,11 +145,12 @@ mod tests {
         event::Event,
         test_util::{next_addr, runtime, shutdown_on_idle},
         topology::config::SinkConfig,
+        Error,
     };
-    use bytes::Buf;
+    use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt, TryStreamExt};
     use futures01::{stream, sync::mpsc, Future, Sink, Stream};
-    use hyper::service::service_fn_ok;
-    use hyper::{Body, Request, Response, Server};
+    use hyper13::service::{make_service_fn, service_fn};
+    use hyper13::{Body, Method, Request, Response, Server};
     use serde_json::Value;
     use std::io::BufRead;
 
@@ -262,33 +263,41 @@ mod tests {
     fn build_test_server(
         addr: &std::net::SocketAddr,
     ) -> (
-        mpsc::Receiver<(http::request::Parts, hyper::Chunk)>,
+        mpsc::Receiver<(http02::request::Parts, std::io::Cursor<Vec<u8>>)>,
         stream_cancel::Trigger,
         impl Future<Item = (), Error = ()>,
     ) {
         let (tx, rx) = mpsc::channel(100);
-        let service = move || {
+        let service = make_service_fn(move |_| {
             let tx = tx.clone();
-            service_fn_ok(move |req: Request<Body>| {
-                let (parts, body) = req.into_parts();
+            async {
+                Ok::<_, Error>(service_fn(move |req: Request<Body>| {
+                    let tx = tx.clone();
+                    async {
+                        let (parts, body) = req.into_parts();
 
-                let tx = tx.clone();
-                tokio01::spawn(
-                    body.concat2()
-                        .map_err(|e| panic!(e))
-                        .and_then(|body| tx.send((parts, body)))
-                        .map(|_| ())
-                        .map_err(|e| panic!(e)),
-                );
+                        tokio01::spawn(
+                            body.compat()
+                                .map(|bytes| bytes.to_vec())
+                                .concat2()
+                                .map(std::io::Cursor::new)
+                                .map_err(|e| panic!(e))
+                                .and_then(|body| tx.send((parts, body)))
+                                .map(|_| ())
+                                .map_err(|e| panic!(e)),
+                        );
 
-                Response::new(Body::empty())
-            })
-        };
+                        Ok::<_, Error>(Response::new(Body::empty()))
+                    }
+                }))
+            }
+        });
 
         let (trigger, tripwire) = stream_cancel::Tripwire::new();
         let server = Server::bind(addr)
             .serve(service)
-            .with_graceful_shutdown(tripwire)
+            .with_graceful_shutdown(tripwire.compat().map(|_| ()))
+            .compat()
             .map_err(|e| panic!("server error: {}", e));
 
         (rx, trigger, server)
@@ -327,7 +336,7 @@ mod tests {
             .wait()
             .map(Result::unwrap)
             .map(|(parts, body)| {
-                assert_eq!(hyper::Method::POST, parts.method);
+                assert_eq!(Method::POST, parts.method);
                 assert_eq!("/fake_nr", parts.uri.path());
                 assert_eq!(
                     parts
@@ -338,7 +347,6 @@ mod tests {
                 );
                 body
             })
-            .map(hyper::Chunk::reader)
             .flat_map(BufRead::lines)
             .map(Result::unwrap)
             .flat_map(|s| -> Vec<String> {
