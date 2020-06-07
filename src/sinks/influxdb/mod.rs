@@ -3,16 +3,17 @@ pub mod metrics;
 
 pub(self) use super::{Healthcheck, RouterSink};
 
-use crate::{dns::Resolver, sinks::util::http::HttpClient};
+use crate::{dns::Resolver, sinks::util::http2::HttpClient};
 use chrono::{DateTime, Utc};
+use futures::TryFutureExt;
 use futures01::Future;
-use http::{StatusCode, Uri};
-use hyper;
+use http02::{StatusCode, Uri};
+use hyper13;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use snafu::Snafu;
 use std::collections::{BTreeMap, HashMap};
-use tower::Service;
+use tower03::Service;
 
 pub enum Field {
     /// string
@@ -154,17 +155,20 @@ fn healthcheck(
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
-    let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let request = hyper13::Request::get(uri)
+        .body(hyper13::Body::empty())
+        .unwrap();
 
     let mut client = HttpClient::new(resolver, None)?;
 
     let healthcheck = client
         .call(request)
+        .compat()
         .map_err(|err| err.into())
         .and_then(|response| match response.status() {
             StatusCode::OK => Ok(()),
             StatusCode::NO_CONTENT => Ok(()),
-            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
+            other => Err(super::HealthcheckError::UnexpectedStatus2 { status: other }.into()),
         });
 
     Ok(Box::new(healthcheck))
@@ -303,7 +307,7 @@ fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> c
         url.pop();
     }
 
-    Ok(url.parse::<Uri>().context(super::UriParseError)?)
+    Ok(url.parse::<Uri>().context(super::UriParseError2)?)
 }
 
 #[cfg(test)]

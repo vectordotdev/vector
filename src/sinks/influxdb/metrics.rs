@@ -5,19 +5,22 @@ use crate::{
         Field, InfluxDB1Settings, InfluxDB2Settings,
     },
     sinks::util::{
-        http::{Error as HttpError, HttpBatchService, HttpRetryLogic, Response as HttpResponse},
-        BatchEventsConfig, MetricBuffer, TowerRequestConfig,
+        http2::{Error as HttpError, HttpBatchService, HttpRetryLogic, Response as HttpResponse},
+        service2::TowerRequestConfig,
+        BatchEventsConfig, MetricBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{Future, Poll, Sink};
-use http::Method;
-use hyper;
+use futures01::Sink;
+use http02::Method;
+use hyper13;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use tower::Service;
+use std::pin::Pin;
+use std::task::Poll;
+use tower03::Service;
 
 #[derive(Clone)]
 struct InfluxDBSvc {
@@ -95,13 +98,13 @@ impl InfluxDBSvc {
         let uri = settings.write_uri(endpoint)?;
 
         let build_request = move |body: Vec<u8>| {
-            let mut builder = hyper::Request::builder();
-            builder.method(Method::POST);
-            builder.uri(uri.clone());
-
-            builder.header("Content-Type", "text/plain");
-            builder.header("Authorization", format!("Token {}", token));
-            builder.body(body).unwrap()
+            hyper13::Request::builder()
+                .method(Method::POST)
+                .uri(uri.clone())
+                .header("Content-Type", "text/plain")
+                .header("Authorization", format!("Token {}", token))
+                .body(body)
+                .unwrap()
         };
 
         let http_service = HttpBatchService::new(cx.resolver(), None, build_request);
@@ -128,10 +131,12 @@ impl InfluxDBSvc {
 impl Service<Vec<Metric>> for InfluxDBSvc {
     type Response = HttpResponse;
     type Error = HttpError;
-    type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
+    type Future = Pin<
+        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>,
+    >;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        self.inner.poll_ready()
+    fn poll_ready(&mut self, cx: &mut std::task::Context) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
     }
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
