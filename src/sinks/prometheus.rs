@@ -6,9 +6,12 @@ use crate::{
     Event,
 };
 use chrono::Utc;
+use futures::{compat::Future01CompatExt, future::FutureExt, TryFutureExt};
 use futures01::{future, Async, AsyncSink, Future, Sink};
-use hyper::{
-    header::HeaderValue, service::service_fn, Body, Method, Request, Response, Server, StatusCode,
+use hyper13::{
+    header::HeaderValue,
+    service::{make_service_fn, service_fn},
+    Body, Method, Request, Response, Server, StatusCode,
 };
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
@@ -267,7 +270,7 @@ fn handle(
     buckets: &[f64],
     expired: bool,
     metrics: &IndexSet<MetricEntry>,
-) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+) -> Box<dyn Future<Item = Response<Body>, Error = hyper13::Error> + Send> {
     let mut response = Response::new(Body::empty());
 
     match (req.method(), req.uri().path()) {
@@ -331,35 +334,38 @@ impl PrometheusSink {
         let last_flush_timestamp = Arc::clone(&self.last_flush_timestamp);
         let flush_period_secs = self.config.flush_period_secs.clone();
 
-        let new_service = move || {
+        let new_service = make_service_fn(move |_| {
             let metrics = Arc::clone(&metrics);
             let namespace = namespace.clone();
             let buckets = buckets.clone();
             let last_flush_timestamp = Arc::clone(&last_flush_timestamp);
             let flush_period_secs = flush_period_secs.clone();
 
-            service_fn(move |req| {
-                let metrics = metrics.read().unwrap();
-                let last_flush_timestamp = last_flush_timestamp.read().unwrap();
-                let interval = (Utc::now().timestamp() - *last_flush_timestamp) as u64;
-                let expired = interval > flush_period_secs;
-                info_span!(
-                    "prometheus_server",
-                    method = field::debug(req.method()),
-                    path = field::debug(req.uri().path()),
-                )
-                .in_scope(|| handle(req, &namespace, &buckets, expired, &metrics))
-            })
-        };
+            async move {
+                Ok::<_, crate::Error>(service_fn(move |req| {
+                    let metrics = metrics.read().unwrap();
+                    let last_flush_timestamp = last_flush_timestamp.read().unwrap();
+                    let interval = (Utc::now().timestamp() - *last_flush_timestamp) as u64;
+                    let expired = interval > flush_period_secs;
+                    info_span!(
+                        "prometheus_server",
+                        method = field::debug(req.method()),
+                        path = field::debug(req.uri().path()),
+                    )
+                    .in_scope(|| handle(req, &namespace, &buckets, expired, &metrics))
+                    .compat()
+                }))
+            }
+        });
 
         let (trigger, tripwire) = Tripwire::new();
 
         let server = Server::bind(&self.config.address)
             .serve(new_service)
-            .with_graceful_shutdown(tripwire.clone())
+            .with_graceful_shutdown(tripwire.clone().compat().map(|_| ()))
             .map_err(|e| eprintln!("server error: {}", e));
 
-        tokio01::spawn(server);
+        tokio::spawn(server);
         self.server_shutdown_trigger = Some(trigger);
     }
 }
