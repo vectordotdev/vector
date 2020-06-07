@@ -228,7 +228,7 @@ mod integration_tests {
         let cnf = PulsarSinkConfig {
             address: "127.0.0.1:6650".to_owned(),
             topic: topic.clone(),
-            encoding: Encoding::Text,
+            encoding: Encoding::Text.into(),
             auth: None,
         };
         let (acker, ack_counter) = Acker::new_for_testing();
