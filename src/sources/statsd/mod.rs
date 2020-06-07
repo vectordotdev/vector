@@ -83,6 +83,7 @@ mod test {
         test_util::{block_on, next_addr, runtime, shutdown_on_idle},
         topology::{self, config},
     };
+    use futures::{TryFutureExt, TryStreamExt};
     use futures01::Stream;
     use std::{thread, time::Duration};
 
@@ -135,12 +136,23 @@ mod test {
         // Give packets some time to flow through
         thread::sleep(Duration::from_millis(100));
 
-        let client = hyper::Client::new();
-        let response =
-            block_on(client.get(format!("http://{}/metrics", out_addr).parse().unwrap())).unwrap();
+        let client = hyper13::Client::new();
+        let response = block_on(
+            client
+                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+                .compat(),
+        )
+        .unwrap();
         assert!(response.status().is_success());
 
-        let body = block_on(response.into_body().concat2()).unwrap();
+        let body = block_on(
+            response
+                .into_body()
+                .compat()
+                .map(|bytes| bytes.to_vec())
+                .concat2(),
+        )
+        .unwrap();
         let lines = std::str::from_utf8(&body)
             .unwrap()
             .lines()
@@ -181,12 +193,22 @@ mod test {
             // Wait for flush to happen
             thread::sleep(Duration::from_millis(2000));
 
-            let response =
-                block_on(client.get(format!("http://{}/metrics", out_addr).parse().unwrap()))
-                    .unwrap();
+            let response = block_on(
+                client
+                    .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+                    .compat(),
+            )
+            .unwrap();
             assert!(response.status().is_success());
 
-            let body = block_on(response.into_body().concat2()).unwrap();
+            let body = block_on(
+                response
+                    .into_body()
+                    .compat()
+                    .map(|bytes| bytes.to_vec())
+                    .concat2(),
+            )
+            .unwrap();
             let lines = std::str::from_utf8(&body)
                 .unwrap()
                 .lines()
@@ -203,12 +225,22 @@ mod test {
             // Give packets some time to flow through
             thread::sleep(Duration::from_millis(100));
 
-            let response =
-                block_on(client.get(format!("http://{}/metrics", out_addr).parse().unwrap()))
-                    .unwrap();
+            let response = block_on(
+                client
+                    .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+                    .compat(),
+            )
+            .unwrap();
             assert!(response.status().is_success());
 
-            let body = block_on(response.into_body().concat2()).unwrap();
+            let body = block_on(
+                response
+                    .into_body()
+                    .compat()
+                    .map(|bytes| bytes.to_vec())
+                    .concat2(),
+            )
+            .unwrap();
             let lines = std::str::from_utf8(&body)
                 .unwrap()
                 .lines()
