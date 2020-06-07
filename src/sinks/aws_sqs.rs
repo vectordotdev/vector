@@ -7,6 +7,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         rusoto2::{self, AwsCredentialsProvider},
+        sink::Response,
         BatchEventsConfig, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -145,6 +146,8 @@ impl fmt::Debug for SqsService {
             .finish()
     }
 }
+
+impl Response for SendMessageBatchResult {}
 
 #[derive(Debug, Clone)]
 struct SqsRetryLogic;
