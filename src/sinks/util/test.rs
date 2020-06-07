@@ -24,7 +24,8 @@ where
 }
 
 pub fn build_test_server(
-    addr: &std::net::SocketAddr,
+    addr: std::net::SocketAddr,
+    rt: &mut Runtime,
 ) -> (
     mpsc::Receiver<(http02::request::Parts, Vec<u8>)>,
     stream_cancel::Trigger,
@@ -56,11 +57,13 @@ pub fn build_test_server(
     });
 
     let (trigger, tripwire) = stream_cancel::Tripwire::new();
-    let server = Server::bind(addr)
-        .serve(service)
-        .with_graceful_shutdown(tripwire.clone().compat().map(|_| ()))
-        .compat()
-        .map_err(|e| panic!("server error: {}", e));
+    let server = rt.block_on_std(async move {
+        Server::bind(&addr)
+            .serve(service)
+            .with_graceful_shutdown(tripwire.clone().compat().map(|_| ()))
+            .compat()
+            .map_err(|e| panic!("server error: {}", e))
+    });
 
     (rx, trigger, server)
 }

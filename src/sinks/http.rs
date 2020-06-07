@@ -291,16 +291,13 @@ mod tests {
         assert_downcast_matches,
         sinks::http::HttpSinkConfig,
         sinks::util::http2::HttpSink,
+        sinks::util::test::build_test_server,
         test_util::{next_addr, random_lines_with_stream, runtime, shutdown_on_idle},
         topology::config::SinkContext,
-        Error,
     };
-    use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt, TryStreamExt};
-    use futures01::{sync::mpsc, Future, Sink, Stream};
+    use futures01::{Sink, Stream};
     use headers03::{Authorization, HeaderMapExt};
-    use http02::request::Parts;
-    use hyper13::service::{make_service_fn, service_fn};
-    use hyper13::{Body, Method, Request, Response, Server};
+    use hyper13::Method;
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
 
@@ -412,7 +409,7 @@ mod tests {
         let cx = SinkContext::new_test(rt.executor());
 
         let (sink, _) = config.build(cx).unwrap();
-        let (rx, trigger, server) = build_test_server(&in_addr);
+        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
@@ -434,6 +431,7 @@ mod tests {
                 );
                 body
             })
+            .map(std::io::Cursor::new)
             .map(flate2::read::GzDecoder::new)
             .map(BufReader::new)
             .flat_map(BufRead::lines)
@@ -474,7 +472,7 @@ mod tests {
         let cx = SinkContext::new_test(rt.executor());
 
         let (sink, _) = config.build(cx).unwrap();
-        let (rx, trigger, server) = build_test_server(&in_addr);
+        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
@@ -496,6 +494,7 @@ mod tests {
                 );
                 body
             })
+            .map(std::io::Cursor::new)
             .map(flate2::read::GzDecoder::new)
             .map(BufReader::new)
             .flat_map(BufRead::lines)
@@ -533,7 +532,7 @@ mod tests {
         let cx = SinkContext::new_test(rt.executor());
 
         let (sink, _) = config.build(cx).unwrap();
-        let (rx, trigger, server) = build_test_server(&in_addr);
+        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
@@ -559,6 +558,7 @@ mod tests {
                 );
                 body
             })
+            .map(std::io::Cursor::new)
             .map(flate2::read::GzDecoder::new)
             .map(BufReader::new)
             .flat_map(BufRead::lines)
@@ -573,47 +573,5 @@ mod tests {
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
-    }
-
-    fn build_test_server(
-        addr: &std::net::SocketAddr,
-    ) -> (
-        mpsc::Receiver<(Parts, impl std::io::Read)>,
-        stream_cancel::Trigger,
-        impl Future<Item = (), Error = ()>,
-    ) {
-        let (tx, rx) = mpsc::channel(100);
-        let service = make_service_fn(move |_| {
-            let tx = tx.clone();
-            async {
-                Ok::<_, Error>(service_fn(move |req: Request<Body>| {
-                    let tx = tx.clone();
-                    async {
-                        let (parts, body) = req.into_parts();
-
-                        tokio01::spawn(
-                            body.compat()
-                                .map(|bytes| bytes.to_vec())
-                                .concat2()
-                                .map_err(|e| panic!(e))
-                                .and_then(|body| tx.send((parts, std::io::Cursor::new(body))))
-                                .map(|_| ())
-                                .map_err(|e| panic!(e)),
-                        );
-
-                        Ok::<_, Error>(Response::new(Body::empty()))
-                    }
-                }))
-            }
-        });
-
-        let (trigger, tripwire) = stream_cancel::Tripwire::new();
-        let server = Server::bind(addr)
-            .serve(service)
-            .with_graceful_shutdown(tripwire.compat().map(|_| ()))
-            .compat()
-            .map_err(|e| panic!("server error: {}", e));
-
-        (rx, trigger, server)
     }
 }

@@ -143,14 +143,12 @@ mod tests {
     use super::*;
     use crate::{
         event::Event,
+        sinks::util::test::build_test_server,
         test_util::{next_addr, runtime, shutdown_on_idle},
         topology::config::SinkConfig,
-        Error,
     };
-    use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt, TryStreamExt};
-    use futures01::{stream, sync::mpsc, Future, Sink, Stream};
-    use hyper13::service::{make_service_fn, service_fn};
-    use hyper13::{Body, Method, Request, Response, Server};
+    use futures01::{stream, Sink, Stream};
+    use hyper13::Method;
     use serde_json::Value;
     use std::io::BufRead;
 
@@ -260,49 +258,6 @@ mod tests {
         assert!(http_config.auth.is_none());
     }
 
-    fn build_test_server(
-        addr: &std::net::SocketAddr,
-    ) -> (
-        mpsc::Receiver<(http02::request::Parts, std::io::Cursor<Vec<u8>>)>,
-        stream_cancel::Trigger,
-        impl Future<Item = (), Error = ()>,
-    ) {
-        let (tx, rx) = mpsc::channel(100);
-        let service = make_service_fn(move |_| {
-            let tx = tx.clone();
-            async {
-                Ok::<_, Error>(service_fn(move |req: Request<Body>| {
-                    let tx = tx.clone();
-                    async {
-                        let (parts, body) = req.into_parts();
-
-                        tokio01::spawn(
-                            body.compat()
-                                .map(|bytes| bytes.to_vec())
-                                .concat2()
-                                .map(std::io::Cursor::new)
-                                .map_err(|e| panic!(e))
-                                .and_then(|body| tx.send((parts, body)))
-                                .map(|_| ())
-                                .map_err(|e| panic!(e)),
-                        );
-
-                        Ok::<_, Error>(Response::new(Body::empty()))
-                    }
-                }))
-            }
-        });
-
-        let (trigger, tripwire) = stream_cancel::Tripwire::new();
-        let server = Server::bind(addr)
-            .serve(service)
-            .with_graceful_shutdown(tripwire.compat().map(|_| ()))
-            .compat()
-            .map_err(|e| panic!("server error: {}", e));
-
-        (rx, trigger, server)
-    }
-
     #[test]
     fn new_relic_logs_happy_path() {
         let in_addr = next_addr();
@@ -320,7 +275,7 @@ mod tests {
         let (sink, _healthcheck) = http_config
             .build(SinkContext::new_test(rt.executor()))
             .unwrap();
-        let (rx, trigger, server) = build_test_server(&in_addr);
+        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream::iter_ok(input_lines.clone().into_iter().map(Event::from));
@@ -347,6 +302,7 @@ mod tests {
                 );
                 body
             })
+            .map(std::io::Cursor::new)
             .flat_map(BufRead::lines)
             .map(Result::unwrap)
             .flat_map(|s| -> Vec<String> {
