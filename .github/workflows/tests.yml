@@ -32,13 +32,13 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: echo 'Env installing...'
-        shell: nix-shell --pure
+        shell: nix-shell
       - run: ./scripts/environment/prepare.sh
-        shell: nix-shell --pure
+        shell: nix-shell
       - run: make slim-builds
-        shell: nix-shell --pure
+        shell: nix-shell
       - run: make test
-        shell: nix-shell --pure
+        shell: nix-shell
 
   test-mac:
     runs-on: macos-latest
