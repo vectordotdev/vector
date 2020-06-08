@@ -38,6 +38,8 @@ pub struct NewRelicLogsConfig {
     #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
+    pub compression: Compression,
+    #[serde(default)]
     pub batch: BatchBytesConfig,
 
     #[serde(default)]
@@ -125,7 +127,7 @@ impl NewRelicLogsConfig {
             healthcheck_uri: None,
             auth: None,
             headers: Some(headers),
-            compression: Compression::None,
+            compression: self.compression,
             encoding: self.encoding.clone().without_default(),
 
             batch,
@@ -141,8 +143,7 @@ mod tests {
     use super::*;
     use crate::{
         event::Event,
-        runtime::Runtime,
-        test_util::{next_addr, shutdown_on_idle},
+        test_util::{next_addr, runtime, shutdown_on_idle},
         topology::config::SinkConfig,
     };
     use bytes::Buf;
@@ -305,7 +306,7 @@ mod tests {
             .unwrap()
             .into();
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let (sink, _healthcheck) = http_config
             .build(SinkContext::new_test(rt.executor()))

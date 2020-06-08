@@ -344,6 +344,7 @@ mod test {
             );
             expected.insert(event::log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
+            expected.insert("hostname", "74794bfb6795");
 
             expected.insert("meta.sequenceId", "1");
             expected.insert("meta.sysUpTime", "37");
@@ -380,6 +381,7 @@ mod test {
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
             expected.insert(event::log_schema().host_key().clone(), "74794bfb6795");
+            expected.insert("hostname", "74794bfb6795");
             expected.insert(event::log_schema().source_type_key().clone(), "syslog");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
@@ -471,6 +473,7 @@ mod test {
             );
             expected.insert(event::log_schema().host_key().clone(), "74794bfb6795");
             expected.insert(event::log_schema().source_type_key().clone(), "syslog");
+            expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
             expected.insert("appname", "root");
@@ -500,6 +503,7 @@ mod test {
             );
             expected.insert(event::log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
+            expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "info");
             expected.insert("facility", "local7");
             expected.insert("appname", "liblogging-stdlog");
@@ -534,6 +538,7 @@ mod test {
             );
             expected.insert(event::log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
+            expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "info");
             expected.insert("facility", "local7");
             expected.insert("appname", "liblogging-stdlog");

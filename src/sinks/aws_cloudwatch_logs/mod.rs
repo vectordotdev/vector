@@ -820,8 +820,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         region::RegionOrEndpoint,
-        runtime::Runtime,
-        test_util::{random_lines, random_lines_with_stream, random_string},
+        test_util::{random_lines, random_lines_with_stream, random_string, runtime},
         topology::config::{SinkConfig, SinkContext},
     };
     use futures01::{
@@ -836,7 +835,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_insert_log_event() {
-        let mut rt = Runtime::single_threaded().unwrap();
+        let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         let stream_name = gen_name();
@@ -891,7 +890,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_insert_log_events_sorted() {
-        let mut rt = Runtime::single_threaded().unwrap();
+        let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         let stream_name = gen_name();
@@ -964,7 +963,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_insert_out_of_range_timestamp() {
-        let mut rt = Runtime::single_threaded().unwrap();
+        let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         let stream_name = gen_name();
@@ -1044,7 +1043,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_dynamic_group_and_stream_creation() {
-        let mut rt = Runtime::single_threaded().unwrap();
+        let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         let group_name = gen_name();
@@ -1099,7 +1098,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_insert_log_event_batched() {
-        let mut rt = Runtime::single_threaded().unwrap();
+        let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         let group_name = gen_name();
@@ -1159,7 +1158,7 @@ mod integration_tests {
     #[test]
     fn cloudwatch_insert_log_event_partitioned() {
         crate::test_util::trace_init();
-        let mut rt = Runtime::single_threaded().unwrap();
+        let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         let stream_name = gen_name();
@@ -1271,14 +1270,14 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let mut rt = Runtime::single_threaded().unwrap();
+        let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         rt.block_on(healthcheck(config, resolver).unwrap()).unwrap();
     }
 
     fn ensure_group(region: Region) {
-        let mut rt = Runtime::single_threaded().unwrap();
+        let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         let client = create_client(region, None, resolver).unwrap();

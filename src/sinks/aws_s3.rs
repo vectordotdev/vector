@@ -6,7 +6,9 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto, BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
+        rusoto,
+        sink::Response,
+        BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
         PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
@@ -350,6 +352,8 @@ struct Request {
     options: S3Options,
 }
 
+impl Response for PutObjectOutput {}
+
 #[derive(Debug, Clone)]
 struct S3RetryLogic;
 
@@ -526,7 +530,6 @@ mod integration_tests {
         dns::Resolver,
         event::Event,
         region::RegionOrEndpoint,
-        runtime::Runtime,
         sinks::aws_s3::{S3Sink, S3SinkConfig},
         test_util::{random_lines_with_stream, random_string, runtime},
         topology::config::SinkContext,
@@ -636,7 +639,7 @@ mod integration_tests {
         let (tx, rx) = futures01::sync::mpsc::channel(1);
         let pump = sink.send_all(rx).map(|_| ()).map_err(|_| ());
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(pump);
 
         let mut tx = tx.wait();
@@ -720,7 +723,7 @@ mod integration_tests {
 
     #[test]
     fn s3_healthchecks() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         let healthcheck = S3Sink::healthcheck(&config(1), resolver).unwrap();
@@ -729,7 +732,7 @@ mod integration_tests {
 
     #[test]
     fn s3_healthchecks_invalid_bucket() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         let config = S3SinkConfig {

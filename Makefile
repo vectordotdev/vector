@@ -53,7 +53,7 @@ build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in rel
 bench: build ## Run benchmarks in /benches
 	$(RUN) bench
 
-test: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
+test: test-behavior test-integration test-unit test-default## Runs all tests, unit, behaviorial, default, and integration.
 
 test-behavior: build ## Runs behaviorial tests
 	$(RUN) test-behavior
@@ -100,6 +100,9 @@ test-shutdown: ## Runs shutdown tests
 
 test-unit: ## Runs unit tests, tests which do not require additional services to be present
 	$(RUN) test-unit
+
+test-default: ## Runs tests in default feature
+	$(RUN) test-default
 
 ##@ Checking
 

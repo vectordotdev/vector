@@ -208,7 +208,7 @@ mod tests {
     use crate::{
         event::{self, Event},
         runtime::Runtime,
-        test_util::{self, collect_n},
+        test_util::{self, collect_n, runtime},
         topology::config::{GlobalOptions, SourceConfig},
     };
     use futures01::sync::mpsc;
@@ -268,7 +268,7 @@ mod tests {
     fn http_multiline_text() {
         let body = "test body\n\ntest body 2";
 
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (rx, addr) = source(&mut rt, Encoding::default(), vec![]);
 
         assert_eq!(200, send(addr, body));
@@ -298,7 +298,7 @@ mod tests {
         //same as above test but with a newline at the end
         let body = "test body\n\ntest body 2\n";
 
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (rx, addr) = source(&mut rt, Encoding::default(), vec![]);
 
         assert_eq!(200, send(addr, body));
@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn http_json_parsing() {
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (rx, addr) = source(&mut rt, Encoding::Json, vec![]);
 
         assert_eq!(400, send(addr, "{")); //malformed
@@ -349,7 +349,7 @@ mod tests {
 
     #[test]
     fn http_json_values() {
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (rx, addr) = source(&mut rt, Encoding::Json, vec![]);
 
         assert_eq!(200, send(addr, r#"[{"key":"value"}]"#));
@@ -374,7 +374,7 @@ mod tests {
 
     #[test]
     fn http_ndjson() {
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (rx, addr) = source(&mut rt, Encoding::Ndjson, vec![]);
 
         assert_eq!(400, send(addr, r#"[{"key":"value"}]"#)); //one object per line
@@ -407,7 +407,7 @@ mod tests {
         headers.insert("User-Agent", "test_client".parse().unwrap());
         headers.insert("Upgrade-Insecure-Requests", "false".parse().unwrap());
 
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let (rx, addr) = source(
             &mut rt,
             Encoding::Ndjson,
