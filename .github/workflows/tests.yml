@@ -8,6 +8,11 @@ on:
     branches:
         - master
 
+
+default:
+  run:
+    shell: nix-shell --pure --run "{0}"
+
 env:
   VERBOSE: true
   ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
