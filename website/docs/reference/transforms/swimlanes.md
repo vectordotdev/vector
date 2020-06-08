@@ -226,7 +226,7 @@ being `true` or `false` respectively.
 ##### `[field-name]`.neq
 
 Check whether a fields contents does not match the value specified.This may be
-a single string or a list of strings, in which case this evaluates to true if
+a single string or a list of strings, in which case this evaluates to false if
 any of the list matches.
 
 

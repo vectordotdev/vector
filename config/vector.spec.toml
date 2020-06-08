@@ -1631,8 +1631,8 @@ dns_servers = ["0.0.0.0:53"]
     "host.exists" = true
 
     # Check whether a fields contents does not match the value specified.This may
-    # be a single string or a list of strings, in which case this evaluates to true
-    # if any of the list matches.
+    # be a single string or a list of strings, in which case this evaluates to
+    # false if any of the list matches.
     #
     # * optional
     # * no default
@@ -2543,8 +2543,8 @@ require('custom_module')
       "host.exists" = true
 
       # Check whether a fields contents does not match the value specified.This may
-      # be a single string or a list of strings, in which case this evaluates to true
-      # if any of the list matches.
+      # be a single string or a list of strings, in which case this evaluates to
+      # false if any of the list matches.
       #
       # * optional
       # * no default
