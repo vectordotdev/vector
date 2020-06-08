@@ -102,6 +102,7 @@ mod test {
 
     #[test]
     fn udp_message() {
+        crate::test_util::trace_init();
         let addr = next_addr();
         let receiver = UdpSocket::bind(addr).unwrap();
 
@@ -134,6 +135,7 @@ mod test {
 
     #[test]
     fn tcp_stream() {
+        crate::test_util::trace_init();
         let addr = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
@@ -172,6 +174,7 @@ mod test {
     // events.
     #[test]
     fn tcp_stream_detects_disconnect() {
+        crate::test_util::trace_init();
         let addr = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
