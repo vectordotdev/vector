@@ -1,3 +1,12 @@
+#![allow(clippy::cognitive_complexity)]
+#![allow(clippy::option_map_unit_fn)]
+#![allow(clippy::or_fun_call)]
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::redundant_clone)]
+#![allow(clippy::single_match)]
+#![allow(clippy::unnecessary_unwrap)]
+#![allow(clippy::useless_format)]
+
 #[macro_use]
 extern crate tracing;
 
