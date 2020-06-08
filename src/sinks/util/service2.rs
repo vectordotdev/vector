@@ -2,7 +2,10 @@ use super::retries2::{FixedRetryPolicy, RetryLogic};
 use super::sink::Response;
 use super::{Batch, BatchSettings, BatchSink};
 use crate::buffers::Acker;
+use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use std::task::Poll;
 use std::time::Duration;
 use tower03::{
     layer::{util::Stack, Layer},
@@ -19,6 +22,10 @@ pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, ConcurrencyLimit<Timeo
 pub type TowerBatchedSink<S, B, L, Request> = BatchSink<TowerCompat<Svc<S, L>>, B, Request>;
 
 pub trait ServiceBuilderExt<L> {
+    fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
+    where
+        F: Fn(R1) -> R2 + Send + Sync + 'static;
+
     fn settings<RL, Request>(
         self,
         settings: TowerRequestSettings,
@@ -27,6 +34,13 @@ pub trait ServiceBuilderExt<L> {
 }
 
 impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
+    fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
+    where
+        F: Fn(R1) -> R2 + Send + Sync + 'static,
+    {
+        self.layer(MapLayer { f: Arc::new(f) })
+    }
+
     fn settings<RL, Request>(
         self,
         settings: TowerRequestSettings,
@@ -171,6 +185,61 @@ where
             .service(inner);
 
         BoxService::new(l)
+    }
+}
+
+// === map ===
+
+pub struct MapLayer<R1, R2> {
+    f: Arc<dyn Fn(R1) -> R2 + Send + Sync + 'static>,
+}
+
+impl<S, R1, R2> Layer<S> for MapLayer<R1, R2>
+where
+    S: Service<R2>,
+{
+    type Service = Map<S, R1, R2>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        Map {
+            f: self.f.clone(),
+            inner,
+        }
+    }
+}
+
+pub struct Map<S, R1, R2> {
+    f: Arc<dyn Fn(R1) -> R2 + Send + Sync + 'static>,
+    inner: S,
+}
+
+impl<S, R1, R2> Service<R1> for Map<S, R1, R2>
+where
+    S: Service<R2>,
+    crate::Error: From<S::Error>,
+{
+    type Response = S::Response;
+    type Error = crate::Error;
+    type Future = futures::future::MapErr<S::Future, fn(S::Error) -> crate::Error>;
+
+    fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner
+            .poll_ready(cx)
+            .map(|result| result.map_err(|e| e.into()))
+    }
+
+    fn call(&mut self, req: R1) -> Self::Future {
+        let req = (self.f)(req);
+        self.inner.call(req).map_err(|e| e.into())
+    }
+}
+
+impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
+    fn clone(&self) -> Self {
+        Self {
+            f: self.f.clone(),
+            inner: self.inner.clone(),
+        }
     }
 }
 

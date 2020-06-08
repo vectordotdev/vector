@@ -6,7 +6,7 @@ use goauth::{
     credentials::Credentials,
     error::GOErr,
 };
-use hyper::{
+use hyper13::{
     header::{HeaderValue, AUTHORIZATION},
     Request, StatusCode,
 };
@@ -120,8 +120,6 @@ impl GcpCredentials {
     }
 
     pub fn apply2<T>(&self, request: &mut http02::Request<T>) {
-        use http02::header::{HeaderValue, AUTHORIZATION};
-
         let token = self.token.read().unwrap();
         let value = format!("{} {}", token.token_type(), token.access_token());
         request
@@ -170,7 +168,7 @@ fn make_jwt(creds: &Credentials, scope: &Scope) -> crate::Result<Jwt<JwtClaims>>
 pub fn healthcheck_response(
     creds: Option<GcpCredentials>,
     not_found_error: crate::Error,
-) -> impl FnOnce(http::Response<hyper::Body>) -> crate::Result<()> {
+) -> impl FnOnce(http02::Response<hyper13::Body>) -> crate::Result<()> {
     move |response| match response.status() {
         StatusCode::OK => {
             // If there are credentials configured, the
@@ -183,7 +181,7 @@ pub fn healthcheck_response(
         }
         StatusCode::FORBIDDEN => Err(GcpError::InvalidCredentials0.into()),
         StatusCode::NOT_FOUND => Err(not_found_error),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+        status => Err(HealthcheckError::UnexpectedStatus2 { status }.into()),
     }
 }
 
@@ -192,8 +190,6 @@ pub fn healthcheck_response2(
     creds: Option<GcpCredentials>,
     not_found_error: crate::Error,
 ) -> impl FnOnce(http02::Response<hyper13::Body>) -> crate::Result<()> {
-    use http02::StatusCode;
-
     move |response| match response.status() {
         StatusCode::OK => {
             // If there are credentials configured, the
