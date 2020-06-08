@@ -9,7 +9,7 @@ on:
         - master
 
 
-default:
+defaults:
   run:
     shell: nix-shell --pure --run "{0}"
 
