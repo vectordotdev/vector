@@ -17,7 +17,7 @@ pub trait Watcher {
     type StreamError: std::error::Error + Send + 'static;
 
     /// The stream type produced by the watch request.
-    type Stream: Stream<Item = Result<WatchResponse<Self::Object>, Self::StreamError>>;
+    type Stream: Stream<Item = Result<WatchResponse<Self::Object>, Self::StreamError>> + Send;
 
     /// Issues a single watch request and returns a stream results.
     fn watch<'a>(
