@@ -27,20 +27,23 @@ export SCOPE ?= ""
  # Deprecated.
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
 
+FORMATTING_BEGIN_YELLOW = \033[0;33m
+FORMATTING_BEGIN_BLUE = \033[36m
+FORMATTING_END = \033[0m
 
 help:
-	@echo "                                      __   __  __"
-	@echo "                                      \ \ / / / /"
-	@echo "                                       \ V / / / "
-	@echo "                                        \_/  \/  "
-	@echo ""
-	@echo "                                      V E C T O R"
-	@echo ""
-	@echo "---------------------------------------------------------------------------------------"
-	@echo -e "Nix user? You can use \033[0;33m\`direnv allow .\`\033[0m or \033[0;33m\`nix-shell --pure\`\033[0m"
-	@echo -e "Want to use \033[0;33m\`docker\`\033[0m or \033[0;33m\`podman\`\033[0m? See \033[0;33m\`ENVIRONMENT=true\`\033[0m commands. (Default \033[0;33m\`CONTAINER_TOOL=docker\`\033[0m)"
-	@echo ""
-	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-46s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+	@printf -- "${FORMATTING_BEGIN_BLUE}                                      __   __  __${FORMATTING_END}\n"
+	@printf -- "${FORMATTING_BEGIN_BLUE}                                      \ \ / / / /${FORMATTING_END}\n"
+	@printf -- "${FORMATTING_BEGIN_BLUE}                                       \ V / / / ${FORMATTING_END}\n"
+	@printf -- "${FORMATTING_BEGIN_BLUE}                                        \_/  \/  ${FORMATTING_END}\n"
+	@printf -- "\n"
+	@printf -- "                                      V E C T O R\n"
+	@printf -- "\n"
+	@printf -- "---------------------------------------------------------------------------------------\n"
+	@printf -- "Nix user? You can use ${FORMATTING_BEGIN_YELLOW}\`direnv allow .\`${FORMATTING_END} or ${FORMATTING_BEGIN_YELLOW}\`nix-shell --pure\`${FORMATTING_END}\n"
+	@printf -- "Want to use ${FORMATTING_BEGIN_YELLOW}\`docker\`${FORMATTING_END} or ${FORMATTING_BEGIN_YELLOW}\`podman\`${FORMATTING_END}? See ${FORMATTING_BEGIN_YELLOW}\`ENVIRONMENT=true\`${FORMATTING_END} commands. (Default ${FORMATTING_BEGIN_YELLOW}\`CONTAINER_TOOL=docker\`${FORMATTING_END})\n"
+	@printf -- "\n"
+	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make ${FORMATTING_BEGIN_BLUE}<target>${FORMATTING_END}\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  ${FORMATTING_BEGIN_BLUE}%-46s${FORMATTING_END} %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Environment
 # We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
