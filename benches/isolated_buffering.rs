@@ -1,3 +1,5 @@
+#![allow(clippy::redundant_pattern_matching)]
+
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},

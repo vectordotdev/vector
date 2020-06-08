@@ -135,6 +135,21 @@ services:
     user: $USER
     command: ./scripts/check-component-features.sh
 
+  check-clippy:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/checker/Dockerfile
+    environment:
+      CARGO_TERM_COLOR: always
+    volumes:
+      - $PWD:$PWD
+      - ./target/cargo/registry:/opt/rust/cargo/registry
+      - ./target/cargo/git:/opt/rust/cargo/git
+      - ./target/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    user: $USER
+    command: scripts/check-clippy.sh
+
   check-fmt:
     build:
       context: .

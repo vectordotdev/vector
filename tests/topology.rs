@@ -1,3 +1,7 @@
+#![allow(clippy::bool_comparison)]
+#![allow(clippy::match_bool)]
+#![allow(clippy::redundant_clone)]
+
 mod support;
 
 use crate::support::{sink, sink_failing_healthcheck, source, transform, MockSourceConfig};
