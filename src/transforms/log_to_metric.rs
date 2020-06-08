@@ -2,13 +2,14 @@ use super::Transform;
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     event::{self, Value},
-    template::Template,
+    template::{Template, TemplateError},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -99,12 +100,13 @@ impl LogToMetric {
 
 enum TransformError {
     FieldNotFound,
+    TemplateError(TemplateError),
     RenderError(String),
     ParseError(&'static str),
 }
 
 fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
-    let template = Template::from(s);
+    let template = Template::try_from(s).map_err(|e| TransformError::TemplateError(e))?;
     let name = template.render(&event).map_err(|e| {
         TransformError::RenderError(format!(
             "Keys ({:?}) do not exist on the event. Dropping event.",
@@ -256,6 +258,9 @@ impl Transform for LogToMetric {
                 }
                 Err(TransformError::RenderError(error)) => {
                     debug!(message = "Unable to render.", %error, rate_limit_secs = 30);
+                }
+                Err(TransformError::TemplateError(error)) => {
+                    debug!(message = "failed to parse.", %error, rate_limit_secs = 30);
                 }
             }
         }

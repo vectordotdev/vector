@@ -249,6 +249,7 @@ mod tests {
         },
     };
     use futures::stream;
+    use std::convert::TryInto;
 
     #[test]
     fn single_partition() {
@@ -257,7 +258,7 @@ mod tests {
         let template = temp_file();
 
         let config = FileSinkConfig {
-            path: template.clone().into(),
+            path: template.clone().try_into().unwrap(),
             idle_timeout_secs: None,
             encoding: Encoding::Text.into(),
         };
@@ -290,7 +291,7 @@ mod tests {
         trace!(message = "Template", %template);
 
         let config = FileSinkConfig {
-            path: template.clone().into(),
+            path: template.clone().try_into().unwrap(),
             idle_timeout_secs: None,
             encoding: Encoding::Text.into(),
         };

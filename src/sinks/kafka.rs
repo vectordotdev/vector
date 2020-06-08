@@ -4,7 +4,7 @@ use crate::{
     kafka::{KafkaCompression, KafkaTlsConfig},
     serde::to_string,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
-    template::Template,
+    template::{Template, TemplateError},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::compat::Compat;
@@ -18,6 +18,7 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 
@@ -27,6 +28,8 @@ type MetadataFuture<F, M> = future::Join<F, future::FutureResult<M, <F as Future
 enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: rdkafka::error::KafkaError },
+    #[snafu(display("invalid topic template: {}", source))]
+    TopicTemplate { source: TemplateError },
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -83,7 +86,7 @@ inventory::submit! {
 impl SinkConfig for KafkaSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = KafkaSink::new(self.clone(), cx.acker())?;
-        let hc = healthcheck(self.clone());
+        let hc = healthcheck(self.clone())?;
         Ok((Box::new(sink), hc))
     }
 
@@ -120,7 +123,7 @@ impl KafkaSink {
         let producer = config.to_rdkafka()?.create().context(KafkaCreateFailed)?;
         Ok(KafkaSink {
             producer,
-            topic: Template::from(config.topic),
+            topic: Template::try_from(config.topic).context(TopicTemplate)?,
             key_field: config.key_field,
             encoding: config.encoding.into(),
             in_flight: FuturesUnordered::new(),
@@ -210,9 +213,12 @@ impl Sink for KafkaSink {
     }
 }
 
-fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
+fn healthcheck(config: KafkaSinkConfig) -> crate::Result<super::Healthcheck> {
     let client = config.to_rdkafka().unwrap();
-    let topic = match Template::from(config.topic).render_string(&Event::from("")) {
+    let topic = match Template::try_from(config.topic)
+        .context(TopicTemplate)?
+        .render_string(&Event::from(""))
+    {
         Ok(topic) => Some(topic),
         Err(missing_keys) => {
             warn!(
@@ -235,7 +241,7 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
         })
     });
 
-    Box::new(check)
+    Ok(Box::new(check))
 }
 
 fn encode_event(
@@ -344,7 +350,7 @@ mod integration_test {
 
         let mut rt = crate::test_util::runtime();
         use futures::compat::Future01CompatExt;
-        let jh = rt.spawn_handle(super::healthcheck(config).compat());
+        let jh = rt.spawn_handle(super::healthcheck(config).unwrap().compat());
 
         rt.block_on_std(jh).unwrap().unwrap();
     }
