@@ -154,6 +154,9 @@ mod test {
         let pump = sink.send_all(events);
         let _ = rt.block_on(pump).unwrap();
 
+        // Some CI machines are very slow, be generous.
+        std::thread::sleep(std::time::Duration::from_secs(5));
+
         let output = receiver.wait();
         assert_eq!(output.len(), lines.len());
         for (source, received) in lines.iter().zip(output) {
@@ -197,7 +200,7 @@ mod test {
         let jh = rt.spawn_handle(async move {
             let mut listener = TcpListener::bind(&addr).await.unwrap();
 
-            // Only accept two connections after the second connection is done
+            // Only accept a few connections after the second connection is done
             // we can exit.
             for _ in 0..2 {
                 let (mut conn, _) = listener.accept().await.unwrap();
@@ -217,7 +220,7 @@ mod test {
                            if  n == 0 {
                                break;
                            } else {
-                               counter1.fetch_add(1, Ordering::Relaxed);
+                               counter1.fetch_add(1, Ordering::SeqCst);
                            }
                         }
                     };
@@ -233,7 +236,14 @@ mod test {
         // we have 10 events we can tell the server to shutdown to simulate the
         // remote shutting down on an idle connection.
         for _ in 0..100 {
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            let amnt = counter.load(Ordering::SeqCst);
+
+            if amnt == 10 {
+                break;
+            }
+
+            // Some CI machines are very slow, be generous.
+            std::thread::sleep(std::time::Duration::from_millis(500));
         }
         assert!(counter.load(Ordering::SeqCst) >= 10);
         close.notify();
@@ -251,6 +261,6 @@ mod test {
         rt.block_on_std(jh).unwrap();
 
         // Check that there are exacty 20 events.
-        assert_eq!(counter.load(Ordering::Relaxed), 20);
+        assert_eq!(counter.load(Ordering::SeqCst), 20);
     }
 }
