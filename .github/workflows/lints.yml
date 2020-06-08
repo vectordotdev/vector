@@ -4,10 +4,7 @@ on:
   push:
     branches:
       - master
-  # TODO: We should never do the docker push on a PR.
   pull_request:
-    branches:
-        - master
 
 env:
   VERBOSE: true
