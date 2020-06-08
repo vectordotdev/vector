@@ -3,6 +3,7 @@ set -e
 
 rustup default "$(cat rust-toolchain)"
 rustup component add rustfmt
+rustup component add clippy
 
 cd scripts
 bundle update --bundler
