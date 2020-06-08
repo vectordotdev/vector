@@ -114,7 +114,8 @@ impl CheckFieldsPredicate for ContainsPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| {
-                self.arg.iter().any(|s| v.to_string_lossy().contains(s))
+                let v = v.to_string_lossy();
+                self.arg.iter().any(|s| v.contains(s))
             }),
             _ => false,
         }
@@ -154,7 +155,8 @@ impl CheckFieldsPredicate for StartsWithPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| {
-                self.arg.iter().any(|s| v.to_string_lossy().starts_with(s))
+                let v = v.to_string_lossy();
+                self.arg.iter().any(|s| v.starts_with(s))
             }),
             _ => false,
         }
@@ -192,7 +194,8 @@ impl CheckFieldsPredicate for EndsWithPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| {
-                self.arg.iter().any(|s| v.to_string_lossy().ends_with(s))
+                let v = v.to_string_lossy();
+                self.arg.iter().any(|s| v.ends_with(s))
             }),
             _ => false,
         }
