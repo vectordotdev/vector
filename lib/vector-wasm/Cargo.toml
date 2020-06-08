@@ -13,5 +13,5 @@ guest = []
 [dependencies]
 serde_json = "1.0.51"
 serde = { version = "1", features = ["derive"] }
-tracing = "0.1.13"
+tracing = "0.1.15"
 anyhow = "1.0.28"

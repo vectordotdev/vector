@@ -59,7 +59,7 @@ tokio-compat = { version = "0.1", features = ["rt-full"] }
 async-trait = "0.1"
 
 # Tracing
-tracing = "0.1.9"
+tracing = "0.1.15"
 tracing-futures = { version = "0.2", features = ["futures-01", "futures-03"]}
 tracing-subscriber = "0.2.2"
 tracing-log = "0.1.0"
@@ -170,9 +170,9 @@ pulsar = { version = "0.3.0", optional = true }
 task-compat = "0.1"
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
-lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "367b150ffc3e82a7b544fcc9d6830d0e974e696b", optional = true }
-lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "367b150ffc3e82a7b544fcc9d6830d0e974e696b", optional = true }
-lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "367b150ffc3e82a7b544fcc9d6830d0e974e696b", optional = true }
+lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
+lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
+lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
 anyhow = { version = "1.0.28", optional = true }
 
 

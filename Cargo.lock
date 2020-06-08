@@ -591,16 +591,16 @@ dependencies = [
 
 [[package]]
 name = "cranelift-bforest"
-version = "0.63.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.64.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "cranelift-entity",
 ]
 
 [[package]]
 name = "cranelift-codegen"
-version = "0.63.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.64.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "byteorder",
  "cranelift-bforest",
@@ -617,8 +617,8 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-meta"
-version = "0.63.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.64.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "cranelift-codegen-shared",
  "cranelift-entity",
@@ -626,18 +626,18 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-shared"
-version = "0.63.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.64.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 
 [[package]]
 name = "cranelift-entity"
-version = "0.63.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.64.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 
 [[package]]
 name = "cranelift-frontend"
-version = "0.63.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.64.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "cranelift-codegen",
  "log",
@@ -647,8 +647,8 @@ dependencies = [
 
 [[package]]
 name = "cranelift-module"
-version = "0.63.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.64.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
@@ -659,8 +659,8 @@ dependencies = [
 
 [[package]]
 name = "cranelift-native"
-version = "0.63.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.64.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "cranelift-codegen",
  "raw-cpuid 7.0.3",
@@ -669,8 +669,8 @@ dependencies = [
 
 [[package]]
 name = "cranelift-object"
-version = "0.63.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.64.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "cranelift-codegen",
  "cranelift-module",
@@ -680,15 +680,15 @@ dependencies = [
 
 [[package]]
 name = "cranelift-wasm"
-version = "0.63.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.64.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
  "cranelift-frontend",
  "log",
  "thiserror",
- "wasmparser 0.55.0",
+ "wasmparser 0.57.0",
 ]
 
 [[package]]
@@ -2243,7 +2243,7 @@ dependencies = [
 [[package]]
 name = "lucet-module"
 version = "0.7.0-dev"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "anyhow",
  "bincode",
@@ -2262,7 +2262,7 @@ dependencies = [
 [[package]]
 name = "lucet-runtime"
 version = "0.7.0-dev"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "cc",
  "cfg-if",
@@ -2276,7 +2276,7 @@ dependencies = [
 [[package]]
 name = "lucet-runtime-internals"
 version = "0.7.0-dev"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "anyhow",
  "bincode",
@@ -2302,7 +2302,7 @@ dependencies = [
 [[package]]
 name = "lucet-runtime-macros"
 version = "0.7.0-dev"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "quote 1.0.2",
  "syn 1.0.14",
@@ -2311,7 +2311,7 @@ dependencies = [
 [[package]]
 name = "lucet-validate"
 version = "0.7.0-dev"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "clap",
  "cranelift-entity",
@@ -2323,7 +2323,7 @@ dependencies = [
 [[package]]
 name = "lucet-wasi"
 version = "0.7.0-dev"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "anyhow",
  "cast",
@@ -2343,7 +2343,7 @@ dependencies = [
 [[package]]
 name = "lucet-wasi-generate"
 version = "0.7.0-dev"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "lucet-wiggle",
  "proc-macro2 1.0.8",
@@ -2356,7 +2356,7 @@ dependencies = [
 [[package]]
 name = "lucet-wiggle"
 version = "0.7.0-dev"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "lucet-runtime",
  "lucet-wiggle-generate",
@@ -2367,7 +2367,7 @@ dependencies = [
 [[package]]
 name = "lucet-wiggle-generate"
 version = "0.7.0-dev"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "heck",
  "lucet-module",
@@ -2381,7 +2381,7 @@ dependencies = [
 [[package]]
 name = "lucet-wiggle-macro"
 version = "0.7.0-dev"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "lucet-wiggle-generate",
  "quote 1.0.2",
@@ -2393,7 +2393,7 @@ dependencies = [
 [[package]]
 name = "lucetc"
 version = "0.7.0-dev"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "anyhow",
  "bimap",
@@ -2423,7 +2423,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "wabt",
- "wasmparser 0.55.0",
+ "wasmparser 0.57.0",
 ]
 
 [[package]]
@@ -3800,9 +3800,9 @@ dependencies = [
 
 [[package]]
 name = "regalloc"
-version = "0.0.24"
+version = "0.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5842bece8a4b1690ffa6d9d959081c1d5d851ee4337a36c0a121fafe8c16add2"
+checksum = "cca5b48c9db66c5ba084e4660b4c0cfe8b551a96074bc04b7c11de86ad0bf1f9"
 dependencies = [
  "log",
  "rustc-hash",
@@ -5530,9 +5530,9 @@ dependencies = [
 
 [[package]]
 name = "tracing"
-version = "0.1.13"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1721cc8cf7d770cc4257872507180f35a4797272f5962f24c806af9e7faf52ab"
+checksum = "a41f40ed0e162c911ac6fcb53ecdc8134c46905fdbbae8c50add462a538b495f"
 dependencies = [
  "cfg-if",
  "log",
@@ -5542,10 +5542,11 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fbad39da2f9af1cae3016339ad7f2c7a9e870f12e8fd04c4fd7ef35b30c0d2b"
+checksum = "99bbad0de3fd923c9c3232ead88510b783e5a4d16a6154adffa3d53308de984c"
 dependencies = [
+ "proc-macro2 1.0.8",
  "quote 1.0.2",
  "syn 1.0.14",
 ]
@@ -6213,8 +6214,8 @@ dependencies = [
 
 [[package]]
 name = "wasi-common"
-version = "0.16.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.17.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -6316,9 +6317,9 @@ checksum = "733954023c0b39602439e60a65126fd31b003196d3a1e8e4531b055165a79b31"
 
 [[package]]
 name = "wasmparser"
-version = "0.55.0"
+version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af931e2e1960c53f4a28b063fec4cacd036f35acbec8ff3a4739125b17382a87"
+checksum = "32fddd575d477c6e9702484139cf9f23dcd554b06d185ed0f56c857dd3a47aa6"
 
 [[package]]
 name = "wast"
@@ -6378,8 +6379,8 @@ checksum = "effc0e4ff8085673ea7b9b2e3c73f6bd4d118810c9009ed8f1e16bd96c331db6"
 
 [[package]]
 name = "wig"
-version = "0.16.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.17.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "heck",
  "proc-macro2 1.0.8",
@@ -6389,18 +6390,19 @@ dependencies = [
 
 [[package]]
 name = "wiggle"
-version = "0.16.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.17.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "thiserror",
+ "tracing",
  "wiggle-macro",
  "witx",
 ]
 
 [[package]]
 name = "wiggle-generate"
-version = "0.16.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.17.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "anyhow",
  "heck",
@@ -6412,8 +6414,8 @@ dependencies = [
 
 [[package]]
 name = "wiggle-macro"
-version = "0.16.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.17.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "quote 1.0.2",
  "syn 1.0.14",
@@ -6484,8 +6486,8 @@ dependencies = [
 
 [[package]]
 name = "winx"
-version = "0.16.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.17.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "bitflags",
  "cvt",
@@ -6495,7 +6497,7 @@ dependencies = [
 [[package]]
 name = "witx"
 version = "0.8.5"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "anyhow",
  "log",
@@ -6539,8 +6541,8 @@ dependencies = [
 
 [[package]]
 name = "yanix"
-version = "0.16.0"
-source = "git+https://github.com/bytecodealliance/lucet.git?rev=367b150ffc3e82a7b544fcc9d6830d0e974e696b#367b150ffc3e82a7b544fcc9d6830d0e974e696b"
+version = "0.17.0"
+source = "git+https://github.com/bytecodealliance/lucet.git?rev=d4fc14a03bdb99ac83173d27fddf1aca48412a86#d4fc14a03bdb99ac83173d27fddf1aca48412a86"
 dependencies = [
  "bitflags",
  "cfg-if",

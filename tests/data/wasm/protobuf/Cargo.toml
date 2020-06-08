@@ -14,7 +14,7 @@ prost = "0.6"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 vector-wasm = { version = "0.1", path = "../../../../lib/vector-wasm"}
-tracing = "0.1.13"
+tracing = "0.1.15"
 anyhow = "1.0.28"
 
 [build-dependencies]
