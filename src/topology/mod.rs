@@ -886,6 +886,7 @@ mod transient_state_tests {
 
     #[test]
     fn remove_sink() {
+        crate::test_util::trace_init();
         let mut rt = runtime();
 
         let mut old_config = Config::empty();
@@ -922,6 +923,7 @@ mod transient_state_tests {
 
     #[test]
     fn remove_transform() {
+        crate::test_util::trace_init();
         let mut rt = runtime();
 
         let mut old_config = Config::empty();

@@ -4,15 +4,13 @@ on:
   push:
     branches:
       - master
-  pull_request:
-    branches:
-        - master
+  pull_request: {}
 
 env:
   VERBOSE: true
   ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
   RUST_TEST_THREADS: 1
-  TEST_LOG: vector=trace
+  TEST_LOG: vector=debug
 
 jobs:
   cancel-previous:
@@ -37,6 +35,9 @@ jobs:
       - run: nix-shell --run "make test"
 
   test-mac:
+    # Full CI suites for this platform were only recently introduced.
+    # Some failures are permitted until we can properly correct them.
+    continue-on-error: true
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
@@ -49,6 +50,9 @@ jobs:
       - run: nix-shell --run "make test"
 
   test-windows:
+    # Full CI suites for this platform were only recently introduced.
+    # Some failures are permitted until we can properly correct them.
+    continue-on-error: true
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v1

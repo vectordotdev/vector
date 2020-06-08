@@ -102,6 +102,7 @@ mod test {
 
     #[test]
     fn udp_message() {
+        crate::test_util::trace_init();
         let addr = next_addr();
         let receiver = UdpSocket::bind(addr).unwrap();
 
@@ -134,6 +135,7 @@ mod test {
 
     #[test]
     fn tcp_stream() {
+        crate::test_util::trace_init();
         let addr = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
@@ -172,6 +174,7 @@ mod test {
     // events.
     #[test]
     fn tcp_stream_detects_disconnect() {
+        crate::test_util::trace_init();
         let addr = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
@@ -230,15 +233,10 @@ mod test {
         // we have 10 events we can tell the server to shutdown to simulate the
         // remote shutting down on an idle connection.
         for _ in 0..100 {
-            let amnt = counter.load(Ordering::SeqCst);
-
-            if amnt == 10 {
-                close.notify();
-                break;
-            }
-
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
+        assert!(counter.load(Ordering::SeqCst) >= 10);
+        close.notify();
 
         // Send another 10 events
         let (_, events) = random_lines_with_stream(10, 10);

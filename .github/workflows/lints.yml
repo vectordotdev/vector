@@ -4,14 +4,12 @@ on:
   push:
     branches:
       - master
-  # TODO: We should never do the docker push on a PR.
-  pull_request:
-    branches:
-        - master
+  pull_request: {}
 
 env:
   VERBOSE: true
   ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+  TEST_LOG: vector=debug
 
 jobs:
   cancel-previous:

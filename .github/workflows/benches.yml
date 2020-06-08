@@ -4,9 +4,7 @@ on:
   push:
     branches:
       - master
-  pull_request:
-    branches:
-        - master
+  pull_request: {}
 
 env:
   VERBOSE: true
