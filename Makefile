@@ -13,16 +13,28 @@ else
     export DEFAULT_FEATURES = default
 endif
 
-export AUTOSPAWN ?= true
-export AUTODESPAWN ?= ${AUTOSPAWN}
-export VERBOSE ?= false
-export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
-export CONTAINER_TOOL ?= docker
-export ENVIRONMENT ?= false
-export ENVIRONMENT_UPSTREAM ?= docker.pkg.github.com/timberio/vector/environment
-export ENVIRONMENT_AUTOBUILD ?= true
-export ENVIRONMENT_TTY ?= true
+# Override this with any scopes for testing/benching.
 export SCOPE ?= ""
+# Override to false to disable autospawning services on integration tests.
+export AUTOSPAWN ?= true
+# Override to control if services are turned off after integration tests.
+export AUTODESPAWN ?= ${AUTOSPAWN}
+# Override to true for a bit more log output in your environment building (more coming!)
+export VERBOSE ?= false
+# Override to set a different Rust toolchain
+export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
+# Override the container tool.
+# TODO: We're working on first class `podman` support for integration tests! We need to move away from compose though: https://github.com/containers/podman-compose/issues/125
+export CONTAINER_TOOL ?= docker
+# Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
+export ENVIRONMENT ?= false
+# The upstream container we publish artifacts to on a successful master build.
+export ENVIRONMENT_UPSTREAM ?= docker.pkg.github.com/timberio/vector/environment
+# Override to disable building the container, having it pull from the Github packages repo instead
+# TODO: Disable this by default. Blocked by `docker pull` from Github Packages requiring authenticated login
+export ENVIRONMENT_AUTOBUILD ?= true
+# Override this when appropriate to disable a TTY being available in commands with `ENVIRONMENT=true` (Useful for CI, but CI uses Nix!)
+export ENVIRONMENT_TTY ?= true
 
  # Deprecated.
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
