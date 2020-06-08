@@ -197,9 +197,8 @@ mod test {
 
         let close1 = close.clone();
         let counter1 = counter.clone();
+        let mut listener = rt.block_on_std(TcpListener::bind(addr)).unwrap();
         let jh = rt.spawn_handle(async move {
-            let mut listener = TcpListener::bind(&addr).await.unwrap();
-
             // Only accept a few connections after the second connection is done
             // we can exit.
             for _ in 0..2 {
