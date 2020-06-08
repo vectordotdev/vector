@@ -233,15 +233,10 @@ mod test {
         // we have 10 events we can tell the server to shutdown to simulate the
         // remote shutting down on an idle connection.
         for _ in 0..100 {
-            let amnt = counter.load(Ordering::SeqCst);
-
-            if amnt == 10 {
-                close.notify();
-                break;
-            }
-
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
+        assert!(counter.load(Ordering::SeqCst) >= 10);
+        close.notify();
 
         // Send another 10 events
         let (_, events) = random_lines_with_stream(10, 10);
