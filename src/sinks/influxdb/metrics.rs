@@ -11,14 +11,13 @@ use crate::{
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
+use futures::future::BoxFuture;
 use futures01::Sink;
-use http02::Method;
 use hyper13;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::pin::Pin;
 use std::task::Poll;
 use tower03::Service;
 
@@ -98,9 +97,7 @@ impl InfluxDBSvc {
         let uri = settings.write_uri(endpoint)?;
 
         let build_request = move |body: Vec<u8>| {
-            hyper13::Request::builder()
-                .method(Method::POST)
-                .uri(uri.clone())
+            hyper13::Request::post(uri.clone())
                 .header("Content-Type", "text/plain")
                 .header("Authorization", format!("Token {}", token))
                 .body(body)
@@ -131,9 +128,7 @@ impl InfluxDBSvc {
 impl Service<Vec<Metric>> for InfluxDBSvc {
     type Response = HttpResponse;
     type Error = HttpError;
-    type Future = Pin<
-        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>,
-    >;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut std::task::Context) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
