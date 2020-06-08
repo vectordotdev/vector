@@ -54,6 +54,9 @@ jobs:
       - run: nix-shell --pure --run "make test"
 
   test-windows:
+    defaults:
+      run:
+        shell: pwsh
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v1
