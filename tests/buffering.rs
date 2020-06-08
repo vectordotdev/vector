@@ -1,3 +1,5 @@
+#![allow(clippy::match_bool)]
+#![allow(clippy::redundant_clone)]
 #![cfg(feature = "leveldb")]
 
 use futures01::{Future, Sink};

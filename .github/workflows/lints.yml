@@ -23,6 +23,18 @@ jobs:
           workflow_id: 1463054
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
+  check-clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
+      - run: nix-shell --pure --run "make check-clippy"
+
   check-fmt:
     runs-on: ubuntu-latest
     steps:

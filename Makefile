@@ -358,7 +358,7 @@ else
 	cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
 endif
 
-check-all: check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
+check-all: check-fmt check-clippy check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
 
 check-component-features: ## Check that all component features are setup properly
 ifeq ($(ENVIRONMENT), true)
@@ -366,6 +366,14 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make check-component-features
 else
 	./scripts/check-component-features.sh
+endif
+
+check-clippy: ## Check code with Clippy
+ifeq ($(ENVIRONMENT), true)
+	${ENVIRONMENT_PREPARE}
+	${ENVIRONMENT_EXEC} make check-clippy
+else
+	cargo clippy --workspace --all-targets -- -D warnings
 endif
 
 check-fmt: ## Check that all files are formatted properly

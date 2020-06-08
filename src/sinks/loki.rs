@@ -295,6 +295,7 @@ mod integration_tests {
     use crate::Event;
     use bytes::Bytes;
     use futures01::Sink;
+    use std::convert::TryFrom;
 
     #[test]
     fn text() {
@@ -312,7 +313,7 @@ mod integration_tests {
         let test_name = config.labels.get_mut("test_name").unwrap();
         assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
 
-        *test_name = Template::from(stream.to_string());
+        *test_name = Template::try_from(stream.to_string()).unwrap();
 
         let (sink, _) = config.build(cx).unwrap();
 
@@ -349,7 +350,7 @@ mod integration_tests {
         let test_name = config.labels.get_mut("test_name").unwrap();
         assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
 
-        *test_name = Template::from(stream.to_string());
+        *test_name = Template::try_from(stream.to_string()).unwrap();
 
         let (sink, _) = config.build(cx).unwrap();
 

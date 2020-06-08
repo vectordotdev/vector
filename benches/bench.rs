@@ -4,6 +4,7 @@ use approx::assert_relative_eq;
 use futures01::future;
 use rand::distributions::{Alphanumeric, Uniform};
 use rand::prelude::*;
+use std::convert::TryFrom;
 use vector::event::Event;
 use vector::test_util::{
     block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
@@ -626,7 +627,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                         .as_mut_log()
                         .insert(event::log_schema().timestamp_key().clone(), Utc::now());
 
-                    (Template::from("index-%Y.%m.%d"), event)
+                    (Template::try_from("index-%Y.%m.%d").unwrap(), event)
                 },
                 |(index, event)| index.render(&event),
             )
@@ -643,7 +644,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                         .as_mut_log()
                         .insert(event::log_schema().timestamp_key().clone(), Utc::now());
 
-                    (Template::from("index"), event)
+                    (Template::try_from("index").unwrap(), event)
                 },
                 |(index, event)| index.render(&event),
             )
