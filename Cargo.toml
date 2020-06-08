@@ -53,7 +53,7 @@ async-trait = "0.1"
 
 # Tracing
 tracing = "0.1.9"
-tracing-futures = { version = "0.2", features = ["futures-01"]}
+tracing-futures = { version = "0.2", features = ["futures-01", "futures-03"]}
 tracing-subscriber = "0.2.2"
 tracing-log = "0.1.0"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "65547d8809fcc726b8187db85b23c42e32ef5dce" }
@@ -65,13 +65,16 @@ metrics-runtime = "0.13.0"
 
 # Aws
 rusoto_core = { version = "0.41.0", optional = true }
+rusoto_core44 = { package = "rusoto_core", version = "0.44.0", optional = true }
 rusoto_s3 = { version = "0.41.0", optional = true }
 rusoto_logs = { version = "0.41.0", optional = true }
 rusoto_cloudwatch = { version = "0.41.0", optional = true }
 rusoto_kinesis = { version = "0.41.0", optional = true }
 rusoto_credential = { version = "0.41.1", optional = true }
-rusoto_firehose = { version = "0.41.0", optional = true }
+rusoto_credential44 = { package = "rusoto_credential", version = "0.44.0", optional = true }
+rusoto_firehose = { version = "0.44.0", optional = true }
 rusoto_sts = { version = "0.41.0", optional = true }
+rusoto_sts44 = { package = "rusoto_sts", version = "0.44.0", optional = true }
 
 # Tower
 tower = "0.1.1"
@@ -112,7 +115,6 @@ structopt = "0.3.13"
 indexmap = {version = "1.0.2", features = ["serde-1"]}
 http = "0.1.14"
 http02 = { package = "http", version = "0.2" }
-http-body = "0.3"
 typetag = "0.1"
 toml = "0.4"
 syslog = "5"
@@ -342,7 +344,7 @@ sinks = [
 ]
 sinks-aws_cloudwatch_logs = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_cloudwatch"]
-sinks-aws_kinesis_firehose = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_firehose"]
+sinks-aws_kinesis_firehose = ["rusoto_core44", "rusoto_credential44", "rusoto_sts44", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_kinesis"]
 sinks-aws_s3 = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_s3", "uuid"]
 sinks-blackhole = []

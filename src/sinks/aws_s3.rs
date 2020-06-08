@@ -6,7 +6,9 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto, BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
+        rusoto,
+        sink::Response,
+        BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
         PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
@@ -350,6 +352,8 @@ struct Request {
     content_encoding: Option<String>,
     options: S3Options,
 }
+
+impl Response for PutObjectOutput {}
 
 #[derive(Debug, Clone)]
 struct S3RetryLogic;
