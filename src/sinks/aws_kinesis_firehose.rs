@@ -1,29 +1,35 @@
 use crate::{
     dns::Resolver,
     event::{self, Event},
-    region::RegionOrEndpoint,
+    region2::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        retries::RetryLogic,
+        retries2::RetryLogic,
         rusoto2::{self, AwsCredentialsProvider},
+        service2::TowerRequestConfig,
         sink::Response,
-        BatchEventsConfig, TowerRequestConfig,
+        BatchEventsConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use bytes::Bytes;
-use futures01::{stream::iter_ok, Future, Poll, Sink};
+use bytes05::Bytes;
+use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
-use rusoto_core::{Region, RusotoError, RusotoFuture};
+use rusoto_core44::{Region, RusotoError};
 use rusoto_firehose::{
-    DescribeDeliveryStreamInput, KinesisFirehose, KinesisFirehoseClient, PutRecordBatchError,
-    PutRecordBatchInput, PutRecordBatchOutput, Record,
+    DescribeDeliveryStreamError, DescribeDeliveryStreamInput, KinesisFirehose,
+    KinesisFirehoseClient, PutRecordBatchError, PutRecordBatchInput, PutRecordBatchOutput, Record,
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{convert::TryInto, fmt};
-use tower::Service;
-use tracing_futures::{Instrument, Instrumented};
+use std::{
+    convert::TryInto,
+    fmt,
+    task::{Context, Poll},
+};
+use tower03::Service;
+use tracing_futures::Instrument;
 
 #[derive(Clone)]
 pub struct KinesisFirehoseService {
@@ -66,10 +72,9 @@ inventory::submit! {
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let config = self.clone();
-        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
-        let sink = KinesisFirehoseService::new(config, cx)?;
-        Ok((Box::new(sink), healthcheck))
+        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
+        let sink = KinesisFirehoseService::new(self.clone(), cx)?;
+        Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -87,7 +92,7 @@ impl KinesisFirehoseService {
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
         let client = create_client(
-            config.region.clone().try_into()?,
+            (&config.region).try_into()?,
             config.assume_role.clone(),
             cx.resolver(),
         )?;
@@ -116,10 +121,11 @@ impl KinesisFirehoseService {
 impl Service<Vec<Record>> for KinesisFirehoseService {
     type Response = PutRecordBatchOutput;
     type Error = RusotoError<PutRecordBatchError>;
-    type Future = Instrumented<RusotoFuture<PutRecordBatchOutput, PutRecordBatchError>>;
+    type Future =
+        BoxFuture<'static, Result<PutRecordBatchOutput, RusotoError<PutRecordBatchError>>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
+    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, records: Vec<Record>) -> Self::Future {
@@ -128,14 +134,15 @@ impl Service<Vec<Record>> for KinesisFirehoseService {
             events = %records.len(),
         );
 
+        let client = self.client.clone();
         let request = PutRecordBatchInput {
             records,
             delivery_stream_name: self.config.stream_name.clone(),
         };
 
-        self.client
-            .put_record_batch(request)
-            .instrument(info_span!("request"))
+        Box::pin(
+            async move { client.put_record_batch(request).await }.instrument(info_span!("request")),
+        )
     }
 }
 
@@ -170,36 +177,33 @@ impl RetryLogic for KinesisFirehoseRetryLogic {
 enum HealthcheckError {
     #[snafu(display("DescribeDeliveryStream failed: {}", source))]
     DescribeDeliveryStreamFailed {
-        source: RusotoError<rusoto_firehose::DescribeDeliveryStreamError>,
+        source: RusotoError<DescribeDeliveryStreamError>,
     },
     #[snafu(display("Stream name does not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
 }
 
-fn healthcheck(
-    config: KinesisFirehoseSinkConfig,
-    resolver: Resolver,
-) -> crate::Result<super::Healthcheck> {
+async fn healthcheck(config: KinesisFirehoseSinkConfig, resolver: Resolver) -> crate::Result<()> {
     let client = create_client(config.region.try_into()?, config.assume_role, resolver)?;
     let stream_name = config.stream_name;
 
-    let fut = client
-        .describe_delivery_stream(DescribeDeliveryStreamInput {
-            delivery_stream_name: stream_name.clone(),
-            exclusive_start_destination_id: None,
-            limit: Some(1),
-        })
-        .map_err(|source| HealthcheckError::DescribeDeliveryStreamFailed { source }.into())
-        .and_then(move |res| Ok(res.delivery_stream_description.delivery_stream_name))
-        .and_then(move |name| {
+    let req = client.describe_delivery_stream(DescribeDeliveryStreamInput {
+        delivery_stream_name: stream_name.clone(),
+        exclusive_start_destination_id: None,
+        limit: Some(1),
+    });
+
+    match req.await {
+        Ok(resp) => {
+            let name = resp.delivery_stream_description.delivery_stream_name;
             if name == stream_name {
                 Ok(())
             } else {
                 Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
             }
-        });
-
-    Ok(Box::new(fut))
+        }
+        Err(source) => Err(HealthcheckError::DescribeDeliveryStreamFailed { source }.into()),
+    }
 }
 
 fn create_client(
@@ -209,7 +213,6 @@ fn create_client(
 ) -> crate::Result<KinesisFirehoseClient> {
     let client = rusoto2::client(resolver)?;
     let creds = AwsCredentialsProvider::new(&region, assume_role)?;
-
     Ok(KinesisFirehoseClient::new_with(client, creds, region))
 }
 
@@ -263,7 +266,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        region::RegionOrEndpoint,
+        region2::RegionOrEndpoint,
         sinks::{
             elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
             util::BatchEventsConfig,
@@ -272,7 +275,7 @@ mod integration_tests {
         topology::config::SinkContext,
     };
     use futures01::Sink;
-    use rusoto_core::Region;
+    use rusoto_core44::Region;
     use rusoto_firehose::{
         CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
         KinesisFirehoseClient,
@@ -289,7 +292,8 @@ mod integration_tests {
             endpoint: "http://localhost:4573".into(),
         };
 
-        ensure_stream(region.clone(), stream.clone());
+        let mut rt = runtime();
+        rt.block_on_std(ensure_stream(region, stream.clone()));
 
         let config = KinesisFirehoseSinkConfig {
             stream_name: stream.clone(),
@@ -307,7 +311,6 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let sink = KinesisFirehoseService::new(config, cx).unwrap();
@@ -352,14 +355,14 @@ mod integration_tests {
         }
     }
 
-    fn ensure_stream(region: Region, delivery_stream_name: String) {
+    async fn ensure_stream(region: Region, delivery_stream_name: String) {
         let client = KinesisFirehoseClient::new(region);
 
         let es_config = ElasticsearchDestinationConfiguration {
             index_name: delivery_stream_name.clone(),
-            domain_arn: "doesn't matter".into(),
+            domain_arn: Some("doesn't matter".into()),
             role_arn: "doesn't matter".into(),
-            type_name: "doesn't matter".into(),
+            type_name: Some("doesn't matter".into()),
             ..Default::default()
         };
 
@@ -369,7 +372,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        match client.create_delivery_stream(req).sync() {
+        match client.create_delivery_stream(req).await {
             Ok(_) => (),
             Err(e) => println!("Unable to create the delivery stream {:?}", e),
         };
