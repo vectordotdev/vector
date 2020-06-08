@@ -9,6 +9,10 @@ on:
     branches:
         - master
 
+defaults:
+  run:
+    shell: nix-shell --pure --run "{0}"
+
 env:
   VERBOSE: true
   ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
@@ -132,6 +136,9 @@ jobs:
       - run: nix-shell --pure --run "make check"
 
   check-windows:
+    defaults:
+      run:
+        shell: pwsh
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v1
