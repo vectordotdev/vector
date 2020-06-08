@@ -550,6 +550,14 @@ impl RetryLogic for CloudwatchRetryLogic {
                     true
                 }
 
+                RusotoError::Unknown(res)
+                    if rusoto_core::proto::json::Error::parse(&res)
+                        .filter(|err| err.typ.as_str() == "ThrottlingException")
+                        .is_some() =>
+                {
+                    true
+                }
+
                 _ => false,
             },
 
