@@ -1610,8 +1610,9 @@ dns_servers = ["0.0.0.0:53"]
     type = "is_log"
     type = "is_metric"
 
-    # Check whether a fields contents exactly matches the value specified.Can also
-    # provide a list of string (evaluates to true if any match).
+    # Check whether a fields contents exactly matches the value specified.This may
+    # be a single string or a list of strings, in which case this evaluates to true
+    # if any of the list matches.
     #
     # * optional
     # * no default
@@ -1629,8 +1630,9 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "host.exists" = true
 
-    # Check whether a fields contents does not match the value specified.Can also
-    # provide a list of string (evaluates to false if any match).
+    # Check whether a fields contents does not match the value specified.This may
+    # be a single string or a list of strings, in which case this evaluates to true
+    # if any of the list matches.
     #
     # * optional
     # * no default
@@ -1649,8 +1651,9 @@ dns_servers = ["0.0.0.0:53"]
     "unit.not_starts_with" = "sys-"
     "unit.not_ends_with" = ".device"
 
-    # Checks whether a string field contains a string argument.Can also provide a
-    # list of string (evaluates to true if any match).
+    # Checks whether a string field contains a string argument.This may be a single
+    # string or a list of strings, in which case this evaluates to true if any of
+    # the list matches.
     #
     # * optional
     # * no default
@@ -1659,8 +1662,9 @@ dns_servers = ["0.0.0.0:53"]
     "message.contains" = "foo"
     "message.contains" = ["foo", "bar"]
 
-    # Checks whether a string field ends with a string argument.Can also provide a
-    # list of string (evaluates to true if any match).
+    # Checks whether a string field ends with a string argument.This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
     #
     # * optional
     # * no default
@@ -1680,15 +1684,16 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "message.regex" = " (any|of|these|five|words) "
 
-    # Checks whether a string field starts with a string argument.Can also provide
-    # a list of string (evaluates to true if any match).
+    # Checks whether a string field starts with a string argument.This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "environment.starts_with" = "staging-"
-    "environment.ends_with" = ["staging-", "running-"]
+    "environment.starts_with" = ["staging-", "running-"]
 
   #
   # General
@@ -2517,8 +2522,9 @@ require('custom_module')
       type = "is_log"
       type = "is_metric"
 
-      # Check whether a fields contents exactly matches the value specified.Can also
-      # provide a list of string (evaluates to true if any match).
+      # Check whether a fields contents exactly matches the value specified.This may
+      # be a single string or a list of strings, in which case this evaluates to true
+      # if any of the list matches.
       #
       # * optional
       # * no default
@@ -2536,8 +2542,9 @@ require('custom_module')
       # * relevant when type = "check_fields"
       "host.exists" = true
 
-      # Check whether a fields contents does not match the value specified.Can also
-      # provide a list of string (evaluates to false if any match).
+      # Check whether a fields contents does not match the value specified.This may
+      # be a single string or a list of strings, in which case this evaluates to true
+      # if any of the list matches.
       #
       # * optional
       # * no default
@@ -2556,8 +2563,9 @@ require('custom_module')
       "unit.not_starts_with" = "sys-"
       "unit.not_ends_with" = ".device"
 
-      # Checks whether a string field contains a string argument.Can also provide a
-      # list of string (evaluates to true if any match).
+      # Checks whether a string field contains a string argument.This may be a single
+      # string or a list of strings, in which case this evaluates to true if any of
+      # the list matches.
       #
       # * optional
       # * no default
@@ -2566,8 +2574,9 @@ require('custom_module')
       "message.contains" = "foo"
       "message.contains" = ["foo", "bar"]
 
-      # Checks whether a string field ends with a string argument.Can also provide a
-      # list of string (evaluates to true if any match).
+      # Checks whether a string field ends with a string argument.This may be a
+      # single string or a list of strings, in which case this evaluates to true if
+      # any of the list matches.
       #
       # * optional
       # * no default
@@ -2587,15 +2596,16 @@ require('custom_module')
       # * relevant when type = "check_fields"
       "message.regex" = " (any|of|these|five|words) "
 
-      # Checks whether a string field starts with a string argument.Can also provide
-      # a list of string (evaluates to true if any match).
+      # Checks whether a string field starts with a string argument.This may be a
+      # single string or a list of strings, in which case this evaluates to true if
+      # any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "environment.starts_with" = "staging-"
-      "environment.ends_with" = ["staging-", "running-"]
+      "environment.starts_with" = ["staging-", "running-"]
 
 # Accepts and outputs `metric` events, allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.
 [transforms.tag_cardinality_limit]

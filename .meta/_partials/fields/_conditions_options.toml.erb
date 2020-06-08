@@ -35,7 +35,7 @@ common = true
 relevant_when = {type = "check_fields"}
 description = """\
 Check whether a fields contents exactly matches the value specified.\
-Can also provide a list of string (evaluates to true if any match).\
+This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches.\
 """
 
 [<%= namespace %>."`[field-name]`.neq"]
@@ -48,7 +48,7 @@ common = false
 relevant_when = {type = "check_fields"}
 description = """\
 Check whether a fields contents does not match the value specified.\
-Can also provide a list of string (evaluates to false if any match).\
+This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches.\
 """
 
 [<%= namespace %>."`[field-name]`.exists"]
@@ -73,7 +73,7 @@ common = true
 relevant_when = {type = "check_fields"}
 description = """\
 Checks whether a string field contains a string argument.\
-Can also provide a list of string (evaluates to true if any match).\
+This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches.\
 """
 
 [<%= namespace %>."`[field_name]`.ends_with"]
@@ -86,20 +86,20 @@ common = true
 relevant_when = {type = "check_fields"}
 description = """\
 Checks whether a string field ends with a string argument.\
-Can also provide a list of string (evaluates to true if any match).\
+This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches.\
 """
 
 [<%= namespace %>."`[field_name]`.starts_with"]
 type = "string"
 examples = [
   { "environment.starts_with" = "staging-" },
-  { "environment.ends_with" = ["staging-", "running-"] }
+  { "environment.starts_with" = ["staging-", "running-"] }
 ]
 common = true
 relevant_when = {type = "check_fields"}
 description = """\
 Checks whether a string field starts with a string argument.\
-Can also provide a list of string (evaluates to true if any match).\
+This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches.\
 """
 
 [<%= namespace %>."`[field_name]`.regex"]

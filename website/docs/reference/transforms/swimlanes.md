@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-05"
+last_modified_on: "2020-06-08"
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events, allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
@@ -53,7 +53,7 @@ events across parallel streams using logical filters.
     "environment.ends_with" = ["-staging", "-running"] # example
     "message.regex" = " (any|of|these|five|words) " # example
     "environment.starts_with" = "staging-" # example
-    "environment.ends_with" = ["staging-", "running-"] # example
+    "environment.starts_with" = ["staging-", "running-"] # example
 ```
 
 </TabItem>
@@ -82,7 +82,7 @@ events across parallel streams using logical filters.
     "environment.ends_with" = ["-staging", "-running"] # example
     "message.regex" = " (any|of|these|five|words) " # example
     "environment.starts_with" = "staging-" # example
-    "environment.ends_with" = ["staging-", "running-"] # example
+    "environment.starts_with" = ["staging-", "running-"] # example
 ```
 
 </TabItem>
@@ -176,8 +176,9 @@ The type of the condition to execute.
 
 ##### `[field-name]`.eq
 
-Check whether a fields contents exactly matches the value specified.Can also
-provide a list of string (evaluates to true if any match).
+Check whether a fields contents exactly matches the value specified.This may be
+a single string or a list of strings, in which case this evaluates to true if
+any of the list matches.
 
 
 
@@ -224,8 +225,9 @@ being `true` or `false` respectively.
 
 ##### `[field-name]`.neq
 
-Check whether a fields contents does not match the value specified.Can also
-provide a list of string (evaluates to false if any match).
+Check whether a fields contents does not match the value specified.This may be
+a single string or a list of strings, in which case this evaluates to true if
+any of the list matches.
 
 
 
@@ -271,8 +273,9 @@ Check if the given `[condition]` does not match.
 
 ##### `[field_name]`.contains
 
-Checks whether a string field contains a string argument.Can also provide a
-list of string (evaluates to true if any match).
+Checks whether a string field contains a string argument.This may be a single
+string or a list of strings, in which case this evaluates to true if any of the
+list matches.
 
 
 
@@ -295,8 +298,9 @@ list of string (evaluates to true if any match).
 
 ##### `[field_name]`.ends_with
 
-Checks whether a string field ends with a string argument.Can also provide a
-list of string (evaluates to true if any match).
+Checks whether a string field ends with a string argument.This may be a single
+string or a list of strings, in which case this evaluates to true if any of the
+list matches.
 
 
 
@@ -332,7 +336,7 @@ preferred where possible.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"environment.starts_with":"staging-"},{"environment.ends_with":["staging-","running-"]}]}
+  examples={[{"environment.starts_with":"staging-"},{"environment.starts_with":["staging-","running-"]}]}
   groups={[]}
   name={"`[field_name]`.starts_with"}
   path={"lanes.`[swimlane-id]`"}
@@ -346,8 +350,9 @@ preferred where possible.
 
 ##### `[field_name]`.starts_with
 
-Checks whether a string field starts with a string argument.Can also provide a
-list of string (evaluates to true if any match).
+Checks whether a string field starts with a string argument.This may be a
+single string or a list of strings, in which case this evaluates to true if any
+of the list matches.
 
 
 

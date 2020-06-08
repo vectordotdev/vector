@@ -6,7 +6,6 @@ use crate::{
 use indexmap::IndexMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::vec::Vec;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
@@ -55,12 +54,7 @@ impl CheckFieldsPredicate for EqualsPredicate {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| match &self.arg {
                 CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
                 CheckFieldsPredicateArg::VecString(ss) => {
-                    for s in ss {
-                        if s.as_bytes() == v.as_bytes() {
-                            return true;
-                        }
-                    }
-                    false
+                    ss.iter().any(|s| s.as_bytes() == v.as_bytes())
                 }
                 CheckFieldsPredicateArg::Integer(i) => match v {
                     Value::Integer(vi) => *i == *vi,
@@ -120,12 +114,7 @@ impl CheckFieldsPredicate for ContainsPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| {
-                for s in &self.arg {
-                    if v.to_string_lossy().contains(s) {
-                        return true;
-                    }
-                }
-                false
+                self.arg.iter().any(|s| v.to_string_lossy().contains(s))
             }),
             _ => false,
         }
@@ -165,12 +154,7 @@ impl CheckFieldsPredicate for StartsWithPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| {
-                for s in &self.arg {
-                    if v.to_string_lossy().starts_with(s) {
-                        return true;
-                    }
-                }
-                false
+                self.arg.iter().any(|s| v.to_string_lossy().starts_with(s))
             }),
             _ => false,
         }
@@ -208,12 +192,7 @@ impl CheckFieldsPredicate for EndsWithPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| {
-                for s in &self.arg {
-                    if v.to_string_lossy().ends_with(s) {
-                        return true;
-                    }
-                }
-                false
+                self.arg.iter().any(|s| v.to_string_lossy().ends_with(s))
             }),
             _ => false,
         }
@@ -253,24 +232,15 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
                 .get(&self.target)
                 .map(|f| f.as_bytes())
                 .map_or(false, |b| {
-                    for s in &self.arg {
-                        if b == s.as_bytes() {
-                            return false; //matched, so NotEquals is false
-                        }
-                    }
-                    true //no matches, so NotEquals is true
+                    //false if any match, else true
+                    !self.arg.iter().any(|s| b == s.as_bytes())
                 }),
             Event::Metric(m) => m
                 .tags
                 .as_ref()
                 .and_then(|t| t.get(self.target.as_ref()))
                 .map_or(false, |v| {
-                    for s in &self.arg {
-                        if v.as_bytes() == s.as_bytes() {
-                            return false;
-                        }
-                    }
-                    true
+                    !self.arg.iter().any(|s| v.as_bytes() == s.as_bytes())
                 }),
         }
     }
