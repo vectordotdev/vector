@@ -36,6 +36,27 @@ jobs:
       - run: nix-shell --pure --run "make slim-builds"
       - run: nix-shell --pure --run "make test"
 
+  test-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
+      - run: nix-shell --pure --run "make test"
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v1
+      - env:
+          USE_CONTAINER: none
+          RUSTFLAGS: "-D warnings"
+        run: cargo test --no-default-features --features default-msvc
+
   test-behavior:
     runs-on: ubuntu-latest
     steps:
@@ -60,17 +81,6 @@ jobs:
       - run: nix-shell --pure --run "make slim-builds"
       - run: nix-shell --pure --run "make test-shutdown"
 
-  test-mac:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix-shell --pure --run "echo 'Env installing...'"
-      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --pure --run "make slim-builds"
-      - run: nix-shell --pure --run "make test"
 
   test-integration-aws:
     runs-on: ubuntu-latest
