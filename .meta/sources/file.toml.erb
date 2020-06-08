@@ -54,7 +54,7 @@ The key name added to each event with the full path of the file.\
 """
 
 [sources.file.options.glob_minimum_cooldown]
-type = "int"
+type = "uint"
 default = 1000
 unit = "milliseconds"
 description = """\
@@ -73,7 +73,7 @@ be globally set via the \
 """
 
 [sources.file.options.ignore_older]
-type = "int"
+type = "uint"
 common = true
 examples = [86400]
 unit = "seconds"
@@ -82,7 +82,7 @@ Ignore files with a data modification date that does not exceed this age.\
 """
 
 [sources.file.options.max_line_bytes]
-type = "int"
+type = "uint"
 unit = "bytes"
 default = 102400
 description = """\
@@ -121,7 +121,7 @@ checksum = "Read `fingerprint_bytes` bytes from the head of the file to uniquely
 device_and_inode = "Uses the [device and inode][urls.inode] to unique identify files."
 
 [sources.file.options.fingerprinting.children.fingerprint_bytes]
-type = "int"
+type = "uint"
 default = 256
 unit = "bytes"
 relevant_when = {strategy = "checksum"}
@@ -131,7 +131,7 @@ fingerprint.\
 """
 
 [sources.file.options.fingerprinting.children.ignored_header_bytes]
-type = "int"
+type = "uint"
 default = 0
 unit = "bytes"
 relevant_when = {strategy = "checksum"}
@@ -141,7 +141,7 @@ fingerprint. This is helpful if all files share a common header.\
 """
 
 [sources.file.options.max_read_bytes]
-type = "int"
+type = "uint"
 category = "Priority"
 default = 2048
 unit = "bytes"
@@ -217,7 +217,7 @@ a semicolon.\
 """
 
 [sources.file.options.multiline.children.timeout_ms]
-type = "int"
+type = "uint"
 category = "Multiline"
 examples = [1000, 600000]
 unit = "milliseconds"

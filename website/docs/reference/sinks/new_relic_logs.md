@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-05-25"
 delivery_guarantee: "at_least_once"
 component_title: "New Relic Logs"
 description: "The Vector `new_relic_logs` sink batches `log` events to New Relic's log service via their log API."
@@ -53,6 +53,9 @@ API][urls.new_relic_log_api].
 
   # Encoding
   encoding.codec = "json" # optional, default
+
+  # Requests
+  compression = "none" # optional, default
 ```
 
 </TabItem>
@@ -92,6 +95,9 @@ API][urls.new_relic_log_api].
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 30 # optional, default, seconds
+
+  # Requests
+  compression = "none" # optional, default
 ```
 
 </TabItem>
@@ -131,7 +137,7 @@ Configures the sink batching behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -154,7 +160,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -202,7 +208,7 @@ Configures the sink specific buffer behavior.
   relevantWhen={{"type":"memory"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"events"}
   warnings={[]}
   >
@@ -225,7 +231,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   relevantWhen={{"type":"disk"}}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -284,6 +290,30 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
+  examples={["none","gzip"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+The compression strategy used to compress the encoded event data before
+transmission.
+
+
 
 </Field>
 <Field
@@ -528,7 +558,7 @@ Configures the sink request behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"requests"}
   warnings={[]}
   >
@@ -551,7 +581,7 @@ The maximum number of in-flight requests allowed at any given time.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -574,7 +604,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -598,7 +628,7 @@ time window.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -622,7 +652,7 @@ intents and purposes, represents an infinite number of retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -647,7 +677,7 @@ to select future backoffs.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -670,7 +700,7 @@ The maximum amount of time, in seconds, to wait between retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -766,6 +796,7 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
+[urls.gzip]: https://www.gzip.org/
 [urls.new_new_relic_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+new_relic_logs
 [urls.new_relic]: https://newrelic.com/
 [urls.new_relic_log_api]: https://docs.newrelic.com/docs/logs/new-relic-logs/log-api/introduction-log-api

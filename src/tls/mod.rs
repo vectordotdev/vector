@@ -17,7 +17,7 @@ mod outgoing;
 mod settings;
 
 #[cfg(feature = "sources-tls")]
-pub(crate) use incoming::MaybeTlsListener;
+pub(crate) use incoming::{MaybeTlsIncomingStream, MaybeTlsListener};
 pub(crate) use maybe_tls::MaybeTls;
 pub(crate) use outgoing::MaybeTlsConnector;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
@@ -46,6 +46,8 @@ pub enum TlsError {
     TlsIdentityError { source: ErrorStack },
     #[snafu(display("Could not export identity to DER: {}", source))]
     DerExportError { source: ErrorStack },
+    #[snafu(display("Identity certificate is missing a key"))]
+    MissingKey,
     #[snafu(display("Could not parse certificate in {:?}: {}", filename, source))]
     CertificateParseError {
         filename: PathBuf,

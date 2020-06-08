@@ -11,13 +11,31 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: x86_64-unknown-linux-musl
-      FEATURES: default-musl
+      FEATURES: default-cmake
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
       - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
       - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    user: $USER
+    command: scripts/build.sh
+
+  build-x86_64-unknown-linux-gnu:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-gnu/Dockerfile
+    environment:
+      NATIVE_BUILD: "false"
+      TARGET: x86_64-unknown-linux-gnu
+      FEATURES: default
+      CARGO_TERM_COLOR: always
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-gnu/cargo/registry:/usr/local/cargo/registry
+      - ./target/x86_64-unknown-linux-gnu/cargo/git:/usr/local/cargo/git
+      - ./target/x86_64-unknown-linux-gnu/rustup/tmp:/usr/local/rustup/tmp
     working_dir: $PWD
     user: $USER
     command: scripts/build.sh
@@ -29,7 +47,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: armv7-unknown-linux-musleabihf
-      FEATURES: default-musl
+      FEATURES: default-cmake
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -47,7 +65,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: aarch64-unknown-linux-musl
-      FEATURES: default-musl
+      FEATURES: default-cmake
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -71,7 +89,7 @@ services:
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
     user: $USER
-    command: cargo bench --all --no-default-features --features default-musl --target x86_64-unknown-linux-musl
+    command: cargo bench --all --no-default-features --features default-cmake --target x86_64-unknown-linux-musl
 
   generate:
     build:
@@ -212,13 +230,31 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: x86_64-unknown-linux-musl
-      FEATURES: default-musl
+      FEATURES: default-cmake
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
       - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
       - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+    working_dir: $PWD
+    user: $USER
+    command: ./scripts/package-archive.sh
+
+  package-archive-x86_64-unknown-linux-gnu:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-gnu/Dockerfile
+    environment:
+      NATIVE_BUILD: "false"
+      TARGET: x86_64-unknown-linux-gnu
+      FEATURES: ""
+      CARGO_TERM_COLOR: always
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-gnu/cargo/registry:/usr/local/cargo/registry
+      - ./target/x86_64-unknown-linux-gnu/cargo/git:/usr/local/cargo/git
+      - ./target/x86_64-unknown-linux-gnu/rustup/tmp:/usr/local/rustup/tmp
     working_dir: $PWD
     user: $USER
     command: ./scripts/package-archive.sh
@@ -230,7 +266,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: armv7-unknown-linux-musleabihf
-      FEATURES: default-musl
+      FEATURES: default-cmake
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -248,7 +284,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: aarch64-unknown-linux-musl
-      FEATURES: default-musl
+      FEATURES: default-cmake
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -262,14 +298,14 @@ services:
   package-deb-x86_64:
     build:
       context: .
-      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-gnu/Dockerfile
     environment:
-      TARGET: x86_64-unknown-linux-musl
+      TARGET: x86_64-unknown-linux-gnu
     volumes:
       - $PWD:$PWD
-      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+      - ./target/x86_64-unknown-linux-gnu/cargo/registry:/usr/local/cargo/registry
+      - ./target/x86_64-unknown-linux-gnu/cargo/git:/usr/local/cargo/git
+      - ./target/x86_64-unknown-linux-gnu/rustup/tmp:/usr/local/rustup/tmp
     working_dir: $PWD
     user: $USER
     command: ./scripts/package-deb.sh
@@ -309,7 +345,7 @@ services:
       context: .
       dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
     environment:
-      TARGET: x86_64-unknown-linux-musl
+      TARGET: x86_64-unknown-linux-gnu
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
@@ -480,7 +516,7 @@ services:
       - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
     user: $USER
-    command: cargo test --no-default-features --features default-musl --target x86_64-unknown-linux-musl
+    command: cargo test --no-default-features --features default-cmake --target x86_64-unknown-linux-musl
 
   test-integration:
     build:
@@ -503,7 +539,7 @@ services:
     network_mode: host
     working_dir: $PWD
     user: $USER
-    command: cargo test --all --no-default-features --features default-musl,docker --target x86_64-unknown-linux-musl -- --test-threads 4
+    command: cargo test --all --no-default-features --features default-cmake,docker --target x86_64-unknown-linux-musl -- --test-threads 4
 
   test-integration-aws:
     build:
@@ -526,7 +562,28 @@ services:
     network_mode: host
     working_dir: $PWD
     user: $USER
-    command: cargo test --all --no-default-features --features default-musl,aws-integration-tests --target x86_64-unknown-linux-musl
+    command: cargo test --all --no-default-features --features default-cmake,aws-integration-tests --target x86_64-unknown-linux-musl
+
+  test-shutdown:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+    environment:
+      CARGO_TERM_COLOR: always
+      TEST_LOG: debug
+      RUST_BACKTRACE: full
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - dependencies-kafka
+    network_mode: host
+    working_dir: $PWD
+    user: $USER
+    command: cargo test --no-default-features --features default-cmake,shutdown-tests --target x86_64-unknown-linux-musl --test shutdown -- --test-threads 4
 
   test-behavior:
     image: ubuntu:18.04
@@ -540,6 +597,24 @@ services:
         "-c",
         "./target/x86_64-unknown-linux-musl/debug/vector test tests/behavior/**/*.toml",
       ]
+
+  test-default:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+    environment:
+      CARGO_TERM_COLOR: always
+      TEST_LOG: debug
+      RUST_BACKTRACE: full
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+    network_mode: host
+    working_dir: $PWD
+    user: $USER
+    command: cargo test --lib --no-default-features --features default-cmake --target x86_64-unknown-linux-musl
 
   #
   # Dependencies
@@ -721,7 +796,7 @@ services:
     environment:
       - PUBSUB_PROJECT1=testproject,topic1:subscription1
   loki:
-    image: grafana/loki:master-89263b0-amd64
+    image: grafana/loki:master
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/loki-config.yaml

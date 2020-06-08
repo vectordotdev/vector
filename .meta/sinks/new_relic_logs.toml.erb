@@ -67,6 +67,13 @@ description = "The API region to send logs to."
 us = "The US region"
 eu = "The EU region"
 
+<%= render("_partials/fields/_compression_options.toml",
+  namespace: "sinks.new_relic_logs.options",
+  options: {
+    "category" => "Requests"
+  }
+) %>
+
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.new_relic_logs.options",
   encodings: ["json"],

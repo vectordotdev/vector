@@ -13,12 +13,12 @@ use tokio01::codec::{FramedWrite, LinesCodec};
 #[cfg(unix)]
 use tokio_uds::UnixStream;
 use vector::test_util::{
-    block_on, next_addr, random_maps, random_string, receive, send_lines, shutdown_on_idle,
-    wait_for_tcp,
+    block_on, next_addr, random_maps, random_string, receive, runtime, send_lines,
+    shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{self, config};
 use vector::{
-    runtime, sinks,
+    sinks,
     sources::syslog::{Mode, SyslogConfig},
 };
 
@@ -39,7 +39,7 @@ fn test_tcp_syslog() {
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
-    let mut rt = runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines = receive(&out_addr);
 
@@ -80,7 +80,7 @@ fn test_udp_syslog() {
     config.add_source("in", SyslogConfig::new(Mode::Udp { address: in_addr }));
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
-    let mut rt = runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines = receive(&out_addr);
 
@@ -144,7 +144,7 @@ fn test_unix_stream_syslog() {
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
-    let mut rt = runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines = receive(&out_addr);
 

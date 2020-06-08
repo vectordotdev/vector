@@ -33,8 +33,8 @@ pub mod honeycomb;
 pub mod http;
 #[cfg(feature = "sinks-humio_logs")]
 pub mod humio_logs;
-#[cfg(feature = "sinks-influxdb_metrics")]
-pub mod influxdb_metrics;
+#[cfg(feature = "sinks-influxdb")]
+pub mod influxdb;
 #[cfg(all(feature = "sinks-kafka", feature = "rdkafka"))]
 pub mod kafka;
 #[cfg(feature = "sinks-logdna")]
@@ -79,6 +79,8 @@ pub enum BuildError {
     SocketAddressError { source: std::io::Error },
     #[snafu(display("URI parse error: {}", source))]
     UriParseError { source: ::http::uri::InvalidUri },
+    #[snafu(display("URI parse error: {}", source))]
+    UriParseError2 { source: ::http02::uri::InvalidUri },
 }
 
 /// Common healthcheck errors
@@ -86,4 +88,6 @@ pub enum BuildError {
 pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
     UnexpectedStatus { status: ::http::StatusCode },
+    #[snafu(display("Unexpected status: {}", status))]
+    UnexpectedStatus2 { status: ::http02::StatusCode },
 }

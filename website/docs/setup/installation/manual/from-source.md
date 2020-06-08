@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-06"
+last_modified_on: "2020-04-30"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
@@ -262,7 +262,7 @@ Building steps:
     <TabItem value="x86_64-unknown-linux-musl">
 
     ```bash
-    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build
+    PASS_FEATURES=default-cmake ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build
     ```
 
     </TabItem>
@@ -270,7 +270,7 @@ Building steps:
     <TabItem value="aarch64-unknown-linux-musl">
 
     ```bash
-    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build
+    PASS_FEATURES=default-cmake ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build
     ```
 
     </TabItem>
@@ -278,7 +278,7 @@ Building steps:
     <TabItem value="armv7-unknown-linux-musleabihf">
 
     ```bash
-    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build
+    PASS_FEATURES=default-cmake ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build
     ```
 
     </TabItem>
@@ -372,7 +372,7 @@ used.
 | Feature        | Description                                                                                                    | Enabled by default                     |
 |:---------------|:---------------------------------------------------------------------------------------------------------------|:---------------------------------------|
 | `default`      | Default set of features for `*-unknown-linux-gnu` and `*-apple-darwin` targets.                                | <i className="feather icon-check"></i> |
-| `default-musl` | Default set of features for `*-unknown-linux-musl` targets. Requires `cmake` and `perl` as build dependencies. |                                        |
+| `default-cmake` | Default set of features for `*-unknown-linux-*` targets which uses `cmake` and `perl` as build dependencies. |                                        |
 | `default-msvc` | Default set of features for `*-pc-windows-msvc` targets. Requires `cmake` and `perl` as build dependencies.    |                                        |
 
 Alternatively, for finer control over dependencies and operating system
@@ -453,6 +453,7 @@ features one has to pass a comma-separated list of component features.
 | `sinks-honeycomb` | Enables building of [`honeycomb` sink][docs.sinks.honeycomb].  |
 | `sinks-http` | Enables building of [`http` sink][docs.sinks.http].  |
 | `sinks-humio_logs` | Enables building of [`humio_logs` sink][docs.sinks.humio_logs].  |
+| `sinks-influxdb_logs` | Enables building of [`influxdb_logs` sink][docs.sinks.influxdb_logs].  |
 | `sinks-influxdb_metrics` | Enables building of [`influxdb_metrics` sink][docs.sinks.influxdb_metrics].  |
 | `sinks-kafka` | Enables building of [`kafka` sink][docs.sinks.kafka].  Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled.  |
 | `sinks-logdna` | Enables building of [`logdna` sink][docs.sinks.logdna].  |
@@ -495,6 +496,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sinks.honeycomb]: /docs/reference/sinks/honeycomb/
 [docs.sinks.http]: /docs/reference/sinks/http/
 [docs.sinks.humio_logs]: /docs/reference/sinks/humio_logs/
+[docs.sinks.influxdb_logs]: /docs/reference/sinks/influxdb_logs/
 [docs.sinks.influxdb_metrics]: /docs/reference/sinks/influxdb_metrics/
 [docs.sinks.kafka]: /docs/reference/sinks/kafka/
 [docs.sinks.logdna]: /docs/reference/sinks/logdna/

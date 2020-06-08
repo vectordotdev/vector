@@ -1,7 +1,7 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     service::{TowerBatchedSink, TowerRequestSettings},
-    Batch, BatchSettings,
+    sink, Batch, BatchSettings,
 };
 use crate::{
     dns::Resolver,
@@ -314,6 +314,12 @@ impl<B> Service<B> for HttpBatchService<B> {
     }
 }
 
+impl<T: fmt::Debug> sink::Response for http::Response<T> {
+    fn is_successful(&self) -> bool {
+        self.status().is_success()
+    }
+}
+
 #[derive(Clone)]
 pub struct HttpRetryLogic;
 
@@ -346,16 +352,22 @@ impl RetryLogic for HttpRetryLogic {
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum Auth {
     Basic { user: String, password: String },
+    Bearer { token: String },
 }
 
 impl Auth {
     pub fn apply<B>(&self, req: &mut Request<B>) {
+        use headers::HeaderMapExt;
+
         match &self {
             Auth::Basic { user, password } => {
-                use headers::HeaderMapExt;
                 let auth = headers::Authorization::basic(&user, &password);
                 req.headers_mut().typed_insert(auth);
             }
+            Auth::Bearer { token } => match headers::Authorization::bearer(&token) {
+                Ok(auth) => req.headers_mut().typed_insert(auth),
+                Err(error) => error!(message = "invalid bearer token", %token, %error),
+            },
         }
     }
 }
@@ -363,6 +375,7 @@ impl Auth {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_util::runtime;
     use futures01::{Future, Sink, Stream};
     use http::Method;
     use hyper::service::service_fn;
@@ -432,7 +445,7 @@ mod test {
             .serve(new_service)
             .map_err(|e| eprintln!("server error: {}", e));
 
-        let mut rt = crate::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         rt.spawn(server);
 

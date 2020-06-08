@@ -1,6 +1,7 @@
 [options.data_dir]
 type = "string"
-examples = ["/var/lib/vector"]
+default = "/var/lib/vector/"
+examples = ["/var/lib/vector", "/var/local/lib/vector/", "/home/user/vector/"]
 description = """\
 The directory used for persisting Vector state, such as on-disk buffers, \
 file checkpoints, and more. Please make sure the Vector project has write \
@@ -50,12 +51,6 @@ description = """\
 The key used to represent when the log was generated. See the \
 [log data model page][docs.data-model.log#timestamp] for more info.\
 """
-
-[options.log_schema.children.kubernetes_key]
-type = "string"
-default = "kubernetes"
-examples = ["kubernetes", "kube", "k8s"]
-description = "The key under which Kubernetes related fields are nested."
 
 [options.log_schema.children.source_type_key]
 type = "string"

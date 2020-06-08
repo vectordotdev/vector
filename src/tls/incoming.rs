@@ -123,6 +123,26 @@ impl<S> MaybeTlsIncomingStream<S> {
     pub fn peer_addr(&self) -> SocketAddr {
         self.peer_addr
     }
+
+    /// None if connection still hasen't been established.
+    pub fn get_ref(&self) -> Option<&S> {
+        match &self.state {
+            StreamState::Accepted(stream) => {
+                if let Some(raw) = stream.raw() {
+                    Some(raw)
+                } else {
+                    Some(
+                        stream
+                            .tls()
+                            .expect("Stream not raw nor tls")
+                            .get_ref()
+                            .get_ref(),
+                    )
+                }
+            }
+            StreamState::Accepting(_) => None,
+        }
+    }
 }
 
 impl MaybeTlsIncomingStream<TcpStream> {

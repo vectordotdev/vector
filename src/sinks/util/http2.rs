@@ -1,14 +1,20 @@
-use super::retries::{RetryAction, RetryLogic};
+use super::{
+    retries2::{RetryAction, RetryLogic},
+    service2::{TowerBatchedSink, TowerRequestSettings},
+    sink, Batch, BatchSettings,
+};
 use crate::{
     dns::Resolver,
+    event::Event,
     tls::{tls_connector_builder, MaybeTlsSettings},
+    topology::config::SinkContext,
 };
 use bytes05::{Buf, Bytes};
 use futures::future::BoxFuture;
+use futures01::{Async, AsyncSink, Poll as Poll01, Sink, StartSend};
 use http02::header::HeaderValue;
 use http02::{Request, StatusCode};
-use http_body::Body as HttpBody;
-use hyper13::body::{self, Body};
+use hyper13::body::{self, Body, HttpBody};
 use hyper13::client::HttpConnector;
 use hyper13::Client;
 use hyper_openssl08::HttpsConnector;
@@ -25,6 +31,136 @@ use tracing_futures::Instrument;
 pub type Response = http02::Response<Bytes>;
 pub type Error = hyper13::Error;
 pub type HttpClientFuture = <HttpClient as Service<http02::Request<Body>>>::Future;
+
+pub trait HttpSink: Send + Sync + 'static {
+    type Input;
+    type Output;
+
+    fn encode_event(&self, event: Event) -> Option<Self::Input>;
+    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>>;
+}
+
+/// Provides a simple wrapper around internal tower and
+/// batching sinks for http.
+///
+/// This type wraps some `HttpSink` and some `Batch` type
+/// and will apply request, batch and tls settings. Internally,
+/// it holds an Arc reference to the `HttpSink`. It then exposes
+/// a `Sink` interface that can be returned from `SinkConfig`.
+///
+/// Implementation details we require to buffer a single item due
+/// to how `Sink` works. This is because we must "encode" the type
+/// to be able to send it to the inner batch type and sink. Because of
+/// this we must provide a single buffer slot. To ensure the buffer is
+/// fully flushed make sure `poll_complete` returns ready.
+pub struct BatchedHttpSink<T, B, L = HttpRetryLogic>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    L: RetryLogic<Response = http02::Response<Bytes>> + Send + 'static,
+{
+    sink: Arc<T>,
+    inner: TowerBatchedSink<HttpBatchService<B::Output>, B, L, B::Output>,
+    // An empty slot is needed to buffer an item where we encoded it but
+    // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
+    // sink combinator. https://docs.rs/futures/0.1.29/src/futures/sink/with_flat_map.rs.html#20
+    slot: Option<B::Input>,
+}
+
+impl<T, B> BatchedHttpSink<T, B, HttpRetryLogic>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+{
+    pub fn new(
+        sink: T,
+        batch: B,
+        request_settings: TowerRequestSettings,
+        batch_settings: BatchSettings,
+        tls_settings: impl Into<MaybeTlsSettings>,
+        cx: &SinkContext,
+    ) -> Self {
+        Self::with_retry_logic(
+            sink,
+            batch,
+            HttpRetryLogic,
+            request_settings,
+            batch_settings,
+            tls_settings,
+            cx,
+        )
+    }
+}
+
+impl<T, B, L> BatchedHttpSink<T, B, L>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    L: RetryLogic<Response = http02::Response<Bytes>, Error = hyper13::Error> + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+{
+    pub fn with_retry_logic(
+        sink: T,
+        batch: B,
+        logic: L,
+        request_settings: TowerRequestSettings,
+        batch_settings: BatchSettings,
+        tls_settings: impl Into<MaybeTlsSettings>,
+        cx: &SinkContext,
+    ) -> Self {
+        let sink = Arc::new(sink);
+        let sink1 = sink.clone();
+        let svc =
+            HttpBatchService::new(cx.resolver(), tls_settings, move |b| sink1.build_request(b));
+
+        let inner = request_settings.batch_sink(logic, svc, batch, batch_settings, cx.acker());
+
+        Self {
+            sink,
+            inner,
+            slot: None,
+        }
+    }
+}
+
+impl<T, B, L> Sink for BatchedHttpSink<T, B, L>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+    L: RetryLogic<Response = http02::Response<Bytes>> + Send + 'static,
+{
+    type SinkItem = crate::Event;
+    type SinkError = crate::Error;
+
+    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
+        if self.slot.is_some() {
+            self.poll_complete()?;
+            return Ok(AsyncSink::NotReady(item));
+        }
+
+        if let Some(item) = self.sink.encode_event(item) {
+            if let AsyncSink::NotReady(item) = self.inner.start_send(item)? {
+                self.poll_complete()?;
+                self.slot = Some(item);
+            }
+        }
+
+        Ok(AsyncSink::Ready)
+    }
+
+    fn poll_complete(&mut self) -> Poll01<(), Self::SinkError> {
+        if let Some(item) = self.slot.take() {
+            if let AsyncSink::NotReady(item) = self.inner.start_send(item)? {
+                self.slot = Some(item);
+                return Ok(Async::NotReady);
+            }
+        }
+
+        self.inner.poll_complete()
+    }
+}
 
 pub struct HttpClient<B = Body> {
     client: Client<HttpsConnector<HttpConnector<Resolver>>, B>,
@@ -185,6 +321,11 @@ impl<B> Service<B> for HttpBatchService<B> {
     }
 }
 
+impl<T: fmt::Debug> sink::Response for http02::Response<T> {
+    fn is_successful(&self) -> bool {
+        self.status().is_success()
+    }
+}
 #[derive(Clone)]
 pub struct HttpRetryLogic;
 
@@ -217,16 +358,22 @@ impl RetryLogic for HttpRetryLogic {
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum Auth {
     Basic { user: String, password: String },
+    Bearer { token: String },
 }
 
 impl Auth {
     pub fn apply<B>(&self, req: &mut Request<B>) {
+        use headers03::HeaderMapExt;
+
         match &self {
             Auth::Basic { user, password } => {
-                use headers03::HeaderMapExt;
                 let auth = headers03::Authorization::basic(&user, &password);
                 req.headers_mut().typed_insert(auth);
             }
+            Auth::Bearer { token } => match headers03::Authorization::bearer(&token) {
+                Ok(auth) => req.headers_mut().typed_insert(auth),
+                Err(error) => error!(message = "invalid bearer token", %token, %error),
+            },
         }
     }
 }

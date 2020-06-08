@@ -20,11 +20,13 @@ pub mod generate;
 pub mod wasm;
 #[macro_use]
 pub mod internal_events;
+pub mod async_read;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod list;
 pub mod metrics;
 pub mod region;
+pub mod region2;
 pub mod runtime;
 pub mod serde;
 pub mod shutdown;

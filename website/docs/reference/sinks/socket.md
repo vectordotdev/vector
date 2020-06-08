@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-06-02"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` sink streams `log` events to a socket, such as a TCP, UDP, or UDS socket."
@@ -43,6 +43,10 @@ The Vector `socket` sink
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # Encoding
+  encoding.codec = "json" # required
+
+  # General
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
   mode = "tcp" # required
 ```
@@ -58,16 +62,22 @@ The Vector `socket` sink
   buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
+  # Encoding
+  encoding.codec = "json" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
+
   # General
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
   mode = "tcp" # required
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
-  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.ca_file = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_file = "/path/to/host_certificate.crt" # optional, no default
   tls.enabled = false # optional, default
+  tls.key_file = "/path/to/host_certificate.key" # optional, no default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
-  tls.key_path = "/path/to/host_certificate.key" # optional, no default
   tls.verify_certificate = true # optional, default
   tls.verify_hostname = true # optional, default
 ```
@@ -77,6 +87,10 @@ The Vector `socket` sink
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # Encoding
+  encoding.codec = "json" # required
+
+  # General
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
   mode = "udp" # required
 ```
@@ -92,6 +106,12 @@ The Vector `socket` sink
   buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
+  # Encoding
+  encoding.codec = "json" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
+
   # General
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
   mode = "udp" # required
@@ -102,6 +122,10 @@ The Vector `socket` sink
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # Encoding
+  encoding.codec = "json" # required
+
+  # General
   mode = "unix" # required
   path = "/path/to/socket" # required, required when mode = "unix"
 ```
@@ -116,6 +140,12 @@ The Vector `socket` sink
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
+
+  # Encoding
+  encoding.codec = "json" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
   # General
   mode = "unix" # required
@@ -182,7 +212,7 @@ Configures the sink specific buffer behavior.
   relevantWhen={{"type":"memory"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"events"}
   warnings={[]}
   >
@@ -205,7 +235,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   relevantWhen={{"type":"disk"}}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -271,7 +301,7 @@ The behavior when the buffer becomes full.
   defaultValue={null}
   enumValues={null}
   examples={[]}
-  groups={[]}
+  groups={["tcp","udp","unix"]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
@@ -293,7 +323,7 @@ Configures the encoding specific sink behavior.
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","text"]}
-  groups={[]}
+  groups={["tcp","udp","unix"]}
   name={"codec"}
   path={"encoding"}
   relevantWhen={null}
@@ -316,7 +346,7 @@ The encoding codec used to serialize the events before outputting.
   defaultValue={null}
   enumValues={null}
   examples={[["timestamp","message","host"]]}
-  groups={[]}
+  groups={["tcp","udp","unix"]}
   name={"except_fields"}
   path={"encoding"}
   relevantWhen={null}
@@ -339,7 +369,7 @@ Prevent the sink from encoding the specified labels.
   defaultValue={null}
   enumValues={null}
   examples={[["timestamp","message","host"]]}
-  groups={[]}
+  groups={["tcp","udp","unix"]}
   name={"only_fields"}
   path={"encoding"}
   relevantWhen={null}
@@ -362,7 +392,7 @@ Limit the sink to only encoding the specified labels.
   defaultValue={"rfc3339"}
   enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
   examples={["rfc3339","unix"]}
-  groups={[]}
+  groups={["tcp","udp","unix"]}
   name={"timestamp_format"}
   path={"encoding"}
   relevantWhen={null}
@@ -480,7 +510,7 @@ Configures the TLS options for connections from this sink.
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
   groups={["tcp"]}
-  name={"ca_path"}
+  name={"ca_file"}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -490,10 +520,10 @@ Configures the TLS options for connections from this sink.
   warnings={[]}
   >
 
-#### ca_path
+#### ca_file
 
 Absolute path to an additional CA certificate file, in DER or PEM format
-(X.509).
+(X.509), or an inline CA certificate in PEM format.
 
 
 
@@ -504,7 +534,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
   groups={["tcp"]}
-  name={"crt_path"}
+  name={"crt_file"}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -514,11 +544,11 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   warnings={[]}
   >
 
-#### crt_path
+#### crt_file
 
 Absolute path to a certificate file used to identify this connection, in DER or
-PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-`key_path` must also be set.
+PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If this
+is set and is not a PKCS#12 archive, [`key_file`](#key_file) must also be set.
 
 
 
@@ -547,6 +577,31 @@ Enable TLS during connections to the remote.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/host_certificate.key"]}
+  groups={["tcp"]}
+  name={"key_file"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### key_file
+
+Absolute path to a private key file used to identify this connection, in DER or
+PEM format (PKCS#8), or an inline private key in PEM format. If this is set,
+`crt_file` must also be set.
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -565,31 +620,7 @@ Enable TLS during connections to the remote.
 #### key_pass
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
-`key_path` is set.
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/path/to/host_certificate.key"]}
-  groups={["tcp"]}
-  name={"key_path"}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### key_path
-
-Absolute path to a certificate key file used to identify this connection, in
-DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be set.
+`key_file` is set.
 
 
 

@@ -115,29 +115,39 @@ impl RunningTopology {
     /// dropped.
     #[must_use]
     pub fn stop(self) -> impl Future<Item = (), Error = ()> {
-        let mut running_tasks = self.tasks;
-
+        // Create handy handles collections of all tasks for the subsequent operations.
         let mut wait_handles = Vec::new();
-        let mut check_handles = HashMap::new();
+        // We need a Vec here since source compnents have two tasks. One for pump in self.tasks,
+        // and the other for source in self.source_tasks.
+        let mut check_handles = HashMap::<String, Vec<_>>::new();
 
-        for (name, task) in running_tasks.drain() {
+        // We need to give some time to the sources to gracefully shutdown, so we will merge
+        // them with other tasks.
+        for (name, task) in self.tasks.into_iter().chain(self.source_tasks.into_iter()) {
             let task = task
                 .or_else(|_| future::ok(())) // Consider an errored task to be shutdown
                 .shared();
 
             wait_handles.push(task.clone());
-            check_handles.insert(name, task);
+            check_handles.entry(name).or_default().push(task);
         }
-        let mut check_handles2 = check_handles.clone();
 
+        // If we reach this, we will forcefully shutdown the sources.
         let deadline = Instant::now() + Duration::from_secs(60);
 
+        // If we reach the deadline, this future will print out which components won't
+        // gracefully shutdown since we will start to forcefully shutdown the sources.
+        let mut check_handles2 = check_handles.clone();
         let timeout = timer::Delay::new(deadline)
             .map(move |_| {
-                check_handles.retain(|_name, handle| {
-                    handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
+                // Remove all tasks that have shutdown.
+                check_handles2.retain(|_name, handles| {
+                    retain(handles, |handle| {
+                        handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
+                    });
+                    !handles.is_empty()
                 });
-                let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
+                let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
 
                 error!(
                     "Failed to gracefully shut down in time. Killing: {}",
@@ -146,12 +156,17 @@ impl RunningTopology {
             })
             .map_err(|err| panic!("Timer error: {:?}", err));
 
+        // Reports in intervals which componenets are still running.
         let reporter = timer::Interval::new_interval(Duration::from_secs(5))
             .inspect(move |_| {
-                check_handles2.retain(|_name, handle| {
-                    handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
+                // Remove all tasks that have shutdown.
+                check_handles.retain(|_name, handles| {
+                    retain(handles, |handle| {
+                        handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
+                    });
+                    !handles.is_empty()
                 });
-                let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
+                let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
 
                 // TODO: replace with checked_duration_since once it's stable
                 let time_remaining = if deadline > Instant::now() {
@@ -171,10 +186,12 @@ impl RunningTopology {
             .map(|_| ())
             .map_err(|(err, _)| panic!("Timer error: {:?}", err));
 
+        // Finishes once all tasks have shutdown.
         let success = future::join_all(wait_handles)
             .map(|_| ())
             .map_err(|_: future::SharedError<()>| ());
 
+        // Aggregate future that ends once anything detectes that all tasks have shutdown.
         let shutdown_complete_future =
             future::select_all::<Vec<Box<dyn Future<Item = (), Error = ()> + Send>>>(vec![
                 Box::new(timeout),
@@ -184,14 +201,8 @@ impl RunningTopology {
             .map(|_| ())
             .map_err(|_| ());
 
-        // TODO: Once all Sources properly look for the ShutdownSignal, remove this in favor of
-        // using 'deadline' instead.
-        let source_shutdown_deadline = Instant::now() + Duration::from_secs(3);
-
         // Now kick off the shutdown process by shutting down the sources.
-        let source_shutdown_complete = self
-            .shutdown_coordinator
-            .shutdown_all(source_shutdown_deadline);
+        let source_shutdown_complete = self.shutdown_coordinator.shutdown_all(deadline);
 
         source_shutdown_complete
             .join(shutdown_complete_future)
@@ -290,19 +301,21 @@ impl RunningTopology {
     /// Shutdowns removed and replaced pieces of topology.
     fn shutdown_diff(&mut self, diff: &ConfigDiff, rt: &mut runtime::Runtime) {
         // Sources
+        let timeout = Duration::from_secs(30); //sec
 
         // First pass to tell the sources to shut down.
         let mut source_shutdown_complete_futures = Vec::new();
-        // TODO: Once all Sources properly look for the ShutdownSignal, up this time limit to something
-        // more like 30-60 seconds.
 
         // Only log that we are waiting for shutdown if we are actually removing
         // sources.
         if !diff.sources.to_remove.is_empty() {
-            info!("Waiting for up to 3 seconds for sources to finish shutting down");
+            info!(
+                "Waiting for up to {} seconds for sources to finish shutting down",
+                timeout.as_secs()
+            );
         }
 
-        let deadline = Instant::now() + Duration::from_secs(3);
+        let deadline = Instant::now() + timeout;
         for name in &diff.sources.to_remove {
             info!("Removing source {:?}", name);
 
@@ -322,7 +335,10 @@ impl RunningTopology {
 
         // Only log message if there are actual futures to check.
         if !source_shutdown_complete_futures.is_empty() {
-            info!("Waiting for up to 3 seconds for sources to finish shutting down");
+            info!(
+                "Waiting for up to {} seconds for sources to finish shutting down",
+                timeout.as_secs()
+            );
         }
 
         rt.block_on(future::join_all(source_shutdown_complete_futures))
@@ -488,7 +504,6 @@ impl RunningTopology {
                     output
                         .unbounded_send(fanout::ControlMessage::Remove(name.to_string()))
                         .unwrap();
-                    // std::thread::sleep(std::time::Duration::from_millis(100));
                 }
             }
         }
@@ -499,22 +514,25 @@ impl RunningTopology {
 
         for (sink_name, sink) in &self.config.sinks {
             if sink.inputs.iter().any(|i| i == name) {
-                output
-                    .unbounded_send(fanout::ControlMessage::Add(
-                        sink_name.clone(),
-                        self.inputs[sink_name].get(),
-                    ))
-                    .unwrap();
+                // Sink may have been removed with the new config so it may not be present.
+                if let Some(input) = self.inputs.get(sink_name) {
+                    output
+                        .unbounded_send(fanout::ControlMessage::Add(sink_name.clone(), input.get()))
+                        .unwrap();
+                }
             }
         }
         for (transform_name, transform) in &self.config.transforms {
             if transform.inputs.iter().any(|i| i == name) {
-                output
-                    .unbounded_send(fanout::ControlMessage::Add(
-                        transform_name.clone(),
-                        self.inputs[transform_name].get(),
-                    ))
-                    .unwrap();
+                // Transform may have been removed with the new config so it may not be present.
+                if let Some(input) = self.inputs.get(transform_name) {
+                    output
+                        .unbounded_send(fanout::ControlMessage::Add(
+                            transform_name.clone(),
+                            input.get(),
+                        ))
+                        .unwrap();
+                }
             }
         }
 
@@ -662,6 +680,18 @@ fn handle_errors(
             let _ = abort_tx.unbounded_send(());
             Err(())
         })
+}
+
+/// If the closure returns false, then the element is removed
+fn retain<T>(vec: &mut Vec<T>, mut retain_filter: impl FnMut(&mut T) -> bool) {
+    let mut i = 0;
+    while let Some(data) = vec.get_mut(i) {
+        if retain_filter(data) {
+            i += 1;
+        } else {
+            let _ = vec.remove(i);
+        }
+    }
 }
 
 #[cfg(all(test, feature = "sinks-console", feature = "sources-socket"))]
@@ -837,5 +867,100 @@ mod source_finished_tests {
 
         rt.block_on(topology.sources_finished().timeout(Duration::from_secs(2)))
             .unwrap();
+    }
+}
+
+#[cfg(all(
+    test,
+    feature = "sinks-blackhole",
+    feature = "sources-stdin",
+    feature = "transforms-json_parser"
+))]
+mod transient_state_tests {
+    use crate::sinks::blackhole::BlackholeConfig;
+    use crate::sources::stdin::StdinConfig;
+    use crate::test_util::runtime;
+    use crate::topology;
+    use crate::topology::config::Config;
+    use crate::transforms::json_parser::JsonParserConfig;
+
+    #[test]
+    fn remove_sink() {
+        let mut rt = runtime();
+
+        let mut old_config = Config::empty();
+        old_config.add_source("in", StdinConfig::default());
+        old_config.add_transform(
+            "trans",
+            &["in"],
+            JsonParserConfig {
+                drop_field: true,
+                ..JsonParserConfig::default()
+            },
+        );
+        old_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
+        old_config.add_sink("out2", &["trans"], BlackholeConfig { print_amount: 1000 });
+
+        let mut new_config = Config::empty();
+        new_config.add_source("in", StdinConfig::default());
+        new_config.add_transform(
+            "trans",
+            &["in"],
+            JsonParserConfig {
+                drop_field: false,
+                ..JsonParserConfig::default()
+            },
+        );
+        new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
+
+        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+
+        assert!(topology
+            .reload_config_and_respawn(new_config, &mut rt, false)
+            .unwrap());
+    }
+
+    #[test]
+    fn remove_transform() {
+        let mut rt = runtime();
+
+        let mut old_config = Config::empty();
+        old_config.add_source("in", StdinConfig::default());
+        old_config.add_transform(
+            "trans1",
+            &["in"],
+            JsonParserConfig {
+                drop_field: true,
+                ..JsonParserConfig::default()
+            },
+        );
+        old_config.add_transform(
+            "trans2",
+            &["trans1"],
+            JsonParserConfig {
+                drop_field: true,
+                ..JsonParserConfig::default()
+            },
+        );
+        old_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
+        old_config.add_sink("out2", &["trans2"], BlackholeConfig { print_amount: 1000 });
+
+        let mut new_config = Config::empty();
+        new_config.add_source("in", StdinConfig::default());
+        new_config.add_transform(
+            "trans1",
+            &["in"],
+            JsonParserConfig {
+                drop_field: false,
+                ..JsonParserConfig::default()
+            },
+        );
+        new_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
+
+        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+
+        assert!(topology
+            .reload_config_and_respawn(new_config, &mut rt, false)
+            .unwrap());
     }
 }

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-06-02"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
@@ -95,10 +95,10 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
   resource.zone = "Twilight" # example
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
-  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.ca_file = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_file = "/path/to/host_certificate.crt" # optional, no default
+  tls.key_file = "/path/to/host_certificate.key" # optional, no default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
-  tls.key_path = "/path/to/host_certificate.key" # optional, no default
   tls.verify_certificate = true # optional, default
   tls.verify_hostname = true # optional, default
 ```
@@ -140,7 +140,7 @@ Configures the sink batching behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -163,7 +163,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -237,7 +237,7 @@ Configures the sink specific buffer behavior.
   relevantWhen={{"type":"memory"}}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"events"}
   warnings={[]}
   >
@@ -260,7 +260,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   relevantWhen={{"type":"disk"}}
   required={true}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"bytes"}
   warnings={[]}
   >
@@ -606,7 +606,7 @@ Configures the sink request behavior.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"requests"}
   warnings={[]}
   >
@@ -629,7 +629,7 @@ The maximum number of in-flight requests allowed at any given time.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -652,7 +652,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -676,7 +676,7 @@ time window.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={null}
   warnings={[]}
   >
@@ -700,7 +700,7 @@ intents and purposes, represents an infinite number of retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -725,7 +725,7 @@ to select future backoffs.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -748,7 +748,7 @@ The maximum amount of time, in seconds, to wait between retries.
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"uint"}
   unit={"seconds"}
   warnings={[]}
   >
@@ -873,7 +873,7 @@ Configures the TLS options for connections from this sink.
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
   groups={[]}
-  name={"ca_path"}
+  name={"ca_file"}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -883,10 +883,10 @@ Configures the TLS options for connections from this sink.
   warnings={[]}
   >
 
-#### ca_path
+#### ca_file
 
 Absolute path to an additional CA certificate file, in DER or PEM format
-(X.509).
+(X.509), or an inline CA certificate in PEM format.
 
 
 
@@ -897,7 +897,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
   groups={[]}
-  name={"crt_path"}
+  name={"crt_file"}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -907,11 +907,36 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   warnings={[]}
   >
 
-#### crt_path
+#### crt_file
 
 Absolute path to a certificate file used to identify this connection, in DER or
-PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-`key_path` must also be set.
+PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If this
+is set and is not a PKCS#12 archive, [`key_file`](#key_file) must also be set.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/host_certificate.key"]}
+  groups={[]}
+  name={"key_file"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### key_file
+
+Absolute path to a private key file used to identify this connection, in DER or
+PEM format (PKCS#8), or an inline private key in PEM format. If this is set,
+`crt_file` must also be set.
 
 
 
@@ -935,31 +960,7 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 #### key_pass
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
-`key_path` is set.
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/path/to/host_certificate.key"]}
-  groups={[]}
-  name={"key_path"}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### key_path
-
-Absolute path to a certificate key file used to identify this connection, in
-DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be set.
+`key_file` is set.
 
 
 

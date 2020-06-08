@@ -2,11 +2,12 @@ use crate::{
     sinks::http::{HttpMethod, HttpSinkConfig},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        BatchBytesConfig, Compression, TowerRequestConfig,
+        service2::TowerRequestConfig,
+        BatchBytesConfig, Compression,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use http::Uri;
+use http02::Uri;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -36,6 +37,8 @@ pub struct NewRelicLogsConfig {
     pub region: Option<NewRelicLogsRegion>,
     #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
     pub encoding: EncodingConfigWithDefault<Encoding>,
+    #[serde(default)]
+    pub compression: Compression,
     #[serde(default)]
     pub batch: BatchBytesConfig,
 
@@ -124,7 +127,7 @@ impl NewRelicLogsConfig {
             healthcheck_uri: None,
             auth: None,
             headers: Some(headers),
-            compression: Some(Compression::None),
+            compression: self.compression,
             encoding: self.encoding.clone().without_default(),
 
             batch,
@@ -140,8 +143,7 @@ mod tests {
     use super::*;
     use crate::{
         event::Event,
-        runtime::Runtime,
-        test_util::{next_addr, shutdown_on_idle},
+        test_util::{next_addr, runtime, shutdown_on_idle},
         topology::config::SinkConfig,
     };
     use bytes::Buf;
@@ -300,11 +302,11 @@ mod tests {
         nr_config.license_key = Some("foo".to_owned());
         let mut http_config = nr_config.create_config().unwrap();
         http_config.uri = format!("http://{}/fake_nr", in_addr)
-            .parse::<http::Uri>()
+            .parse::<http02::Uri>()
             .unwrap()
             .into();
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let (sink, _healthcheck) = http_config
             .build(SinkContext::new_test(rt.executor()))

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-05-14"
 title: Configuration
 description: Configuring Vector
 ---
@@ -41,7 +41,7 @@ data_dir = "/var/lib/vector"
 [transforms.apache_parser]
   inputs       = ["apache_logs"]
   type         = "regex_parser"                # fast/powerful regex
-  regex        = '^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$'
+  patterns      = ['^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$']
 
 # Sample the data to save on cost
 [transforms.apache_sampler]

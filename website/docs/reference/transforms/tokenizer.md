@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-06-03"
 component_title: "Tokenizer"
 description: "The Vector `tokenizer` transform accepts and outputs `log` events, allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
 event_types: ["log"]
@@ -218,7 +218,7 @@ And the following configuration:
 [transforms.<transform-id>]
 type = "tokenizer"
 field = "message"
-fields = ["remote_addr", "ident", "user_id", "timestamp", "message", "status", "bytes"]
+field_names = ["remote_addr", "ident", "user_id", "timestamp", "message", "status", "bytes"]
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:
