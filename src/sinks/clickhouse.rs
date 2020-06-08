@@ -244,7 +244,7 @@ mod integration_tests {
     use serde_json::Value;
     use std::time::Duration;
     use tokio01::util::FutureExt;
-    
+
     #[test]
     fn insert_events() {
         crate::test_util::trace_init();
