@@ -12,6 +12,7 @@ on:
 env:
   VERBOSE: true
   ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+  TEST_LOG: vector=debug
 
 jobs:
   cancel-previous:
