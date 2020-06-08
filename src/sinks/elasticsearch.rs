@@ -11,7 +11,7 @@ use crate::{
         service2::TowerRequestConfig,
         BatchBytesConfig, Buffer, Compression,
     },
-    template::Template,
+    template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -157,6 +157,8 @@ enum ParseError {
     AWSCredentialsGenerateFailed { source: CredentialsError },
     #[snafu(display("Compression can not be used with AWS hosted Elasticsearch"))]
     AWSCompressionNotAllowed,
+    #[snafu(display("Index template parse error: {}", source))]
+    IndexTemplate { source: TemplateError },
 }
 
 impl HttpSink for ElasticSearchCommon {
@@ -337,11 +339,12 @@ impl ElasticSearchCommon {
             return Err(ParseError::AWSCompressionNotAllowed.into());
         }
 
-        let index = if let Some(idx) = &config.index {
-            Template::from(idx.as_str())
-        } else {
-            Template::from("vector-%Y.%m.%d")
-        };
+        let index = config
+            .index
+            .as_ref()
+            .map(String::as_str)
+            .unwrap_or("vector-%Y.%m.%d");
+        let index = Template::try_from(index).context(IndexTemplate)?;
 
         let doc_type = config.doc_type.clone().unwrap_or("_doc".into());
 

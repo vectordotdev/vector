@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 use futures01::{sink::Sink, stream::Stream, Future};
+use std::convert::TryInto;
 use std::path::PathBuf;
 use tempfile::tempdir;
 use tokio01::codec::{BytesCodec, FramedWrite};
@@ -48,7 +49,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                     "out",
                     &["in"],
                     sinks::file::FileSinkConfig {
-                        path: output.into(),
+                        path: output.try_into().unwrap(),
                         idle_timeout_secs: None,
                         encoding: sinks::file::Encoding::Text.into(),
                     },

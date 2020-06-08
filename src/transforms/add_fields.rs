@@ -9,6 +9,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 use string_cache::DefaultAtom as Atom;
 use toml::value::Value as TomlValue;
 
@@ -134,10 +135,13 @@ impl Transform for AddFields {
 
 fn flatten_field(key: Atom, value: TomlValue, new_fields: &mut IndexMap<Atom, TemplateOrValue>) {
     match value {
-        TomlValue::String(s) => {
-            let t = Template::from(s);
-            new_fields.insert(key, t.into())
-        }
+        TomlValue::String(s) => match Template::try_from(s.as_str()) {
+            Ok(t) => new_fields.insert(key, t.into()),
+            Err(error) => {
+                error!(message = "invalid template", %error);
+                new_fields.insert(key, Value::from(s).into())
+            }
+        },
         TomlValue::Integer(i) => {
             let i = Value::from(i);
             new_fields.insert(key, i.into())
