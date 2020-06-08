@@ -152,7 +152,7 @@ ifeq ($(ENVIRONMENT), true)
 	${ENVIRONMENT_EXEC} make test
 	${ENVIRONMENT_COPY_ARTIFACTS}
 else
-	cargo test --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE}
+	cargo test --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
 endif
 
 test-all: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
