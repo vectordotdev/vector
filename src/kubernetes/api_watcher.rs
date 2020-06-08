@@ -6,6 +6,7 @@ use super::{
     watch_request_builder::WatchRequestBuilder,
     watcher::{self, Watcher},
 };
+use crate::internal_events::kubernetes::api_watcher as internal_events;
 use futures::{
     future::BoxFuture,
     stream::{BoxStream, Stream},
@@ -59,7 +60,7 @@ where
             .request_builder
             .build(watch_optional)
             .context(invocation::RequestPreparation)?;
-        trace!(message = "request prepared", ?request);
+        emit!(internal_events::RequestPrepared { request: &request });
 
         // Send request, get response.
         let response = self
@@ -67,7 +68,9 @@ where
             .send(request)
             .await
             .context(invocation::Request)?;
-        trace!(message = "got response", ?response);
+        emit!(internal_events::ResponseReceived {
+            response: &response
+        });
 
         // Handle response status code.
         let status = response.status();

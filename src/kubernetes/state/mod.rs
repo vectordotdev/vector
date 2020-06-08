@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
 
 pub mod evmap;
+pub mod instrumenting;
 pub mod mock;
 
 /// Provides the interface for write access to the cached state.

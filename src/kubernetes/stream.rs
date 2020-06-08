@@ -1,6 +1,7 @@
 //! Work with HTTP bodies as streams of Kubernetes resources.
 
 use super::multi_response_decoder::MultiResponseDecoder;
+use crate::internal_events::kubernetes::stream as internal_events;
 use async_stream::try_stream;
 use bytes05::Buf;
 use futures::pin_mut;
@@ -27,6 +28,7 @@ where
             let mut buf = buf.context(Reading)?;
             let chunk = buf.to_bytes();
             let responses = decoder.process_next_chunk(chunk.as_ref());
+            emit!(internal_events::ChunkProcessed{ byte_size: chunk.len() });
             for response in responses {
                 let response = response.context(Parsing)?;
                 yield response;

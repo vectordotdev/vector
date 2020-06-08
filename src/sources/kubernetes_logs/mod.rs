@@ -152,8 +152,10 @@ impl Source {
         let label_selector = "vector.dev/exclude!=true".to_owned();
 
         let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
+        let watcher = k8s::instrumenting_watcher::InstrumentingWatcher::new(watcher);
         let (state_reader, state_writer) = evmap::new();
         let state_writer = k8s::state::evmap::Writer::new(state_writer);
+        let state_writer = k8s::state::instrumenting::Writer::new(state_writer);
 
         let mut reflector = k8s::reflector::Reflector::new(
             watcher,

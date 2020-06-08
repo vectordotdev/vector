@@ -4,6 +4,7 @@ use super::{
     resource_version,
     watcher::{self, Watcher},
 };
+use crate::internal_events::kubernetes::reflector as internal_events;
 use futures::{
     pin_mut,
     stream::{Stream, StreamExt},
@@ -90,7 +91,7 @@ where
             let stream = match invocation_result {
                 Ok(val) => val,
                 Err(watcher::invocation::Error::Desync { source }) => {
-                    warn!(message = "handling desync", error = ?source);
+                    emit!(internal_events::DesyncReceived { error: source });
                     // We got desynced, reset the state and retry fetching.
                     // By omiting the flush here, we cache the results from the
                     // previous run until flush is issued when the new events
@@ -278,6 +279,7 @@ mod tests {
     };
     use crate::{
         kubernetes::{
+            instrumenting_watcher::InstrumentingWatcher,
             mock_watcher::{self, MockWatcher},
             state,
         },
@@ -356,11 +358,13 @@ mod tests {
             let (state_events_tx, _state_events_rx) = mpsc::channel(0);
             let (_state_action_tx, state_action_rx) = mpsc::channel(0);
             let state_writer = state::mock::Writer::new(state_events_tx, state_action_rx);
+            let state_writer = state::instrumenting::Writer::new(state_writer);
 
             // Prepare watcher.
             let (watcher_events_tx, mut watcher_events_rx) = mpsc::channel(0);
             let (mut watcher_invocations_tx, watcher_invocations_rx) = mpsc::channel(0);
             let watcher = MockWatcher::<Pod>::new(watcher_events_tx, watcher_invocations_rx);
+            let watcher = InstrumentingWatcher::new(watcher);
 
             // Prepare reflector.
             let mut reflector = Reflector::new(
@@ -521,6 +525,7 @@ mod tests {
             let (watcher_events_tx, mut watcher_events_rx) = mpsc::channel(0);
             let (mut watcher_invocations_tx, watcher_invocations_rx) = mpsc::channel(0);
             let watcher = MockWatcher::<Pod>::new(watcher_events_tx, watcher_invocations_rx);
+            let watcher = InstrumentingWatcher::new(watcher);
 
             // Prepare reflector.
             let mut reflector = Reflector::new(
@@ -592,11 +597,13 @@ mod tests {
             let (state_events_tx, mut state_events_rx) = mpsc::channel(0);
             let (mut state_action_tx, state_action_rx) = mpsc::channel(0);
             let state_writer = state::mock::Writer::new(state_events_tx, state_action_rx);
+            let state_writer = state::instrumenting::Writer::new(state_writer);
 
             // Prepare watcher.
             let (watcher_events_tx, mut watcher_events_rx) = mpsc::channel(0);
             let (mut watcher_invocations_tx, watcher_invocations_rx) = mpsc::channel(0);
             let watcher = MockWatcher::<Pod>::new(watcher_events_tx, watcher_invocations_rx);
+            let watcher = InstrumentingWatcher::new(watcher);
 
             // Prepare reflector.
             let deletion_delay = Duration::from_secs(600);
@@ -745,11 +752,13 @@ mod tests {
             let (state_events_tx, _state_events_rx) = mpsc::channel(0);
             let (_state_action_tx, state_action_rx) = mpsc::channel(0);
             let state_writer = state::mock::Writer::new(state_events_tx, state_action_rx);
+            let state_writer = state::instrumenting::Writer::new(state_writer);
 
             // Prepare watcher.
             let (watcher_events_tx, mut watcher_events_rx) = mpsc::channel(0);
             let (mut watcher_invocations_tx, watcher_invocations_rx) = mpsc::channel(0);
             let watcher = MockWatcher::<Pod>::new(watcher_events_tx, watcher_invocations_rx);
+            let watcher = InstrumentingWatcher::new(watcher);
 
             // Prepare reflector.
             let mut reflector = Reflector::new(
@@ -821,6 +830,7 @@ mod tests {
             // Prepare state.
             let (state_reader, state_writer) = evmap10::new();
             let state_writer = Writer::new(state_writer);
+            let state_writer = state::instrumenting::Writer::new(state_writer);
             let resulting_state_reader = state_reader.clone();
 
             // Prepare watcher.
@@ -828,6 +838,7 @@ mod tests {
             let (mut watcher_invocations_tx, watcher_invocations_rx) = mpsc::channel(0);
             let watcher: MockWatcher<Pod> =
                 MockWatcher::new(watcher_events_tx, watcher_invocations_rx);
+            let watcher = InstrumentingWatcher::new(watcher);
 
             // Prepare reflector.
             let mut reflector = Reflector::new(

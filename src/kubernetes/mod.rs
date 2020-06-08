@@ -24,6 +24,7 @@ pub mod api_watcher;
 pub mod client;
 pub mod delayed_delete;
 pub mod hash_value;
+pub mod instrumenting_watcher;
 pub mod mock_watcher;
 pub mod multi_response_decoder;
 pub mod reflector;
