@@ -5,10 +5,11 @@ use crate::{
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{HttpClient, HttpClientFuture},
-            retries::{RetryAction, RetryLogic},
+            http2::{HttpClient, HttpClientFuture},
+            retries2::{RetryAction, RetryLogic},
+            service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
             BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
-            PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
+            PartitionInnerBuffer,
         },
         Healthcheck, RouterSink,
     },
@@ -18,17 +19,19 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures01::{stream::iter_ok, Future, Poll, Sink};
-use http::{Method, StatusCode, Uri};
-use hyper::{
+use futures::TryFutureExt;
+use futures01::{stream::iter_ok, Future, Sink};
+use http02::{Method, StatusCode, Uri};
+use hyper13::{
     header::{HeaderName, HeaderValue},
-    Body, Request,
+    Body, Request, Response,
 };
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::collections::HashMap;
-use tower::{Service, ServiceBuilder};
+use std::task::Poll;
+use tower03::{Service, ServiceBuilder};
 use tracing::field;
 use uuid::Uuid;
 
@@ -212,7 +215,7 @@ impl GcsSink {
 
         let buffer = PartitionBuffer::new(Buffer::new(config.compression));
 
-        let sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+        let sink = PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch, cx.acker())
             .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
@@ -220,38 +223,39 @@ impl GcsSink {
     }
 
     fn healthcheck(&mut self) -> crate::Result<Healthcheck> {
-        let mut builder = Request::builder();
-        builder.method(Method::HEAD);
-        builder.uri(self.base_url.parse::<Uri>()?);
+        let builder = Request::builder()
+            .method(Method::HEAD)
+            .uri(self.base_url.parse::<Uri>()?);
 
         let mut request = builder.body(Body::empty()).unwrap();
         if let Some(creds) = &self.creds {
             creds.apply(&mut request);
         }
 
-        let healthcheck =
-            self.client
-                .call(request)
-                .map_err(Into::into)
-                .and_then(healthcheck_response(
-                    self.creds.clone(),
-                    GcsError::BucketNotFound {
-                        bucket: self.bucket.clone(),
-                    }
-                    .into(),
-                ));
+        let healthcheck = self
+            .client
+            .call(request)
+            .compat()
+            .map_err(Into::into)
+            .and_then(healthcheck_response(
+                self.creds.clone(),
+                GcsError::BucketNotFound {
+                    bucket: self.bucket.clone(),
+                }
+                .into(),
+            ));
 
         Ok(Box::new(healthcheck))
     }
 }
 
 impl Service<RequestWrapper> for GcsSink {
-    type Response = hyper::Response<Body>;
-    type Error = hyper::Error;
+    type Response = Response<Body>;
+    type Error = hyper13::Error;
     type Future = HttpClientFuture;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
+    fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: RequestWrapper) -> Self::Future {
@@ -260,9 +264,7 @@ impl Service<RequestWrapper> for GcsSink {
         let uri = format!("{}{}", self.base_url, request.key)
             .parse::<Uri>()
             .unwrap();
-        let mut builder = Request::builder();
-        builder.method(Method::PUT);
-        builder.uri(uri);
+        let mut builder = Request::builder().method(Method::PUT).uri(uri);
         let headers = builder.headers_mut().unwrap();
         headers.insert("content-type", settings.content_type);
         headers.insert(
@@ -437,8 +439,8 @@ struct GcsRetryLogic;
 
 // This is a clone of HttpRetryLogic for the Body type, should get merged
 impl RetryLogic for GcsRetryLogic {
-    type Error = hyper::Error;
-    type Response = hyper::Response<Body>;
+    type Error = hyper13::Error;
+    type Response = Response<Body>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_connect() || error.is_closed()
