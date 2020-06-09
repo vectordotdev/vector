@@ -1,5 +1,3 @@
-#![cfg(all(feature = "wasm", feature = "transforms-lua"))]
-
 use criterion::{black_box, criterion_group, criterion_main, Benchmark, BenchmarkId, Criterion};
 use serde_json::Value;
 use std::{collections::HashMap, fs, io::Read, path::Path};
