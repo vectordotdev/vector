@@ -3,7 +3,7 @@ use crate::{
     emit,
     event::Event,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
-    region::{region_from_endpoint, RegionOrEndpoint},
+    region2::{region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http2::{BatchedHttpSink, HttpClient, HttpSink},
@@ -25,9 +25,11 @@ use http02::{
 };
 use hyper13::Body;
 use lazy_static::lazy_static;
-use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
-use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
-use rusoto_credential::{AwsCredentials, CredentialsError};
+use rusoto_core44::Region;
+use rusoto_credential44::{
+    AwsCredentials, CredentialsError, DefaultCredentialsProvider, ProvideAwsCredentials,
+};
+use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
@@ -328,7 +330,7 @@ impl ElasticSearchCommon {
                 let mut rt = tokio01::runtime::current_thread::Runtime::new()?;
 
                 let credentials = rt
-                    .block_on(provider.credentials())
+                    .block_on(provider.credentials().compat())
                     .context(AWSCredentialsGenerateFailed)?;
 
                 Some(credentials)
@@ -424,7 +426,7 @@ fn finish_signer(
     credentials: &AwsCredentials,
     mut builder: http02::request::Builder,
 ) -> http02::request::Builder {
-    signer.sign_with_plus(&credentials, true);
+    signer.sign(&credentials);
 
     for (name, values) in signer.headers() {
         let header_name = name
