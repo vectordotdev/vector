@@ -637,7 +637,6 @@ mod tests {
         crate::test_util::trace_init();
 
         let dir = tempfile::tempdir().unwrap();
-
         let mut file = File::create(dir.path().join("script2.lua")).unwrap();
         write!(
             &mut file,
@@ -662,9 +661,9 @@ mod tests {
                 emit(event)
             end
             """
-            search_dirs = ["{}"]
+            search_dirs = [{:?}]
             "#,
-            dir.path().display()
+            dir.path().as_os_str() // This seems a bit weird, but recall we also support windows.
         );
 
         let mut transform = from_config(&config).unwrap();
