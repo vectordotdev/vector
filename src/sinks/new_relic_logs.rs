@@ -143,13 +143,12 @@ mod tests {
     use super::*;
     use crate::{
         event::Event,
+        sinks::util::test::build_test_server,
         test_util::{next_addr, runtime, shutdown_on_idle},
         topology::config::SinkConfig,
     };
-    use bytes::Buf;
-    use futures01::{stream, sync::mpsc, Future, Sink, Stream};
-    use hyper::service::service_fn_ok;
-    use hyper::{Body, Request, Response, Server};
+    use futures01::{stream, Sink, Stream};
+    use hyper13::Method;
     use serde_json::Value;
     use std::io::BufRead;
 
@@ -259,41 +258,6 @@ mod tests {
         assert!(http_config.auth.is_none());
     }
 
-    fn build_test_server(
-        addr: &std::net::SocketAddr,
-    ) -> (
-        mpsc::Receiver<(http::request::Parts, hyper::Chunk)>,
-        stream_cancel::Trigger,
-        impl Future<Item = (), Error = ()>,
-    ) {
-        let (tx, rx) = mpsc::channel(100);
-        let service = move || {
-            let tx = tx.clone();
-            service_fn_ok(move |req: Request<Body>| {
-                let (parts, body) = req.into_parts();
-
-                let tx = tx.clone();
-                tokio01::spawn(
-                    body.concat2()
-                        .map_err(|e| panic!(e))
-                        .and_then(|body| tx.send((parts, body)))
-                        .map(|_| ())
-                        .map_err(|e| panic!(e)),
-                );
-
-                Response::new(Body::empty())
-            })
-        };
-
-        let (trigger, tripwire) = stream_cancel::Tripwire::new();
-        let server = Server::bind(addr)
-            .serve(service)
-            .with_graceful_shutdown(tripwire)
-            .map_err(|e| panic!("server error: {}", e));
-
-        (rx, trigger, server)
-    }
-
     #[test]
     fn new_relic_logs_happy_path() {
         let in_addr = next_addr();
@@ -311,7 +275,7 @@ mod tests {
         let (sink, _healthcheck) = http_config
             .build(SinkContext::new_test(rt.executor()))
             .unwrap();
-        let (rx, trigger, server) = build_test_server(&in_addr);
+        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream::iter_ok(input_lines.clone().into_iter().map(Event::from));
@@ -327,7 +291,7 @@ mod tests {
             .wait()
             .map(Result::unwrap)
             .map(|(parts, body)| {
-                assert_eq!(hyper::Method::POST, parts.method);
+                assert_eq!(Method::POST, parts.method);
                 assert_eq!("/fake_nr", parts.uri.path());
                 assert_eq!(
                     parts
@@ -338,7 +302,7 @@ mod tests {
                 );
                 body
             })
-            .map(hyper::Chunk::reader)
+            .map(std::io::Cursor::new)
             .flat_map(BufRead::lines)
             .map(Result::unwrap)
             .flat_map(|s| -> Vec<String> {

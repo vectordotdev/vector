@@ -279,7 +279,7 @@ mod tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let (rx, _trigger, server) = build_test_server(&addr);
+        let (rx, _trigger, server) = build_test_server(addr, &mut rt);
         rt.spawn(server);
 
         let lines = test_util::random_lines(100).take(10).collect::<Vec<_>>();

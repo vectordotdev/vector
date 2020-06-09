@@ -291,14 +291,13 @@ mod tests {
         assert_downcast_matches,
         sinks::http::HttpSinkConfig,
         sinks::util::http2::HttpSink,
+        sinks::util::test::build_test_server,
         test_util::{next_addr, random_lines_with_stream, runtime, shutdown_on_idle},
         topology::config::SinkContext,
     };
-    use bytes::Buf;
-    use futures01::{sync::mpsc, Future, Sink, Stream};
-    use headers::{Authorization, HeaderMapExt};
-    use hyper::service::service_fn_ok;
-    use hyper::{Body, Request, Response, Server};
+    use futures01::{Sink, Stream};
+    use headers03::{Authorization, HeaderMapExt};
+    use hyper13::Method;
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
 
@@ -410,7 +409,7 @@ mod tests {
         let cx = SinkContext::new_test(rt.executor());
 
         let (sink, _) = config.build(cx).unwrap();
-        let (rx, trigger, server) = build_test_server(&in_addr);
+        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
@@ -424,7 +423,7 @@ mod tests {
             .wait()
             .map(Result::unwrap)
             .map(|(parts, body)| {
-                assert_eq!(hyper::Method::POST, parts.method);
+                assert_eq!(Method::POST, parts.method);
                 assert_eq!("/frames", parts.uri.path());
                 assert_eq!(
                     Some(Authorization::basic("waldo", "hunter2")),
@@ -432,7 +431,7 @@ mod tests {
                 );
                 body
             })
-            .map(hyper::Chunk::reader)
+            .map(std::io::Cursor::new)
             .map(flate2::read::GzDecoder::new)
             .map(BufReader::new)
             .flat_map(BufRead::lines)
@@ -473,7 +472,7 @@ mod tests {
         let cx = SinkContext::new_test(rt.executor());
 
         let (sink, _) = config.build(cx).unwrap();
-        let (rx, trigger, server) = build_test_server(&in_addr);
+        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
@@ -487,7 +486,7 @@ mod tests {
             .wait()
             .map(Result::unwrap)
             .map(|(parts, body)| {
-                assert_eq!(hyper::Method::PUT, parts.method);
+                assert_eq!(Method::PUT, parts.method);
                 assert_eq!("/frames", parts.uri.path());
                 assert_eq!(
                     Some(Authorization::basic("waldo", "hunter2")),
@@ -495,7 +494,7 @@ mod tests {
                 );
                 body
             })
-            .map(hyper::Chunk::reader)
+            .map(std::io::Cursor::new)
             .map(flate2::read::GzDecoder::new)
             .map(BufReader::new)
             .flat_map(BufRead::lines)
@@ -533,7 +532,7 @@ mod tests {
         let cx = SinkContext::new_test(rt.executor());
 
         let (sink, _) = config.build(cx).unwrap();
-        let (rx, trigger, server) = build_test_server(&in_addr);
+        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
@@ -547,7 +546,7 @@ mod tests {
             .wait()
             .map(Result::unwrap)
             .map(|(parts, body)| {
-                assert_eq!(hyper::Method::POST, parts.method);
+                assert_eq!(Method::POST, parts.method);
                 assert_eq!("/frames", parts.uri.path());
                 assert_eq!(
                     Some("bar"),
@@ -559,7 +558,7 @@ mod tests {
                 );
                 body
             })
-            .map(hyper::Chunk::reader)
+            .map(std::io::Cursor::new)
             .map(flate2::read::GzDecoder::new)
             .map(BufReader::new)
             .flat_map(BufRead::lines)
@@ -574,40 +573,5 @@ mod tests {
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
-    }
-
-    fn build_test_server(
-        addr: &std::net::SocketAddr,
-    ) -> (
-        mpsc::Receiver<(http::request::Parts, hyper::Chunk)>,
-        stream_cancel::Trigger,
-        impl Future<Item = (), Error = ()>,
-    ) {
-        let (tx, rx) = mpsc::channel(100);
-        let service = move || {
-            let tx = tx.clone();
-            service_fn_ok(move |req: Request<Body>| {
-                let (parts, body) = req.into_parts();
-
-                let tx = tx.clone();
-                tokio01::spawn(
-                    body.concat2()
-                        .map_err(|e| panic!(e))
-                        .and_then(|body| tx.send((parts, body)))
-                        .map(|_| ())
-                        .map_err(|e| panic!(e)),
-                );
-
-                Response::new(Body::empty())
-            })
-        };
-
-        let (trigger, tripwire) = stream_cancel::Tripwire::new();
-        let server = Server::bind(addr)
-            .serve(service)
-            .with_graceful_shutdown(tripwire)
-            .map_err(|e| panic!("server error: {}", e));
-
-        (rx, trigger, server)
     }
 }

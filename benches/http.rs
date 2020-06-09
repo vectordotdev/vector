@@ -1,12 +1,16 @@
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
+use futures::TryFutureExt;
 use futures01::Future;
-use hyper::service::service_fn_ok;
-use hyper::{Body, Response, Server};
+use hyper13::{
+    service::{make_service_fn, service_fn},
+    Body, Response, Server,
+};
 use std::net::SocketAddr;
 use vector::test_util::{next_addr, random_lines, send_lines, wait_for_tcp};
 use vector::{
     runtime, sinks, sources,
     topology::{self, config},
+    Error,
 };
 
 fn benchmark_http_no_compression(c: &mut Criterion) {
@@ -127,10 +131,15 @@ fn benchmark_http_gzip(c: &mut Criterion) {
 
 fn serve(addr: SocketAddr) {
     std::thread::spawn(move || {
-        let make_service = || service_fn_ok(|_req| Response::new(Body::empty()));
+        let make_service = make_service_fn(|_| async {
+            Ok::<_, Error>(service_fn(|_req| async {
+                Ok::<_, Error>(Response::new(Body::empty()))
+            }))
+        });
 
         let fut = Server::bind(&addr)
             .serve(make_service)
+            .compat()
             .map_err(|e| panic!(e));
 
         tokio01::runtime::current_thread::run(fut);
