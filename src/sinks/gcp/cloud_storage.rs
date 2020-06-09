@@ -13,7 +13,7 @@ use crate::{
         },
         Healthcheck, RouterSink,
     },
-    template::Template,
+    template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -28,8 +28,9 @@ use hyper13::{
 };
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::task::Poll;
 use tower03::{Service, ServiceBuilder};
 use tracing::field;
@@ -175,6 +176,8 @@ enum HealthcheckError {
     UnknownBucket { bucket: String },
     #[snafu(display("Unknown status code: {}", status))]
     UnknownStatus { status: http::StatusCode },
+    #[snafu(display("key_prefix template parse error: {}", source))]
+    KeyPrefixTemplate { source: TemplateError },
 }
 
 impl GcsSink {
@@ -200,11 +203,12 @@ impl GcsSink {
 
         let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
 
-        let key_prefix = if let Some(kp) = &config.key_prefix {
-            Template::from(kp.as_str())
-        } else {
-            Template::from("date=%F/")
-        };
+        let key_prefix = config
+            .key_prefix
+            .as_ref()
+            .map(String::as_str)
+            .unwrap_or("date=%F/");
+        let key_prefix = Template::try_from(key_prefix).context(KeyPrefixTemplate)?;
 
         let settings = self.settings.clone();
 
@@ -471,7 +475,7 @@ mod tests {
     #[test]
     fn gcs_encode_event_text() {
         let message = "hello world".to_string();
-        let batch_time_format = Template::from("date=%F");
+        let batch_time_format = Template::try_from("date=%F").unwrap();
         let bytes = encode_event(
             message.clone().into(),
             &batch_time_format,
@@ -490,7 +494,7 @@ mod tests {
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
 
-        let batch_time_format = Template::from("date=%F");
+        let batch_time_format = Template::try_from("date=%F").unwrap();
         let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
 
         let (bytes, _) = bytes.into_parts();

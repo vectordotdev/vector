@@ -634,7 +634,8 @@ where
 
         self.in_flight.push(rx);
 
-        let request_id = self.next_request_id.wrapping_add(1);
+        let request_id = self.next_request_id;
+        self.next_request_id = request_id.wrapping_add(1);
 
         trace!(
             message = "submitting service request.",

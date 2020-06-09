@@ -1,3 +1,5 @@
+#![allow(clippy::identity_conversion)]
+
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
 use tempfile::tempdir;
