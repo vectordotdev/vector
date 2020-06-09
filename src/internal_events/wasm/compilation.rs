@@ -54,7 +54,7 @@ impl WasmCompilation {
 impl InternalEvent for WasmCompilation {
     fn emit_logs(&self) {
         #[cfg(not(feature = "wasm-timings"))]
-        debug!(
+        info!(
             message = "WASM Compilation via `lucet`",
             state = self.state.as_const_str(),
             role = self.role.as_const_str(),
@@ -62,13 +62,13 @@ impl InternalEvent for WasmCompilation {
         #[cfg(feature = "wasm-timings")]
         {
             if self.elapsed.as_nanos() == 0 {
-                debug!(
+                info!(
                     message = "Compilation via vendored `lucet`",
                     state = self.state.as_const_str(),
                     role = self.role.as_const_str(),
                 );
             } else {
-                debug!(
+                info!(
                     message = "Compilation via vendored `lucet`",
                     state = self.state.as_const_str(),
                     role = self.role.as_const_str(),
