@@ -273,14 +273,7 @@ impl MetadataClient {
             return Err(Ec2MetadataError::UnableToFetchToken.into());
         }
 
-        let body = res
-            .into_body()
-            .try_fold(BytesMut::new(), |mut store, bytes| async move {
-                store.extend_from_slice(&bytes);
-                Ok(store)
-            })
-            .await?;
-        let token: Bytes = body.into();
+        let token = body_to_bytes(res.into_body()).await?;
 
         let next_refresh = Instant::now() + Duration::from_secs(21600);
         self.token = Some((token.clone(), next_refresh));
@@ -306,13 +299,7 @@ impl MetadataClient {
             return Ok(None);
         }
 
-        let body = res
-            .into_body()
-            .try_fold(BytesMut::new(), |mut store, bytes| async move {
-                store.extend_from_slice(&bytes);
-                Ok(store)
-            })
-            .await?;
+        let body = body_to_bytes(res.into_body()).await?;
 
         serde_json::from_slice(&body[..])
             .map_err(Into::into)
@@ -344,15 +331,9 @@ impl MetadataClient {
             return Ok(None);
         }
 
-        let body = res
-            .into_body()
-            .try_fold(BytesMut::new(), |mut store, bytes| async move {
-                store.extend_from_slice(&bytes);
-                Ok(store)
-            })
-            .await?;
+        let body = body_to_bytes(res.into_body()).await?;
 
-        Ok(Some(body.into()))
+        Ok(Some(body))
     }
 
     pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
@@ -510,6 +491,18 @@ impl Keys {
 enum Ec2MetadataError {
     #[snafu(display("Unable to fetch token."))]
     UnableToFetchToken,
+}
+
+// Can be eliminated once we start using `bytes` crate with the same version as `hyper`.
+async fn body_to_bytes(body: Body) -> Result<Bytes, hyper13::Error> {
+    body
+        // hyper13::body::to_body
+        .try_fold(BytesMut::new(), |mut store, bytes| async move {
+            store.extend_from_slice(&bytes);
+            Ok(store)
+        })
+        .await
+        .map(Into::into)
 }
 
 #[cfg(test)]
