@@ -136,8 +136,6 @@ mod tests {
     fn captures_internal_metrics() {
         crate::metrics::init().unwrap();
 
-        let controller = get_controller().expect("no controller");
-
         gauge!("foo", 1);
         gauge!("foo", 2);
         counter!("bar", 3);
@@ -147,6 +145,7 @@ mod tests {
         value!("quux", 7, "host" => "foo");
         value!("quux", 8, "host" => "foo");
 
+        let controller = get_controller().expect("no controller");
         let output = capture_metrics(&controller)
             .map(|event| {
                 let m = event.into_metric();
