@@ -150,6 +150,7 @@ mod tests {
         INSTANCE.get_or_init(|| Mutex::new(())).lock().unwrap()
     }
 
+    #[ignore]
     #[test]
     fn add() {
         let _guard = tests_lock();
@@ -181,6 +182,7 @@ mod tests {
         })
     }
 
+    #[ignore]
     #[test]
     fn update() {
         let _guard = tests_lock();
@@ -212,6 +214,7 @@ mod tests {
         })
     }
 
+    #[ignore]
     #[test]
     fn delete() {
         let _guard = tests_lock();
@@ -243,6 +246,7 @@ mod tests {
         })
     }
 
+    #[ignore]
     #[test]
     fn resync() {
         let _guard = tests_lock();
@@ -270,6 +274,7 @@ mod tests {
         })
     }
 
+    #[ignore]
     #[test]
     fn request_maintenance_without_maintenance() {
         let _guard = tests_lock();
@@ -283,6 +288,7 @@ mod tests {
         })
     }
 
+    #[ignore]
     #[test]
     fn request_maintenance_with_maintenance() {
         let _guard = tests_lock();
@@ -307,6 +313,7 @@ mod tests {
         })
     }
 
+    #[ignore]
     #[test]
     fn perform_maintenance() {
         let _guard = tests_lock();
