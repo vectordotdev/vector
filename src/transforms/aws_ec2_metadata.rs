@@ -1,14 +1,13 @@
 use super::Transform;
 use crate::{
     event::Event,
-    sinks::util::http::HttpClient,
+    sinks::util::http2::HttpClient,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
-use bytes::Bytes;
-use futures::compat::Future01CompatExt;
-use futures01::Stream;
-use http::{uri::PathAndQuery, Request, StatusCode, Uri};
-use hyper::Body;
+use bytes::{Bytes, BytesMut};
+use futures::{compat::Future01CompatExt, TryStreamExt};
+use http02::{uri::PathAndQuery, Request, StatusCode, Uri};
+use hyper13::Body;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::RandomState, HashSet};
 use std::time::{Duration, Instant};
@@ -132,8 +131,8 @@ impl TransformConfig for Ec2Metadata {
         let host = self
             .host
             .clone()
-            .map(|s| Uri::from_shared(s.into()).unwrap())
-            .unwrap_or(HOST.clone());
+            .map(|s| Uri::from_maybe_shared(s).unwrap())
+            .unwrap_or_else(|| HOST.clone());
 
         let refresh_interval = self
             .refresh_interval_secs
@@ -274,8 +273,7 @@ impl MetadataClient {
             return Err(Ec2MetadataError::UnableToFetchToken.into());
         }
 
-        let body = res.into_body().concat2().compat().await?;
-        let token = body.into_bytes();
+        let token = body_to_bytes(res.into_body()).await?;
 
         let next_refresh = Instant::now() + Duration::from_secs(21600);
         self.token = Some((token.clone(), next_refresh));
@@ -291,7 +289,7 @@ impl MetadataClient {
         let uri = Uri::from_parts(parts)?;
 
         let req = Request::get(uri)
-            .header(TOKEN_HEADER.clone(), token)
+            .header(TOKEN_HEADER.as_ref(), token.as_ref())
             .body(Body::empty())?;
 
         let res = self.client.send(req).await?;
@@ -301,7 +299,7 @@ impl MetadataClient {
             return Ok(None);
         }
 
-        let body = res.into_body().concat2().compat().await?;
+        let body = body_to_bytes(res.into_body()).await?;
 
         serde_json::from_slice(&body[..])
             .map_err(Into::into)
@@ -323,7 +321,7 @@ impl MetadataClient {
         debug!(message = "Sending metadata request.", %uri);
 
         let req = Request::get(uri)
-            .header(TOKEN_HEADER.clone(), token)
+            .header(TOKEN_HEADER.as_ref(), token.as_ref())
             .body(Body::empty())?;
 
         let res = self.client.send(req).await?;
@@ -333,9 +331,9 @@ impl MetadataClient {
             return Ok(None);
         }
 
-        let body = res.into_body().concat2().compat().await?;
+        let body = body_to_bytes(res.into_body()).await?;
 
-        Ok(Some(body.into_bytes()))
+        Ok(Some(body))
     }
 
     pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
@@ -493,6 +491,18 @@ impl Keys {
 enum Ec2MetadataError {
     #[snafu(display("Unable to fetch token."))]
     UnableToFetchToken,
+}
+
+// Can be eliminated once we start using `bytes` crate with the same version as `hyper`.
+async fn body_to_bytes(body: Body) -> Result<Bytes, hyper13::Error> {
+    body
+        // hyper13::body::to_body
+        .try_fold(BytesMut::new(), |mut store, bytes| async move {
+            store.extend_from_slice(&bytes);
+            Ok(store)
+        })
+        .await
+        .map(Into::into)
 }
 
 #[cfg(test)]
