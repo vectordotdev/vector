@@ -3795,14 +3795,15 @@ dependencies = [
 
 [[package]]
 name = "rusoto_cloudwatch"
-version = "0.41.0"
+version = "0.44.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f470c278733d18760a5966a89227f4d9a06bb1d8260d676b011faa4d2aa82342"
+checksum = "17952154d3dc02e4b29b8aed92bacc3dd6502b665c3a0e466aa64e110cf33845"
 dependencies = [
- "bytes 0.4.12",
- "futures 0.1.29",
- "rusoto_core 0.41.0",
- "serde_urlencoded 0.5.5",
+ "async-trait",
+ "bytes 0.5.4",
+ "futures 0.3.4",
+ "rusoto_core 0.44.0",
+ "serde_urlencoded 0.6.1",
  "xml-rs",
 ]
 
