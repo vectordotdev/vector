@@ -8,9 +8,11 @@ pub fn register(registration: &Registration) -> Result<()> {
     let buffer =
         serde_json::to_vec(registration).context("Could not turn registration to JSON.")?;
     let mut slice = buffer.into_boxed_slice();
+
     unsafe {
         ffi::register(slice.as_mut_ptr() as u32, slice.len() as u32);
     }
+
     Ok(())
 }
 
@@ -18,7 +20,9 @@ pub fn register(registration: &Registration) -> Result<()> {
 /// When returning `Ok(i64)` it indicates the number of events emitted so far.
 pub fn emit(mut data: impl AsMut<[u8]>) -> Result<u32> {
     let data = data.as_mut();
+
     let retval = unsafe { ffi::emit(data.as_mut_ptr() as u32, data.len() as u32) };
+
     Ok(retval)
 }
 
@@ -27,7 +31,9 @@ pub fn raise(error: impl Display) -> Result<u32> {
     let mut string = format!("{}", error);
     let buffer = unsafe { string.as_mut_vec() };
     let parts = buffer.as_mut_slice();
+
     let retval = unsafe { ffi::raise(parts.as_mut_ptr() as u32, parts.len() as u32) };
+
     Ok(retval)
 }
 
@@ -35,8 +41,9 @@ pub fn raise(error: impl Display) -> Result<u32> {
 pub fn config() -> Result<HashMap<String, serde_json::Value>> {
     let size = unsafe { ffi::config_size() };
     let ptr = crate::interop::allocate_buffer(size);
-    // TODO: Check for `-1`.
-    let _ = unsafe { ffi::config(ptr as u32, size) };
+
+    unsafe { ffi::config(ptr as u32, size) };
+
     let buffer = unsafe { Vec::from_raw_parts(ptr as *mut u8, size as usize, size as usize) };
     let config: HashMap<String, serde_json::Value> = serde_json::from_slice(&buffer)?;
     Ok(config)

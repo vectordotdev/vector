@@ -24,8 +24,6 @@ mod files;
 mod http;
 #[cfg(feature = "transforms-lua")]
 mod lua;
-#[cfg(feature = "wasm")]
-mod wasm;
 
 criterion_group!(
     benches,
@@ -47,7 +45,6 @@ criterion_main!(
     files::files,
     lua::lua,
     event::event,
-    wasm::wasm
 );
 
 fn benchmark_simple_pipe(c: &mut Criterion) {

@@ -16,7 +16,7 @@ pub enum Role {
 
 impl Role {
     /// Cheaply turn into a `&'static str` so you don't need to format it for metrics.
-    pub fn as_const_str(&self) -> &'static str {
+    pub fn as_const_str(self) -> &'static str {
         match self {
             Role::Transform => TRANSFORM,
             Role::Source => SOURCE,

@@ -1,4 +1,6 @@
-use criterion::{black_box, criterion_group, Benchmark, BenchmarkId, Criterion};
+#![cfg(feature = "wasm")]
+
+use criterion::{black_box, criterion_group, criterion_main, Benchmark, BenchmarkId, Criterion};
 use serde_json::Value;
 use std::{collections::HashMap, fs, io::Read, path::Path};
 use vector::{
@@ -183,3 +185,4 @@ fn bench_group_transforms_over_parameterized_event_sizes(
 }
 
 criterion_group!(wasm, protobuf, drop, add_fields);
+criterion_main!(wasm);

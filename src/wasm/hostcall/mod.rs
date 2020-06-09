@@ -9,13 +9,7 @@ use vector_wasm::Registration;
 pub use wrapped_for_ffi::ensure_linked;
 
 // Also add any new functions to the `ffi::ensure_linked` function!
-pub const HOSTCALL_LIST: [&str; 5] = [
-    "emit",
-    "register",
-    "raise",
-    "config_size",
-    "config",
-];
+pub const HOSTCALL_LIST: [&str; 5] = ["emit", "register", "raise", "config_size", "config"];
 
 pub fn emit(vmctx: &Vmctx, data: u32, length: u32) -> crate::Result<u32> {
     let mut event_buffer = vmctx.get_embed_ctx_mut::<EventBuffer>();

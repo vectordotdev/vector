@@ -23,7 +23,12 @@ pub struct WasmConfig {
 
 impl Into<WasmModuleConfig> for WasmConfig {
     fn into(self) -> WasmModuleConfig {
-        WasmModuleConfig::new(Role::Transform, self.module, self.artifact_cache, self.options)
+        WasmModuleConfig::new(
+            Role::Transform,
+            self.module,
+            self.artifact_cache,
+            self.options,
+        )
     }
 }
 

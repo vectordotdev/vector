@@ -38,7 +38,7 @@ fn handle(slice: &mut Vec<u8>) -> Result<Vec<u8>> {
                         .context("Message field was not an array or string.")
                         .and_then(|array| {
                             array
-                                .into_iter()
+                                .iter()
                                 .map(|maybe_number| {
                                     maybe_number
                                         .as_u64()
@@ -101,9 +101,7 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
 }
 
 #[no_mangle]
-pub extern "C" fn shutdown() {
-    ();
-}
+pub extern "C" fn shutdown() {}
 
 #[test]
 fn fixture_test() {}

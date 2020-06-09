@@ -93,7 +93,13 @@ fn compile(
 
     let mut bindings = Bindings::empty();
     bindings.extend(&lucet_wasi::bindings())?;
-    bindings.extend(&Bindings::env(hostcall::HOSTCALL_LIST.iter().cloned().map(|f| (String::from(f), String::from(f))).collect()))?;
+    bindings.extend(&Bindings::env(
+        hostcall::HOSTCALL_LIST
+            .iter()
+            .cloned()
+            .map(|f| (String::from(f), String::from(f)))
+            .collect(),
+    ))?;
 
     Lucetc::new(input)
         .with_bindings(bindings)

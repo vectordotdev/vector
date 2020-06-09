@@ -127,11 +127,11 @@ $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module.
 
 .PHONY: test-wasm
 test-wasm: build-wasm-tests  ### Run engine tests.
-	TEST_THREADS=1 TEST_LOG=vector=trace cargo test wasm --no-default-features --features wasm,wasm-timings -- --nocapture
+	TEST_THREADS=1 TEST_LOG=vector=trace cargo test wasm --no-default-features --features "wasm wasm-timings" -- --nocapture
 
 .PHONY: bench-wasm
 bench-wasm: build-wasm-tests  ### Run engine tests.
-	cargo bench wasm --no-default-features --features ${DEFAULT_FEATURES},wasm
+	cargo bench --no-default-features --features "${DEFAULT_FEATURES} wasm" --bench wasm wasm
 
 ##@ Checking
 

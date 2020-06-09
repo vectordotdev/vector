@@ -18,6 +18,4 @@ pub extern "C" fn process(_data: u32, _length: u32) -> u32 {
 }
 
 #[no_mangle]
-pub extern "C" fn shutdown() {
-    ();
-}
+pub extern "C" fn shutdown() {}
