@@ -1,5 +1,5 @@
 {
-  "artifact_cache": "cache",
+  "artifact_cache": "target/artifacts",
   "max_heap_memory_size": 10485760,
   "options": {
     "takes_array":[1, 2, 3],

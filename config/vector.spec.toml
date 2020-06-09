@@ -2694,6 +2694,15 @@ require('custom_module')
 
 # Accepts and outputs `log` events, allowing you to execute **experimental** WASM plugins.
 [transforms.wasm]
+  # The directory where Vector should store the artifact it builds of this WASM
+  # module. Typically, all WASM modules share this.
+  #
+  # * required
+  # * type: string
+  artifact_cache = "/etc/vector/artifacts"
+  artifact_cache = "/var/lib/vector/artifacts"
+  artifact_cache = "C:\\vector\\artifacts"
+
   # The maximum size of the heap of this module, in bytes. (This includes the
   # module itself, default is 10 MB.)
   #

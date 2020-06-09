@@ -12,15 +12,18 @@ use vector_wasm::Role;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct WasmConfig {
+    /// The location of the source WASM or WAT module.
     pub module: PathBuf,
-    /// Options to be passed to the WASM module.b
+    /// The location of the WASM artifact cache.
+    pub artifact_cache: PathBuf,
+    /// Options to be passed to the WASM module.
     #[serde(default)]
     pub options: HashMap<String, serde_json::Value>,
 }
 
 impl Into<WasmModuleConfig> for WasmConfig {
     fn into(self) -> WasmModuleConfig {
-        WasmModuleConfig::new(Role::Transform, self.module, self.options)
+        WasmModuleConfig::new(Role::Transform, self.module, self.artifact_cache, self.options)
     }
 }
 
@@ -107,6 +110,7 @@ mod tests {
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/protobuf/protobuf.wat"
+            artifact_cache = "target/artifacts"
             "#,
         )?;
 
@@ -130,6 +134,7 @@ mod tests {
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/protobuf/protobuf.wat"
+            artifact_cache = "target/artifacts"
             "#,
         )?;
 
@@ -152,6 +157,7 @@ mod tests {
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/add_fields/add_fields.wat"
+            artifact_cache = "target/artifacts"
             "#,
         )?;
 
@@ -174,6 +180,7 @@ mod tests {
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/drop/drop.wat"
+            artifact_cache = "target/artifacts"
             "#,
         )?;
 
@@ -195,6 +202,7 @@ mod tests {
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/panic/panic.wat"
+            artifact_cache = "target/artifacts"
             "#,
         )?;
 
@@ -223,6 +231,7 @@ mod tests {
         let mut transform = parse_config(
             r#"
             module = "tests/data/wasm/assert_config/assert_config.wat"
+            artifact_cache = "target/artifacts"
             options.takes_string = "test"
             options.takes_number = 123
             options.takes_bool = true

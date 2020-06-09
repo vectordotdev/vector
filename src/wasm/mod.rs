@@ -63,12 +63,14 @@ impl WasmModuleConfig {
     pub fn new(
         role: Role,
         path: impl Into<PathBuf>,
+        artifact_cache: impl Into<PathBuf>,
         options: HashMap<String, serde_json::Value>,
     ) -> Self {
         Self {
             role,
             path: path.into(),
-            artifact_cache: defaults::ARTIFACT_CACHE.into(),
+            artifact_cache: artifact_cache.into(),
+            // The rest should be configured via setters below...
             max_heap_memory_size: defaults::HEAP_MEMORY_SIZE,
             options,
         }
@@ -77,12 +79,6 @@ impl WasmModuleConfig {
     /// Set the maximum heap size of the transform to the given value. See `defaults::HEAP_MEMORY_SIZE`.
     pub fn set_max_heap_memory_size(&mut self, max_heap_memory_size: usize) -> &mut Self {
         self.max_heap_memory_size = max_heap_memory_size;
-        self
-    }
-
-    /// Set the maximum heap size of the transform to the given value. See `defaults::HEAP_MEMORY_SIZE`.
-    pub fn set_artifact_cache(&mut self, artifact_cache: impl Into<PathBuf>) -> &mut Self {
-        self.artifact_cache = artifact_cache.into();
         self
     }
 }
@@ -271,6 +267,7 @@ fn protobuf() -> Result<()> {
     let mut module = WasmModule::build(WasmModuleConfig::new(
         Role::Transform,
         "tests/data/wasm/protobuf/protobuf.wat",
+        "target/artifacts",
         HashMap::new(),
     ))?;
     let out = module.process(event.clone())?;

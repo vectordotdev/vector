@@ -32925,7 +32925,7 @@ module.exports = {
     "wasm": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  module = \"./modules/example.wasm\" # required\n  type = \"wasm\" # required"
+        "toml": "[transforms.out]\n  artifact_cache = \"/etc/vector/artifacts\" # required\n  inputs = [\"in\"] # required\n  module = \"./modules/example.wasm\" # required\n  type = \"wasm\" # required"
       },
       "delivery_guarantee": null,
       "description": null,

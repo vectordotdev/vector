@@ -23,6 +23,19 @@ description = """\
 The file path of the `.wasm` or `.wat` module.
 """
 
+[transforms.wasm.options.artifact_cache]
+type = "string"
+examples = [
+  "/etc/vector/artifacts",
+  "/var/lib/vector/artifacts",
+  "C:\\vector\\artifacts",
+]
+common = true
+required = true
+description = """\
+The directory where Vector should store the artifact it builds of this WASM module. Typically, all WASM modules share this.
+"""
+
 [transforms.wasm.options.heap_max_size]
 type = "int"
 common = true

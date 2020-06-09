@@ -40,6 +40,7 @@ execute **experimental** WASM plugins.
 [transforms.my_transform_id]
   type = "wasm" # required
   inputs = ["my-source-or-transform-id"] # required
+  artifact_cache = "/etc/vector/artifacts" # required
   heap_max_size = 10485760 # optional, default
   module = "./modules/example.wasm" # required
 ```
@@ -51,6 +52,7 @@ execute **experimental** WASM plugins.
 [transforms.my_transform_id]
   type = "wasm" # required
   inputs = ["my-source-or-transform-id"] # required
+  artifact_cache = "/etc/vector/artifacts" # required
   heap_max_size = 10485760 # optional, default
   module = "./modules/example.wasm" # required
 ```
@@ -61,6 +63,30 @@ execute **experimental** WASM plugins.
 ## Options
 
 <Fields filters={true}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/etc/vector/artifacts","/var/lib/vector/artifacts","C:\\vector\\artifacts"]}
+  groups={[]}
+  name={"artifact_cache"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### artifact_cache
+
+The directory where Vector should store the artifact it builds of this WASM
+module. Typically, all WASM modules share this.
+
+
+
+</Field>
 <Field
   common={true}
   defaultValue={10485760}
