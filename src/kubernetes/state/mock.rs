@@ -5,11 +5,12 @@
 use async_trait::async_trait;
 use futures::{
     channel::mpsc::{Receiver, Sender},
+    future::BoxFuture,
     SinkExt, StreamExt,
 };
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
 
-/// The kind of operation.
+/// The kind of item-scoped operation.
 #[derive(Debug, PartialEq, Eq)]
 pub enum OpKind {
     /// Item added.
@@ -20,13 +21,17 @@ pub enum OpKind {
     Delete,
 }
 
-/// An event that's send to the test scenario driver.
+/// An event that's send to the test scenario driver for operations flow.
 pub enum ScenarioEvent<T>
 where
     T: Metadata<Ty = ObjectMeta> + Send,
 {
-    Op(T, OpKind),
+    /// An item-scoped operation.
+    Item(T, OpKind),
+    /// Resync operation.
     Resync,
+    /// Maintenance is performed.
+    Maintenance,
 }
 
 impl<T> ScenarioEvent<T>
@@ -35,8 +40,8 @@ where
 {
     pub fn unwrap_op(self) -> (T, OpKind) {
         match self {
-            ScenarioEvent::Op(val, op) => (val, op),
-            ScenarioEvent::Resync => panic!("unwrap_op on resync"),
+            ScenarioEvent::Item(val, op) => (val, op),
+            _ => panic!("unwrap_op on non-item op"),
         }
     }
 }
@@ -56,6 +61,7 @@ where
 {
     events_tx: Sender<ScenarioEvent<T>>,
     actions_rx: Receiver<()>,
+    maintenance_request: Option<(Sender<()>, Receiver<()>)>,
 }
 
 impl<T> Writer<T>
@@ -64,14 +70,41 @@ where
 {
     /// Create a new mock writer.
     /// Takes:
-    /// - `events_tx`, to which it sends the events when the mock action is
-    ///    called;
-    /// - `actions_rx`, that is read a message from before the mock action
+    /// - `events_tx` - a message is sent here at the beginning of the
+    ///    operation.
+    /// - `actions_rx` - a message is read from here before the operation
     ///    returns.
     pub fn new(events_tx: Sender<ScenarioEvent<T>>, actions_rx: Receiver<()>) -> Self {
         Self {
             events_tx,
             actions_rx,
+            maintenance_request: None,
+        }
+    }
+
+    /// Create a new mock writer (with maintenance flow).
+    /// Takes:
+    /// - `events_tx` - a message is sent here at the beginning of the
+    ///    operation.
+    /// - `actions_rx` - a message is read from here before the operation
+    ///    returns;
+    /// - `maintenance_request_events_tx` - a message is sent here at the
+    ///    beginning of the maintenance request;
+    /// - `maintenance_request_events_tx` - a message is read from here before
+    ///    the maintenance request returns.
+    pub fn new_with_maintenance(
+        events_tx: Sender<ScenarioEvent<T>>,
+        actions_rx: Receiver<()>,
+        maintenance_request_events_tx: Sender<()>,
+        maintenance_request_actions_rx: Receiver<()>,
+    ) -> Self {
+        Self {
+            events_tx,
+            actions_rx,
+            maintenance_request: Some((
+                maintenance_request_events_tx,
+                maintenance_request_actions_rx,
+            )),
         }
     }
 }
@@ -85,7 +118,7 @@ where
 
     async fn add(&mut self, item: Self::Item) {
         self.events_tx
-            .send(ScenarioEvent::Op(item, OpKind::Add))
+            .send(ScenarioEvent::Item(item, OpKind::Add))
             .await
             .unwrap();
         self.actions_rx.next().await.unwrap();
@@ -93,7 +126,7 @@ where
 
     async fn update(&mut self, item: Self::Item) {
         self.events_tx
-            .send(ScenarioEvent::Op(item, OpKind::Update))
+            .send(ScenarioEvent::Item(item, OpKind::Update))
             .await
             .unwrap();
         self.actions_rx.next().await.unwrap();
@@ -101,7 +134,7 @@ where
 
     async fn delete(&mut self, item: Self::Item) {
         self.events_tx
-            .send(ScenarioEvent::Op(item, OpKind::Delete))
+            .send(ScenarioEvent::Item(item, OpKind::Delete))
             .await
             .unwrap();
         self.actions_rx.next().await.unwrap();
@@ -109,6 +142,31 @@ where
 
     async fn resync(&mut self) {
         self.events_tx.send(ScenarioEvent::Resync).await.unwrap();
+        self.actions_rx.next().await.unwrap();
+    }
+}
+
+#[async_trait]
+impl<T> super::MaintainedWrite for Writer<T>
+where
+    T: Metadata<Ty = ObjectMeta> + Send,
+{
+    fn maintenance_request(&mut self) -> Option<BoxFuture<'_, ()>> {
+        if let Some((ref mut events_tx, ref mut actions_rx)) = self.maintenance_request {
+            Some(Box::pin(async move {
+                events_tx.send(()).await.unwrap();
+                actions_rx.next().await.unwrap();
+            }))
+        } else {
+            None
+        }
+    }
+
+    async fn perform_maintenance(&mut self) {
+        self.events_tx
+            .send(ScenarioEvent::Maintenance)
+            .await
+            .unwrap();
         self.actions_rx.next().await.unwrap();
     }
 }

@@ -2,6 +2,7 @@
 
 use crate::internal_events::kubernetes::instrumenting_state as internal_events;
 use async_trait::async_trait;
+use futures::future::BoxFuture;
 
 /// A [`super::Write`] implementatiom that wraps another [`super::Write`] and
 /// adds instrumentation.
@@ -44,13 +45,33 @@ where
     }
 }
 
+#[async_trait]
+impl<T> super::MaintainedWrite for Writer<T>
+where
+    T: super::MaintainedWrite + Send,
+{
+    fn maintenance_request(&mut self) -> Option<BoxFuture<'_, ()>> {
+        self.inner.maintenance_request().map(|future| {
+            emit!(internal_events::StateMaintenanceRequested);
+            future
+        })
+    }
+
+    async fn perform_maintenance(&mut self) {
+        emit!(internal_events::StateMaintenancePerformed);
+        self.inner.perform_maintenance().await
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::super::{mock, Write};
+    use super::super::{mock, MaintainedWrite, Write};
     use super::*;
     use crate::test_util;
     use futures::{channel::mpsc, SinkExt, StreamExt};
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+    use once_cell::sync::OnceCell;
+    use std::sync::{Mutex, MutexGuard};
 
     fn prepare_test() -> (
         Writer<mock::Writer<Pod>>,
@@ -100,12 +121,13 @@ mod tests {
             })
     }
 
-    fn assert_counter_incremented(
+    fn assert_counter_changed(
         before: Option<metrics_runtime::Measurement>,
         after: Option<metrics_runtime::Measurement>,
+        expected_difference: u64,
     ) {
         let before = before.unwrap_or_else(|| metrics_runtime::Measurement::Counter(0));
-        let after = after.expect("after value was None");
+        let after = after.unwrap_or_else(|| metrics_runtime::Measurement::Counter(0));
 
         let (before, after) = match (before, after) {
             (
@@ -117,11 +139,20 @@ mod tests {
 
         let difference = after - before;
 
-        assert_eq!(difference, 1);
+        assert_eq!(difference, expected_difference);
+    }
+
+    /// Guarantees only one test will run at a time.
+    /// This is required because we assert on a global state, and we don't
+    /// want interference.
+    fn tests_lock() -> MutexGuard<'static, ()> {
+        static INSTANCE: OnceCell<Mutex<()>> = OnceCell::new();
+        INSTANCE.get_or_init(|| Mutex::new(())).lock().unwrap()
     }
 
     #[test]
     fn add() {
+        let _guard = tests_lock();
         test_util::trace_init();
         test_util::block_on_std(async {
             let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -139,7 +170,7 @@ mod tests {
 
                     // By now metrics should've updated.
                     let after = get_metric_value("item_added");
-                    assert_counter_incremented(before, after);
+                    assert_counter_changed(before, after, 1);
 
                     actions_tx.send(()).await.unwrap();
                 })
@@ -152,6 +183,7 @@ mod tests {
 
     #[test]
     fn update() {
+        let _guard = tests_lock();
         test_util::trace_init();
         test_util::block_on_std(async {
             let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -169,7 +201,7 @@ mod tests {
 
                     // By now metrics should've updated.
                     let after = get_metric_value("item_updated");
-                    assert_counter_incremented(before, after);
+                    assert_counter_changed(before, after, 1);
 
                     actions_tx.send(()).await.unwrap();
                 })
@@ -182,6 +214,7 @@ mod tests {
 
     #[test]
     fn delete() {
+        let _guard = tests_lock();
         test_util::trace_init();
         test_util::block_on_std(async {
             let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -199,7 +232,7 @@ mod tests {
 
                     // By now metrics should've updated.
                     let after = get_metric_value("item_deleted");
-                    assert_counter_incremented(before, after);
+                    assert_counter_changed(before, after, 1);
 
                     actions_tx.send(()).await.unwrap();
                 })
@@ -212,6 +245,7 @@ mod tests {
 
     #[test]
     fn resync() {
+        let _guard = tests_lock();
         test_util::trace_init();
         test_util::block_on_std(async {
             let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -225,13 +259,77 @@ mod tests {
                     ));
 
                     let after = get_metric_value("resynced");
-                    assert_counter_incremented(before, after);
+                    assert_counter_changed(before, after, 1);
 
                     actions_tx.send(()).await.unwrap();
                 })
             };
 
             writer.resync().await;
+            join.await.unwrap();
+        })
+    }
+
+    #[test]
+    fn request_maintenance_without_maintenance() {
+        let _guard = tests_lock();
+        test_util::trace_init();
+        test_util::block_on_std(async {
+            let (mut writer, _events_rx, _actions_tx) = prepare_test();
+            let before = get_metric_value("maintenace_requested");
+            let _ = writer.maintenance_request();
+            let after = get_metric_value("maintenace_requested");
+            assert_counter_changed(before, after, 0);
+        })
+    }
+
+    #[test]
+    fn request_maintenance_with_maintenance() {
+        let _guard = tests_lock();
+        test_util::trace_init();
+        test_util::block_on_std(async {
+            let (events_tx, _events_rx) = mpsc::channel(0);
+            let (_actions_tx, actions_rx) = mpsc::channel(0);
+            let (maintenance_request_events_tx, _maintenance_request_events_rx) = mpsc::channel(0);
+            let (_maintenance_request_actions_tx, maintenance_request_actions_rx) =
+                mpsc::channel(0);
+            let writer = mock::Writer::<Pod>::new_with_maintenance(
+                events_tx,
+                actions_rx,
+                maintenance_request_events_tx,
+                maintenance_request_actions_rx,
+            );
+            let mut writer = Writer::new(writer);
+            let before = get_metric_value("maintenace_requested");
+            let _ = writer.maintenance_request();
+            let after = get_metric_value("maintenace_requested");
+            assert_counter_changed(before, after, 1);
+        })
+    }
+
+    #[test]
+    fn perform_maintenance() {
+        let _guard = tests_lock();
+        test_util::trace_init();
+        test_util::block_on_std(async {
+            let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
+
+            let join = {
+                let before = get_metric_value("maintenace_performed");
+                tokio::spawn(async move {
+                    assert!(matches!(
+                        events_rx.next().await.unwrap(),
+                        mock::ScenarioEvent::Maintenance
+                    ));
+
+                    let after = get_metric_value("maintenace_performed");
+                    assert_counter_changed(before, after, 1);
+
+                    actions_tx.send(()).await.unwrap();
+                })
+            };
+
+            writer.perform_maintenance().await;
             join.await.unwrap();
         })
     }

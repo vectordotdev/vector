@@ -156,14 +156,15 @@ impl Source {
         let (state_reader, state_writer) = evmap::new();
         let state_writer = k8s::state::evmap::Writer::new(state_writer);
         let state_writer = k8s::state::instrumenting::Writer::new(state_writer);
+        let state_writer =
+            k8s::state::delayed_delete::Writer::new(state_writer, Duration::from_secs(60));
 
         let mut reflector = k8s::reflector::Reflector::new(
             watcher,
             state_writer,
             Some(field_selector),
             Some(label_selector),
-            std::time::Duration::from_secs(1),
-            Some(std::time::Duration::from_secs(60)),
+            Duration::from_secs(1),
         );
         let reflector_process = reflector.run();
 

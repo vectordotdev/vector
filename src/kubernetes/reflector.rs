@@ -1,7 +1,7 @@
 //! Watch and cache the remote Kubernetes API resources.
 
 use super::{
-    resource_version,
+    resource_version, state,
     watcher::{self, Watcher},
 };
 use crate::internal_events::kubernetes::reflector as internal_events;
@@ -16,12 +16,7 @@ use k8s_openapi::{
 use snafu::Snafu;
 use std::convert::Infallible;
 use std::time::Duration;
-use tokio::{
-    select,
-    time::{delay_for, delay_until},
-};
-
-use super::{delayed_delete::DelayedDelete, state};
+use tokio::{select, time::delay_for};
 
 /// Watches remote Kubernetes resources and maintains a local representation of
 /// the remote state. "Reflects" the remote state locally.
@@ -32,7 +27,7 @@ pub struct Reflector<W, S>
 where
     W: Watcher,
     <W as Watcher>::Object: Metadata<Ty = ObjectMeta> + Send,
-    S: state::Write<Item = <W as Watcher>::Object>,
+    S: state::MaintainedWrite<Item = <W as Watcher>::Object>,
 {
     watcher: W,
     state_writer: S,
@@ -40,14 +35,13 @@ where
     label_selector: Option<String>,
     resource_version: resource_version::State,
     pause_between_requests: Duration,
-    delayed_delete: Option<DelayedDelete<<W as Watcher>::Object>>,
 }
 
 impl<W, S> Reflector<W, S>
 where
     W: Watcher,
     <W as Watcher>::Object: Metadata<Ty = ObjectMeta> + Send,
-    S: state::Write<Item = <W as Watcher>::Object>,
+    S: state::MaintainedWrite<Item = <W as Watcher>::Object>,
 {
     /// Create a new [`Cache`].
     pub fn new(
@@ -56,10 +50,8 @@ where
         field_selector: Option<String>,
         label_selector: Option<String>,
         pause_between_requests: Duration,
-        delay_deletes_for: Option<Duration>,
     ) -> Self {
         let resource_version = resource_version::State::new();
-        let delayed_delete = delay_deletes_for.map(DelayedDelete::new);
         Self {
             watcher,
             state_writer,
@@ -67,7 +59,6 @@ where
             field_selector,
             resource_version,
             pause_between_requests,
-            delayed_delete,
         }
     }
 }
@@ -78,7 +69,7 @@ where
     <W as Watcher>::Object: Metadata<Ty = ObjectMeta> + Send + Unpin + std::fmt::Debug,
     <W as Watcher>::InvocationError: Unpin,
     <W as Watcher>::StreamError: Unpin,
-    S: state::Write<Item = <W as Watcher>::Object>,
+    S: state::MaintainedWrite<Item = <W as Watcher>::Object>,
 {
     /// Run the watch loop and drive the state updates via `state_writer`.
     pub async fn run(
@@ -93,14 +84,7 @@ where
                 Err(watcher::invocation::Error::Desync { source }) => {
                     emit!(internal_events::DesyncReceived { error: source });
                     // We got desynced, reset the state and retry fetching.
-                    // By omiting the flush here, we cache the results from the
-                    // previous run until flush is issued when the new events
-                    // begin arriving, reducing the time durig which the state
-                    // has no data.
                     self.resource_version.reset();
-                    if let Some(ref mut delayed_delete) = self.delayed_delete {
-                        delayed_delete.clear();
-                    }
                     self.state_writer.resync().await;
                     continue;
                 }
@@ -114,27 +98,19 @@ where
             pin_mut!(stream);
             loop {
                 // Obtain an value from the watch stream.
-                let val = if let Some(ref mut delayed_delete) = self.delayed_delete {
-                    // If delayed delete is requested, we perform the delayed
-                    // deletions concurrently with reading items from the watch
-                    // responses stream.
-                    let delayed_delete_deadline = delayed_delete.next_deadline();
-                    select! {
-                        // If we get a delayted delete deadline - process the
-                        // delayed deletes and restart the loop.
-                        _ = async { delay_until(delayed_delete_deadline.unwrap().into()).await }, if delayed_delete_deadline.is_some() => {
-                            trace!(message = "performing delayed deletes");
-                            delayed_delete.perform(&mut self.state_writer).await;
-                            continue;
-                        }
-                        // If we got a value from the watch responses stream -
-                        // just pass it outside.
-                        val = stream.next() => val,
+                // If maintenance is requested, we perform it concurrently
+                // to reading items from the watch stream.
+                let maintenance_request = self.state_writer.maintenance_request();
+                let val = select! {
+                    // If we got a maintenance request - perform the
+                    // maintenance.
+                    _ = async { maintenance_request.unwrap().await }, if maintenance_request.is_some() => {
+                        self.state_writer.perform_maintenance().await;
+                        continue;
                     }
-                } else {
-                    // Delayed deletes aren't requested, so just wait for the
-                    // next value and pass it outside.
-                    stream.next().await
+                    // If we got a value from the watch stream - just pass it
+                    // outside.
+                    val = stream.next() => val,
                 };
                 trace!(message = "got an item from watch stream");
 
@@ -230,11 +206,7 @@ where
             }
             WatchEvent::Deleted(object) => {
                 trace!(message = "got an object event", event = "deleted");
-                if let Some(ref mut delayed_delete) = self.delayed_delete {
-                    delayed_delete.schedule_delete(object);
-                } else {
-                    self.state_writer.delete(object).await;
-                }
+                self.state_writer.delete(object).await;
             }
             WatchEvent::Modified(object) => {
                 trace!(message = "got an object event", event = "modified");
@@ -356,8 +328,8 @@ mod tests {
         test_util::block_on_std(async move {
             // Prepare state.
             let (state_events_tx, _state_events_rx) = mpsc::channel(0);
-            let (_state_action_tx, state_action_rx) = mpsc::channel(0);
-            let state_writer = state::mock::Writer::new(state_events_tx, state_action_rx);
+            let (_state_actions_tx, state_actions_rx) = mpsc::channel(0);
+            let state_writer = state::mock::Writer::new(state_events_tx, state_actions_rx);
             let state_writer = state::instrumenting::Writer::new(state_writer);
 
             // Prepare watcher.
@@ -367,14 +339,8 @@ mod tests {
             let watcher = InstrumentingWatcher::new(watcher);
 
             // Prepare reflector.
-            let mut reflector = Reflector::new(
-                watcher,
-                state_writer,
-                None,
-                None,
-                Duration::from_secs(1),
-                None,
-            );
+            let mut reflector =
+                Reflector::new(watcher, state_writer, None, None, Duration::from_secs(1));
 
             // Run test logic.
             let logic = tokio::spawn(async move {
@@ -518,8 +484,8 @@ mod tests {
         test_util::block_on_std(async move {
             // Prepare state.
             let (state_events_tx, _state_events_rx) = mpsc::channel(0);
-            let (_state_action_tx, state_action_rx) = mpsc::channel(0);
-            let state_writer = state::mock::Writer::new(state_events_tx, state_action_rx);
+            let (_state_actions_tx, state_actions_rx) = mpsc::channel(0);
+            let state_writer = state::mock::Writer::new(state_events_tx, state_actions_rx);
 
             // Prepare watcher.
             let (watcher_events_tx, mut watcher_events_rx) = mpsc::channel(0);
@@ -534,7 +500,6 @@ mod tests {
                 Some("fields".to_owned()),
                 Some("labels".to_owned()),
                 Duration::from_secs(1),
-                None,
             );
 
             // Run test logic.
@@ -595,9 +560,11 @@ mod tests {
         test_util::block_on_std(async move {
             // Prepare state.
             let (state_events_tx, mut state_events_rx) = mpsc::channel(0);
-            let (mut state_action_tx, state_action_rx) = mpsc::channel(0);
-            let state_writer = state::mock::Writer::new(state_events_tx, state_action_rx);
+            let (mut state_actions_tx, state_actions_rx) = mpsc::channel(0);
+            let state_writer = state::mock::Writer::new(state_events_tx, state_actions_rx);
             let state_writer = state::instrumenting::Writer::new(state_writer);
+            let deletion_delay = Duration::from_secs(600);
+            let state_writer = state::delayed_delete::Writer::new(state_writer, deletion_delay);
 
             // Prepare watcher.
             let (watcher_events_tx, mut watcher_events_rx) = mpsc::channel(0);
@@ -606,15 +573,8 @@ mod tests {
             let watcher = InstrumentingWatcher::new(watcher);
 
             // Prepare reflector.
-            let deletion_delay = Duration::from_secs(600);
-            let mut reflector = Reflector::new(
-                watcher,
-                state_writer,
-                None,
-                None,
-                Duration::from_secs(1),
-                Some(deletion_delay),
-            );
+            let mut reflector =
+                Reflector::new(watcher, state_writer, None, None, Duration::from_secs(1));
 
             // Run test logic.
             let logic = tokio::spawn(async move {
@@ -656,7 +616,7 @@ mod tests {
                 );
 
                 // Send the confirmation of the processing at the state.
-                state_action_tx.send(()).await.unwrap();
+                state_actions_tx.send(()).await.unwrap();
 
                 // Let the reflector work until watcher requests next event from
                 // the stream.
@@ -690,15 +650,27 @@ mod tests {
                 // Advance the time 10 times the deletion delay.
                 tokio::time::advance(deletion_delay * 10).await;
 
-                // At this point, pod deletion should propagate to the state.
-                // Let the reflector work until the deletion reaches the state.
+                // At this point, maintenance should be performed, for both
+                // delayed deletion state and mock state.
+
+                // Delayed deletes are processed first.
                 assert_eq!(
                     state_events_rx.next().await.unwrap().unwrap_op(),
                     (make_pod("uid0", "15"), state::mock::OpKind::Delete),
                 );
 
                 // Send the confirmation of the processing at the state.
-                state_action_tx.send(()).await.unwrap();
+                state_actions_tx.send(()).await.unwrap();
+
+                // Then, the maintenance event should be triggered.
+                // This completes the `perform_maintenance` call.
+                assert!(matches!(
+                    state_events_rx.next().await.unwrap(),
+                    state::mock::ScenarioEvent::Maintenance
+                ));
+
+                // Send the confirmation of the processing at the state.
+                state_actions_tx.send(()).await.unwrap();
 
                 // We're done with the test! Shutdown the stream and force an
                 // invocation error to terminate the reflector.
@@ -750,8 +722,8 @@ mod tests {
         test_util::block_on_std(async move {
             // Prepare state.
             let (state_events_tx, _state_events_rx) = mpsc::channel(0);
-            let (_state_action_tx, state_action_rx) = mpsc::channel(0);
-            let state_writer = state::mock::Writer::new(state_events_tx, state_action_rx);
+            let (_state_actions_tx, state_actions_rx) = mpsc::channel(0);
+            let state_writer = state::mock::Writer::new(state_events_tx, state_actions_rx);
             let state_writer = state::instrumenting::Writer::new(state_writer);
 
             // Prepare watcher.
@@ -761,14 +733,8 @@ mod tests {
             let watcher = InstrumentingWatcher::new(watcher);
 
             // Prepare reflector.
-            let mut reflector = Reflector::new(
-                watcher,
-                state_writer,
-                None,
-                None,
-                Duration::from_secs(1),
-                None,
-            );
+            let mut reflector =
+                Reflector::new(watcher, state_writer, None, None, Duration::from_secs(1));
 
             // Run test logic.
             let logic = tokio::spawn(async move {
@@ -820,6 +786,117 @@ mod tests {
         })
     }
 
+    /// Test that maintenance works accordingly.
+    #[test]
+    fn test_maintenance() {
+        test_util::trace_init();
+        test_util::block_on_std(async move {
+            // Prepare state.
+            let (state_events_tx, mut state_events_rx) = mpsc::channel(0);
+            let (mut state_actions_tx, state_actions_rx) = mpsc::channel(0);
+            let (state_maintenance_request_events_tx, mut state_maintenance_request_events_rx) =
+                mpsc::channel(0);
+            let (mut state_maintenance_request_actions_tx, state_maintenance_request_actions_rx) =
+                mpsc::channel(0);
+            let state_writer = state::mock::Writer::new_with_maintenance(
+                state_events_tx,
+                state_actions_rx,
+                state_maintenance_request_events_tx,
+                state_maintenance_request_actions_rx,
+            );
+            let state_writer = state::instrumenting::Writer::new(state_writer);
+
+            // Prepare watcher.
+            let (watcher_events_tx, mut watcher_events_rx) = mpsc::channel(0);
+            let (mut watcher_invocations_tx, watcher_invocations_rx) = mpsc::channel(0);
+            let watcher = MockWatcher::<Pod>::new(watcher_events_tx, watcher_invocations_rx);
+            let watcher = InstrumentingWatcher::new(watcher);
+
+            // Prepare reflector.
+            let mut reflector =
+                Reflector::new(watcher, state_writer, None, None, Duration::from_secs(1));
+
+            // Run test logic.
+            let logic = tokio::spawn(async move {
+                // Wait for watcher to request next invocation.
+                assert!(matches!(
+                    watcher_events_rx.next().await.unwrap(),
+                    mock_watcher::ScenarioEvent::Invocation(_)
+                ));
+
+                // Assert that maintenance request events didn't arrive yet.
+                assert!(state_maintenance_request_events_rx.try_next().is_err());
+
+                // Provide watcher with a new stream.
+                let (mut watch_stream_tx, watch_stream_rx) = mpsc::channel(0);
+                watcher_invocations_tx
+                    .send(mock_watcher::ScenarioActionInvocation::Ok(watch_stream_rx))
+                    .await
+                    .unwrap();
+
+                // Wait for reflector to request a state maintenance.
+                state_maintenance_request_events_rx.next().await.unwrap();
+
+                // Send the maintenance request action to advance to the
+                // maintenance.
+                state_maintenance_request_actions_tx.send(()).await.unwrap();
+
+                // Wait for a maintenance perform event arrival.
+                assert!(matches!(
+                    state_events_rx.next().await.unwrap(),
+                    state::mock::ScenarioEvent::Maintenance
+                ));
+
+                // Send the confirmation of the state maintenance.
+                state_actions_tx.send(()).await.unwrap();
+
+                // Let the reflector work until watcher requests next event from
+                // the stream.
+                assert_eq!(
+                    watcher_events_rx.next().await.unwrap(),
+                    mock_watcher::ScenarioEvent::Stream
+                );
+
+                // We're done with the test! Shutdown the stream and force an
+                // invocation error to terminate the reflector.
+
+                // Watcher is still waiting for the item on stream.
+                // Send done notification to the stream.
+                watch_stream_tx
+                    .send(mock_watcher::ScenarioActionStream::Done)
+                    .await
+                    .unwrap();
+
+                // Wait for next invocation and send an error to terminate the
+                // flow.
+                assert!(matches!(
+                    watcher_events_rx.next().await.unwrap(),
+                    mock_watcher::ScenarioEvent::Invocation(_)
+                ));
+                watcher_invocations_tx
+                    .send(mock_watcher::ScenarioActionInvocation::ErrOther)
+                    .await
+                    .unwrap();
+            });
+
+            // Run the test and wait for an error.
+            let result = reflector.run().await;
+
+            // Join on the logic first, to report logic errors with higher
+            // priority.
+            logic.await.unwrap();
+
+            // The only way reflector completes is with an error, but that's ok.
+            // In tests we make it exit with an error to complete the test.
+            result.unwrap_err();
+
+            // Explicitly drop the reflector at the very end.
+            // Internal evmap is dropped with the reflector, so readers won't
+            // work after drop.
+            drop(reflector);
+        })
+    }
+
     // A helper function to run a flow test.
     // Use this to test various flows without the test code repetition.
     fn run_flow_test(
@@ -841,14 +918,8 @@ mod tests {
             let watcher = InstrumentingWatcher::new(watcher);
 
             // Prepare reflector.
-            let mut reflector = Reflector::new(
-                watcher,
-                state_writer,
-                None,
-                None,
-                Duration::from_secs(1),
-                None,
-            );
+            let mut reflector =
+                Reflector::new(watcher, state_writer, None, None, Duration::from_secs(1));
 
             // Run test logic.
             let logic = tokio::spawn(async move {

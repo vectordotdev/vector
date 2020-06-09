@@ -3,6 +3,7 @@
 use crate::kubernetes::hash_value::HashValue;
 use async_trait::async_trait;
 use evmap10::WriteHandle;
+use futures::future::BoxFuture;
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
 
 /// A [`WriteHandle`] wrapper that implements [`super::Write`].
@@ -61,11 +62,25 @@ where
     }
 
     async fn resync(&mut self) {
+        // By omiting the flush here, we cache the results from the
+        // previous run until flush is issued when the new events
+        // begin arriving, reducing the time durig which the state
+        // has no data.
         self.inner.purge();
-        // We do not flush on resync until the next per-item operation
-        // arrives.
-        // This way we preserve the old state while waiting for the data to
-        // populate the new state.
+    }
+}
+
+#[async_trait]
+impl<T> super::MaintainedWrite for Writer<T>
+where
+    T: Metadata<Ty = ObjectMeta> + Send,
+{
+    fn maintenance_request(&mut self) -> Option<BoxFuture<'_, ()>> {
+        None
+    }
+
+    async fn perform_maintenance(&mut self) {
+        // noop
     }
 }
 

@@ -14,6 +14,12 @@ pub struct StateItemDeleted;
 #[derive(Debug)]
 pub struct StateResynced;
 
+#[derive(Debug)]
+pub struct StateMaintenanceRequested;
+
+#[derive(Debug)]
+pub struct StateMaintenancePerformed;
+
 impl InternalEvent for StateItemAdded {
     fn emit_metrics(&self) {
         counter!("k8s_state_ops", 1, "op_kind" => "item_added");
@@ -35,5 +41,17 @@ impl InternalEvent for StateItemDeleted {
 impl InternalEvent for StateResynced {
     fn emit_metrics(&self) {
         counter!("k8s_state_ops", 1, "op_kind" => "resynced");
+    }
+}
+
+impl InternalEvent for StateMaintenanceRequested {
+    fn emit_metrics(&self) {
+        counter!("k8s_state_ops", 1, "op_kind" => "maintenace_requested");
+    }
+}
+
+impl InternalEvent for StateMaintenancePerformed {
+    fn emit_metrics(&self) {
+        counter!("k8s_state_ops", 1, "op_kind" => "maintenace_performed");
     }
 }
