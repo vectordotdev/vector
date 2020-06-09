@@ -29,6 +29,12 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make slim-builds"
@@ -41,6 +47,12 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make slim-builds"
@@ -53,6 +65,12 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make slim-builds"
@@ -65,6 +83,12 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make slim-builds"
@@ -77,6 +101,12 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make slim-builds"
@@ -89,6 +119,12 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make slim-builds"
@@ -101,6 +137,12 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make slim-builds"
@@ -113,6 +155,12 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make slim-builds"
@@ -125,6 +173,12 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make slim-builds"
@@ -137,6 +191,12 @@ jobs:
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: nix-shell --pure --run "echo 'Env installing...'"
       - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
       - run: nix-shell --pure --run "make slim-builds"
