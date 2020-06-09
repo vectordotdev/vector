@@ -32,7 +32,7 @@ impl ArtifactCache {
         }
     }
 
-    /// Returns true if the file is fresh and needs to be rebuilt.
+    /// Returns true if the artifact cache is fresh and the artifact compilation can be skipped.
     pub fn has_fresh(&self, file: impl AsRef<Path> + Debug) -> Result<bool> {
         let file = file.as_ref();
         let fingerprint = Fingerprint::new(file)?;
