@@ -188,6 +188,12 @@ examples = [
 templateable = true
 description = "Index name to write events to."
 
+[sinks.elasticsearch.options.pipeline]
+type = "string"
+common = true
+examples = ["pipeline-name"]
+description = "Name of the pipeline to apply."
+
 [sinks.elasticsearch.options.query]
 type = "table"
 description = "Custom parameters to Elasticsearch query string."

@@ -41,6 +41,8 @@ pub struct ElasticSearchConfig {
     pub index: Option<String>,
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
+    pub pipeline: Option<String>,
+
     #[serde(default)]
     pub compression: Compression,
     #[serde(
@@ -353,6 +355,10 @@ impl ElasticSearchCommon {
         let mut query_params = config.query.clone().unwrap_or_default();
         query_params.insert("timeout".into(), format!("{}s", request.timeout.as_secs()));
 
+        if let Some(pipeline) = &config.pipeline {
+            query_params.insert("pipeline".into(), pipeline.into());
+        }
+
         let mut query = url::form_urlencoded::Serializer::new(String::new());
         for (p, v) in &query_params {
             query.append_pair(&p[..], &v[..]);
@@ -522,6 +528,22 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::fs::File;
     use std::io::Read;
+
+    #[test]
+    fn ensure_pipeline_in_params() {
+        let index = gen_index();
+        let pipeline = String::from("test-pipeline");
+
+        let config = ElasticSearchConfig {
+            host: "http://localhost:9200".into(),
+            index: Some(index.clone()),
+            pipeline: Some(pipeline.clone()),
+            ..config()
+        };
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+
+        assert_eq!(common.query_params["pipeline"], pipeline);
+    }
 
     #[test]
     fn structures_events_correctly() {

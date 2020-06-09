@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-02"
+last_modified_on: "2020-06-03"
 delivery_guarantee: "at_least_once"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
@@ -58,6 +58,7 @@ endpoint][urls.elasticsearch_bulk].
   healthcheck = true # optional, default
   host = "http://10.24.32.122:9000" # optional, no default
   index = "vector-%F" # optional, default
+  pipeline = "pipeline-name" # optional, no default
 ```
 
 </TabItem>
@@ -74,6 +75,7 @@ endpoint][urls.elasticsearch_bulk].
   host = "http://10.24.32.122:9000" # optional, no default
   id_key = "id" # optional, no default
   index = "vector-%F" # optional, default
+  pipeline = "pipeline-name" # optional, no default
 
   # Auth
   auth.password = "${ELASTICSEARCH_PASSWORD}" # required, required when strategy = "basic"
@@ -745,6 +747,29 @@ perofrmance][urls.elasticsearch_id_performance].
 
 Index name to write events to.
  See [Document Conflicts](#document-conflicts) and [Template Syntax](#template-syntax) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["pipeline-name"]}
+  groups={[]}
+  name={"pipeline"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### pipeline
+
+Name of the pipeline to apply.
+
 
 
 </Field>

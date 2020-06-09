@@ -4741,6 +4741,13 @@ require('custom_module')
   # * type: [string]
   inputs = ["my-source-or-transform-id"]
 
+  # Name of the pipeline to apply.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  pipeline = "pipeline-name"
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
