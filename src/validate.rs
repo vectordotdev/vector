@@ -20,10 +20,10 @@ pub struct Opts {
     #[structopt(long)]
     no_environment: bool,
 
-    /// Shorthand for `--no_topology` and `--no_environment` flags. Just `-n` won't disable anything,
-    /// it needs to be used with `t` for `--no_topology`, and or `e` for `--no_environment` in any order.
+    /// Shorthand for `--no-topology` and `--no-environment` flags. Just `-n` won't disable anything,
+    /// it needs to be used with `t` for `--no-topology`, and or `e` for `--no-environment` in any order.
     /// Example:
-    /// `-nte` and `-net` both mean `--no_topology` and `--no_environment`
+    /// `-nte` and `-net` both mean `--no-topology` and `--no-environment`
     #[structopt(short, parse(from_str = NoCheck::from_str), possible_values = &["","t", "e","et","te"], default_value="")]
     no: NoCheck,
 
