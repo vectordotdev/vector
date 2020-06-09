@@ -50,7 +50,7 @@ disabled with flags such as `--no-topology`, expanding the above checks with the
 6. All `inputs` values reference valid and upstream [source][docs.sources] or
 [transform][docs.transforms] components.
 
-The following group of checks require the runtime environment to pass succesfully,
+The following group of checks require the runtime environment to pass successfully,
 disabled with flags such as `--no-environment`, expanding the above checks with the following:
 
 7. All components are capable of running (data directories exist, are writable, etc).
