@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-07"
+last_modified_on: "2020-06-09"
 component_title: "WASM"
 description: "The Vector `wasm` transform accepts and outputs `log` events, allowing you to execute **experimental** WASM plugins."
 event_types: ["log"]
@@ -103,7 +103,7 @@ module itself, default is 10 MB.)
 
 ### module
 
-The file path of the `.wasm` module.
+The file path of the `.wasm` or `.wat` module.
 
 
 

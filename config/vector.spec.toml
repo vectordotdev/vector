@@ -2708,7 +2708,7 @@ require('custom_module')
   # * type: [string]
   inputs = ["my-source-or-transform-id"]
 
-  # The file path of the `.wasm` module.
+  # The file path of the `.wasm` or `.wat` module.
   #
   # * required
   # * type: string
