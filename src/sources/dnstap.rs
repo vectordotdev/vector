@@ -3,6 +3,7 @@ use crate::{
     event::{self, Event, LogEvent, PathComponent, PathIter},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Error, Result,
 };
 use bytes::Bytes;
 use futures01::sync::mpsc;
@@ -136,13 +137,22 @@ fn handle_event(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> O
 
     let dnstap_data_type: i32 = proto_msg.r#type;
     // the raw value is reserved intentionally to ensure forward-compatibility
+    let mut need_raw_data = false;
     log_event.insert("type", dnstap_data_type);
     if dnstap_data_type == DnstapDataType::Message as i32 {
         //TODO: parse parts of dnstap that are left as bytes
         if let Some(message) = proto_msg.message {
-            decode_dnstap_message(log_event, "data", message);
+            if let Err(err) = decode_dnstap_message(log_event, "data", message) {
+                error!(target: "dnstap event", "failed to parse dnstap message: {}", err.to_string());
+                need_raw_data = true;
+                log_event.insert("error", err.to_string());
+            }
         }
     } else {
+        need_raw_data = true;
+    }
+
+    if need_raw_data {
         log_event.insert("data.raw_data", format_bytes_as_hex_string(&frame.to_vec()));
     }
 
@@ -153,13 +163,7 @@ fn decode_dnstap_message(
     log_event: &mut LogEvent,
     key_prefix: &str,
     dnstap_message: DnstapMessage,
-) {
-    // the raw value is reserved intentionally to ensure forward-compatibility
-    log_event.insert_path(
-        make_event_key_with_prefix(key_prefix, "type"),
-        dnstap_message.r#type as i64,
-    );
-
+) -> Result<()> {
     if let Some(socket_family) = dnstap_message.socket_family {
         // the raw value is reserved intentionally to ensure forward-compatibility
         log_event.insert_path(
@@ -169,10 +173,10 @@ fn decode_dnstap_message(
 
         if let Some(query_address) = dnstap_message.query_address {
             let source_address = if socket_family == 1 {
-                let address_buffer: [u8; 4] = query_address[0..4].try_into().unwrap();
+                let address_buffer: [u8; 4] = query_address[0..4].try_into()?;
                 IpAddr::V4(Ipv4Addr::from(address_buffer))
             } else {
-                let address_buffer: [u8; 16] = query_address[0..16].try_into().unwrap();
+                let address_buffer: [u8; 16] = query_address[0..16].try_into()?;
                 IpAddr::V6(Ipv6Addr::from(address_buffer))
             };
 
@@ -191,10 +195,10 @@ fn decode_dnstap_message(
 
         if let Some(response_address) = dnstap_message.response_address {
             let response_addr = if socket_family == 1 {
-                let address_buffer: [u8; 4] = response_address[0..4].try_into().unwrap();
+                let address_buffer: [u8; 4] = response_address[0..4].try_into()?;
                 IpAddr::V4(Ipv4Addr::from(address_buffer))
             } else {
-                let address_buffer: [u8; 16] = response_address[0..16].try_into().unwrap();
+                let address_buffer: [u8; 16] = response_address[0..16].try_into()?;
                 IpAddr::V6(Ipv6Addr::from(address_buffer))
             };
 
@@ -214,10 +218,15 @@ fn decode_dnstap_message(
 
     if let Some(query_zone) = dnstap_message.query_zone {
         let mut decoder: BinDecoder = BinDecoder::new(&query_zone);
-        log_event.insert_path(
-            make_event_key_with_prefix(key_prefix, "query_zone"),
-            Name::read(&mut decoder).unwrap().to_utf8(),
-        );
+        match Name::read(&mut decoder) {
+            Ok(raw_data) => {
+                log_event.insert_path(
+                    make_event_key_with_prefix(key_prefix, "query_zone"),
+                    raw_data.to_utf8(),
+                );
+            }
+            Err(error) => return Err(Error::from(error.to_string())),
+        }
     }
 
     if let Some(query_time_sec) = dnstap_message.query_time_sec {
@@ -248,25 +257,82 @@ fn decode_dnstap_message(
         );
     }
 
-    if let Some(query_message) = dnstap_message.query_message {
-        decode_dns_query_message(
-            log_event,
-            &concat_event_key_paths(key_prefix, "query_message"),
-            query_message,
-        );
+    // the raw value is reserved intentionally to ensure forward-compatibility
+    let dnstap_message_type = dnstap_message.r#type;
+    log_event.insert_path(
+        make_event_key_with_prefix(key_prefix, "type"),
+        dnstap_message_type as i64,
+    );
+
+    match dnstap_message_type {
+        1..=14 => {
+            if let Some(query_message) = dnstap_message.query_message {
+                if let Err(error) = decode_dns_query_message(
+                    log_event,
+                    &concat_event_key_paths(key_prefix, "query_message"),
+                    &query_message,
+                ) {
+                    log_raw_dns_message(
+                        log_event,
+                        &concat_event_key_paths(key_prefix, "query_message"),
+                        &query_message,
+                    );
+
+                    return Err(error);
+                };
+            }
+
+            if let Some(response_message) = dnstap_message.response_message {
+                if let Err(error) = decode_dns_query_message(
+                    log_event,
+                    &concat_event_key_paths(key_prefix, "response_message"),
+                    &response_message,
+                ) {
+                    log_raw_dns_message(
+                        log_event,
+                        &concat_event_key_paths(key_prefix, "response_message"),
+                        &response_message,
+                    );
+
+                    return Err(error);
+                };
+            }
+        }
+        _ => {
+            if let Some(query_message) = dnstap_message.query_message {
+                log_raw_dns_message(
+                    log_event,
+                    &concat_event_key_paths(key_prefix, "query_message"),
+                    &query_message,
+                );
+            }
+
+            if let Some(response_message) = dnstap_message.response_message {
+                log_raw_dns_message(
+                    log_event,
+                    &concat_event_key_paths(key_prefix, "response_message"),
+                    &response_message,
+                );
+            }
+        }
     }
 
-    if let Some(response_message) = dnstap_message.response_message {
-        decode_dns_query_message(
-            log_event,
-            &concat_event_key_paths(key_prefix, "response_message"),
-            response_message,
-        );
-    }
+    Ok(())
 }
 
-fn decode_dns_query_message(log_event: &mut LogEvent, key_prefix: &str, raw_dns_message: Vec<u8>) {
-    if let Ok(msg) = TrustDnsMessage::from_vec(&raw_dns_message) {
+fn log_raw_dns_message(log_event: &mut LogEvent, key_prefix: &str, raw_dns_message: &Vec<u8>) {
+    log_event.insert_path(
+        make_event_key_with_prefix(key_prefix, "raw_data"),
+        format_bytes_as_hex_string(raw_dns_message),
+    );
+}
+
+fn decode_dns_query_message(
+    log_event: &mut LogEvent,
+    key_prefix: &str,
+    raw_dns_message: &Vec<u8>,
+) -> Result<()> {
+    if let Ok(msg) = TrustDnsMessage::from_vec(raw_dns_message) {
         println!("Query: {:?}", msg);
 
         decode_dns_query_message_header(
@@ -279,28 +345,30 @@ fn decode_dns_query_message(log_event: &mut LogEvent, key_prefix: &str, raw_dns_
             log_event,
             &concat_event_key_paths(key_prefix, "question"),
             &msg,
-        );
+        )?;
 
         decode_dns_query_message_answer_section(
             log_event,
             &concat_event_key_paths(key_prefix, "answer"),
             &msg,
-        );
+        )?;
 
         decode_dns_query_message_authority_section(
             log_event,
             &concat_event_key_paths(key_prefix, "authority"),
             &msg,
-        );
+        )?;
 
         decode_dns_query_message_additional_section(
             log_event,
             &concat_event_key_paths(key_prefix, "additional"),
             &msg,
-        );
+        )?;
 
         decode_edns(log_event, &concat_event_key_paths(key_prefix, "opt"), &msg);
     };
+
+    Ok(())
 }
 
 fn decode_dns_query_message_header(
@@ -383,71 +451,63 @@ fn decode_dns_query_message_query_section(
     log_event: &mut LogEvent,
     key_path: &str,
     dns_message: &TrustDnsMessage,
-) {
-    dns_message
-        .queries()
-        .iter()
-        .enumerate()
-        .for_each(|(i, query)| {
-            log_event.insert_path(
-                make_event_key_with_index(key_path, i as u32),
-                query.to_string(),
-            );
-        });
+) -> Result<()> {
+    for (i, query) in dns_message.queries().iter().enumerate() {
+        log_event.insert_path(
+            make_event_key_with_index(key_path, i as u32),
+            query.to_string(),
+        );
+    }
+
+    Ok(())
 }
 
 fn decode_dns_query_message_answer_section(
     log_event: &mut LogEvent,
     key_path: &str,
     dns_message: &TrustDnsMessage,
-) {
-    dns_message
-        .answers()
-        .iter()
-        .enumerate()
-        .for_each(|(i, record)| {
-            decode_dns_record(
-                log_event,
-                &make_indexed_event_key_path(key_path, i as u32),
-                record,
-            );
-        });
+) -> Result<()> {
+    for (i, record) in dns_message.answers().iter().enumerate() {
+        decode_dns_record(
+            log_event,
+            &make_indexed_event_key_path(key_path, i as u32),
+            record,
+        )?;
+    }
+
+    Ok(())
 }
 
 fn decode_dns_query_message_authority_section(
     log_event: &mut LogEvent,
     key_path: &str,
     dns_message: &TrustDnsMessage,
-) {
-    dns_message
-        .name_servers()
-        .iter()
-        .enumerate()
-        .for_each(|(i, record)| {
-            decode_dns_record(
-                log_event,
-                &make_indexed_event_key_path(key_path, i as u32),
-                record,
-            );
-        });
+) -> Result<()> {
+    for (i, record) in dns_message.name_servers().iter().enumerate() {
+        decode_dns_record(
+            log_event,
+            &make_indexed_event_key_path(key_path, i as u32),
+            record,
+        )?;
+    }
+
+    Ok(())
 }
 
 fn decode_dns_query_message_additional_section(
     log_event: &mut LogEvent,
     key_path: &str,
     dns_message: &TrustDnsMessage,
-) {
-    dns_message
-        .additionals()
-        .iter()
-        .enumerate()
-        .for_each(|(i, record)| {
-            decode_dns_record(
-                log_event,
-                &make_indexed_event_key_path(key_path, i as u32),
-                record,
-            );
-        });
+) -> Result<()> {
+    for (i, record) in dns_message.additionals().iter().enumerate() {
+        decode_dns_record(
+            log_event,
+            &make_indexed_event_key_path(key_path, i as u32),
+            record,
+        )?;
+    }
+
+    Ok(())
 }
 
 fn decode_edns(log_event: &mut LogEvent, key_prefix: &str, dns_message: &TrustDnsMessage) {
@@ -556,7 +616,7 @@ fn decode_edns_opt(
     );
 }
 
-fn decode_dns_record(log_event: &mut LogEvent, key_path: &str, record: &Record) {
+fn decode_dns_record(log_event: &mut LogEvent, key_path: &str, record: &Record) -> Result<()> {
     log_event.insert_path(
         make_event_key_with_prefix(key_path, "name"),
         record.name().to_string(),
@@ -578,8 +638,10 @@ fn decode_dns_record(log_event: &mut LogEvent, key_path: &str, record: &Record) 
     );
     log_event.insert_path(
         make_event_key_with_prefix(key_path, "rdata"),
-        format_rdata(record.rdata()),
+        format_rdata(record.rdata())?,
     );
+
+    Ok(())
 }
 
 fn parse_unknown_record_type(rtype: u16) -> String {
@@ -600,19 +662,19 @@ fn format_bytes_as_hex_string(bytes: &Vec<u8>) -> String {
         .join(".")
 }
 
-fn format_rdata(rdata: &RData) -> String {
+fn format_rdata(rdata: &RData) -> Result<String> {
     match rdata {
-        RData::A(ip) => ip.to_string(),
-        RData::AAAA(ip) => ip.to_string(),
-        RData::CNAME(name) => name.to_utf8(),
-        RData::SRV(srv) => format!(
+        RData::A(ip) => Ok(ip.to_string()),
+        RData::AAAA(ip) => Ok(ip.to_string()),
+        RData::CNAME(name) => Ok(name.to_utf8()),
+        RData::SRV(srv) => Ok(format!(
             "{} {} {} {}",
             srv.priority(),
             srv.weight(),
             srv.port(),
             srv.target().to_utf8()
-        ),
-        RData::TXT(txt) => txt
+        )),
+        RData::TXT(txt) => Ok(txt
             .txt_data()
             .iter()
             .map(|value| {
@@ -624,8 +686,8 @@ fn format_rdata(rdata: &RData) -> String {
                 )
             })
             .collect::<Vec<String>>()
-            .join(" "),
-        RData::SOA(soa) => format!(
+            .join(" ")),
+        RData::SOA(soa) => Ok(format!(
             "{} {} ({} {} {} {} {})",
             soa.mname().to_utf8(),
             soa.rname().to_utf8(),
@@ -634,35 +696,50 @@ fn format_rdata(rdata: &RData) -> String {
             soa.retry(),
             soa.expire(),
             soa.minimum()
-        ),
+        )),
         RData::Unknown { code, rdata } => match code {
-            13 => {
-                let mut decoder = BinDecoder::new(rdata.anything().unwrap());
-                let cpu = decode_character_string(&mut decoder);
-                let os = decode_character_string(&mut decoder);
-                format!(
-                    "\"{}\" \"{}\"",
-                    escape_string_for_text_representation(cpu),
-                    escape_string_for_text_representation(os)
-                )
-            }
+            13 => match rdata.anything() {
+                Some(raw_rdata) => {
+                    let mut decoder = BinDecoder::new(raw_rdata);
+                    let cpu = decode_character_string(&mut decoder)?;
+                    let os = decode_character_string(&mut decoder)?;
+                    Ok(format!(
+                        "\"{}\" \"{}\"",
+                        escape_string_for_text_representation(cpu),
+                        escape_string_for_text_representation(os)
+                    ))
+                }
+                None => Err(Error::from("Empty HINFO rdata")),
+            },
 
-            _ => format_bytes_as_hex_string(rdata.anything().unwrap()),
+            _ => match rdata.anything() {
+                Some(raw_rdata) => Ok(format_bytes_as_hex_string(raw_rdata)),
+                None => Err(Error::from("Empty rdata")),
+            },
         },
-        _ => String::from("unknown yet"),
+        _ => Ok(String::from("unknown yet")),
     }
 }
 
-fn decode_character_string(decoder: &mut BinDecoder) -> String {
-    let len = decoder.read_u8().unwrap().unverified() as usize;
-    String::from_utf8_lossy(
-        decoder
-            .read_slice(len)
-            .unwrap()
-            .verify_unwrap(|r| r.len() == len)
-            .unwrap(),
-    )
-    .to_string()
+fn decode_character_string(decoder: &mut BinDecoder) -> Result<String> {
+    match decoder.read_u8() {
+        Ok(raw_len) => {
+            let len = raw_len.unverified() as usize;
+            match decoder.read_slice(len) {
+                Ok(raw_text) => match raw_text.verify_unwrap(|r| r.len() == len) {
+                    Ok(verified_text) => Ok(String::from_utf8_lossy(verified_text).to_string()),
+                    Err(raw_data) => Err(Error::from(format!(
+                        "Unexpected data length: expected {}, got {}. Raw data {}",
+                        len,
+                        raw_data.len(),
+                        format_bytes_as_hex_string(&raw_data.to_vec())
+                    ))),
+                },
+                Err(error) => Err(Error::from(error.to_string())),
+            }
+        }
+        Err(error) => Err(Error::from(error.to_string())),
+    }
 }
 
 fn escape_string_for_text_representation(original_string: String) -> String {
