@@ -287,7 +287,7 @@ impl Service<Request> for S3Sink {
             body: Some(request.body.into()),
             bucket: request.bucket,
             key: request.key,
-            content_encoding: request.content_encoding,
+            content_type: request.content_type,
             acl: options.acl.map(to_string),
             grant_full_control: options.grant_full_control,
             grant_read: options.grant_read,
@@ -342,7 +342,11 @@ fn build_request(
         body: inner,
         bucket,
         key,
-        content_encoding: compression.content_encoding().map(|ce| ce.to_string()),
+        content_type: if compression == Compression::Gzip {
+            Some("application/x-gzip".to_string())
+        } else {
+            Some("application/octet-stream".to_string())
+        },
         options,
     }
 }
@@ -352,7 +356,7 @@ struct Request {
     body: Vec<u8>,
     bucket: String,
     key: String,
-    content_encoding: Option<String>,
+    content_type: Option<String>,
     options: S3Options,
 }
 
@@ -572,6 +576,10 @@ mod integration_tests {
 
             let obj = get_object(key).await;
             assert_eq!(obj.content_encoding, None);
+            assert_eq!(
+                obj.content_type,
+                Some("application/octet-stream".to_string())
+            );
 
             let response_lines = get_lines(obj).await;
             assert_eq!(lines, response_lines);
@@ -725,7 +733,8 @@ mod integration_tests {
                 assert!(key.ends_with(".log.gz"));
 
                 let obj = get_object(key).await;
-                assert_eq!(obj.content_encoding, Some("gzip".to_string()));
+                assert_eq!(obj.content_encoding, None);
+                assert_eq!(obj.content_type, Some("application/x-gzip".to_string()));
 
                 acc.append(&mut get_gzipped_lines(obj).await);
                 acc
