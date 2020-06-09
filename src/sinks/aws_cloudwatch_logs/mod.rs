@@ -37,6 +37,11 @@ use tower::{
     Service, ServiceBuilder, ServiceExt,
 };
 
+// Estimated maximum size of InputLogEvent with an empty message
+const EVENT_SIZE_OVERHEAD: usize = 50;
+const MAX_EVENT_SIZE: usize = 256 * 1024;
+const MAX_MESSAGE_SIZE: usize = MAX_EVENT_SIZE - EVENT_SIZE_OVERHEAD;
+
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("{}", source))]
@@ -262,25 +267,25 @@ impl CloudwatchLogsSvc {
         })
     }
 
-    pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
-        let timestamp =
-            if let Some(Value::Timestamp(ts)) = log.remove(&event::log_schema().timestamp_key()) {
-                ts.timestamp_millis()
-            } else {
-                Utc::now().timestamp_millis()
-            };
+    pub fn encode_log(&self, mut log: LogEvent) -> Option<InputLogEvent> {
+        let timestamp = match log.remove(&event::log_schema().timestamp_key()) {
+            Some(Value::Timestamp(ts)) => ts.timestamp_millis(),
+            _ => Utc::now().timestamp_millis(),
+        };
 
-        match self.encoding.codec() {
-            Encoding::Json => {
-                let message = serde_json::to_string(&log).unwrap();
-                InputLogEvent { message, timestamp }
-            }
-            Encoding::Text => {
-                let message = log
-                    .get(&event::log_schema().message_key())
-                    .map(|v| v.to_string_lossy())
-                    .unwrap_or_else(|| "".into());
-                InputLogEvent { message, timestamp }
+        let message = match self.encoding.codec() {
+            Encoding::Json => serde_json::to_string(&log).unwrap(),
+            Encoding::Text => log
+                .get(&event::log_schema().message_key())
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_else(|| "".into()),
+        };
+
+        match message.len() {
+            length if length <= MAX_MESSAGE_SIZE => Some(InputLogEvent { message, timestamp }),
+            length => {
+                error!(message = "Message exceeds CloudWatch maximum size", %length);
+                None
             }
         }
     }
@@ -298,7 +303,7 @@ impl CloudwatchLogsSvc {
                 e
             })
             .map(|e| e.into_log())
-            .map(|e| self.encode_log(e))
+            .filter_map(|e| self.encode_log(e))
             .filter(|e| age_range.contains(&e.timestamp))
             .collect::<Vec<_>>();
 
@@ -767,7 +772,9 @@ mod tests {
     fn cloudwatch_encoded_event_retains_timestamp() {
         let mut event = Event::from("hello world").into_log();
         event.insert("key", "value");
-        let encoded = svc(default_config(Encoding::Json)).encode_log(event.clone());
+        let encoded = svc(default_config(Encoding::Json))
+            .encode_log(event.clone())
+            .unwrap();
 
         let ts = if let Value::Timestamp(ts) = event[&event::log_schema().timestamp_key()] {
             ts.timestamp_millis()
@@ -783,7 +790,7 @@ mod tests {
         let config = default_config(Encoding::Json);
         let mut event = Event::from("hello world").into_log();
         event.insert("key", "value");
-        let encoded = svc(config).encode_log(event.clone());
+        let encoded = svc(config).encode_log(event.clone()).unwrap();
         let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
         assert!(map.get(&event::log_schema().timestamp_key()).is_none());
     }
@@ -793,7 +800,7 @@ mod tests {
         let config = default_config(Encoding::Text);
         let mut event = Event::from("hello world").into_log();
         event.insert("key", "value");
-        let encoded = svc(config).encode_log(event.clone());
+        let encoded = svc(config).encode_log(event.clone()).unwrap();
         assert_eq!(encoded.message, "hello world");
     }
 
