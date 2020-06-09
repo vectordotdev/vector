@@ -173,7 +173,7 @@ fn test_max_size() {
 
     // Give the topology some time to process the received data and simulate
     // a crash.
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    std::thread::sleep(std::time::Duration::from_secs(5));
     terminate_abruptly(rt, topology);
 
     // Then run vector again with a sink that accepts events now. It should
@@ -311,7 +311,7 @@ fn test_reclaim_disk_space() {
 
     // Give the topology some time to process the received data and simulate
     // a crash.
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    std::thread::sleep(std::time::Duration::from_secs(5));
     terminate_abruptly(rt, topology);
 
     let before_disk_size: u64 = compute_disk_size(&data_dir);
