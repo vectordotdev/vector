@@ -132,7 +132,7 @@ impl TransformConfig for Ec2Metadata {
             .host
             .clone()
             .map(|s| Uri::from_maybe_shared(s).unwrap())
-            .unwrap_or(HOST.clone());
+            .unwrap_or_else(|| HOST.clone());
 
         let refresh_interval = self
             .refresh_interval_secs
