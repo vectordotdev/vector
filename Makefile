@@ -131,7 +131,7 @@ test-wasm: build-wasm-tests  ### Run engine tests.
 
 .PHONY: bench-wasm
 bench-wasm: build-wasm-tests  ### Run engine tests.
-	cargo bench --no-default-features --features "${DEFAULT_FEATURES} wasm" --bench wasm wasm
+	cargo bench --no-default-features --features "${DEFAULT_FEATURES} wasm lua" --bench wasm wasm
 
 ##@ Checking
 

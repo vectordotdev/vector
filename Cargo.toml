@@ -439,5 +439,10 @@ harness = false
 name = "isolated_buffering"
 harness = false
 
+[[bench]]
+name = "wasm"
+harness = false
+
+
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
