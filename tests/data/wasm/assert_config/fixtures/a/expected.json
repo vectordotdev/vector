@@ -11,6 +11,6 @@
     "takes_number": 123,
     "takes_string": "test"
   },
-  "path": "tests/data/wasm/assert_config/assert_config.wat",
+  "path": "target/wasm32-wasi/release/assert_config.wasm",
   "role": "Transform"
 }

@@ -115,21 +115,15 @@ target/wasm32-wasi/.obtained:
 	@touch target/wasm32-wasi/.obtained
 
 WASM_MODULES = $(patsubst tests/data/wasm/%/,%,$(wildcard tests/data/wasm/*/))
-WASM_WATS = $(foreach MODULE,$(WASM_MODULES),tests/data/wasm/${MODULE}/${MODULE}.wat)
+WASM_MODULE_OUTPUTS = $(patsubst %,/target/wasm32-wasi/%,$(WASM_MODULES))
 
 .PHONY: build-wasm-tests
-build-wasm-tests: clean-wasm pre-build-wasm-tests $(WASM_WATS) ### builds all WASM test modules.
+build-wasm-tests: $(WASM_MODULE_OUTPUTS) ### builds all WASM test modules.
 
-.PHONY: pre-build-wasm-tests
-pre-build-wasm-tests:
-	@echo "# Building test WASM modules as .wasm then transforming them into .wat!"
-	@echo "# You need to have run `rustup target add wasm32-wasi` and have `wabt` installed!"
-
-tests/data/wasm/%.wat: MODULE = $(lastword $(subst /, , $(dir $@)))
-tests/data/wasm/%.wat: ### Build a specific WASM module.
-	@echo "# Building WASM module ${MODULE}, requires Rustc for wasm32-wasi and wabt."
+$(WASM_MODULE_OUTPUTS): MODULE = $(notdir $@)
+$(WASM_MODULE_OUTPUTS): ### Build a specific WASM module.
+	@echo "# Building WASM module ${MODULE}, requires Rustc for wasm32-wasi."
 	cargo build --target wasm32-wasi --release --package ${MODULE}
-	wasm2wat target/wasm32-wasi/release/${MODULE}.wasm -o tests/data/wasm/${MODULE}/${MODULE}.wat
 
 .PHONY: test-wasm
 test-wasm: build-wasm-tests  ### Run engine tests.
@@ -137,11 +131,7 @@ test-wasm: build-wasm-tests  ### Run engine tests.
 
 .PHONY: bench-wasm
 bench-wasm: build-wasm-tests  ### Run engine tests.
-	cargo bench wasm --no-default-features --features ${DEFAULT_FEATURES}
-
-.PHONY: clean-wasm
-clean-wasm:
-	rm -rfv tests/data/wasm/*/*.wat
+	cargo bench wasm --no-default-features --features ${DEFAULT_FEATURES},wasm
 
 ##@ Checking
 

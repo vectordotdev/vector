@@ -30,7 +30,8 @@ pub fn protobuf(c: &mut Criterion) {
             let mut transform = Wasm::new(
                 toml::from_str(
                     r#"
-                module = "tests/data/wasm/protobuf/protobuf.wat"
+                module = "target/wasm32-wasi/release/protobuf.wasm"
+                artifact_cache = "target/artifacts/"
                 "#,
                 )
                 .unwrap(),
@@ -72,7 +73,8 @@ pub fn drop(criterion: &mut Criterion) {
                 Wasm::new(
                     toml::from_str(
                         r#"
-              module = "tests/data/wasm/drop/drop.wat"
+              module = "target/wasm32-wasi/release/drop.wasm"
+              artifact_cache = "target/artifacts/"
               "#,
                     )
                     .unwrap(),
@@ -119,7 +121,8 @@ pub fn add_fields(criterion: &mut Criterion) {
                 Wasm::new(
                     toml::from_str(
                         r#"
-              module = "tests/data/wasm/add_fields/add_fields.wat"
+              module = "target/wasm32-wasi/release/add_fields.wasm"
+              artifact_cache = "target/artifacts/"
               "#,
                     )
                     .unwrap(),

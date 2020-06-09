@@ -109,7 +109,7 @@ mod tests {
 
         let mut transform = parse_config(
             r#"
-            module = "tests/data/wasm/protobuf/protobuf.wat"
+            module = "target/wasm32-wasi/release/protobuf.wasm"
             artifact_cache = "target/artifacts"
             "#,
         )?;
@@ -133,7 +133,7 @@ mod tests {
 
         let mut transform = parse_config(
             r#"
-            module = "tests/data/wasm/protobuf/protobuf.wat"
+            module = "target/wasm32-wasi/release/protobuf.wasm"
             artifact_cache = "target/artifacts"
             "#,
         )?;
@@ -156,7 +156,7 @@ mod tests {
 
         let mut transform = parse_config(
             r#"
-            module = "tests/data/wasm/add_fields/add_fields.wat"
+            module = "target/wasm32-wasi/release/add_fields.wasm"
             artifact_cache = "target/artifacts"
             "#,
         )?;
@@ -179,7 +179,7 @@ mod tests {
 
         let mut transform = parse_config(
             r#"
-            module = "tests/data/wasm/drop/drop.wat"
+            module = "target/wasm32-wasi/release/drop.wasm"
             artifact_cache = "target/artifacts"
             "#,
         )?;
@@ -201,7 +201,7 @@ mod tests {
 
         let mut transform = parse_config(
             r#"
-            module = "tests/data/wasm/panic/panic.wat"
+            module = "target/wasm32-wasi/release/panic.wasm"
             artifact_cache = "target/artifacts"
             "#,
         )?;
@@ -230,7 +230,7 @@ mod tests {
 
         let mut transform = parse_config(
             r#"
-            module = "tests/data/wasm/assert_config/assert_config.wat"
+            module = "target/wasm32-wasi/release/assert_config.wasm"
             artifact_cache = "target/artifacts"
             options.takes_string = "test"
             options.takes_number = 123
