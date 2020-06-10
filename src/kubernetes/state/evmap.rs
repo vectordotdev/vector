@@ -124,3 +124,80 @@ fn kv<T: Metadata<Ty = ObjectMeta>>(object: T) -> Option<(String, Value<T>)> {
     let key = value.uid()?.to_owned();
     Some((key, value))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kubernetes::state::{MaintainedWrite, Write};
+    use k8s_openapi::api::core::v1::Pod;
+
+    fn make_pod(uid: &str) -> Pod {
+        Pod {
+            metadata: Some(ObjectMeta {
+                uid: Some(uid.to_owned()),
+                ..ObjectMeta::default()
+            }),
+            ..Pod::default()
+        }
+    }
+
+    #[test]
+    fn test_kv() {
+        let pod = make_pod("uid");
+        let (key, val) = kv(pod.clone()).unwrap();
+        assert_eq!(key, "uid");
+        assert_eq!(val, Box::new(HashValue::new(pod)));
+    }
+
+    #[tokio::test]
+    async fn test_without_debounce() {
+        let (state_reader, state_writer) = evmap10::new();
+        let mut state_writer = Writer::new(state_writer, None);
+
+        assert_eq!(state_reader.is_empty(), true);
+        assert!(state_writer.maintenance_request().is_none());
+
+        state_writer.add(make_pod("uid0")).await;
+
+        assert_eq!(state_reader.is_empty(), false);
+        assert!(state_writer.maintenance_request().is_none());
+
+        drop(state_writer);
+    }
+
+    #[tokio::test]
+    async fn test_with_debounce() {
+        // Due to https://github.com/tokio-rs/tokio/issues/2090 we're not
+        // pausing the time.
+
+        let (state_reader, state_writer) = evmap10::new();
+        let flush_debounce_timeout = Duration::from_millis(100);
+        let mut state_writer = Writer::new(state_writer, Some(flush_debounce_timeout));
+
+        assert_eq!(state_reader.is_empty(), true);
+        assert!(state_writer.maintenance_request().is_none());
+
+        state_writer.add(make_pod("uid0")).await;
+        state_writer.add(make_pod("uid1")).await;
+
+        assert_eq!(state_reader.is_empty(), true);
+        assert!(state_writer.maintenance_request().is_some());
+
+        let join = tokio::spawn(async move {
+            let mut state_writer = state_writer;
+            state_writer.maintenance_request().unwrap().await;
+            state_writer.perform_maintenance().await;
+            state_writer
+        });
+
+        assert_eq!(state_reader.is_empty(), true);
+
+        tokio::time::delay_for(flush_debounce_timeout * 2).await;
+        let mut state_writer = join.await.unwrap();
+
+        assert_eq!(state_reader.is_empty(), false);
+        assert!(state_writer.maintenance_request().is_none());
+
+        drop(state_writer);
+    }
+}
