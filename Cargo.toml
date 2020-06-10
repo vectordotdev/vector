@@ -68,7 +68,7 @@ metrics-runtime = "0.13.0"
 rusoto_core = { version = "0.41.0", optional = true }
 rusoto_core44 = { package = "rusoto_core", version = "0.44.0", optional = true }
 rusoto_s3 = { version = "0.44.0", optional = true }
-rusoto_logs = { version = "0.41.0", optional = true }
+rusoto_logs = { version = "0.44.0", optional = true }
 rusoto_cloudwatch = { version = "0.44.0", optional = true }
 rusoto_kinesis = { version = "0.44.0", optional = true }
 rusoto_credential = { version = "0.41.1", optional = true }
@@ -80,7 +80,7 @@ rusoto_signature = { package = "rusoto_signature", version = "0.44.0", optional 
 
 # Tower
 tower = "0.1.1"
-tower03 = { package = "tower", version = "0.3", git = "https://github.com/tower-rs/tower", features = ["limit", "retry", "timeout", "util"] }
+tower03 = { package = "tower", version = "0.3", git = "https://github.com/tower-rs/tower", features = ["buffer", "limit", "retry", "timeout", "util"] }
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }
@@ -355,7 +355,7 @@ sinks = [
   "sinks-vector",
   "sinks-pulsar"
 ]
-sinks-aws_cloudwatch_logs = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_logs"]
+sinks-aws_cloudwatch_logs = ["rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44", "rusoto_cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44", "rusoto_kinesis"]
@@ -400,7 +400,15 @@ docker = [
   "splunk-integration-tests",
 ]
 
-aws-integration-tests = ["sinks-aws_cloudwatch_logs", "sinks-aws_cloudwatch_metrics", "sinks-elasticsearch", "sinks-aws_kinesis_firehose", "sinks-aws_kinesis_streams", "sinks-aws_s3", "transforms-aws_ec2_metadata"]
+aws-integration-tests = [
+  "aws-cloudwatch-logs-integration-tests",
+  "aws-cloudwatch-metrics-integration-tests",
+  "aws-ec2-metadata-integration-tests",
+  "aws-kinesis-firehose-integration-tests",
+  "aws-kinesis-streams-integration-tests",
+  "aws-s3-integration-tests",
+  "es-integration-tests",
+]
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
