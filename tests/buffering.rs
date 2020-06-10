@@ -69,6 +69,7 @@ fn test_buffering() {
         .sink_map_err(|err| panic!(err))
         .send_all(input_events_stream);
     let _ = rt.block_on(send).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(2));
 
     // There was a race caused by a channel in the mock source, and this
     // check is here to ensure it's really gone.
@@ -76,7 +77,6 @@ fn test_buffering() {
 
     // Give the topology some time to process the received data and simulate
     // a crash.
-    std::thread::sleep(std::time::Duration::from_secs(5));
     terminate_abruptly(rt, topology);
 
     // Then run vector again with a sink that accepts events now. It should
@@ -161,11 +161,13 @@ fn test_max_size() {
     let mut rt = test_util::runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(1)); // Give topo a moment to start up.
 
     let send = in_tx
         .sink_map_err(|err| panic!(err))
         .send_all(input_events_stream);
     let _ = rt.block_on(send).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(2));
 
     // There was a race caused by a channel in the mock source, and this
     // check is here to ensure it's really gone.
@@ -173,7 +175,6 @@ fn test_max_size() {
 
     // Give the topology some time to process the received data and simulate
     // a crash.
-    std::thread::sleep(std::time::Duration::from_secs(8));
     terminate_abruptly(rt, topology);
 
     // Then run vector again with a sink that accepts events now. It should
@@ -304,6 +305,7 @@ fn test_reclaim_disk_space() {
         .sink_map_err(|err| panic!(err))
         .send_all(input_events_stream);
     let _ = rt.block_on(send).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(5));
 
     // There was a race caused by a channel in the mock source, and this
     // check is here to ensure it's really gone.
@@ -311,7 +313,6 @@ fn test_reclaim_disk_space() {
 
     // Give the topology some time to process the received data and simulate
     // a crash.
-    std::thread::sleep(std::time::Duration::from_secs(8));
     terminate_abruptly(rt, topology);
 
     let before_disk_size: u64 = compute_disk_size(&data_dir);
