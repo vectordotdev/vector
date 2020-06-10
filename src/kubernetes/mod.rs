@@ -22,6 +22,7 @@
 
 pub mod api_watcher;
 pub mod client;
+pub mod debounce;
 pub mod hash_value;
 pub mod instrumenting_watcher;
 pub mod mock_watcher;
@@ -34,6 +35,7 @@ pub mod watch_request_builder;
 pub mod watcher;
 
 // Reexports for more elegant public API.
+pub use debounce::Debounce;
 pub use hash_value::HashValue;
 pub use multi_response_decoder::MultiResponseDecoder;
 pub use reflector::Reflector;

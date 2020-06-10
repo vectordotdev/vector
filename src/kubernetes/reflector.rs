@@ -896,7 +896,7 @@ mod tests {
 
             // Prepare state.
             let (state_reader, state_writer) = evmap10::new();
-            let state_writer = state::evmap::Writer::new(state_writer);
+            let state_writer = state::evmap::Writer::new(state_writer, None); // test without debounce to avouid complexity
             let state_writer = state::instrumenting::Writer::new(state_writer);
             let resulting_state_reader = state_reader.clone();
 

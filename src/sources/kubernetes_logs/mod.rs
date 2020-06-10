@@ -154,7 +154,8 @@ impl Source {
         let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
         let watcher = k8s::instrumenting_watcher::InstrumentingWatcher::new(watcher);
         let (state_reader, state_writer) = evmap::new();
-        let state_writer = k8s::state::evmap::Writer::new(state_writer);
+        let state_writer =
+            k8s::state::evmap::Writer::new(state_writer, Some(Duration::from_millis(10)));
         let state_writer = k8s::state::instrumenting::Writer::new(state_writer);
         let state_writer =
             k8s::state::delayed_delete::Writer::new(state_writer, Duration::from_secs(60));
