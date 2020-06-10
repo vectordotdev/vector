@@ -32956,7 +32956,8 @@ module.exports = {
       "title": "WASM",
       "type": "transform",
       "unsupported_operating_systems": [
-
+        "MacOS",
+        "Windows"
       ]
     }
   }

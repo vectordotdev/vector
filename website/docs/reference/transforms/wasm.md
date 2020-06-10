@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-06-09"
+last_modified_on: "2020-06-10"
 component_title: "WASM"
 description: "The Vector `wasm` transform accepts and outputs `log` events, allowing you to execute **experimental** WASM plugins."
 event_types: ["log"]
 function_category: "program"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+wasm%22
+operating_systems: ["Linux"]
 sidebar_label: "wasm|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/wasm.rs
 status: "beta"
 title: "WASM Transform"
+unsupported_operating_systems: ["MacOS","Windows"]
 ---
 
 import Fields from '@site/src/components/Fields';

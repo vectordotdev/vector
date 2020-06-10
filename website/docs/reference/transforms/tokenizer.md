@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-06-03"
+last_modified_on: "2020-06-10"
 component_title: "Tokenizer"
 description: "The Vector `tokenizer` transform accepts and outputs `log` events, allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+tokenizer%22
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "tokenizer|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/tokenizer.rs
 status: "prod-ready"
 title: "Tokenizer Transform"
+unsupported_operating_systems: []
 ---
 
 import Fields from '@site/src/components/Fields';
