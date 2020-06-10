@@ -6,7 +6,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries2::RetryLogic,
-        rusoto2 as rusoto,
+        rusoto,
         service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
         sink::Response,
         BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,

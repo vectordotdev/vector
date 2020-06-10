@@ -6,7 +6,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries2::RetryLogic,
-        rusoto2 as rusoto,
+        rusoto,
         service2::TowerRequestConfig,
         sink::Response,
         BatchEventsConfig,
@@ -219,7 +219,6 @@ fn create_client(
 ) -> crate::Result<KinesisClient> {
     let client = rusoto::client(resolver)?;
     let creds = rusoto::AwsCredentialsProvider::new(&region, assume_role)?;
-
     Ok(KinesisClient::new_with(client, creds, region))
 }
 

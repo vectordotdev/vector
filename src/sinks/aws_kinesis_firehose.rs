@@ -5,7 +5,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries2::RetryLogic,
-        rusoto2::{self, AwsCredentialsProvider},
+        rusoto,
         service2::TowerRequestConfig,
         sink::Response,
         BatchEventsConfig,
@@ -211,8 +211,8 @@ fn create_client(
     assume_role: Option<String>,
     resolver: Resolver,
 ) -> crate::Result<KinesisFirehoseClient> {
-    let client = rusoto2::client(resolver)?;
-    let creds = AwsCredentialsProvider::new(&region, assume_role)?;
+    let client = rusoto::client(resolver)?;
+    let creds = rusoto::AwsCredentialsProvider::new(&region, assume_role)?;
     Ok(KinesisFirehoseClient::new_with(client, creds, region))
 }
 
