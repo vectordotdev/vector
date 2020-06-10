@@ -18,6 +18,7 @@
 
 pub mod framework;
 pub mod interface;
+mod lock;
 pub mod log_lookup;
 pub mod namespace;
 mod resource_file;
@@ -30,5 +31,6 @@ pub mod wait_for_rollout;
 
 pub use framework::Framework;
 pub use interface::Interface;
+pub use lock::lock;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
