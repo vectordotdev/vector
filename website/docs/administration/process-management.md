@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-06-09"
 title: Process Management
 description: "How to manage the Vector process, such as starting, stopping, and reloading."
 ---
@@ -112,7 +112,6 @@ vector --config vector.toml
 | **Required**            |                                                                                                                     |    |
 | `-c, --config <path>`   | Path the Vector [configuration file][docs.configuration].                                                           |    |
 | **Optional**            |                                                                                                                     |    |
-| `-d, --dry-run`         | Vector will [validate configuration][docs.validating] and exit.                                                     |    |
 | `-q, --quiet`           | Raises the log level to `warn`.                                                                                     |    |
 | `-qq`                   | Raises the log level to `error`.                                                                                    |    |
 | `-qqq`                  | Turns logging off.                                                                                                  |    |
@@ -319,7 +318,6 @@ transition from the old to new pipeline is graceful.
 [docs.configuration]: /docs/setup/configuration/
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.sources]: /docs/reference/sources/
-[docs.validating]: /docs/administration/validating/
 [urls.exit_codes]: https://docs.rs/exitcode/1.1.2/exitcode/#constants
 [urls.systemd]: https://systemd.io/
 [urls.vector_systemd_file]: https://github.com/timberio/vector/blob/master/distribution/systemd/vector.service

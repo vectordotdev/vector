@@ -6,7 +6,7 @@ use vector::{
 fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
     let rt = runtime();
     Config::load(config.as_bytes())
-        .and_then(|c| topology::builder::build_pieces(&c, &ConfigDiff::initial(&c), rt.executor()))
+        .and_then(|c| topology::builder::check_build(&c, &ConfigDiff::initial(&c), rt.executor()))
         .map(|(_topology, warnings)| warnings)
 }
 

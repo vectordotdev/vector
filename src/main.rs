@@ -20,7 +20,9 @@ use structopt::{clap::AppSettings, StructOpt};
 #[cfg(unix)]
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
-use vector::{config_paths, event, generate, list, metrics, runtime, topology, trace, unit_test};
+use vector::{
+    config_paths, event, generate, list, metrics, runtime, topology, trace, unit_test, validate,
+};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -44,10 +46,6 @@ struct RootOpts {
     /// Exit on startup if any sinks fail healthchecks
     #[structopt(short, long)]
     require_healthy: bool,
-
-    /// Exit on startup after config verification and optional healthchecks are run
-    #[structopt(short, long)]
-    dry_run: bool,
 
     /// Number of threads to use for processing (default is number of available cores)
     #[structopt(short, long)]
@@ -84,7 +82,7 @@ struct RootOpts {
 #[structopt(rename_all = "kebab-case")]
 enum SubCommand {
     /// Validate the target config, then exit.
-    Validate(Validate),
+    Validate(validate::Opts),
 
     /// Generate a Vector configuration containing a list of components.
     Generate(generate::Opts),
@@ -95,22 +93,6 @@ enum SubCommand {
     /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
     /// For guidance on how to write unit tests check out: https://vector.dev/docs/setup/guides/unit-testing/
     Test(unit_test::Opts),
-}
-
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
-struct Validate {
-    /// Ensure that the config topology is correct and that all components resolve
-    #[structopt(short, long)]
-    topology: bool,
-
-    /// Fail validation on warnings
-    #[structopt(short, long)]
-    deny_warnings: bool,
-
-    /// Any number of Vector config files to validate. If none are specified the
-    /// default config path `/etc/vector/vector.toml` will be targeted.
-    paths: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -169,8 +151,13 @@ fn main() {
     let opts = root_opts.root;
     let sub_command = root_opts.sub_command;
 
-    let level = match opts.quiet {
-        0 => match opts.verbose {
+    let (quiet_level, verbose_level) = match sub_command {
+        Some(SubCommand::Validate(_)) if opts.verbose == 0 => (opts.quiet + 1, opts.verbose),
+        Some(SubCommand::Validate(_)) => (opts.quiet, opts.verbose - 1),
+        _ => (opts.quiet, opts.verbose),
+    };
+    let level = match quiet_level {
+        0 => match verbose_level {
             0 => "info",
             1 => "debug",
             2..=255 => "trace",
@@ -216,7 +203,7 @@ fn main() {
 
     sub_command.map(|s| {
         std::process::exit(match s {
-            SubCommand::Validate(v) => validate(&v),
+            SubCommand::Validate(v) => validate::validate(&v, color),
             SubCommand::List(l) => list::cmd(&l),
             SubCommand::Test(t) => unit_test::cmd(&t),
             SubCommand::Generate(g) => generate::cmd(&g),
@@ -232,14 +219,9 @@ fn main() {
         }
     }
 
-    let mut config_paths = config_paths::expand(opts.config_paths.clone()).unwrap_or_else(|| {
+    let config_paths = config_paths::prepare(opts.config_paths.clone()).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
-    config_paths.sort();
-    config_paths.dedup();
-    config_paths::CONFIG_PATHS
-        .set(config_paths.clone())
-        .expect("Cannot set global config paths");
 
     if opts.watch_config {
         // Start listening for config changes immediately.
@@ -280,29 +262,15 @@ fn main() {
         arch = built_info::CFG_TARGET_ARCH
     );
 
-    if opts.dry_run {
-        info!("Dry run enabled, exiting after config validation.");
-    }
-
     let diff = topology::ConfigDiff::initial(&config);
     let pieces = topology::validate(&config, &diff, rt.executor()).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 
-    if opts.dry_run && !opts.require_healthy {
-        info!("Config validated, exiting.");
-        std::process::exit(exitcode::OK);
-    }
-
     let result = topology::start_validated(config, diff, pieces, &mut rt, opts.require_healthy);
     let (topology, mut graceful_crash) = result.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
-
-    if opts.dry_run {
-        info!("Healthchecks passed, exiting.");
-        std::process::exit(exitcode::OK);
-    }
 
     #[cfg(unix)]
     {
@@ -472,79 +440,6 @@ fn open_config(path: &Path) -> Option<File> {
             }
         }
     }
-}
-
-fn validate(opts: &Validate) -> exitcode::ExitCode {
-    let paths = config_paths::expand(opts.paths.clone()).unwrap_or_else(|| {
-        std::process::exit(exitcode::CONFIG);
-    });
-
-    for config_path in paths {
-        let file = if let Some(file) = open_config(&config_path) {
-            file
-        } else {
-            error!(
-                message = "Failed to open config file.",
-                path = ?config_path
-            );
-            return exitcode::CONFIG;
-        };
-
-        trace!(
-            message = "Parsing config.",
-            path = ?config_path
-        );
-
-        let config = vector::topology::Config::load(file);
-        let config = handle_config_errors(config);
-        let mut config = config.unwrap_or_else(|| {
-            error!(
-                message = "Failed to parse config file.",
-                path = ?config_path
-            );
-            std::process::exit(exitcode::CONFIG);
-        });
-        if let Err(errs) = config.expand_macros() {
-            for error in errs {
-                error!("Parse error: {}", error);
-            }
-        }
-
-        if opts.topology {
-            let exit = match topology::builder::check(&config) {
-                Err(errors) => {
-                    for error in errors {
-                        error!("Topology error: {}", error);
-                    }
-                    Some(exitcode::CONFIG)
-                }
-                Ok(warnings) => {
-                    for warning in &warnings {
-                        warn!("Topology warning: {}", warning);
-                    }
-                    if opts.deny_warnings && !warnings.is_empty() {
-                        Some(exitcode::CONFIG)
-                    } else {
-                        None
-                    }
-                }
-            };
-            if exit.is_some() {
-                error!(
-                    message = "Failed to verify config file topology.",
-                    path = ?config_path
-                );
-                return exit.unwrap();
-            }
-        }
-
-        debug!(
-            message = "Validation successful.",
-            path = ?config_path
-        );
-    }
-
-    exitcode::OK
 }
 
 #[allow(unused)]

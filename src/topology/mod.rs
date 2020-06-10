@@ -15,7 +15,7 @@ pub mod unit_test;
 pub use self::config::Config;
 pub use self::config::SinkContext;
 
-use crate::topology::builder::Pieces;
+use crate::topology::{builder::Pieces, task::Task};
 
 use crate::buffers;
 use crate::runtime;
@@ -83,7 +83,7 @@ pub fn start_validated(
 }
 
 pub fn validate(config: &Config, diff: &ConfigDiff, exec: runtime::TaskExecutor) -> Option<Pieces> {
-    match builder::build_pieces(config, diff, exec) {
+    match builder::check_build(config, diff, exec) {
         Err(errors) => {
             for error in errors {
                 error!("Configuration error: {}", error);
@@ -97,6 +97,18 @@ pub fn validate(config: &Config, diff: &ConfigDiff, exec: runtime::TaskExecutor)
             Some(new_pieces)
         }
     }
+}
+
+pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(String, Task)> {
+    (&diff.sinks.to_change | &diff.sinks.to_add)
+        .into_iter()
+        .filter_map(|name| {
+            pieces
+                .healthchecks
+                .remove(&name)
+                .map(move |task| (name, task))
+        })
+        .collect()
 }
 
 impl RunningTopology {
@@ -272,10 +284,9 @@ impl RunningTopology {
         rt: &mut runtime::Runtime,
         require_healthy: bool,
     ) -> bool {
-        let healthchecks = (&diff.sinks.to_change | &diff.sinks.to_add)
+        let healthchecks = take_healthchecks(diff, pieces)
             .into_iter()
-            .map(|name| pieces.healthchecks.remove(&name).unwrap())
-            .collect::<Vec<_>>();
+            .map(|(_, task)| task);
         let healthchecks = futures01::future::join_all(healthchecks).map(|_| ());
 
         info!("Running healthchecks.");

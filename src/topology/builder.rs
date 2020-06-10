@@ -22,9 +22,29 @@ pub struct Pieces {
     pub shutdown_coordinator: SourceShutdownCoordinator,
 }
 
+/// Builds only the new pieces and checks topology.
+pub fn check_build(
+    config: &super::Config,
+    diff: &ConfigDiff,
+    exec: runtime::TaskExecutor,
+) -> Result<(Pieces, Vec<String>), Vec<String>> {
+    match (check(config), build_pieces(config, diff, exec)) {
+        (Ok(warnings), Ok(new_pieces)) => Ok((new_pieces, warnings)),
+        (Err(t_errors), Err(p_errors)) => Err(t_errors.into_iter().chain(p_errors).collect()),
+        (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
+    }
+}
+
 pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
     let mut errors = vec![];
     let mut warnings = vec![];
+
+    if config.sources.is_empty() {
+        errors.push("No sources defined in the config.".to_owned());
+    }
+    if config.sinks.is_empty() {
+        errors.push("No sinks defined in the config.".to_owned());
+    }
 
     // Warnings and errors
     let sink_inputs = config
@@ -88,12 +108,12 @@ pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
     }
 }
 
-/// Builds only the new pieces.
+/// Builds only the new pieces, and doesn't check their topology.
 pub fn build_pieces(
     config: &super::Config,
     diff: &ConfigDiff,
     exec: runtime::TaskExecutor,
-) -> Result<(Pieces, Vec<String>), Vec<String>> {
+) -> Result<Pieces, Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
     let mut tasks = HashMap::new();
@@ -102,14 +122,6 @@ pub fn build_pieces(
     let mut shutdown_coordinator = SourceShutdownCoordinator::new();
 
     let mut errors = vec![];
-    let mut warnings = vec![];
-
-    if config.sources.is_empty() {
-        return Err(vec!["No sources defined in the config.".to_owned()]);
-    }
-    if config.sinks.is_empty() {
-        return Err(vec!["No sinks defined in the config.".to_owned()]);
-    }
 
     // TODO: remove the unimplemented
     let resolver = Resolver::new(config.global.dns_servers.clone(), exec.clone()).unwrap();
@@ -252,16 +264,6 @@ pub fn build_pieces(
         tasks.insert(name.clone(), task);
     }
 
-    // Warnings and errors
-    match check(&config) {
-        Err(check_errors) => {
-            errors.extend(check_errors);
-        }
-        Ok(check_warnings) => {
-            warnings.extend(check_warnings);
-        }
-    }
-
     if errors.is_empty() {
         let pieces = Pieces {
             inputs,
@@ -272,7 +274,7 @@ pub fn build_pieces(
             shutdown_coordinator,
         };
 
-        Ok((pieces, warnings))
+        Ok(pieces)
     } else {
         Err(errors)
     }
