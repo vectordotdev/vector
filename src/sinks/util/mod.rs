@@ -5,7 +5,7 @@ pub mod http;
 pub mod http2;
 pub mod retries;
 pub mod retries2;
-#[cfg(feature = "rusoto_core44")]
+#[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod service;
 pub mod service2;

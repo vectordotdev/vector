@@ -1,6 +1,6 @@
 use super::CloudwatchError;
 use futures::{channel::oneshot, ready};
-use rusoto_core44::RusotoError;
+use rusoto_core::RusotoError;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogGroupRequest,
     CreateLogStreamError, CreateLogStreamRequest, DescribeLogStreamsError,

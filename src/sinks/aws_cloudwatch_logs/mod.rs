@@ -3,7 +3,7 @@ mod request;
 use crate::{
     dns::Resolver,
     event::{self, Event, LogEvent, Value},
-    region2::RegionOrEndpoint,
+    region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries2::{FixedRetryPolicy, RetryLogic},
@@ -19,7 +19,7 @@ use chrono::{Duration, Utc};
 use futures::{channel::oneshot, future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
-use rusoto_core44::{request::BufferedHttpResponse, Region, RusotoError};
+use rusoto_core::{request::BufferedHttpResponse, Region, RusotoError};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError,
     DescribeLogGroupsRequest, DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
@@ -50,11 +50,11 @@ const MAX_MESSAGE_SIZE: usize = MAX_EVENT_SIZE - EVENT_SIZE_OVERHEAD;
 pub(self) enum CloudwatchLogsError {
     #[snafu(display("{}", source))]
     HttpClientError {
-        source: rusoto_core44::request::TlsError,
+        source: rusoto_core::request::TlsError,
     },
     #[snafu(display("{}", source))]
     InvalidCloudwatchCredentials {
-        source: rusoto_credential44::CredentialsError,
+        source: rusoto_credential::CredentialsError,
     },
     #[snafu(display("Encoded event is too long, length={}", length))]
     EventTooLong { length: usize },
@@ -541,7 +541,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                 }
 
                 RusotoError::Unknown(res)
-                    if rusoto_core44::proto::json::Error::parse(&res)
+                    if rusoto_core::proto::json::Error::parse(&res)
                         .filter(|err| err.typ.as_str() == "ThrottlingException")
                         .is_some() =>
                 {
@@ -647,7 +647,7 @@ mod tests {
     use crate::{
         dns::Resolver,
         event::{self, Event, Value},
-        region2::RegionOrEndpoint,
+        region::RegionOrEndpoint,
         test_util::runtime,
     };
     use std::collections::HashMap;
@@ -820,7 +820,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        region2::RegionOrEndpoint,
+        region::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, runtime},
         topology::config::{SinkConfig, SinkContext},
     };
@@ -829,7 +829,7 @@ mod integration_tests {
         Sink,
     };
     use pretty_assertions::assert_eq;
-    use rusoto_core44::Region;
+    use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
     use std::convert::TryFrom;
 

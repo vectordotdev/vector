@@ -1,4 +1,4 @@
-#![cfg(feature = "rusoto_core44")]
+#![cfg(feature = "rusoto_core")]
 
 use crate::{dns::Resolver, sinks::util, tls::MaybeTlsSettings};
 use async_trait::async_trait;
@@ -8,18 +8,18 @@ use http02::{
     Method, Request, Response, StatusCode,
 };
 use hyper13::body::{Body, HttpBody};
-use rusoto_core44::{
+use rusoto_core::{
     request::{
         DispatchSignedRequest, DispatchSignedRequestFuture, HttpDispatchError, HttpResponse,
     },
     ByteStream, Region,
 };
-use rusoto_credential44::{
+use rusoto_credential::{
     AutoRefreshingProvider, AwsCredentials, ChainProvider, CredentialsError, ProvideAwsCredentials,
     StaticProvider,
 };
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
-use rusoto_sts44::{StsAssumeRoleSessionCredentialsProvider, StsClient};
+use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use snafu::{ResultExt, Snafu};
 use std::{
     io,

@@ -3,7 +3,7 @@ use crate::{
     emit,
     event::Event,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
-    region2::{region_from_endpoint, RegionOrEndpoint},
+    region::{region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http2::{BatchedHttpSink, HttpClient, HttpSink},
@@ -25,8 +25,8 @@ use http02::{
 };
 use hyper13::Body;
 use lazy_static::lazy_static;
-use rusoto_core44::Region;
-use rusoto_credential44::{
+use rusoto_core::Region;
+use rusoto_credential::{
     AwsCredentials, CredentialsError, DefaultCredentialsProvider, ProvideAwsCredentials,
 };
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
