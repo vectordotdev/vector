@@ -307,7 +307,7 @@ impl CloudwatchLogsSvc {
             .map(|e| e.into_log())
             .filter_map(|e| {
                 self.encode_log(e)
-                    .map_err(|error| error!(message = "Could not encode event", %error))
+                    .map_err(|error| error!(message = "Could not encode event", %error, rate_limit_secs = 5))
                     .ok()
             })
             .filter(|e| age_range.contains(&e.timestamp))
