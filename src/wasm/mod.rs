@@ -1,7 +1,7 @@
-//! Foreign module support
+//! WASM Plugin Support
 //!
-//! This module contains the implementation code of our foreign module support. The core traits of
-//! our foreign module support exist in the `vector-wasm` crate.
+//! This module contains the implementation code of our plugin module support. The core traits of
+//! our plugin support exist in the `vector-wasm` crate.
 //!
 //! **Note:** This code is experimental.
 
@@ -109,7 +109,7 @@ fn compile(
     Ok(fingerprint)
 }
 
-/// A foreign module that is operating as a WASM guest.
+/// A plugin module that is operating as a WASM guest.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct WasmModule {

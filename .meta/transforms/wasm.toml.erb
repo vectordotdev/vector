@@ -58,7 +58,7 @@ Given the following configuration:
   inputs = [...]
   type = "wasm"
   module = "module.wasm"
-  wasi = true
+  artifact_cache = "artifacts/"
 ```
 
 Accompanied by a `module.wasm` file built via `cargo +nightly --target wasm32-wasi ...`, Vector will use the module as a
