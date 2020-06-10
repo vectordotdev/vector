@@ -22,6 +22,7 @@ jobs:
 
 
   bench:
+    name: All (Linux, Flaky)
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true

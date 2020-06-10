@@ -15,6 +15,7 @@ env:
 
 jobs:
   cancel-previous:
+    name: Cancel redundant jobs
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -24,6 +25,7 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
   test-linux:
+    name: Unit (Linux, flaky)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -42,6 +44,7 @@ jobs:
       - run: nix-shell --run "make test"
 
   test-mac:
+    name: Unit (Mac, flaky)
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
@@ -63,6 +66,7 @@ jobs:
       - run: nix-shell --run "make test"
 
   test-windows:
+    name: Unit (Windows, flaky)
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
@@ -75,6 +79,7 @@ jobs:
         run: cargo test --no-default-features --features default-msvc
 
   test-behavior:
+    name: Behavior (Linux)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -93,6 +98,7 @@ jobs:
       - run: nix-shell --run "make test-behavior"
 
   test-shutdown:
+    name: Shutdown (Linux)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -112,6 +118,7 @@ jobs:
 
 
   test-integration-aws:
+    name: Integration (Linux, AWS)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -130,6 +137,7 @@ jobs:
       - run: nix-shell --run "make test-integration-aws"
 
   test-integration-clickhouse:
+    name: Integration (Linux, Clickhouse)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -148,6 +156,7 @@ jobs:
       - run: nix-shell --run "make test-integration-clickhouse"
 
   test-integration-docker:
+    name: Integration (Linux, Docker)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -166,6 +175,7 @@ jobs:
       - run: nix-shell --run "make test-integration-docker"
 
   test-integration-elasticsearch:
+    name: Integration (Linux, ES)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -184,6 +194,7 @@ jobs:
       - run: nix-shell --run "make test-integration-elasticsearch"
 
   test-integration-gcp:
+    name: Integration (Linux, GCP)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -220,6 +231,7 @@ jobs:
       - run: nix-shell --run "make test-integration-influxdb"
 
   test-integration-kafka:
+    name: Integration (Linux, Kafka)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -238,6 +250,7 @@ jobs:
       - run: nix-shell --run "make test-integration-kafka"
 
   test-integration-loki:
+    name: Integration (Linux, Loki)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -256,6 +269,7 @@ jobs:
       - run: nix-shell --run "make test-integration-loki"
 
   test-integration-pulsar:
+    name: Integration (Linux, Pulsar)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -274,6 +288,7 @@ jobs:
       - run: nix-shell --run "make test-integration-pulsar"
 
   test-integration-splunk:
+    name: Integration (Linux, Splunk)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -292,6 +307,7 @@ jobs:
       - run: nix-shell --run "make test-integration-splunk"
 
   test-integration-kubernetes:
+    name: Integration (Linux, Kubernetes)
     # This is an experimental test. Allow it to fail without failing the whole
     # workflow, but keep it executing on every build to gather stats.
     continue-on-error: true
