@@ -25,7 +25,7 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
   test-linux:
-    name: Unit (Linux, flaky)
+    name: Unit - Linux, flaky
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -44,7 +44,7 @@ jobs:
       - run: nix-shell --run "make test"
 
   test-mac:
-    name: Unit (Mac, flaky)
+    name: Unit - Mac, flaky
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
@@ -66,7 +66,7 @@ jobs:
       - run: nix-shell --run "make test"
 
   test-windows:
-    name: Unit (Windows, flaky)
+    name: Unit - Windows, flaky
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
@@ -79,7 +79,7 @@ jobs:
         run: cargo test --no-default-features --features default-msvc
 
   test-behavior:
-    name: Behavior (Linux)
+    name: Behavior - Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -98,7 +98,7 @@ jobs:
       - run: nix-shell --run "make test-behavior"
 
   test-shutdown:
-    name: Shutdown (Linux)
+    name: Shutdown - Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -118,7 +118,7 @@ jobs:
 
 
   test-integration-aws:
-    name: Integration (Linux, AWS)
+    name: Integration - Linux, AWS
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -137,7 +137,7 @@ jobs:
       - run: nix-shell --run "make test-integration-aws"
 
   test-integration-clickhouse:
-    name: Integration (Linux, Clickhouse)
+    name: Integration - Linux, Clickhouse
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -156,7 +156,7 @@ jobs:
       - run: nix-shell --run "make test-integration-clickhouse"
 
   test-integration-docker:
-    name: Integration (Linux, Docker)
+    name: Integration - Linux, Docker
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -175,7 +175,7 @@ jobs:
       - run: nix-shell --run "make test-integration-docker"
 
   test-integration-elasticsearch:
-    name: Integration (Linux, ES)
+    name: Integration - Linux, ES
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -194,7 +194,7 @@ jobs:
       - run: nix-shell --run "make test-integration-elasticsearch"
 
   test-integration-gcp:
-    name: Integration (Linux, GCP)
+    name: Integration - Linux, GCP
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -213,6 +213,7 @@ jobs:
       - run: nix-shell --run "make test-integration-gcp"
 
   test-integration-influxdb:
+    name: Integration - Linux, Influx
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -231,7 +232,7 @@ jobs:
       - run: nix-shell --run "make test-integration-influxdb"
 
   test-integration-kafka:
-    name: Integration (Linux, Kafka)
+    name: Integration - Linux, Kafka)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -250,7 +251,7 @@ jobs:
       - run: nix-shell --run "make test-integration-kafka"
 
   test-integration-loki:
-    name: Integration (Linux, Loki)
+    name: Integration - Linux, Loki
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -269,7 +270,7 @@ jobs:
       - run: nix-shell --run "make test-integration-loki"
 
   test-integration-pulsar:
-    name: Integration (Linux, Pulsar)
+    name: Integration - Linux, Pulsar
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -288,7 +289,7 @@ jobs:
       - run: nix-shell --run "make test-integration-pulsar"
 
   test-integration-splunk:
-    name: Integration (Linux, Splunk)
+    name: Integration - Linux, Splunk
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -307,7 +308,7 @@ jobs:
       - run: nix-shell --run "make test-integration-splunk"
 
   test-integration-kubernetes:
-    name: Integration (Linux, Kubernetes)
+    name: Integration - Linux, Kubernetes, flaky
     # This is an experimental test. Allow it to fail without failing the whole
     # workflow, but keep it executing on every build to gather stats.
     continue-on-error: true

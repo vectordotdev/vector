@@ -24,7 +24,7 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
   check-clippy:
-    name: Clippy (Linux)
+    name: Clippy - Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -100,7 +100,7 @@ jobs:
       - run: nix-shell --pure --run "make check-markdown"
 
   check-component-features:
-    name: Component Features (Linux)
+    name: Component Features - Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -176,7 +176,7 @@ jobs:
       - run: nix-shell --pure --run "make check-scripts"
 
   check-linux:
-    name: Check (Linux)
+    name: Check - Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -195,7 +195,7 @@ jobs:
       - run: nix-shell --pure --run "make check"
 
   check-mac:
-    name: Check (Mac)
+    name: Check - Mac
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
@@ -214,7 +214,7 @@ jobs:
       - run: nix-shell --pure --run "make check"
 
   check-windows:
-    name: Check (Windows)
+    name: Check - Windows
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v1
