@@ -52,10 +52,11 @@ df -h
 #
 
 # Create short plain-text extended description for the package
-cmark-gfm "$PROJECT_ROOT/README.md" --to commonmark | # expand link aliases
-  sed '/^## /Q' | # select text before first header
-  cmark-gfm --to plaintext | # convert to plain text
-  fmt -uw 80 > "$PROJECT_ROOT/target/debian-extended-description.txt"
+EXPANDED_LINK_ALIASED="$(cmark-gfm "$PROJECT_ROOT/README.md" --to commonmark)" # expand link aliases
+TEXT_BEFORE_FIRST_HEADER="$(sed '/^## /Q' <<< "$EXPANDED_LINK_ALIASED")" # select text before first header
+PLAIN_TEXT="$(cmark-gfm --to plaintext <<< "$TEXT_BEFORE_FIRST_HEADER")" # convert to plain text
+FORMATTED="$(fmt -uw 80 <<< "$PLAIN_TEXT")"
+cat <<< "$FORMATTED" > "$PROJECT_ROOT/target/debian-extended-description.txt"
 
 # Create the license file for binary distributions (LICENSE + NOTICE)
 cat LICENSE NOTICE > "$PROJECT_ROOT/target/debian-license.txt"
