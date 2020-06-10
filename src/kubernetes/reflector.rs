@@ -908,8 +908,9 @@ mod tests {
             let watcher = InstrumentingWatcher::new(watcher);
 
             // Prepare reflector.
+            let pause_between_requests = Duration::from_secs(60 * 60); // 1 hour
             let mut reflector =
-                Reflector::new(watcher, state_writer, None, None, Duration::from_secs(1));
+                Reflector::new(watcher, state_writer, None, None, pause_between_requests);
 
             // Run test logic.
             let logic = tokio::spawn(async move {
@@ -988,6 +989,10 @@ mod tests {
                         .send(mock_watcher::ScenarioActionStream::Done)
                         .await
                         .unwrap();
+
+                    // Advance the time to scroll pass the delay till next
+                    // invocation.
+                    tokio::time::advance(pause_between_requests * 2).await;
                 }
 
                 // We're done with the test! Shutdown the stream and force an
