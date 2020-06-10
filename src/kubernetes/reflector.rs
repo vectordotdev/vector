@@ -245,10 +245,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        state::evmap::{Value, Writer},
-        Error, Reflector,
-    };
+    use super::{Error, Reflector};
     use crate::{
         kubernetes::{
             instrumenting_watcher::InstrumentingWatcher,
@@ -266,7 +263,7 @@ mod tests {
     use std::time::Duration;
 
     /// A helper function to simplify assertion on the `evmap` state.
-    fn gather_state<T>(handle: &evmap10::ReadHandle<String, Value<T>>) -> Vec<T>
+    fn gather_state<T>(handle: &evmap10::ReadHandle<String, state::evmap::Value<T>>) -> Vec<T>
     where
         T: Metadata<Ty = ObjectMeta> + Clone,
     {
@@ -370,8 +367,6 @@ mod tests {
             result.unwrap_err();
 
             // Explicitly drop the reflector at the very end.
-            // Internal evmap is dropped with the reflector, so readers won't
-            // work after drop.
             drop(reflector);
         });
     }
@@ -547,8 +542,6 @@ mod tests {
             result.unwrap_err();
 
             // Explicitly drop the reflector at the very end.
-            // Internal evmap is dropped with the reflector, so readers won't
-            // work after drop.
             drop(reflector);
         })
     }
@@ -558,6 +551,9 @@ mod tests {
     fn test_delayed_deletes() {
         test_util::trace_init();
         test_util::block_on_std(async move {
+            // Freeze time.
+            tokio::time::pause();
+
             // Prepare state.
             let (state_events_tx, mut state_events_rx) = mpsc::channel(0);
             let (mut state_actions_tx, state_actions_rx) = mpsc::channel(0);
@@ -578,9 +574,6 @@ mod tests {
 
             // Run test logic.
             let logic = tokio::spawn(async move {
-                // Pause the time.
-                tokio::time::pause();
-
                 // Wait for watcher to request next invocation.
                 assert!(matches!(
                     watcher_events_rx.next().await.unwrap(),
@@ -692,9 +685,6 @@ mod tests {
                     .send(mock_watcher::ScenarioActionInvocation::ErrOther)
                     .await
                     .unwrap();
-
-                // Resume the time.
-                tokio::time::resume();
             });
 
             // Run the test and wait for an error.
@@ -709,9 +699,10 @@ mod tests {
             result.unwrap_err();
 
             // Explicitly drop the reflector at the very end.
-            // Internal evmap is dropped with the reflector, so readers won't
-            // work after drop.
             drop(reflector);
+
+            // Unfreeze time.
+            tokio::time::resume();
         })
     }
 
@@ -780,8 +771,6 @@ mod tests {
             ));
 
             // Explicitly drop the reflector at the very end.
-            // Internal evmap is dropped with the reflector, so readers won't
-            // work after drop.
             drop(reflector);
         })
     }
@@ -891,8 +880,6 @@ mod tests {
             result.unwrap_err();
 
             // Explicitly drop the reflector at the very end.
-            // Internal evmap is dropped with the reflector, so readers won't
-            // work after drop.
             drop(reflector);
         })
     }
@@ -904,9 +891,12 @@ mod tests {
         expected_resulting_state: StateSnapshot,
     ) {
         test_util::block_on_std(async move {
+            // Freeze time.
+            tokio::time::pause();
+
             // Prepare state.
             let (state_reader, state_writer) = evmap10::new();
-            let state_writer = Writer::new(state_writer);
+            let state_writer = state::evmap::Writer::new(state_writer);
             let state_writer = state::instrumenting::Writer::new(state_writer);
             let resulting_state_reader = state_reader.clone();
 
@@ -923,9 +913,6 @@ mod tests {
 
             // Run test logic.
             let logic = tokio::spawn(async move {
-                // Pause the time.
-                tokio::time::pause();
-
                 // Process the invocations.
                 for (
                     expected_state_before_op,
@@ -948,7 +935,7 @@ mod tests {
                     assert_eq!(state, expected_state_before_op);
 
                     // Assert the resource version passed with watch invocation.
-                    assert_eq!(expected_resource_version, watch_optional.resource_version);
+                    assert_eq!(watch_optional.resource_version, expected_resource_version);
 
                     // Determine the requested action from the test scenario.
                     let responses = match expected_invocation_response {
@@ -1016,9 +1003,6 @@ mod tests {
                     .send(mock_watcher::ScenarioActionInvocation::ErrOther)
                     .await
                     .unwrap();
-
-                // Resume the time.
-                tokio::time::resume();
             });
 
             // Run the test and wait for an error.
@@ -1040,6 +1024,9 @@ mod tests {
             // Internal evmap is dropped with the reflector, so readers won't
             // work after drop.
             drop(reflector);
+
+            // Unfreeze time.
+            tokio::time::resume();
         })
     }
 }
