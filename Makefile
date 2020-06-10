@@ -123,7 +123,12 @@ build-wasm-tests: $(WASM_MODULE_OUTPUTS) ### builds all WASM test modules.
 $(WASM_MODULE_OUTPUTS): MODULE = $(notdir $@)
 $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module.
 	@echo "# Building WASM module ${MODULE}, requires Rustc for wasm32-wasi."
-	cargo build --target wasm32-wasi --release --package ${MODULE}
+	cargo build \
+		--target-dir target/ \
+		--manifest-path tests/data/wasm/${MODULE}/Cargo.toml \
+		--target wasm32-wasi \
+		--release \
+		--package ${MODULE}
 
 .PHONY: test-wasm
 test-wasm: build-wasm-tests  ### Run engine tests.

@@ -17,7 +17,6 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-use tracing::Level;
 use vector_wasm::{Registration, Role};
 mod artifact_cache;
 mod fingerprint;

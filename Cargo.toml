@@ -32,12 +32,6 @@ members = [
   "lib/file-source",
   "lib/tracing-limit",
   "lib/vector-wasm",
-  # Wasm test modules.
-  "tests/data/wasm/protobuf",
-  "tests/data/wasm/drop",
-  "tests/data/wasm/add_fields",
-  "tests/data/wasm/panic",
-  "tests/data/wasm/assert_config",
 ]
 
 [dependencies]

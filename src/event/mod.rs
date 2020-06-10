@@ -279,7 +279,6 @@ impl Serialize for Value {
             Value::Integer(i) => serializer.serialize_i64(*i),
             Value::Float(f) => serializer.serialize_f64(*f),
             Value::Boolean(b) => serializer.serialize_bool(*b),
-            Value::Timestamp(_) => serializer.serialize_str(&self.to_string_lossy()),
             Value::Bytes(_) | Value::Timestamp(_) => {
                 serializer.serialize_str(&self.to_string_lossy())
             }

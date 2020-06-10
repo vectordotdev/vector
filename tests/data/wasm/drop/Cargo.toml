@@ -10,3 +10,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 vector-wasm = { version = "0.1", path = "../../../../lib/vector-wasm"}
+
+[workspace]

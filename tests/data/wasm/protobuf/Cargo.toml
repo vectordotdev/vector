@@ -19,3 +19,5 @@ anyhow = "1.0.28"
 
 [build-dependencies]
 prost-build = "0.6"
+
+[workspace]
