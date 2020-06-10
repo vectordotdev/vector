@@ -9,7 +9,7 @@ use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use sinks::socket::SocketSinkConfig;
 use sinks::util::{encoding::EncodingConfig, Encoding};
-use std::{collections::HashMap, thread, time::Duration};
+use std::{str::FromStr, collections::HashMap, thread, time::Duration};
 #[cfg(unix)]
 use tokio01::codec::{FramedWrite, LinesCodec};
 #[cfg(unix)]
@@ -23,6 +23,7 @@ use vector::{
     sinks,
     sources::syslog::{Mode, SyslogConfig},
 };
+use serde_json::Value;
 
 #[test]
 fn test_tcp_syslog() {
@@ -66,7 +67,12 @@ fn test_tcp_syslog() {
 
     let output_messages: Vec<SyslogMessageRFC5424> = output_lines
         .iter()
-        .map(|s| serde_json::from_str(s).unwrap())
+        .map(|s| {
+            let mut value = Value::from_str(s).unwrap();
+            value.as_object_mut().unwrap().remove("hostname"); // Vector adds this field which will cause a parse error.
+            value.as_object_mut().unwrap().remove("source_ip"); // Vector adds this field which will cause a parse error.
+            serde_json::from_value(value).unwrap()
+        })
         .collect();
     assert_eq!(output_messages, input_messages);
 }
@@ -117,7 +123,12 @@ fn test_udp_syslog() {
 
     let mut output_messages: Vec<SyslogMessageRFC5424> = output_lines
         .iter()
-        .map(|s| serde_json::from_str(s).unwrap())
+        .map(|s| {
+            let mut value = Value::from_str(s).unwrap();
+            value.as_object_mut().unwrap().remove("hostname"); // Vector adds this field which will cause a parse error.
+            value.as_object_mut().unwrap().remove("source_ip"); // Vector adds this field which will cause a parse error.
+            serde_json::from_value(value).unwrap()
+        })
         .collect();
 
     output_messages.sort_by_key(|m| m.timestamp.clone());
@@ -193,7 +204,12 @@ fn test_unix_stream_syslog() {
 
     let output_messages: Vec<SyslogMessageRFC5424> = output_lines
         .iter()
-        .map(|s| serde_json::from_str(s).unwrap())
+        .map(|s| {
+            let mut value = Value::from_str(s).unwrap();
+            value.as_object_mut().unwrap().remove("hostname"); // Vector adds this field which will cause a parse error.
+            value.as_object_mut().unwrap().remove("source_ip"); // Vector adds this field which will cause a parse error.
+            serde_json::from_value(value).unwrap()
+        })
         .collect();
     assert_eq!(output_messages, input_messages);
 }
