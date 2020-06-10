@@ -7,9 +7,10 @@ use approx::assert_relative_eq;
 use futures01::{Future, Sink, Stream};
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
+use serde_json::Value;
 use sinks::socket::SocketSinkConfig;
 use sinks::util::{encoding::EncodingConfig, Encoding};
-use std::{str::FromStr, collections::HashMap, thread, time::Duration};
+use std::{collections::HashMap, str::FromStr, thread, time::Duration};
 #[cfg(unix)]
 use tokio01::codec::{FramedWrite, LinesCodec};
 #[cfg(unix)]
@@ -23,7 +24,6 @@ use vector::{
     sinks,
     sources::syslog::{Mode, SyslogConfig},
 };
-use serde_json::Value;
 
 #[test]
 fn test_tcp_syslog() {
