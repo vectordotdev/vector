@@ -43,7 +43,7 @@ const MAX_EVENT_SIZE: usize = 256 * 1024;
 const MAX_MESSAGE_SIZE: usize = MAX_EVENT_SIZE - EVENT_SIZE_OVERHEAD;
 
 #[derive(Debug, Snafu)]
-enum BuildError {
+pub(self) enum CloudwatchLogsError {
     #[snafu(display("{}", source))]
     HttpClientError {
         source: rusoto_core::request::TlsError,
@@ -52,6 +52,8 @@ enum BuildError {
     InvalidCloudwatchCredentials {
         source: rusoto_core::CredentialsError,
     },
+    #[snafu(display("Encoded event is too long, length={}", length))]
+    EventTooLong { length: usize },
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -267,7 +269,10 @@ impl CloudwatchLogsSvc {
         })
     }
 
-    pub fn encode_log(&self, mut log: LogEvent) -> Option<InputLogEvent> {
+    pub(self) fn encode_log(
+        &self,
+        mut log: LogEvent,
+    ) -> Result<InputLogEvent, CloudwatchLogsError> {
         let timestamp = match log.remove(&event::log_schema().timestamp_key()) {
             Some(Value::Timestamp(ts)) => ts.timestamp_millis(),
             _ => Utc::now().timestamp_millis(),
@@ -282,11 +287,8 @@ impl CloudwatchLogsSvc {
         };
 
         match message.len() {
-            length if length <= MAX_MESSAGE_SIZE => Some(InputLogEvent { message, timestamp }),
-            length => {
-                error!(message = "Message exceeds CloudWatch maximum size", %length);
-                None
-            }
+            length if length <= MAX_MESSAGE_SIZE => Ok(InputLogEvent { message, timestamp }),
+            length => Err(CloudwatchLogsError::EventTooLong { length }),
         }
     }
 
@@ -303,7 +305,11 @@ impl CloudwatchLogsSvc {
                 e
             })
             .map(|e| e.into_log())
-            .filter_map(|e| self.encode_log(e))
+            .filter_map(|e| {
+                self.encode_log(e)
+                    .map_err(|error| error!(message = "Could not encode event", %error))
+                    .ok()
+            })
             .filter(|e| age_range.contains(&e.timestamp))
             .collect::<Vec<_>>();
 
