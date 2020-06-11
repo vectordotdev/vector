@@ -102,6 +102,7 @@ mod test {
 
     #[test]
     fn udp_message() {
+        crate::test_util::trace_init();
         let addr = next_addr();
         let receiver = UdpSocket::bind(addr).unwrap();
 
@@ -134,6 +135,7 @@ mod test {
 
     #[test]
     fn tcp_stream() {
+        crate::test_util::trace_init();
         let addr = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
@@ -151,6 +153,9 @@ mod test {
         let (lines, events) = random_lines_with_stream(10, 100);
         let pump = sink.send_all(events);
         let _ = rt.block_on(pump).unwrap();
+
+        // Some CI machines are very slow, be generous.
+        std::thread::sleep(std::time::Duration::from_secs(2));
 
         let output = receiver.wait();
         assert_eq!(output.len(), lines.len());
@@ -172,6 +177,7 @@ mod test {
     // events.
     #[test]
     fn tcp_stream_detects_disconnect() {
+        crate::test_util::trace_init();
         let addr = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
@@ -191,10 +197,9 @@ mod test {
 
         let close1 = close.clone();
         let counter1 = counter.clone();
+        let mut listener = rt.block_on_std(TcpListener::bind(addr)).unwrap();
         let jh = rt.spawn_handle(async move {
-            let mut listener = TcpListener::bind(&addr).await.unwrap();
-
-            // Only accept two connections after the second connection is done
+            // Only accept a few connections after the second connection is done
             // we can exit.
             for _ in 0..2 {
                 let (mut conn, _) = listener.accept().await.unwrap();
@@ -214,7 +219,7 @@ mod test {
                            if  n == 0 {
                                break;
                            } else {
-                               counter1.fetch_add(1, Ordering::Relaxed);
+                               counter1.fetch_add(1, Ordering::SeqCst);
                            }
                         }
                     };
@@ -233,17 +238,22 @@ mod test {
             let amnt = counter.load(Ordering::SeqCst);
 
             if amnt == 10 {
-                close.notify();
                 break;
             }
 
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            // Some CI machines are very slow, be generous.
+            std::thread::sleep(std::time::Duration::from_millis(500));
         }
+        assert!(counter.load(Ordering::SeqCst) >= 10);
+        close.notify();
 
         // Send another 10 events
         let (_, events) = random_lines_with_stream(10, 10);
         let pump = sink.send_all(events);
         let pump = rt.block_on(pump).unwrap();
+
+        // Some CI machines are very slow, be generous.
+        std::thread::sleep(std::time::Duration::from_secs(2));
 
         // Drop the connection to allow the server to fully read from the buffer
         // and exit.
@@ -252,7 +262,7 @@ mod test {
         // Wait for server task to be complete.
         rt.block_on_std(jh).unwrap();
 
-        // Check that there are exacty 20 events.
-        assert_eq!(counter.load(Ordering::Relaxed), 20);
+        // Check that there are exactly 20 events.
+        assert_eq!(counter.load(Ordering::SeqCst), 20);
     }
 }
