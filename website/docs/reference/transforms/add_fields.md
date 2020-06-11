@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-06-10"
 component_title: "Add Fields"
 description: "The Vector `add_fields` transform accepts and outputs `log` events, allowing you to add one or more log fields."
 event_types: ["log"]
 function_category: "schema"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "add_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
 status: "prod-ready"
 title: "Add Fields Transform"
+unsupported_operating_systems: []
 ---
 
 import Fields from '@site/src/components/Fields';

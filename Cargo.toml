@@ -31,6 +31,7 @@ members = [
   "lib/codec",
   "lib/file-source",
   "lib/tracing-limit",
+  "lib/vector-wasm",
 ]
 
 [dependencies]
@@ -52,7 +53,7 @@ tokio-compat = { version = "0.1", features = ["rt-full"] }
 async-trait = "0.1"
 
 # Tracing
-tracing = "0.1.9"
+tracing = "0.1.15"
 tracing-futures = { version = "0.2", features = ["futures-01", "futures-03"]}
 tracing-subscriber = "0.2.2"
 tracing-log = "0.1.0"
@@ -161,6 +162,13 @@ lru = "0.4.3"
 bloom = "0.3.2"
 pulsar = { version = "0.3.0", optional = true }
 task-compat = "0.1"
+# For WASM
+vector-wasm = { path = "lib/vector-wasm", optional = true }
+lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
+lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
+lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
+anyhow = { version = "1.0.28", optional = true }
+
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1"
@@ -220,6 +228,9 @@ rdkafka-cmake = ["rdkafka", "rdkafka/cmake_build"]
 leveldb-plain = ["leveldb", "leveldb/leveldb-sys-2"]
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `leveldb-plain` doesn't work.
 leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
+# This feature enables the WASM foreign module support.
+wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm", "anyhow"]
+wasm-timings = ["wasm"]
 
 # Sources
 sources = [
@@ -310,6 +321,7 @@ transforms-split = []
 transforms-swimlanes = []
 transforms-tag_cardinality_limit = []
 transforms-tokenizer = ["nom"]
+transforms-wasm = ["wasm"]
 
 # Sinks
 sinks = [
@@ -420,6 +432,11 @@ harness = false
 [[bench]]
 name = "isolated_buffering"
 harness = false
+
+[[bench]]
+name = "wasm"
+harness = false
+required-features = ["transforms-wasm", "transforms-lua"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"

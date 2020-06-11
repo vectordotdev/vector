@@ -32921,6 +32921,44 @@ module.exports = {
       "unsupported_operating_systems": [
 
       ]
+    },
+    "wasm": {
+      "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  artifact_cache = \"/etc/vector/artifacts\" # required\n  inputs = [\"in\"] # required\n  module = \"./modules/example.wasm\" # required\n  type = \"wasm\" # required"
+      },
+      "delivery_guarantee": null,
+      "description": null,
+      "event_types": [
+        "log"
+      ],
+      "features": [
+
+      ],
+      "function_category": "program",
+      "id": "wasm_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
+      "name": "wasm",
+      "operating_systems": [
+
+      ],
+      "output_types": [
+        "log"
+      ],
+      "service_providers": [
+
+      ],
+      "short_description": "Accepts log events and allows you to execute **experimental** WASM plugins.",
+      "status": "beta",
+      "title": "WASM",
+      "type": "transform",
+      "unsupported_operating_systems": [
+        "MacOS",
+        "Windows"
+      ]
     }
   }
 };

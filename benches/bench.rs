@@ -39,7 +39,7 @@ criterion_main!(
     batch::batch,
     files::files,
     lua::lua,
-    event::event
+    event::event,
 );
 
 fn benchmark_simple_pipe(c: &mut Criterion) {

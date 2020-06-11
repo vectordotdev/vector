@@ -1,11 +1,11 @@
 [package]
 name = "codec"
 version = "0.1.0"
-authors = ["Lucio Franco <luciofranco14@gmail.com>"]
+authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 
 [dependencies]
 bytes = { version = "0.4.10", features = ["serde"] }
 tokio-codec = "0.1"
-tracing = "0.1.2"
+tracing = "0.1.15"
 serde_json = "1.0.33"

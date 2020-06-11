@@ -434,6 +434,7 @@ features one has to pass a comma-separated list of component features.
 | `transforms-swimlanes` | Enables building of [`swimlanes` transform][docs.transforms.swimlanes].  |
 | `transforms-tag_cardinality_limit` | Enables building of [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit].  |
 | `transforms-tokenizer` | Enables building of [`tokenizer` transform][docs.transforms.tokenizer].  |
+| `transforms-wasm` | Enables building of [`wasm` transform][docs.transforms.wasm].  |
 | `sinks-aws_cloudwatch_logs` | Enables building of [`aws_cloudwatch_logs` sink][docs.sinks.aws_cloudwatch_logs].  |
 | `sinks-aws_cloudwatch_metrics` | Enables building of [`aws_cloudwatch_metrics` sink][docs.sinks.aws_cloudwatch_metrics].  |
 | `sinks-aws_kinesis_firehose` | Enables building of [`aws_kinesis_firehose` sink][docs.sinks.aws_kinesis_firehose].  |
@@ -547,6 +548,7 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
 [docs.transforms.tag_cardinality_limit]: /docs/reference/transforms/tag_cardinality_limit/
 [docs.transforms.tokenizer]: /docs/reference/transforms/tokenizer/
+[docs.transforms.wasm]: /docs/reference/transforms/wasm/
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc
 [urls.leveldb]: https://github.com/google/leveldb
 [urls.librdkafka]: https://github.com/edenhill/librdkafka

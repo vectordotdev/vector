@@ -656,6 +656,14 @@
           "description": "A simple title for this transform, typically one word.",
           "minLength": 1,
           "max_lenfth": 50
+        },
+        "only_operating_systems": {
+          "$ref": "#/definitions/operating_systems",
+          "description": "A whitelist of operating systems supported by this source."
+        },
+        "except_operating_systems": {
+          "$ref": "#/definitions/operating_systems",
+          "description": "A blacklist of operating systems not supported by this source."
         }
       }
     }
