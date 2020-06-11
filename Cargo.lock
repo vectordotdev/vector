@@ -5876,7 +5876,6 @@ dependencies = [
  "http 0.2.1",
  "hyper 0.12.35",
  "hyper 0.13.4",
- "hyper-openssl 0.7.1",
  "hyper-openssl 0.8.0",
  "indexmap",
  "inventory",

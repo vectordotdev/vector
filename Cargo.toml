@@ -105,7 +105,7 @@ bytes05 = { package = "bytes", version = "0.5", features = ["serde"] }
 stream-cancel = "0.4.3"
 hyper = "0.12.35"
 hyper13 = { package = "hyper", version = "0.13" }
-hyper-openssl = "0.7"
+hyper-openssl = "0.8"
 hyper-openssl08 = { package = "hyper-openssl", version = "0.8" }
 native-tls = "0.2.3"
 openssl = "0.10.26"
