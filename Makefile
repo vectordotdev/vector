@@ -58,8 +58,12 @@ help:
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make ${FORMATTING_BEGIN_BLUE}<target>${FORMATTING_END}\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  ${FORMATTING_BEGIN_BLUE}%-46s${FORMATTING_END} %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Environment
+
+# These are some predefined macros, please use them!
+
 # We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
 define ENVIRONMENT_EXEC
+	${ENVIRONMENT_PREPARE}
 	@echo "Entering environment..."
 	@mkdir -p target
 	$(CONTAINER_TOOL) run \
@@ -110,10 +114,8 @@ define ENVIRONMENT_PREPARE
 endef
 endif
 
-
-environment: ## Enter a full Vector dev shell in $CONTAINER_TOOL, binding this folder to the container.
-	${ENVIRONMENT_PREPARE}
-	@export ENVIRONMENT_TTY=true
+environment: export ENVIRONMENT_TTY = true ## Enter a full Vector dev shell in $CONTAINER_TOOL, binding this folder to the container.
+environment:
 	${ENVIRONMENT_EXEC}
 
 environment-prepare: ## Prepare the Vector dev shell using $CONTAINER_TOOL.
@@ -129,7 +131,6 @@ environment-push: environment-prepare ## Publish a new version of the container 
 ##@ Building
 build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make build
 	${ENVIRONMENT_COPY_ARTIFACTS}
 else
@@ -138,7 +139,6 @@ endif
 
 build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make build-dev
 	${ENVIRONMENT_COPY_ARTIFACTS}
 else
@@ -163,7 +163,6 @@ build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in rel
 
 test: ## Run the test suite
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test
 	${ENVIRONMENT_COPY_ARTIFACTS}
 else
@@ -174,7 +173,6 @@ test-all: test-behavior test-integration test-unit ## Runs all tests, unit, beha
 
 test-behavior: ## Runs behaviorial test
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-behavior
 	${ENVIRONMENT_COPY_ARTIFACTS}
 else
@@ -188,7 +186,6 @@ test-integration: test-integration-pulsar test-integration-splunk
 
 test-integration-aws: ## Runs Clickhouse integration tests
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}fre
 	${ENVIRONMENT_EXEC} make test-integration-aws
 else
 	if $(AUTOSPAWN); then \
@@ -207,7 +204,6 @@ endif
 
 test-integration-clickhouse: ## Runs Clickhouse integration tests
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-clickhouse
 else
 	if $(AUTOSPAWN); then \
@@ -222,7 +218,6 @@ endif
 
 test-integration-docker: ## Runs Docker integration tests
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-docker
 else
 	cargo test --no-default-features --features docker-integration-tests ::docker:: -- --nocapture
@@ -230,7 +225,6 @@ endif
 
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-elasticsearch
 else
 	if $(AUTOSPAWN); then \
@@ -245,7 +239,6 @@ endif
 
 test-integration-gcp: ## Runs GCP integration tests
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-gcp
 else
 	if $(AUTOSPAWN); then \
@@ -260,7 +253,6 @@ endif
 
 test-integration-influxdb: ## Runs Kafka integration tests
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-influxdb
 else
 	if $(AUTOSPAWN); then \
@@ -275,7 +267,6 @@ endif
 
 test-integration-kafka: ## Runs Kafka integration tests
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-kafka
 else
 	if $(AUTOSPAWN); then \
@@ -290,7 +281,6 @@ endif
 
 test-integration-loki: ## Runs Loki integration tests
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-loki
 else
 	if $(AUTOSPAWN); then \
@@ -305,7 +295,6 @@ endif
 
 test-integration-pulsar: ## Runs Pulsar integration tests
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-pulsar
 else
 	if $(AUTOSPAWN); then \
@@ -320,7 +309,6 @@ endif
 
 test-integration-splunk: ## Runs Splunk integration tests
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-integration-splunk
 else
 	if $(AUTOSPAWN); then \
@@ -339,7 +327,6 @@ test-integration-kubernetes: ## Runs Kubernetes integration tests (Sorry, no `EN
 
 test-shutdown: ## Runs shutdown tests
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make test-shutdown
 else
 	if $(AUTOSPAWN); then \
@@ -356,7 +343,6 @@ endif
 
 bench: ## Run benchmarks in /benches
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make bench
 	${ENVIRONMENT_COPY_ARTIFACTS}
 else
@@ -367,7 +353,6 @@ endif
 
 check: ## Run prerequisite code checks
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check
 else
 	cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
@@ -377,7 +362,6 @@ check-all: check-fmt check-clippy check-style check-markdown check-generate chec
 
 check-component-features: ## Check that all component features are setup properly
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check-component-features
 else
 	./scripts/check-component-features.sh
@@ -385,7 +369,6 @@ endif
 
 check-clippy: ## Check code with Clippy
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check-clippy
 else
 	cargo clippy --workspace --all-targets -- -D warnings
@@ -393,7 +376,6 @@ endif
 
 check-fmt: ## Check that all files are formatted properly
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check-fmt
 else
 	./scripts/check-fmt.sh
@@ -401,7 +383,6 @@ endif
 
 check-style: ## Check that all files are styled properly
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check-style
 else
 	./scripts/check-style.sh
@@ -409,7 +390,6 @@ endif
 
 check-markdown: ## Check that markdown is styled properly
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check-markdown
 else
 	@echo "This requires yarn have been run in the website/ dir!"
@@ -418,7 +398,6 @@ endif
 
 check-generate: ## Check that no files are pending generation
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check-generate
 else
 	./scripts/check-generate.sh
@@ -427,7 +406,6 @@ endif
 
 check-version: ## Check that Vector's version is correct accounting for recent changes
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check-version
 else
 	./scripts/check-version.rb
@@ -435,7 +413,6 @@ endif
 
 check-examples: ## Check that the config/examples files are valid
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check-examples
 else
 	cargo run -- validate --topology --deny-warnings ./config/examples/*.toml
@@ -443,7 +420,6 @@ endif
 
 check-scripts: ## Check that scipts do not have common mistakes
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make check-scripts
 else
 	./scripts/check-scripts.sh
@@ -588,7 +564,6 @@ verify-nixos:  ## Verify that Vector can be built on NixOS
 
 generate:  ## Generates files across the repo using the data in /.meta
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make generate
 else
 	bundle exec --gemfile scripts/Gemfile ./scripts/generate.rb
@@ -608,7 +583,6 @@ clean: environment-clean ## Clean everything
 
 fmt: ## Format code
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make fmt
 else
 	cargo fmt
@@ -626,7 +600,6 @@ signoff: ## Signsoff all previous commits since branch creation
 
 slim-builds: ## Updates the Cargo config to product disk optimized builds (for CI, not for users)
 ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_PREPARE}
 	${ENVIRONMENT_EXEC} make slim-builds
 else
 	./scripts/slim-builds.sh
