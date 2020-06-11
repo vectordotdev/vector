@@ -1,8 +1,8 @@
 //! A Kubernetes API client built using Vector interfaces to the system
 //! resources as building blocks.
 //!
-//! Here are a few pointers to the resources that were used as an inpiration for
-//! this mod:
+//! Here are a few pointers to the resources that were used as an inspiration
+//! for this mod:
 //!
 //! - https://github.com/kubernetes/client-go/blob/master/tools/clientcmd/api/types.go
 //!
