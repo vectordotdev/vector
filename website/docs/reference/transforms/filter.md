@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-05-04"
+last_modified_on: "2020-06-10"
 component_title: "Filter"
 description: "The Vector `filter` transform accepts and outputs `log` and `metric` events, allowing you to select events based on a set of logical conditions."
 event_types: ["log","metric"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+filter%22
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "filter|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/filter.rs
 status: "beta"
 title: "Filter Transform"
+unsupported_operating_systems: []
 ---
 
 import Fields from '@site/src/components/Fields';

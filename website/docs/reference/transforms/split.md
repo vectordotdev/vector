@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-06-10"
 component_title: "Split"
 description: "The Vector `split` transform accepts and outputs `log` events, allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+split%22
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "split|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/split.rs
 status: "prod-ready"
 title: "Split Transform"
+unsupported_operating_systems: []
 ---
 
 import Fields from '@site/src/components/Fields';

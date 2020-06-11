@@ -2692,6 +2692,47 @@ require('custom_module')
     timestamp = "timestamp|%a %b %e %T %Y"
     parent = {child = "int"}
 
+# Accepts and outputs `log` events, allowing you to execute **experimental** WASM plugins.
+[transforms.wasm]
+  # The directory where Vector should store the artifact it builds of this WASM
+  # module. Typically, all WASM modules share this.
+  #
+  # * required
+  # * type: string
+  artifact_cache = "/etc/vector/artifacts"
+  artifact_cache = "/var/lib/vector/artifacts"
+  artifact_cache = "C:\\vector\\artifacts"
+
+  # The maximum size of the heap of this module, in bytes. (This includes the
+  # module itself, default is 10 MB.)
+  #
+  # * optional
+  # * default: 10485760
+  # * type: int
+  heap_max_size = 10485760
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The file path of the `.wasm` or `.wat` module.
+  #
+  # * required
+  # * type: string
+  module = "./modules/example.wasm"
+  module = "/example.wat"
+  module = "example.wasm"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "wasm"
+  type = "wasm"
+
 
 # ------------------------------------------------------------------------------
 # Sinks

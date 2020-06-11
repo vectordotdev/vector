@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-05-19"
+last_modified_on: "2020-06-10"
 component_title: "Grok Parser"
 description: "The Vector `grok_parser` transform accepts and outputs `log` events, allowing you to parse a log field value with Grok."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+grok_parser%22
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "grok_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/grok_parser.rs
 status: "prod-ready"
 title: "Grok Parser Transform"
+unsupported_operating_systems: []
 ---
 
 import Fields from '@site/src/components/Fields';

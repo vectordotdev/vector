@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-06-10"
 component_title: "Rename Fields"
 description: "The Vector `rename_fields` transform accepts and outputs `log` events, allowing you to rename one or more log fields."
 event_types: ["log"]
 function_category: "schema"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+rename_fields%22
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "rename_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/rename_fields.rs
 status: "prod-ready"
 title: "Rename Fields Transform"
+unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';

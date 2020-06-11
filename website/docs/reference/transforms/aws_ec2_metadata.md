@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-06-10"
 component_title: "AWS EC2 Metadata"
 description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events, allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
 function_category: "enrich"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+aws_ec2_metadata%22
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "aws_ec2_metadata|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/aws_ec2_metadata.rs
 status: "beta"
 title: "AWS EC2 Metadata Transform"
+unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';

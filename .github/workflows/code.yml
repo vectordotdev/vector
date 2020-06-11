@@ -215,6 +215,15 @@ jobs:
       - run: make slim-builds
       - run: make test-unit
 
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make slim-builds
+      - run: make ensure-has-wasm-toolchain
+      - run: make build-wasm-tests
+      - run: make test-wasm
+
   test-default:
     runs-on: ubuntu-latest
     steps:
