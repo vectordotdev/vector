@@ -93,9 +93,9 @@ where
     pub(super) fn adjust_to_response(
         &self,
         start: Instant,
-        response: &Result<L::Response, L::Error>,
+        response: &Result<L::Response, crate::Error>,
     ) {
-        let is_back_pressure = matches!(response, Err(r) if self.logic.is_retriable_error(r));
+        let is_back_pressure = matches!(response, Err(r) if self.logic.is_retriable_error(r.downcast_ref::<L::Error>().expect("REMOVE THIS: We got an unexpected error type")));
         self.adjust_to_back_pressure(start, is_back_pressure)
     }
 }

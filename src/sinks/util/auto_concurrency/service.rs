@@ -46,17 +46,17 @@ impl<S, L> AutoConcurrencyLimit<S, L> {
 impl<S, L, Request> Service<Request> for AutoConcurrencyLimit<S, L>
 where
     S: Service<Request>,
-    S::Error: Error + Send + Sync + 'static,
-    L: RetryLogic<Response = S::Response, Error = S::Error>,
+    S::Error: Into<crate::Error>,
+    L: RetryLogic<Response = S::Response>,
 {
     type Response = S::Response;
-    type Error = S::Error;
+    type Error = crate::Error;
     type Future = ResponseFuture<S::Future, L>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         loop {
             self.state = match self.state {
-                State::Ready(_) => return self.inner.poll_ready(cx),
+                State::Ready(_) => return self.inner.poll_ready(cx).map_err(Into::into),
                 State::Waiting(ref mut fut) => {
                     tokio::pin!(fut);
                     let permit = ready!(fut.poll(cx));

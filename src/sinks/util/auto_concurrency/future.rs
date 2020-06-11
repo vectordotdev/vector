@@ -40,16 +40,17 @@ impl<F, L> ResponseFuture<F, L> {
     }
 }
 
-impl<F, L> Future for ResponseFuture<F, L>
+impl<F, L, E> Future for ResponseFuture<F, L>
 where
-    F: Future<Output = Result<L::Response, L::Error>>,
+    F: Future<Output = Result<L::Response, E>>,
     L: RetryLogic,
+    E: Into<crate::Error>,
 {
-    type Output = Result<L::Response, L::Error>;
+    type Output = Result<L::Response, crate::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let future = self.project();
-        let output = ready!(future.inner.poll(cx));
+        let output = ready!(future.inner.poll(cx)).map_err(Into::into);
         future.controller.adjust_to_response(*future.start, &output);
         Poll::Ready(output)
     }
