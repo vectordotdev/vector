@@ -155,7 +155,7 @@ mod test {
         let _ = rt.block_on(pump).unwrap();
 
         // Some CI machines are very slow, be generous.
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        std::thread::sleep(std::time::Duration::from_secs(2));
 
         let output = receiver.wait();
         assert_eq!(output.len(), lines.len());
@@ -252,6 +252,9 @@ mod test {
         let pump = sink.send_all(events);
         let pump = rt.block_on(pump).unwrap();
 
+        // Some CI machines are very slow, be generous.
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
         // Drop the connection to allow the server to fully read from the buffer
         // and exit.
         drop(pump);
@@ -259,7 +262,7 @@ mod test {
         // Wait for server task to be complete.
         rt.block_on_std(jh).unwrap();
 
-        // Check that there are exacty 20 events.
+        // Check that there are exactly 20 events.
         assert_eq!(counter.load(Ordering::SeqCst), 20);
     }
 }
