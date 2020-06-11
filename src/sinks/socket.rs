@@ -154,6 +154,9 @@ mod test {
         let pump = sink.send_all(events);
         let _ = rt.block_on(pump).unwrap();
 
+        // Some CI machines are very slow, be generous.
+        std::thread::sleep(std::time::Duration::from_secs(1));
+
         let output = receiver.wait();
         assert_eq!(output.len(), lines.len());
         for (source, received) in lines.iter().zip(output) {
