@@ -327,10 +327,9 @@ impl ElasticSearchCommon {
                 let provider =
                     DefaultCredentialsProvider::new().context(AWSCredentialsProviderFailed)?;
 
-                let mut rt = tokio01::runtime::current_thread::Runtime::new()?;
-
+                let mut rt = tokio_compat::runtime::current_thread::Runtime::new()?;
                 let credentials = rt
-                    .block_on(provider.credentials().compat())
+                    .block_on_std(provider.credentials())
                     .context(AWSCredentialsGenerateFailed)?;
 
                 Some(credentials)
@@ -524,6 +523,7 @@ mod integration_tests {
         topology::config::{SinkConfig, SinkContext},
         Event,
     };
+    use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
     use http02::{Request, StatusCode};
     use hyper13::Body;
@@ -659,6 +659,10 @@ mod integration_tests {
     }
 
     fn run_insert_tests(mut config: ElasticSearchConfig, break_events: bool) {
+        // Need async version of ElasticSearchCommon::parse_config otherwise
+        // function called in blocked runtime will panic with error:
+        // default Tokio reactor already set for execution context
+
         crate::test_util::trace_init();
         let mut rt = runtime();
 
@@ -669,68 +673,77 @@ mod integration_tests {
         let cx = SinkContext::new_test(rt.executor());
         let (sink, healthcheck) = config.build(cx.clone()).expect("Building config failed");
 
-        rt.block_on(healthcheck).expect("Health check failed");
+        rt.block_on_std(async move {
+            healthcheck.compat().await.expect("Health check failed");
 
-        let (input, events) = random_events_with_stream(100, 100);
-        match break_events {
-            true => {
-                // Break all but the first event to simulate some kind of partial failure
-                let mut doit = false;
-                let pump = sink.send_all(events.map(move |mut event| {
-                    if doit {
-                        event.as_mut_log().insert("message", 1);
-                    }
-                    doit = true;
-                    event
-                }));
-                let _ = rt.block_on(pump).expect("Sending events failed");
+            let (input, events) = random_events_with_stream(100, 100);
+            match break_events {
+                true => {
+                    // Break all but the first event to simulate some kind of partial failure
+                    let mut doit = false;
+                    let _ = sink
+                        .send_all(events.map(move |mut event| {
+                            if doit {
+                                event.as_mut_log().insert("message", 1);
+                            }
+                            doit = true;
+                            event
+                        }))
+                        .compat()
+                        .await
+                        .expect("Sending events failed");
+                }
+                false => {
+                    let _ = sink
+                        .send_all(events)
+                        .compat()
+                        .await
+                        .expect("Sending events failed");
+                }
+            };
+
+            // make sure writes all all visible
+            flush(cx.resolver(), common.clone())
+                .await
+                .expect("Flushing writes failed");
+
+            let mut test_ca = Vec::<u8>::new();
+            File::open("tests/data/Vector_CA.crt")
+                .unwrap()
+                .read_to_end(&mut test_ca)
+                .unwrap();
+            let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+
+            let client = reqwest::Client::builder()
+                .add_root_certificate(test_ca)
+                .build()
+                .expect("Could not build HTTP client");
+
+            let response = client
+                .get(&format!("{}/{}/_search", common.base_url, index))
+                .json(&json!({
+                    "query": { "query_string": { "query": "*" } }
+                }))
+                .send()
+                .unwrap()
+                .json::<elastic_responses::search::SearchResponse<Value>>()
+                .unwrap();
+
+            if break_events {
+                assert_ne!(input.len() as u64, response.total());
+            } else {
+                assert_eq!(input.len() as u64, response.total());
+
+                let input = input
+                    .into_iter()
+                    .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
+                    .collect::<Vec<_>>();
+                for hit in response.into_hits() {
+                    let event = hit.into_document().unwrap();
+                    assert!(input.contains(&event));
+                }
             }
-            false => {
-                let pump = sink.send_all(events);
-                let _ = rt.block_on(pump).expect("Sending events failed");
-            }
-        };
-
-        // make sure writes all all visible
-        rt.block_on_std(flush(cx.resolver(), common.clone()))
-            .expect("Flushing writes failed");
-
-        let mut test_ca = Vec::<u8>::new();
-        File::open("tests/data/Vector_CA.crt")
-            .unwrap()
-            .read_to_end(&mut test_ca)
-            .unwrap();
-        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
-
-        let client = reqwest::Client::builder()
-            .add_root_certificate(test_ca)
-            .build()
-            .expect("Could not build HTTP client");
-
-        let response = client
-            .get(&format!("{}/{}/_search", common.base_url, index))
-            .json(&json!({
-                "query": { "query_string": { "query": "*" } }
-            }))
-            .send()
-            .unwrap()
-            .json::<elastic_responses::search::SearchResponse<Value>>()
-            .unwrap();
-
-        if break_events {
-            assert_ne!(input.len() as u64, response.total());
-        } else {
-            assert_eq!(input.len() as u64, response.total());
-
-            let input = input
-                .into_iter()
-                .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
-                .collect::<Vec<_>>();
-            for hit in response.into_hits() {
-                let event = hit.into_document().unwrap();
-                assert!(input.contains(&event));
-            }
-        }
+        });
     }
 
     fn gen_index() -> String {

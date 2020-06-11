@@ -538,13 +538,15 @@ mod integration_tests {
         test_util::{random_lines_with_stream, random_string, runtime},
         topology::config::SinkContext,
     };
+    use bytes05::BytesMut;
     use flate2::read::GzDecoder;
+    use futures::compat::Future01CompatExt;
     use futures::stream::{self, StreamExt};
     use futures01::Sink;
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
     use rusoto_s3::{S3Client, S3};
-    use std::io::{BufRead, BufReader};
+    use std::io::{BufRead, BufReader, Cursor};
 
     const BUCKET: &str = "router-tests";
 
@@ -553,15 +555,15 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let config = rt.block_on_std(config(1000000));
-        let prefix = config.key_prefix.clone();
-        let sink = S3Sink::new(&config, cx).unwrap();
-
-        let (lines, events) = random_lines_with_stream(100, 10);
-
-        let pump = sink.send_all(events);
-        let _ = rt.block_on(pump).unwrap();
         rt.block_on_std(async move {
+            let config = config(1000000).await;
+            let prefix = config.key_prefix.clone();
+            let sink = S3Sink::new(&config, cx).unwrap();
+
+            let (lines, events) = random_lines_with_stream(100, 10);
+
+            let _ = sink.send_all(events).compat().await.unwrap();
+
             let keys = get_keys(prefix.unwrap()).await;
             assert_eq!(keys.len(), 1);
 
@@ -571,9 +573,9 @@ mod integration_tests {
             let obj = get_object(key).await;
             assert_eq!(obj.content_encoding, None);
 
-            let response_lines = get_lines(obj);
+            let response_lines = get_lines(obj).await;
             assert_eq!(lines, response_lines);
-        });
+        })
     }
 
     #[test]
@@ -581,41 +583,43 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let config = rt.block_on_std(async {
-            S3SinkConfig {
+        rt.block_on_std(async move {
+            let config = S3SinkConfig {
                 key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
                 filename_time_format: Some("waitsforfullbatch".into()),
                 filename_append_uuid: Some(false),
                 ..config(1000).await
-            }
-        });
-        let prefix = config.key_prefix.clone();
-        let sink = S3Sink::new(&config, cx).unwrap();
-
-        let (lines, _events) = random_lines_with_stream(100, 30);
-
-        let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
-            let mut e = Event::from(line);
-            let i = if i < 10 {
-                1
-            } else if i < 20 {
-                2
-            } else {
-                3
             };
-            e.as_mut_log().insert("i", format!("{}", i));
-            e
-        });
+            let prefix = config.key_prefix.clone();
+            let sink = S3Sink::new(&config, cx).unwrap();
 
-        let pump = sink.send_all(futures01::stream::iter_ok(events));
-        let _ = rt.block_on(pump).unwrap();
-        rt.block_on_std(async move {
+            let (lines, _events) = random_lines_with_stream(100, 30);
+
+            let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
+                let mut e = Event::from(line);
+                let i = if i < 10 {
+                    1
+                } else if i < 20 {
+                    2
+                } else {
+                    3
+                };
+                e.as_mut_log().insert("i", format!("{}", i));
+                e
+            });
+
+            let _ = sink
+                .send_all(futures01::stream::iter_ok(events))
+                .compat()
+                .await
+                .unwrap();
+
             let keys = get_keys(prefix.unwrap()).await;
             assert_eq!(keys.len(), 3);
 
             let response_lines = stream::iter(keys)
                 .fold(Vec::new(), |mut acc, key| async {
-                    acc.push(get_lines(get_object(key).await));
+                    acc.push(get_lines(get_object(key).await).await);
                     acc
                 })
                 .await;
@@ -649,7 +653,6 @@ mod integration_tests {
 
         let mut rt = runtime();
         rt.spawn_std(async {
-            use futures::compat::Future01CompatExt;
             let _ = sink.send_all(rx).compat().await.unwrap();
         });
 
@@ -683,7 +686,7 @@ mod integration_tests {
 
             let response_lines = stream::iter(keys)
                 .fold(Vec::new(), |mut acc, key| async {
-                    acc.push(get_lines(get_object(key).await));
+                    acc.push(get_lines(get_object(key).await).await);
                     acc
                 })
                 .await;
@@ -701,21 +704,20 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let config = rt.block_on_std(async {
-            S3SinkConfig {
+        rt.block_on_std(async {
+            let config = S3SinkConfig {
                 compression: Compression::Gzip,
                 filename_time_format: Some("%S%f".into()),
                 ..config(1000).await
-            }
-        });
+            };
 
-        let prefix = config.key_prefix.clone();
-        let sink = S3Sink::new(&config, cx).unwrap();
+            let prefix = config.key_prefix.clone();
+            let sink = S3Sink::new(&config, cx).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 500);
+            let (lines, events) = random_lines_with_stream(100, 500);
 
-        let _ = rt.block_on(sink.send_all(events)).unwrap();
-        rt.block_on_std(async move {
+            let _ = sink.send_all(events).compat().await.unwrap();
+
             let keys = get_keys(prefix.unwrap()).await;
             assert_eq!(keys.len(), 2);
 
@@ -725,7 +727,7 @@ mod integration_tests {
                 let obj = get_object(key).await;
                 assert_eq!(obj.content_encoding, Some("gzip".to_string()));
 
-                acc.append(&mut get_gzipped_lines(obj));
+                acc.append(&mut get_gzipped_lines(obj).await);
                 acc
             });
 
@@ -738,9 +740,10 @@ mod integration_tests {
         let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
-        let config = rt.block_on_std(config(1));
-        let healthcheck = S3Sink::healthcheck(config, resolver);
-        rt.block_on_std(healthcheck).unwrap();
+        rt.block_on_std(async move {
+            let config = config(1).await;
+            S3Sink::healthcheck(config, resolver).await.unwrap();
+        });
     }
 
     #[test]
@@ -748,18 +751,17 @@ mod integration_tests {
         let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
-        let config = rt.block_on_std(async {
-            S3SinkConfig {
+        rt.block_on_std(async move {
+            let config = S3SinkConfig {
                 bucket: "asdflkjadskdaadsfadf".to_string(),
                 ..config(1).await
-            }
+            };
+            assert_downcast_matches!(
+                S3Sink::healthcheck(config, resolver).await.unwrap_err(),
+                HealthcheckError,
+                HealthcheckError::UnknownBucket{ .. }
+            );
         });
-        let healthcheck = S3Sink::healthcheck(config, resolver);
-        assert_downcast_matches!(
-            rt.block_on_std(healthcheck).unwrap_err(),
-            HealthcheckError,
-            HealthcheckError::UnknownBucket{ .. }
-        );
     }
 
     fn client() -> S3Client {
@@ -844,13 +846,27 @@ mod integration_tests {
             .unwrap()
     }
 
-    fn get_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
-        let buf_read = BufReader::new(obj.body.unwrap().into_blocking_read());
+    async fn get_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
+        let body = get_object_output_body(obj).await;
+        let buf_read = BufReader::new(body);
         buf_read.lines().map(|l| l.unwrap()).collect()
     }
 
-    fn get_gzipped_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
-        let buf_read = BufReader::new(GzDecoder::new(obj.body.unwrap().into_blocking_read()));
+    async fn get_gzipped_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
+        let body = get_object_output_body(obj).await;
+        let buf_read = BufReader::new(GzDecoder::new(body));
         buf_read.lines().map(|l| l.unwrap()).collect()
+    }
+
+    async fn get_object_output_body(obj: rusoto_s3::GetObjectOutput) -> Cursor<Bytes> {
+        let bytes = obj
+            .body
+            .unwrap()
+            .fold(BytesMut::new(), |mut store, bytes| async move {
+                store.extend_from_slice(&bytes.unwrap());
+                store
+            })
+            .await;
+        Cursor::new(bytes.freeze())
     }
 }

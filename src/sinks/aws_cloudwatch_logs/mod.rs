@@ -150,13 +150,14 @@ pub enum CloudwatchError {
 impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let batch = self.batch.unwrap_or(1000, 1);
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        // let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let log_group = self.group_name.clone();
         let log_stream = self.stream_name.clone();
 
         let svc = ServiceBuilder::new()
-            .concurrency_limit(request.in_flight_limit)
+            // .concurrency_limit(request.in_flight_limit)
+            .concurrency_limit(1)
             .service(CloudwatchLogsPartitionSvc::new(
                 self.clone(),
                 cx.resolver(),
@@ -1010,43 +1011,40 @@ mod integration_tests {
             line
         };
 
-        // ------------------ past
+        // Too old event (> 14 days)
         add_event(Duration::days(-15));
-        // ------------------ 14 day limit
-        lines.push(add_event(Duration::days(-13)));
-        lines.push(add_event(Duration::days(-1)));
-        // ------------------ now
+        // Too new event (> 2 hours)
+        add_event(Duration::minutes(125));
+        // Now and future in +2h limit
         lines.push(add_event(Duration::zero()));
-        // ------------------ future
         lines.push(add_event(Duration::hours(1)));
         lines.push(add_event(Duration::minutes(110)));
-        // ------------------ 2h limit
-        add_event(Duration::minutes(125));
+        // 14 days limit
+        lines.push(add_event(Duration::days(-1)));
+        lines.push(add_event(Duration::days(-13)));
 
         let pump = sink.send_all(stream::iter_ok(events));
         let (sink, _) = rt.block_on(pump).unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
-        request.log_group_name = GROUP_NAME.into();
-        request.start_time = Some((now - Duration::days(30)).timestamp_millis());
+        rt.block_on_std(async move {
+            let client = create_client(region, None, resolver).unwrap();
 
-        let client = create_client(region, None, resolver).unwrap();
+            let mut request = GetLogEventsRequest::default();
+            request.log_stream_name = stream_name.clone().into();
+            request.log_group_name = GROUP_NAME.into();
+            request.start_time = Some((now - Duration::days(30)).timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { client.get_log_events(request).await })
-            .unwrap();
+            let response = client.get_log_events(request).await.unwrap();
+            let events = response.events.unwrap();
+            let output_lines = events
+                .into_iter()
+                .map(|e| e.message.unwrap())
+                .collect::<Vec<_>>();
 
-        let events = response.events.unwrap();
-
-        let output_lines = events
-            .into_iter()
-            .map(|e| e.message.unwrap())
-            .collect::<Vec<_>>();
-
-        assert_eq!(output_lines, lines);
+            assert_eq!(output_lines, lines);
+        });
     }
 
     #[test]
@@ -1064,7 +1062,7 @@ mod integration_tests {
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
-            group_name: Template::try_from(GROUP_NAME).unwrap(),
+            group_name: Template::try_from(group_name.as_str()).unwrap(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
@@ -1085,29 +1083,29 @@ mod integration_tests {
         // drop the sink so it closes all its connections
         drop(sink);
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
-        request.log_group_name = group_name;
-        request.start_time = Some(timestamp.timestamp_millis());
+        rt.block_on_std(async move {
+            let client = create_client(region, None, resolver).unwrap();
 
-        let client = create_client(region, None, resolver).unwrap();
+            let mut request = GetLogEventsRequest::default();
+            request.log_stream_name = stream_name.clone().into();
+            request.log_group_name = group_name;
+            request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { client.get_log_events(request).await })
-            .unwrap();
+            let response = client.get_log_events(request).await.unwrap();
+            let events = response.events.unwrap();
+            let output_lines = events
+                .into_iter()
+                .map(|e| e.message.unwrap())
+                .collect::<Vec<_>>();
 
-        let events = response.events.unwrap();
-
-        let output_lines = events
-            .into_iter()
-            .map(|e| e.message.unwrap())
-            .collect::<Vec<_>>();
-
-        assert_eq!(output_lines, input_lines);
+            assert_eq!(output_lines, input_lines);
+        });
     }
 
     #[test]
     fn cloudwatch_insert_log_event_batched() {
+        crate::test_util::trace_init();
+
         let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
@@ -1122,7 +1120,7 @@ mod integration_tests {
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
-            group_name: Template::try_from(GROUP_NAME).unwrap(),
+            group_name: Template::try_from(group_name.as_str()).unwrap(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
@@ -1146,25 +1144,24 @@ mod integration_tests {
         // drop the sink so it closes all its connections
         drop(sink);
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
-        request.log_group_name = group_name.into();
-        request.start_time = Some(timestamp.timestamp_millis());
+        rt.block_on_std(async move {
+            let client = create_client(region, None, resolver).unwrap();
 
-        let client = create_client(region, None, resolver).unwrap();
+            let mut request = GetLogEventsRequest::default();
+            request.log_stream_name = stream_name.clone().into();
+            request.log_group_name = group_name.into();
+            request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { client.get_log_events(request).await })
-            .unwrap();
+            let response = client.get_log_events(request).await.unwrap();
+            let events = response.events.unwrap();
+            let output_lines = events
+                .into_iter()
+                .map(|e| e.message.unwrap())
+                .collect::<Vec<_>>();
 
-        let events = response.events.unwrap();
-
-        let output_lines = events
-            .into_iter()
-            .map(|e| e.message.unwrap())
-            .collect::<Vec<_>>();
-
-        assert_eq!(output_lines, input_lines);
+            assert_eq!(output_lines, input_lines);
+            println!("done")
+        });
     }
 
     #[test]
@@ -1290,7 +1287,7 @@ mod integration_tests {
         let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
-        let _ = rt.block_on_std(healthcheck(config, resolver));
+        let _ = rt.block_on_std(healthcheck(config, resolver)).unwrap();
     }
 
     fn ensure_group(region: Region) {
@@ -1304,9 +1301,13 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let _ = rt
-            .block_on_std(async move { client.create_log_group(req).await })
-            .unwrap();
+        rt.block_on_std(async move {
+            match client.create_log_group(req).await {
+                Ok(_) => {}
+                Err(RusotoError::Service(CreateLogGroupError::ResourceAlreadyExists(_))) => {}
+                Err(err) => panic!("{:?}", err),
+            };
+        });
     }
 
     fn gen_name() -> String {
