@@ -67,9 +67,41 @@ pub enum Error {
     },
 }
 
+/// This function implements the exact same logic that Go's `net.JoinHostPort`
+/// has.
+/// Rust doesn't have anything like this out of the box, yet the reference
+/// kubernetes client in-cluster config implementation uses it:
+/// https://github.com/kubernetes/client-go/blob/3d5c80942cce510064da1ab62c579e190a0230fd/rest/config.go#L484
+///
+/// To avoid needlessly complicating the logic here, we simply implement the
+/// `net.JoinHostPort` as it is in Go: https://golang.org/pkg/net/#JoinHostPort
 fn join_host_port(host: &str, port: &str) -> String {
     if host.contains(":") {
         return format!("[{}]:{}", host, port);
     }
     format!("{}:{}", host, port)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_join_host_port() {
+        // IPv4
+        assert_eq!(join_host_port("0.0.0.0", "1234"), "0.0.0.0:1234");
+        assert_eq!(join_host_port("127.0.0.1", "443"), "127.0.0.1:443");
+        // IPv6
+        assert_eq!(join_host_port("::", "1234"), "[::]:1234");
+        assert_eq!(
+            join_host_port("2001:0db8:0000:0000:0000:8a2e:0370:7334", "1234"),
+            "[2001:0db8:0000:0000:0000:8a2e:0370:7334]:1234"
+        );
+        assert_eq!(
+            join_host_port("2001:db8::8a2e:370:7334", "1234"),
+            "[2001:db8::8a2e:370:7334]:1234"
+        );
+        // DNS
+        assert_eq!(join_host_port("example.com", "1234"), "example.com:1234");
+    }
 }
