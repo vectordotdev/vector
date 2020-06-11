@@ -1,7 +1,6 @@
 *.iml
 *.tmp
 **/*.rs.bk
-.envrc
 .DS_Store
 .idea/
 .vscode/

@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn file_update() {
         crate::test_util::trace_init();
-        let delay = Duration::from_secs(1);
+        let delay = Duration::from_secs(3);
         let file_path = temp_file();
         let mut file = File::create(&file_path).unwrap();
 
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn multi_file_update() {
         crate::test_util::trace_init();
-        let delay = Duration::from_secs(1);
+        let delay = Duration::from_secs(3);
         let file_path = temp_file();
         let mut file = File::create(&file_path).unwrap();
 
@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn sym_file_update() {
         crate::test_util::trace_init();
-        let delay = Duration::from_secs(1);
+        let delay = Duration::from_secs(3);
         let file_path = temp_file();
         let sym_file = temp_file();
         let mut file = File::create(&file_path).unwrap();

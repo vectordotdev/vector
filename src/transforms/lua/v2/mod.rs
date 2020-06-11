@@ -353,6 +353,7 @@ mod tests {
 
     #[test]
     fn lua_add_field() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -373,6 +374,7 @@ mod tests {
 
     #[test]
     fn lua_read_field() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -394,6 +396,7 @@ mod tests {
 
     #[test]
     fn lua_remove_field() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -414,6 +417,7 @@ mod tests {
 
     #[test]
     fn lua_drop_event() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -433,6 +437,7 @@ mod tests {
 
     #[test]
     fn lua_duplicate_event() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -454,6 +459,7 @@ mod tests {
 
     #[test]
     fn lua_read_empty_field() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -477,6 +483,7 @@ mod tests {
 
     #[test]
     fn lua_integer_value() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -494,6 +501,7 @@ mod tests {
 
     #[test]
     fn lua_numeric_value() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -511,6 +519,7 @@ mod tests {
 
     #[test]
     fn lua_boolean_value() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -528,6 +537,7 @@ mod tests {
 
     #[test]
     fn lua_non_coercible_value() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -545,6 +555,7 @@ mod tests {
 
     #[test]
     fn lua_non_string_key_write() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -565,6 +576,7 @@ mod tests {
 
     #[test]
     fn lua_non_string_key_read() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -582,6 +594,7 @@ mod tests {
 
     #[test]
     fn lua_script_error() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -601,6 +614,7 @@ mod tests {
 
     #[test]
     fn lua_syntax_error() {
+        crate::test_util::trace_init();
         let err = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -620,9 +634,9 @@ mod tests {
     fn lua_load_file() {
         use std::fs::File;
         use std::io::Write;
+        crate::test_util::trace_init();
 
         let dir = tempfile::tempdir().unwrap();
-
         let mut file = File::create(dir.path().join("script2.lua")).unwrap();
         write!(
             &mut file,
@@ -647,9 +661,9 @@ mod tests {
                 emit(event)
             end
             """
-            search_dirs = ["{}"]
+            search_dirs = [{:?}]
             "#,
-            dir.path().display()
+            dir.path().as_os_str() // This seems a bit weird, but recall we also support windows.
         );
 
         let mut transform = from_config(&config).unwrap();
@@ -661,6 +675,7 @@ mod tests {
 
     #[test]
     fn lua_pairs() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -686,6 +701,7 @@ mod tests {
 
     #[test]
     fn lua_metric() {
+        crate::test_util::trace_init();
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)

@@ -1,4 +1,4 @@
-name: labels
+name: Labels
 
 on:
   push:

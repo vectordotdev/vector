@@ -73,7 +73,7 @@ make test ENVIRONMENT=true
 # Validate your tests pass (starting required services in Docker)
 make test-integration SCOPE="sources::example" ENVIRONMENT=true
 # Validate your tests pass against a live service.
-make test-integration SCOPE="sources::example" autospawn=false ENVIRONMENT=true
+make test-integration SCOPE="sources::example" AUTOSPAWN=false ENVIRONMENT=true
 # Validate all tests pass (starting required services in Docker)
 make test-integration ENVIRONMENT=true
 # Run your benchmarks
@@ -151,19 +151,19 @@ cargo build
 make build-dev
 # Validate your test pass
 cargo test sources::example
-make test scope="sources::example"
+make test SCOPE="sources::example"
 # Validate tests (that do not require other services) pass
 cargo test
 make test
 # Validate your tests pass (starting required services in Docker)
-make test-integration scope="sources::example" autospawn=false
+make test-integration SCOPE="sources::example" AUTOSPAWN=true
 # Validate your tests pass against a live service.
-make test-integration scope="sources::example" autospawn=false
+make test-integration SCOPE="sources::example" AUTOSPAWN=false
 cargo test --features docker sources::example
 # Validate all tests pass (starting required services in Docker)
 make test-integration
 # Run your benchmarks
-make bench scope="transforms::example"
+make bench SCOPE="transforms::example"
 cargo bench transforms::example
 # Rebuild Vector's metadata
 make generate

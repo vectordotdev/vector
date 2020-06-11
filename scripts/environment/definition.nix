@@ -30,6 +30,10 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     AWS_SECRET_ACCESS_KEY = "dummy";
     # Lucet (for wasm) depends on libclang
     LIBCLANG_PATH="${pkgs.llvmPackages.libclang}/lib";
+    CPATH= if pkgs.stdenv.isLinux then
+    "${pkgs.linuxHeaders}/include"
+    else
+    "";
   };
 
   packages = with pkgs; [
@@ -68,12 +72,6 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     docker
     docker-compose
     # Wasm
-    (import (builtins.fetchGit {
-        name = "wabt";
-      url = "https://github.com/nixos/nixpkgs-channels/";
-      ref = "refs/heads/nixpkgs-unstable";
-      rev = "f61b3e02c05d36c58cb5f5fc793c38df5a79e490";
-    }) {}).wabt
     llvmPackages.libclang
   ] ++ (if stdenv.isDarwin then [
     darwin.cf-private
@@ -89,5 +87,6 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     # Container tools
     podman
     podman-compose
+    linuxHeaders
   ]);
 }

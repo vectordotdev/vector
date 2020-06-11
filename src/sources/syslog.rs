@@ -53,7 +53,7 @@ pub enum Mode {
     },
 }
 
-fn default_max_length() -> usize {
+pub fn default_max_length() -> usize {
     bytesize::kib(100u64) as usize
 }
 

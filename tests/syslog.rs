@@ -7,9 +7,10 @@ use approx::assert_relative_eq;
 use futures01::{Future, Sink, Stream};
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
+use serde_json::Value;
 use sinks::socket::SocketSinkConfig;
 use sinks::util::{encoding::EncodingConfig, Encoding};
-use std::{collections::HashMap, thread, time::Duration};
+use std::{collections::HashMap, str::FromStr, thread, time::Duration};
 #[cfg(unix)]
 use tokio01::codec::{FramedWrite, LinesCodec};
 #[cfg(unix)]
@@ -66,7 +67,12 @@ fn test_tcp_syslog() {
 
     let output_messages: Vec<SyslogMessageRFC5424> = output_lines
         .iter()
-        .map(|s| serde_json::from_str(s).unwrap())
+        .map(|s| {
+            let mut value = Value::from_str(s).unwrap();
+            value.as_object_mut().unwrap().remove("hostname"); // Vector adds this field which will cause a parse error.
+            value.as_object_mut().unwrap().remove("source_ip"); // Vector adds this field which will cause a parse error.
+            serde_json::from_value(value).unwrap()
+        })
         .collect();
     assert_eq!(output_messages, input_messages);
 }
@@ -117,7 +123,12 @@ fn test_udp_syslog() {
 
     let mut output_messages: Vec<SyslogMessageRFC5424> = output_lines
         .iter()
-        .map(|s| serde_json::from_str(s).unwrap())
+        .map(|s| {
+            let mut value = Value::from_str(s).unwrap();
+            value.as_object_mut().unwrap().remove("hostname"); // Vector adds this field which will cause a parse error.
+            value.as_object_mut().unwrap().remove("source_ip"); // Vector adds this field which will cause a parse error.
+            serde_json::from_value(value).unwrap()
+        })
         .collect();
 
     output_messages.sort_by_key(|m| m.timestamp.clone());
@@ -172,7 +183,11 @@ fn test_unix_stream_syslog() {
                 .map(|(_source, sink)| sink)
                 .and_then(|sink| {
                     let socket = sink.into_inner().into_inner();
-                    tokio01::io::shutdown(socket)
+                    // In tokio 0.1 `AsyncWrite::shutdown` for `TcpStream` is a noop.
+                    // See https://docs.rs/tokio-tcp/0.1.4/src/tokio_tcp/stream.rs.html#917
+                    // Use `TcpStream::shutdown` instead - it actually does something.
+                    socket
+                        .shutdown(std::net::Shutdown::Both)
                         .map(|_| ())
                         .map_err(|e| panic!("{:}", e))
                 })
@@ -189,7 +204,12 @@ fn test_unix_stream_syslog() {
 
     let output_messages: Vec<SyslogMessageRFC5424> = output_lines
         .iter()
-        .map(|s| serde_json::from_str(s).unwrap())
+        .map(|s| {
+            let mut value = Value::from_str(s).unwrap();
+            value.as_object_mut().unwrap().remove("hostname"); // Vector adds this field which will cause a parse error.
+            value.as_object_mut().unwrap().remove("source_ip"); // Vector adds this field which will cause a parse error.
+            serde_json::from_value(value).unwrap()
+        })
         .collect();
     assert_eq!(output_messages, input_messages);
 }

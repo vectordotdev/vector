@@ -773,7 +773,11 @@ mod test {
                     .map(|(_source, sink)| sink)
                     .and_then(|sink| {
                         let socket = sink.into_inner().into_inner();
-                        tokio01::io::shutdown(socket)
+                        // In tokio 0.1 `AsyncWrite::shutdown` for `TcpStream` is a noop.
+                        // See https://docs.rs/tokio-tcp/0.1.4/src/tokio_tcp/stream.rs.html#917
+                        // Use `TcpStream::shutdown` instead - it actually does something.
+                        socket
+                            .shutdown(std::net::Shutdown::Both)
                             .map(|_| ())
                             .map_err(|e| panic!("{:}", e))
                     })

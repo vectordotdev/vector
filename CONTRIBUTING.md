@@ -21,6 +21,9 @@ expanding into more specifics.
    1. [CI](#ci)
 1. [Development](#development)
    1. [Setup](#setup)
+      1. [Using a Docker or Podman environment](#using-a-docker-or-podman-environment)
+      1. [Using Nix](#using-nix)
+      1. [Bring your own toolbox](#bring-your-own-toolbox)
    1. [The Basics](#the-basics)
       1. [Directory Structure](#directory-structure)
       1. [Makefile](#makefile)
@@ -169,15 +172,166 @@ updated versions of Vector through various channels.
 
 ### Setup
 
-1. Install Rust via [`rustup`](https://rustup.rs/):
+We're super excited to have you interested in working on Vector! Before you start you should pick how you want to develop.
 
-   ```bash
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   ```
+For small or first-time contributions, we recommend the Docker method. If you do a lot of contributing, try adopting the Nix method! It'll be way faster and feel more smooth. Prefer to do it yourself? That's fine too!
 
-2. [Install Docker](https://docs.docker.com/install/). Docker
-   containers are used for mocking Vector's integrations and executing Vector's
-   `make` targets.
+#### Using a Docker or Podman environment
+
+> **Targets:** You can use this method to produce AARCH64, Arm6/7, as well as x86/64 Linux builds.
+
+Since not everyone has a full working native environment, or can use Nix, we took our Nix environment and stuffed it into a Docker (or Podman) container!
+
+This is ideal for users who want it to "Just work" and just want to start contributing. It's also what we use for our CI, so you know if it breaks we can't do anything else until we fix it. 😉
+
+**Before you go farther, install Docker or Podman through your official package manager, or from the [Docker](https://docs.docker.com/get-docker/) or [Podman](https://podman.io/) sites.**
+
+```bash
+# Optional: Only if you use `podman`
+export CONTAINER_TOOL="podman"
+```
+
+By default, `make environment` style tasks will do a `docker pull` from Github's container repository, you can **optionally** build your own environment while you make your morning coffee ☕:
+
+```bash
+# Optional: Only if you want to go make a coffee
+make environment-prepare
+```
+
+Now that you have your coffee, you can enter the shell!
+
+```bash
+# Enter a shell with optimized mounts for interactive processes.
+# Inside here, you can use Vector like you have full toolchain (See below!)
+make environment
+# Try out a specific container tool. (Docker/Podman)
+make environment CONTAINER_TOOL="podman"
+# Add extra cli opts
+make environment CLI_OPTS="--publish 3000:2000"
+```
+
+Now you can use the jobs detailed in **"Bring your own toolbox"** below.
+
+Want to run from outside of the environment? *Clever. Good thinking.* You can run any of the following:
+
+```bash
+
+# Validate your code can compile
+make check ENVIRONMENT=true
+# Validate your code actually does compile (in dev mode)
+make build-dev ENVIRONMENT=true
+# Validate your test pass
+make test SCOPE="sources::example" ENVIRONMENT=true
+# Validate tests (that do not require other services) pass
+make test ENVIRONMENT=true
+# Validate your tests pass (starting required services in Docker)
+make test-integration SCOPE="sources::example" ENVIRONMENT=true
+# Validate your tests pass against a live service.
+make test-integration SCOPE="sources::example" AUTOSPAWN=false ENVIRONMENT=true
+# Validate all tests pass (starting required services in Docker)
+make test-integration ENVIRONMENT=true
+# Run your benchmarks
+make bench SCOPE="transforms::example" ENVIRONMENT=true
+# Rebuild Vector's metadata
+make generate ENVIRONMENT=true
+# Serve the website on port 3000
+make website ENVIRONMENT=true
+# Format your code before pushing!
+make fmt ENVIRONMENT=true
+```
+
+We use explicit environment opt-in as many contributors choose to keep their Rust toolchain local, and use `make generate ENVIRONMENT=true` etc.
+
+#### Using Nix
+
+> **Targets:** This method is preferred and ideal for Linux and Mac builds which are not cross compiles.
+>
+> **Note:** We're still new at this Nix stuff, so if you're a Nix expert please, teach us more!
+
+If you're a Nix user, or you're open to trying out a new tool, you can use our Nix expressions!
+
+If you don't have Nix yet, [install it](https://nixos.org/download.html):
+
+```bash
+curl -L https://nixos.org/nix/install | sh
+# Hesitating? Uninstalling is just `rm -rf /nix && rm -rf ~/.nix-*`,
+# then remove the import from `.bash_profile`
+```
+
+Next, run `nix-shell` from the Vector directory.
+
+**_Wow, you did it!_** Now you can run the commands described in "Bring your own toolbox" now. This has pulled in all the required packages and set required environment variables.
+
+Your other programs are there too, so you can run `code .` or `clion .` or whatever and get going like normal.
+
+We've only partially adopted Nix to ensure contributors can still use familiar tools. You may still need to run `bundle install`, `yarn` or other commands to initialize things. (PRs welcome if you have ideas to integrate with `carnix`, `bundix`, etc!)
+
+If you're interested in having Nix **automatically enter your environment**, you can consider a tool like [`direnv`](https://direnv.net/docs/installation.html), often available from your package manager.
+
+```bash
+❯ cd /git/timberio/vector
+❯ direnv allow .
+❯ cd ../vector
+direnv: loading /git/timberio/vector/.envrc
+direnv: using nix
+direnv: export +AR +AS +CC +CONFIG_SHELL +CXX +HOST_PATH +IN_NIX_SHELL +LC_ALL +LD +NIX_BINTOOLS +NIX_BINTOOLS_WRAPPER_x86_64_unknown_linux_gnu_TARGET_HOST +NIX_BUILD_CORES +NIX_BUILD_TOP +NIX_CC +NIX_CC_WRAPPER_x86_64_unknown_linux_gnu_TARGET_HOST +NIX_CFLAGS_COMPILE +NIX_ENFORCE_NO_NATIVE +NIX_HARDENING_ENABLE +NIX_INDENT_MAKE +NIX_LDFLAGS +NIX_STORE +NM +OBJCOPY +OBJDUMP +PROTOC +PROTOC_INCLUDE +RANLIB +READELF +SIZE +SOURCE_DATE_EPOCH +STRINGS +STRIP +TEMP +TEMPDIR +TMP +TMPDIR +buildInputs +builder +configureFlags +depsBuildBuild +depsBuildBuildPropagated +depsBuildTarget +depsBuildTargetPropagated +depsHostHost +depsHostHostPropagated +depsTargetTarget +depsTargetTargetPropagated +doCheck +doInstallCheck +name +nativeBuildInputs +nobuildPhase +out +outputs +patches +phases +propagatedBuildInputs +propagatedNativeBuildInputs +shell +shellHook +stdenv +strictDeps +system ~LOCALE_ARCHIVE ~PATH
+```
+
+Now you can use the jobs detailed in **"Bring your own toolbox"** below.
+
+#### Bring your own toolbox
+
+> **Targets:** This option is required for MSVC/Mac/FreeBSD toolchains. It can be used to build for any environment or OS.
+
+To build Vector on your own host will require a fairly complete development environment!
+
+We keep an up to date list of all dependencies used in our CI environment inside our `default.nix` file. Loosely, you'll need the following:
+
+* **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, and `autotools`. (Full list in [`scripts/environment/definition.nix`](./scripts/environment/definition.nix).
+* **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
+* **To build the Website:** Have a working modern Ruby 2.7 and Bundler toolchain available, also `bundle install` in the `scripts/` directory.
+* **To run the Website in Dev:** Have a working `node` environment with `npm`/`yarn`, also run `yarn` from the `website/` directory.
+* **To run `make check-component-features`:** Have `remarshal` installed.
+
+If you find yourself needing to run something (such as `make generate`) inside the Docker environment described above, that's totally fine, they won't collide or hurt each other. In this case, you'd just run `make environment-generate`.
+
+We're interested in reducing our dependencies if simple options exist. Got an idea? Try it out, we'd to hear of your successes and failures!
+
+In order to do your development on Vector, you'll primarily use a few commands, such as `cargo` and `make` tasks you can use ordered from most to least frequently run:
+
+```bash
+# Validate your code can compile
+cargo check
+make check
+# Validate your code actually does compile (in dev mode)
+cargo build
+make build-dev
+# Validate your test pass
+cargo test sources::example
+make test scope="sources::example"
+# Validate tests (that do not require other services) pass
+cargo test
+make test
+# Validate your tests pass (starting required services in Docker)
+make test-integration scope="sources::example" autospawn=false
+# Validate your tests pass against a live service.
+make test-integration scope="sources::example" autospawn=false
+cargo test --features docker sources::example
+# Validate all tests pass (starting required services in Docker)
+make test-integration
+# Run your benchmarks
+make bench scope="transforms::example"
+cargo bench transforms::example
+# Rebuild Vector's metadata
+make generate
+# Serve the website on port 3000
+make website
+# Format your code before pushing!
+make fmt
+cargo fmt
+```
+
+If you run `make` you'll see a full list of all our tasks. Some of these will start Docker containers, sign commits, or even make releases. These are not common development commands and your mileage may vary.
 
 ### The Basics
 
