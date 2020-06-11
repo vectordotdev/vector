@@ -60,6 +60,25 @@ help:
 ##@ Environment
 
 # These are some predefined macros, please use them!
+ifeq ($(ENVIRONMENT), true)
+define MAYBE_ENVIRONMENT_EXEC
+${ENVIRONMENT_EXEC}
+endef
+else
+define MAYBE_ENVIRONMENT_EXEC
+
+endef
+endif
+
+ifeq ($(ENVIRONMENT), true)
+define MAYBE_ENVIRONMENT_COPY_ARTIFACTS
+${ENVIRONMENT_COPY_ARTIFACTS}
+endef
+else
+define MAYBE_ENVIRONMENT_COPY_ARTIFACTS
+
+endef
+endif
 
 # We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
 define ENVIRONMENT_EXEC
@@ -130,20 +149,11 @@ environment-push: environment-prepare ## Publish a new version of the container 
 
 ##@ Building
 build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make build
-	${ENVIRONMENT_COPY_ARTIFACTS}
-else
-	cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
-endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make build-dev
-	${ENVIRONMENT_COPY_ARTIFACTS}
-else
-	cargo build --no-default-features --features ${DEFAULT_FEATURES}
-endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${DEFAULT_FEATURES}
 
 build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
@@ -162,22 +172,12 @@ build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in rel
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
 test: ## Run the test suite
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make test
-	${ENVIRONMENT_COPY_ARTIFACTS}
-else
-	cargo test --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
-endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
 
 test-all: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
 
 test-behavior: ## Runs behaviorial test
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make test-behavior
-	${ENVIRONMENT_COPY_ARTIFACTS}
-else
-	cargo run -- test tests/behavior/**/*.toml
-endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*.toml
 
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker test-integration-elasticsearch
@@ -185,140 +185,100 @@ test-integration: test-integration-gcp test-integration-influxdb test-integratio
 test-integration: test-integration-pulsar test-integration-splunk
 
 test-integration-aws: ## Runs Clickhouse integration tests
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make test-integration-aws
-else
-	if $(AUTOSPAWN); then \
-		$(CONTAINER_TOOL)-compose up -d dependencies-aws; \
-		sleep 5 # Many services are very lazy... Give them a sec... \
-	fi
-	cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_logs:: -- --nocapture
-	cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_metrics:: -- --nocapture
-	cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_firehose:: -- --nocapture
-	cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_streams:: -- --nocapture
-	cargo test --no-default-features --features aws-integration-tests ::aws_s3:: -- --nocapture
-	if $(AUTODESPAWN); then \
-		$(CONTAINER_TOOL)-compose stop; \
-	fi
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-aws
+	sleep 5 # Many services are very lazy... Give them a sec...
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_logs:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_metrics:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_firehose:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_streams:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests ::aws_s3:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
 test-integration-clickhouse: ## Runs Clickhouse integration tests
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make test-integration-clickhouse
-else
-	if $(AUTOSPAWN); then \
-		$(CONTAINER_TOOL)-compose up -d dependencies-clickhouse; \
-		sleep 5 # Many services are very lazy... Give them a sec... \
-	fi
-	cargo test --no-default-features --features clickhouse-integration-tests ::clickhouse:: -- --nocapture
-	if $(AUTODESPAWN); then \
-		$(CONTAINER_TOOL)-compose stop; \
-	fi
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-clickhouse
+	sleep 5 # Many services are very lazy... Give them a sec...
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features clickhouse-integration-tests ::clickhouse:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
 test-integration-docker: ## Runs Docker integration tests
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make test-integration-docker
-else
-	cargo test --no-default-features --features docker-integration-tests ::docker:: -- --nocapture
-endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features docker-integration-tests ::docker:: -- --nocapture
 
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make test-integration-elasticsearch
-else
-	if $(AUTOSPAWN); then \
-		$(CONTAINER_TOOL)-compose up -d dependencies-elasticsearch; \
-		sleep 20 # Elasticsearch is incredibly slow to start up, be very generous... \
-	fi
-	cargo test --no-default-features --features es-integration-tests ::elasticsearch:: -- --nocapture
-	if $(AUTODESPAWN); then \
-		$(CONTAINER_TOOL)-compose stop; \
-	fi
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-elasticsearch
+	sleep 20 # Elasticsearch is incredibly slow to start up, be very generous...
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features es-integration-tests ::elasticsearch:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
 test-integration-gcp: ## Runs GCP integration tests
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make test-integration-gcp
-else
-	if $(AUTOSPAWN); then \
-		$(CONTAINER_TOOL)-compose up -d dependencies-gcp; \
-		sleep 5 # Many services are very lazy... Give them a sec... \
-	fi
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-gcp
+	sleep 5 # Many services are very lazy... Give them a sec...
+endif
 	cargo test --no-default-features --features gcp-integration-tests ::gcp:: -- --nocapture
-	if $(AUTODESPAWN); then \
-		$(CONTAINER_TOOL)-compose stop; \
-	fi
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
 test-integration-influxdb: ## Runs Kafka integration tests
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make test-integration-influxdb
-else
-	if $(AUTOSPAWN); then \
-		$(CONTAINER_TOOL)-compose up -d dependencies-influxdb; \
-		sleep 5 # Many services are very lazy... Give them a sec... \
-	fi
-	cargo test --no-default-features --features influxdb-integration-tests ::influxdb::integration_tests:: -- --nocapture
-	if $(AUTODESPAWN); then \
-		$(CONTAINER_TOOL)-compose stop; \
-	fi
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-influxdb
+	sleep 5 # Many services are very lazy... Give them a sec...
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features influxdb-integration-tests ::influxdb::integration_tests:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
 test-integration-kafka: ## Runs Kafka integration tests
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make test-integration-kafka
-else
-	if $(AUTOSPAWN); then \
-		$(CONTAINER_TOOL)-compose up -d dependencies-kafka; \
-		sleep 5 # Many services are very lazy... Give them a sec... \
-	fi
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-kafka
+	sleep 5 # Many services are very lazy... Give them a sec...
+endif
 	cargo test --no-default-features --features kafka-integration-tests ::kafka:: -- --nocapture
-	if $(AUTODESPAWN); then \
-		$(CONTAINER_TOOL)-compose stop; \
-	fi
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
 test-integration-loki: ## Runs Loki integration tests
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make test-integration-loki
-else
-	if $(AUTOSPAWN); then \
-		$(CONTAINER_TOOL)-compose up -d dependencies-loki; \
-		sleep 5 # Many services are very lazy... Give them a sec... \
-	fi
-	cargo test --no-default-features --features loki-integration-tests ::loki:: -- --nocapture
-	if $(AUTODESPAWN); then \
-		$(CONTAINER_TOOL)-compose stop; \
-	fi
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-loki
+	sleep 5 # Many services are very lazy... Give them a sec...
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features loki-integration-tests ::loki:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
 test-integration-pulsar: ## Runs Pulsar integration tests
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make test-integration-pulsar
-else
-	if $(AUTOSPAWN); then \
-		$(CONTAINER_TOOL)-compose up -d dependencies-pulsar; \
-		sleep 5 # Many services are very lazy... Give them a sec... \
-	fi
-	cargo test --no-default-features --features pulsar-integration-tests ::pulsar:: -- --nocapture
-	if $(AUTODESPAWN); then \
-		$(CONTAINER_TOOL)-compose stop; \
-	fi
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-pulsar
+	sleep 5 # Many services are very lazy... Give them a sec...
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features pulsar-integration-tests ::pulsar:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
 test-integration-splunk: ## Runs Splunk integration tests
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make test-integration-splunk
-else
-	if $(AUTOSPAWN); then \
-		$(CONTAINER_TOOL)-compose up -d dependencies-splunk; \
-		sleep 5 # Many services are very lazy... Give them a sec... \
-	fi
-	cargo test --no-default-features --features splunk-integration-tests ::splunk:: -- --nocapture
-	if $(AUTODESPAWN); then \
-		$(CONTAINER_TOOL)-compose stop; \
-	fi
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-splunk
+	sleep 5 # Many services are very lazy... Give them a sec...
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features splunk-integration-tests ::splunk:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
 PACKAGE_DEB_USE_CONTAINER ?= "$(USE_CONTAINER)"
@@ -326,104 +286,56 @@ test-integration-kubernetes: ## Runs Kubernetes integration tests (Sorry, no `EN
 	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" USE_CONTAINER=none $(RUN) test-integration-kubernetes
 
 test-shutdown: ## Runs shutdown tests
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make test-shutdown
-else
-	if $(AUTOSPAWN); then \
-		$(CONTAINER_TOOL)-compose up -d dependencies-kafka; \
-		sleep 5 # Many services are very lazy... Give them a sec... \
-	fi
-	cargo test --features shutdown-tests  --test shutdown -- --test-threads 4
-	if $(AUTODESPAWN); then \
-		$(CONTAINER_TOOL)-compose stop; \
-	fi
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-kafka
+	sleep 5 # Many services are very lazy... Give them a sec...
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --features shutdown-tests  --test shutdown -- --test-threads 4
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
 bench: ## Run benchmarks in /benches
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make bench
-	${ENVIRONMENT_COPY_ARTIFACTS}
-else
-	cargo bench --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE}
-endif
+	${MAYBE_ENVIRONMENT_EXEC} ${ENVIRONMENT_EXEC} make bench
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 ##@ Checking (Supports `ENVIRONMENT=true`)
 
 check: ## Run prerequisite code checks
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make check
-else
-	cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
-endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
 
 check-all: check-fmt check-clippy check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
 
 check-component-features: ## Check that all component features are setup properly
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make check-component-features
-else
-	./scripts/check-component-features.sh
-endif
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features.sh
 
 check-clippy: ## Check code with Clippy
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make check-clippy
-else
-	cargo clippy --workspace --all-targets -- -D warnings
-endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo clippy --workspace --all-targets -- -D warnings
 
 check-fmt: ## Check that all files are formatted properly
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make check-fmt
-else
-	./scripts/check-fmt.sh
-endif
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-fmt.sh
 
 check-style: ## Check that all files are styled properly
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make check-style
-else
-	./scripts/check-style.sh
-endif
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh
 
 check-markdown: ## Check that markdown is styled properly
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make check-markdown
-else
 	@echo "This requires yarn have been run in the website/ dir!"
-	./website/node_modules/.bin/markdownlint .
-endif
+	${MAYBE_ENVIRONMENT_EXEC} ./website/node_modules/.bin/markdownlint .
 
 check-generate: ## Check that no files are pending generation
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make check-generate
-else
-	./scripts/check-generate.sh
-endif
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-generate.sh
 
 
 check-version: ## Check that Vector's version is correct accounting for recent changes
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make check-version
-else
-	./scripts/check-version.rb
-endif
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-version.rb
 
 check-examples: ## Check that the config/examples files are valid
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make check-examples
-else
-	cargo run -- validate --topology --deny-warnings ./config/examples/*.toml
-endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo run -- validate --topology --deny-warnings ./config/examples/*.toml
 
 check-scripts: ## Check that scipts do not have common mistakes
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make check-scripts
-else
-	./scripts/check-scripts.sh
-endif
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
 
 ##@ Packaging
 
@@ -563,11 +475,7 @@ verify-nixos:  ## Verify that Vector can be built on NixOS
 ##@ Website
 
 generate:  ## Generates files across the repo using the data in /.meta
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make generate
-else
-	bundle exec --gemfile scripts/Gemfile ./scripts/generate.rb
-endif
+	${MAYBE_ENVIRONMENT_EXEC} bundle exec --gemfile scripts/Gemfile ./scripts/generate.rb
 
 export ARTICLE ?= true
 sign-blog: ## Sign newly added blog articles using GPG
@@ -582,12 +490,8 @@ clean: environment-clean ## Clean everything
 	cargo clean
 
 fmt: ## Format code
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make fmt
-else
-	cargo fmt
-	./scripts/check-style.sh --fix
-endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh --fix
 
 init-target-dir: ## Create target directory owned by the current user
 	$(RUN) init-target-dir
@@ -599,11 +503,7 @@ signoff: ## Signsoff all previous commits since branch creation
 	$(RUN) signoff
 
 slim-builds: ## Updates the Cargo config to product disk optimized builds (for CI, not for users)
-ifeq ($(ENVIRONMENT), true)
-	${ENVIRONMENT_EXEC} make slim-builds
-else
-	./scripts/slim-builds.sh
-endif
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/slim-builds.sh
 
 target-graph: ## Display dependencies between targets in this Makefile
 	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))) && docker-compose run --rm target-graph $(TARGET)
