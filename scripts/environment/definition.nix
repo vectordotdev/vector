@@ -30,7 +30,10 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     AWS_SECRET_ACCESS_KEY = "dummy";
     # Lucet (for wasm) depends on libclang
     LIBCLANG_PATH="${pkgs.llvmPackages.libclang}/lib";
-    CPATH="${pkgs.linuxHeaders}/include";
+    CPATH= if pkgs.stdenv.isLinux then
+    "${pkgs.linuxHeaders}/include"
+    else
+    "";
   };
 
   packages = with pkgs; [
