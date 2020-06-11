@@ -10,3 +10,4 @@ miniodat
 sample.log
 target
 node_modules
+tests/data/wasm/*/target

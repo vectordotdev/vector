@@ -35,6 +35,10 @@ export ENVIRONMENT_UPSTREAM ?= docker.pkg.github.com/timberio/vector/environment
 export ENVIRONMENT_AUTOBUILD ?= true
 # Override this when appropriate to disable a TTY being available in commands with `ENVIRONMENT=true` (Useful for CI, but CI uses Nix!)
 export ENVIRONMENT_TTY ?= true
+# A list of WASM modules by name
+export WASM_MODULES = $(patsubst tests/data/wasm/%/,%,$(wildcard tests/data/wasm/*/))
+# The same WASM modules, by output path.
+export WASM_MODULE_OUTPUTS = $(patsubst %,/target/wasm32-wasi/%,$(WASM_MODULES))
 
  # Deprecated.
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
@@ -295,13 +299,36 @@ ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
+.PHONY: build-wasm-tests
+test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
+
+$(WASM_MODULE_OUTPUTS): MODULE = $(notdir $@)
+$(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
+	@echo "# Building WASM module ${MODULE}, requires Rustc for wasm32-wasi."
+	${MAYBE_ENVIRONMENT_EXEC} cargo build \
+		--target-dir target/ \
+		--manifest-path tests/data/wasm/${MODULE}/Cargo.toml \
+		--target wasm32-wasi \
+		--release \
+		--package ${MODULE}
+
+.PHONY: test-wasm
+test-wasm: export TEST_THREADS=1
+test-wasm: export TEST_LOG=vector=trace
+test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-default-features --features "wasm wasm-timings" -- --nocapture
+
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
 bench: ## Run benchmarks in /benches
 	${MAYBE_ENVIRONMENT_EXEC} ${ENVIRONMENT_EXEC} make bench
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
-##@ Checking (Supports `ENVIRONMENT=true`)
+.PHONY: bench-wasm
+bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES} transforms-wasm transforms-lua" --bench wasm wasm
+
+##@ Checking
 
 check: ## Run prerequisite code checks
 	${MAYBE_ENVIRONMENT_EXEC} cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
@@ -513,3 +540,13 @@ version: ## Get the current Vector version
 
 git-hooks: ## Add Vector-local git hooks for commit sign-off
 	@scripts/install-git-hooks.sh
+
+.PHONY: ensure-has-wasm-toolchain ### Configures a wasm toolchain for test artifact building, if required
+ensure-has-wasm-toolchain: target/wasm32-wasi/.obtained
+target/wasm32-wasi/.obtained:
+	@echo "# You should also install WABT for WASM module development!"
+	@echo "# You can use your package manager or check https://github.com/WebAssembly/wabt"
+	${MAYBE_ENVIRONMENT_EXEC} rustup target add wasm32-wasi
+	@mkdir -p target/wasm32-wasi
+	@touch target/wasm32-wasi/.obtained
+

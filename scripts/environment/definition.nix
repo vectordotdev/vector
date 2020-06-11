@@ -28,6 +28,9 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     # Vector gets very angry if you don't set these and use the AWS components.
     AWS_ACCESS_KEY_ID = "dummy";
     AWS_SECRET_ACCESS_KEY = "dummy";
+    # Lucet (for wasm) depends on libclang
+    LIBCLANG_PATH="${pkgs.llvmPackages.libclang}/lib";
+    CPATH="${pkgs.linuxHeaders}/include";
   };
 
   packages = with pkgs; [
@@ -65,6 +68,8 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     # Container tools
     docker
     docker-compose
+    # Wasm
+    llvmPackages.libclang
   ] ++ (if stdenv.isDarwin then [
     darwin.cf-private
     darwin.apple_sdk.frameworks.CoreServices
@@ -79,5 +84,6 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     # Container tools
     podman
     podman-compose
+    linuxHeaders
   ]);
 }

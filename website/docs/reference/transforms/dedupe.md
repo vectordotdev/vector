@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-06-10"
 component_title: "Dedupe events"
 description: "The Vector `dedupe` transform accepts and outputs `log` events, allowing you to prevent duplicate Events from being outputted by using an LRU cache."
 event_types: ["log"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+dedupe%22
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "dedupe|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/dedupe.rs
 status: "prod-ready"
 title: "Dedupe events Transform"
+unsupported_operating_systems: []
 ---
 
 import Fields from '@site/src/components/Fields';

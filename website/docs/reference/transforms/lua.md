@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-06-10"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events, allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
 function_category: "program"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "lua|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/lua
 status: "beta"
 title: "Lua Transform"
+unsupported_operating_systems: []
 ---
 
 import Fields from '@site/src/components/Fields';

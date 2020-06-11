@@ -67,7 +67,7 @@ usage][urls.vector_performance].
 ### Reference
 
 * [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [8 more...][docs.sources]
-* [**Transforms**][docs.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], and [18 more...][docs.transforms]
+* [**Transforms**][docs.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], and [19 more...][docs.transforms]
 * [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], [gcp_pubsub][docs.sinks.gcp_pubsub], and [26 more...][docs.sinks]
 
 ### Administration
@@ -148,7 +148,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Hot reload** - [Reload configuration on the fly][docs.process-management#reloading] without disrupting data flow.
 * **Zero delay start** - [Starts and restarts][docs.administration.process-management] without a delay.
 * **Multi-platform** - [Linux, MacOS, Windows, x86_64, ARM64, and ARMv7][docs.installation].
-* **CI friendly** - [Config linting][docs.administration.validating], [dry runs][docs.administration.validating], and [unit tests][guides.advanced.unit-testing] make Vector CI friendly.
+* **CI friendly** - [Config validating][docs.administration.validating] and [unit tests][guides.advanced.unit-testing] make Vector CI friendly.
 * **Configurable concurrency** - All CPU cores ([service][docs.strategies#service]) or just one ([daemon][docs.strategies#daemon]) via the [`--threads` flag][docs.process-management#starting].
 * **Custom DNS** - [Custom DNS][docs.global-options#dns_servers] makes service discovery possible.
 * **Optional static binary** - [Optional MUSL static binaries][pages.releases] mean zero required dependencies.
