@@ -11,6 +11,8 @@ use std::path::PathBuf;
 
 mod parser;
 
+use parser::{schema::DnstapEventSchema, DnstapParser};
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct DnstapConfig {
     #[serde(default = "default_max_length")]
@@ -88,7 +90,7 @@ fn handle_event(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> O
         log_event.insert(host_key, host);
     }
 
-    match parser::parse_dnstap_data(log_event, frame) {
+    match DnstapParser::new(DnstapEventSchema::new(), log_event).parse_dnstap_data(frame) {
         Err(error) => {
             error!("Dnstap protobuf decode error {:?}", error);
             None
@@ -96,4 +98,3 @@ fn handle_event(host_key: &str, received_from: Option<Bytes>, frame: Bytes) -> O
         Ok(_) => Some(event),
     }
 }
-
