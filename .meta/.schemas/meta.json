@@ -300,6 +300,10 @@
         "prometheus": {
           "type": "string",
           "description": "The minimum Kafka version required."
+        },
+        "feature": {
+          "type": "string",
+          "description": "The features of Vector required."
         }
       }
     },

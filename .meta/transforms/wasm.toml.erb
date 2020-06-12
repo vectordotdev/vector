@@ -1,12 +1,12 @@
 [transforms.wasm]
 title = "WASM"
-allow_you_to_description = "execute **experimental** WASM plugins. (**Note:** Enable this transform by building Vector with the `wasm` feature!)"
+allow_you_to_description = "execute **experimental** WASM plugins"
 beta = true
 common = false
 function_category = "program"
 input_types = ["log"]
 output_types = ["log"]
-requirements = {}
+requirements.feature = "wasm"
 only_operating_systems = ["Linux"]
 
 <%= render("_partials/fields/_component_options.toml", type: "transform", name: "wasm") %>
