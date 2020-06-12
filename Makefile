@@ -188,16 +188,12 @@ test-integration: test-integration-aws test-integration-clickhouse test-integrat
 test-integration: test-integration-gcp test-integration-influxdb test-integration-kafka test-integration-loki
 test-integration: test-integration-pulsar test-integration-splunk
 
-test-integration-aws: ## Runs Clickhouse integration tests
+test-integration-aws: ## Runs AWS integration tests
 ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-aws
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_logs:: -- --nocapture
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests ::aws_cloudwatch_metrics:: -- --nocapture
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_firehose:: -- --nocapture
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests ::aws_kinesis_streams:: -- --nocapture
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests ::aws_s3:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests ::aws_ -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -235,7 +231,7 @@ ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
-test-integration-influxdb: ## Runs Kafka integration tests
+test-integration-influxdb: ## Runs InfluxDB integration tests
 ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-influxdb
 	sleep 5 # Many services are very lazy... Give them a sec...

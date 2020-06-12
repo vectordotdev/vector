@@ -399,7 +399,14 @@ docker = [
   "splunk-integration-tests",
 ]
 
-aws-integration-tests = ["sinks-aws_cloudwatch_logs", "sinks-aws_cloudwatch_metrics", "sinks-elasticsearch", "sinks-aws_kinesis_firehose", "sinks-aws_kinesis_streams", "sinks-aws_s3", "transforms-aws_ec2_metadata"]
+aws-integration-tests = [
+  "aws-cloudwatch-logs-integration-tests",
+  "aws-cloudwatch-metrics-integration-tests",
+  "aws-ec2-metadata-integration-tests",
+  "aws-kinesis-firehose-integration-tests",
+  "aws-kinesis-streams-integration-tests",
+  "aws-s3-integration-tests",
+]
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
@@ -440,4 +447,3 @@ required-features = ["transforms-wasm", "transforms-lua"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
-
