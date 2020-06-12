@@ -2,15 +2,17 @@ use crate::{
     buffers::Acker,
     event::metric::{MetricKind, MetricValue},
     event::Event,
-    sinks::util::{BatchBytesConfig, BatchSink, Buffer, Compression},
+    sinks::util::{service2::TowerCompat, BatchBytesConfig, BatchSink, Buffer, Compression},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{future, stream::iter_ok, Future, Poll, Sink};
+use futures::{future, FutureExt, TryFutureExt};
+use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
-use tower::{Service, ServiceBuilder};
+use std::task::{Context, Poll};
+use tower03::{Service, ServiceBuilder};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -64,8 +66,8 @@ inventory::submit! {
 impl SinkConfig for StatsdSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = StatsdSvc::new(self.clone(), cx.acker())?;
-        let healthcheck = StatsdSvc::healthcheck(self.clone())?;
-        Ok((sink, healthcheck))
+        let healthcheck = StatsdSvc::healthcheck(self.clone()).boxed().compat();
+        Ok((sink, Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -92,15 +94,20 @@ impl StatsdSvc {
 
         let svc = ServiceBuilder::new().service(service);
 
-        let sink = BatchSink::new(svc, Buffer::new(Compression::None), batch, acker)
-            .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
-            .with_flat_map(move |event| iter_ok(encode_event(event, &namespace)));
+        let sink = BatchSink::new(
+            TowerCompat::new(svc),
+            Buffer::new(Compression::None),
+            batch,
+            acker,
+        )
+        .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
+        .with_flat_map(move |event| iter_ok(encode_event(event, &namespace)));
 
         Ok(Box::new(sink))
     }
 
-    fn healthcheck(_config: StatsdSinkConfig) -> crate::Result<super::Healthcheck> {
-        Ok(Box::new(future::ok(())))
+    async fn healthcheck(_config: StatsdSinkConfig) -> crate::Result<()> {
+        Ok(())
     }
 }
 
@@ -192,11 +199,11 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
 
 impl Service<Vec<u8>> for StatsdSvc {
     type Response = ();
-    type Error = tokio01::io::Error;
-    type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
+    type Error = tokio::io::Error;
+    type Future = future::Ready<Result<(), Self::Error>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, mut frame: Vec<u8>) -> Self::Future {
@@ -205,7 +212,7 @@ impl Service<Vec<u8>> for StatsdSvc {
             frame.pop();
         };
         self.client.send(frame.as_ref());
-        Box::new(future::ok(()))
+        future::ok(())
     }
 }
 
@@ -219,7 +226,7 @@ mod test {
         Event,
     };
     use bytes::Bytes;
-    use futures01::{stream, stream::Stream, sync::mpsc, Sink};
+    use futures01::{future, stream::Stream, sync::mpsc, Future, Sink};
     use std::time::{Duration, Instant};
     use tokio01::{
         self,
@@ -354,7 +361,7 @@ mod test {
         });
         events.push(event);
 
-        let stream = stream::iter_ok(events.clone().into_iter());
+        let stream = iter_ok(events.clone().into_iter());
         let sender = sink.send_all(stream);
         let deadline = Instant::now() + Duration::from_millis(100);
 
