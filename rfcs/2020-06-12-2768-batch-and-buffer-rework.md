@@ -1,6 +1,6 @@
 # RFC #2768 - 2020-06-12 - Batch and Buffer Rework
 
-# Motivation
+## Motivation
 
 Most sinks in Vector batch up events to send in a buffer in order to
 improve efficiency and increase transmission rates. However, the current
@@ -16,7 +16,7 @@ implementations of batching suffer from two significant problems:
    for a remote service, this will routinely lead to problems when the
    flow rate is high enough to avoid triggering a batch timeout.
 
-# Guide-Level Proposal
+## Guide-Level Proposal
 
 For sinks that use the `BatchSink` framework (`PartitionBatchSink` is
 similar), events move along the following path:
@@ -56,7 +56,7 @@ both. Additionally, the batch limits must be inviolable, so that no
 requests are ever sent that exceed size limits. To accomplish this the
 following is necessary:
 
-## Unified Batch Configuration
+### Unified Batch Configuration
 
 The split configuration types for bytes and events will be rolled into a
 single configuration combining both attributes. The `max_size` element
@@ -73,7 +73,7 @@ struct BatchConfig {
 }
 ```
 
-## Failible Batch Insertion
+### Failible Batch Insertion
 
 The current batch buffers always allow events to be inserted, and then
 check separately if the buffer is "big enough" to be sent. This will be
@@ -97,7 +97,7 @@ not be encoded into the trait directly, as each buffer will implement
 their own creation method to accomodate additional creation parameters,
 such as the compression mode or partition key.
 
-# Outstanding Questions
+## Outstanding Questions
 
 Does it make sense to move conversion of input events into the
 intermediate `type Input` into the buffer types instead of using a map
@@ -110,7 +110,7 @@ into the trait? Is this possible for `MetricBuffer`? If this could be
 done for all buffers, it would guarantee availability of the byte size
 limit across the board.
 
-# Implementation Plan
+## Implementation Plan
 
 The desired goal can be accomplished incrementally as follows:
 
