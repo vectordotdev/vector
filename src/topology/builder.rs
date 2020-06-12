@@ -157,7 +157,7 @@ pub fn build_pieces(
         // the server Task is still running the Task will simply be dropped on the floor.
         let server = server
             .select(force_shutdown_tripwire)
-            .map(|_| ())
+            .map(|_| debug!("Finished"))
             .map_err(|_| ());
         let server = Task::new(&name, &typetag, server);
 
@@ -198,7 +198,7 @@ pub fn build_pieces(
         let transform = transform
             .transform_stream(filter_event_type(input_rx, input_type))
             .forward(output)
-            .map(|_| ());
+            .map(|_| debug!("Finished"));
         let task = Task::new(&name, &typetag, transform);
 
         inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));
@@ -241,7 +241,9 @@ pub fn build_pieces(
             Ok((sink, healthcheck)) => (sink, healthcheck),
         };
 
-        let sink = filter_event_type(rx, input_type).forward(sink).map(|_| ());
+        let sink = filter_event_type(rx, input_type)
+            .forward(sink)
+            .map(|_| debug!("Finished"));
         let task = Task::new(&name, &typetag, sink);
 
         let healthcheck_task = if enable_healthcheck {
