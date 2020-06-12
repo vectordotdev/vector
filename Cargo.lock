@@ -3250,7 +3250,17 @@ checksum = "96d14b1c185652833d24aaad41c5832b0be5616a590227c1fbff57c616754b23"
 dependencies = [
  "byteorder",
  "bytes 0.4.12",
- "prost-derive",
+ "prost-derive 0.5.0",
+]
+
+[[package]]
+name = "prost"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce49aefe0a6144a45de32927c77bd2859a5f7677b55f220ae5b744e87389c212"
+dependencies = [
+ "bytes 0.5.4",
+ "prost-derive 0.6.1",
 ]
 
 [[package]]
@@ -3265,7 +3275,7 @@ dependencies = [
  "log",
  "multimap",
  "petgraph",
- "prost",
+ "prost 0.5.0",
  "prost-types",
  "tempfile",
  "which",
@@ -3285,13 +3295,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-derive"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "537aa19b95acde10a12fec4301466386f757403de4cd4e5b4fa78fb5ecb18f72"
+dependencies = [
+ "anyhow",
+ "itertools",
+ "proc-macro2 1.0.8",
+ "quote 1.0.2",
+ "syn 1.0.14",
+]
+
+[[package]]
 name = "prost-types"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1de482a366941c8d56d19b650fac09ca08508f2a696119ee7513ad590c8bac6f"
 dependencies = [
  "bytes 0.4.12",
- "prost",
+ "prost 0.5.0",
 ]
 
 [[package]]
@@ -3321,9 +3344,9 @@ dependencies = [
  "futures-timer",
  "log",
  "nom 5.1.0",
- "prost",
+ "prost 0.5.0",
  "prost-build",
- "prost-derive",
+ "prost-derive 0.5.0",
  "rand 0.7.3",
  "regex",
  "tokio 0.1.22",
@@ -5906,9 +5929,9 @@ dependencies = [
  "openssl-probe",
  "owning_ref",
  "pretty_assertions",
- "prost",
+ "prost 0.6.1",
  "prost-build",
- "prost-derive",
+ "prost-derive 0.5.0",
  "prost-types",
  "pulsar",
  "rand 0.5.6",
