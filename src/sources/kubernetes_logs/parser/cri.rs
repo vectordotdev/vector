@@ -96,7 +96,7 @@ mod tests {
     fn test_parsing() {
         let cases = vec![
             (
-                "2016-10-06T00:17:09.669794202Z stdout F The content of the log entry 1",
+                "2016-10-06T00:17:09.669794202Z stdout F The content of the log entry 1".into(),
                 test_util::make_log_event(
                     "The content of the log entry 1",
                     "2016-10-06T00:17:09.669794202Z",
@@ -105,7 +105,7 @@ mod tests {
                 ),
             ),
             (
-                "2016-10-06T00:17:09.669794202Z stdout P First line of log entry 2",
+                "2016-10-06T00:17:09.669794202Z stdout P First line of log entry 2".into(),
                 test_util::make_log_event(
                     "First line of log entry 2",
                     "2016-10-06T00:17:09.669794202Z",
@@ -114,7 +114,7 @@ mod tests {
                 ),
             ),
             (
-                "2016-10-06T00:17:09.669794202Z stdout P Second line of the log entry 2",
+                "2016-10-06T00:17:09.669794202Z stdout P Second line of the log entry 2".into(),
                 test_util::make_log_event(
                     "Second line of the log entry 2",
                     "2016-10-06T00:17:09.669794202Z",
@@ -123,7 +123,7 @@ mod tests {
                 ),
             ),
             (
-                "2016-10-06T00:17:10.113242941Z stderr F Last line of the log entry 2",
+                "2016-10-06T00:17:10.113242941Z stderr F Last line of the log entry 2".into(),
                 test_util::make_log_event(
                     "Last line of the log entry 2",
                     "2016-10-06T00:17:10.113242941Z",

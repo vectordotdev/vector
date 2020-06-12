@@ -109,7 +109,7 @@ mod tests {
     fn test_parsing() {
         let cases = vec![
             (
-                r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
                 test_util::make_log_event(
                     "The actual log line",
                     "2016-10-05T00:00:30.082640485Z",
@@ -118,7 +118,7 @@ mod tests {
                 ),
             ),
             (
-                r#"{"log": "The partial log line", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                r#"{"log": "The partial log line", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
                 test_util::make_log_event(
                     "The partial log line",
                     "2016-10-05T00:00:30.082640485Z",
