@@ -505,9 +505,9 @@ async fn body_to_bytes(body: Body) -> Result<Bytes, hyper13::Error> {
         .map(Into::into)
 }
 
+#[cfg(feature = "aws-ec2-metadata-integration-tests")]
 #[cfg(test)]
-#[cfg(feature = "aws-integration-tests")]
-mod tests {
+mod integration_tests {
     use super::*;
     use crate::{event::Event, test_util::runtime};
 

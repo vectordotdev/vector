@@ -852,6 +852,7 @@ mod integration_tests {
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
+    use std::convert::TryFrom;
 
     const GROUP_NAME: &'static str = "vector-cw";
 
@@ -869,8 +870,8 @@ mod integration_tests {
         ensure_group(region.clone());
 
         let config = CloudwatchLogsSinkConfig {
-            stream_name: stream_name.clone().into(),
-            group_name: GROUP_NAME.into(),
+            stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+            group_name: Template::try_from(GROUP_NAME).unwrap(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
@@ -924,8 +925,8 @@ mod integration_tests {
         ensure_group(region.clone());
 
         let config = CloudwatchLogsSinkConfig {
-            stream_name: stream_name.clone().into(),
-            group_name: GROUP_NAME.into(),
+            stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+            group_name: Template::try_from(GROUP_NAME).unwrap(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
@@ -997,8 +998,8 @@ mod integration_tests {
         ensure_group(region.clone());
 
         let config = CloudwatchLogsSinkConfig {
-            stream_name: stream_name.clone().into(),
-            group_name: GROUP_NAME.into(),
+            stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+            group_name: Template::try_from(GROUP_NAME).unwrap(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
@@ -1026,18 +1027,17 @@ mod integration_tests {
             line
         };
 
-        // ------------------ past
+        // Too old event (> 14 days)
         add_event(Duration::days(-15));
-        // ------------------ 14 day limit
-        lines.push(add_event(Duration::days(-13)));
-        lines.push(add_event(Duration::days(-1)));
-        // ------------------ now
+        // Too new event (> 2 hours)
+        add_event(Duration::minutes(125));
+        // Right now and future in +2h limit
         lines.push(add_event(Duration::zero()));
-        // ------------------ future
         lines.push(add_event(Duration::hours(1)));
         lines.push(add_event(Duration::minutes(110)));
-        // ------------------ 2h limit
-        add_event(Duration::minutes(125));
+        // In 14 days limit
+        lines.push(add_event(Duration::days(-1)));
+        lines.push(add_event(Duration::days(-13)));
 
         let pump = sink.send_all(stream::iter_ok(events));
         let (sink, _) = rt.block_on(pump).unwrap();
@@ -1077,8 +1077,8 @@ mod integration_tests {
         };
 
         let config = CloudwatchLogsSinkConfig {
-            stream_name: stream_name.clone().into(),
-            group_name: group_name.clone().into(),
+            stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+            group_name: Template::try_from(group_name.as_str()).unwrap(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
@@ -1133,8 +1133,8 @@ mod integration_tests {
         ensure_group(region.clone());
 
         let config = CloudwatchLogsSinkConfig {
-            stream_name: stream_name.clone().into(),
-            group_name: group_name.clone().into(),
+            stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+            group_name: Template::try_from(group_name.as_str()).unwrap(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
@@ -1194,8 +1194,8 @@ mod integration_tests {
         ensure_group(region);
 
         let config = CloudwatchLogsSinkConfig {
-            group_name: GROUP_NAME.into(),
-            stream_name: format!("{}-{{{{key}}}}", stream_name).into(),
+            group_name: Template::try_from(GROUP_NAME).unwrap(),
+            stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
@@ -1281,8 +1281,8 @@ mod integration_tests {
         ensure_group(region);
 
         let config = CloudwatchLogsSinkConfig {
-            stream_name: "test-stream".into(),
-            group_name: GROUP_NAME.into(),
+            stream_name: Template::try_from("test-stream").unwrap(),
+            group_name: Template::try_from(GROUP_NAME).unwrap(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
