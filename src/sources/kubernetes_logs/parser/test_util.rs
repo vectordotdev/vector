@@ -41,6 +41,6 @@ where
         let output = parser
             .transform(input)
             .expect("parser failed to parse the event");
-        assert_eq!(Event::Log(expected), output);
+        assert_eq!(Event::Log(expected), output, "expected left, actual right");
     }
 }
