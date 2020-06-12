@@ -8,13 +8,14 @@ use std::convert::TryInto;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 #[cfg(unix)]
 use trust_dns_proto::{
-    op::{message::Message as TrustDnsMessage, Edns},
+    op::{message::Message as TrustDnsMessage, Edns, Query},
     rr::{
         dnssec::SupportedAlgorithms,
         domain::Name,
         rdata::opt::{EdnsCode, EdnsOption},
         record_data::RData,
         resource::Record,
+        RecordType,
     },
     serialize::binary::{BinDecodable, BinDecoder},
 };
@@ -30,12 +31,12 @@ pub mod schema;
 use schema::DnstapEventSchema;
 
 pub struct DnstapParser<'a> {
-    event_schema: DnstapEventSchema,
+    event_schema: &'a DnstapEventSchema,
     log_event: &'a mut LogEvent,
 }
 
 impl<'a> DnstapParser<'a> {
-    pub fn new(event_schema: DnstapEventSchema, log_event: &'a mut LogEvent) -> Self {
+    pub fn new(event_schema: &'a DnstapEventSchema, log_event: &'a mut LogEvent) -> Self {
         Self {
             event_schema,
             log_event,
@@ -48,21 +49,23 @@ impl<'a> DnstapParser<'a> {
 
         if let Some(server_id) = proto_msg.identity {
             self.log_event.insert(
-                self.event_schema.dnstap_data_schema().server_identity(),
+                self.event_schema
+                    .dnstap_root_data_schema()
+                    .server_identity(),
                 String::from_utf8(server_id).unwrap_or_default(),
             );
         }
 
         if let Some(version) = proto_msg.version {
             self.log_event.insert(
-                self.event_schema.dnstap_data_schema().server_version(),
+                self.event_schema.dnstap_root_data_schema().server_version(),
                 String::from_utf8(version).unwrap_or_default(),
             );
         }
 
         if let Some(extra) = proto_msg.extra {
             self.log_event.insert(
-                self.event_schema.dnstap_data_schema().extra(),
+                self.event_schema.dnstap_root_data_schema().extra(),
                 String::from_utf8(extra).unwrap_or_default(),
             );
         }
@@ -71,7 +74,7 @@ impl<'a> DnstapParser<'a> {
         // the raw value is reserved intentionally to ensure forward-compatibility
         let mut need_raw_data = false;
         self.log_event.insert(
-            self.event_schema.dnstap_data_schema().data_type(),
+            self.event_schema.dnstap_root_data_schema().data_type(),
             dnstap_data_type,
         );
         if dnstap_data_type == DnstapDataType::Message as i32 {
@@ -81,7 +84,7 @@ impl<'a> DnstapParser<'a> {
                     error!(target: "dnstap event", "failed to parse dnstap message: {}", err.to_string());
                     need_raw_data = true;
                     self.log_event.insert(
-                        self.event_schema.dnstap_data_schema().error(),
+                        self.event_schema.dnstap_root_data_schema().error(),
                         err.to_string(),
                     );
                 }
@@ -92,7 +95,7 @@ impl<'a> DnstapParser<'a> {
 
         if need_raw_data {
             self.log_event.insert(
-                self.event_schema.dnstap_data_schema().raw_data(),
+                self.event_schema.dnstap_root_data_schema().raw_data(),
                 format_bytes_as_hex_string(&frame.to_vec()),
             );
         }
@@ -104,20 +107,14 @@ impl<'a> DnstapParser<'a> {
         if let Some(socket_family) = dnstap_message.socket_family {
             // the raw value is reserved intentionally to ensure forward-compatibility
             self.log_event.insert(
-                self.event_schema
-                    .dnstap_data_schema()
-                    .message()
-                    .socket_family(),
+                self.event_schema.dnstap_message_schema().socket_family(),
                 socket_family,
             );
 
             if let Some(socket_protocol) = dnstap_message.socket_protocol {
                 // the raw value is reserved intentionally to ensure forward-compatibility
                 self.log_event.insert(
-                    self.event_schema
-                        .dnstap_data_schema()
-                        .message()
-                        .socket_protocol(),
+                    self.event_schema.dnstap_message_schema().socket_protocol(),
                     socket_protocol,
                 );
             }
@@ -132,20 +129,14 @@ impl<'a> DnstapParser<'a> {
                 };
 
                 self.log_event.insert(
-                    self.event_schema
-                        .dnstap_data_schema()
-                        .message()
-                        .query_address(),
+                    self.event_schema.dnstap_message_schema().query_address(),
                     source_address.to_string(),
                 );
             }
 
             if let Some(query_port) = dnstap_message.query_port {
                 self.log_event.insert(
-                    self.event_schema
-                        .dnstap_data_schema()
-                        .message()
-                        .query_port(),
+                    self.event_schema.dnstap_message_schema().query_port(),
                     query_port as i64,
                 );
             }
@@ -160,20 +151,14 @@ impl<'a> DnstapParser<'a> {
                 };
 
                 self.log_event.insert(
-                    self.event_schema
-                        .dnstap_data_schema()
-                        .message()
-                        .response_address(),
+                    self.event_schema.dnstap_message_schema().response_address(),
                     response_addr.to_string(),
                 );
             }
 
             if let Some(response_port) = dnstap_message.response_port {
                 self.log_event.insert(
-                    self.event_schema
-                        .dnstap_data_schema()
-                        .message()
-                        .response_port(),
+                    self.event_schema.dnstap_message_schema().response_port(),
                     response_port as i64,
                 );
             }
@@ -184,10 +169,7 @@ impl<'a> DnstapParser<'a> {
             match Name::read(&mut decoder) {
                 Ok(raw_data) => {
                     self.log_event.insert(
-                        self.event_schema
-                            .dnstap_data_schema()
-                            .message()
-                            .query_zone(),
+                        self.event_schema.dnstap_message_schema().query_zone(),
                         raw_data.to_utf8(),
                     );
                 }
@@ -197,20 +179,14 @@ impl<'a> DnstapParser<'a> {
 
         if let Some(query_time_sec) = dnstap_message.query_time_sec {
             self.log_event.insert(
-                self.event_schema
-                    .dnstap_data_schema()
-                    .message()
-                    .query_time_sec(),
+                self.event_schema.dnstap_message_schema().query_time_sec(),
                 query_time_sec as i64,
             );
         }
 
         if let Some(query_time_nsec) = dnstap_message.query_time_nsec {
             self.log_event.insert(
-                self.event_schema
-                    .dnstap_data_schema()
-                    .message()
-                    .query_time_nsec(),
+                self.event_schema.dnstap_message_schema().query_time_nsec(),
                 query_time_nsec as i64,
             );
         }
@@ -218,8 +194,7 @@ impl<'a> DnstapParser<'a> {
         if let Some(response_time_sec) = dnstap_message.response_time_sec {
             self.log_event.insert(
                 self.event_schema
-                    .dnstap_data_schema()
-                    .message()
+                    .dnstap_message_schema()
                     .response_time_sec(),
                 response_time_sec as i64,
             );
@@ -228,8 +203,7 @@ impl<'a> DnstapParser<'a> {
         if let Some(response_time_nsec) = dnstap_message.response_time_nsec {
             self.log_event.insert(
                 self.event_schema
-                    .dnstap_data_schema()
-                    .message()
+                    .dnstap_message_schema()
                     .response_time_nsec(),
                 response_time_nsec as i64,
             );
@@ -239,22 +213,19 @@ impl<'a> DnstapParser<'a> {
         let dnstap_message_type = dnstap_message.r#type;
         self.log_event.insert(
             self.event_schema
-                .dnstap_data_schema()
-                .message()
+                .dnstap_message_schema()
                 .dnstap_message_type(),
             dnstap_message_type as i64,
         );
 
         let query_message_key = self
             .event_schema
-            .dnstap_data_schema()
-            .message()
+            .dnstap_message_schema()
             .query_message()
             .to_string();
         let response_message_key = self
             .event_schema
-            .dnstap_data_schema()
-            .message()
+            .dnstap_message_schema()
             .response_message()
             .to_string();
         match dnstap_message_type {
@@ -501,11 +472,31 @@ impl<'a> DnstapParser<'a> {
         dns_message: &TrustDnsMessage,
     ) -> Result<()> {
         for (i, query) in dns_message.queries().iter().enumerate() {
-            self.log_event.insert_path(
-                make_event_key_with_index(key_path, i as u32),
-                query.to_string(),
-            );
+            self.parse_dns_query_question(&make_indexed_event_key_path(key_path, i as u32), query)?;
         }
+
+        Ok(())
+    }
+
+    fn parse_dns_query_question(self: &mut Self, key_path: &str, question: &Query) -> Result<()> {
+        self.log_event.insert_path(
+            make_event_key_with_prefix(key_path, self.event_schema.dns_record_schema().name()),
+            question.name().to_string(),
+        );
+        self.log_event.insert_path(
+            make_event_key_with_prefix(
+                key_path,
+                self.event_schema.dns_record_schema().record_type(),
+            ),
+            match question.query_type() {
+                RecordType::Unknown( code ) => parse_unknown_record_type(code),
+                _ => question.query_type().to_string(),
+            },
+        );
+        self.log_event.insert_path(
+            make_event_key_with_prefix(key_path, self.event_schema.dns_record_schema().class()),
+            question.query_class().to_string(),
+        );
 
         Ok(())
     }

@@ -8,9 +8,10 @@ use crate::{
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use std::convert::TryInto;
+use std::fs;
+use std::marker::{Send, Sync};
 #[cfg(unix)]
 use std::path::PathBuf;
-use std::fs;
 use tokio01::{
     self,
     codec::{length_delimited, Framed},
@@ -340,24 +341,26 @@ impl FrameStreamReader {
     }
 }
 
+pub trait FrameHandler {
+    fn content_type(self: &Self) -> String;
+    fn max_length(self: &Self) -> usize;
+    fn host_key(self: &Self) -> String;
+    fn handle_event(self: &Self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event>;
+    fn socket_path(self: &Self) -> PathBuf;
+}
+
 /**
  * Based off of the build_unix_source function.
  * Functions similarly, but uses the FrameStreamReader to deal with
  * framestream control packets, and responds appropriately.
  **/
 pub fn build_framestream_unix_source(
-    path: PathBuf,
-    max_length: usize,
-    host_key: String,
-    content_type: String,
+    frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
     shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
-    build_event: impl Fn(&str, Option<Bytes>, Bytes) -> Option<Event>
-        + std::marker::Send
-        + std::marker::Sync
-        + std::clone::Clone
-        + 'static,
 ) -> Source {
+    let path = frame_handler.socket_path();
+
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     //check if the path already exists (and try to delete it)
@@ -366,8 +369,8 @@ pub fn build_framestream_unix_source(
             //exists, so try to delete it
             info!(message = "deleting file", ?path);
             fs::remove_file(&path).expect("failed to delete existing socket");
-        },
-        Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {}, //doesn't exist, do nothing
+        }
+        Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {} //doesn't exist, do nothing
         Err(e) => error!("failed to bind to listener socket; error = {:?}", e),
     };
 
@@ -383,10 +386,8 @@ pub fn build_framestream_unix_source(
             .for_each(move |socket| {
                 let out = out.clone();
                 let peer_addr = socket.peer_addr().ok();
-                let host_key = host_key.clone();
-                let content_type = content_type.clone();
+                let content_type = frame_handler.content_type();
                 let listen_path = path.clone();
-                let build_event = build_event.clone();
 
                 let span = info_span!("connection");
                 let path = if let Some(addr) = peer_addr {
@@ -405,16 +406,17 @@ pub fn build_framestream_unix_source(
                 let (sock_sink, sock_stream) = Framed::new(
                     socket,
                     length_delimited::Builder::new()
-                        .max_frame_length(max_length)
+                        .max_frame_length(frame_handler.max_length())
                         .new_codec(),
                 )
                 .split();
                 let mut fs_reader = FrameStreamReader::new(Box::new(sock_sink), content_type);
+                let frame_handler_copy = frame_handler.clone();
                 let events = sock_stream
                     .take_until(shutdown.clone())
                     .filter_map(
                         move |frame| match fs_reader.handle_frame(Bytes::from(frame)) {
-                            Some(f) => build_event(&host_key, received_from.clone(), f),
+                            Some(f) => frame_handler_copy.handle_event(received_from.clone(), f),
                             None => None,
                         },
                     )
@@ -433,7 +435,7 @@ pub fn build_framestream_unix_source(
 
 #[cfg(test)]
 mod test {
-    use super::{build_framestream_unix_source, ControlField, ControlHeader};
+    use super::{build_framestream_unix_source, ControlField, ControlHeader, FrameHandler};
     use crate::test_util::{collect_n, collect_n_stream};
     use crate::{
         event::{self, Event},
@@ -450,44 +452,69 @@ mod test {
     };
     use tokio_uds::UnixStream;
 
-    fn build_event_bytes(
-        host_key: &str,
-        received_from: Option<Bytes>,
-        frame: Bytes,
-    ) -> Option<Event> {
-        let mut event = Event::from(frame);
-        event
-            .as_mut_log()
-            .insert(event::log_schema().source_type_key(), "framestream");
-        if let Some(host) = received_from {
-            event.as_mut_log().insert(host_key, host);
+    #[derive(Clone)]
+    struct MockFrameHandler {
+        content_type: String,
+        max_length: usize,
+        host_key: String,
+        socket_path: PathBuf,
+    }
+
+    impl MockFrameHandler {
+        pub fn new(content_type: String) -> Self {
+            Self {
+                content_type,
+                max_length: bytesize::kib(100u64) as usize,
+                host_key: "test_framestream".to_string(),
+                socket_path: tempfile::tempdir().unwrap().into_path().join("unix_test"),
+            }
         }
-        Some(event)
+    }
+
+    impl FrameHandler for MockFrameHandler {
+        fn content_type(self: &Self) -> String {
+            self.content_type.clone()
+        }
+        fn max_length(self: &Self) -> usize {
+            self.max_length.clone()
+        }
+        fn host_key(self: &Self) -> String {
+            self.host_key.clone()
+        }
+
+        fn handle_event(self: &Self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+            let mut event = Event::from(frame);
+            event
+                .as_mut_log()
+                .insert(event::log_schema().source_type_key(), "framestream");
+            if let Some(host) = received_from {
+                event.as_mut_log().insert(self.host_key(), host);
+            }
+            Some(event)
+        }
+
+        fn socket_path(self: &Self) -> PathBuf {
+            self.socket_path.clone()
+        }
     }
 
     fn init_framstream_unix(
-        content_type: String,
+        frame_handler: MockFrameHandler,
         sender: mpsc::Sender<event::Event>,
     ) -> (PathBuf, runtime::Runtime) {
-        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
-
         let server = build_framestream_unix_source(
-            in_path.clone(),
-            bytesize::kib(100u64) as usize,
-            "test_framestream".to_string(),
-            content_type,
+            frame_handler.clone(),
             ShutdownSignal::noop(),
             sender,
-            build_event_bytes,
         );
 
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
 
         // Wait for server to accept traffic
-        while let Err(_) = std::os::unix::net::UnixStream::connect(&in_path) {}
+        while let Err(_) = std::os::unix::net::UnixStream::connect(&frame_handler.socket_path()) {}
 
-        (in_path, rt)
+        (frame_handler.socket_path(), rt)
     }
 
     fn make_unix_stream(
@@ -557,7 +584,8 @@ mod test {
     #[test]
     fn normal_framestream() {
         let (tx, rx) = mpsc::channel(2);
-        let (path, mut rt) = init_framstream_unix("test_content".to_string(), tx);
+        let (path, mut rt) =
+            init_framstream_unix(MockFrameHandler::new("test_content".to_string()), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).split();
 
         //1 - send READY frame (with content_type)
@@ -602,7 +630,8 @@ mod test {
     #[test]
     fn multiple_content_types() {
         let (tx, _) = mpsc::channel(2);
-        let (path, mut rt) = init_framstream_unix("test_content".to_string(), tx);
+        let (path, mut rt) =
+            init_framstream_unix(MockFrameHandler::new("test_content".to_string()), tx);
         let (sock_sink, mut sock_stream) = make_unix_stream(path).split();
 
         //1 - send READY frame (with content_type)
@@ -628,7 +657,8 @@ mod test {
     #[test]
     fn wrong_content_type() {
         let (tx, _) = mpsc::channel(2);
-        let (path, mut rt) = init_framstream_unix("test_content".to_string(), tx);
+        let (path, mut rt) =
+            init_framstream_unix(MockFrameHandler::new("test_content".to_string()), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).split();
 
         //1 - send READY frame (with WRONG content_type)
@@ -659,7 +689,8 @@ mod test {
     #[test]
     fn data_too_soon() {
         let (tx, rx) = mpsc::channel(2);
-        let (path, mut rt) = init_framstream_unix("test_content".to_string(), tx);
+        let (path, mut rt) =
+            init_framstream_unix(MockFrameHandler::new("test_content".to_string()), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).split();
 
         //1 - send data frame (too soon!)
@@ -711,7 +742,8 @@ mod test {
     #[test]
     fn unidirectional_framestream() {
         let (tx, rx) = mpsc::channel(2);
-        let (path, mut rt) = init_framstream_unix("test_content".to_string(), tx);
+        let (path, mut rt) =
+            init_framstream_unix(MockFrameHandler::new("test_content".to_string()), tx);
         let (mut sock_sink, _) = make_unix_stream(path).split();
 
         //1 - send START frame (with content_type)

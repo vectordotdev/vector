@@ -1,6 +1,12 @@
-#[derive(Default)]
+use serde::{Deserialize, Serialize};
+#[cfg(unix)]
+use std::{convert::TryFrom, fs::read_to_string, path::PathBuf};
+
+#[derive(Default, Deserialize, Serialize, Debug, PartialEq, Clone)]
+#[serde(default, deny_unknown_fields)]
 pub struct DnstapEventSchema {
-    dnstap_data_schema: DnstapDataSchema,
+    dnstap_root_data_schema: DnstapRootDataSchema,
+    dnstap_message_schema: DnstapMessageSchema,
     dns_query_message_schema: DnsQueryMessageSchema,
     dns_query_header_schema: DnsQueryHeaderSchema,
     dns_message_opt_pseudo_section_schema: DnsMessageOptPseudoSectionSchema,
@@ -11,7 +17,8 @@ pub struct DnstapEventSchema {
 impl DnstapEventSchema {
     pub fn new() -> Self {
         Self {
-            dnstap_data_schema: DnstapDataSchema::default(),
+            dnstap_root_data_schema: DnstapRootDataSchema::default(),
+            dnstap_message_schema: DnstapMessageSchema::default(),
             dns_query_message_schema: DnsQueryMessageSchema::default(),
             dns_query_header_schema: DnsQueryHeaderSchema::default(),
             dns_message_opt_pseudo_section_schema: DnsMessageOptPseudoSectionSchema::default(),
@@ -20,8 +27,12 @@ impl DnstapEventSchema {
         }
     }
 
-    pub fn dnstap_data_schema(self: &Self) -> &DnstapDataSchema {
-        &self.dnstap_data_schema
+    pub fn dnstap_root_data_schema(self: &Self) -> &DnstapRootDataSchema {
+        &self.dnstap_root_data_schema
+    }
+
+    pub fn dnstap_message_schema(self: &Self) -> &DnstapMessageSchema {
+        &self.dnstap_message_schema
     }
 
     pub fn dns_query_message_schema(self: &Self) -> &DnsQueryMessageSchema {
@@ -45,31 +56,60 @@ impl DnstapEventSchema {
     }
 }
 
-pub struct DnstapDataSchema {
+impl TryFrom<PathBuf> for DnstapEventSchema {
+    type Error = String;
+
+    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
+        if let Some(file_name) = path.as_path().to_str() {
+            match read_to_string(&path) {
+                Ok(toml_text) => match toml::de::from_str(&toml_text) {
+                    Ok(schema) => Ok(schema),
+                    Err(e) => {
+                        error!("Failed to parse schema: {}", e.to_string());
+                        Err(e.to_string())
+                    }
+                },
+                Err(e) => {
+                    error!(
+                        "Failed to read schema from file '{}': {}",
+                        file_name,
+                        e.to_string()
+                    );
+                    Err(e.to_string())
+                }
+            }
+        } else {
+            error!("Failed to unwrap schema path. Something unusual happened.");
+            Err("Failed to unwrap schema path".to_string())
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+#[serde(default, deny_unknown_fields)]
+pub struct DnstapRootDataSchema {
     server_identity: String,
     server_version: String,
     extra: String,
     data_type: String,
-    message: DnstapMessageSchema,
     error: String,
     raw_data: String,
 }
 
-impl Default for DnstapDataSchema {
+impl Default for DnstapRootDataSchema {
     fn default() -> Self {
         Self {
             server_identity: String::from("server_identity"),
             server_version: String::from("server_version"),
             extra: String::from("extra"),
             data_type: String::from("type"),
-            message: DnstapMessageSchema::default(),
             error: String::from("error"),
-            raw_data: String::from("data.raw_data"),
+            raw_data: String::from("raw_data"),
         }
     }
 }
 
-impl DnstapDataSchema {
+impl DnstapRootDataSchema {
     pub fn server_identity(self: &Self) -> &str {
         &self.server_identity
     }
@@ -82,9 +122,6 @@ impl DnstapDataSchema {
     pub fn data_type(self: &Self) -> &str {
         &self.data_type
     }
-    pub fn message(self: &Self) -> &DnstapMessageSchema {
-        &self.message
-    }
     pub fn error(self: &Self) -> &str {
         &self.error
     }
@@ -93,6 +130,8 @@ impl DnstapDataSchema {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+#[serde(default, deny_unknown_fields)]
 pub struct DnstapMessageSchema {
     socket_family: String,
     socket_protocol: String,
@@ -176,6 +215,8 @@ impl Default for DnstapMessageSchema {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+#[serde(default, deny_unknown_fields)]
 pub struct DnsQueryMessageSchema {
     raw_data: String,
     header: String,
@@ -224,6 +265,8 @@ impl Default for DnsQueryMessageSchema {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+#[serde(default, deny_unknown_fields)]
 pub struct DnsQueryHeaderSchema {
     id: String,
     opcode: String,
@@ -307,6 +350,8 @@ impl Default for DnsQueryHeaderSchema {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+#[serde(default, deny_unknown_fields)]
 pub struct DnsMessageOptPseudoSectionSchema {
     extended_rcode: String,
     version: String,
@@ -345,6 +390,8 @@ impl Default for DnsMessageOptPseudoSectionSchema {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+#[serde(default, deny_unknown_fields)]
 pub struct DnsMessageOptionSchema {
     opt_code: String,
     opt_name: String,
@@ -378,6 +425,8 @@ impl Default for DnsMessageOptionSchema {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+#[serde(default, deny_unknown_fields)]
 pub struct DnsRecordSchema {
     name: String,
     record_type: String,
@@ -413,5 +462,207 @@ impl Default for DnsRecordSchema {
             class: String::from("class"),
             rdata: String::from("rdata"),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_write_out_default() {
+        let toml_text = toml::ser::to_string_pretty(&DnstapEventSchema::new())
+            .expect("Failed to write default schema out as toml");
+        assert!(!toml_text.is_empty());
+    }
+
+    #[test]
+    fn test_read_in_default() {
+        let schema: DnstapEventSchema =
+            toml::de::from_str("").expect("Failed to read default schema from toml");
+        assert_eq!(DnstapEventSchema::new(), schema);
+    }
+
+    #[test]
+    fn test_read_in_fully_customized_schema() {
+        let toml_text = "
+            [dnstap_root_data_schema]
+                server_identity = 'serverId'
+                server_version = 'serverVersion'
+                extra = 'extraInfo'
+                data_type = 'dataType'
+                error = 'error'
+                raw_data = 'rawData'
+
+            [dnstap_message_schema]
+                socket_family = 'socketFamily'
+                socket_protocol = 'queryProtocol'
+                query_address = 'sourceAddress'
+                query_port = 'sourcePort'
+                response_address = 'responseAddress'
+                response_port = 'responsePort'
+                query_zone = 'queryZone'
+                query_time_sec = 'data.query_time_sec'
+                query_time_nsec = 'data.query_time_nsec'
+                response_time_sec = 'data.response_time_sec'
+                response_time_nsec = 'data.response_time_nsec'
+                dnstap_message_type = 'data.type'
+                query_message = 'data.requestData'
+                response_message = 'data.responseData'
+
+            [dns_query_message_schema]
+                raw_data = 'rawDnsMessageData'
+                header = 'header'
+                question_section = 'question'
+                answer_section = 'answer'
+                authority_section = 'authority'
+                additional_section = 'additional'
+                opt_pseudo_section = 'opt'
+
+            [dns_query_header_schema]
+                id = 'id'
+                opcode = 'opcode'
+                rcode = 'rcode'
+                qr = 'qr'
+                aa = 'aa'
+                tc = 'tc'
+                rd = 'rd'
+                ra = 'ra'
+                ad = 'ad'
+                cd = 'cd'
+                question_count = 'qdcount'
+                answer_count = 'ancount'
+                authority_count = 'nscount'
+                additional_count = 'arcount'
+
+            [dns_message_opt_pseudo_section_schema]
+                extended_rcode = 'extendedRcode'
+                version = 'ednsVersion'
+                do_flag = 'do'
+                udp_max_payload_size = 'udpPayloadSize'
+                options = 'options'
+
+            [dns_message_option_schema]
+                opt_code = 'optCode'
+                opt_name = 'optName'
+                supported_algorithms = 'supportedAlgorithms'
+                opt_data = 'optData'
+
+            [dns_record_schema]
+                name = 'domainName'
+                record_type = 'recordTypeId'
+                ttl = 'ttl'
+                class = 'rClass'
+                rdata = 'rData'
+            ";
+
+        let schema: DnstapEventSchema =
+            toml::de::from_str(toml_text).expect("Failed to read customized schema from toml");
+
+        assert_ne!(DnstapEventSchema::new(), schema);
+
+        assert_eq!(
+            "serverVersion",
+            schema.dnstap_root_data_schema().server_version
+        );
+        assert_eq!(
+            "serverId",
+            schema.dnstap_root_data_schema().server_identity()
+        );
+
+        assert_eq!(
+            "socketFamily",
+            schema.dnstap_message_schema().socket_family()
+        );
+        assert_eq!(
+            "queryProtocol",
+            schema.dnstap_message_schema().socket_protocol()
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown_table_name")]
+    fn test_read_in_with_unknown_table_name() {
+        let toml_text = "
+            [dnstap_root_data_schema]
+                server_version = 'test_server_version'
+                extra = 'test_extra'
+
+            [unknown_table_name]
+                socket_family = 'data.socket_family'
+            ";
+
+        let _schema: DnstapEventSchema =
+            toml::de::from_str(toml_text).expect("Expected read failure upon unknown table name");
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown_field")]
+    fn test_read_in_with_unknown_field() {
+        let toml_text = "
+            [dnstap_root_data_schema]
+                unknown_field = 'test'
+            ";
+
+        let _schema: DnstapEventSchema =
+            toml::de::from_str(toml_text).expect("Expected read failure upon unknown field");
+    }
+
+    #[test]
+    fn test_read_in_with_partial_schema() {
+        let toml_text = "
+            [dnstap_root_data_schema]
+                server_version = 'test_server_version'
+                extra = 'test_extra'
+
+            [dnstap_message_schema]
+                socket_family = 'data.socket_family'
+
+            [dns_message_option_schema]
+                opt_code = ''
+                opt_name = 'test name'
+                opt_data = 'opt_data'
+            ";
+
+        let schema: DnstapEventSchema =
+            toml::de::from_str(toml_text).expect("Failed to read default schema from toml");
+
+        assert_ne!(DnstapEventSchema::new(), schema);
+        assert_eq!(
+            &DnsQueryMessageSchema::default(),
+            schema.dns_query_message_schema()
+        );
+        assert_ne!(
+            &DnstapRootDataSchema::default(),
+            schema.dnstap_root_data_schema()
+        );
+
+        assert_eq!(
+            "test_server_version",
+            schema.dnstap_root_data_schema().server_version
+        );
+        assert_eq!(
+            "server_identity",
+            schema.dnstap_root_data_schema().server_identity()
+        );
+
+        assert_eq!(
+            "data.socket_family",
+            schema.dnstap_message_schema().socket_family()
+        );
+        assert_eq!(
+            "data.socket_protocol",
+            schema.dnstap_message_schema().socket_protocol()
+        );
+
+        assert_eq!("", schema.dns_message_option_schema().opt_code());
+        assert_eq!("test name", schema.dns_message_option_schema().opt_name());
+        assert_eq!("opt_data", schema.dns_message_option_schema().opt_data());
+        assert_eq!(
+            "supported_algorithms",
+            schema.dns_message_option_schema().supported_algorithms()
+        );
+
+        assert_eq!("name", schema.dns_record_schema().name());
     }
 }
