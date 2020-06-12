@@ -67,7 +67,7 @@ impl SourceConfig for Config {
         shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<sources::Source> {
-        let source = Source::init(self, Resolver, globals, name)?;
+        let source = Source::new(self, Resolver, globals, name)?;
 
         // TODO: this is a workaround for the legacy futures 0.1.
         // When the core is updated to futures 0.3 this should be simplied
@@ -104,7 +104,7 @@ struct Source {
 }
 
 impl Source {
-    fn init(
+    fn new(
         config: &Config,
         resolver: Resolver,
         globals: &GlobalOptions,
