@@ -332,6 +332,7 @@ sinks = [
   "sinks-aws_kinesis_firehose",
   "sinks-aws_kinesis_streams",
   "sinks-aws_s3",
+  "sinks-azure_monitor_logs",
   "sinks-blackhole",
   "sinks-clickhouse",
   "sinks-console",
@@ -354,14 +355,14 @@ sinks = [
   "sinks-splunk_hec",
   "sinks-statsd",
   "sinks-vector",
-  "sinks-pulsar",
-  "sinks-azure_monitor_logs"
+  "sinks-pulsar"
 ]
 sinks-aws_cloudwatch_logs = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_kinesis"]
 sinks-aws_s3 = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_s3", "uuid"]
+sinks-azure_monitor_logs = ["bytesize"]
 sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
@@ -385,7 +386,6 @@ sinks-splunk_hec = ["bytesize"]
 sinks-statsd = ["tokio-util/udp"]
 sinks-vector = []
 sinks-pulsar = ["pulsar"]
-sinks-azure_monitor_logs = ["bytesize"]
 
 # Identifies that the build is a nightly build
 nightly = []

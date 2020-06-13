@@ -367,8 +367,9 @@ mod tests {
         let headers = parts.headers;
         let rfc1123date = headers.get("x-ms-date").unwrap();
 
-        let auth_expected =
-            sink.build_authorization_header_value(rfc1123date.to_str().unwrap(), body.len()).unwrap();
+        let auth_expected = sink
+            .build_authorization_header_value(rfc1123date.to_str().unwrap(), body.len())
+            .unwrap();
 
         let authorization = headers.get("authorization").unwrap();
         assert_eq!(authorization.to_str().unwrap(), &auth_expected);
