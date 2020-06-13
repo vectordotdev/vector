@@ -12,6 +12,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
+use bytesize::ByteSize;
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http02::{
@@ -20,6 +21,7 @@ use http02::{
 use hyper13::Body;
 use lazy_static::lazy_static;
 use openssl::{base64, hash, pkey, sign};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -54,6 +56,7 @@ lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         ..Default::default()
     };
+    static ref LOG_TYPE_REGEX: Regex = Regex::new(r"^\w+$").unwrap();
     static ref LOG_TYPE_HEADER: HeaderName = HeaderName::from_static("log-type");
     static ref X_MS_DATE_HEADER: HeaderName = HeaderName::from_static(X_MS_DATE);
     static ref X_MS_AZURE_RESOURCE_HEADER: HeaderName =
@@ -83,56 +86,18 @@ const API_VERSION: &'static str = "2016-04-01";
 impl SinkConfig for AzureMonitorLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let batch = self.batch.unwrap_or(bytesize::mb(10u64), 1);
-        if batch.size as u64 > bytesize::mb(MAX_BATCH_SIZE_MB) {
-            warn!(
-                "provided batch size is too big for Azure Monitor: {}",
-                batch.size
-            );
+        let batch_size = batch.size as u64;
+
+        if batch_size > bytesize::mb(MAX_BATCH_SIZE_MB) {
+            return Err(format!(
+                "provided batch size is too big for Azure Monitor: {}, max is {}",
+                ByteSize::b(batch_size),
+                ByteSize::mb(MAX_BATCH_SIZE_MB)
+            )
+            .into());
         }
 
-        let url = format!(
-            "https://{}.ods.opinsights.azure.com{}?api-version={}",
-            self.customer_id, RESOURCE, API_VERSION
-        );
-        let uri: Uri = url.parse()?;
-
-        let shared_key_bytes = base64::decode_block(&self.shared_key)?;
-        let shared_key = pkey::PKey::hmac(&shared_key_bytes)?;
-        let mut default_headers = HeaderMap::with_capacity(5);
-
-        let log_type = HeaderValue::from_str(&self.log_type)?;
-        default_headers.insert(LOG_TYPE_HEADER.clone(), log_type);
-
-        if let Some(time_generated_field) = &self.time_generated_field {
-            if !time_generated_field.is_empty() {
-                default_headers.insert(
-                    TIME_GENERATED_FIELD_HEADER.clone(),
-                    HeaderValue::from_str(time_generated_field)?,
-                );
-            }
-        } else {
-            default_headers.insert(
-                TIME_GENERATED_FIELD_HEADER.clone(),
-                HeaderValue::from_static("timestamp"),
-            );
-        }
-
-        if let Some(azure_resource_id) = &self.azure_resource_id {
-            default_headers.insert(
-                TIME_GENERATED_FIELD_HEADER.clone(),
-                HeaderValue::from_str(azure_resource_id)?,
-            );
-        }
-
-        default_headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_VALUE.clone());
-
-        let sink = AzureMonitorLogsSink {
-            uri,
-            encoding: self.encoding.clone(),
-            customer_id: self.customer_id.clone(),
-            shared_key,
-            default_headers,
-        };
+        let sink = AzureMonitorLogsSink::new(self)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 
@@ -188,18 +153,18 @@ impl HttpSink for AzureMonitorLogsSink {
     }
 
     fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
-        let events = serde_json::json!([events]);
-
         let body = serde_json::to_vec(&events).unwrap();
         let len = body.len();
 
         let mut request = Request::post(self.uri.clone()).body(body).unwrap();
-
         let rfc1123date = chrono::Utc::now()
             .format("%a, %d %b %Y %H:%M:%S GMT")
             .to_string();
 
-        let authorization = self.build_authorization_header_value(&rfc1123date, len).unwrap();
+        let authorization = self
+            .build_authorization_header_value(&rfc1123date, len)
+            .unwrap();
+
         *request.headers_mut() = self.default_headers.clone();
         request
             .headers_mut()
@@ -213,7 +178,72 @@ impl HttpSink for AzureMonitorLogsSink {
 }
 
 impl AzureMonitorLogsSink {
-    fn build_authorization_header_value(&self, rfc1123date: &str, len: usize) -> crate::Result<String> {
+    fn new(config: &AzureMonitorLogsConfig) -> crate::Result<AzureMonitorLogsSink> {
+        let url = format!(
+            "https://{}.ods.opinsights.azure.com{}?api-version={}",
+            config.customer_id, RESOURCE, API_VERSION
+        );
+        let uri: Uri = url.parse()?;
+
+        if config.shared_key.is_empty() {
+            return Err(format!("shared_key can't be an empty string").into());
+        }
+
+        let shared_key_bytes = base64::decode_block(&config.shared_key)?;
+        let shared_key = pkey::PKey::hmac(&shared_key_bytes)?;
+        let mut default_headers = HeaderMap::with_capacity(3);
+
+        if config.log_type.len() > 100 || !LOG_TYPE_REGEX.is_match(&config.log_type) {
+            return Err(format!(
+                "invalid log_type \"{}\": log type can only contain letters, numbers, and underscore (_), and may not exceed 100 characters",
+                config.log_type
+            ).into());
+        }
+
+        let log_type = HeaderValue::from_str(&config.log_type)?;
+        default_headers.insert(LOG_TYPE_HEADER.clone(), log_type);
+
+        if let Some(time_generated_field) = &config.time_generated_field {
+            if !time_generated_field.is_empty() {
+                default_headers.insert(
+                    TIME_GENERATED_FIELD_HEADER.clone(),
+                    HeaderValue::from_str(time_generated_field)?,
+                );
+            }
+        } else {
+            default_headers.insert(
+                TIME_GENERATED_FIELD_HEADER.clone(),
+                HeaderValue::from_static("timestamp"),
+            );
+        }
+
+        if let Some(azure_resource_id) = &config.azure_resource_id {
+            if azure_resource_id.is_empty() {
+                return Err(format!("azure_resource_id can't be an empty string").into());
+            }
+
+            default_headers.insert(
+                X_MS_AZURE_RESOURCE_HEADER.clone(),
+                HeaderValue::from_str(azure_resource_id)?,
+            );
+        }
+
+        default_headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_VALUE.clone());
+
+        Ok(AzureMonitorLogsSink {
+            uri,
+            encoding: config.encoding.clone(),
+            customer_id: config.customer_id.clone(),
+            shared_key,
+            default_headers,
+        })
+    }
+
+    fn build_authorization_header_value(
+        &self,
+        rfc1123date: &str,
+        len: usize,
+    ) -> crate::Result<String> {
         let string_to_hash = format!(
             "POST\n{}\n{}\n{}:{}\n{}",
             len, CONTENT_TYPE, X_MS_DATE, rfc1123date, RESOURCE
@@ -242,20 +272,193 @@ async fn healthcheck(
     let res = client.send(request).await?;
 
     if res.status().is_server_error() {
-        return Err(format!("Server returned a server error.").into());
+        return Err(format!("Server returned a server error").into());
     }
 
     if res.status() == StatusCode::FORBIDDEN {
-        return Err(format!("The service failed to authenticate the request. Verify that the workspace ID and connection key are valid.").into());
+        return Err(format!("The service failed to authenticate the request. Verify that the workspace ID and connection key are valid").into());
     }
 
     if res.status() == StatusCode::NOT_FOUND {
-        return Err(format!("Either the URL provided is incorrect, or the request is too large.").into());
+        return Err(
+            format!("Either the URL provided is incorrect, or the request is too large").into(),
+        );
     }
 
     if res.status() == StatusCode::BAD_REQUEST {
-        return Err(format!("The workspace has been closed or the request was invalid.").into());
+        return Err(format!("The workspace has been closed or the request was invalid").into());
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{event::LogEvent, test_util::runtime};
+    use serde_json::value::RawValue;
+    use std::iter::FromIterator;
+
+    #[test]
+    fn encode_valid() {
+        let config: AzureMonitorLogsConfig = toml::from_str(
+            r#"
+            # random GUID and random 64 Base-64 encoded bytes
+            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+            shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            log_type = "Vector"
+            time_generated_field = "timestamp"
+        "#,
+        )
+        .unwrap();
+
+        let sink = AzureMonitorLogsSink::new(&config).unwrap();
+
+        let log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
+        let json = sink.encode_event(Event::from(log)).unwrap();
+        let body = serde_json::to_string(&json).unwrap();
+        assert_eq!(body, "{\"message\":\"hello world\"}");
+    }
+
+    #[test]
+    fn correct_request() {
+        let config: AzureMonitorLogsConfig = toml::from_str(
+            r#"
+            # random GUID and random 64 Base-64 encoded bytes
+            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+            shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            log_type = "Vector"
+            time_generated_field = "timestamp"
+            azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+        "#,
+        )
+        .unwrap();
+
+        let sink = AzureMonitorLogsSink::new(&config).unwrap();
+
+        let log1 = LogEvent::from_iter([("message", "hello")].iter().map(|&s| s));
+        let log2 = LogEvent::from_iter([("message", "world")].iter().map(|&s| s));
+        let event1 = sink.encode_event(Event::from(log1)).unwrap();
+        let event2 = sink.encode_event(Event::from(log2)).unwrap();
+
+        let json1 = serde_json::to_string(&event1).unwrap();
+        let json2 = serde_json::to_string(&event2).unwrap();
+        let raw1 = RawValue::from_string(json1).unwrap();
+        let raw2 = RawValue::from_string(json2).unwrap();
+
+        let events = vec![raw1, raw2];
+
+        let request = sink.build_request(events);
+
+        let (parts, body) = request.into_parts();
+        assert_eq!(&parts.method.to_string(), "POST");
+
+        let json: serde_json::Value = serde_json::from_slice(&body[..]).unwrap();
+        let expected_json = serde_json::json!([
+            {
+                "message": "hello"
+            },
+            {
+                "message": "world"
+            }
+        ]);
+        assert_eq!(json, expected_json);
+
+        let headers = parts.headers;
+        let rfc1123date = headers.get("x-ms-date").unwrap();
+
+        let auth_expected =
+            sink.build_authorization_header_value(rfc1123date.to_str().unwrap(), body.len()).unwrap();
+
+        let authorization = headers.get("authorization").unwrap();
+        assert_eq!(authorization.to_str().unwrap(), &auth_expected);
+
+        let log_type = headers.get("log-type").unwrap();
+        assert_eq!(log_type.to_str().unwrap(), "Vector");
+
+        let time_generated_field = headers.get("time-generated-field").unwrap();
+        assert_eq!(time_generated_field.to_str().unwrap(), "timestamp");
+
+        let azure_resource_id = headers.get("x-ms-azureresourceid").unwrap();
+        assert_eq!(
+            azure_resource_id.to_str().unwrap(),
+            "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+        );
+
+        assert_eq!(
+            &parts.uri.to_string(),
+            "https://97ce69d9-b4be-4241-8dbd-d265edcf06c4.ods.opinsights.azure.com/api/logs?api-version=2016-04-01"
+        );
+    }
+
+    #[test]
+    fn fails_missing_creds() {
+        let config: AzureMonitorLogsConfig = toml::from_str(
+            r#"
+            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+            shared_key = ""
+            log_type = "Vector"
+            time_generated_field = "timestamp"
+            azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+        "#,
+        )
+        .unwrap();
+        if config
+            .build(SinkContext::new_test(runtime().executor()))
+            .is_ok()
+        {
+            panic!("config.build failed to error");
+        }
+    }
+
+    #[test]
+    fn fails_invalid_base64() {
+        let config: AzureMonitorLogsConfig = toml::from_str(
+            r#"
+            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+            shared_key = "1Qs77Vz40+iDMBBTRmROKJwnEX"
+            log_type = "Vector"
+            time_generated_field = "timestamp"
+            azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+        "#,
+        )
+        .unwrap();
+        if config
+            .build(SinkContext::new_test(runtime().executor()))
+            .is_ok()
+        {
+            panic!("config.build failed to error");
+        }
+    }
+
+    #[test]
+    fn fails_config_missing_fields() {
+        toml::from_str::<AzureMonitorLogsConfig>(
+            r#"
+            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+            shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            time_generated_field = "timestamp"
+            azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+        "#,
+        )
+        .expect_err("Config parsing failed to error with missing log_type");
+
+        toml::from_str::<AzureMonitorLogsConfig>(
+            r#"
+            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+            log_type = "Vector"
+            azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+        "#,
+        )
+        .expect_err("Config parsing failed to error with missing shared_key");
+
+        toml::from_str::<AzureMonitorLogsConfig>(
+            r#"
+            shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            log_type = "Vector"
+            time_generated_field = "timestamp"
+        "#,
+        )
+        .expect_err("Config parsing failed to error with missing customer_id");
+    }
 }
