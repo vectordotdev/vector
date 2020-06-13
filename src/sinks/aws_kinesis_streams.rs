@@ -2,31 +2,38 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     internal_events::AwsKinesisStreamsEventSent,
-    region::RegionOrEndpoint,
+    region2::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        retries::RetryLogic,
-        rusoto::{self, AwsCredentialsProvider},
+        retries2::RetryLogic,
+        rusoto2 as rusoto,
+        service2::TowerRequestConfig,
         sink::Response,
-        BatchEventsConfig, TowerRequestConfig,
+        BatchEventsConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use bytes::Bytes;
-use futures01::{stream::iter_ok, Future, Poll, Sink};
+use bytes05::Bytes;
+use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rand::random;
-use rusoto_core::{Region, RusotoError, RusotoFuture};
+use rusoto_core44::{Region, RusotoError};
 use rusoto_kinesis::{
     DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError, PutRecordsInput,
     PutRecordsOutput, PutRecordsRequestEntry,
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{convert::TryInto, fmt, sync::Arc};
+use std::{
+    convert::TryInto,
+    fmt,
+    sync::Arc,
+    task::{Context, Poll},
+};
 use string_cache::DefaultAtom as Atom;
-use tower::Service;
-use tracing_futures::{Instrument, Instrumented};
+use tower03::Service;
+use tracing_futures::Instrument;
 
 #[derive(Clone)]
 pub struct KinesisService {
@@ -70,10 +77,9 @@ inventory::submit! {
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let config = self.clone();
-        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
-        let sink = KinesisService::new(config, cx)?;
-        Ok((Box::new(sink), healthcheck))
+        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
+        let sink = KinesisService::new(self.clone(), cx)?;
+        Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -91,7 +97,7 @@ impl KinesisService {
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
         let client = Arc::new(create_client(
-            config.region.clone().try_into()?,
+            (&config.region).try_into()?,
             config.assume_role.clone(),
             cx.resolver(),
         )?);
@@ -115,10 +121,10 @@ impl KinesisService {
 impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
     type Response = PutRecordsOutput;
     type Error = RusotoError<PutRecordsError>;
-    type Future = Instrumented<RusotoFuture<PutRecordsOutput, PutRecordsError>>;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
+    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, records: Vec<PutRecordsRequestEntry>) -> Self::Future {
@@ -127,14 +133,13 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
             events = %records.len(),
         );
 
+        let client = self.client.clone();
         let request = PutRecordsInput {
             records,
             stream_name: self.config.stream_name.clone(),
         };
 
-        self.client
-            .put_records(request)
-            .instrument(info_span!("request"))
+        Box::pin(async move { client.put_records(request).await }.instrument(info_span!("request")))
     }
 }
 
@@ -180,7 +185,7 @@ enum HealthcheckError {
     NoMatchingStreamName { stream_name: String },
 }
 
-fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Result<super::Healthcheck> {
+async fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Result<()> {
     let client = create_client(
         config.region.try_into()?,
         config.assume_role.clone(),
@@ -188,23 +193,23 @@ fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Result<s
     )?;
     let stream_name = config.stream_name;
 
-    let fut = client
-        .describe_stream(DescribeStreamInput {
-            stream_name: stream_name.clone(),
-            exclusive_start_shard_id: None,
-            limit: Some(1),
-        })
-        .map_err(|source| HealthcheckError::DescribeStreamFailed { source }.into())
-        .and_then(move |res| Ok(res.stream_description.stream_name))
-        .and_then(move |name| {
+    let req = client.describe_stream(DescribeStreamInput {
+        stream_name: stream_name.clone(),
+        exclusive_start_shard_id: None,
+        limit: Some(1),
+    });
+
+    match req.await {
+        Ok(resp) => {
+            let name = resp.stream_description.stream_name;
             if name == stream_name {
                 Ok(())
             } else {
                 Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
             }
-        });
-
-    Ok(Box::new(fut))
+        }
+        Err(source) => Err(HealthcheckError::DescribeStreamFailed { source }.into()),
+    }
 }
 
 fn create_client(
@@ -213,7 +218,8 @@ fn create_client(
     resolver: Resolver,
 ) -> crate::Result<KinesisClient> {
     let client = rusoto::client(resolver)?;
-    let creds = AwsCredentialsProvider::new(&region, assume_role)?;
+    let creds = rusoto::AwsCredentialsProvider::new(&region, assume_role)?;
+
     Ok(KinesisClient::new_with(client, creds, region))
 }
 
@@ -330,12 +336,12 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        region::RegionOrEndpoint,
+        region2::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string, runtime},
         topology::config::SinkContext,
     };
-    use futures01::{Future, Sink};
-    use rusoto_core::Region;
+    use futures01::Sink;
+    use rusoto_core44::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
 
@@ -348,7 +354,8 @@ mod integration_tests {
             endpoint: "http://localhost:4568".into(),
         };
 
-        ensure_stream(region.clone(), stream.clone());
+        let mut rt = runtime();
+        rt.block_on_std(ensure_stream(region.clone(), stream.clone()));
 
         let config = KinesisSinkConfig {
             stream_name: stream.clone(),
@@ -363,7 +370,6 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let sink = KinesisService::new(config, cx).unwrap();
@@ -379,7 +385,7 @@ mod integration_tests {
 
         let timestamp = timestamp as f64 / 1000.0;
         let records = rt
-            .block_on(fetch_records(stream.clone(), timestamp, region))
+            .block_on_std(fetch_records(stream, timestamp, region))
             .unwrap();
 
         let mut output_lines = records
@@ -392,60 +398,45 @@ mod integration_tests {
         assert_eq!(output_lines, input_lines)
     }
 
-    fn fetch_records(
+    async fn fetch_records(
         stream_name: String,
         timestamp: f64,
         region: Region,
-    ) -> impl Future<Item = Vec<rusoto_kinesis::Record>, Error = ()> {
+    ) -> crate::Result<Vec<rusoto_kinesis::Record>> {
         let client = Arc::new(KinesisClient::new(region));
 
-        let stream_name1 = stream_name.clone();
-        let describe = rusoto_kinesis::DescribeStreamInput {
-            stream_name,
+        let req = rusoto_kinesis::DescribeStreamInput {
+            stream_name: stream_name.clone(),
             ..Default::default()
         };
+        let resp = client.describe_stream(req).await?;
+        let shard = resp
+            .stream_description
+            .shards
+            .into_iter()
+            .next()
+            .expect("No shards");
 
-        let client1 = client.clone();
-        let client2 = client.clone();
+        let req = rusoto_kinesis::GetShardIteratorInput {
+            stream_name,
+            shard_id: shard.shard_id,
+            shard_iterator_type: "AT_TIMESTAMP".into(),
+            timestamp: Some(timestamp),
+            ..Default::default()
+        };
+        let resp = client.get_shard_iterator(req).await?;
+        let shard_iterator = resp.shard_iterator.expect("No iterator age produced");
 
-        client
-            .describe_stream(describe)
-            .map_err(|e| panic!("{:?}", e))
-            .map(|res| {
-                res.stream_description
-                    .shards
-                    .into_iter()
-                    .next()
-                    .expect("No shards")
-            })
-            .map(|shard| shard.shard_id)
-            .and_then(move |shard_id| {
-                let req = rusoto_kinesis::GetShardIteratorInput {
-                    stream_name: stream_name1,
-                    shard_id,
-                    shard_iterator_type: "AT_TIMESTAMP".into(),
-                    timestamp: Some(timestamp),
-                    ..Default::default()
-                };
-
-                client1
-                    .get_shard_iterator(req)
-                    .map_err(|e| panic!("{:?}", e))
-            })
-            .map(|iter| iter.shard_iterator.expect("No iterator age produced"))
-            .and_then(move |shard_iterator| {
-                let req = rusoto_kinesis::GetRecordsInput {
-                    shard_iterator,
-                    // limit: Some(limit),
-                    limit: None,
-                };
-
-                client2.get_records(req).map_err(|e| panic!("{:?}", e))
-            })
-            .map(|records| records.records)
+        let req = rusoto_kinesis::GetRecordsInput {
+            shard_iterator,
+            // limit: Some(limit),
+            limit: None,
+        };
+        let resp = client.get_records(req).await?;
+        Ok(resp.records)
     }
 
-    fn ensure_stream(region: Region, stream_name: String) {
+    async fn ensure_stream(region: Region, stream_name: String) {
         let client = KinesisClient::new(region);
 
         let req = rusoto_kinesis::CreateStreamInput {
@@ -453,9 +444,9 @@ mod integration_tests {
             shard_count: 1,
         };
 
-        match client.create_stream(req).sync() {
+        match client.create_stream(req).await {
             Ok(_) => (),
-            Err(e) => println!("Unable to check the stream {:?}", e),
+            Err(e) => panic!("Unable to check the stream {:?}", e),
         };
     }
 
