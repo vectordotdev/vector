@@ -344,8 +344,10 @@ mod tests {
             metric::{Metric, MetricKind, MetricValue},
             Event, Value,
         },
+        test_util::runtime,
         transforms::Transform,
     };
+    use futures01::{stream, Stream};
 
     fn from_config(config: &str) -> crate::Result<Lua> {
         Lua::new(&toml::from_str(config).unwrap())
@@ -732,5 +734,35 @@ mod tests {
         let event = transform.transform(event).unwrap();
 
         assert_eq!(event, expected);
+    }
+
+    #[test]
+    fn lua_multiple_events() {
+        crate::test_util::trace_init();
+        let transform = from_config(
+            r#"
+            hooks.process = """function (event, emit)
+                event["log"]["hello"] = "goodbye"
+                emit(event)
+            end
+            """
+            "#,
+        )
+        .unwrap();
+
+        let n = 10;
+
+        let events = (0..n)
+            .into_iter()
+            .map(|i| Event::from(format!("program me {}", i)));
+
+        let stream =
+            Transform::transform_stream(Box::new(transform), Box::new(stream::iter_ok(events)));
+
+        let mut rt = runtime();
+
+        let results = rt.block_on(stream.collect()).unwrap();
+
+        assert_eq!(results.len(), n);
     }
 }
