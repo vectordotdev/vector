@@ -3795,14 +3795,15 @@ dependencies = [
 
 [[package]]
 name = "rusoto_cloudwatch"
-version = "0.41.0"
+version = "0.44.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f470c278733d18760a5966a89227f4d9a06bb1d8260d676b011faa4d2aa82342"
+checksum = "17952154d3dc02e4b29b8aed92bacc3dd6502b665c3a0e466aa64e110cf33845"
 dependencies = [
- "bytes 0.4.12",
- "futures 0.1.29",
- "rusoto_core 0.41.0",
- "serde_urlencoded 0.5.5",
+ "async-trait",
+ "bytes 0.5.4",
+ "futures 0.3.4",
+ "rusoto_core 0.44.0",
+ "serde_urlencoded 0.6.1",
  "xml-rs",
 ]
 
@@ -3920,15 +3921,15 @@ dependencies = [
 
 [[package]]
 name = "rusoto_kinesis"
-version = "0.41.0"
+version = "0.44.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f88609598b24779b268f47c0d19780cf4865b0cbccd9f677bae75f7f7c5d4dcb"
+checksum = "c5d81ca868353012878cfc22bca6e9bc13c5f6e586f5e1687ade02d25ad3e5f7"
 dependencies = [
- "bytes 0.4.12",
- "futures 0.1.29",
- "rusoto_core 0.41.0",
+ "async-trait",
+ "bytes 0.5.4",
+ "futures 0.3.4",
+ "rusoto_core 0.44.0",
  "serde",
- "serde_derive",
  "serde_json",
 ]
 
@@ -3948,13 +3949,14 @@ dependencies = [
 
 [[package]]
 name = "rusoto_s3"
-version = "0.41.0"
+version = "0.44.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6c840fca030950caf0c9bea89eb35311aa5b01c0341fb0aaf28d347b5c416d7"
+checksum = "eebe039c71a8ab54ce6614e2967ef034bb3202f306e4025901f620cdfa5680c8"
 dependencies = [
- "bytes 0.4.12",
- "futures 0.1.29",
- "rusoto_core 0.41.0",
+ "async-trait",
+ "bytes 0.5.4",
+ "futures 0.3.4",
+ "rusoto_core 0.44.0",
  "xml-rs",
 ]
 

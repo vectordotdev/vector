@@ -67,10 +67,10 @@ metrics-runtime = "0.13.0"
 # Aws
 rusoto_core = { version = "0.41.0", optional = true }
 rusoto_core44 = { package = "rusoto_core", version = "0.44.0", optional = true }
-rusoto_s3 = { version = "0.41.0", optional = true }
+rusoto_s3 = { version = "0.44.0", optional = true }
 rusoto_logs = { version = "0.41.0", optional = true }
-rusoto_cloudwatch = { version = "0.41.0", optional = true }
-rusoto_kinesis = { version = "0.41.0", optional = true }
+rusoto_cloudwatch = { version = "0.44.0", optional = true }
+rusoto_kinesis = { version = "0.44.0", optional = true }
 rusoto_credential = { version = "0.41.1", optional = true }
 rusoto_credential44 = { package = "rusoto_credential", version = "0.44.0", optional = true }
 rusoto_firehose = { version = "0.44.0", optional = true }
@@ -355,10 +355,10 @@ sinks = [
   "sinks-pulsar"
 ]
 sinks-aws_cloudwatch_logs = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_logs"]
-sinks-aws_cloudwatch_metrics = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_cloudwatch"]
+sinks-aws_cloudwatch_metrics = ["rusoto_core44", "rusoto_credential44", "rusoto_sts44", "rusoto_cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto_core44", "rusoto_credential44", "rusoto_sts44", "rusoto_firehose"]
-sinks-aws_kinesis_streams = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_kinesis"]
-sinks-aws_s3 = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_s3", "uuid"]
+sinks-aws_kinesis_streams = ["rusoto_core44", "rusoto_credential44", "rusoto_sts44", "rusoto_kinesis"]
+sinks-aws_s3 = ["bytesize", "rusoto_core44", "rusoto_credential44", "rusoto_sts44", "rusoto_s3", "uuid"]
 sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []

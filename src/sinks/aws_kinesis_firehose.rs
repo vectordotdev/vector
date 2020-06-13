@@ -5,7 +5,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries2::RetryLogic,
-        rusoto2::{self, AwsCredentialsProvider},
+        rusoto2 as rusoto,
         service2::TowerRequestConfig,
         sink::Response,
         BatchEventsConfig,
@@ -121,8 +121,7 @@ impl KinesisFirehoseService {
 impl Service<Vec<Record>> for KinesisFirehoseService {
     type Response = PutRecordBatchOutput;
     type Error = RusotoError<PutRecordBatchError>;
-    type Future =
-        BoxFuture<'static, Result<PutRecordBatchOutput, RusotoError<PutRecordBatchError>>>;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
@@ -211,8 +210,9 @@ fn create_client(
     assume_role: Option<String>,
     resolver: Resolver,
 ) -> crate::Result<KinesisFirehoseClient> {
-    let client = rusoto2::client(resolver)?;
-    let creds = AwsCredentialsProvider::new(&region, assume_role)?;
+    let client = rusoto::client(resolver)?;
+    let creds = rusoto::AwsCredentialsProvider::new(&region, assume_role)?;
+
     Ok(KinesisFirehoseClient::new_with(client, creds, region))
 }
 

@@ -1,24 +1,27 @@
 use crate::{
     dns::Resolver,
     event::{self, Event},
-    region::RegionOrEndpoint,
+    region2::RegionOrEndpoint,
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        retries::RetryLogic,
-        rusoto,
+        retries2::RetryLogic,
+        rusoto2 as rusoto,
+        service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
         sink::Response,
         BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
-        PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
+        PartitionInnerBuffer,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use bytes::Bytes;
+use bytes05::Bytes;
 use chrono::Utc;
-use futures01::{stream::iter_ok, Future, Poll, Sink};
+use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures01::{stream::iter_ok, Sink};
+use http02::StatusCode;
 use lazy_static::lazy_static;
-use rusoto_core::{Region, RusotoError, RusotoFuture};
+use rusoto_core44::{Region, RusotoError};
 use rusoto_s3::{
     HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3,
 };
@@ -26,9 +29,11 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
-use tower::{Service, ServiceBuilder};
+use std::task::Context;
+use std::task::Poll;
+use tower03::{Service, ServiceBuilder};
 use tracing::field;
-use tracing_futures::{Instrument, Instrumented};
+use tracing_futures::Instrument;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -36,7 +41,7 @@ pub struct S3Sink {
     client: S3Client,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct S3SinkConfig {
     pub bucket: String,
@@ -134,10 +139,11 @@ inventory::submit! {
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = S3Sink::healthcheck(self, cx.resolver())?;
+        let healthcheck = S3Sink::healthcheck(self.clone(), cx.resolver())
+            .boxed()
+            .compat();
         let sink = S3Sink::new(self, cx)?;
-
-        Ok((sink, healthcheck))
+        Ok((sink, Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -156,7 +162,7 @@ enum HealthcheckError {
     #[snafu(display("Unknown bucket: {:?}", bucket))]
     UnknownBucket { bucket: String },
     #[snafu(display("Unknown status code: {}", status))]
-    UnknownStatus { status: http::StatusCode },
+    UnknownStatus { status: StatusCode },
 }
 
 impl S3Sink {
@@ -176,7 +182,7 @@ impl S3Sink {
             .unwrap_or("date=%F/");
         let key_prefix = Template::try_from(key_prefix)?;
 
-        let region = config.region.clone().try_into()?;
+        let region = (&config.region).try_into()?;
 
         let s3 = S3Sink {
             client: Self::create_client(region, config.assume_role.clone(), cx.resolver())?,
@@ -203,42 +209,36 @@ impl S3Sink {
 
         let buffer = PartitionBuffer::new(Buffer::new(config.compression));
 
-        let sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+        let sink = PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch, cx.acker())
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
             .sink_map_err(|error| error!("Sink failed to flush: {}", error));
 
         Ok(Box::new(sink))
     }
 
-    pub fn healthcheck(
-        config: &S3SinkConfig,
-        resolver: Resolver,
-    ) -> crate::Result<super::Healthcheck> {
+    pub async fn healthcheck(config: S3SinkConfig, resolver: Resolver) -> crate::Result<()> {
         let client = Self::create_client(
-            config.region.clone().try_into()?,
+            (&config.region).try_into()?,
             config.assume_role.clone(),
             resolver,
         )?;
 
-        let request = HeadBucketRequest {
-            bucket: config.bucket.clone(),
-        };
-
-        let response = client.head_bucket(request);
-
         let bucket = config.bucket.clone();
-        let healthcheck = response.map_err(|err| match err {
-            RusotoError::Unknown(response) => match response.status {
-                http::status::StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
-                http::status::StatusCode::NOT_FOUND => {
-                    HealthcheckError::UnknownBucket { bucket }.into()
-                }
-                status => HealthcheckError::UnknownStatus { status }.into(),
-            },
-            err => err.into(),
+        let req = client.head_bucket(HeadBucketRequest {
+            bucket: bucket.clone(),
         });
 
-        Ok(Box::new(healthcheck))
+        match req.await {
+            Ok(_) => Ok(()),
+            Err(error) => Err(match error {
+                RusotoError::Unknown(resp) => match resp.status {
+                    StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
+                    StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
+                    status => HealthcheckError::UnknownStatus { status }.into(),
+                },
+                error => error.into(),
+            }),
+        }
     }
 
     pub fn create_client(
@@ -265,14 +265,15 @@ impl S3Sink {
 impl Service<Request> for S3Sink {
     type Response = PutObjectOutput;
     type Error = RusotoError<PutObjectError>;
-    type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
+    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: Request) -> Self::Future {
         let options = request.options;
+
         let mut tagging = url::form_urlencoded::Serializer::new(String::new());
         if let Some(tags) = options.tags {
             for (p, v) in tags {
@@ -280,24 +281,26 @@ impl Service<Request> for S3Sink {
             }
         }
         let tagging = tagging.finish();
-        self.client
-            .put_object(PutObjectRequest {
-                body: Some(request.body.into()),
-                bucket: request.bucket,
-                key: request.key,
-                content_encoding: request.content_encoding,
-                acl: options.acl.map(to_string),
-                grant_full_control: options.grant_full_control,
-                grant_read: options.grant_read,
-                grant_read_acp: options.grant_read_acp,
-                grant_write_acp: options.grant_write_acp,
-                server_side_encryption: options.server_side_encryption.map(to_string),
-                ssekms_key_id: options.ssekms_key_id,
-                storage_class: options.storage_class.map(to_string),
-                tagging: Some(tagging),
-                ..Default::default()
-            })
-            .instrument(info_span!("request"))
+
+        let client = self.client.clone();
+        let request = PutObjectRequest {
+            body: Some(request.body.into()),
+            bucket: request.bucket,
+            key: request.key,
+            content_encoding: request.content_encoding,
+            acl: options.acl.map(to_string),
+            grant_full_control: options.grant_full_control,
+            grant_read: options.grant_read,
+            grant_read_acp: options.grant_read_acp,
+            grant_write_acp: options.grant_write_acp,
+            server_side_encryption: options.server_side_encryption.map(to_string),
+            ssekms_key_id: options.ssekms_key_id,
+            storage_class: options.storage_class.map(to_string),
+            tagging: Some(tagging),
+            ..Default::default()
+        };
+
+        Box::pin(async move { client.put_object(request).await }.instrument(info_span!("request")))
     }
 }
 
@@ -530,17 +533,20 @@ mod integration_tests {
         assert_downcast_matches,
         dns::Resolver,
         event::Event,
-        region::RegionOrEndpoint,
+        region2::RegionOrEndpoint,
         sinks::aws_s3::{S3Sink, S3SinkConfig},
         test_util::{random_lines_with_stream, random_string, runtime},
         topology::config::SinkContext,
     };
+    use bytes05::BytesMut;
     use flate2::read::GzDecoder;
-    use futures01::{Future, Sink};
+    use futures::compat::Future01CompatExt;
+    use futures::stream::{self, StreamExt};
+    use futures01::Sink;
     use pretty_assertions::assert_eq;
-    use rusoto_core::region::Region;
+    use rusoto_core44::region::Region;
     use rusoto_s3::{S3Client, S3};
-    use std::io::{BufRead, BufReader};
+    use std::io::{BufRead, BufReader, Cursor};
 
     const BUCKET: &str = "router-tests";
 
@@ -549,26 +555,27 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let config = config(1000000);
-        let prefix = config.key_prefix.clone();
-        let sink = S3Sink::new(&config, cx).unwrap();
+        rt.block_on_std(async move {
+            let config = config(1000000).await;
+            let prefix = config.key_prefix.clone();
+            let sink = S3Sink::new(&config, cx).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 10);
+            let (lines, events) = random_lines_with_stream(100, 10);
 
-        let pump = sink.send_all(events);
-        let _ = rt.block_on(pump).unwrap();
+            let _ = sink.send_all(events).compat().await.unwrap();
 
-        let keys = get_keys(prefix.unwrap());
-        assert_eq!(keys.len(), 1);
+            let keys = get_keys(prefix.unwrap()).await;
+            assert_eq!(keys.len(), 1);
 
-        let key = keys[0].clone();
-        assert!(key.ends_with(".log"));
+            let key = keys[0].clone();
+            assert!(key.ends_with(".log"));
 
-        let obj = get_object(key);
-        assert_eq!(obj.content_encoding, None);
+            let obj = get_object(key).await;
+            assert_eq!(obj.content_encoding, None);
 
-        let response_lines = get_lines(obj);
-        assert_eq!(lines, response_lines);
+            let response_lines = get_lines(obj).await;
+            assert_eq!(lines, response_lines);
+        })
     }
 
     #[test]
@@ -576,61 +583,66 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        ensure_bucket(&client());
-
-        let config = S3SinkConfig {
-            key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
-            filename_time_format: Some("waitsforfullbatch".into()),
-            filename_append_uuid: Some(false),
-            ..config(1000)
-        };
-        let prefix = config.key_prefix.clone();
-        let sink = S3Sink::new(&config, cx).unwrap();
-
-        let (lines, _events) = random_lines_with_stream(100, 30);
-
-        let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
-            let mut e = Event::from(line);
-            let i = if i < 10 {
-                1
-            } else if i < 20 {
-                2
-            } else {
-                3
+        rt.block_on_std(async move {
+            let config = S3SinkConfig {
+                key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
+                filename_time_format: Some("waitsforfullbatch".into()),
+                filename_append_uuid: Some(false),
+                ..config(1000).await
             };
-            e.as_mut_log().insert("i", format!("{}", i));
-            e
+            let prefix = config.key_prefix.clone();
+            let sink = S3Sink::new(&config, cx).unwrap();
+
+            let (lines, _events) = random_lines_with_stream(100, 30);
+
+            let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
+                let mut e = Event::from(line);
+                let i = if i < 10 {
+                    1
+                } else if i < 20 {
+                    2
+                } else {
+                    3
+                };
+                e.as_mut_log().insert("i", format!("{}", i));
+                e
+            });
+
+            let _ = sink
+                .send_all(futures01::stream::iter_ok(events))
+                .compat()
+                .await
+                .unwrap();
+
+            let keys = get_keys(prefix.unwrap()).await;
+            assert_eq!(keys.len(), 3);
+
+            let response_lines = stream::iter(keys)
+                .fold(Vec::new(), |mut acc, key| async {
+                    acc.push(get_lines(get_object(key).await).await);
+                    acc
+                })
+                .await;
+
+            assert_eq!(&lines[00..10], response_lines[0].as_slice());
+            assert_eq!(&lines[10..20], response_lines[1].as_slice());
+            assert_eq!(&lines[20..30], response_lines[2].as_slice());
         });
-
-        let pump = sink.send_all(futures01::stream::iter_ok(events));
-        let _ = rt.block_on(pump).unwrap();
-
-        let keys = get_keys(prefix.unwrap());
-        assert_eq!(keys.len(), 3);
-
-        let response_lines = keys
-            .into_iter()
-            .map(|key| get_lines(get_object(key)))
-            .collect::<Vec<_>>();
-
-        assert_eq!(&lines[00..10], response_lines[0].as_slice());
-        assert_eq!(&lines[10..20], response_lines[1].as_slice());
-        assert_eq!(&lines[20..30], response_lines[2].as_slice());
     }
 
     #[test]
     fn s3_waits_for_full_batch_or_timeout_before_sending() {
-        let rt = runtime();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        ensure_bucket(&client());
-
-        let config = S3SinkConfig {
-            key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
-            filename_time_format: Some("waitsforfullbatch".into()),
-            filename_append_uuid: Some(false),
-            ..config(1000)
-        };
+        let config = rt.block_on_std(async {
+            S3SinkConfig {
+                key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
+                filename_time_format: Some("waitsforfullbatch".into()),
+                filename_append_uuid: Some(false),
+                ..config(1000).await
+            }
+        });
 
         let prefix = config.key_prefix.clone();
         let sink = S3Sink::new(&config, cx).unwrap();
@@ -638,10 +650,11 @@ mod integration_tests {
         let (lines, _) = random_lines_with_stream(100, 30);
 
         let (tx, rx) = futures01::sync::mpsc::channel(1);
-        let pump = sink.send_all(rx).map(|_| ()).map_err(|_| ());
 
         let mut rt = runtime();
-        rt.spawn(pump);
+        rt.spawn_std(async {
+            let _ = sink.send_all(rx).compat().await.unwrap();
+        });
 
         let mut tx = tx.wait();
 
@@ -667,19 +680,23 @@ mod integration_tests {
 
         drop(tx);
 
+        rt.block_on_std(async move {
+            let keys = get_keys(prefix.unwrap()).await;
+            assert_eq!(keys.len(), 3);
+
+            let response_lines = stream::iter(keys)
+                .fold(Vec::new(), |mut acc, key| async {
+                    acc.push(get_lines(get_object(key).await).await);
+                    acc
+                })
+                .await;
+
+            assert_eq!(&lines[00..10], response_lines[0].as_slice());
+            assert_eq!(&lines[10..20], response_lines[1].as_slice());
+            assert_eq!(&lines[20..30], response_lines[2].as_slice());
+        });
+
         crate::test_util::shutdown_on_idle(rt);
-
-        let keys = get_keys(prefix.unwrap());
-        assert_eq!(keys.len(), 3);
-
-        let response_lines = keys
-            .into_iter()
-            .map(|key| get_lines(get_object(key)))
-            .collect::<Vec<_>>();
-
-        assert_eq!(&lines[00..10], response_lines[0].as_slice());
-        assert_eq!(&lines[10..20], response_lines[1].as_slice());
-        assert_eq!(&lines[20..30], response_lines[2].as_slice());
     }
 
     #[test]
@@ -687,39 +704,35 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        ensure_bucket(&client());
+        rt.block_on_std(async {
+            let config = S3SinkConfig {
+                compression: Compression::Gzip,
+                filename_time_format: Some("%S%f".into()),
+                ..config(1000).await
+            };
 
-        let config = S3SinkConfig {
-            compression: Compression::Gzip,
-            filename_time_format: Some("%S%f".into()),
-            ..config(1000)
-        };
+            let prefix = config.key_prefix.clone();
+            let sink = S3Sink::new(&config, cx).unwrap();
 
-        let prefix = config.key_prefix.clone();
-        let sink = S3Sink::new(&config, cx).unwrap();
+            let (lines, events) = random_lines_with_stream(100, 500);
 
-        let (lines, events) = random_lines_with_stream(100, 500);
+            let _ = sink.send_all(events).compat().await.unwrap();
 
-        let pump = sink.send_all(events);
-        let _ = rt.block_on(pump).unwrap();
+            let keys = get_keys(prefix.unwrap()).await;
+            assert_eq!(keys.len(), 2);
 
-        let keys = get_keys(prefix.unwrap());
-        assert_eq!(keys.len(), 2);
-
-        let response_lines = keys
-            .into_iter()
-            .map(|key| {
+            let response_lines = stream::iter(keys).fold(Vec::new(), |mut acc, key| async {
                 assert!(key.ends_with(".log.gz"));
 
-                let obj = get_object(key);
+                let obj = get_object(key).await;
                 assert_eq!(obj.content_encoding, Some("gzip".to_string()));
 
-                get_gzipped_lines(obj)
-            })
-            .flatten()
-            .collect::<Vec<_>>();
+                acc.append(&mut get_gzipped_lines(obj).await);
+                acc
+            });
 
-        assert_eq!(lines, response_lines);
+            assert_eq!(lines, response_lines.await);
+        });
     }
 
     #[test]
@@ -727,8 +740,10 @@ mod integration_tests {
         let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
-        let healthcheck = S3Sink::healthcheck(&config(1), resolver).unwrap();
-        rt.block_on(healthcheck).unwrap();
+        rt.block_on_std(async move {
+            let config = config(1).await;
+            S3Sink::healthcheck(config, resolver).await.unwrap();
+        });
     }
 
     #[test]
@@ -736,16 +751,17 @@ mod integration_tests {
         let mut rt = runtime();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
-        let config = S3SinkConfig {
-            bucket: "asdflkjadskdaadsfadf".to_string(),
-            ..config(1)
-        };
-        let healthcheck = S3Sink::healthcheck(&config, resolver).unwrap();
-        assert_downcast_matches!(
-            rt.block_on(healthcheck).unwrap_err(),
-            HealthcheckError,
-            HealthcheckError::UnknownBucket{ .. }
-        );
+        rt.block_on_std(async move {
+            let config = S3SinkConfig {
+                bucket: "asdflkjadskdaadsfadf".to_string(),
+                ..config(1).await
+            };
+            assert_downcast_matches!(
+                S3Sink::healthcheck(config, resolver).await.unwrap_err(),
+                HealthcheckError,
+                HealthcheckError::UnknownBucket{ .. }
+            );
+        });
     }
 
     fn client() -> S3Client {
@@ -754,8 +770,8 @@ mod integration_tests {
             endpoint: "http://localhost:9000".to_owned(),
         };
 
-        use rusoto_core::HttpClient;
-        use rusoto_credential::StaticProvider;
+        use rusoto_core44::HttpClient;
+        use rusoto_credential44::StaticProvider;
 
         let p = StaticProvider::new_minimal("test-access-key".into(), "test-secret-key".into());
         let d = HttpClient::new().unwrap();
@@ -763,8 +779,8 @@ mod integration_tests {
         S3Client::new_with(d, p, region)
     }
 
-    fn config(batch_size: usize) -> S3SinkConfig {
-        ensure_bucket(&client());
+    async fn config(batch_size: usize) -> S3SinkConfig {
+        ensure_bucket(&client()).await;
 
         S3SinkConfig {
             key_prefix: Some(random_string(10) + "/date=%F/"),
@@ -779,7 +795,7 @@ mod integration_tests {
         }
     }
 
-    fn ensure_bucket(client: &S3Client) {
+    async fn ensure_bucket(client: &S3Client) {
         use rusoto_s3::{CreateBucketError, CreateBucketRequest};
 
         let req = CreateBucketRequest {
@@ -787,21 +803,19 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let res = client.create_bucket(req);
-
-        match res.sync() {
+        match client.create_bucket(req).await {
             Ok(_) | Err(RusotoError::Service(CreateBucketError::BucketAlreadyOwnedByYou(_))) => {}
             Err(e) => match e {
-                RusotoError::Unknown(b) => {
-                    let body = String::from_utf8_lossy(&b.body[..]);
-                    panic!("Couldn't create bucket: {:?}; Body {}", b, body);
+                RusotoError::Unknown(resp) => {
+                    let body = String::from_utf8_lossy(&resp.body[..]);
+                    panic!("Couldn't create bucket: {:?}; Body {}", resp, body);
                 }
                 _ => panic!("Couldn't create bucket: {}", e),
             },
         }
     }
 
-    fn get_keys(prefix: String) -> Vec<String> {
+    async fn get_keys(prefix: String) -> Vec<String> {
         let prefix = prefix.split("/").into_iter().next().unwrap().to_string();
 
         let list_res = client()
@@ -810,7 +824,7 @@ mod integration_tests {
                 prefix: Some(prefix),
                 ..Default::default()
             })
-            .sync()
+            .await
             .unwrap();
 
         list_res
@@ -821,24 +835,38 @@ mod integration_tests {
             .collect()
     }
 
-    fn get_object(key: String) -> rusoto_s3::GetObjectOutput {
+    async fn get_object(key: String) -> rusoto_s3::GetObjectOutput {
         client()
             .get_object(rusoto_s3::GetObjectRequest {
                 bucket: BUCKET.to_string(),
                 key,
                 ..Default::default()
             })
-            .sync()
+            .await
             .unwrap()
     }
 
-    fn get_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
-        let buf_read = BufReader::new(obj.body.unwrap().into_blocking_read());
+    async fn get_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
+        let body = get_object_output_body(obj).await;
+        let buf_read = BufReader::new(body);
         buf_read.lines().map(|l| l.unwrap()).collect()
     }
 
-    fn get_gzipped_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
-        let buf_read = BufReader::new(GzDecoder::new(obj.body.unwrap().into_blocking_read()));
+    async fn get_gzipped_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
+        let body = get_object_output_body(obj).await;
+        let buf_read = BufReader::new(GzDecoder::new(body));
         buf_read.lines().map(|l| l.unwrap()).collect()
+    }
+
+    async fn get_object_output_body(obj: rusoto_s3::GetObjectOutput) -> Cursor<Bytes> {
+        let bytes = obj
+            .body
+            .unwrap()
+            .fold(BytesMut::new(), |mut store, bytes| async move {
+                store.extend_from_slice(&bytes.unwrap());
+                store
+            })
+            .await;
+        Cursor::new(bytes.freeze())
     }
 }
