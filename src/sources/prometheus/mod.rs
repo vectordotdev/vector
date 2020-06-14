@@ -1,13 +1,16 @@
 use crate::{
+    hyper::body_to_bytes,
     internal_events::{PrometheusHttpError, PrometheusParseError, PrometheusRequestCompleted},
     shutdown::ShutdownSignal,
-    stream::StreamExt,
+    stream::StreamExt as VStreamExt,
     topology::config::GlobalOptions,
     Event,
 };
-use futures01::{sync::mpsc, Future, Sink, Stream};
+use futures::{FutureExt, TryFutureExt};
+use futures01::{sync::mpsc, Future, Sink, Stream as Stream01};
 use http::Uri;
-use hyper_openssl::HttpsConnector;
+use hyper13::{Body, Client, Request};
+use hyper_openssl08::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::time::{Duration, Instant};
@@ -66,16 +69,17 @@ fn prometheus(
         .map(move |_| futures01::stream::iter_ok(urls.clone()))
         .flatten()
         .map(move |url| {
-            let https = HttpsConnector::new(4).expect("TLS initialization failed");
-            let client = hyper::Client::builder().build(https);
+            let https = HttpsConnector::new().expect("TLS initialization failed");
+            let client = Client::builder().build(https);
 
-            let request = hyper::Request::get(&url)
-                .body(hyper::Body::empty())
+            let request = Request::get(&url)
+                .body(Body::empty())
                 .expect("error creating request");
 
             client
                 .request(request)
-                .and_then(|response| response.into_body().concat2())
+                .and_then(|response| body_to_bytes(response.into_body()).boxed())
+                .compat()
                 .map(|body| {
                     emit!(PrometheusRequestCompleted);
 

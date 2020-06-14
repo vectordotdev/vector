@@ -35,7 +35,7 @@ impl InternalEvent for PrometheusParseError {
 
 #[derive(Debug)]
 pub struct PrometheusHttpError {
-    pub error: hyper::Error,
+    pub error: hyper13::Error,
 }
 
 impl InternalEvent for PrometheusHttpError {
