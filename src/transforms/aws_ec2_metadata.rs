@@ -1,11 +1,12 @@
 use super::Transform;
 use crate::{
     event::Event,
+    hyper::body_to_bytes,
     sinks::util::http2::HttpClient,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
-use bytes::{Bytes, BytesMut};
-use futures::{compat::Future01CompatExt, TryStreamExt};
+use bytes::Bytes;
+use futures::compat::Future01CompatExt;
 use http02::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper13::Body;
 use serde::{Deserialize, Serialize};
@@ -491,18 +492,6 @@ impl Keys {
 enum Ec2MetadataError {
     #[snafu(display("Unable to fetch token."))]
     UnableToFetchToken,
-}
-
-// Can be eliminated once we start using `bytes` crate with the same version as `hyper`.
-async fn body_to_bytes(body: Body) -> Result<Bytes, hyper13::Error> {
-    body
-        // hyper13::body::to_body
-        .try_fold(BytesMut::new(), |mut store, bytes| async move {
-            store.extend_from_slice(&bytes);
-            Ok(store)
-        })
-        .await
-        .map(Into::into)
 }
 
 #[cfg(feature = "aws-ec2-metadata-integration-tests")]
