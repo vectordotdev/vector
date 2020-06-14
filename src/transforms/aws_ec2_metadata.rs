@@ -494,6 +494,7 @@ enum Ec2MetadataError {
     UnableToFetchToken,
 }
 
+#[cfg(feature = "aws-ec2-metadata-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
     use super::*;
