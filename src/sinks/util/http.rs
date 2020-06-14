@@ -410,9 +410,8 @@ mod test {
 
     #[test]
     fn util_http_it_makes_http_requests() {
-        let rt = crate::test_util::runtime();
         let addr = crate::test_util::next_addr();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
 
         let uri = format!("http://{}:{}/", addr.ip(), addr.port())
             .parse::<Uri>()
