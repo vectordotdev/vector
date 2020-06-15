@@ -572,6 +572,16 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
+  # The frequency that the consumer offsets are committed (written) to offset
+  # storage.
+  #
+  # * optional
+  # * default: 5000
+  # * type: uint
+  # * unit: milliseconds
+  commit_interval_ms = 5000
+  commit_interval_ms = 10000
+
   # Maximum time the broker may wait to fill the response.
   #
   # * optional
@@ -817,6 +827,7 @@ dns_servers = ["0.0.0.0:53"]
   # * default: 102400
   # * type: uint
   # * unit: bytes
+  # * relevant when mode = "tcp" or mode = "unix"
   max_length = 102400
 
   # The type of socket to use.

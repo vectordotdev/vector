@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    kafka::{KafkaCompression, KafkaTlsConfig},
+    kafka::KafkaTlsConfig,
     shutdown::ShutdownSignal,
     stream::StreamExt,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -34,7 +34,6 @@ pub struct KafkaSourceConfig {
     bootstrap_servers: String,
     topics: Vec<String>,
     group_id: String,
-    compression: Option<KafkaCompression>,
     #[serde(default = "default_auto_offset_reset")]
     auto_offset_reset: String,
     #[serde(default = "default_session_timeout_ms")]
@@ -45,7 +44,6 @@ pub struct KafkaSourceConfig {
     fetch_wait_max_ms: u64,
     #[serde(default = "default_commit_interval_ms")]
     commit_interval_ms: u64,
-    host_key: Option<String>,
     key_field: Option<String>,
     librdkafka_options: Option<HashMap<String, String>>,
     tls: Option<KafkaTlsConfig>,
