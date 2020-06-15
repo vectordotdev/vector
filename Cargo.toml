@@ -76,6 +76,7 @@ rusoto_credential44 = { package = "rusoto_credential", version = "0.44.0", optio
 rusoto_firehose = { version = "0.44.0", optional = true }
 rusoto_sts = { version = "0.41.0", optional = true }
 rusoto_sts44 = { package = "rusoto_sts", version = "0.44.0", optional = true }
+rusoto_signature = { package = "rusoto_signature", version = "0.44.0", optional = true }
 
 # Tower
 tower = "0.1.1"
@@ -355,15 +356,15 @@ sinks = [
   "sinks-pulsar"
 ]
 sinks-aws_cloudwatch_logs = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_logs"]
-sinks-aws_cloudwatch_metrics = ["rusoto_core44", "rusoto_credential44", "rusoto_sts44", "rusoto_cloudwatch"]
-sinks-aws_kinesis_firehose = ["rusoto_core44", "rusoto_credential44", "rusoto_sts44", "rusoto_firehose"]
-sinks-aws_kinesis_streams = ["rusoto_core44", "rusoto_credential44", "rusoto_sts44", "rusoto_kinesis"]
-sinks-aws_s3 = ["bytesize", "rusoto_core44", "rusoto_credential44", "rusoto_sts44", "rusoto_s3", "uuid"]
+sinks-aws_cloudwatch_metrics = ["rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44", "rusoto_cloudwatch"]
+sinks-aws_kinesis_firehose = ["rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44", "rusoto_firehose"]
+sinks-aws_kinesis_streams = ["rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44", "rusoto_kinesis"]
+sinks-aws_s3 = ["bytesize", "rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44", "rusoto_s3", "uuid"]
 sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
 sinks-datadog = []
-sinks-elasticsearch = ["base64", "bytesize", "rusoto_core", "rusoto_credential", "rusoto_sts"]
+sinks-elasticsearch = ["base64", "bytesize", "rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt", "uuid"]
 sinks-honeycomb = ["sinks-http"]

@@ -3,7 +3,7 @@ use crate::{
     emit,
     event::Event,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
-    region::{region_from_endpoint, RegionOrEndpoint},
+    region2::{region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http2::{BatchedHttpSink, HttpClient, HttpSink},
@@ -25,9 +25,11 @@ use http02::{
 };
 use hyper13::Body;
 use lazy_static::lazy_static;
-use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
-use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
-use rusoto_credential::{AwsCredentials, CredentialsError};
+use rusoto_core44::Region;
+use rusoto_credential44::{
+    AwsCredentials, CredentialsError, DefaultCredentialsProvider, ProvideAwsCredentials,
+};
+use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
@@ -325,10 +327,9 @@ impl ElasticSearchCommon {
                 let provider =
                     DefaultCredentialsProvider::new().context(AWSCredentialsProviderFailed)?;
 
-                let mut rt = tokio01::runtime::current_thread::Runtime::new()?;
-
+                let mut rt = tokio_compat::runtime::current_thread::Runtime::new()?;
                 let credentials = rt
-                    .block_on(provider.credentials())
+                    .block_on_std(provider.credentials())
                     .context(AWSCredentialsGenerateFailed)?;
 
                 Some(credentials)
@@ -424,7 +425,7 @@ fn finish_signer(
     credentials: &AwsCredentials,
     mut builder: http02::request::Builder,
 ) -> http02::request::Builder {
-    signer.sign_with_plus(&credentials, true);
+    signer.sign(&credentials);
 
     for (name, values) in signer.headers() {
         let header_name = name
@@ -522,6 +523,7 @@ mod integration_tests {
         topology::config::{SinkConfig, SinkContext},
         Event,
     };
+    use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
     use http02::{Request, StatusCode};
     use hyper13::Body;
@@ -667,68 +669,77 @@ mod integration_tests {
         let cx = SinkContext::new_test(rt.executor());
         let (sink, healthcheck) = config.build(cx.clone()).expect("Building config failed");
 
-        rt.block_on(healthcheck).expect("Health check failed");
+        rt.block_on_std(async move {
+            healthcheck.compat().await.expect("Health check failed");
 
-        let (input, events) = random_events_with_stream(100, 100);
-        match break_events {
-            true => {
-                // Break all but the first event to simulate some kind of partial failure
-                let mut doit = false;
-                let pump = sink.send_all(events.map(move |mut event| {
-                    if doit {
-                        event.as_mut_log().insert("message", 1);
-                    }
-                    doit = true;
-                    event
-                }));
-                let _ = rt.block_on(pump).expect("Sending events failed");
+            let (input, events) = random_events_with_stream(100, 100);
+            match break_events {
+                true => {
+                    // Break all but the first event to simulate some kind of partial failure
+                    let mut doit = false;
+                    let _ = sink
+                        .send_all(events.map(move |mut event| {
+                            if doit {
+                                event.as_mut_log().insert("message", 1);
+                            }
+                            doit = true;
+                            event
+                        }))
+                        .compat()
+                        .await
+                        .expect("Sending events failed");
+                }
+                false => {
+                    let _ = sink
+                        .send_all(events)
+                        .compat()
+                        .await
+                        .expect("Sending events failed");
+                }
+            };
+
+            // make sure writes all all visible
+            flush(cx.resolver(), common.clone())
+                .await
+                .expect("Flushing writes failed");
+
+            let mut test_ca = Vec::<u8>::new();
+            File::open("tests/data/Vector_CA.crt")
+                .unwrap()
+                .read_to_end(&mut test_ca)
+                .unwrap();
+            let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+
+            let client = reqwest::Client::builder()
+                .add_root_certificate(test_ca)
+                .build()
+                .expect("Could not build HTTP client");
+
+            let response = client
+                .get(&format!("{}/{}/_search", common.base_url, index))
+                .json(&json!({
+                    "query": { "query_string": { "query": "*" } }
+                }))
+                .send()
+                .unwrap()
+                .json::<elastic_responses::search::SearchResponse<Value>>()
+                .unwrap();
+
+            if break_events {
+                assert_ne!(input.len() as u64, response.total());
+            } else {
+                assert_eq!(input.len() as u64, response.total());
+
+                let input = input
+                    .into_iter()
+                    .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
+                    .collect::<Vec<_>>();
+                for hit in response.into_hits() {
+                    let event = hit.into_document().unwrap();
+                    assert!(input.contains(&event));
+                }
             }
-            false => {
-                let pump = sink.send_all(events);
-                let _ = rt.block_on(pump).expect("Sending events failed");
-            }
-        };
-
-        // make sure writes all all visible
-        rt.block_on_std(flush(cx.resolver(), common.clone()))
-            .expect("Flushing writes failed");
-
-        let mut test_ca = Vec::<u8>::new();
-        File::open("tests/data/Vector_CA.crt")
-            .unwrap()
-            .read_to_end(&mut test_ca)
-            .unwrap();
-        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
-
-        let client = reqwest::Client::builder()
-            .add_root_certificate(test_ca)
-            .build()
-            .expect("Could not build HTTP client");
-
-        let response = client
-            .get(&format!("{}/{}/_search", common.base_url, index))
-            .json(&json!({
-                "query": { "query_string": { "query": "*" } }
-            }))
-            .send()
-            .unwrap()
-            .json::<elastic_responses::search::SearchResponse<Value>>()
-            .unwrap();
-
-        if break_events {
-            assert_ne!(input.len() as u64, response.total());
-        } else {
-            assert_eq!(input.len() as u64, response.total());
-
-            let input = input
-                .into_iter()
-                .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
-                .collect::<Vec<_>>();
-            for hit in response.into_hits() {
-                let event = hit.into_document().unwrap();
-                assert!(input.contains(&event));
-            }
-        }
+        });
     }
 
     fn gen_index() -> String {
