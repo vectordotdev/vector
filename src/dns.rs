@@ -5,7 +5,6 @@ use hyper13::client::connect::dns::Name as Name13;
 use snafu::ResultExt;
 use std::{
     net::{IpAddr, SocketAddr, ToSocketAddrs},
-    str::FromStr,
     task::{Context, Poll},
 };
 use tokio::task::spawn_blocking;
@@ -13,10 +12,7 @@ use tower03::Service;
 
 pub type ResolverFuture = Box<dyn Future<Item = LookupIp, Error = DnsError> + Send + 'static>;
 
-pub enum LookupIp {
-    Single(Option<IpAddr>),
-    Query(std::vec::IntoIter<SocketAddr>),
-}
+pub struct LookupIp(std::vec::IntoIter<SocketAddr>);
 
 #[derive(Debug, Clone, Copy)]
 pub struct Resolver;
@@ -28,23 +24,18 @@ impl Resolver {
     }
 
     pub async fn lookup_ip(self, name: String) -> Result<LookupIp, DnsError> {
-        if let Ok(ip) = IpAddr::from_str(&name) {
-            Ok(LookupIp::Single(Some(ip)))
-        } else {
-            // name is indeed a domain.
-            spawn_blocking(move || {
-                // We need to add port with the domain so that `to_socket_addrs`
-                // resolves it properly. We will be discarding the port afterwards.
-                //
-                // Any port will do, but `9` is a well defined port for discarding
-                // packets.
-                (name.as_ref(), 9).to_socket_addrs()
-            })
-            .await
-            .context(JoinError)?
-            .map(LookupIp::Query)
-            .context(UnableLookup)
-        }
+        spawn_blocking(move || {
+            // We need to add port with the name so that `to_socket_addrs`
+            // resolves it properly. We will be discarding the port afterwards.
+            //
+            // Any port will do, but `9` is a well defined port for discarding
+            // packets.
+            (name.as_ref(), 9).to_socket_addrs()
+        })
+        .await
+        .context(JoinError)?
+        .map(LookupIp)
+        .context(UnableLookup)
     }
 }
 
@@ -52,10 +43,7 @@ impl Iterator for LookupIp {
     type Item = IpAddr;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            LookupIp::Single(ip) => ip.take(),
-            LookupIp::Query(iter) => iter.next().map(|address| address.ip()),
-        }
+        self.0.next().map(|address| address.ip())
     }
 }
 
