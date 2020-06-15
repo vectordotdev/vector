@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-04"
+last_modified_on: "2020-06-15"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
@@ -875,9 +875,9 @@ If no severity key is specified, the severity of outgoing records will be set
 to 0 (`DEFAULT`).
 
 See the [GCP Stackdriver Logging LogSeverity
-description](https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity)
-for more details on the value of the [`severity`](#severity) field.
-
+description][urls.gcp_stackdriver_severity] for more details on the value of
+the [`severity`](#severity) field.
+ See [Severity Level Remapping](#severity-level-remapping) for more info.
 
 
 </Field>
@@ -1168,6 +1168,30 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
 
+### Severity Level Remapping
+
+If a [`severity_key`](#severity_key) is configured, outgoing log records will have their
+`severity` header field set from the named field in the Vector
+event. However, the [required values][urls.gcp_stackdriver_severity] for
+this field may be inconvenient to produce, typically requiring a custom
+mapping using an additional transform. To assist with this, this sink
+remaps certain commonly used words to the required numbers as in the
+following table. Note that only the prefix is compared (such that a
+value of `emergency` matches `emerg`), and the comparison ignores case.
+
+| Prefix | Value
+|:-------|:-----
+| emerg  | 800
+| fatal  | 800
+| alert  | 700
+| crit   | 600
+| err    | 500
+| warn   | 400
+| notice | 300
+| info   | 200
+| debug  | 100
+| trace  | 100
+
 ### TLS
 
 Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
@@ -1189,5 +1213,6 @@ options.
 [urls.gcp_resources]: https://cloud.google.com/monitoring/api/resources
 [urls.gcp_stackdriver_logging]: https://cloud.google.com/logging/docs/reference/v2/rest/
 [urls.gcp_stackdriver_logging_rest]: https://cloud.google.com/logging/
+[urls.gcp_stackdriver_severity]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
 [urls.new_gcp_stackdriver_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_stackdriver_logs
 [urls.openssl]: https://www.openssl.org/
