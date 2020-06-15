@@ -186,7 +186,7 @@ This RFC ultimately proposes the following steps:
 4. Refactor the `PathIter` to make `vector::Event::Path` type.
 5. Add UX improvements on `Path` , particularly an internal `String` ↔ `Path` with an `Into` that does not do path parsing, as well as a `Path::build(s: String)` that does.
 6. Refactor all `LogEvent` to accept `Into<Path>` values.
-    1. Remove obsolete functionality like `insert_path` and `remove_prune` since the new `Path` type covers this.
+    1. Remove obsolete functionality like `insert_path` since the new `Path` type covers this.
     2. Refactor the `keys` function to return an `Iterator<Path>`
 7. Add an `Entry` style API to `LogEvent`.
     1. Remove functionality rendered obsolete by the Entry API like `try_insert`, moving them to use the new Entry API
