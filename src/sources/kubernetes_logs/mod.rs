@@ -22,7 +22,7 @@ use crate::{
 };
 use evmap10::{self as evmap};
 use file_source::{FileServer, FileServerShutdown, Fingerprinter};
-use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
+use futures::{future::FutureExt, pin_mut, sink::Sink, stream::StreamExt};
 use futures01::sync::mpsc;
 use k8s_openapi::api::core::v1::Pod;
 use k8s_paths_provider::K8sPathsProvider;
@@ -222,15 +222,26 @@ impl Source {
 
         let event_processing_loop = events.map(Ok).forward(out);
 
+        let (reflector_process_shutdown_signal_tx, reflector_process_shutdown_signal_rx) =
+            futures::channel::oneshot::channel();
+        pin_mut!(reflector_process);
+        let reflector_process_with_shutdown =
+            cancel_on_signal(reflector_process, reflector_process_shutdown_signal_rx);
+
         use std::future::Future;
         use std::pin::Pin;
         let list: Vec<Pin<Box<dyn Future<Output = ()> + Send>>> = vec![
-            Box::pin(reflector_process.map(|result| match result {
-                Ok(_val) => info!(message = "reflector process completed gracefully"),
+            Box::pin(reflector_process_with_shutdown.map(|result| match result {
+                Ok(()) => info!(message = "reflector process completed gracefully"),
                 Err(error) => error!(message = "reflector process exited with an error", ?error),
             })),
             Box::pin(file_server_join_handle.map(|result| match result {
-                Ok(FileServerShutdown) => info!(message = "file server completed gracefully"),
+                Ok(FileServerShutdown) => {
+                    info!(message = "file server completed gracefully");
+                    reflector_process_shutdown_signal_tx
+                        .send(())
+                        .expect("unable to trigger reflector shutdown");
+                }
                 Err(error) => error!(message = "file server exited with an error", ?error),
             })),
             Box::pin(event_processing_loop.map(|result| {
@@ -266,4 +277,25 @@ fn create_event(line: bytes05::Bytes, file: String) -> Event {
     event.as_mut_log().insert(FILE_KEY, file);
 
     event
+}
+
+/// Takes a `future` and a oneshot channel as a `signal`, and returns a future
+/// that completes when the `future` errors or `signal` is sent or cancelled.
+/// If `signal` is sent or cancelled, the `future` is dropped (and not polled
+/// anymore).
+async fn cancel_on_signal<E, F>(
+    future: F,
+    signal: futures::channel::oneshot::Receiver<()>,
+) -> Result<(), E>
+where
+    F: std::future::Future<Output = Result<std::convert::Infallible, E>> + Unpin,
+{
+    use futures::future::Either;
+    match futures::future::select(future, signal).await {
+        Either::Left((future_result, _)) => match future_result {
+            Ok(_infallible) => unreachable!("ok value is infallible, thus impossible to reach"),
+            Err(err) => Err(err),
+        },
+        Either::Right((_signal_result, _)) => Ok(()),
+    }
 }
