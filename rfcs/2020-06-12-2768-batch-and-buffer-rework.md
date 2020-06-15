@@ -59,10 +59,14 @@ following is necessary:
 ### Unified Batch Configuration
 
 The split configuration types for bytes and events will be rolled into a
-single configuration combining both attributes. The `max_size` element
-is retained for backwards compatibility, and each sink will use it as a
-default for the maximum bytes or events depending on the previous
-configuration mode.
+single configuration combining both attributes. Batch sizes will be
+limited to which ever maximum is reached first.
+
+The `max_size` element is retained for backwards compatibility, and each
+sink will use it as a default for the maximum bytes or events depending
+on the previous configuration mode. If both `max_size` and either of
+`max_bytes` or `max_events` are set, Vector will produce a configuration
+error indicating a conflict in the configuration.
 
 ```rust
 struct BatchConfig {
