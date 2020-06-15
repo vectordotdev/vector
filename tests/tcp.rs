@@ -363,11 +363,8 @@ fn healthcheck() {
 
     let _listener = TcpListener::bind(&addr).unwrap();
 
-    let healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
-        addr.ip().to_string(),
-        addr.port(),
-        resolver.clone(),
-    );
+    let healthcheck =
+        vector::sinks::util::tcp::tcp_healthcheck(addr.ip().to_string(), addr.port(), resolver);
 
     assert!(healthcheck.wait().is_ok());
 
