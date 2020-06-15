@@ -36,6 +36,7 @@ expanding into more specifics.
       1. [Tips and Tricks](#tips-and-tricks)
    1. [Benchmarking](#benchmarking)
    1. [Profiling](#profiling)
+   1. [Kubernetes](#kubernetes)
 1. [Humans](#humans)
    1. [Documentation](#documentation)
    1. [Changelog](#changelog)
@@ -546,6 +547,44 @@ cat stacks.folded | inferno-flamegraph > flamegraph.svg
 
 And that's it! You now have a flamegraph SVG file that can be opened and
 navigated in your favorite web browser.
+
+### Kubernetes
+
+There is a special flow for when you develop portions of Vector that are
+designed to work with Kubernetes, like `kubernetes_logs` source or the
+`deployment/kubernetes/*.yaml` configs.
+
+This flow facilitates building Vector and deploying it into a cluster.
+
+There are some extra requirements:
+
+* `linux` system (create an issue if you want to work with another OS and we'll
+  help);
+* [`skaffold`](https://skaffold.dev/)
+* [`kustomize`](https://kustomize.io/)
+* [`minikube`](https://minikube.sigs.k8s.io/)-powered or other k8s cluster
+* [`cargo watch`](https://github.com/passcod/cargo-watch)
+
+Once you have the requirements, use the `scripts/skaffold.sh dev` command.
+
+It will
+
+1. build the `vector` binary in development mode,
+2. build a docker image from this binary via `skaffold/docker/Dockerfile`,
+3. deploy `vector` into the Kubernetes cluster at your current kubectl context
+   using the built docker image and a mix of our production deployment
+   configuration from the `distribution/kubernetes/*.yaml` and the special
+   dev-flow configuration at `skaffold/manifests/*.yaml`.
+
+As the result of invoking the `scripts/skaffold.sh dev`, you should see
+a `skaffold` process running on your local machine, printing the logs from the
+deployed `vector` instance.
+
+To stop the process, press `Ctrl+C`, and wait for `skaffold` to clean up
+the cluster state and exit.
+
+`scripts/skaffold.sh` wraps `skaffold`, you can use other `skaffold` subcommands
+if it fits you better.
 
 ## Humans
 
