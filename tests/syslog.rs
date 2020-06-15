@@ -163,7 +163,7 @@ fn test_unix_stream_syslog() {
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
-    while let Err(_) = std::os::unix::net::UnixStream::connect(&in_path) {}
+    while std::os::unix::net::UnixStream::connect(&in_path).is_err() {}
 
     let input_messages: Vec<SyslogMessageRFC5424> = (0..num_messages)
         .map(|i| SyslogMessageRFC5424::random(i, 30, 4, 3, 3))

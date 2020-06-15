@@ -115,7 +115,7 @@ where
 impl<E: Default + PartialEq> From<E> for EncodingConfigWithDefault<E> {
     fn from(codec: E) -> Self {
         Self {
-            codec: codec,
+            codec,
             only_fields: Default::default(),
             except_fields: Default::default(),
             timestamp_format: Default::default(),
