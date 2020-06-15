@@ -5831,6 +5831,24 @@ require('custom_module')
   # * type: string
   project_id = "vector-123456"
 
+  # The field of the log event from which to take the outgoing log's `severity`
+  # field. The named field is removed from the log event if present, and must be
+  # either an integer between 0 and 800 or a string containing one of the
+  # severity level names (case is ignored) or a common prefix such as `err`. This
+  # could be added by an `add_fields` transform or extracted from a field from
+  # the source.
+  #
+  # If no severity key is specified, the severity of outgoing records will be set
+  # to 0 (`DEFAULT`).
+  #
+  # See the GCP Stackdriver Logging LogSeverity description for more details on
+  # the value of the `severity` field.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  severity_key = "severity"
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #

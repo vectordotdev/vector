@@ -1,6 +1,6 @@
 use super::{healthcheck_response2, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    event::Event,
+    event::{Event, Value},
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -21,6 +21,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::collections::HashMap;
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -36,6 +37,7 @@ pub struct StackdriverConfig {
     pub log_id: String,
 
     pub resource: StackdriverResource,
+    pub severity_key: Option<String>,
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
@@ -57,6 +59,7 @@ pub struct StackdriverConfig {
 struct StackdriverSink {
     config: StackdriverConfig,
     creds: Option<GcpCredentials>,
+    severity_key: Option<Atom>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -116,6 +119,10 @@ impl SinkConfig for StackdriverConfig {
         let sink = StackdriverSink {
             config: self.clone(),
             creds,
+            severity_key: self
+                .severity_key
+                .as_ref()
+                .map(|key| Atom::from(key.as_str())),
         };
 
         let healthcheck = healthcheck(
@@ -154,9 +161,17 @@ impl HttpSink for StackdriverSink {
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.config.encoding.apply_rules(&mut event);
+        let mut log = event.into_log();
+        let severity = self
+            .severity_key
+            .as_ref()
+            .and_then(|key| log.remove(key))
+            .map(remap_severity)
+            .unwrap_or(0.into());
 
         let entry = serde_json::json!({
-            "jsonPayload": event.into_log(),
+            "jsonPayload": log,
+            "severity": severity,
         });
 
         Some(entry)
@@ -187,6 +202,46 @@ impl HttpSink for StackdriverSink {
     }
 }
 
+fn remap_severity(severity: Value) -> Value {
+    let n = match severity {
+        Value::Integer(n) => n - n % 100,
+        Value::Bytes(s) => {
+            let s = String::from_utf8_lossy(&s);
+            match s.parse::<usize>() {
+                Ok(n) => (n - n % 100) as i64,
+                Err(_) => match s.to_uppercase() {
+                    s if s.starts_with("EMERG") || s.starts_with("FATAL") => 800,
+                    s if s.starts_with("ALERT") => 700,
+                    s if s.starts_with("CRIT") => 600,
+                    s if s.starts_with("ERR") => 500,
+                    s if s.starts_with("WARN") => 400,
+                    s if s.starts_with("NOTICE") => 300,
+                    s if s.starts_with("INFO") => 200,
+                    s if s.starts_with("DEBUG") || s.starts_with("TRACE") => 100,
+                    s if s.starts_with("DEFAULT") => 0,
+                    _ => {
+                        warn!(
+                            message = "Unknown severity value string, using DEFAULT",
+                            value = %s,
+                            rate_limit_secs = 10
+                        );
+                        0
+                    }
+                },
+            }
+        }
+        value => {
+            warn!(
+                message = "Unknown severity value type, using DEFAULT",
+                ?value,
+                rate_limit_secs = 10
+            );
+            0
+        }
+    };
+    Value::Integer(n)
+}
+
 async fn healthcheck(
     cx: SinkContext,
     sink: StackdriverSink,
@@ -214,7 +269,10 @@ impl StackdriverConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::LogEvent, test_util::runtime};
+    use crate::{
+        event::{LogEvent, Value},
+        test_util::runtime,
+    };
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
 
@@ -233,12 +291,48 @@ mod tests {
         let sink = StackdriverSink {
             config,
             creds: None,
+            severity_key: Some("anumber".into()),
         };
 
-        let log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
+        let log = LogEvent::from_iter(
+            [("message", "hello world"), ("anumber", "100")]
+                .iter()
+                .map(|&s| s),
+        );
         let json = sink.encode_event(Event::from(log)).unwrap();
         let body = serde_json::to_string(&json).unwrap();
-        assert_eq!(body, "{\"jsonPayload\":{\"message\":\"hello world\"}}");
+        assert_eq!(
+            body,
+            "{\"jsonPayload\":{\"message\":\"hello world\"},\"severity\":100}"
+        );
+    }
+
+    #[test]
+    fn severity_remaps_strings() {
+        for &(s, n) in &[
+            ("EMERGENCY", 800), // Handles full upper case
+            ("EMERG", 800),     // Handles abbreviations
+            ("FATAL", 800),     // Handles highest alternate
+            ("alert", 700),     // Handles lower case
+            ("CrIt1c", 600),    // Handles mixed case and suffixes
+            ("err404", 500),    // Handles lower case and suffixes
+            ("warnings", 400),
+            ("notice", 300),
+            ("info", 200),
+            ("DEBUG2", 100), // Handles upper case and suffixes
+            ("trace", 100),  // Handles lowest alternate
+            ("nothing", 0),  // Maps unknown terms to DEFAULT
+            ("123", 100),    // Handles numbers in strings
+            ("-100", 0),     // Maps negatives to DEFAULT
+        ] {
+            assert_eq!(
+                remap_severity(s.into()),
+                Value::Integer(n),
+                "remap_severity({:?}) != {}",
+                s,
+                n
+            );
+        }
     }
 
     #[test]
@@ -256,6 +350,7 @@ mod tests {
         let sink = StackdriverSink {
             config,
             creds: None,
+            severity_key: None,
         };
 
         let log1 = LogEvent::from_iter([("message", "hello")].iter().map(|&s| s));
@@ -285,11 +380,13 @@ mod tests {
             serde_json::json!({
                 "entries": [
                     {
+                        "severity": 0,
                         "jsonPayload": {
                             "message": "hello"
                         }
                     },
                     {
+                        "severity": 0,
                         "jsonPayload": {
                             "message": "world"
                         }

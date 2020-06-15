@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-02"
+last_modified_on: "2020-06-15"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
@@ -64,6 +64,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
   log_id = "vector-logs" # required
   organization_id = "622418129737" # optional, no default
   project_id = "vector-123456" # required
+  severity_key = "severity" # optional, no default
 
   # Batch
   batch.max_size = 5242880 # optional, default, bytes
@@ -849,6 +850,42 @@ For example, Compute Engine VM instances use the labels `projectId`,
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={["severity"]}
+  groups={[]}
+  name={"severity_key"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### severity_key
+
+The field of the log event from which to take the outgoing log's [`severity`](#severity)
+field. The named field is removed from the log event if present, and must be
+either an integer between 0 and 800 or a string containing one of the [severity
+level names][urls.gcp_stackdriver_severity] (case is ignored) or a common
+prefix such as `err`. This could be added by an [`add_fields`
+transform][docs.transforms.add_fields] or extracted from a field from the
+source.
+
+If no severity key is specified, the severity of outgoing records will be set
+to 0 (`DEFAULT`).
+
+See the [GCP Stackdriver Logging LogSeverity
+description][urls.gcp_stackdriver_severity] for more details on the value of
+the [`severity`](#severity) field.
+ See [Severity Level Remapping](#severity-level-remapping) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={[]}
   groups={[]}
   name={"tls"}
@@ -1132,6 +1169,30 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
 
+### Severity Level Remapping
+
+If a [`severity_key`](#severity_key) is configured, outgoing log records will have their
+`severity` header field set from the named field in the Vector
+event. However, the [required values][urls.gcp_stackdriver_severity] for
+this field may be inconvenient to produce, typically requiring a custom
+mapping using an additional transform. To assist with this, this sink
+remaps certain commonly used words to the required numbers as in the
+following table. Note that only the prefix is compared (such that a
+value of `emergency` matches `emerg`), and the comparison ignores case.
+
+| Prefix | Value
+|:-------|:-----
+| emerg  | 800
+| fatal  | 800
+| alert  | 700
+| crit   | 600
+| err    | 500
+| warn   | 400
+| notice | 300
+| info   | 200
+| debug  | 100
+| trace  | 100
+
 ### TLS
 
 Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
@@ -1144,6 +1205,7 @@ options.
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[docs.transforms.add_fields]: /docs/reference/transforms/add_fields/
 [urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
 [urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcp_authentication_service_account]: https://cloud.google.com/docs/authentication/production#obtaining_and_providing_service_account_credentials_manually
@@ -1152,5 +1214,6 @@ options.
 [urls.gcp_resources]: https://cloud.google.com/monitoring/api/resources
 [urls.gcp_stackdriver_logging]: https://cloud.google.com/logging/docs/reference/v2/rest/
 [urls.gcp_stackdriver_logging_rest]: https://cloud.google.com/logging/
+[urls.gcp_stackdriver_severity]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
 [urls.new_gcp_stackdriver_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_stackdriver_logs
 [urls.openssl]: https://www.openssl.org/
