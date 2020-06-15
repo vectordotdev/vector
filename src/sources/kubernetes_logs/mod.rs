@@ -11,7 +11,7 @@ mod path_helpers;
 mod pod_metadata_annotator;
 
 use crate::event::{self, Event};
-use crate::internal_events::KubernetesLogsEventReceived;
+use crate::internal_events::{KubernetesLogsEventAnnotationFailed, KubernetesLogsEventReceived};
 use crate::kubernetes as k8s;
 use crate::{
     dns::Resolver,
@@ -215,10 +215,7 @@ impl Source {
             .filter_map(move |event| futures::future::ready(partial_events_merger.transform(event)))
             .map(move |mut event| {
                 if annotator.annotate(&mut event).is_none() {
-                    warn!(
-                        message = "failed to annotate event with pod metadata",
-                        ?event
-                    );
+                    emit!(KubernetesLogsEventAnnotationFailed { event: &event });
                 }
                 event
             });
