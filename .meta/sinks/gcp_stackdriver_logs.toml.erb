@@ -113,6 +113,25 @@ Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or \
 `project_id` must be set.\
 """
 
+[sinks.gcp_stackdriver_logs.options.severity_key]
+type = "string"
+required = false
+examples = ["severity"]
+description = """\
+The field of the log event from which to take the outgoing log's \
+`severity` field. The named field is removed from the log event if \
+present, and must be either an integer between 0 and 800 or a string \
+containing one of the [severity level names][urls.gcp_stackdriver_severity] \
+(case is ignored) or a common prefix such as `err`. \
+This could be added by an [`add_fields` transform][docs.transforms.add_fields] \
+or extracted from a field from the source.
+
+If no severity key is specified, the severity of outgoing records will be set to 0 (`DEFAULT`).
+
+See the [GCP Stackdriver Logging LogSeverity description][urls.gcp_stackdriver_severity] \
+for more details on the value of the `severity` field.\
+"""
+
 [sinks.gcp_stackdriver_logs.options.resource]
 type = "table"
 description = "Options for describing the logging resource."
