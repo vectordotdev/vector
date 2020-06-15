@@ -94,4 +94,4 @@ export CONTAINER_IMAGE
 export KUBE_TEST_DEPLOY_COMMAND="scripts/deploy-kubernetes-test.sh"
 
 # Run the tests.
-cargo test --test kubernetes-e2e --no-default-features --features kubernetes-e2e-tests -- --nocapture
+cargo test --test kubernetes-e2e --no-default-features --features kubernetes-e2e-tests -- --nocapture --test-threads 1
