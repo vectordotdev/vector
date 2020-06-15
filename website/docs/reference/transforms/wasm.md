@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-10"
+last_modified_on: "2020-06-15"
 component_title: "WASM"
 description: "The Vector `wasm` transform accepts and outputs `log` events, allowing you to execute **experimental** WASM plugins."
 event_types: ["log"]
@@ -13,6 +13,7 @@ title: "WASM Transform"
 unsupported_operating_systems: ["MacOS","Windows"]
 ---
 
+import Alert from '@site/src/components/Alert';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -29,6 +30,15 @@ execute **experimental** WASM plugins.
 
      website/docs/reference/transforms/wasm.md.erb
 -->
+
+## Requirements
+
+<Alert icon={false} type="danger" className="list--icons list--icons--warnings">
+
+* Vector must be build with the `wasm` feature. *This is not enabled by default. Review [Building Vector][urls.contributing]*.
+
+</Alert>
+
 
 ## Configuration
 
@@ -169,3 +179,4 @@ You can learn more in the
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[urls.contributing]: https://github.com/timberio/vector/blob/master/CONTRIBUTING.md#setup

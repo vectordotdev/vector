@@ -6,7 +6,7 @@ common = false
 function_category = "program"
 input_types = ["log"]
 output_types = ["log"]
-requirements = {}
+requirements.feature = "wasm"
 only_operating_systems = ["Linux"]
 
 <%= render("_partials/fields/_component_options.toml", type: "transform", name: "wasm") %>
