@@ -24,8 +24,8 @@ pub(super) fn build_pod_logs_directory(
         K8S_LOGS_DIR,
         &[pod_namespace, pod_name, pod_uid].join(LOG_PATH_DELIMITER),
     ]
-    .iter()
-    .collect()
+    .join("/")
+    .into()
 }
 
 /// Parses pod log file path and returns the log file info.
