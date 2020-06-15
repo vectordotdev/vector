@@ -4,7 +4,7 @@ use goauth::scopes::Scope;
 use goauth::{
     auth::{JwtClaims, Token, TokenErr},
     credentials::Credentials,
-    error::GOErr,
+    GoErr,
 };
 use hyper13::{
     header::{HeaderValue, AUTHORIZATION},
@@ -32,11 +32,11 @@ enum GcpError {
     #[snafu(display("Invalid GCP credentials"))]
     InvalidCredentials0,
     #[snafu(display("Invalid GCP credentials"))]
-    InvalidCredentials1 { source: GOErr },
+    InvalidCredentials1 { source: GoErr },
     #[snafu(display("Invalid RSA key in GCP credentials"))]
-    InvalidRsaKey { source: GOErr },
+    InvalidRsaKey { source: GoErr },
     #[snafu(display("Failed to get OAuth token"))]
-    GetToken { source: GOErr },
+    GetToken { source: GoErr },
     #[snafu(display("Failed to get OAuth token text"))]
     GetTokenText { source: reqwest::Error },
     #[snafu(display("Failed to get implicit GCP token"))]
@@ -90,11 +90,19 @@ fn get_token_implicit() -> Result<Token, GcpError> {
     }
 }
 
+fn get_token_with_creds_blocking(
+    jwt: &Jwt<JwtClaims>,
+    credentials: &Credentials,
+) -> Result<Token, GoErr> {
+    let mut rt = tokio_compat::runtime::current_thread::Runtime::new()?;
+    rt.block_on_std(goauth::get_token(jwt, credentials))
+}
+
 impl GcpCredentials {
     fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
         let creds = Credentials::from_file(path).context(InvalidCredentials1)?;
         let jwt = make_jwt(&creds, &scope)?;
-        let token = goauth::get_token_with_creds(&jwt, &creds).context(GetToken)?;
+        let token = get_token_with_creds_blocking(&jwt, &creds).context(GetToken)?;
         Ok(Self {
             creds: Some(creds),
             scope,
@@ -131,7 +139,7 @@ impl GcpCredentials {
         let token = match &self.creds {
             Some(creds) => {
                 let jwt = make_jwt(creds, &self.scope).unwrap(); // Errors caught above
-                goauth::get_token_with_creds(&jwt, creds)?
+                get_token_with_creds_blocking(&jwt, creds)?
             }
             None => get_token_implicit()?,
         };
