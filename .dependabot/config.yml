@@ -1,6 +1,7 @@
 version: 1
 update_configs:
   - package_manager: "rust:cargo"
+    directory: "/"
     update_schedule: "weekly"
     default_reviewers:
       - "hoverbear"
