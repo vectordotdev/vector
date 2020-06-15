@@ -5927,6 +5927,7 @@ dependencies = [
  "rusoto_kinesis",
  "rusoto_logs",
  "rusoto_s3",
+ "rusoto_signature",
  "rusoto_sts 0.41.0",
  "rusoto_sts 0.44.0",
  "schannel",

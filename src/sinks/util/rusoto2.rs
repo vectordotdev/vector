@@ -12,13 +12,13 @@ use rusoto_core44::{
     request::{
         DispatchSignedRequest, DispatchSignedRequestFuture, HttpDispatchError, HttpResponse,
     },
-    signature::{SignedRequest, SignedRequestPayload},
     ByteStream, Region,
 };
 use rusoto_credential44::{
     AutoRefreshingProvider, AwsCredentials, ChainProvider, CredentialsError, ProvideAwsCredentials,
     StaticProvider,
 };
+use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use rusoto_sts44::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use snafu::{ResultExt, Snafu};
 use std::{

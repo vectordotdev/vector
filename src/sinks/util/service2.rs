@@ -230,7 +230,7 @@ where
 
     fn call(&mut self, req: R1) -> Self::Future {
         let req = (self.f)(req);
-        self.inner.call(req).map_err(|e| e.into())
+        self.inner.call(req).map_err(Into::into)
     }
 }
 
