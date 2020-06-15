@@ -66,9 +66,9 @@ down() {
     $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONIFGS_FILE"
   fi
 
-  $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE"
-
   templated-config-global | $VECTOR_TEST_KUBECTL delete -f -
+
+  $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE"
 }
 
 case "$COMMAND" in
