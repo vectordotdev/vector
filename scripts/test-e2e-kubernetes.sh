@@ -33,26 +33,40 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
   # Assign a default test run ID if none is provided by the user.
   TEST_RUN_ID="${TEST_RUN_ID:-"$(date +%s)-$(random-string)"}"
 
-  # Package a .deb file to build a docker container, unless skipped.
-  if [[ -z "${SKIP_PACKAGE_DEB:-}" ]]; then
-    make package-deb-x86_64 USE_CONTAINER="${PACKAGE_DEB_USE_CONTAINER:-"docker"}"
+  if [[ "${QUICK_BUILD:-"false"}" == "true" ]]; then
+    # Build in debug mode.
+    cargo build
+
+    # Prepare test image parameters.
+    VERSION_TAG="test-$TEST_RUN_ID"
+
+    # Prepare the container image for the deployment command and docker build.
+    CONTAINER_IMAGE="$CONTAINER_IMAGE_REPO:$VERSION_TAG-debug"
+
+    # Build docker image.
+    docker build --tag "$CONTAINER_IMAGE" -f skaffold/docker/Dockerfile target/debug
+  else
+    # Package a .deb file to build a docker container, unless skipped.
+    if [[ -z "${SKIP_PACKAGE_DEB:-}" ]]; then
+      make package-deb-x86_64 USE_CONTAINER="${PACKAGE_DEB_USE_CONTAINER:-"docker"}"
+    fi
+
+    # Prepare test image parameters.
+    VERSION_TAG="test-$TEST_RUN_ID"
+    BASE_TAG="debian"
+
+    # Build docker image with Vector - the same way it's done for releses. Don't
+    # do the push - we'll handle it later.
+    REPO="$CONTAINER_IMAGE_REPO" \
+      CHANNEL="test" \
+      BASE="$BASE_TAG" \
+      TAG="$VERSION_TAG" \
+      PUSH="" \
+      scripts/build-docker.sh
+
+    # Prepare the container image for the deployment command.
+    CONTAINER_IMAGE="$CONTAINER_IMAGE_REPO:$VERSION_TAG-$BASE_TAG"
   fi
-
-  # Prepare test image parameters.
-  VERSION_TAG="test-$TEST_RUN_ID"
-  BASE_TAG="debian"
-
-  # Build docker image with Vector - the same way it's done for releses. Don't
-  # do the push - we'll handle it later.
-  REPO="$CONTAINER_IMAGE_REPO" \
-    CHANNEL="test" \
-    BASE="$BASE_TAG" \
-    TAG="$VERSION_TAG" \
-    PUSH="" \
-    scripts/build-docker.sh
-
-  # Prepare the container image for the deployment command.
-  CONTAINER_IMAGE="$CONTAINER_IMAGE_REPO:$VERSION_TAG-$BASE_TAG"
 fi
 
 if [[ -z "${SKIP_CONTAINER_IMAGE_PUBLISHING:-}" ]]; then
