@@ -150,6 +150,18 @@ mod tests {
         INSTANCE.get_or_init(|| Mutex::new(())).lock().unwrap()
     }
 
+    // TODO: tests here are ignored because they cause interference with
+    // the metrics tests.
+    // There is no way to assert individual emits, and asserting metrics
+    // directly causes issues:
+    // - these tests break the internal tests at the metrics implementation
+    //   itself, since we end up initializing the metrics controller twice;
+    // - testing metrics introduces unintended coupling between subsystems,
+    //   ideally we only need to assert that we emit, but avoid assumptions on
+    //   what the results of that emit are.
+    // Unignore them and/or properly reimplemenmt once the issues above are
+    // resolved.
+
     #[ignore]
     #[test]
     fn add() {
