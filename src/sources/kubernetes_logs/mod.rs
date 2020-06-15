@@ -35,6 +35,9 @@ use tokio::task::spawn_blocking;
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
 
+/// The `self_node_name` value env var key.
+const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
+
 /// Configuration for the `kubernetes_logs` source.
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields, default)]
@@ -42,6 +45,7 @@ pub struct Config {
     /// The `name` of the Kubernetes `Node` that Vector runs at.
     /// Required to filter the `Pod`s to only include the ones with the log
     /// files accessible locally.
+    #[serde(default = "default_self_node_name_env_template")]
     self_node_name: String,
 
     /// Automatically merge partial events.
@@ -110,9 +114,15 @@ impl Source {
         globals: &GlobalOptions,
         name: &str,
     ) -> crate::Result<Self> {
-        let self_node_name = if config.self_node_name.is_empty() {
-            std::env::var("VECTOR_SELF_NODE_NAME")
-                .map_err(|_| "VECTOR_SELF_NODE_NAME is not set")?
+        let self_node_name = if config.self_node_name.is_empty()
+            || config.self_node_name == default_self_node_name_env_template()
+        {
+            std::env::var(SELF_NODE_NAME_ENV_KEY).map_err(|_| {
+                format!(
+                    "self_node_name config value or {} env var is not set",
+                    SELF_NODE_NAME_ENV_KEY
+                )
+            })?
         } else {
             config.self_node_name.clone()
         };
@@ -298,4 +308,10 @@ where
         },
         Either::Right((_signal_result, _)) => Ok(()),
     }
+}
+
+/// This function returns the default value for `self_node_name` variable
+/// as it should be at the generated config file.
+fn default_self_node_name_env_template() -> String {
+    format!("${{{}}}", SELF_NODE_NAME_ENV_KEY)
 }
