@@ -96,9 +96,9 @@ impl Substring {
         };
 
         Ok(Self {
-            source: source,
-            start: start,
-            end: end,
+            source,
+            start,
+            end,
         })
     }
 }
