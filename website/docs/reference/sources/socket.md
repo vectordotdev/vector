@@ -179,7 +179,7 @@ port.
 ### host_key
 
 The key name added to each event representing the current host. This can also
-be globally set via the [global 'host_key'
+be globally set via the [global [`host_key`](#host_key)
 option][docs.reference.global-options#host_key].
  See [Context](#context) for more info.
 
