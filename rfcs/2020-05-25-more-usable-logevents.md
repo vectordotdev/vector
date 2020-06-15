@@ -184,13 +184,13 @@ This RFC ultimately proposes the following steps:
 2. Add `Value::Bytes`. (Unused for now -- to be used later in raw codecs and WASM)
 3. Add UX improvements on `LogEvent`, particularly turning JSON into or from `LogEvent`.
 4. Refactor the `PathIter` to make `vector::Event::Path` type.
-5. Add UX improvements on `Path` , particularly an internal `String` ↔ `Path` with an `Into` that does not do path parsing, as well as a `Path::build(s: String)` that does.
+5. Add UX improvements on `Path` , particularly an internal `String` ↔ `Path` with an `Into`/`From` that does not do path parsing, as well as a `Path::parse(s: String)` that does.
 6. Refactor all `LogEvent` to accept `Into<Path>` values.
     1. Remove obsolete functionality like `insert_path` since the new `Path` type covers this.
     2. Refactor the `keys` function to return an `Iterator<Path>`
 7. Add an `Entry` style API to `LogEvent`.
     1. Remove functionality rendered obsolete by the Entry API like `try_insert`, moving them to use the new Entry API
-8. Provide `iter` and `iter_mut` functions that return `(Path, Value)`. 
+8. Provide `iter` and `iter_mut` functions that yield `(Path, Value)`. 
     1. Remove the `all_fields` function, moving them to the new iterator. 
 
 We believe these steps will provide a more ergonomic and consistent API.
