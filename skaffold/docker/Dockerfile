@@ -12,3 +12,5 @@ ARG LOG=debug,vector=trace
 ENV LOG="$LOG"
 
 COPY vector /usr/bin/vector
+
+STOPSIGNAL SIGTERM
