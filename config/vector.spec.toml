@@ -1610,13 +1610,16 @@ dns_servers = ["0.0.0.0:53"]
     type = "is_log"
     type = "is_metric"
 
-    # Check whether a fields contents exactly matches the value specified.
+    # Check whether a fields contents exactly matches the value specified.This may
+    # be a single string or a list of strings, in which case this evaluates to true
+    # if any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "message.eq" = "this is the content to match against"
+    "message.eq" = ["match this", "or this"]
 
     # Check whether a field exists or does not exist, depending on the provided
     # value being `true` or `false` respectively.
@@ -1627,13 +1630,16 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "host.exists" = true
 
-    # Check whether a fields contents does not match the value specified.
+    # Check whether a fields contents does not match the value specified.This may
+    # be a single string or a list of strings, in which case this evaluates to
+    # false if any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "method.neq" = "POST"
+    "method.neq" = ["POST", "GET"]
 
     # Check if the given `[condition]` does not match.
     #
@@ -1645,21 +1651,27 @@ dns_servers = ["0.0.0.0:53"]
     "unit.not_starts_with" = "sys-"
     "unit.not_ends_with" = ".device"
 
-    # Checks whether a string field contains a string argument.
+    # Checks whether a string field contains a string argument.This may be a single
+    # string or a list of strings, in which case this evaluates to true if any of
+    # the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "message.contains" = "foo"
+    "message.contains" = ["foo", "bar"]
 
-    # Checks whether a string field ends with a string argument.
+    # Checks whether a string field ends with a string argument.This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "environment.ends_with" = "-staging"
+    "environment.ends_with" = ["-staging", "-running"]
 
     # Checks whether a string field matches a regular expression. Vector uses the
     # documented Rust Regex syntax. Note that this condition is considerably more
@@ -1672,13 +1684,16 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "message.regex" = " (any|of|these|five|words) "
 
-    # Checks whether a string field starts with a string argument.
+    # Checks whether a string field starts with a string argument.This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "environment.starts_with" = "staging-"
+    "environment.starts_with" = ["staging-", "running-"]
 
   #
   # General
@@ -2507,13 +2522,16 @@ require('custom_module')
       type = "is_log"
       type = "is_metric"
 
-      # Check whether a fields contents exactly matches the value specified.
+      # Check whether a fields contents exactly matches the value specified.This may
+      # be a single string or a list of strings, in which case this evaluates to true
+      # if any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "message.eq" = "this is the content to match against"
+      "message.eq" = ["match this", "or this"]
 
       # Check whether a field exists or does not exist, depending on the provided
       # value being `true` or `false` respectively.
@@ -2524,13 +2542,16 @@ require('custom_module')
       # * relevant when type = "check_fields"
       "host.exists" = true
 
-      # Check whether a fields contents does not match the value specified.
+      # Check whether a fields contents does not match the value specified.This may
+      # be a single string or a list of strings, in which case this evaluates to
+      # false if any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "method.neq" = "POST"
+      "method.neq" = ["POST", "GET"]
 
       # Check if the given `[condition]` does not match.
       #
@@ -2542,21 +2563,27 @@ require('custom_module')
       "unit.not_starts_with" = "sys-"
       "unit.not_ends_with" = ".device"
 
-      # Checks whether a string field contains a string argument.
+      # Checks whether a string field contains a string argument.This may be a single
+      # string or a list of strings, in which case this evaluates to true if any of
+      # the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "message.contains" = "foo"
+      "message.contains" = ["foo", "bar"]
 
-      # Checks whether a string field ends with a string argument.
+      # Checks whether a string field ends with a string argument.This may be a
+      # single string or a list of strings, in which case this evaluates to true if
+      # any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "environment.ends_with" = "-staging"
+      "environment.ends_with" = ["-staging", "-running"]
 
       # Checks whether a string field matches a regular expression. Vector uses the
       # documented Rust Regex syntax. Note that this condition is considerably more
@@ -2569,13 +2596,16 @@ require('custom_module')
       # * relevant when type = "check_fields"
       "message.regex" = " (any|of|these|five|words) "
 
-      # Checks whether a string field starts with a string argument.
+      # Checks whether a string field starts with a string argument.This may be a
+      # single string or a list of strings, in which case this evaluates to true if
+      # any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "environment.starts_with" = "staging-"
+      "environment.starts_with" = ["staging-", "running-"]
 
 # Accepts and outputs `metric` events, allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.
 [transforms.tag_cardinality_limit]
