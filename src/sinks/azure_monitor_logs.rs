@@ -1,5 +1,5 @@
 use crate::{
-    event::Event,
+    event::{self, Event, Value},
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -23,6 +23,7 @@ use lazy_static::lazy_static;
 use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -31,7 +32,6 @@ pub struct AzureMonitorLogsConfig {
     pub shared_key: String,
     pub log_type: String,
     pub azure_resource_id: Option<String>,
-    pub time_generated_field: Option<String>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -147,7 +147,23 @@ impl HttpSink for AzureMonitorLogsSink {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
 
-        let entry = serde_json::json!(event.into_log());
+        // it seems like Azure Monitor doesn't support full 9-digit nanosecond precision
+        // adjust the timestamp format accordingly, keeping only milliseconds
+        let mut log = event.into_log();
+        let timestamp_key = event::log_schema().timestamp_key();
+
+        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(timestamp_key) {
+            ts
+        } else {
+            chrono::Utc::now()
+        };
+
+        let mut entry = serde_json::json!(log);
+        let object_entry = entry.as_object_mut().unwrap();
+        object_entry.insert(
+            timestamp_key.to_string(),
+            JsonValue::String(timestamp.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
+        );
 
         Some(entry)
     }
@@ -203,19 +219,11 @@ impl AzureMonitorLogsSink {
         let log_type = HeaderValue::from_str(&config.log_type)?;
         default_headers.insert(LOG_TYPE_HEADER.clone(), log_type);
 
-        if let Some(time_generated_field) = &config.time_generated_field {
-            if !time_generated_field.is_empty() {
-                default_headers.insert(
-                    TIME_GENERATED_FIELD_HEADER.clone(),
-                    HeaderValue::from_str(time_generated_field)?,
-                );
-            }
-        } else {
-            default_headers.insert(
-                TIME_GENERATED_FIELD_HEADER.clone(),
-                HeaderValue::from_static("timestamp"),
-            );
-        }
+        let timestamp_key = event::log_schema().timestamp_key();
+        default_headers.insert(
+            TIME_GENERATED_FIELD_HEADER.clone(),
+            HeaderValue::from_str(timestamp_key)?,
+        );
 
         if let Some(azure_resource_id) = &config.azure_resource_id {
             if azure_resource_id.is_empty() {
@@ -299,6 +307,16 @@ mod tests {
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
 
+    fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
+        let now = chrono::Utc::now();
+
+        let timestamp_key = event::log_schema().timestamp_key().to_string();
+        let timestamp_value = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        log.insert(&timestamp_key, now);
+
+        (timestamp_key, timestamp_value)
+    }
+
     #[test]
     fn encode_valid() {
         let config: AzureMonitorLogsConfig = toml::from_str(
@@ -307,17 +325,21 @@ mod tests {
             customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
             shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
             log_type = "Vector"
-            time_generated_field = "timestamp"
         "#,
         )
         .unwrap();
 
         let sink = AzureMonitorLogsSink::new(&config).unwrap();
+        let mut log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
+        let (timestamp_key, timestamp_value) = insert_timestamp_kv(&mut log);
 
-        let log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
-        let json = sink.encode_event(Event::from(log)).unwrap();
-        let body = serde_json::to_string(&json).unwrap();
-        assert_eq!(body, "{\"message\":\"hello world\"}");
+        let event = Event::from(log);
+        let json = sink.encode_event(event).unwrap();
+        let expected_json = serde_json::json!({
+            timestamp_key: timestamp_value,
+            "message": "hello world"
+        });
+        assert_eq!(json, expected_json);
     }
 
     #[test]
@@ -328,7 +350,6 @@ mod tests {
             customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
             shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
             log_type = "Vector"
-            time_generated_field = "timestamp"
             azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
         "#,
         )
@@ -336,8 +357,12 @@ mod tests {
 
         let sink = AzureMonitorLogsSink::new(&config).unwrap();
 
-        let log1 = LogEvent::from_iter([("message", "hello")].iter().map(|&s| s));
-        let log2 = LogEvent::from_iter([("message", "world")].iter().map(|&s| s));
+        let mut log1 = LogEvent::from_iter([("message", "hello")].iter().map(|&s| s));
+        let (timestamp_key1, timestamp_value1) = insert_timestamp_kv(&mut log1);
+
+        let mut log2 = LogEvent::from_iter([("message", "world")].iter().map(|&s| s));
+        let (timestamp_key2, timestamp_value2) = insert_timestamp_kv(&mut log2);
+
         let event1 = sink.encode_event(Event::from(log1)).unwrap();
         let event2 = sink.encode_event(Event::from(log2)).unwrap();
 
@@ -356,9 +381,11 @@ mod tests {
         let json: serde_json::Value = serde_json::from_slice(&body[..]).unwrap();
         let expected_json = serde_json::json!([
             {
+                timestamp_key1: timestamp_value1,
                 "message": "hello"
             },
             {
+                timestamp_key2: timestamp_value2,
                 "message": "world"
             }
         ]);
@@ -378,7 +405,11 @@ mod tests {
         assert_eq!(log_type.to_str().unwrap(), "Vector");
 
         let time_generated_field = headers.get("time-generated-field").unwrap();
-        assert_eq!(time_generated_field.to_str().unwrap(), "timestamp");
+        let timestamp_key = event::log_schema().timestamp_key();
+        assert_eq!(
+            time_generated_field.to_str().unwrap(),
+            timestamp_key.as_ref()
+        );
 
         let azure_resource_id = headers.get("x-ms-azureresourceid").unwrap();
         assert_eq!(
@@ -399,7 +430,6 @@ mod tests {
             customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
             shared_key = ""
             log_type = "Vector"
-            time_generated_field = "timestamp"
             azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
         "#,
         )
@@ -419,7 +449,6 @@ mod tests {
             customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
             shared_key = "1Qs77Vz40+iDMBBTRmROKJwnEX"
             log_type = "Vector"
-            time_generated_field = "timestamp"
             azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
         "#,
         )
@@ -438,7 +467,6 @@ mod tests {
             r#"
             customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
             shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
-            time_generated_field = "timestamp"
             azure_resource_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
         "#,
         )
@@ -457,7 +485,6 @@ mod tests {
             r#"
             shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
             log_type = "Vector"
-            time_generated_field = "timestamp"
         "#,
         )
         .expect_err("Config parsing failed to error with missing customer_id");
