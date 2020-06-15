@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-06-02"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
@@ -98,11 +98,11 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
-  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.ca_file = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_file = "/path/to/host_certificate.crt" # optional, no default
   tls.enabled = false # optional, default
+  tls.key_file = "/path/to/host_certificate.key" # optional, no default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
-  tls.key_path = "/path/to/host_certificate.key" # optional, no default
 ```
 
 </TabItem>
@@ -254,7 +254,7 @@ The behavior when the buffer becomes full.
 <Field
   common={true}
   defaultValue={"none"}
-  enumValues={{"none":"No compression","gzip":"[Gzip](https://www.gnu.org/software/gzip/) standard DEFLATE compression","lz4":"High speed [LZ4 compression](https://lz4.github.io/lz4/)","snappy":"High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression.","zstd":"[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."}}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression.","lz4":"High speed [LZ4 compression][urls.lz4].","snappy":"High speed [Snappy compression][urls.snappy], developed by Google. Slower than [LZ4][urls.lz4] but higher compression.","zstd":"[Zstandard compression][urls.zstd], developed at Facebook. Faster than [Gzip][urls.gzip] at similar compression ratios."}}
   examples={["none","gzip","lz4","snappy","zstd"]}
   groups={[]}
   name={"compression"}
@@ -269,7 +269,8 @@ The behavior when the buffer becomes full.
 
 ### compression
 
-Compression codec to use for compressing message sets
+The compression strategy used to compress the encoded event data before
+transmission.
 
 
 
@@ -562,7 +563,7 @@ Configures the TLS options for connections from this sink.
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
   groups={[]}
-  name={"ca_path"}
+  name={"ca_file"}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -572,10 +573,10 @@ Configures the TLS options for connections from this sink.
   warnings={[]}
   >
 
-#### ca_path
+#### ca_file
 
 Absolute path to an additional CA certificate file, in DER or PEM format
-(X.509).
+(X.509), or an inline CA certificate in PEM format.
 
 
 
@@ -586,7 +587,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
   groups={[]}
-  name={"crt_path"}
+  name={"crt_file"}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -596,11 +597,11 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   warnings={[]}
   >
 
-#### crt_path
+#### crt_file
 
 Absolute path to a certificate file used to identify this connection, in DER or
-PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-`key_path` must also be set.
+PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If this
+is set and is not a PKCS#12 archive, [`key_file`](#key_file) must also be set.
 
 
 
@@ -629,6 +630,31 @@ Enable TLS during connections to the remote.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/host_certificate.key"]}
+  groups={[]}
+  name={"key_file"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### key_file
+
+Absolute path to a private key file used to identify this connection, in DER or
+PEM format (PKCS#8), or an inline private key in PEM format. If this is set,
+`crt_file` must also be set.
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -647,31 +673,7 @@ Enable TLS during connections to the remote.
 #### key_pass
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
-`key_path` is set.
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/path/to/host_certificate.key"]}
-  groups={[]}
-  name={"key_path"}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### key_path
-
-Absolute path to a certificate key file used to identify this connection, in
-DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be set.
+`key_file` is set.
 
 
 
@@ -791,9 +793,13 @@ this dependency is packaged with Vector, meaning you do not need to install it.
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+[urls.gzip]: https://www.gzip.org/
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.kafka]: https://kafka.apache.org/
 [urls.kafka_protocol]: https://kafka.apache.org/protocol
 [urls.librdkafka]: https://github.com/edenhill/librdkafka
 [urls.librdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+[urls.lz4]: https://lz4.github.io/lz4/
 [urls.openssl]: https://www.openssl.org/
+[urls.snappy]: https://google.github.io/snappy/
+[urls.zstd]: https://zstd.net

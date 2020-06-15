@@ -13,6 +13,8 @@ use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     ser::{Serialize, Serializer},
 };
+use std::convert::TryFrom;
+use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
 use string_cache::DefaultAtom as Atom;
@@ -29,36 +31,67 @@ pub struct Template {
     has_fields: bool,
 }
 
-impl From<&str> for Template {
-    fn from(src: &str) -> Template {
-        Template {
-            src: src.into(),
-            src_bytes: src.into(),
-            has_ts: StrftimeItems::new(src).filter(is_dynamic).count() > 0,
-            has_fields: RE.is_match(src),
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TemplateError {
+    StrftimeError,
+}
+
+impl Error for TemplateError {}
+
+impl fmt::Display for TemplateError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::StrftimeError => write!(f, "Invalid strftime item"),
         }
     }
 }
 
-impl From<PathBuf> for Template {
-    fn from(p: PathBuf) -> Self {
-        Template::from(&*p.to_string_lossy())
+impl TryFrom<&str> for Template {
+    type Error = TemplateError;
+
+    fn try_from(src: &str) -> Result<Self, Self::Error> {
+        let (has_error, is_dynamic) = StrftimeItems::new(src).fold((false, false), |pair, item| {
+            (pair.0 || is_error(&item), pair.1 || is_dynamic(&item))
+        });
+        match has_error {
+            true => Err(TemplateError::StrftimeError),
+            false => Ok(Template {
+                src: src.into(),
+                src_bytes: src.into(),
+                has_ts: is_dynamic,
+                has_fields: RE.is_match(src),
+            }),
+        }
     }
+}
+
+impl TryFrom<PathBuf> for Template {
+    type Error = TemplateError;
+
+    fn try_from(p: PathBuf) -> Result<Self, Self::Error> {
+        Template::try_from(&*p.to_string_lossy())
+    }
+}
+
+impl TryFrom<String> for Template {
+    type Error = TemplateError;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Template::try_from(s.as_str())
+    }
+}
+
+fn is_error(item: &Item) -> bool {
+    matches!(item, Item::Error)
 }
 
 fn is_dynamic(item: &Item) -> bool {
     match item {
-        Item::Error => true,
+        Item::Error => false,
         Item::Fixed(_) => true,
         Item::Numeric(_, _) => true,
         Item::Space(_) | Item::OwnedSpace(_) => false,
         Item::Literal(_) | Item::OwnedLiteral(_) => false,
-    }
-}
-
-impl From<String> for Template {
-    fn from(s: String) -> Self {
-        Template::from(s.as_str())
     }
 }
 
@@ -163,7 +196,7 @@ impl<'de> Visitor<'de> for TemplateVisitor {
     where
         E: de::Error,
     {
-        Ok(Template::from(s))
+        Template::try_from(s).map_err(de::Error::custom)
     }
 }
 
@@ -185,10 +218,16 @@ mod tests {
 
     #[test]
     fn get_fields() {
-        let f1 = Template::from("{{ foo }}").get_fields().unwrap();
-        let f2 = Template::from("{{ foo }}-{{ bar }}").get_fields().unwrap();
-        let f3 = Template::from("nofield").get_fields();
-        let f4 = Template::from("%F").get_fields();
+        let f1 = Template::try_from("{{ foo }}")
+            .unwrap()
+            .get_fields()
+            .unwrap();
+        let f2 = Template::try_from("{{ foo }}-{{ bar }}")
+            .unwrap()
+            .get_fields()
+            .unwrap();
+        let f3 = Template::try_from("nofield").unwrap().get_fields();
+        let f4 = Template::try_from("%F").unwrap().get_fields();
 
         assert_eq!(f1, vec![Atom::from("foo")]);
         assert_eq!(f2, vec![Atom::from("foo"), Atom::from("bar")]);
@@ -198,16 +237,32 @@ mod tests {
 
     #[test]
     fn is_dynamic() {
-        assert_eq!(true, Template::from("/kube-demo/%F").is_dynamic());
-        assert_eq!(false, Template::from("/kube-demo/echo").is_dynamic());
-        assert_eq!(true, Template::from("/kube-demo/{{ foo }}").is_dynamic());
-        assert_eq!(true, Template::from("/kube-demo/{{ foo }}/%F").is_dynamic());
+        assert_eq!(
+            true,
+            Template::try_from("/kube-demo/%F").unwrap().is_dynamic()
+        );
+        assert_eq!(
+            false,
+            Template::try_from("/kube-demo/echo").unwrap().is_dynamic()
+        );
+        assert_eq!(
+            true,
+            Template::try_from("/kube-demo/{{ foo }}")
+                .unwrap()
+                .is_dynamic()
+        );
+        assert_eq!(
+            true,
+            Template::try_from("/kube-demo/{{ foo }}/%F")
+                .unwrap()
+                .is_dynamic()
+        );
     }
 
     #[test]
     fn render_static() {
         let event = Event::from("hello world");
-        let template = Template::from("foo");
+        let template = Template::try_from("foo").unwrap();
 
         assert_eq!(Ok(Bytes::from("foo")), template.render(&event))
     }
@@ -216,7 +271,7 @@ mod tests {
     fn render_dynamic() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("log_stream", "stream");
-        let template = Template::from("{{log_stream}}");
+        let template = Template::try_from("{{log_stream}}").unwrap();
 
         assert_eq!(Ok(Bytes::from("stream")), template.render(&event))
     }
@@ -225,7 +280,7 @@ mod tests {
     fn render_dynamic_with_prefix() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("log_stream", "stream");
-        let template = Template::from("abcd-{{log_stream}}");
+        let template = Template::try_from("abcd-{{log_stream}}").unwrap();
 
         assert_eq!(Ok(Bytes::from("abcd-stream")), template.render(&event))
     }
@@ -234,7 +289,7 @@ mod tests {
     fn render_dynamic_with_postfix() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("log_stream", "stream");
-        let template = Template::from("{{log_stream}}-abcd");
+        let template = Template::try_from("{{log_stream}}-abcd").unwrap();
 
         assert_eq!(Ok(Bytes::from("stream-abcd")), template.render(&event))
     }
@@ -242,7 +297,7 @@ mod tests {
     #[test]
     fn render_dynamic_missing_key() {
         let event = Event::from("hello world");
-        let template = Template::from("{{log_stream}}-{{foo}}");
+        let template = Template::try_from("{{log_stream}}-{{foo}}").unwrap();
 
         assert_eq!(
             Err(vec![Atom::from("log_stream"), Atom::from("foo")]),
@@ -255,7 +310,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("baz", "quux");
-        let template = Template::from("stream-{{foo}}-{{baz}}.log");
+        let template = Template::try_from("stream-{{foo}}-{{baz}}.log").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("stream-bar-quux.log")),
@@ -268,7 +323,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("baz", "quux");
-        let template = Template::from(r"{stream}{\{{}}}-{{foo}}-{{baz}}.log");
+        let template = Template::try_from(r"{stream}{\{{}}}-{{foo}}-{{baz}}.log").unwrap();
 
         assert_eq!(
             Ok(Bytes::from(r"{stream}{\{{}}}-bar-quux.log")),
@@ -285,7 +340,7 @@ mod tests {
             .as_mut_log()
             .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
-        let template = Template::from("abcd-%F");
+        let template = Template::try_from("abcd-%F").unwrap();
 
         assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event))
     }
@@ -299,7 +354,7 @@ mod tests {
             .as_mut_log()
             .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
-        let template = Template::from("abcd-%F_%T");
+        let template = Template::try_from("abcd-%F_%T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("abcd-2001-02-03_04:05:06")),
@@ -317,7 +372,7 @@ mod tests {
             .as_mut_log()
             .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
-        let template = Template::from("{{ foo }}-%F_%T");
+        let template = Template::try_from("{{ foo }}-%F_%T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("butts-2001-02-03_04:05:06")),
@@ -335,7 +390,7 @@ mod tests {
             .as_mut_log()
             .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
-        let template = Template::from("nested {{ format }} %T");
+        let template = Template::try_from("nested {{ format }} %T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("nested 2001-02-03 04:05:06")),
@@ -353,11 +408,19 @@ mod tests {
             .as_mut_log()
             .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
-        let template = Template::from("nested {{ %F }} %T");
+        let template = Template::try_from("nested {{ %F }} %T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("nested foo 04:05:06")),
             template.render(&event)
         )
+    }
+
+    #[test]
+    fn strftime_error() {
+        assert_eq!(
+            Template::try_from("%E").unwrap_err(),
+            TemplateError::StrftimeError
+        );
     }
 }

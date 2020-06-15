@@ -4,22 +4,23 @@ use crate::{
     internal_events::{SplunkEventEncodeError, SplunkEventSent},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpClient, HttpSink},
-        BatchBytesConfig, Buffer, Compression, TowerRequestConfig,
+        http2::{BatchedHttpSink, HttpClient, HttpSink},
+        service2::TowerRequestConfig,
+        BatchBytesConfig, Buffer, Compression,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use bytes::Bytes;
-use futures01::{Future, Sink};
-use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
-use hyper::Body;
+use futures::{FutureExt, TryFutureExt};
+use futures01::Sink;
+use http02::{Request, StatusCode, Uri};
+use hyper13::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
+use std::convert::TryFrom;
 use string_cache::DefaultAtom as Atom;
-use tower::Service;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -42,7 +43,8 @@ pub struct HecSinkConfig {
         default
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
-    pub compression: Option<Compression>,
+    #[serde(default)]
+    pub compression: Compression,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     #[serde(default)]
@@ -79,7 +81,6 @@ inventory::submit! {
 impl SinkConfig for HecSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_host(&self.host)?;
-        let healthcheck = healthcheck(&self, cx.resolver())?;
 
         let batch = self.batch.unwrap_or(bytesize::mib(1u64), 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -87,7 +88,7 @@ impl SinkConfig for HecSinkConfig {
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            Buffer::new(self.is_gzip()),
+            Buffer::new(self.compression),
             request,
             batch,
             tls_settings,
@@ -95,7 +96,9 @@ impl SinkConfig for HecSinkConfig {
         )
         .sink_map_err(|e| error!("Fatal splunk_hec sink error: {}", e));
 
-        Ok((Box::new(sink), healthcheck))
+        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
+
+        Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -174,32 +177,18 @@ impl HttpSink for HecSinkConfig {
         }
     }
 
-    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
-        let uri = format!("{}/services/collector/event", self.host)
-            .parse::<Uri>()
-            .expect("Unable to parse URI");
+    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
+        let uri = build_uri(&self.host, "/services/collector/event").expect("Unable to parse URI");
 
-        let token = Bytes::from(format!("Splunk {}", self.token));
+        let mut builder = Request::post(uri)
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Splunk {}", self.token));
 
-        let mut builder = Request::builder();
-        builder.method(Method::POST);
-        builder.uri(uri.clone());
-
-        builder.header("Content-Type", "application/json");
-
-        if self.is_gzip() {
-            builder.header("Content-Encoding", "gzip");
+        if let Some(ce) = self.compression.content_encoding() {
+            builder = builder.header("Content-Encoding", ce);
         }
 
-        builder.header("Authorization", token.clone());
-
         builder.body(events).unwrap()
-    }
-}
-
-impl HecSinkConfig {
-    fn is_gzip(&self) -> bool {
-        matches!(&self.compression, Some(Compression::Gzip))
     }
 }
 
@@ -211,13 +200,9 @@ enum HealthcheckError {
     QueuesFull,
 }
 
-pub fn healthcheck(
-    config: &HecSinkConfig,
-    resolver: Resolver,
-) -> crate::Result<super::Healthcheck> {
-    let uri = format!("{}/services/collector/health/1.0", config.host)
-        .parse::<Uri>()
-        .context(super::UriParseError)?;
+pub async fn healthcheck(config: HecSinkConfig, resolver: Resolver) -> crate::Result<()> {
+    let uri =
+        build_uri(&config.host, "/services/collector/health/1.0").context(super::UriParseError2)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", config.token))
@@ -227,33 +212,33 @@ pub fn healthcheck(
     let tls = TlsSettings::from_options(&config.tls)?;
     let mut client = HttpClient::new(resolver, tls)?;
 
-    let healthcheck = client
-        .call(request)
-        .map_err(|err| err.into())
-        .and_then(|response| match response.status() {
-            StatusCode::OK => Ok(()),
-            StatusCode::BAD_REQUEST => Err(HealthcheckError::InvalidToken.into()),
-            StatusCode::SERVICE_UNAVAILABLE => Err(HealthcheckError::QueuesFull.into()),
-            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
-        });
-
-    Ok(Box::new(healthcheck))
+    let response = client.send(request).await?;
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        StatusCode::BAD_REQUEST => Err(HealthcheckError::InvalidToken.into()),
+        StatusCode::SERVICE_UNAVAILABLE => Err(HealthcheckError::QueuesFull.into()),
+        other => Err(super::HealthcheckError::UnexpectedStatus2 { status: other }.into()),
+    }
 }
 
 pub fn validate_host(host: &str) -> crate::Result<()> {
-    let uri = Uri::try_from(host).context(super::UriParseError)?;
+    let uri = Uri::try_from(host).context(super::UriParseError2)?;
 
-    match uri.scheme_part() {
+    match uri.scheme() {
         Some(_) => Ok(()),
         None => Err(Box::new(BuildError::UriMissingScheme)),
     }
+}
+
+fn build_uri(host: &str, path: &str) -> Result<Uri, http02::uri::InvalidUri> {
+    format!("{}{}", host.trim_end_matches('/'), path).parse::<Uri>()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::event::Event;
-    use crate::sinks::util::{http::HttpSink, test::load_sink};
+    use crate::sinks::util::{http2::HttpSink, test::load_sink};
     use chrono::Utc;
     use serde::Deserialize;
     use std::collections::BTreeMap;
@@ -312,7 +297,10 @@ mod tests {
         );
 
         let now = Utc::now().timestamp_millis() as f64 / 1000f64;
-        assert!((hec_event.time - now).abs() < 0.1);
+        assert!(
+            (hec_event.time - now).abs() < 0.2,
+            format!("hec_event.time = {}, now = {}", hec_event.time, now)
+        );
         assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
 
@@ -346,7 +334,10 @@ mod tests {
         );
 
         let now = Utc::now().timestamp_millis() as f64 / 1000f64;
-        assert!((hec_event.time - now).abs() < 0.1);
+        assert!(
+            (hec_event.time - now).abs() < 0.2,
+            format!("hec_event.time = {}, now = {}", hec_event.time, now)
+        );
         assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
 
@@ -359,6 +350,14 @@ mod tests {
         assert!(validate_host(&valid).is_ok());
         assert!(validate_host(&invalid_scheme).is_err());
         assert!(validate_host(&invalid_uri).is_err());
+    }
+
+    #[test]
+    fn splunk_build_uri() {
+        let uri = build_uri("http://test.com/", "/a");
+
+        assert!(uri.is_ok());
+        assert_eq!(format!("{}", uri.unwrap()), "http://test.com/a");
     }
 }
 
@@ -640,8 +639,8 @@ mod integration_tests {
         // OK
         {
             let config = config(Encoding::Text, vec![]);
-            let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver.clone()).unwrap();
-            rt.block_on(healthcheck).unwrap();
+            let healthcheck = sinks::splunk_hec::healthcheck(config, resolver.clone());
+            rt.block_on_std(healthcheck).unwrap();
         }
 
         // Server not listening at address
@@ -650,9 +649,9 @@ mod integration_tests {
                 host: "http://localhost:1111".to_string(),
                 ..config(Encoding::Text, vec![])
             };
-            let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver.clone()).unwrap();
+            let healthcheck = sinks::splunk_hec::healthcheck(config, resolver.clone());
 
-            rt.block_on(healthcheck).unwrap_err();
+            rt.block_on_std(healthcheck).unwrap_err();
         }
 
         // Invalid token
@@ -680,9 +679,9 @@ mod integration_tests {
             let server = warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
             rt.spawn(server);
 
-            let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver).unwrap();
+            let healthcheck = sinks::splunk_hec::healthcheck(config, resolver);
             assert_downcast_matches!(
-                rt.block_on(healthcheck).unwrap_err(),
+                rt.block_on_std(healthcheck).unwrap_err(),
                 HealthcheckError,
                 HealthcheckError::QueuesFull
             );
@@ -725,7 +724,7 @@ mod integration_tests {
             host: "http://localhost:8088/".into(),
             token: get_token(),
             host_key: "host".into(),
-            compression: Some(Compression::None),
+            compression: Compression::None,
             encoding: encoding.into(),
             batch: BatchBytesConfig {
                 max_size: Some(1),

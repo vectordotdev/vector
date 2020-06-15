@@ -372,6 +372,9 @@
 - name: "transform: tokenizer"
   description: Anything `tokenizer` transform related
   color: 54a0ff
+- name: "transform: wasm"
+  description: Anything `wasm` transform related
+  color: 54a0ff
 
 #
 # sink
@@ -430,6 +433,9 @@
   color: 4ddbfb
 - name: "sink: humio_logs"
   description: Anything `humio_logs` sink related
+  color: 4ddbfb
+- name: "sink: influxdb_logs"
+  description: Anything `influxdb_logs` sink related
   color: 4ddbfb
 - name: "sink: influxdb_metrics"
   description: Anything `influxdb_metrics` sink related

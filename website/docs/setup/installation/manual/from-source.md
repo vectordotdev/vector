@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-06-11"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
@@ -70,7 +70,7 @@ The following steps should be used to compile Vector directly on Linux based sys
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.1)', value: 'latest'},
+        { label: 'Latest (0.9.2)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -158,7 +158,7 @@ operating systems.
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.1)', value: 'latest'},
+        { label: 'Latest (0.9.2)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -166,7 +166,7 @@ operating systems.
 
     ```bat
     git clone https://github.com/timberio/vector
-    git checkout v0.9.1
+    git checkout v0.9.2
     cd vector
     ```
 
@@ -217,7 +217,7 @@ Building steps:
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.1)', value: 'latest'},
+        { label: 'Latest (0.9.2)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -434,6 +434,7 @@ features one has to pass a comma-separated list of component features.
 | `transforms-swimlanes` | Enables building of [`swimlanes` transform][docs.transforms.swimlanes].  |
 | `transforms-tag_cardinality_limit` | Enables building of [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit].  |
 | `transforms-tokenizer` | Enables building of [`tokenizer` transform][docs.transforms.tokenizer].  |
+| `transforms-wasm` | Enables building of [`wasm` transform][docs.transforms.wasm].  |
 | `sinks-aws_cloudwatch_logs` | Enables building of [`aws_cloudwatch_logs` sink][docs.sinks.aws_cloudwatch_logs].  |
 | `sinks-aws_cloudwatch_metrics` | Enables building of [`aws_cloudwatch_metrics` sink][docs.sinks.aws_cloudwatch_metrics].  |
 | `sinks-aws_kinesis_firehose` | Enables building of [`aws_kinesis_firehose` sink][docs.sinks.aws_kinesis_firehose].  |
@@ -452,6 +453,7 @@ features one has to pass a comma-separated list of component features.
 | `sinks-honeycomb` | Enables building of [`honeycomb` sink][docs.sinks.honeycomb].  |
 | `sinks-http` | Enables building of [`http` sink][docs.sinks.http].  |
 | `sinks-humio_logs` | Enables building of [`humio_logs` sink][docs.sinks.humio_logs].  |
+| `sinks-influxdb_logs` | Enables building of [`influxdb_logs` sink][docs.sinks.influxdb_logs].  |
 | `sinks-influxdb_metrics` | Enables building of [`influxdb_metrics` sink][docs.sinks.influxdb_metrics].  |
 | `sinks-kafka` | Enables building of [`kafka` sink][docs.sinks.kafka].  Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled.  |
 | `sinks-logdna` | Enables building of [`logdna` sink][docs.sinks.logdna].  |
@@ -494,6 +496,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sinks.honeycomb]: /docs/reference/sinks/honeycomb/
 [docs.sinks.http]: /docs/reference/sinks/http/
 [docs.sinks.humio_logs]: /docs/reference/sinks/humio_logs/
+[docs.sinks.influxdb_logs]: /docs/reference/sinks/influxdb_logs/
 [docs.sinks.influxdb_metrics]: /docs/reference/sinks/influxdb_metrics/
 [docs.sinks.kafka]: /docs/reference/sinks/kafka/
 [docs.sinks.logdna]: /docs/reference/sinks/logdna/
@@ -545,6 +548,7 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
 [docs.transforms.tag_cardinality_limit]: /docs/reference/transforms/tag_cardinality_limit/
 [docs.transforms.tokenizer]: /docs/reference/transforms/tokenizer/
+[docs.transforms.wasm]: /docs/reference/transforms/wasm/
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc
 [urls.leveldb]: https://github.com/google/leveldb
 [urls.librdkafka]: https://github.com/edenhill/librdkafka

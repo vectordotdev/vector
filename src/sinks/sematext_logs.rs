@@ -1,7 +1,8 @@
 use crate::{
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
-        encoding::EncodingConfigWithDefault, BatchBytesConfig, Compression, TowerRequestConfig,
+        encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchBytesConfig,
+        Compression,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
@@ -57,7 +58,7 @@ impl SinkConfig for SematextLogsConfig {
 
         let (sink, healthcheck) = ElasticSearchConfig {
             host,
-            compression: Some(Compression::None),
+            compression: Compression::None,
             doc_type: Some("logs".to_string()),
             index: Some(self.token.clone()),
             batch: self.batch.clone(),
@@ -126,7 +127,7 @@ mod tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let (rx, _trigger, server) = build_test_server(&addr);
+        let (rx, _trigger, server) = build_test_server(addr, &mut rt);
         rt.spawn(server);
 
         let (expected, lines) = test_util::random_lines_with_stream(100, 10);

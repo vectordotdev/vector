@@ -115,6 +115,7 @@ scopes:
   - swimlanes transform
   - tag_cardinality_limit transform
   - tokenizer transform
+  - wasm transform
 
   # sinks
   - aws_cloudwatch_logs sink
@@ -135,6 +136,7 @@ scopes:
   - honeycomb sink
   - http sink
   - humio_logs sink
+  - influxdb_logs sink
   - influxdb_metrics sink
   - kafka sink
   - logdna sink

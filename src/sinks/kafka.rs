@@ -4,7 +4,7 @@ use crate::{
     kafka::{KafkaCompression, KafkaTlsConfig},
     serde::to_string,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
-    template::Template,
+    template::{Template, TemplateError},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::compat::Compat;
@@ -18,6 +18,7 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 
@@ -27,6 +28,8 @@ type MetadataFuture<F, M> = future::Join<F, future::FutureResult<M, <F as Future
 enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: rdkafka::error::KafkaError },
+    #[snafu(display("invalid topic template: {}", source))]
+    TopicTemplate { source: TemplateError },
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -35,7 +38,8 @@ pub struct KafkaSinkConfig {
     topic: String,
     key_field: Option<Atom>,
     encoding: EncodingConfigWithDefault<Encoding>,
-    compression: Option<KafkaCompression>,
+    #[serde(default)]
+    compression: KafkaCompression,
     tls: Option<KafkaTlsConfig>,
     #[serde(default = "default_socket_timeout_ms")]
     socket_timeout_ms: u64,
@@ -82,7 +86,7 @@ inventory::submit! {
 impl SinkConfig for KafkaSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = KafkaSink::new(self.clone(), cx.acker())?;
-        let hc = healthcheck(self.clone());
+        let hc = healthcheck(self.clone())?;
         Ok((Box::new(sink), hc))
     }
 
@@ -102,10 +106,7 @@ impl KafkaSinkConfig {
         if let Some(tls) = &self.tls {
             tls.apply(&mut client_config)?;
         }
-        client_config.set(
-            "compression.codec",
-            &to_string(self.compression.unwrap_or_default()),
-        );
+        client_config.set("compression.codec", &to_string(self.compression));
         client_config.set("socket.timeout.ms", &self.socket_timeout_ms.to_string());
         client_config.set("message.timeout.ms", &self.message_timeout_ms.to_string());
         if let Some(ref librdkafka_options) = self.librdkafka_options {
@@ -122,7 +123,7 @@ impl KafkaSink {
         let producer = config.to_rdkafka()?.create().context(KafkaCreateFailed)?;
         Ok(KafkaSink {
             producer,
-            topic: Template::from(config.topic),
+            topic: Template::try_from(config.topic).context(TopicTemplate)?,
             key_field: config.key_field,
             encoding: config.encoding.into(),
             in_flight: FuturesUnordered::new(),
@@ -212,9 +213,12 @@ impl Sink for KafkaSink {
     }
 }
 
-fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
+fn healthcheck(config: KafkaSinkConfig) -> crate::Result<super::Healthcheck> {
     let client = config.to_rdkafka().unwrap();
-    let topic = match Template::from(config.topic).render_string(&Event::from("")) {
+    let topic = match Template::try_from(config.topic)
+        .context(TopicTemplate)?
+        .render_string(&Event::from(""))
+    {
         Ok(topic) => Some(topic),
         Err(missing_keys) => {
             warn!(
@@ -237,7 +241,7 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
         })
     });
 
-    Box::new(check)
+    Ok(Box::new(check))
 }
 
 fn encode_event(
@@ -325,7 +329,7 @@ mod integration_test {
 
     #[test]
     fn kafka_happy_path_plaintext() {
-        kafka_happy_path("localhost:9092", None, None);
+        kafka_happy_path("localhost:9092", None, KafkaCompression::None);
     }
 
     #[test]
@@ -335,7 +339,7 @@ mod integration_test {
         let config = KafkaSinkConfig {
             bootstrap_servers: "localhost:9092".into(),
             topic: topic.clone(),
-            compression: None,
+            compression: KafkaCompression::None,
             encoding: EncodingConfigWithDefault::from(Encoding::Text),
             key_field: None,
             tls: None,
@@ -346,7 +350,7 @@ mod integration_test {
 
         let mut rt = crate::test_util::runtime();
         use futures::compat::Future01CompatExt;
-        let jh = rt.spawn_handle(super::healthcheck(config).compat());
+        let jh = rt.spawn_handle(super::healthcheck(config).unwrap().compat());
 
         rt.block_on_std(jh).unwrap().unwrap();
     }
@@ -362,11 +366,11 @@ mod integration_test {
             Some(KafkaTlsConfig {
                 enabled: Some(true),
                 options: TlsOptions {
-                    ca_path: Some(TEST_CA.into()),
+                    ca_file: Some(TEST_CA.into()),
                     ..Default::default()
                 },
             }),
-            None,
+            KafkaCompression::None,
         );
     }
 
@@ -377,42 +381,38 @@ mod integration_test {
             Some(KafkaTlsConfig {
                 enabled: Some(true),
                 options: TlsOptions {
-                    ca_path: Some(TEST_CA.into()),
+                    ca_file: Some(TEST_CA.into()),
                     // Dummy key, not actually checked by server
-                    crt_path: Some(TEST_CRT.into()),
-                    key_path: Some(TEST_KEY.into()),
+                    crt_file: Some(TEST_CRT.into()),
+                    key_file: Some(TEST_KEY.into()),
                     ..Default::default()
                 },
             }),
-            None,
+            KafkaCompression::None,
         );
     }
 
     #[test]
     fn kafka_happy_path_gzip() {
-        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Gzip));
+        kafka_happy_path("localhost:9092", None, KafkaCompression::Gzip);
     }
 
     #[test]
     fn kafka_happy_path_lz4() {
-        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Lz4));
+        kafka_happy_path("localhost:9092", None, KafkaCompression::Lz4);
     }
 
     #[test]
     fn kafka_happy_path_snappy() {
-        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Snappy));
+        kafka_happy_path("localhost:9092", None, KafkaCompression::Snappy);
     }
 
     #[test]
     fn kafka_happy_path_zstd() {
-        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Zstd));
+        kafka_happy_path("localhost:9092", None, KafkaCompression::Zstd);
     }
 
-    fn kafka_happy_path(
-        server: &str,
-        tls: Option<KafkaTlsConfig>,
-        compression: Option<KafkaCompression>,
-    ) {
+    fn kafka_happy_path(server: &str, tls: Option<KafkaTlsConfig>, compression: KafkaCompression) {
         let topic = format!("test-{}", random_string(10));
 
         let tls_enabled = tls.as_ref().map(|tls| tls.enabled()).unwrap_or(false);

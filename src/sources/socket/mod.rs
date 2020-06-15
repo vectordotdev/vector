@@ -129,17 +129,21 @@ mod test {
     #[cfg(unix)]
     use super::unix::UnixConfig;
     use super::SocketConfig;
+    use crate::dns::Resolver;
     use crate::event;
-    use crate::runtime;
+    use crate::runtime::Runtime;
     use crate::shutdown::{ShutdownSignal, SourceShutdownCoordinator};
+    use crate::sinks::util::tcp::TcpSink;
     use crate::test_util::{
-        block_on, collect_n, next_addr, send_lines, send_lines_tls, wait_for_tcp, CollectN,
+        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, wait_for_tcp, CollectN,
     };
-    use crate::tls::{TlsConfig, TlsOptions};
+    use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
+    use bytes::Bytes;
     #[cfg(unix)]
     use futures01::Sink;
     use futures01::{
+        stream,
         sync::{mpsc, oneshot},
         Future, Stream,
     };
@@ -169,7 +173,7 @@ mod test {
                 tx,
             )
             .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(server);
         wait_for_tcp(addr);
 
@@ -197,7 +201,7 @@ mod test {
                 tx,
             )
             .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(server);
         wait_for_tcp(addr);
 
@@ -228,7 +232,7 @@ mod test {
                 tx,
             )
             .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(server);
         wait_for_tcp(addr);
 
@@ -264,8 +268,8 @@ mod test {
         config.tls = Some(TlsConfig {
             enabled: Some(true),
             options: TlsOptions {
-                crt_path: Some("tests/data/localhost.crt".into()),
-                key_path: Some("tests/data/localhost.key".into()),
+                crt_file: Some("tests/data/localhost.crt".into()),
+                key_file: Some("tests/data/localhost.key".into()),
                 ..Default::default()
             },
         });
@@ -278,7 +282,7 @@ mod test {
                 tx,
             )
             .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(server);
         wait_for_tcp(addr);
 
@@ -317,7 +321,7 @@ mod test {
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
             .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
             .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         let source_handle = oneshot::spawn(server, &rt.executor());
         wait_for_tcp(addr);
 
@@ -346,7 +350,7 @@ mod test {
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
-        let (tx, rx) = mpsc::channel(1000);
+        let (tx, rx) = mpsc::channel(10000);
         let source_name = "tcp_shutdown_infinite_stream";
 
         let addr = next_addr();
@@ -355,24 +359,30 @@ mod test {
         let (shutdown_signal, _) = shutdown.register_source(source_name);
 
         // Start TCP Source
-        let server = SocketConfig::from(TcpConfig::new(addr.into()))
-            .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
-            .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
+        let server = SocketConfig::from(TcpConfig {
+            shutdown_timeout_secs: 1,
+            ..TcpConfig::new(addr.into())
+        })
+        .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
+        .unwrap();
+        let mut rt = Runtime::with_thread_count(2).unwrap();
         let source_handle = oneshot::spawn(server, &rt.executor());
         wait_for_tcp(addr);
 
         // Spawn future that keeps sending lines to the TCP source forever.
-        let run_pump_atomic_sender = Arc::new(AtomicBool::new(true));
-        let run_pump_atomic_receiver = run_pump_atomic_sender.clone();
-        let pump_future = send_lines(
-            addr,
-            std::iter::repeat("test".to_string())
-                .take_while(move |_| run_pump_atomic_receiver.load(Ordering::Relaxed)),
+        let sink = TcpSink::new(
+            "localhost".to_owned(),
+            addr.port(),
+            Resolver::new(Vec::new(), rt.executor()).unwrap(),
+            MaybeTlsSettings::Raw(()),
         );
-        let pump_handle = std::thread::spawn(move || {
-            pump_future.wait().ok().unwrap();
-        });
+        rt.spawn(
+            stream::iter_ok::<_, ()>(std::iter::repeat(()))
+                .map(|_| Bytes::from("test\n"))
+                .map_err(|_| ())
+                .forward(sink)
+                .map(|_| ()),
+        );
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
         let (_rx, events) = rt.block_on(CollectN::new(rx, 100)).ok().unwrap();
@@ -391,10 +401,116 @@ mod test {
 
         // Ensure that the source has actually shut down.
         rt.block_on(source_handle).unwrap();
+    }
 
-        // Stop the pump from sending lines forever.
-        run_pump_atomic_sender.store(false, Ordering::Relaxed);
-        assert!(pump_handle.join().is_ok());
+    #[test]
+    fn tcp_gracefull_shutdown() {
+        let n = 10000;
+        // It's important that the buffer be large enough that the TCP source doesn't have
+        // to block trying to forward its input into the Sender because the channel is full,
+        // otherwise even sending the signal to shut down won't wake it up.
+        let (tx, rx) = mpsc::channel(n);
+        let source_name = "tcp_gracefull_shutdown_0";
+
+        let addr = next_addr();
+
+        let mut shutdown = SourceShutdownCoordinator::new();
+        let (shutdown_signal, _) = shutdown.register_source(source_name);
+
+        // Start TCP Source
+        let server = SocketConfig::from(TcpConfig {
+            shutdown_timeout_secs: 10,
+            ..TcpConfig::new(addr.into())
+        })
+        .build(
+            source_name,
+            &GlobalOptions::default(),
+            shutdown_signal,
+            tx.clone(),
+        )
+        .unwrap();
+        let mut rt = Runtime::with_thread_count(4).unwrap();
+        let source_handle = oneshot::spawn(server, &rt.executor());
+        wait_for_tcp(addr);
+
+        // Spawn future that keeps sending n lines to the TCP source.
+        info!("Start sink");
+        let sink = TcpSink::new(
+            "localhost".to_owned(),
+            addr.port(),
+            Resolver::new(Vec::new(), rt.executor()).unwrap(),
+            MaybeTlsSettings::Raw(()),
+        );
+        rt.spawn(
+            stream::iter_ok::<_, ()>(0..n)
+                .map(|i| Bytes::from(format!("{}\n", i)))
+                .forward(sink)
+                .map(|_| ()),
+        );
+
+        // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
+        info!("Collect 100 events");
+        let (rx, events) = rt.block_on(CollectN::new(rx, 100)).ok().unwrap();
+        assert_eq!(100, events.len());
+        let mut count = 0;
+        for event in events {
+            assert_eq!(
+                event.as_log()[&event::log_schema().message_key()],
+                format!("{}", count).into()
+            );
+            count += 1;
+        }
+
+        info!("Shutdown first source");
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
+        assert_eq!(true, shutdown_success);
+
+        // Ensure that the source has actually shut down.
+        rt.block_on(source_handle).unwrap();
+
+        // Start second source
+        info!("Start second source");
+        let source_name = "tcp_gracefull_shutdown_1";
+        let (shutdown_signal, _tripwire) = shutdown.register_source(source_name);
+
+        // Start TCP Source
+        let server = SocketConfig::from(TcpConfig {
+            shutdown_timeout_secs: 10,
+            ..TcpConfig::new(addr.into())
+        })
+        .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
+        .unwrap();
+        let source_handle = oneshot::spawn(server, &rt.executor());
+
+        // Consume rest of the events
+        info!("Collect rest of the events");
+        let (_rx, _) = rt
+            .block_on(CollectN::new(
+                rx.map(move |event| {
+                    assert_eq!(
+                        event.as_log()[&event::log_schema().message_key()],
+                        format!("{}", count).into()
+                    );
+                    count += 1;
+                }),
+                n - count,
+            ))
+            .ok()
+            .unwrap();
+
+        info!("Shutdown second source");
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
+        assert_eq!(true, shutdown_success);
+
+        // Ensure that the source has actually shut down.
+        rt.block_on(source_handle).unwrap();
+
+        // Ensure that the sink has actually shut down.
+        assert!(rt.shutdown_on_idle().wait().is_ok());
     }
 
     //////// UDP TESTS ////////
@@ -430,12 +546,12 @@ mod test {
         sender: mpsc::Sender<event::Event>,
         source_name: &str,
         shutdown: &mut SourceShutdownCoordinator,
-    ) -> (SocketAddr, runtime::Runtime, oneshot::SpawnHandle<(), ()>) {
+    ) -> (SocketAddr, Runtime, oneshot::SpawnHandle<(), ()>) {
         let (shutdown_signal, _) = shutdown.register_source(source_name);
         init_udp_inner(sender, source_name, shutdown_signal)
     }
 
-    fn init_udp(sender: mpsc::Sender<event::Event>) -> (SocketAddr, runtime::Runtime) {
+    fn init_udp(sender: mpsc::Sender<event::Event>) -> (SocketAddr, Runtime) {
         let (addr, rt, handle) = init_udp_inner(sender, "default", ShutdownSignal::noop());
         handle.forget();
         return (addr, rt);
@@ -445,7 +561,7 @@ mod test {
         sender: mpsc::Sender<event::Event>,
         source_name: &str,
         shutdown_signal: ShutdownSignal,
-    ) -> (SocketAddr, runtime::Runtime, oneshot::SpawnHandle<(), ()>) {
+    ) -> (SocketAddr, Runtime, oneshot::SpawnHandle<(), ()>) {
         let addr = next_addr();
 
         let server = SocketConfig::from(UdpConfig::new(addr))
@@ -456,7 +572,7 @@ mod test {
                 sender,
             )
             .unwrap();
-        let rt = runtime::Runtime::new().unwrap();
+        let rt = runtime();
         let source_handle = oneshot::spawn(server, &rt.executor());
 
         // Wait for udp to start listening
@@ -620,7 +736,7 @@ mod test {
 
     ////////////// UNIX TESTS //////////////
     #[cfg(unix)]
-    fn init_unix(sender: mpsc::Sender<event::Event>) -> (PathBuf, runtime::Runtime) {
+    fn init_unix(sender: mpsc::Sender<event::Event>) -> (PathBuf, Runtime) {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
 
         let server = SocketConfig::from(UnixConfig::new(in_path.clone()))
@@ -632,7 +748,7 @@ mod test {
             )
             .unwrap();
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(server);
 
         // Wait for server to accept traffic
@@ -657,7 +773,11 @@ mod test {
                     .map(|(_source, sink)| sink)
                     .and_then(|sink| {
                         let socket = sink.into_inner().into_inner();
-                        tokio01::io::shutdown(socket)
+                        // In tokio 0.1 `AsyncWrite::shutdown` for `TcpStream` is a noop.
+                        // See https://docs.rs/tokio-tcp/0.1.4/src/tokio_tcp/stream.rs.html#917
+                        // Use `TcpStream::shutdown` instead - it actually does something.
+                        socket
+                            .shutdown(std::net::Shutdown::Both)
                             .map(|_| ())
                             .map_err(|e| panic!("{:}", e))
                     })

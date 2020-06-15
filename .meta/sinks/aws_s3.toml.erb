@@ -84,15 +84,12 @@ category = "Naming"
 default = "log"
 description = "The filename extension to use in the object name."
 
-[sinks.aws_s3.options.compression]
-type = "string"
-common = true
-required = true
-description = "The compression mechanism to use."
-
-[sinks.aws_s3.options.compression.enum]
-gzip = "GZIP compression"
-none = "No compression"
+<%= render("_partials/fields/_compression_options.toml",
+  namespace: "sinks.aws_s3.options",
+  options: {
+    "default" => "gzip"
+  }
+) %>
 
 [sinks.aws_s3.options.filename_time_format]
 type = "string"

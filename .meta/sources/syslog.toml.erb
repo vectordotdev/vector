@@ -87,6 +87,23 @@ Vector will use the upstream hostname. In the case where `mode` = `"unix"` the \
 socket path will be used. This key can be renamed via the `host_key` option.\
 """
 
+[sources.syslog.fields.log.fields.hostname]
+type = "string"
+examples = ["my.host.com"]
+required = true
+description = """\
+The hostname extracted from the Syslog line. (`host` is also this value if it exists in the log.)
+"""
+
+[sources.syslog.fields.log.fields.source_ip]
+type = "string"
+examples = ["127.0.0.1"]
+required = true
+description = """\
+The upstream hostname. In the case where `mode` = `"unix"` the socket path will \
+be used. (`host` is also this value if `hostname` does not exist in the log.)
+"""
+
 [sources.syslog.fields.log.fields.facility]
 type = "string"
 examples = ["1"]
@@ -171,6 +188,8 @@ A `log` event will be produced with the following structure:
   "facility": "user",
   "timestamp": "2020-03-13T20:45:38.119Z",
   "host": "dynamicwireless.name", // controlled via the `host_key` option,
+  "source_ip": "127.0.0.1",
+  "hostname": "dynamicwireless.name"
   "appname": "non",
   "procid": "2426",
   "msgid": "ID931",

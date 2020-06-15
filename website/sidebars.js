@@ -183,6 +183,8 @@ module.exports = {
             
               "reference/transforms/tokenizer",
             
+              "reference/transforms/wasm",
+            
           ]
         },
         {
@@ -226,6 +228,8 @@ module.exports = {
               "reference/sinks/http",
             
               "reference/sinks/humio_logs",
+            
+              "reference/sinks/influxdb_logs",
             
               "reference/sinks/influxdb_metrics",
             

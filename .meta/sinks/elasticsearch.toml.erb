@@ -123,19 +123,12 @@ or the value of the `$AWS_REGION` or `$AWS_DEFAULT_REGION` environment \
 variables if that cannot be determined, or "us-east-1".\
 """
 
-[sinks.elasticsearch.options.compression]
-type = "string"
-common = true
-required = false
-default = "none"
-warnings = [{visibility_level = "component", text = "AWS hosted Elasticsearch is unable to use compression"}]
-description = """\
-The compression mechanism to use.\
-"""
-
-[sinks.elasticsearch.options.compression.enum]
-gzip = "GZIP compression"
-none = "No compression"
+<%= render("_partials/fields/_compression_options.toml",
+  namespace: "sinks.elasticsearch.options",
+  options: {
+    "warnings" => [{"visibility_level" => "component", "text" => "AWS hosted Elasticsearch is unable to use compression"}]
+  }
+) %>
 
 [sinks.elasticsearch.options.doc_type]
 type = "string"
@@ -194,6 +187,12 @@ examples = [
 ]
 templateable = true
 description = "Index name to write events to."
+
+[sinks.elasticsearch.options.pipeline]
+type = "string"
+common = true
+examples = ["pipeline-name"]
+description = "Name of the pipeline to apply."
 
 [sinks.elasticsearch.options.query]
 type = "table"

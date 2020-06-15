@@ -80,7 +80,7 @@ pub struct TcpConnectionError {
 
 impl InternalEvent for TcpConnectionError {
     fn emit_logs(&self) {
-        warn!(message = "connection error.", error = %self.error);
+        warn!(message = "connection error.", error = %self.error, rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {

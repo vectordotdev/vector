@@ -1,7 +1,7 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     service::{TowerBatchedSink, TowerRequestSettings},
-    Batch, BatchSettings,
+    sink, Batch, BatchSettings,
 };
 use crate::{
     dns::Resolver,
@@ -314,6 +314,12 @@ impl<B> Service<B> for HttpBatchService<B> {
     }
 }
 
+impl<T: fmt::Debug> sink::Response for http::Response<T> {
+    fn is_successful(&self) -> bool {
+        self.status().is_success()
+    }
+}
+
 #[derive(Clone)]
 pub struct HttpRetryLogic;
 
@@ -369,6 +375,7 @@ impl Auth {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_util::runtime;
     use futures01::{Future, Sink, Stream};
     use http::Method;
     use hyper::service::service_fn;
@@ -438,7 +445,7 @@ mod test {
             .serve(new_service)
             .map_err(|e| eprintln!("server error: {}", e));
 
-        let mut rt = crate::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         rt.spawn(server);
 

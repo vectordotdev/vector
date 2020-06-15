@@ -1,7 +1,10 @@
+#![allow(clippy::match_bool)]
+#![allow(clippy::redundant_clone)]
 #![cfg(feature = "leveldb")]
 
 use futures01::{Future, Sink};
 use prost::Message;
+use std::sync::atomic::Ordering;
 use tempfile::tempdir;
 use tracing::trace;
 use vector::event;
@@ -59,6 +62,7 @@ fn test_buffering() {
     let mut rt = test_util::runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(1)); // Give topo a moment to start up.
 
     let (input_events, input_events_stream) =
         test_util::random_events_with_stream(line_length, num_events);
@@ -67,16 +71,12 @@ fn test_buffering() {
         .send_all(input_events_stream);
     let _ = rt.block_on(send).unwrap();
 
-    // A race caused by `rt.block_on(send).unwrap()` is handled here. For some
-    // reason, at times less events than were sent actually arrive to the
-    // `source`.
-    // We mitigate that by waiting on the event counter provided by our source
-    // mock.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    // There was a race caused by a channel in the mock source, and this
+    // check is here to ensure it's really gone.
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     // Give the topology some time to process the received data and simulate
     // a crash.
-    std::thread::sleep(std::time::Duration::from_millis(100));
     terminate_abruptly(rt, topology);
 
     // Then run vector again with a sink that accepts events now. It should
@@ -98,6 +98,7 @@ fn test_buffering() {
     let mut rt = test_util::runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(1)); // Give topo a moment to start up.
 
     let (input_events2, input_events_stream) =
         test_util::random_events_with_stream(line_length, num_events);
@@ -109,12 +110,9 @@ fn test_buffering() {
 
     let output_events = test_util::receive_events(out_rx);
 
-    // A race caused by `rt.block_on(send).unwrap()` is handled here. For some
-    // reason, at times less events than were sent actually arrive to the
-    // `source`.
-    // We mitigate that by waiting on the event counter provided by our source
-    // mock.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    // There was a race caused by a channel in the mock source, and this
+    // check is here to ensure it's really gone.
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     terminate_gracefully(rt, topology);
 
@@ -164,22 +162,20 @@ fn test_max_size() {
     let mut rt = test_util::runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(1)); // Give topo a moment to start up.
 
     let send = in_tx
         .sink_map_err(|err| panic!(err))
         .send_all(input_events_stream);
     let _ = rt.block_on(send).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(2));
 
-    // A race caused by `rt.block_on(send).unwrap()` is handled here. For some
-    // reason, at times less events than were sent actually arrive to the
-    // `source`.
-    // We mitigate that by waiting on the event counter provided by our source
-    // mock.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    // There was a race caused by a channel in the mock source, and this
+    // check is here to ensure it's really gone.
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     // Give the topology some time to process the received data and simulate
     // a crash.
-    std::thread::sleep(std::time::Duration::from_millis(100));
     terminate_abruptly(rt, topology);
 
     // Then run vector again with a sink that accepts events now. It should
@@ -202,6 +198,7 @@ fn test_max_size() {
     let mut rt = test_util::runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(1)); // Give topo a moment to start up.
 
     let output_events = test_util::receive_events(out_rx);
 
@@ -247,6 +244,7 @@ fn test_max_size_resume() {
     let mut rt = runtime::Runtime::new().unwrap();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(1)); // Give topo a moment to start up.
 
     // Send all of the input events _before_ the output sink is ready.
     // This causes the writers to stop writing to the on-disk buffer, and once
@@ -303,6 +301,7 @@ fn test_reclaim_disk_space() {
     let mut rt = test_util::runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(1)); // Give topo a moment to start up.
 
     let (input_events, input_events_stream) =
         test_util::random_events_with_stream(line_length, num_events);
@@ -310,17 +309,14 @@ fn test_reclaim_disk_space() {
         .sink_map_err(|err| panic!(err))
         .send_all(input_events_stream);
     let _ = rt.block_on(send).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(5));
 
-    // A race caused by `rt.block_on(send).unwrap()` is handled here. For some
-    // reason, at times less events than were sent actually arrive to the
-    // `source`.
-    // We mitigate that by waiting on the event counter provided by our source
-    // mock.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    // There was a race caused by a channel in the mock source, and this
+    // check is here to ensure it's really gone.
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     // Give the topology some time to process the received data and simulate
     // a crash.
-    std::thread::sleep(std::time::Duration::from_millis(100));
     terminate_abruptly(rt, topology);
 
     let before_disk_size: u64 = compute_disk_size(&data_dir);
@@ -344,6 +340,7 @@ fn test_reclaim_disk_space() {
     let mut rt = test_util::runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(1)); // Give topo a moment to start up.
 
     let (input_events2, input_events_stream) =
         test_util::random_events_with_stream(line_length, num_events);
@@ -355,12 +352,9 @@ fn test_reclaim_disk_space() {
 
     let output_events = test_util::receive_events(out_rx);
 
-    // A race caused by `rt.block_on(send).unwrap()` is handled here. For some
-    // reason, at times less events than were sent actually arrive to the
-    // `source`.
-    // We mitigate that by waiting on the event counter provided by our source
-    // mock.
-    test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    // There was a race caused by a channel in the mock source, and this
+    // check is here to ensure it's really gone.
+    assert_eq!(source_event_counter.load(Ordering::Acquire), num_events);
 
     terminate_gracefully(rt, topology);
 

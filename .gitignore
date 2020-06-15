@@ -1,7 +1,6 @@
 *.iml
 *.tmp
 **/*.rs.bk
-.envrc
 .DS_Store
 .idea/
 .vscode/
@@ -11,3 +10,4 @@ miniodat
 sample.log
 target
 node_modules
+tests/data/wasm/*/target

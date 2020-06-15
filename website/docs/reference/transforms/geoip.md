@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-06-10"
 component_title: "GeoIP"
 description: "The Vector [`geoip`](#geoip) transform accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases."
 event_types: ["log"]
 function_category: "enrich"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+geoip%22
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "geoip|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/geoip.rs
 status: "beta"
 title: "GeoIP Transform"
+unsupported_operating_systems: []
 ---
 
 import Fields from '@site/src/components/Fields';
