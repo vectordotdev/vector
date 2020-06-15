@@ -1,58 +1,44 @@
 use super::{resource_file::ResourceFile, Result};
+use crate::up_down;
 use std::process::{Command, Stdio};
 
-/// Takes care of deploying vector into the kubernetes cluster.
-///
-/// Manages the config file secret accordingly.
 #[derive(Debug)]
-pub struct Manager {
+pub struct CommandBuilder {
     interface_command: String,
     namespace: String,
     custom_resource_file: ResourceFile,
 }
 
-impl Manager {
-    /// Create a new [`Manager`].
-    pub fn new(interface_command: &str, namespace: &str, custom_resource: &str) -> Result<Self> {
-        let custom_resource_file = ResourceFile::new(custom_resource)?;
-        Ok(Self {
-            interface_command: interface_command.to_owned(),
-            namespace: namespace.to_owned(),
-            custom_resource_file,
-        })
-    }
-
-    pub fn up(&self) -> Result<()> {
-        self.exec("up")?;
-        Ok(())
-    }
-
-    pub fn down(&self) -> Result<()> {
-        self.exec("down")?;
-        Ok(())
-    }
-
-    fn exec(&self, operation: &str) -> Result<()> {
-        if !Command::new(&self.interface_command)
-            .arg(operation)
+impl up_down::CommandBuilder for CommandBuilder {
+    fn build(&self, command_to_build: up_down::CommandToBuild) -> Command {
+        let mut command = Command::new(&self.interface_command);
+        command
+            .arg(match command_to_build {
+                up_down::CommandToBuild::Up => "up",
+                up_down::CommandToBuild::Down => "down",
+            })
             .arg(&self.namespace)
             .env(
                 "CUSTOM_RESOURCE_CONIFGS_FILE",
                 self.custom_resource_file.path(),
             )
-            .stdin(Stdio::null())
-            .spawn()?
-            .wait()?
-            .success()
-        {
-            Err(format!("failed to exec: {}", operation))?;
-        }
-        Ok(())
+            .stdin(Stdio::null());
+        command
     }
 }
 
-impl Drop for Manager {
-    fn drop(&mut self) {
-        self.down().expect("vector turndown failed");
-    }
+/// Takes care of deploying vector into the kubernetes cluster.
+///
+/// Manages the config file secret accordingly.
+pub fn manager(
+    interface_command: &str,
+    namespace: &str,
+    custom_resource: &str,
+) -> Result<up_down::Manager<CommandBuilder>> {
+    let custom_resource_file = ResourceFile::new(custom_resource)?;
+    Ok(up_down::Manager::new(CommandBuilder {
+        interface_command: interface_command.to_owned(),
+        namespace: namespace.to_owned(),
+        custom_resource_file,
+    }))
 }

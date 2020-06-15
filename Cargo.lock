@@ -1915,6 +1915,7 @@ dependencies = [
  "once_cell",
  "serde_json",
  "tempfile",
+ "tokio 0.2.21",
 ]
 
 [[package]]

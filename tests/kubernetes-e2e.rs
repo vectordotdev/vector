@@ -92,9 +92,12 @@ fn generate_long_string(a: usize, b: usize) -> String {
 /// Read the first line from vector logs and assert that it matches the expected
 /// one.
 /// This allows detecting the situations where things have gone very wrong.
-fn smoke_check_first_line(log_reader: &mut log_lookup::Reader) {
+async fn smoke_check_first_line(log_reader: &mut log_lookup::Reader) {
     // Wait for first line as a smoke check.
-    let first_line = log_reader.next().expect("unable to read first line");
+    let first_line = log_reader
+        .read_line()
+        .await
+        .expect("unable to read first line");
     let expected_pat = "INFO vector: Log level \"info\" is enabled.\n";
     assert!(
         first_line.ends_with(expected_pat),
@@ -109,7 +112,7 @@ enum FlowControlCommand {
     Terminate,
 }
 
-fn look_for_log_line<P>(
+async fn look_for_log_line<P>(
     log_reader: &mut log_lookup::Reader,
     mut predicate: P,
 ) -> Result<(), Box<dyn std::error::Error>>
@@ -117,7 +120,7 @@ where
     P: FnMut(serde_json::Value) -> FlowControlCommand,
 {
     let mut lines_till_we_give_up = 10000;
-    while let Some(line) = log_reader.next() {
+    while let Some(line) = log_reader.read_line().await {
         println!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
@@ -149,7 +152,7 @@ where
     }
 
     // Ensure log reader exited.
-    log_reader.wait().expect("log reader wait failed");
+    log_reader.wait().await.expect("log reader wait failed");
 
     Ok(())
 }
@@ -157,31 +160,37 @@ where
 /// This test validates that vector picks up logs at the simplest case
 /// possible - a new pod is deployed and prints to stdout, and we assert that
 /// vector picks that up.
-#[test]
-fn simple() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::test]
+async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG)?;
-    framework.wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])?;
+    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    framework
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .await?;
 
-    let test_namespace = framework.namespace("test-vector-test-pod")?;
+    let test_namespace = framework.namespace("test-vector-test-pod").await?;
 
-    let test_pod = framework.test_pod(test_pod::Config::from_pod(&make_test_pod(
-        "test-vector-test-pod",
-        "test-pod",
-        "echo MARKER",
-        vec![],
-    ))?)?;
-    framework.wait(
-        "test-vector-test-pod",
-        vec!["pods/test-pod"],
-        WaitFor::Condition("initialized"),
-        vec!["--timeout=30s"],
-    )?;
+    let test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod",
+            "echo MARKER",
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=30s"],
+        )
+        .await?;
 
     let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
-    smoke_check_first_line(&mut log_reader);
+    smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
     let mut got_marker = false;
@@ -206,7 +215,8 @@ fn simple() -> Result<(), Box<dyn std::error::Error>> {
 
         // Request to stop the flow.
         FlowControlCommand::Terminate
-    })?;
+    })
+    .await?;
 
     assert!(got_marker);
 
@@ -218,32 +228,38 @@ fn simple() -> Result<(), Box<dyn std::error::Error>> {
 
 /// This test validates that vector properly merges a log message that
 /// kubernetes has internally split into multiple partial log lines.
-#[test]
-fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::test]
+async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG)?;
-    framework.wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])?;
+    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    framework
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .await?;
 
-    let test_namespace = framework.namespace("test-vector-test-pod")?;
+    let test_namespace = framework.namespace("test-vector-test-pod").await?;
 
     let test_message = generate_long_string(8, 8 * 1024); // 64 KiB
-    let test_pod = framework.test_pod(test_pod::Config::from_pod(&make_test_pod(
-        "test-vector-test-pod",
-        "test-pod",
-        &format!("echo {}", test_message),
-        vec![],
-    ))?)?;
-    framework.wait(
-        "test-vector-test-pod",
-        vec!["pods/test-pod"],
-        WaitFor::Condition("initialized"),
-        vec!["--timeout=30s"],
-    )?;
+    let test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod",
+            &format!("echo {}", test_message),
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=30s"],
+        )
+        .await?;
 
     let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
-    smoke_check_first_line(&mut log_reader);
+    smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
     let mut got_expected_line = false;
@@ -268,7 +284,8 @@ fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
 
         // Request to stop the flow.
         FlowControlCommand::Terminate
-    })?;
+    })
+    .await?;
 
     assert!(got_expected_line);
 
@@ -280,31 +297,37 @@ fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
 
 /// This test validates that vector partail message merging mechanism doesn't
 /// interfere with the non-partial messages that don't end with newline.
-#[test]
-fn no_newline_at_eol() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::test]
+async fn no_newline_at_eol() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG)?;
-    framework.wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])?;
+    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    framework
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .await?;
 
-    let test_namespace = framework.namespace("test-vector-test-pod")?;
+    let test_namespace = framework.namespace("test-vector-test-pod").await?;
 
-    let test_pod = framework.test_pod(test_pod::Config::from_pod(&make_test_pod(
-        "test-vector-test-pod",
-        "test-pod",
-        "echo -n MARKER", // `-n` doesn't print newline
-        vec![],
-    ))?)?;
-    framework.wait(
-        "test-vector-test-pod",
-        vec!["pods/test-pod"],
-        WaitFor::Condition("initialized"),
-        vec!["--timeout=30s"],
-    )?;
+    let test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod",
+            "echo -n MARKER", // `-n` doesn't print newline
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=30s"],
+        )
+        .await?;
 
     let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
-    smoke_check_first_line(&mut log_reader);
+    smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
     let mut got_expected_line = false;
@@ -329,7 +352,8 @@ fn no_newline_at_eol() -> Result<(), Box<dyn std::error::Error>> {
 
         // Request to stop the flow.
         FlowControlCommand::Terminate
-    })?;
+    })
+    .await?;
 
     assert!(got_expected_line);
 
@@ -341,34 +365,40 @@ fn no_newline_at_eol() -> Result<(), Box<dyn std::error::Error>> {
 
 /// This test validates that vector picks up preexisting logs - logs that
 /// existed before vector was deployed.
-#[test]
-fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::test]
+async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let test_namespace = framework.namespace("test-vector-test-pod")?;
+    let test_namespace = framework.namespace("test-vector-test-pod").await?;
 
-    let test_pod = framework.test_pod(test_pod::Config::from_pod(&make_test_pod(
-        "test-vector-test-pod",
-        "test-pod",
-        "echo MARKER",
-        vec![],
-    ))?)?;
-    framework.wait(
-        "test-vector-test-pod",
-        vec!["pods/test-pod"],
-        WaitFor::Condition("initialized"),
-        vec!["--timeout=30s"],
-    )?;
+    let test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod",
+            "echo MARKER",
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=30s"],
+        )
+        .await?;
 
     // Wait for some extra time to ensure pod completes.
-    std::thread::sleep(std::time::Duration::from_secs(10));
+    tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG)?;
-    framework.wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])?;
+    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    framework
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .await?;
 
     let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
-    smoke_check_first_line(&mut log_reader);
+    smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
     let mut got_marker = false;
@@ -393,7 +423,8 @@ fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
 
         // Request to stop the flow.
         FlowControlCommand::Terminate
-    })?;
+    })
+    .await?;
 
     assert!(got_marker);
 
@@ -405,32 +436,38 @@ fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
 
 /// This test validates that vector picks up multiple log lines, and that they
 /// arrive at the proper order.
-#[test]
-fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::test]
+async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG)?;
-    framework.wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])?;
+    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    framework
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .await?;
 
-    let test_namespace = framework.namespace("test-vector-test-pod")?;
+    let test_namespace = framework.namespace("test-vector-test-pod").await?;
 
     let test_messages = vec!["MARKER1", "MARKER2", "MARKER3", "MARKER4", "MARKER5"];
-    let test_pod = framework.test_pod(test_pod::Config::from_pod(&make_test_pod(
-        "test-vector-test-pod",
-        "test-pod",
-        &format!("echo -e {}", test_messages.join(r"\\n")),
-        vec![],
-    ))?)?;
-    framework.wait(
-        "test-vector-test-pod",
-        vec!["pods/test-pod"],
-        WaitFor::Condition("initialized"),
-        vec!["--timeout=30s"],
-    )?;
+    let test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod",
+            &format!("echo -e {}", test_messages.join(r"\\n")),
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=30s"],
+        )
+        .await?;
 
     let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
-    smoke_check_first_line(&mut log_reader);
+    smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
     let mut test_messages_iter = test_messages.into_iter().peekable();
@@ -456,7 +493,8 @@ fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
 
         // Request to stop the flow.
         FlowControlCommand::Terminate
-    })?;
+    })
+    .await?;
 
     assert!(test_messages_iter.next().is_none());
 
@@ -468,31 +506,37 @@ fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
 
 /// This test validates that vector properly annotates log events with pod
 /// metadata obtained from the k8s API.
-#[test]
-fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::test]
+async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG)?;
-    framework.wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])?;
+    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    framework
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .await?;
 
-    let test_namespace = framework.namespace("test-vector-test-pod")?;
+    let test_namespace = framework.namespace("test-vector-test-pod").await?;
 
-    let test_pod = framework.test_pod(test_pod::Config::from_pod(&make_test_pod(
-        "test-vector-test-pod",
-        "test-pod",
-        "echo MARKER",
-        vec![("label1", "hello"), ("label2", "world")],
-    ))?)?;
-    framework.wait(
-        "test-vector-test-pod",
-        vec!["pods/test-pod"],
-        WaitFor::Condition("initialized"),
-        vec!["--timeout=30s"],
-    )?;
+    let test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod",
+            "echo MARKER",
+            vec![("label1", "hello"), ("label2", "world")],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=30s"],
+        )
+        .await?;
 
     let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
-    smoke_check_first_line(&mut log_reader);
+    smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
     let mut got_marker = false;
@@ -525,7 +569,8 @@ fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
 
         // Request to stop the flow.
         FlowControlCommand::Terminate
-    })?;
+    })
+    .await?;
 
     assert!(got_marker);
 

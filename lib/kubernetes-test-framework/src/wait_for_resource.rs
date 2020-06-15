@@ -1,8 +1,7 @@
 use super::Result;
-use std::{
-    ffi::OsStr,
-    process::{Command, Stdio},
-};
+use crate::util::run_command;
+use std::{ffi::OsStr, process::Stdio};
+use tokio::process::Command;
 
 pub enum WaitFor<C>
 where
@@ -12,7 +11,7 @@ where
     Condition(C),
 }
 
-pub fn namespace<CMD, NS, R, COND, EX>(
+pub async fn namespace<CMD, NS, R, COND, EX>(
     kubectl_command: CMD,
     namespace: NS,
     resources: impl IntoIterator<Item = R>,
@@ -28,10 +27,10 @@ where
 {
     let mut command = prepare_base_command(kubectl_command, resources, wait_for, extra);
     command.arg("-n").arg(namespace);
-    run_wait_command(command)
+    run_command(command).await
 }
 
-pub fn all_namespaces<CMD, R, COND, EX>(
+pub async fn all_namespaces<CMD, R, COND, EX>(
     kubectl_command: CMD,
     resources: impl IntoIterator<Item = R>,
     wait_for: WaitFor<COND>,
@@ -45,7 +44,7 @@ where
 {
     let mut command = prepare_base_command(kubectl_command, resources, wait_for, extra);
     command.arg("--all-namespaces=true");
-    run_wait_command(command)
+    run_command(command).await
 }
 
 pub fn prepare_base_command<CMD, R, COND, EX>(
@@ -78,13 +77,4 @@ where
 
     command.args(extra);
     command
-}
-
-fn run_wait_command(mut command: Command) -> Result<()> {
-    let mut child = command.spawn()?;
-    let exit_status = child.wait()?;
-    if !exit_status.success() {
-        Err(format!("waiting for resources failed: {:?}", command))?;
-    }
-    Ok(())
 }

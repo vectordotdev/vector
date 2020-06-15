@@ -23,6 +23,8 @@ pub mod log_lookup;
 pub mod namespace;
 mod resource_file;
 pub mod test_pod;
+mod up_down;
+mod util;
 pub mod vector;
 pub mod wait_for_resource;
 pub mod wait_for_rollout;

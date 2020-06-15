@@ -1,7 +1,8 @@
 //! The test framework main entry point.
 
 use super::{
-    log_lookup, namespace, test_pod, vector, wait_for_resource, wait_for_rollout, Interface, Result,
+    log_lookup, namespace, test_pod, up_down, vector, wait_for_resource, wait_for_rollout,
+    Interface, Result,
 };
 
 pub struct Framework {
@@ -14,25 +15,35 @@ impl Framework {
         Self { interface }
     }
 
-    pub fn vector(&self, namespace: &str, custom_resource: &str) -> Result<vector::Manager> {
-        let manager = vector::Manager::new(
+    pub async fn vector(
+        &self,
+        namespace: &str,
+        custom_resource: &str,
+    ) -> Result<up_down::Manager<vector::CommandBuilder>> {
+        let mut manager = vector::manager(
             self.interface.deploy_vector_command.as_str(),
             namespace,
             custom_resource,
         )?;
-        manager.up()?;
+        manager.up().await?;
         Ok(manager)
     }
 
-    pub fn namespace(&self, namespace: &str) -> Result<namespace::Manager> {
-        let manager = namespace::Manager::new(&self.interface.kubectl_command, namespace)?;
-        manager.up()?;
+    pub async fn namespace(
+        &self,
+        namespace: &str,
+    ) -> Result<up_down::Manager<namespace::CommandBuilder>> {
+        let mut manager = namespace::manager(&self.interface.kubectl_command, namespace);
+        manager.up().await?;
         Ok(manager)
     }
 
-    pub fn test_pod(&self, config: test_pod::Config) -> Result<test_pod::Manager> {
-        let manager = test_pod::Manager::new(&self.interface.kubectl_command, config)?;
-        manager.up()?;
+    pub async fn test_pod(
+        &self,
+        config: test_pod::Config,
+    ) -> Result<up_down::Manager<test_pod::CommandBuilder>> {
+        let mut manager = test_pod::manager(&self.interface.kubectl_command, config);
+        manager.up().await?;
         Ok(manager)
     }
 
@@ -40,7 +51,7 @@ impl Framework {
         log_lookup::logs(&self.interface.kubectl_command, namespace, resource)
     }
 
-    pub fn wait<'a>(
+    pub async fn wait<'a>(
         &self,
         namespace: &str,
         resources: impl IntoIterator<Item = &'a str>,
@@ -54,9 +65,10 @@ impl Framework {
             wait_for,
             extra,
         )
+        .await
     }
 
-    pub fn wait_all_namespaces<'a>(
+    pub async fn wait_all_namespaces<'a>(
         &self,
         resources: impl IntoIterator<Item = &'a str>,
         wait_for: wait_for_resource::WaitFor<&'_ str>,
@@ -68,14 +80,15 @@ impl Framework {
             wait_for,
             extra,
         )
+        .await
     }
 
-    pub fn wait_for_rollout<'a>(
+    pub async fn wait_for_rollout<'a>(
         &self,
         namespace: &str,
         resource: &str,
         extra: impl IntoIterator<Item = &'a str>,
     ) -> Result<()> {
-        wait_for_rollout::run(&self.interface.kubectl_command, namespace, resource, extra)
+        wait_for_rollout::run(&self.interface.kubectl_command, namespace, resource, extra).await
     }
 }

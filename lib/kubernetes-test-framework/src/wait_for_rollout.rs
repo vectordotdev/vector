@@ -1,10 +1,9 @@
 use super::Result;
-use std::{
-    ffi::OsStr,
-    process::{Command, Stdio},
-};
+use crate::util::run_command;
+use std::{ffi::OsStr, process::Stdio};
+use tokio::process::Command;
 
-pub fn run<CMD, NS, R, EX>(
+pub async fn run<CMD, NS, R, EX>(
     kubectl_command: CMD,
     namespace: NS,
     resource: R,
@@ -28,10 +27,6 @@ where
     command.arg(resource);
     command.args(extra);
 
-    let mut child = command.spawn()?;
-    let exit_status = child.wait()?;
-    if !exit_status.success() {
-        Err(format!("waiting for rollout failed: {:?}", command))?;
-    }
+    run_command(command).await?;
     Ok(())
 }

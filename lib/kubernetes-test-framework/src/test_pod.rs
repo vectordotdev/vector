@@ -1,4 +1,5 @@
 use super::{resource_file::ResourceFile, Result};
+use crate::up_down;
 use k8s_openapi::api::core::v1::Pod;
 use std::process::{Command, Stdio};
 
@@ -21,59 +22,29 @@ impl Config {
 }
 
 #[derive(Debug)]
-pub struct Manager {
+pub struct CommandBuilder {
     kubectl_command: String,
     config: Config,
 }
 
-impl Manager {
-    pub fn new(kubectl_command: &str, config: Config) -> Result<Self> {
-        Ok(Self {
-            kubectl_command: kubectl_command.to_owned(),
-            config,
-        })
-    }
-
-    pub fn up(&self) -> Result<()> {
-        let mut command = self.prepare_command();
-
-        command.arg("create");
-        command
-            .arg("-f")
-            .arg(self.config.custom_resource_file.path());
-        Self::run_command(command)?;
-
-        Ok(())
-    }
-
-    pub fn down(&self) -> Result<()> {
-        let mut command = self.prepare_command();
-
-        command.arg("delete");
-        command
-            .arg("-f")
-            .arg(self.config.custom_resource_file.path());
-        Self::run_command(command)?;
-
-        Ok(())
-    }
-
-    fn prepare_command(&self) -> Command {
+impl up_down::CommandBuilder for CommandBuilder {
+    fn build(&self, command_to_build: up_down::CommandToBuild) -> Command {
         let mut command = Command::new(&self.kubectl_command);
-        command.stdin(Stdio::null());
         command
-    }
-
-    fn run_command(mut command: Command) -> Result<()> {
-        if !command.spawn()?.wait()?.success() {
-            Err(format!("failed to exec: {:?}", &command))?;
-        }
-        Ok(())
+            .arg(match command_to_build {
+                up_down::CommandToBuild::Up => "create",
+                up_down::CommandToBuild::Down => "delete",
+            })
+            .arg("-f")
+            .arg(self.config.custom_resource_file.path())
+            .stdin(Stdio::null());
+        command
     }
 }
 
-impl Drop for Manager {
-    fn drop(&mut self) {
-        self.down().expect("test pod turndown failed");
-    }
+pub fn manager(kubectl_command: &str, config: Config) -> up_down::Manager<CommandBuilder> {
+    up_down::Manager::new(CommandBuilder {
+        kubectl_command: kubectl_command.to_owned(),
+        config,
+    })
 }
