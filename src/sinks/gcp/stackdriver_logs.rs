@@ -210,14 +210,14 @@ fn remap_severity(severity: Value) -> Value {
             match s.parse::<usize>() {
                 Ok(n) => (n - n % 100) as i64,
                 Err(_) => match s.to_uppercase() {
-                    s if s.starts_with("EMERG") => 800,
+                    s if s.starts_with("EMERG") || s.starts_with("FATAL") => 800,
                     s if s.starts_with("ALERT") => 700,
                     s if s.starts_with("CRIT") => 600,
                     s if s.starts_with("ERR") => 500,
                     s if s.starts_with("WARN") => 400,
                     s if s.starts_with("NOTICE") => 300,
                     s if s.starts_with("INFO") => 200,
-                    s if s.starts_with("DEBUG") => 100,
+                    s if s.starts_with("DEBUG") || s.starts_with("TRACE") => 100,
                     s if s.starts_with("DEFAULT") => 0,
                     _ => {
                         warn!(
@@ -312,6 +312,7 @@ mod tests {
         for &(s, n) in &[
             ("EMERGENCY", 800), // Handles full upper case
             ("EMERG", 800),     // Handles abbreviations
+            ("FATAL", 800),     // Handles highest alternate
             ("alert", 700),     // Handles lower case
             ("CrIt1c", 600),    // Handles mixed case and suffixes
             ("err404", 500),    // Handles lower case and suffixes
@@ -319,6 +320,7 @@ mod tests {
             ("notice", 300),
             ("info", 200),
             ("DEBUG2", 100), // Handles upper case and suffixes
+            ("trace", 100),  // Handles lowest alternate
             ("nothing", 0),  // Maps unknown terms to DEFAULT
             ("123", 100),    // Handles numbers in strings
             ("-100", 0),     // Maps negatives to DEFAULT
