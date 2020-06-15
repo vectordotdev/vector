@@ -66,6 +66,7 @@ ingests data through [Kafka][urls.kafka] and outputs
   type = "kafka" # required
   auto_offset_reset = "largest" # optional, default
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
+  commit_interval_ms = 5000 # optional, default, milliseconds
   fetch_wait_max_ms = 100 # optional, default, milliseconds
   group_id = "consumer-group-name" # required
   key_field = "message_key" # optional, no default
@@ -136,6 +137,30 @@ option for explanation.
 A comma-separated list of host and port pairs that are the addresses of the
 Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
 initially to bootstrap itself.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={5000}
+  enumValues={null}
+  examples={[5000,10000]}
+  groups={[]}
+  name={"commit_interval_ms"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={"milliseconds"}
+  warnings={[]}
+  >
+
+### commit_interval_ms
+
+The frequency that the consumer offsets are committed (written) to offset
+storage.
 
 
 
