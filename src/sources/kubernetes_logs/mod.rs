@@ -1,6 +1,7 @@
 //! This mod implements `kubernetes_logs` source.
 //! The scope of this source is to consume the log files that `kubelet` keeps
-//! at `/var/log/pods` at the host of the k8s node.
+//! at `/var/log/pods` at the host of the k8s node when `vector` itself is
+//! running inside the cluster as a `DaemonSet`.
 
 #![deny(missing_docs)]
 
