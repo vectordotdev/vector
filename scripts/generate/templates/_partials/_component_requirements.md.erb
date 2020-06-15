@@ -35,6 +35,9 @@
 <%- if requirements.prometheus -%>
 * [Prometheus][urls.prometheus] version `<%= requirements.prometheus %>` is required.
 <%- end -%>
+<%- if requirements.feature -%>
+* Vector must be build with the `<%= requirements.feature %>` feature. *This is not enabled by default. Review [Building Vector][urls.contributing]*.
+<%- end -%>
 <%- if permissions_list.any? -%>
 * Permissions are required. See the ["Permissions" section][<%= component_short_link(component) %>#permissions] for more info.
 <%- end -%>

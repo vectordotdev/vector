@@ -2,6 +2,13 @@
 
 <%= component_header(component) %>
 
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
+
 ## Configuration
 
 <%= component_config_example(component) %>
