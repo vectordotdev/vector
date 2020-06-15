@@ -26,6 +26,8 @@ services:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-gnu/Dockerfile
+      args:
+        USER: $USER
     environment:
       NATIVE_BUILD: "false"
       TARGET: x86_64-unknown-linux-gnu
@@ -98,6 +100,8 @@ services:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-gnu/Dockerfile
+      args:
+        USER: $USER
     environment:
       NATIVE_BUILD: "false"
       TARGET: x86_64-unknown-linux-gnu
@@ -152,6 +156,8 @@ services:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-gnu/Dockerfile
+      args:
+        USER: $USER
     environment:
       TARGET: x86_64-unknown-linux-gnu
     volumes:
