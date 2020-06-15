@@ -11,7 +11,7 @@ use crate::{
         service2::TowerRequestConfig,
         BatchBytesConfig, Buffer, Compression,
     },
-    template::Template,
+    template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -41,6 +41,8 @@ pub struct ElasticSearchConfig {
     pub index: Option<String>,
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
+    pub pipeline: Option<String>,
+
     #[serde(default)]
     pub compression: Compression,
     #[serde(
@@ -157,6 +159,8 @@ enum ParseError {
     AWSCredentialsGenerateFailed { source: CredentialsError },
     #[snafu(display("Compression can not be used with AWS hosted Elasticsearch"))]
     AWSCompressionNotAllowed,
+    #[snafu(display("Index template parse error: {}", source))]
+    IndexTemplate { source: TemplateError },
 }
 
 impl HttpSink for ElasticSearchCommon {
@@ -337,11 +341,12 @@ impl ElasticSearchCommon {
             return Err(ParseError::AWSCompressionNotAllowed.into());
         }
 
-        let index = if let Some(idx) = &config.index {
-            Template::from(idx.as_str())
-        } else {
-            Template::from("vector-%Y.%m.%d")
-        };
+        let index = config
+            .index
+            .as_ref()
+            .map(String::as_str)
+            .unwrap_or("vector-%Y.%m.%d");
+        let index = Template::try_from(index).context(IndexTemplate)?;
 
         let doc_type = config.doc_type.clone().unwrap_or("_doc".into());
 
@@ -349,6 +354,10 @@ impl ElasticSearchCommon {
 
         let mut query_params = config.query.clone().unwrap_or_default();
         query_params.insert("timeout".into(), format!("{}s", request.timeout.as_secs()));
+
+        if let Some(pipeline) = &config.pipeline {
+            query_params.insert("pipeline".into(), pipeline.into());
+        }
 
         let mut query = url::form_urlencoded::Serializer::new(String::new());
         for (p, v) in &query_params {
@@ -519,6 +528,22 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::fs::File;
     use std::io::Read;
+
+    #[test]
+    fn ensure_pipeline_in_params() {
+        let index = gen_index();
+        let pipeline = String::from("test-pipeline");
+
+        let config = ElasticSearchConfig {
+            host: "http://localhost:9200".into(),
+            index: Some(index.clone()),
+            pipeline: Some(pipeline.clone()),
+            ..config()
+        };
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+
+        assert_eq!(common.query_params["pipeline"], pipeline);
+    }
 
     #[test]
     fn structures_events_correctly() {

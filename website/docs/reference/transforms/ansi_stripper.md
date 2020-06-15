@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-06-10"
 component_title: "ANSI Stripper"
 description: "The Vector `ansi_stripper` transform accepts and outputs `log` events, allowing you to strips ANSI escape sequences from the specified field."
 event_types: ["log"]
 function_category: "sanitize"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+ansi_stripper%22
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "ansi_stripper|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/ansi_stripper.rs
 status: "prod-ready"
 title: "ANSI Stripper Transform"
+unsupported_operating_systems: []
 ---
 
 import Fields from '@site/src/components/Fields';

@@ -1,7 +1,7 @@
 use super::{
     retries2::{RetryAction, RetryLogic},
     service2::{TowerBatchedSink, TowerRequestSettings},
-    Batch, BatchSettings,
+    sink, Batch, BatchSettings,
 };
 use crate::{
     dns::Resolver,
@@ -14,8 +14,7 @@ use futures::future::BoxFuture;
 use futures01::{Async, AsyncSink, Poll as Poll01, Sink, StartSend};
 use http02::header::HeaderValue;
 use http02::{Request, StatusCode};
-use http_body::Body as HttpBody;
-use hyper13::body::{self, Body};
+use hyper13::body::{self, Body, HttpBody};
 use hyper13::client::HttpConnector;
 use hyper13::Client;
 use hyper_openssl08::HttpsConnector;
@@ -322,6 +321,11 @@ impl<B> Service<B> for HttpBatchService<B> {
     }
 }
 
+impl<T: fmt::Debug> sink::Response for http02::Response<T> {
+    fn is_successful(&self) -> bool {
+        self.status().is_success()
+    }
+}
 #[derive(Clone)]
 pub struct HttpRetryLogic;
 

@@ -1,0 +1,233 @@
+name: Lint Suite
+
+on:
+  push:
+    branches:
+      - master
+  pull_request: {}
+
+env:
+  VERBOSE: true
+  ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+  TEST_LOG: vector=debug
+  RUST_BACKTRACE: full
+
+jobs:
+  cancel-previous:
+    name: Cancel redundant jobs
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: styfle/cancel-workflow-action@0.3.1
+        with:
+          workflow_id: 1463054
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+
+  check-clippy:
+    name: Clippy - Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
+      - run: nix-shell --pure --run "make check-clippy"
+
+  check-fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
+      - run: nix-shell --pure --run "make check-fmt"
+
+  check-generate:
+    name: Generate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
+      - run: nix-shell --pure --run "make check-generate"
+
+  check-markdown:
+    name: Markdown
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
+      - run: nix-shell --pure --run "make check-markdown"
+
+  check-component-features:
+    name: Component Features - Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
+      - run: nix-shell --pure --run "make check-component-features"
+
+  check-blog:
+    name: Blog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
+      - run: nix-shell --pure --run "make check-blog"
+
+  check-version:
+    name: Version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1 # v1 on purpose! v2 gives errors since it's shallow.
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
+      - run: nix-shell --pure --run "make check-version"
+
+  check-scripts:
+    name: Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
+      - run: nix-shell --pure --run "make check-scripts"
+
+  check-linux:
+    name: Check - Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
+      - run: nix-shell --pure --run "make check"
+
+  check-mac:
+    name: Check - Mac
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: nix-shell --pure --run "echo 'Env installing...'"
+      - run: nix-shell --pure --run "bash scripts/environment/prepare.sh"
+      - run: nix-shell --pure --run "make slim-builds"
+      - run: nix-shell --pure --run "make check"
+
+  check-windows:
+    name: Check - Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v1
+      - env:
+          USE_CONTAINER: none
+          RUSTFLAGS: "-D warnings"
+        run: cargo check --no-default-features --features default-msvc
+
+  check-advisories:
+    name: Advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          command: check advisories

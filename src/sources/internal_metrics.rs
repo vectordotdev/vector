@@ -136,7 +136,8 @@ mod tests {
     fn captures_internal_metrics() {
         crate::metrics::init().unwrap();
 
-        let controller = get_controller().expect("no controller");
+        // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
+        std::thread::sleep(std::time::Duration::from_millis(300));
 
         gauge!("foo", 1);
         gauge!("foo", 2);
@@ -146,6 +147,11 @@ mod tests {
         timing!("baz", 6);
         value!("quux", 7, "host" => "foo");
         value!("quux", 8, "host" => "foo");
+
+        let controller = get_controller().expect("no controller");
+
+        // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
+        std::thread::sleep(std::time::Duration::from_millis(300));
 
         let output = capture_metrics(&controller)
             .map(|event| {

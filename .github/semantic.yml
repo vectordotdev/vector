@@ -115,6 +115,7 @@ scopes:
   - swimlanes transform
   - tag_cardinality_limit transform
   - tokenizer transform
+  - wasm transform
 
   # sinks
   - aws_cloudwatch_logs sink

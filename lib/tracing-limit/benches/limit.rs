@@ -1,3 +1,6 @@
+#![allow(clippy::redundant_static_lifetimes)]
+#![allow(clippy::unreadable_literal)]
+
 #[macro_use]
 extern crate tracing;
 
