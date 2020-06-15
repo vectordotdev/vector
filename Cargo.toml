@@ -99,7 +99,7 @@ reqwest = "0.9.5"
 derivative = "1.0"
 chrono = { version = "0.4.6", features = ["serde"] }
 rand = "0.5.5"
-regex = "1.3.5"
+regex = "1.3.9"
 bytes = { version = "0.4.10", features = ["serde"] }
 bytes05 = { package = "bytes", version = "0.5", features = ["serde"] }
 stream-cancel = "0.4.3"
