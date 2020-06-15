@@ -106,6 +106,10 @@ impl LogEvent {
         util::log::get(&self.fields, key)
     }
 
+    pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
+        self.fields.get(key.as_ref())
+    }
+
     pub fn get_mut(&mut self, key: &Atom) -> Option<&mut Value> {
         util::log::get_mut(&mut self.fields, key)
     }
