@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    kafka::{KafkaCompression, KafkaTlsConfig},
+    kafka::KafkaTlsConfig,
     shutdown::ShutdownSignal,
     stream::StreamExt,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
