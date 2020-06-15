@@ -61,6 +61,7 @@ spec:
             - name: config-dir
               mountPath: /etc/vector/
               readOnly: true
+      terminationGracePeriodSeconds: 60
       tolerations:
         # This toleration is to have the daemonset runnable on master nodes.
         # Remove it if your masters can't run pods.
