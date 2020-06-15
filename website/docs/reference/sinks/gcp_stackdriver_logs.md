@@ -866,10 +866,11 @@ For example, Compute Engine VM instances use the labels `projectId`,
 
 The field of the log event from which to take the outgoing log's [`severity`](#severity)
 field. The named field is removed from the log event if present, and must be
-either an integer between 0 and 800 or a string containing one of the severity
-level names (case is ignored) or a common prefix such as `err`. This could be
-added by an [`add_fields` transform][docs.transforms.add_fields] or extracted
-from a field from the source.
+either an integer between 0 and 800 or a string containing one of the [severity
+level names][urls.gcp_stackdriver_severity] (case is ignored) or a common
+prefix such as `err`. This could be added by an [`add_fields`
+transform][docs.transforms.add_fields] or extracted from a field from the
+source.
 
 If no severity key is specified, the severity of outgoing records will be set
 to 0 (`DEFAULT`).
