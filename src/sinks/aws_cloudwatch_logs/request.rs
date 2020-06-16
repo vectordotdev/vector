@@ -1,8 +1,8 @@
 use super::CloudwatchError;
-use futures01::{sync::oneshot, try_ready, Async, Future, Poll};
 use futures::compat::Compat;
 use futures::future::BoxFuture;
-use rusoto_core44::RusotoError;
+use futures01::{sync::oneshot, try_ready, Async, Future, Poll};
+use rusoto_core::RusotoError;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogGroupRequest,
     CreateLogStreamError, CreateLogStreamRequest, DescribeLogStreamsError,
