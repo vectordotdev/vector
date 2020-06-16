@@ -1,14 +1,25 @@
-use crate::sinks::util::Batch;
+use crate::sinks::util::{Batch, BatchSettings};
 use serde_json::value::{to_raw_value, RawValue, Value};
 
 pub type BoxedRawValue = Box<RawValue>;
 
 /// A `batch` implementation for storing an array of json
 /// values.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct JsonArrayBuffer {
     buffer: Vec<BoxedRawValue>,
     total_bytes: usize,
+    max_size: usize,
+}
+
+impl JsonArrayBuffer {
+    pub fn new(settings: BatchSettings) -> Self {
+        Self {
+            buffer: Vec::new(),
+            total_bytes: 0,
+            max_size: settings.size,
+        }
+    }
 }
 
 impl Batch for JsonArrayBuffer {
@@ -30,7 +41,11 @@ impl Batch for JsonArrayBuffer {
     }
 
     fn fresh(&self) -> Self {
-        JsonArrayBuffer::default()
+        Self {
+            buffer: Vec::new(),
+            total_bytes: 0,
+            max_size: self.max_size,
+        }
     }
 
     fn finish(self) -> Self::Output {
@@ -46,10 +61,15 @@ impl Batch for JsonArrayBuffer {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::time::Duration;
 
     #[test]
     fn multi_object_array() {
-        let mut buffer = JsonArrayBuffer::default();
+        let batch = BatchSettings {
+            size: 9999,
+            timeout: Duration::from_secs(9999),
+        };
+        let mut buffer = JsonArrayBuffer::new(batch);
 
         buffer.push(json!({
             "key1": "value1"
