@@ -46,9 +46,9 @@ on a set of logical conditions.
   inputs = ["my-source-or-transform-id"] # required
 
   # Condition
-  condition.type = "check_fields" # optional, default
   condition."message.eq" = "this is the content to match against" # example
   condition."message.eq" = ["match this", "or this"] # example
+  condition.type = "check_fields" # optional, default
   condition."message.contains" = "foo" # example
   condition."message.contains" = ["foo", "bar"] # example
   condition."environment.ends_with" = "-staging" # example
@@ -68,9 +68,9 @@ on a set of logical conditions.
   inputs = ["my-source-or-transform-id"] # required
 
   # Condition
-  condition.type = "check_fields" # optional, default
   condition."message.eq" = "this is the content to match against" # example
   condition."message.eq" = ["match this", "or this"] # example
+  condition.type = "check_fields" # optional, default
   condition."host.exists" = true # example
   condition."method.neq" = "POST" # example
   condition."method.neq" = ["POST", "GET"] # example
@@ -117,6 +117,31 @@ messages that pass all conditions will be forwarded.
 <Fields filters={false}>
 <Field
   common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.eq":"this is the content to match against"},{"message.eq":["match this","or this"]}]}
+  groups={[]}
+  name={"`[field-name]`.eq"}
+  path={"condition"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[field-name]`.eq
+
+Check whether a fields contents exactly matches the value specified. This may
+be a single string or a list of strings, in which case this evaluates to true
+if any of the list matches.
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={"check_fields"}
   enumValues={{"check_fields":"Allows you to check individual fields against a list of conditions.","is_log":"Returns true if the event is a log.","is_metric":"Returns true if the event is a metric."}}
   examples={["check_fields","is_log","is_metric"]}
@@ -134,31 +159,6 @@ messages that pass all conditions will be forwarded.
 #### type
 
 The type of the condition to execute.
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"message.eq":"this is the content to match against"},{"message.eq":["match this","or this"]}]}
-  groups={[]}
-  name={"`[field-name]`.eq"}
-  path={"condition"}
-  relevantWhen={{"type":"check_fields"}}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### `[field-name]`.eq
-
-Check whether a fields contents exactly matches the value specified.This may be
-a single string or a list of strings, in which case this evaluates to true if
-any of the list matches.
 
 
 
@@ -205,7 +205,7 @@ being `true` or `false` respectively.
 
 #### `[field-name]`.neq
 
-Check whether a fields contents does not match the value specified.This may be
+Check whether a fields contents does not match the value specified. This may be
 a single string or a list of strings, in which case this evaluates to false if
 any of the list matches.
 
@@ -253,7 +253,7 @@ Check if the given `[condition]` does not match.
 
 #### `[field_name]`.contains
 
-Checks whether a string field contains a string argument.This may be a single
+Checks whether a string field contains a string argument. This may be a single
 string or a list of strings, in which case this evaluates to true if any of the
 list matches.
 
@@ -278,7 +278,7 @@ list matches.
 
 #### `[field_name]`.ends_with
 
-Checks whether a string field ends with a string argument.This may be a single
+Checks whether a string field ends with a string argument. This may be a single
 string or a list of strings, in which case this evaluates to true if any of the
 list matches.
 
@@ -356,7 +356,7 @@ preferred where possible.
 
 #### `[field_name]`.starts_with
 
-Checks whether a string field starts with a string argument.This may be a
+Checks whether a string field starts with a string argument. This may be a
 single string or a list of strings, in which case this evaluates to true if any
 of the list matches.
 
