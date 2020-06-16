@@ -3972,15 +3972,15 @@ dependencies = [
 
 [[package]]
 name = "rusoto_logs"
-version = "0.41.0"
+version = "0.44.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "691f665f2ae401d4fddaac8d6a33c3e7c388e93494242ea937ebdddf9961f7f6"
+checksum = "b9ce5baac7de9c642a5f3c62d2ff85fbb06b1cfee5b61793c1b06d655884a75b"
 dependencies = [
- "bytes 0.4.12",
- "futures 0.1.29",
- "rusoto_core 0.41.0",
+ "async-trait",
+ "bytes 0.5.4",
+ "futures 0.3.4",
+ "rusoto_core 0.44.0",
  "serde",
- "serde_derive",
  "serde_json",
 ]
 
