@@ -49,6 +49,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            # Set a reasonable log level to avoid issues with internal logs
+            # overwriting console output at E2E tests. Fell free to change at
+            # a real deployment.
+            - name: LOG
+              value: info
           volumeMounts:
             - name: var-log
               mountPath: /var/log/
