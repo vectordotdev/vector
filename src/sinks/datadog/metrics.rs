@@ -5,7 +5,7 @@ use crate::{
         Event,
     },
     sinks::util::{
-        http2::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchEventsConfig, MetricBuffer,
     },

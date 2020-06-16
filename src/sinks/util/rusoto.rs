@@ -29,11 +29,11 @@ use std::{
 };
 use tower03::{Service, ServiceExt};
 
-pub type Client = HttpClient<util::http2::HttpClient<RusotoBody>>;
+pub type Client = HttpClient<util::http::HttpClient<RusotoBody>>;
 
 pub fn client(resolver: Resolver) -> crate::Result<Client> {
     let settings = MaybeTlsSettings::enable_client()?;
-    let client = util::http2::HttpClient::new(resolver, settings)?;
+    let client = util::http::HttpClient::new(resolver, settings)?;
     Ok(HttpClient { client })
 }
 

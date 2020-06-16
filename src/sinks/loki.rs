@@ -18,7 +18,7 @@ use crate::{
     runtime::FutureExt,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        http2::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchBytesConfig, UriSerde,
     },
