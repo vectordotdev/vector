@@ -487,6 +487,9 @@
 - name: "type: enhancement"
   description: Any change that enhances it's subject
   color: 5f27cd
+- name: "type: feature"
+  description: A new feature. Such as a new source, transform, or sink.
+  color: 5f27cd
 - name: "type: help"
   description: For general help. Also try https://chat.vector.dev.
   color: 5f27cd
