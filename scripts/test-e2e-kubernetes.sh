@@ -93,5 +93,18 @@ export CONTAINER_IMAGE
 # Set the deployment command for integration tests.
 export KUBE_TEST_DEPLOY_COMMAND="scripts/deploy-kubernetes-test.sh"
 
+# Prepare args.
+CARGO_TEST_ARGS=()
+if [[ -n "${SCOPE:-}" && "$SCOPE" != '""' ]]; then
+  CARGO_TEST_ARGS+=("$SCOPE")
+fi
+
 # Run the tests.
-cargo test --test kubernetes-e2e --no-default-features --features kubernetes-e2e-tests -- --nocapture --test-threads 1 ${SCOPE:-}
+cargo test \
+  --test kubernetes-e2e \
+  --no-default-features \
+  --features kubernetes-e2e-tests \
+  -- \
+  --nocapture \
+  --test-threads 1 \
+  "${CARGO_TEST_ARGS[@]}"
