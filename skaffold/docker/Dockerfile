@@ -8,6 +8,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 ENTRYPOINT ["/usr/bin/vector"]
+STOPSIGNAL SIGTERM
 
 ARG LOG=debug,vector=trace
 ENV LOG="$LOG"
@@ -20,5 +21,3 @@ RUN set -x \
   && patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 /usr/bin/vector \
   && ldd /usr/bin/vector \
   && /usr/bin/vector --version
-
-STOPSIGNAL SIGTERM
