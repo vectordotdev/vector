@@ -350,7 +350,7 @@ mod integration_test {
         };
 
         let mut rt = crate::test_util::runtime();
-        let jh = rt.spawn_handle_std(super::healthcheck(config).unwrap());
+        let jh = rt.spawn_handle_std(super::healthcheck(config).unwrap().compat());
 
         rt.block_on_std(jh).unwrap().unwrap();
     }
