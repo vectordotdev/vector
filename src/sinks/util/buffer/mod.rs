@@ -1,4 +1,4 @@
-use super::batch::Batch;
+use super::batch::{Batch, BatchSettings};
 use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -43,6 +43,7 @@ impl Compression {
 pub struct Buffer {
     inner: InnerBuffer,
     num_items: usize,
+    max_size: usize,
 }
 
 #[derive(Debug)]
@@ -52,16 +53,18 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
-    pub fn new(compression: Compression) -> Self {
+    pub fn new(settings: BatchSettings, compression: Compression) -> Self {
         let inner = match compression {
-            Compression::None => InnerBuffer::Plain(Vec::new()),
-            Compression::Gzip => {
-                InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::fast()))
-            }
+            Compression::None => InnerBuffer::Plain(Vec::with_capacity(settings.size)),
+            Compression::Gzip => InnerBuffer::Gzip(GzEncoder::new(
+                Vec::with_capacity(settings.size),
+                flate2::Compression::fast(),
+            )),
         };
         Self {
             inner,
             num_items: 0,
+            max_size: settings.size,
         }
     }
 
@@ -112,14 +115,16 @@ impl Batch for Buffer {
 
     fn fresh(&self) -> Self {
         let inner = match &self.inner {
-            InnerBuffer::Plain(_) => InnerBuffer::Plain(Vec::new()),
-            InnerBuffer::Gzip(_) => {
-                InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::default()))
-            }
+            InnerBuffer::Plain(_) => InnerBuffer::Plain(Vec::with_capacity(self.max_size)),
+            InnerBuffer::Gzip(_) => InnerBuffer::Gzip(GzEncoder::new(
+                Vec::with_capacity(self.max_size),
+                flate2::Compression::default(),
+            )),
         };
         Self {
             inner,
             num_items: 0,
+            max_size: self.max_size,
         }
     }
 
@@ -166,13 +171,15 @@ mod test {
 
             future::ok::<_, std::io::Error>(())
         });
+        let batch = BatchSettings {
+            timeout: Duration::from_secs(0),
+            size: 1000,
+        };
+
         let buffered = BatchSink::with_executor(
             svc,
-            Buffer::new(Compression::Gzip),
-            BatchSettings {
-                timeout: Duration::from_secs(0),
-                size: 1000,
-            },
+            Buffer::new(batch, Compression::Gzip),
+            batch,
             acker,
             rt.executor(),
         );

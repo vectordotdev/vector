@@ -115,7 +115,7 @@ impl SinkConfig for HttpSinkConfig {
 
         let sink = BatchedHttpSink::new(
             config,
-            Buffer::new(compression),
+            Buffer::new(batch, compression),
             request,
             batch,
             Some(tls.clone()),

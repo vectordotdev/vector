@@ -28,13 +28,14 @@ fn batching(
             |input| {
                 let mut rt = vector::test_util::runtime();
                 let (acker, _) = Acker::new_for_testing();
+                let batch = BatchSettings {
+                    size: max_size,
+                    timeout: Duration::from_secs(1),
+                };
                 let batch_sink = BatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                    Buffer::new(compression),
-                    BatchSettings {
-                        size: max_size,
-                        timeout: Duration::from_secs(1),
-                    },
+                    Buffer::new(batch, compression),
+                    batch,
                     acker,
                 )
                 .sink_map_err(|e| panic!(e));
@@ -72,13 +73,14 @@ fn partitioned_batching(
             |input| {
                 let mut rt = vector::test_util::runtime();
                 let (acker, _) = Acker::new_for_testing();
+                let batch = BatchSettings {
+                    size: max_size,
+                    timeout: Duration::from_secs(1),
+                };
                 let batch_sink = PartitionBatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                    PartitionedBuffer::new(compression),
-                    BatchSettings {
-                        size: max_size,
-                        timeout: Duration::from_secs(1),
-                    },
+                    PartitionedBuffer::new(batch, compression),
+                    batch,
                     acker,
                 )
                 .sink_map_err(|e| panic!(e));
@@ -166,9 +168,9 @@ impl Partition<Bytes> for InnerBuffer {
 }
 
 impl PartitionedBuffer {
-    pub fn new(compression: Compression) -> Self {
+    pub fn new(batch: BatchSettings, compression: Compression) -> Self {
         Self {
-            inner: Buffer::new(compression),
+            inner: Buffer::new(batch, compression),
             key: None,
         }
     }

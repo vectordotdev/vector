@@ -96,7 +96,7 @@ impl StatsdSvc {
 
         let sink = BatchSink::new(
             TowerCompat::new(svc),
-            Buffer::new(Compression::None),
+            Buffer::new(batch, Compression::None),
             batch,
             acker,
         )

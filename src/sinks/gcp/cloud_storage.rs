@@ -217,7 +217,7 @@ impl GcsSink {
             .settings(request, GcsRetryLogic)
             .service(self);
 
-        let buffer = PartitionBuffer::new(Buffer::new(config.compression));
+        let buffer = PartitionBuffer::new(Buffer::new(batch, config.compression));
 
         let sink = PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch, cx.acker())
             .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))

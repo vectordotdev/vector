@@ -987,7 +987,7 @@ mod tests {
         });
         let buffered = BatchSink::with_executor(
             svc,
-            Buffer::new(Compression::None),
+            Buffer::new(SETTINGS, Compression::None),
             SETTINGS,
             acker,
             rt.executor(),

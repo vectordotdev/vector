@@ -113,7 +113,7 @@ impl SinkConfig for ElasticSearchConfig {
 
         let sink = BatchedHttpSink::with_retry_logic(
             common,
-            Buffer::new(compression),
+            Buffer::new(batch, compression),
             ElasticSearchRetryLogic,
             request,
             batch,
