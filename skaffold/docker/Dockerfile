@@ -13,4 +13,6 @@ ENV LOG="$LOG"
 
 COPY vector /usr/bin/vector
 
+RUN /usr/bin/vector --version
+
 STOPSIGNAL SIGTERM
