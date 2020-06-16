@@ -4,7 +4,7 @@ use hyper::client::connect::dns::{Name, Resolve};
 use hyper13::client::connect::dns::Name as Name13;
 use snafu::ResultExt;
 use std::{
-    net::{IpAddr, SocketAddr, ToSocketAddrs},
+    net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs},
     task::{Context, Poll},
 };
 use tokio::task::spawn_blocking;
@@ -24,18 +24,23 @@ impl Resolver {
     }
 
     pub async fn lookup_ip(self, name: String) -> Result<LookupIp, DnsError> {
-        spawn_blocking(move || {
-            // We need to add port with the name so that `to_socket_addrs`
-            // resolves it properly. We will be discarding the port afterwards.
-            //
-            // Any port will do, but `9` is a well defined port for discarding
-            // packets.
-            (name.as_ref(), 9).to_socket_addrs()
-        })
-        .await
-        .context(JoinError)?
-        .map(LookupIp)
-        .context(UnableLookup)
+        // We need to add port with the name so that `to_socket_addrs`
+        // resolves it properly. We will be discarding the port afterwards.
+        //
+        // Any port will do, but `9` is a well defined port for discarding
+        // packets.
+        let dummy_port = 9;
+        if name == "localhost" {
+            Ok(LookupIp(
+                vec![SocketAddr::new(Ipv4Addr::LOCALHOST.into(), dummy_port)].into_iter(),
+            ))
+        } else {
+            spawn_blocking(move || (name.as_ref(), dummy_port).to_socket_addrs())
+                .await
+                .context(JoinError)?
+                .map(LookupIp)
+                .context(UnableLookup)
+        }
     }
 }
 
