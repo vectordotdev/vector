@@ -493,9 +493,6 @@
 - name: "type: help"
   description: For general help. Also try https://chat.vector.dev.
   color: 5f27cd
-- name: "type: new feature"
-  description: A new source, transform, sink, or entirely new feature.
-  color: 5f27cd
 - name: "type: performance"
   description: Any change that significantly improves performance
   color: 5f27cd
