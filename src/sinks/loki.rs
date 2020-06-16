@@ -244,7 +244,7 @@ async fn healthcheck(config: LokiConfig, resolver: Resolver) -> crate::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sinks::util::http2::HttpSink;
+    use crate::sinks::util::http::HttpSink;
     use crate::sinks::util::test::load_sink;
     use crate::Event;
 
