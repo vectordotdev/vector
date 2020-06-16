@@ -1684,6 +1684,18 @@ dns_servers = ["0.0.0.0:53"]
     "environment.ends_with" = "-staging"
     "environment.ends_with" = ["-staging", "-running"]
 
+    # Checks whether an IP field is contained within a given IP CIDR (works with
+    # IPv4 and IPv6). This may be a single string or a list of strings, in which
+    # case this evaluates to true if the IP field is contained within any of the
+    # CIDRs in the list.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "message.ip_cidr_contains" = "10.0.0.0/8"
+    "message.ip_cidr_contains" = ["2000::/10", "192.168.0.0/16"]
+
     # Checks whether a string field matches a regular expression. Vector uses the
     # documented Rust Regex syntax. Note that this condition is considerably more
     # expensive than a regular string match (such as `starts_with` or `contains`)
@@ -2595,6 +2607,18 @@ require('custom_module')
       # * relevant when type = "check_fields"
       "environment.ends_with" = "-staging"
       "environment.ends_with" = ["-staging", "-running"]
+
+      # Checks whether an IP field is contained within a given IP CIDR (works with
+      # IPv4 and IPv6). This may be a single string or a list of strings, in which
+      # case this evaluates to true if the IP field is contained within any of the
+      # CIDRs in the list.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      # * relevant when type = "check_fields"
+      "message.ip_cidr_contains" = "10.0.0.0/8"
+      "message.ip_cidr_contains" = ["2000::/10", "192.168.0.0/16"]
 
       # Checks whether a string field matches a regular expression. Vector uses the
       # documented Rust Regex syntax. Note that this condition is considerably more
