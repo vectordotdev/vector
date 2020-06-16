@@ -239,7 +239,7 @@ fn validate_healthchecks(
             fmt.error(error);
         };
 
-        let handle = rt.spawn_handle(healthcheck.compat());
+        let handle = rt.spawn_handle_std(healthcheck.compat());
         match rt.block_on_std(handle) {
             Ok(Ok(())) => {
                 if config

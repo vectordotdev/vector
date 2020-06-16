@@ -1,5 +1,9 @@
 #![allow(clippy::skip_while_next)]
-#![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
+#![cfg(all(
+    feature = "sources-socket",
+    feature = "transforms-sampler",
+    feature = "sinks-socket"
+))]
 
 use approx::assert_relative_eq;
 use futures01::{Future, Stream};

@@ -291,7 +291,7 @@ impl RunningTopology {
 
         info!("Running healthchecks.");
         if require_healthy {
-            let jh = rt.spawn_handle(healthchecks.compat());
+            let jh = rt.spawn_handle_std(healthchecks.compat());
             let success = rt
                 .block_on_std(jh)
                 .expect("Task panicked or runtime shutdown unexpectedly");
