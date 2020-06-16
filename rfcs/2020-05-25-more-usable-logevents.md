@@ -190,8 +190,8 @@ This RFC ultimately proposes the following steps:
     2. Refactor the `keys` function to return an `Iterator<Path>`
 7. Add an `Entry` style API to `LogEvent`.
     1. Remove functionality rendered obsolete by the Entry API like `try_insert`, moving them to use the new Entry API
-8. Provide `iter` and `iter_mut` functions that yield `(Path, Value)`. 
-    1. Remove the `all_fields` function, moving them to the new iterator. 
+8. Provide `iter` and `iter_mut` functions that yield `(Path, Value)`.
+    1. Remove the `all_fields` function, moving them to the new iterator.
 
 We believe these steps will provide a more ergonomic and consistent API.
 
