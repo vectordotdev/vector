@@ -19,16 +19,16 @@ impl<T> Batch for VecBuffer<T> {
     type Input = T;
     type Output = Vec<T>;
 
-    fn len(&self) -> usize {
-        self.batch.len()
-    }
-
     fn push(&mut self, item: Self::Input) {
         self.batch.push(item)
     }
 
     fn is_empty(&self) -> bool {
         self.batch.is_empty()
+    }
+
+    fn is_full(&self) -> bool {
+        self.batch.len() >= self.max_events
     }
 
     fn fresh(&self) -> Self {

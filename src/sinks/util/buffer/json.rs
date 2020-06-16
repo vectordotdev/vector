@@ -26,10 +26,6 @@ impl Batch for JsonArrayBuffer {
     type Input = Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn len(&self) -> usize {
-        self.total_bytes
-    }
-
     fn push(&mut self, item: Self::Input) {
         let item = to_raw_value(&item).expect("Value should be valid json");
         self.total_bytes += item.get().len();
@@ -38,6 +34,10 @@ impl Batch for JsonArrayBuffer {
 
     fn is_empty(&self) -> bool {
         self.buffer.is_empty()
+    }
+
+    fn is_full(&self) -> bool {
+        self.total_bytes >= self.max_size
     }
 
     fn fresh(&self) -> Self {
@@ -80,7 +80,7 @@ mod tests {
         }));
 
         assert_eq!(buffer.num_items(), 2);
-        assert_eq!(buffer.len(), 34);
+        assert_eq!(buffer.total_bytes, 34);
 
         let json = buffer.finish();
 

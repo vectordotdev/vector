@@ -40,9 +40,10 @@ pub struct BatchSettings {
 pub trait Batch {
     type Input;
     type Output;
-    fn len(&self) -> usize;
+
     fn push(&mut self, item: Self::Input);
     fn is_empty(&self) -> bool;
+    fn is_full(&self) -> bool;
     fn fresh(&self) -> Self;
     fn finish(self) -> Self::Output;
     fn num_items(&self) -> usize;

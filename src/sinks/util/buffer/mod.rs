@@ -101,16 +101,16 @@ impl Batch for Buffer {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn len(&self) -> usize {
-        self.size()
-    }
-
     fn push(&mut self, item: Self::Input) {
         self.push(&item)
     }
 
     fn is_empty(&self) -> bool {
         self.is_empty()
+    }
+
+    fn is_full(&self) -> bool {
+        self.size() >= self.max_size
     }
 
     fn fresh(&self) -> Self {

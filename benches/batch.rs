@@ -180,10 +180,6 @@ impl Batch for PartitionedBuffer {
     type Input = InnerBuffer;
     type Output = InnerBuffer;
 
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-
     fn push(&mut self, item: Self::Input) {
         let partition = item.partition();
         self.key = Some(partition);
@@ -192,6 +188,10 @@ impl Batch for PartitionedBuffer {
 
     fn is_empty(&self) -> bool {
         self.inner.is_empty()
+    }
+
+    fn is_full(&self) -> bool {
+        self.inner.is_full()
     }
 
     fn fresh(&self) -> Self {

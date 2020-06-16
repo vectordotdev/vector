@@ -111,10 +111,6 @@ impl Batch for MetricBuffer {
     type Input = Event;
     type Output = Vec<Metric>;
 
-    fn len(&self) -> usize {
-        self.num_items()
-    }
-
     fn push(&mut self, item: Self::Input) {
         let item = item.into_metric();
 
@@ -193,6 +189,10 @@ impl Batch for MetricBuffer {
 
     fn is_empty(&self) -> bool {
         self.num_items() == 0
+    }
+
+    fn is_full(&self) -> bool {
+        self.num_items() >= self.max_size
     }
 
     fn fresh(&self) -> Self {

@@ -29,10 +29,6 @@ where
     type Input = PartitionInnerBuffer<T::Input, K>;
     type Output = PartitionInnerBuffer<T::Output, K>;
 
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-
     fn push(&mut self, item: Self::Input) {
         let partition = item.partition();
         self.key = Some(partition);
@@ -41,6 +37,10 @@ where
 
     fn is_empty(&self) -> bool {
         self.inner.is_empty()
+    }
+
+    fn is_full(&self) -> bool {
+        self.inner.is_full()
     }
 
     fn fresh(&self) -> Self {

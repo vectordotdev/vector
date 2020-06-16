@@ -187,7 +187,7 @@ where
     }
 
     fn should_send(&mut self) -> bool {
-        self.closing || self.batch.len() >= self.settings.size || self.linger_elapsed()
+        self.closing || self.batch.is_full() || self.linger_elapsed()
     }
 
     fn linger_elapsed(&mut self) -> bool {
@@ -212,17 +212,17 @@ where
     type SinkError = crate::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        if self.batch.len() >= self.settings.size {
+        if self.batch.is_full() {
             trace!("batch full.");
             self.poll_complete()?;
 
-            if self.batch.len() > self.settings.size {
+            if self.batch.is_full() {
                 debug!(message = "Batch full; applying back pressure.", size = %self.settings.size, rate_limit_secs = 10);
                 return Ok(AsyncSink::NotReady(item));
             }
         }
 
-        if self.batch.len() == 0 {
+        if self.batch.is_empty() {
             trace!("Creating new batch.");
             // We just inserted the first item of a new batch, so set our delay to the longest time
             // we want to allow that item to linger in the batch before being flushed.
@@ -464,12 +464,12 @@ where
         let partition = item.partition();
 
         if let Some(batch) = self.partitions.get_mut(&partition) {
-            if batch.len() >= self.settings.size {
+            if batch.is_full() {
                 trace!("Batch full; driving service to completion.");
                 self.poll_complete()?;
 
                 if let Some(batch) = self.partitions.get_mut(&partition) {
-                    if batch.len() >= self.settings.size {
+                    if batch.is_full() {
                         debug!(
                             message = "Buffer full; applying back pressure.",
                             max_size = %self.settings.size,
@@ -509,7 +509,6 @@ where
         }
 
         let closing = self.closing;
-        let max_size = self.settings.size;
 
         let mut partitions = Vec::new();
 
@@ -528,7 +527,7 @@ where
         let ready = self
             .partitions
             .iter()
-            .filter(|(_, b)| closing || b.len() >= max_size)
+            .filter(|(_, b)| closing || b.is_full())
             .map(|(p, _)| p.clone())
             .collect::<Vec<_>>();
 
