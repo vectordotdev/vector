@@ -1,6 +1,6 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use crate::event::Event;
-use crate::sinks::util::Batch;
+use crate::sinks::util::{Batch, BatchSettings};
 use std::cmp::Ordering;
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
@@ -57,6 +57,7 @@ impl PartialEq for MetricEntry {
 
 #[derive(Clone, PartialEq)]
 pub struct MetricBuffer {
+    max_size: usize,
     state: HashSet<MetricEntry>,
     metrics: HashSet<MetricEntry>,
 }
@@ -96,10 +97,12 @@ impl MetricBuffer {
     //   Absolute AggregatedHistogram => Absolute AggregatedHistogram
     //   Absolute AggregatedSummary   => Absolute AggregatedSummary
     //
-    pub fn new() -> Self {
+    pub fn new(settings: BatchSettings) -> Self {
+        let max_size = settings.size;
         Self {
             state: HashSet::new(),
-            metrics: HashSet::new(),
+            metrics: HashSet::with_capacity(max_size),
+            max_size,
         }
     }
 }
@@ -204,7 +207,8 @@ impl Batch for MetricBuffer {
 
         Self {
             state,
-            metrics: HashSet::new(),
+            metrics: HashSet::with_capacity(self.max_size),
+            max_size: self.max_size,
         }
     }
 
@@ -313,16 +317,12 @@ mod test {
 
             future::ok::<_, std::io::Error>(())
         });
-        let buffered = BatchSink::with_executor(
-            svc,
-            MetricBuffer::new(),
-            BatchSettings {
-                timeout: Duration::from_secs(0),
-                size: 6,
-            },
-            acker,
-            rt.executor(),
-        );
+        let batch = BatchSettings {
+            timeout: Duration::from_secs(0),
+            size: 6,
+        };
+        let buffered =
+            BatchSink::with_executor(svc, MetricBuffer::new(batch), batch, acker, rt.executor());
 
         (buffered, rt, clock, sent_requests)
     }

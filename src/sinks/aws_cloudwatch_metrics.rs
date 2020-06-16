@@ -91,7 +91,7 @@ impl CloudWatchMetricsSvc {
             .batch_sink(
                 CloudWatchMetricsRetryLogic,
                 cloudwatch_metrics,
-                MetricBuffer::new(),
+                MetricBuffer::new(batch),
                 batch,
                 cx.acker(),
             )
