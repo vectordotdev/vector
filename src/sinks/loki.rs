@@ -20,7 +20,7 @@ use crate::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
-        BatchBytesConfig, UriSerde,
+        BatchBytesConfig, UriSerde, VecBuffer,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -86,7 +86,7 @@ impl SinkConfig for LokiConfig {
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            Vec::new(),
+            VecBuffer::new(batch_settings),
             request_settings,
             batch_settings,
             Some(tls),

@@ -380,7 +380,7 @@ mod test {
         assert_eq!(buffer[1].len(), 2);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "counter-0".into(),
@@ -428,7 +428,7 @@ mod test {
         );
 
         assert_eq!(
-            sorted(&buffer[1].clone().finish()),
+            sorted(&buffer[1].clone()),
             [
                 Metric {
                     name: "counter-2".into(),
@@ -491,7 +491,7 @@ mod test {
         assert_eq!(buffer[0].len(), 4);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "counter-0".into(),
@@ -566,7 +566,7 @@ mod test {
         assert_eq!(buffer[0].len(), 4);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "gauge-1".into(),
@@ -656,7 +656,7 @@ mod test {
         assert_eq!(buffer[0].len(), 5);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "gauge-1".into(),
@@ -741,7 +741,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [Metric {
                 name: "set-0".into(),
                 timestamp: None,
@@ -802,7 +802,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "dist-2".into(),
@@ -909,7 +909,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "buckets-2".into(),
@@ -1001,7 +1001,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "buckets-2".into(),
@@ -1067,7 +1067,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "quantiles-2".into(),

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub struct BatchBytesConfig {
     pub max_size: Option<usize>,
     pub timeout_secs: Option<u64>,
@@ -16,7 +16,7 @@ impl BatchBytesConfig {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub struct BatchEventsConfig {
     pub max_events: Option<usize>,
     pub timeout_secs: Option<u64>,
@@ -31,7 +31,7 @@ impl BatchEventsConfig {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct BatchSettings {
     pub size: usize,
     pub timeout: Duration,
@@ -54,34 +54,5 @@ pub trait Batch {
     {
         let fresh = self.fresh();
         std::mem::replace(self, fresh)
-    }
-}
-
-impl<T> Batch for Vec<T> {
-    type Input = T;
-    type Output = Self;
-
-    fn len(&self) -> usize {
-        self.len()
-    }
-
-    fn push(&mut self, item: Self::Input) {
-        self.push(item)
-    }
-
-    fn is_empty(&self) -> bool {
-        self.is_empty()
-    }
-
-    fn fresh(&self) -> Self {
-        Self::new()
-    }
-
-    fn finish(self) -> Self::Output {
-        self
-    }
-
-    fn num_items(&self) -> usize {
-        self.len()
     }
 }

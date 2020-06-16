@@ -725,7 +725,9 @@ impl<'a> Response for &'a str {}
 mod tests {
     use super::*;
     use crate::buffers::Acker;
-    use crate::sinks::util::{buffer::partition::Partition, BatchSettings, Buffer, Compression};
+    use crate::sinks::util::{
+        buffer::partition::Partition, BatchSettings, Buffer, Compression, VecBuffer,
+    };
     use crate::test_util::runtime;
     use bytes::Bytes;
     use futures01::{future, Sink};
@@ -749,7 +751,13 @@ mod tests {
         let (acker, ack_counter) = Acker::new_for_testing();
 
         let svc = tower::service_fn(|_| future::ok::<_, std::io::Error>(()));
-        let buffered = BatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
+        let buffered = BatchSink::with_executor(
+            svc,
+            VecBuffer::new(SETTINGS),
+            SETTINGS,
+            acker,
+            rt.executor(),
+        );
 
         let _ = clock.enter(|_| {
             buffered
@@ -798,7 +806,8 @@ mod tests {
             ..SETTINGS
         };
 
-        let mut sink = BatchSink::with_executor(svc, Vec::new(), settings, acker, exec.clone());
+        let mut sink =
+            BatchSink::with_executor(svc, VecBuffer::new(settings), settings, acker, exec.clone());
 
         let _ = clock.enter(|handle| {
             assert!(sink.start_send(0).unwrap().is_ready());
@@ -863,7 +872,13 @@ mod tests {
 
             future::ok::<_, std::io::Error>(())
         });
-        let buffered = BatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
+        let buffered = BatchSink::with_executor(
+            svc,
+            VecBuffer::new(SETTINGS),
+            SETTINGS,
+            acker,
+            rt.executor(),
+        );
 
         let _ = clock.enter(|_| {
             buffered
@@ -899,8 +914,13 @@ mod tests {
 
             future::ok::<_, std::io::Error>(())
         });
-        let mut buffered =
-            BatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
+        let mut buffered = BatchSink::with_executor(
+            svc,
+            VecBuffer::new(SETTINGS),
+            SETTINGS,
+            acker,
+            rt.executor(),
+        );
 
         clock.enter(|_| {
             assert!(buffered.start_send(0).unwrap().is_ready());
@@ -928,8 +948,13 @@ mod tests {
 
             future::ok::<_, std::io::Error>(())
         });
-        let mut buffered =
-            BatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
+        let mut buffered = BatchSink::with_executor(
+            svc,
+            VecBuffer::new(SETTINGS),
+            SETTINGS,
+            acker,
+            rt.executor(),
+        );
 
         clock.enter(|handle| {
             assert!(buffered.start_send(0).unwrap().is_ready());
@@ -1008,8 +1033,13 @@ mod tests {
 
             future::ok::<_, std::io::Error>(())
         });
-        let buffered =
-            PartitionBatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
+        let buffered = PartitionBatchSink::with_executor(
+            svc,
+            VecBuffer::new(SETTINGS),
+            SETTINGS,
+            acker,
+            rt.executor(),
+        );
 
         let (_buffered, _) = buffered
             .sink_map_err(drop)
@@ -1047,8 +1077,13 @@ mod tests {
             ..SETTINGS
         };
 
-        let buffered =
-            PartitionBatchSink::with_executor(svc, Vec::new(), settings, acker, rt.executor());
+        let buffered = PartitionBatchSink::with_executor(
+            svc,
+            VecBuffer::new(settings),
+            settings,
+            acker,
+            rt.executor(),
+        );
 
         let input = vec![Partitions::A, Partitions::B];
 
@@ -1082,8 +1117,13 @@ mod tests {
             ..SETTINGS
         };
 
-        let buffered =
-            PartitionBatchSink::with_executor(svc, Vec::new(), settings, acker, rt.executor());
+        let buffered = PartitionBatchSink::with_executor(
+            svc,
+            VecBuffer::new(settings),
+            settings,
+            acker,
+            rt.executor(),
+        );
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
 
@@ -1119,8 +1159,13 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
 
-        let mut buffered =
-            PartitionBatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
+        let mut buffered = PartitionBatchSink::with_executor(
+            svc,
+            VecBuffer::new(SETTINGS),
+            SETTINGS,
+            acker,
+            rt.executor(),
+        );
 
         clock.enter(|handle| {
             buffered.start_send(1 as usize).unwrap();

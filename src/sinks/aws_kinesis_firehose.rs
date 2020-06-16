@@ -8,7 +8,7 @@ use crate::{
         rusoto,
         service2::TowerRequestConfig,
         sink::Response,
-        BatchEventsConfig,
+        BatchEventsConfig, VecBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -107,7 +107,7 @@ impl KinesisFirehoseService {
             .batch_sink(
                 KinesisFirehoseRetryLogic,
                 kinesis,
-                Vec::new(),
+                VecBuffer::new(batch),
                 batch,
                 cx.acker(),
             )

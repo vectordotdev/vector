@@ -6,6 +6,7 @@ use std::io::Write;
 pub mod json;
 pub mod metrics;
 pub mod partition;
+pub mod vec;
 
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 

@@ -27,6 +27,7 @@ pub use batch::{Batch, BatchBytesConfig, BatchEventsConfig, BatchSettings};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
 pub use buffer::metrics::{MetricBuffer, MetricEntry};
 pub use buffer::partition::Partition;
+pub use buffer::vec::VecBuffer;
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use service::{ServiceBuilderExt, TowerRequestConfig, TowerRequestLayer, TowerRequestSettings};
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};

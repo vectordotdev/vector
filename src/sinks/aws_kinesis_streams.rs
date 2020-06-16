@@ -9,7 +9,7 @@ use crate::{
         rusoto,
         service2::TowerRequestConfig,
         sink::Response,
-        BatchEventsConfig,
+        BatchEventsConfig, VecBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -110,7 +110,13 @@ impl KinesisService {
         let kinesis = KinesisService { client, config };
 
         let sink = request
-            .batch_sink(KinesisRetryLogic, kinesis, Vec::new(), batch, cx.acker())
+            .batch_sink(
+                KinesisRetryLogic,
+                kinesis,
+                VecBuffer::new(batch),
+                batch,
+                cx.acker(),
+            )
             .sink_map_err(|e| error!("Fatal kinesis streams sink error: {}", e))
             .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 

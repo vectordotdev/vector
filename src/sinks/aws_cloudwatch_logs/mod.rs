@@ -8,7 +8,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
         rusoto, BatchEventsConfig, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-        TowerRequestConfig, TowerRequestSettings,
+        TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext},
@@ -159,7 +159,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             )?);
 
         let sink = {
-            let buffer = PartitionBuffer::new(Vec::new());
+            let buffer = PartitionBuffer::new(VecBuffer::new(batch));
             let svc_sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
                 .sink_map_err(|e| error!("Fatal cloudwatchlogs sink error: {}", e))
                 .with_flat_map(move |event| iter_ok(partition(event, &log_group, &log_stream)));
