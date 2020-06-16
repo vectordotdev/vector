@@ -19,17 +19,17 @@ Require TLS for incoming connections. \
 If this is set, an identity certificate is also required.\
 """
 
-[<%= namespace %>.tls.children.ca_path]
+[<%= namespace %>.tls.children.ca_file]
 type = "string"
 examples = ["/path/to/certificate_authority.crt"]
 groups = <%= groups.to_toml %>
 <%= relevant %>
 description = """\
 Absolute path to an additional CA certificate file, in DER or PEM format \
-(X.509).\
+(X.509), or an inline CA certificate in PEM format.\
 """
 
-[<%= namespace %>.tls.children.crt_path]
+[<%= namespace %>.tls.children.crt_file]
 type = "string"
 common = true
 examples = ["/path/to/host_certificate.crt"]
@@ -37,20 +37,20 @@ groups = <%= groups.to_toml %>
 <%= relevant %>
 description = """\
 Absolute path to a certificate file used to identify this server, in DER \
-or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, \
-`key_path` must also be set. \
+or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. \
+If this is set and is not a PKCS#12 archive, `key_file` must also be set. \
 This is required if `enabled` is set to `true`.\
 """
 
-[<%= namespace %>.tls.children.key_path]
+[<%= namespace %>.tls.children.key_file]
 type = "string"
 common = true
 examples = ["/path/to/host_certificate.key"]
 groups = <%= groups.to_toml %>
 <%= relevant %>
 description = """\
-Absolute path to a certificate key file used to identify this server, in \
-DER or PEM format (PKCS#8).\
+Absolute path to a private key file used to identify this server, in \
+DER or PEM format (PKCS#8), or an inline private key in PEM format.\
 """
 
 [<%= namespace %>.tls.children.key_pass]
@@ -61,7 +61,7 @@ groups = <%= groups.to_toml %>
 <%= relevant %>
 description = """\
 Pass phrase used to unlock the encrypted key file. This has no effect unless \
-`key_path` is set.\
+`key_file` is set.\
 """
 
 [<%= namespace %>.tls.children.verify_certificate]

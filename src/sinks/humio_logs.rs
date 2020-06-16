@@ -1,6 +1,9 @@
 use crate::{
     sinks::splunk_hec::{self, HecSinkConfig},
-    sinks::util::{encoding::EncodingConfigWithDefault, BatchBytesConfig, TowerRequestConfig},
+    sinks::util::{
+        encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchBytesConfig,
+        Compression,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -16,6 +19,8 @@ pub struct HumioLogsConfig {
         default
     )]
     encoding: EncodingConfigWithDefault<Encoding>,
+    #[serde(default)]
+    pub compression: Compression,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -69,6 +74,7 @@ impl HumioLogsConfig {
             token: self.token.clone(),
             host,
             encoding: self.encoding.clone().transmute(),
+            compression: self.compression,
             batch: self.batch.clone(),
             request: self.request.clone(),
             ..Default::default()
@@ -80,7 +86,7 @@ impl HumioLogsConfig {
 mod tests {
     use super::*;
     use crate::event::Event;
-    use crate::sinks::util::{http::HttpSink, test::load_sink};
+    use crate::sinks::util::{http2::HttpSink, test::load_sink};
     use chrono::Utc;
     use serde::Deserialize;
 
@@ -106,7 +112,10 @@ mod tests {
         let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
 
         let now = Utc::now().timestamp_millis() as f64 / 1000f64;
-        assert!((hec_event.time - now).abs() < 0.1);
+        assert!(
+            (hec_event.time - now).abs() < 0.2,
+            format!("hec_event.time = {}, now = {}", hec_event.time, now)
+        );
         assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
 }

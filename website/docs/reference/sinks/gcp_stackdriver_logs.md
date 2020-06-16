@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-06-15"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
@@ -64,6 +64,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
   log_id = "vector-logs" # required
   organization_id = "622418129737" # optional, no default
   project_id = "vector-123456" # required
+  severity_key = "severity" # optional, no default
 
   # Batch
   batch.max_size = 5242880 # optional, default, bytes
@@ -95,10 +96,10 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
   resource.zone = "Twilight" # example
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
-  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.ca_file = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_file = "/path/to/host_certificate.crt" # optional, no default
+  tls.key_file = "/path/to/host_certificate.key" # optional, no default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
-  tls.key_path = "/path/to/host_certificate.key" # optional, no default
   tls.verify_certificate = true # optional, default
   tls.verify_hostname = true # optional, default
 ```
@@ -849,6 +850,42 @@ For example, Compute Engine VM instances use the labels `projectId`,
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={["severity"]}
+  groups={[]}
+  name={"severity_key"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### severity_key
+
+The field of the log event from which to take the outgoing log's [`severity`](#severity)
+field. The named field is removed from the log event if present, and must be
+either an integer between 0 and 800 or a string containing one of the [severity
+level names][urls.gcp_stackdriver_severity] (case is ignored) or a common
+prefix such as `err`. This could be added by an [`add_fields`
+transform][docs.transforms.add_fields] or extracted from a field from the
+source.
+
+If no severity key is specified, the severity of outgoing records will be set
+to 0 (`DEFAULT`).
+
+See the [GCP Stackdriver Logging LogSeverity
+description][urls.gcp_stackdriver_severity] for more details on the value of
+the [`severity`](#severity) field.
+ See [Severity Level Remapping](#severity-level-remapping) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={[]}
   groups={[]}
   name={"tls"}
@@ -873,7 +910,7 @@ Configures the TLS options for connections from this sink.
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
   groups={[]}
-  name={"ca_path"}
+  name={"ca_file"}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -883,10 +920,10 @@ Configures the TLS options for connections from this sink.
   warnings={[]}
   >
 
-#### ca_path
+#### ca_file
 
 Absolute path to an additional CA certificate file, in DER or PEM format
-(X.509).
+(X.509), or an inline CA certificate in PEM format.
 
 
 
@@ -897,7 +934,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
   groups={[]}
-  name={"crt_path"}
+  name={"crt_file"}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -907,11 +944,36 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   warnings={[]}
   >
 
-#### crt_path
+#### crt_file
 
 Absolute path to a certificate file used to identify this connection, in DER or
-PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-`key_path` must also be set.
+PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If this
+is set and is not a PKCS#12 archive, [`key_file`](#key_file) must also be set.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/host_certificate.key"]}
+  groups={[]}
+  name={"key_file"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### key_file
+
+Absolute path to a private key file used to identify this connection, in DER or
+PEM format (PKCS#8), or an inline private key in PEM format. If this is set,
+`crt_file` must also be set.
 
 
 
@@ -935,31 +997,7 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 #### key_pass
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
-`key_path` is set.
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/path/to/host_certificate.key"]}
-  groups={[]}
-  name={"key_path"}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### key_path
-
-Absolute path to a certificate key file used to identify this connection, in
-DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be set.
+`key_file` is set.
 
 
 
@@ -1131,6 +1169,30 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
 
+### Severity Level Remapping
+
+If a [`severity_key`](#severity_key) is configured, outgoing log records will have their
+`severity` header field set from the named field in the Vector
+event. However, the [required values][urls.gcp_stackdriver_severity] for
+this field may be inconvenient to produce, typically requiring a custom
+mapping using an additional transform. To assist with this, this sink
+remaps certain commonly used words to the required numbers as in the
+following table. Note that only the prefix is compared (such that a
+value of `emergency` matches `emerg`), and the comparison ignores case.
+
+| Prefix | Value
+|:-------|:-----
+| emerg  | 800
+| fatal  | 800
+| alert  | 700
+| crit   | 600
+| err    | 500
+| warn   | 400
+| notice | 300
+| info   | 200
+| debug  | 100
+| trace  | 100
+
 ### TLS
 
 Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
@@ -1143,6 +1205,7 @@ options.
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[docs.transforms.add_fields]: /docs/reference/transforms/add_fields/
 [urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
 [urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcp_authentication_service_account]: https://cloud.google.com/docs/authentication/production#obtaining_and_providing_service_account_credentials_manually
@@ -1151,5 +1214,6 @@ options.
 [urls.gcp_resources]: https://cloud.google.com/monitoring/api/resources
 [urls.gcp_stackdriver_logging]: https://cloud.google.com/logging/docs/reference/v2/rest/
 [urls.gcp_stackdriver_logging_rest]: https://cloud.google.com/logging/
+[urls.gcp_stackdriver_severity]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
 [urls.new_gcp_stackdriver_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_stackdriver_logs
 [urls.openssl]: https://www.openssl.org/

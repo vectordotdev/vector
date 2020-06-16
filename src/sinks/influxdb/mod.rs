@@ -3,16 +3,17 @@ pub mod metrics;
 
 pub(self) use super::{Healthcheck, RouterSink};
 
-use crate::{dns::Resolver, sinks::util::http::HttpClient};
+use crate::{dns::Resolver, sinks::util::http2::HttpClient};
 use chrono::{DateTime, Utc};
+use futures::TryFutureExt;
 use futures01::Future;
-use http::{StatusCode, Uri};
-use hyper;
+use http02::{StatusCode, Uri};
+use hyper13;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use snafu::Snafu;
 use std::collections::{BTreeMap, HashMap};
-use tower::Service;
+use tower03::Service;
 
 pub enum Field {
     /// string
@@ -60,6 +61,12 @@ pub struct InfluxDB2Settings {
 
 trait InfluxDBSettings {
     fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
+    fn write_uri2(self: &Self, endpoint: String) -> crate::Result<http02::Uri> {
+        let uri = self.write_uri(endpoint)?;
+        Ok(format!("{}", uri)
+            .parse::<http02::Uri>()
+            .context(super::UriParseError2)?)
+    }
     fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
     fn token(self: &Self) -> String;
 }
@@ -148,17 +155,20 @@ fn healthcheck(
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
-    let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let request = hyper13::Request::get(uri)
+        .body(hyper13::Body::empty())
+        .unwrap();
 
     let mut client = HttpClient::new(resolver, None)?;
 
     let healthcheck = client
         .call(request)
+        .compat()
         .map_err(|err| err.into())
         .and_then(|response| match response.status() {
             StatusCode::OK => Ok(()),
             StatusCode::NO_CONTENT => Ok(()),
-            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
+            other => Err(super::HealthcheckError::UnexpectedStatus2 { status: other }.into()),
         });
 
     Ok(Box::new(healthcheck))
@@ -297,7 +307,7 @@ fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> c
         url.pop();
     }
 
-    Ok(url.parse::<Uri>().context(super::UriParseError)?)
+    Ok(url.parse::<Uri>().context(super::UriParseError2)?)
 }
 
 #[cfg(test)]
@@ -672,16 +682,16 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use crate::runtime::Runtime;
     use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, DATABASE, ORG, TOKEN};
     use crate::sinks::influxdb::{healthcheck, InfluxDB1Settings, InfluxDB2Settings};
+    use crate::test_util::runtime;
     use crate::topology::SinkContext;
 
     #[test]
     fn influxdb2_healthchecks_ok() {
         onboarding_v2();
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
         let endpoint = "http://localhost:9999".to_string();
         let influxdb1_settings = None;
@@ -705,7 +715,7 @@ mod integration_tests {
     fn influxdb2_healthchecks_fail() {
         onboarding_v2();
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
         let endpoint = "http://not_exist:9999".to_string();
         let influxdb1_settings = None;
@@ -726,7 +736,7 @@ mod integration_tests {
 
     #[test]
     fn influxdb1_healthchecks_ok() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
         let endpoint = "http://localhost:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
@@ -750,7 +760,7 @@ mod integration_tests {
 
     #[test]
     fn influxdb1_healthchecks_fail() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
         let endpoint = "http://not_exist:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {

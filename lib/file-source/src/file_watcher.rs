@@ -88,7 +88,7 @@ impl FileWatcher {
             findable: true,
             reader,
             file_position,
-            devno: devno,
+            devno,
             inode: ino,
             is_dead: false,
             last_read_attempt: ts.clone(),

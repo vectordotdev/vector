@@ -1,0 +1,23 @@
+[package]
+name = "protobuf"
+version = "0.1.0"
+authors = ["The Vector Authors"]
+edition = "2018"
+build = "build.rs"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+prost = "0.6"
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+vector-wasm = { version = "0.1", path = "../../../../lib/vector-wasm"}
+tracing = "0.1.15"
+anyhow = "1.0.28"
+
+[build-dependencies]
+prost-build = "0.6"
+
+[workspace]

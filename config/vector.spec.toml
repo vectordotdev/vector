@@ -32,9 +32,11 @@
 # permissions to this dir.
 #
 # * optional
-# * no default
+# * default: "/var/lib/vector/"
 # * type: string
 data_dir = "/var/lib/vector"
+data_dir = "/var/local/lib/vector/"
+data_dir = "/home/user/vector/"
 
 # The list of DNS servers Vector will use to resolve DNS requests. When set
 # Vector will ignore the system configuration and use only the list of DNS
@@ -60,15 +62,6 @@ dns_servers = ["0.0.0.0:53"]
   host_key = "@host"
   host_key = "instance"
   host_key = "machine"
-
-  # The key under which Kubernetes related fields are nested.
-  #
-  # * optional
-  # * default: "kubernetes"
-  # * type: string
-  kubernetes_key = "kubernetes"
-  kubernetes_key = "kube"
-  kubernetes_key = "k8s"
 
   # The key used to hold the log message. See the log data model page for more
   # info.
@@ -438,21 +431,22 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.http.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this server, in DER or
-    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set. This
+    # is required if `enabled` is set to `true`.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -463,22 +457,22 @@ dns_servers = ["0.0.0.0:53"]
     enabled = false
     enabled = true
 
+    # Absolute path to a private key file used to identify this server, in DER or
+    # PEM format (PKCS#8), or an inline private key in PEM format.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this server, in DER
-    # or PEM format (PKCS#8).
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -578,6 +572,16 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
+  # The frequency that the consumer offsets are committed (written) to offset
+  # storage.
+  #
+  # * optional
+  # * default: 5000
+  # * type: uint
+  # * unit: milliseconds
+  commit_interval_ms = 5000
+  commit_interval_ms = 10000
+
   # Maximum time the broker may wait to fill the response.
   #
   # * optional
@@ -655,21 +659,21 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.kafka.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Enable TLS during connections to the remote.
     #
@@ -679,22 +683,23 @@ dns_servers = ["0.0.0.0:53"]
     enabled = false
     enabled = true
 
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
 # Ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events.
 [sources.logplex]
@@ -722,21 +727,22 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.logplex.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this server, in DER or
-    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set. This
+    # is required if `enabled` is set to `true`.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -747,22 +753,22 @@ dns_servers = ["0.0.0.0:53"]
     enabled = false
     enabled = true
 
+    # Absolute path to a private key file used to identify this server, in DER or
+    # PEM format (PKCS#8), or an inline private key in PEM format.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this server, in DER
-    # or PEM format (PKCS#8).
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -821,6 +827,7 @@ dns_servers = ["0.0.0.0:53"]
   # * default: 102400
   # * type: uint
   # * unit: bytes
+  # * relevant when mode = "tcp" or mode = "unix"
   max_length = 102400
 
   # The type of socket to use.
@@ -874,23 +881,24 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.socket.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when mode = "tcp"
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this server, in DER or
-    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set. This
+    # is required if `enabled` is set to `true`.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when mode = "tcp"
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -902,8 +910,17 @@ dns_servers = ["0.0.0.0:53"]
     enabled = false
     enabled = true
 
+    # Absolute path to a private key file used to identify this server, in DER or
+    # PEM format (PKCS#8), or an inline private key in PEM format.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when mode = "tcp"
+    key_file = "/path/to/host_certificate.key"
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
@@ -911,15 +928,6 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when mode = "tcp"
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this server, in DER
-    # or PEM format (PKCS#8).
-    #
-    # * optional
-    # * no default
-    # * type: string
-    # * relevant when mode = "tcp"
-    key_path = "/path/to/host_certificate.key"
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -969,21 +977,22 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.splunk_hec.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this server, in DER or
-    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set. This
+    # is required if `enabled` is set to `true`.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -994,22 +1003,22 @@ dns_servers = ["0.0.0.0:53"]
     enabled = false
     enabled = true
 
+    # Absolute path to a private key file used to identify this server, in DER or
+    # PEM format (PKCS#8), or an inline private key in PEM format.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this server, in DER
-    # or PEM format (PKCS#8).
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -1137,21 +1146,22 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.syslog.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this server, in DER or
-    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set. This
+    # is required if `enabled` is set to `true`.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -1162,22 +1172,22 @@ dns_servers = ["0.0.0.0:53"]
     enabled = false
     enabled = true
 
+    # Absolute path to a private key file used to identify this server, in DER or
+    # PEM format (PKCS#8), or an inline private key in PEM format.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this server, in DER
-    # or PEM format (PKCS#8).
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -1227,21 +1237,22 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.vector.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this server, in DER or
-    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set. This
+    # is required if `enabled` is set to `true`.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -1252,22 +1263,22 @@ dns_servers = ["0.0.0.0:53"]
     enabled = false
     enabled = true
 
+    # Absolute path to a private key file used to identify this server, in DER or
+    # PEM format (PKCS#8), or an inline private key in PEM format.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this server, in DER
-    # or PEM format (PKCS#8).
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -1610,13 +1621,16 @@ dns_servers = ["0.0.0.0:53"]
     type = "is_log"
     type = "is_metric"
 
-    # Check whether a fields contents exactly matches the value specified.
+    # Check whether a fields contents exactly matches the value specified.This may
+    # be a single string or a list of strings, in which case this evaluates to true
+    # if any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "message.eq" = "this is the content to match against"
+    "message.eq" = ["match this", "or this"]
 
     # Check whether a field exists or does not exist, depending on the provided
     # value being `true` or `false` respectively.
@@ -1627,13 +1641,16 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "host.exists" = true
 
-    # Check whether a fields contents does not match the value specified.
+    # Check whether a fields contents does not match the value specified.This may
+    # be a single string or a list of strings, in which case this evaluates to
+    # false if any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "method.neq" = "POST"
+    "method.neq" = ["POST", "GET"]
 
     # Check if the given `[condition]` does not match.
     #
@@ -1645,21 +1662,27 @@ dns_servers = ["0.0.0.0:53"]
     "unit.not_starts_with" = "sys-"
     "unit.not_ends_with" = ".device"
 
-    # Checks whether a string field contains a string argument.
+    # Checks whether a string field contains a string argument.This may be a single
+    # string or a list of strings, in which case this evaluates to true if any of
+    # the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "message.contains" = "foo"
+    "message.contains" = ["foo", "bar"]
 
-    # Checks whether a string field ends with a string argument.
+    # Checks whether a string field ends with a string argument.This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "environment.ends_with" = "-staging"
+    "environment.ends_with" = ["-staging", "-running"]
 
     # Checks whether a string field matches a regular expression. Vector uses the
     # documented Rust Regex syntax. Note that this condition is considerably more
@@ -1672,13 +1695,16 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "message.regex" = " (any|of|these|five|words) "
 
-    # Checks whether a string field starts with a string argument.
+    # Checks whether a string field starts with a string argument.This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "environment.starts_with" = "staging-"
+    "environment.starts_with" = ["staging-", "running-"]
 
   #
   # General
@@ -2507,13 +2533,16 @@ require('custom_module')
       type = "is_log"
       type = "is_metric"
 
-      # Check whether a fields contents exactly matches the value specified.
+      # Check whether a fields contents exactly matches the value specified.This may
+      # be a single string or a list of strings, in which case this evaluates to true
+      # if any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "message.eq" = "this is the content to match against"
+      "message.eq" = ["match this", "or this"]
 
       # Check whether a field exists or does not exist, depending on the provided
       # value being `true` or `false` respectively.
@@ -2524,13 +2553,16 @@ require('custom_module')
       # * relevant when type = "check_fields"
       "host.exists" = true
 
-      # Check whether a fields contents does not match the value specified.
+      # Check whether a fields contents does not match the value specified.This may
+      # be a single string or a list of strings, in which case this evaluates to
+      # false if any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "method.neq" = "POST"
+      "method.neq" = ["POST", "GET"]
 
       # Check if the given `[condition]` does not match.
       #
@@ -2542,21 +2574,27 @@ require('custom_module')
       "unit.not_starts_with" = "sys-"
       "unit.not_ends_with" = ".device"
 
-      # Checks whether a string field contains a string argument.
+      # Checks whether a string field contains a string argument.This may be a single
+      # string or a list of strings, in which case this evaluates to true if any of
+      # the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "message.contains" = "foo"
+      "message.contains" = ["foo", "bar"]
 
-      # Checks whether a string field ends with a string argument.
+      # Checks whether a string field ends with a string argument.This may be a
+      # single string or a list of strings, in which case this evaluates to true if
+      # any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "environment.ends_with" = "-staging"
+      "environment.ends_with" = ["-staging", "-running"]
 
       # Checks whether a string field matches a regular expression. Vector uses the
       # documented Rust Regex syntax. Note that this condition is considerably more
@@ -2569,13 +2607,16 @@ require('custom_module')
       # * relevant when type = "check_fields"
       "message.regex" = " (any|of|these|five|words) "
 
-      # Checks whether a string field starts with a string argument.
+      # Checks whether a string field starts with a string argument.This may be a
+      # single string or a list of strings, in which case this evaluates to true if
+      # any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "environment.starts_with" = "staging-"
+      "environment.starts_with" = ["staging-", "running-"]
 
 # Accepts and outputs `metric` events, allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.
 [transforms.tag_cardinality_limit]
@@ -2691,6 +2732,47 @@ require('custom_module')
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
     parent = {child = "int"}
+
+# Accepts and outputs `log` events, allowing you to execute **experimental** WASM plugins.
+[transforms.wasm]
+  # The directory where Vector should store the artifact it builds of this WASM
+  # module. Typically, all WASM modules share this.
+  #
+  # * required
+  # * type: string
+  artifact_cache = "/etc/vector/artifacts"
+  artifact_cache = "/var/lib/vector/artifacts"
+  artifact_cache = "C:\\vector\\artifacts"
+
+  # The maximum size of the heap of this module, in bytes. (This includes the
+  # module itself, default is 10 MB.)
+  #
+  # * optional
+  # * default: 10485760
+  # * type: int
+  heap_max_size = 10485760
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The file path of the `.wasm` or `.wat` module.
+  #
+  # * required
+  # * type: string
+  module = "./modules/example.wasm"
+  module = "/example.wat"
+  module = "example.wasm"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "wasm"
+  type = "wasm"
 
 
 # ------------------------------------------------------------------------------
@@ -4129,38 +4211,39 @@ require('custom_module')
 
   [sinks.clickhouse.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -4371,21 +4454,21 @@ require('custom_module')
 
   [sinks.datadog_logs.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Enable TLS during connections to the remote.
     #
@@ -4395,22 +4478,23 @@ require('custom_module')
     enabled = false
     enabled = true
 
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -4739,6 +4823,13 @@ require('custom_module')
   # * type: [string]
   inputs = ["my-source-or-transform-id"]
 
+  # Name of the pipeline to apply.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  pipeline = "pipeline-name"
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -4870,38 +4961,39 @@ require('custom_module')
 
   [sinks.elasticsearch.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -5305,38 +5397,39 @@ require('custom_module')
 
   [sinks.gcp_cloud_storage.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -5581,38 +5674,39 @@ require('custom_module')
 
   [sinks.gcp_pubsub.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -5736,6 +5830,24 @@ require('custom_module')
   # * required
   # * type: string
   project_id = "vector-123456"
+
+  # The field of the log event from which to take the outgoing log's `severity`
+  # field. The named field is removed from the log event if present, and must be
+  # either an integer between 0 and 800 or a string containing one of the
+  # severity level names (case is ignored) or a common prefix such as `err`. This
+  # could be added by an `add_fields` transform or extracted from a field from
+  # the source.
+  #
+  # If no severity key is specified, the severity of outgoing records will be set
+  # to 0 (`DEFAULT`).
+  #
+  # See the GCP Stackdriver Logging LogSeverity description for more details on
+  # the value of the `severity` field.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  severity_key = "severity"
 
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -5913,38 +6025,39 @@ require('custom_module')
 
   [sinks.gcp_stackdriver_logs.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -6404,38 +6517,39 @@ require('custom_module')
 
   [sinks.http.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -6520,6 +6634,20 @@ require('custom_module')
     when_full = "drop_newest"
 
   #
+  # Requests
+  #
+
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
+
+  #
   # Encoding
   #
 
@@ -6571,7 +6699,7 @@ require('custom_module')
   # The optional host to send Humio logs to.
   #
   # * optional
-  # * no default
+  # * default: "https://cloud.humio.com"
   # * type: string
   host = "http://myhumiohost.com"
 
@@ -7317,21 +7445,21 @@ require('custom_module')
 
   [sinks.kafka.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Enable TLS during connections to the remote.
     #
@@ -7341,22 +7469,23 @@ require('custom_module')
     enabled = false
     enabled = true
 
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
 # Batches `log` events to LogDna's HTTP Ingestion API.
 [sinks.logdna]
@@ -7878,38 +8007,39 @@ require('custom_module')
 
   [sinks.loki.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -7992,6 +8122,20 @@ require('custom_module')
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Requests
+  #
+
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
 
   #
   # Encoding
@@ -8739,21 +8883,21 @@ require('custom_module')
 
   [sinks.socket.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Enable TLS during connections to the remote.
     #
@@ -8763,22 +8907,23 @@ require('custom_module')
     enabled = false
     enabled = true
 
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -9047,38 +9192,39 @@ require('custom_module')
 
   [sinks.splunk_hec.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.
@@ -9217,21 +9363,21 @@ require('custom_module')
 
   [sinks.vector.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509), or an inline CA certificate in PEM format.
     #
     # * optional
     # * no default
     # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
+    ca_file = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
     #
     # * optional
     # * no default
     # * type: string
-    crt_path = "/path/to/host_certificate.crt"
+    crt_file = "/path/to/host_certificate.crt"
 
     # Enable TLS during connections to the remote.
     #
@@ -9241,22 +9387,23 @@ require('custom_module')
     enabled = false
     enabled = true
 
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # `key_file` is set.
     #
     # * optional
     # * no default
     # * type: string
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host.

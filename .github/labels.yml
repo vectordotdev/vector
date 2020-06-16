@@ -372,6 +372,9 @@
 - name: "transform: tokenizer"
   description: Anything `tokenizer` transform related
   color: 54a0ff
+- name: "transform: wasm"
+  description: Anything `wasm` transform related
+  color: 54a0ff
 
 #
 # sink
@@ -484,11 +487,11 @@
 - name: "type: enhancement"
   description: Any change that enhances it's subject
   color: 5f27cd
+- name: "type: feature"
+  description: A new feature. Such as a new source, transform, or sink.
+  color: 5f27cd
 - name: "type: help"
   description: For general help. Also try https://chat.vector.dev.
-  color: 5f27cd
-- name: "type: new feature"
-  description: A new source, transform, sink, or entirely new feature.
   color: 5f27cd
 - name: "type: performance"
   description: Any change that significantly improves performance

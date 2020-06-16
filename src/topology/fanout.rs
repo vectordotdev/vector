@@ -143,8 +143,7 @@ impl Sink for Fanout {
 #[cfg(test)]
 mod tests {
     use super::{ControlMessage, Fanout};
-    use crate::runtime;
-    use crate::test_util::{self, CollectCurrent};
+    use crate::test_util::{self, runtime, CollectCurrent};
     use crate::Event;
     use futures01::sync::mpsc;
     use futures01::{stream, Future, Sink, Stream};
@@ -196,7 +195,7 @@ mod tests {
         let rec2 = Event::from("line 2".to_string());
         let rec3 = Event::from("line 3".to_string());
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let recs = vec![rec1.clone(), rec2.clone(), rec3.clone()];
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
@@ -307,7 +306,7 @@ mod tests {
         let rec2 = Event::from("line 2".to_string());
         let rec3 = Event::from("line 3".to_string());
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let recs = vec![rec1.clone(), rec2.clone(), rec3.clone()];
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
@@ -347,7 +346,7 @@ mod tests {
         let rec2 = Event::from("line 2".to_string());
         let rec3 = Event::from("line 3".to_string());
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let recs = vec![rec1.clone(), rec2.clone(), rec3.clone()];
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
@@ -387,7 +386,7 @@ mod tests {
         let rec2 = Event::from("line 2".to_string());
         let rec3 = Event::from("line 3".to_string());
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let recs = vec![rec1.clone(), rec2.clone(), rec3.clone()];
         let send = fanout.send_all(stream::iter_ok(recs.clone()));

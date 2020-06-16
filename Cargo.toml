@@ -31,6 +31,7 @@ members = [
   "lib/codec",
   "lib/file-source",
   "lib/tracing-limit",
+  "lib/vector-wasm",
 ]
 
 [dependencies]
@@ -44,7 +45,7 @@ futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat"] }
 tokio01 = { package = "tokio", version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing"], default-features = false }
 tokio = { version = "0.2.13", features = ["blocking", "fs", "sync", "macros", "test-util", "rt-core", "io-std"] }
-tokio-codec = "0.1.0"
+tokio-codec = "0.1.2"
 tokio-openssl = "0.3.0"
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
@@ -52,8 +53,8 @@ tokio-compat = { version = "0.1", features = ["rt-full"] }
 async-trait = "0.1"
 
 # Tracing
-tracing = "0.1.9"
-tracing-futures = { version = "0.2", features = ["futures-01"]}
+tracing = "0.1.15"
+tracing-futures = { version = "0.2", features = ["futures-01", "futures-03"]}
 tracing-subscriber = "0.2.2"
 tracing-log = "0.1.0"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "65547d8809fcc726b8187db85b23c42e32ef5dce" }
@@ -65,13 +66,17 @@ metrics-runtime = "0.13.0"
 
 # Aws
 rusoto_core = { version = "0.41.0", optional = true }
-rusoto_s3 = { version = "0.41.0", optional = true }
+rusoto_core44 = { package = "rusoto_core", version = "0.44.0", optional = true }
+rusoto_s3 = { version = "0.44.0", optional = true }
 rusoto_logs = { version = "0.41.0", optional = true }
-rusoto_cloudwatch = { version = "0.41.0", optional = true }
-rusoto_kinesis = { version = "0.41.0", optional = true }
+rusoto_cloudwatch = { version = "0.44.0", optional = true }
+rusoto_kinesis = { version = "0.44.0", optional = true }
 rusoto_credential = { version = "0.41.1", optional = true }
-rusoto_firehose = { version = "0.41.0", optional = true }
+rusoto_credential44 = { package = "rusoto_credential", version = "0.44.0", optional = true }
+rusoto_firehose = { version = "0.44.0", optional = true }
 rusoto_sts = { version = "0.41.0", optional = true }
+rusoto_sts44 = { package = "rusoto_sts", version = "0.44.0", optional = true }
+rusoto_signature = { package = "rusoto_signature", version = "0.44.0", optional = true }
 
 # Tower
 tower = "0.1.1"
@@ -87,15 +92,15 @@ prost-derive = "0.5"
 prost-types = "0.5"
 
 # GCP
-goauth = { version = "0.6.1", optional = true }
-smpl_jwt = { version = "0.4.0", optional = true }
+goauth = { version = "0.7.1", optional = true }
+smpl_jwt = { version = "0.5.0", optional = true }
 reqwest = "0.9.5"
 
 # External libs
 derivative = "1.0"
 chrono = { version = "0.4.6", features = ["serde"] }
 rand = "0.5.5"
-regex = "1.3.5"
+regex = "1.3.9"
 bytes = { version = "0.4.10", features = ["serde"] }
 bytes05 = { package = "bytes", version = "0.5", features = ["serde"] }
 stream-cancel = "0.4.3"
@@ -112,11 +117,10 @@ structopt = "0.3.13"
 indexmap = {version = "1.0.2", features = ["serde-1"]}
 http = "0.1.14"
 http02 = { package = "http", version = "0.2" }
-http-body = "0.3"
 typetag = "0.1"
 toml = "0.4"
 syslog = "5"
-syslog_loose = { version = "0.2.0", optional = true }
+syslog_loose = { version = "0.3.0", optional = true }
 tokio-uds = { version = "0.2.5", optional = true }
 derive_is_enum_variant = "0.1.1"
 leveldb = { git = "https://github.com/timberio/leveldb", optional = true, default-features = false }
@@ -145,8 +149,8 @@ trust-dns-resolver = { version = "0.12", features = ["serde-config"]}
 trust-dns-proto = { version = "0.8" }
 listenfd = { version = "0.3.3", optional = true }
 inventory = "0.1"
-maxminddb = { version = "0.13.0", optional = true }
-strip-ansi-escapes = { version = "0.1.0", optional = true }
+maxminddb = { version = "0.14.0", optional = true }
+strip-ansi-escapes = { version = "0.1.0"}
 colored = "1.9"
 # Forked version to support graceful shutdown with custom tls impl
 warp = { version = "0.1", git = "https://github.com/timberio/warp", branch = "0.1.x", default-features = false, optional = true }
@@ -159,6 +163,13 @@ lru = "0.4.3"
 bloom = "0.3.2"
 pulsar = { version = "0.3.0", optional = true }
 task-compat = "0.1"
+# For WASM
+vector-wasm = { path = "lib/vector-wasm", optional = true }
+lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
+lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
+lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
+anyhow = { version = "1.0.28", optional = true }
+
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1"
@@ -218,6 +229,9 @@ rdkafka-cmake = ["rdkafka", "rdkafka/cmake_build"]
 leveldb-plain = ["leveldb", "leveldb/leveldb-sys-2"]
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `leveldb-plain` doesn't work.
 leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
+# This feature enables the WASM foreign module support.
+wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm", "anyhow"]
+wasm-timings = ["wasm"]
 
 # Sources
 sources = [
@@ -285,7 +299,7 @@ transforms = [
 ]
 transforms-add_fields = []
 transforms-add_tags = []
-transforms-ansi_stripper = ["strip-ansi-escapes"]
+transforms-ansi_stripper = []
 transforms-aws_ec2_metadata = ["evmap"]
 transforms-coercer = []
 transforms-concat = []
@@ -308,6 +322,7 @@ transforms-split = []
 transforms-swimlanes = []
 transforms-tag_cardinality_limit = []
 transforms-tokenizer = ["nom"]
+transforms-wasm = ["wasm"]
 
 # Sinks
 sinks = [
@@ -341,15 +356,15 @@ sinks = [
   "sinks-pulsar"
 ]
 sinks-aws_cloudwatch_logs = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_logs"]
-sinks-aws_cloudwatch_metrics = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_cloudwatch"]
-sinks-aws_kinesis_firehose = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_firehose"]
-sinks-aws_kinesis_streams = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_kinesis"]
-sinks-aws_s3 = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_s3", "uuid"]
+sinks-aws_cloudwatch_metrics = ["rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44", "rusoto_cloudwatch"]
+sinks-aws_kinesis_firehose = ["rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44", "rusoto_firehose"]
+sinks-aws_kinesis_streams = ["rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44", "rusoto_kinesis"]
+sinks-aws_s3 = ["bytesize", "rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44", "rusoto_s3", "uuid"]
 sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
 sinks-datadog = []
-sinks-elasticsearch = ["base64", "bytesize", "rusoto_core", "rusoto_credential", "rusoto_sts"]
+sinks-elasticsearch = ["base64", "bytesize", "rusoto_core44", "rusoto_credential44", "rusoto_signature", "rusoto_sts44"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt", "uuid"]
 sinks-honeycomb = ["sinks-http"]
@@ -385,7 +400,14 @@ docker = [
   "splunk-integration-tests",
 ]
 
-aws-integration-tests = ["sinks-aws_cloudwatch_logs", "sinks-aws_cloudwatch_metrics", "sinks-elasticsearch", "sinks-aws_kinesis_firehose", "sinks-aws_kinesis_streams", "sinks-aws_s3", "transforms-aws_ec2_metadata"]
+aws-integration-tests = [
+  "aws-cloudwatch-logs-integration-tests",
+  "aws-cloudwatch-metrics-integration-tests",
+  "aws-ec2-metadata-integration-tests",
+  "aws-kinesis-firehose-integration-tests",
+  "aws-kinesis-streams-integration-tests",
+  "aws-s3-integration-tests",
+]
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
@@ -418,6 +440,11 @@ harness = false
 [[bench]]
 name = "isolated_buffering"
 harness = false
+
+[[bench]]
+name = "wasm"
+harness = false
+required-features = ["transforms-wasm", "transforms-lua"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"

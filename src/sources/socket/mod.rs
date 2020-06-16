@@ -131,11 +131,11 @@ mod test {
     use super::SocketConfig;
     use crate::dns::Resolver;
     use crate::event;
-    use crate::runtime;
+    use crate::runtime::Runtime;
     use crate::shutdown::{ShutdownSignal, SourceShutdownCoordinator};
     use crate::sinks::util::tcp::TcpSink;
     use crate::test_util::{
-        block_on, collect_n, next_addr, send_lines, send_lines_tls, wait_for_tcp, CollectN,
+        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, wait_for_tcp, CollectN,
     };
     use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
@@ -173,7 +173,7 @@ mod test {
                 tx,
             )
             .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(server);
         wait_for_tcp(addr);
 
@@ -201,7 +201,7 @@ mod test {
                 tx,
             )
             .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(server);
         wait_for_tcp(addr);
 
@@ -232,7 +232,7 @@ mod test {
                 tx,
             )
             .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(server);
         wait_for_tcp(addr);
 
@@ -268,8 +268,8 @@ mod test {
         config.tls = Some(TlsConfig {
             enabled: Some(true),
             options: TlsOptions {
-                crt_path: Some("tests/data/localhost.crt".into()),
-                key_path: Some("tests/data/localhost.key".into()),
+                crt_file: Some("tests/data/localhost.crt".into()),
+                key_file: Some("tests/data/localhost.key".into()),
                 ..Default::default()
             },
         });
@@ -282,7 +282,7 @@ mod test {
                 tx,
             )
             .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(server);
         wait_for_tcp(addr);
 
@@ -321,7 +321,7 @@ mod test {
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
             .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
             .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         let source_handle = oneshot::spawn(server, &rt.executor());
         wait_for_tcp(addr);
 
@@ -365,7 +365,7 @@ mod test {
         })
         .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
         .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = Runtime::with_thread_count(2).unwrap();
         let source_handle = oneshot::spawn(server, &rt.executor());
         wait_for_tcp(addr);
 
@@ -429,7 +429,7 @@ mod test {
             tx.clone(),
         )
         .unwrap();
-        let mut rt = runtime::Runtime::with_thread_count(4).unwrap();
+        let mut rt = Runtime::with_thread_count(4).unwrap();
         let source_handle = oneshot::spawn(server, &rt.executor());
         wait_for_tcp(addr);
 
@@ -546,12 +546,12 @@ mod test {
         sender: mpsc::Sender<event::Event>,
         source_name: &str,
         shutdown: &mut SourceShutdownCoordinator,
-    ) -> (SocketAddr, runtime::Runtime, oneshot::SpawnHandle<(), ()>) {
+    ) -> (SocketAddr, Runtime, oneshot::SpawnHandle<(), ()>) {
         let (shutdown_signal, _) = shutdown.register_source(source_name);
         init_udp_inner(sender, source_name, shutdown_signal)
     }
 
-    fn init_udp(sender: mpsc::Sender<event::Event>) -> (SocketAddr, runtime::Runtime) {
+    fn init_udp(sender: mpsc::Sender<event::Event>) -> (SocketAddr, Runtime) {
         let (addr, rt, handle) = init_udp_inner(sender, "default", ShutdownSignal::noop());
         handle.forget();
         return (addr, rt);
@@ -561,7 +561,7 @@ mod test {
         sender: mpsc::Sender<event::Event>,
         source_name: &str,
         shutdown_signal: ShutdownSignal,
-    ) -> (SocketAddr, runtime::Runtime, oneshot::SpawnHandle<(), ()>) {
+    ) -> (SocketAddr, Runtime, oneshot::SpawnHandle<(), ()>) {
         let addr = next_addr();
 
         let server = SocketConfig::from(UdpConfig::new(addr))
@@ -572,7 +572,7 @@ mod test {
                 sender,
             )
             .unwrap();
-        let rt = runtime::Runtime::new().unwrap();
+        let rt = runtime();
         let source_handle = oneshot::spawn(server, &rt.executor());
 
         // Wait for udp to start listening
@@ -736,7 +736,7 @@ mod test {
 
     ////////////// UNIX TESTS //////////////
     #[cfg(unix)]
-    fn init_unix(sender: mpsc::Sender<event::Event>) -> (PathBuf, runtime::Runtime) {
+    fn init_unix(sender: mpsc::Sender<event::Event>) -> (PathBuf, Runtime) {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
 
         let server = SocketConfig::from(UnixConfig::new(in_path.clone()))
@@ -748,7 +748,7 @@ mod test {
             )
             .unwrap();
 
-        let mut rt = runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(server);
 
         // Wait for server to accept traffic
@@ -773,7 +773,11 @@ mod test {
                     .map(|(_source, sink)| sink)
                     .and_then(|sink| {
                         let socket = sink.into_inner().into_inner();
-                        tokio01::io::shutdown(socket)
+                        // In tokio 0.1 `AsyncWrite::shutdown` for `TcpStream` is a noop.
+                        // See https://docs.rs/tokio-tcp/0.1.4/src/tokio_tcp/stream.rs.html#917
+                        // Use `TcpStream::shutdown` instead - it actually does something.
+                        socket
+                            .shutdown(std::net::Shutdown::Both)
                             .map(|_| ())
                             .map_err(|e| panic!("{:}", e))
                     })

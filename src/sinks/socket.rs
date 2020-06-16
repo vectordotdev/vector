@@ -91,17 +91,14 @@ mod test {
         test_util::{next_addr, random_lines_with_stream, receive, runtime},
         topology::config::SinkContext,
     };
+    use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use serde_json::Value;
     use std::net::UdpSocket;
-    use std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    };
-    use tokio::{io::AsyncReadExt, net::TcpListener};
 
     #[test]
     fn udp_message() {
+        crate::test_util::trace_init();
         let addr = next_addr();
         let receiver = UdpSocket::bind(addr).unwrap();
 
@@ -134,6 +131,7 @@ mod test {
 
     #[test]
     fn tcp_stream() {
+        crate::test_util::trace_init();
         let addr = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
@@ -152,6 +150,9 @@ mod test {
         let pump = sink.send_all(events);
         let _ = rt.block_on(pump).unwrap();
 
+        // Some CI machines are very slow, be generous.
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
         let output = receiver.wait();
         assert_eq!(output.len(), lines.len());
         for (source, received) in lines.iter().zip(output) {
@@ -164,63 +165,91 @@ mod test {
     // This is a test that checks that we properly receieve all events in the
     // case of a proper server side write side shutdown.
     //
-    // This test basically sends 10 events shutsdown the server and forces a
+    // This test basically sends 10 events, shutsdown the server and forces a
     // reconnect. It then forces another 10 events through and we should get a
     // total of 20 events.
     //
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
+    #[cfg(feature = "sources-tls")]
     #[test]
     fn tcp_stream_detects_disconnect() {
+        use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
+        use futures01::{Async, Stream};
+        use std::io::{ErrorKind, Read};
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+        use tokio01::io::AsyncWrite;
+
         let addr = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
                 address: addr.to_string(),
                 encoding: Encoding::Text.into(),
-                // TODO: enable TLS here since this is where
-                // ran into the issue before!
-                tls: None,
+                tls: Some(TlsConfig {
+                    enabled: Some(true),
+                    options: TlsOptions {
+                        verify_certificate: Some(false),
+                        verify_hostname: Some(false),
+                        ca_file: Some("tests/data/localhost.crt".into()),
+                        ..Default::default()
+                    },
+                }),
             }),
         };
         let mut rt = runtime();
         let context = SinkContext::new_test(rt.executor());
         let (sink, _healthcheck) = config.build(context).unwrap();
 
-        let close = Arc::new(tokio::sync::Notify::new());
-        let counter = Arc::new(AtomicUsize::new(0));
+        let msg_counter = Arc::new(AtomicUsize::new(0));
+        let msg_counter1 = msg_counter.clone();
+        let conn_counter = Arc::new(AtomicUsize::new(0));
+        let conn_counter1 = conn_counter.clone();
 
-        let close1 = close.clone();
-        let counter1 = counter.clone();
-        let jh = rt.spawn_handle(async move {
-            let mut listener = TcpListener::bind(&addr).await.unwrap();
+        let (mut close_tx, mut close_rx) = tokio01::sync::mpsc::unbounded_channel::<()>();
 
-            // Only accept two connections after the second connection is done
-            // we can exit.
-            for _ in 0..2 {
-                let (mut conn, _) = listener.accept().await.unwrap();
+        let config = Some(TlsConfig {
+            enabled: Some(true),
+            options: TlsOptions {
+                crt_file: Some("tests/data/localhost.crt".into()),
+                key_file: Some("tests/data/localhost.key".into()),
+                ..Default::default()
+            },
+        });
+        let stream = MaybeTlsSettings::from_config(&config, true).unwrap();
 
+        // Only accept two connections.
+        let fut = stream
+            .bind(&addr)
+            .unwrap()
+            .incoming()
+            .take(2)
+            .for_each(move |mut socket| {
+                conn_counter1.fetch_add(1, Ordering::SeqCst);
                 loop {
+                    if let Ok(Async::Ready(_)) = close_rx.poll() {
+                        socket.shutdown().unwrap();
+                        break;
+                    }
+
                     let mut buf = vec![0u8; 11];
-
-                    tokio::select! {
-                        _ = close1.notified() => {
-                            conn.shutdown(std::net::Shutdown::Write).unwrap();
-                            break;
-                        }
-
-                        res = conn.read(&mut buf) => {
-                            let n = res.unwrap();
-
-                           if  n == 0 {
-                               break;
-                           } else {
-                               counter1.fetch_add(1, Ordering::Relaxed);
-                           }
+                    match socket.read(&mut buf) {
+                        Err(error) if error.kind() == ErrorKind::WouldBlock => {}
+                        Err(error) => panic!("{}", error),
+                        Ok(n) => {
+                            if n == 0 {
+                                break;
+                            } else {
+                                msg_counter1.fetch_add(1, Ordering::SeqCst);
+                            }
                         }
                     };
                 }
-            }
-        });
+                Ok(())
+            });
+        let jh = rt.spawn_handle_std(fut.compat());
 
         let (_, events) = random_lines_with_stream(10, 10);
         let pump = sink.send_all(events);
@@ -230,29 +259,36 @@ mod test {
         // we have 10 events we can tell the server to shutdown to simulate the
         // remote shutting down on an idle connection.
         for _ in 0..100 {
-            let amnt = counter.load(Ordering::SeqCst);
+            let amnt = msg_counter.load(Ordering::SeqCst);
 
             if amnt == 10 {
-                close.notify();
+                close_tx.try_send(()).unwrap();
                 break;
             }
 
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            // Some CI machines are very slow, be generous.
+            std::thread::sleep(std::time::Duration::from_millis(500));
         }
+        assert_eq!(msg_counter.load(Ordering::SeqCst), 10);
+        assert_eq!(conn_counter.load(Ordering::SeqCst), 1);
 
         // Send another 10 events
         let (_, events) = random_lines_with_stream(10, 10);
         let pump = sink.send_all(events);
         let pump = rt.block_on(pump).unwrap();
 
+        // Some CI machines are very slow, be generous.
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
         // Drop the connection to allow the server to fully read from the buffer
         // and exit.
         drop(pump);
 
         // Wait for server task to be complete.
-        rt.block_on_std(jh).unwrap();
+        let _ = rt.block_on_std(jh).unwrap();
 
         // Check that there are exacty 20 events.
-        assert_eq!(counter.load(Ordering::Relaxed), 20);
+        assert_eq!(msg_counter.load(Ordering::SeqCst), 20);
+        assert_eq!(conn_counter.load(Ordering::SeqCst), 2);
     }
 }

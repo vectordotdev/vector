@@ -1,0 +1,12 @@
+{
+  "processed": {
+    "people": [
+      {
+        "name": "Foo",
+        "id": 1,
+        "email": "foo@test.com",
+        "phones": []
+      }
+    ]
+  }
+}

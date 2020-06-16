@@ -3,23 +3,24 @@ use crate::{
     event::{self, Event},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
-        BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
+        http2::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+        service2::TowerRequestConfig,
+        BatchBytesConfig, Buffer, Compression, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{future, Future, Sink};
-use http::{
+use futures::{FutureExt, TryFutureExt};
+use futures01::{future, Sink};
+use http02::{
     header::{self, HeaderName, HeaderValue},
-    Method, Uri,
+    Method, Request, StatusCode, Uri,
 };
-use hyper::{Body, Request};
+use hyper13::Body;
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -127,8 +128,10 @@ impl SinkConfig for HttpSinkConfig {
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
                 let healthcheck =
-                    healthcheck(healthcheck_uri, self.auth.clone(), cx.resolver(), tls)?;
-                Ok((sink, healthcheck))
+                    healthcheck(healthcheck_uri, self.auth.clone(), cx.resolver(), tls)
+                        .boxed()
+                        .compat();
+                Ok((sink, Box::new(healthcheck)))
             }
             None => Ok((sink, Box::new(future::ok(())))),
         }
@@ -186,37 +189,36 @@ impl HttpSink for HttpSinkConfig {
         Some(body)
     }
 
-    fn build_request(&self, mut body: Self::Output) -> http::Request<Vec<u8>> {
-        let mut builder = hyper::Request::builder();
-
+    fn build_request(&self, mut body: Self::Output) -> http02::Request<Vec<u8>> {
         let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
             HttpMethod::Post => Method::POST,
             HttpMethod::Put => Method::PUT,
         };
-
-        builder.method(method);
-
         let uri: Uri = self.uri.clone().into();
-        builder.uri(uri);
 
-        match self.encoding.codec() {
-            Encoding::Text => builder.header("Content-Type", "text/plain"),
-            Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
+        let ct = match self.encoding.codec() {
+            Encoding::Text => "text/plain",
+            Encoding::Ndjson => "application/x-ndjson",
             Encoding::Json => {
                 body.insert(0, b'[');
                 body.pop(); // remove trailing comma from last record
                 body.push(b']');
-                builder.header("Content-Type", "application/json")
+                "application/json"
             }
         };
 
+        let mut builder = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header("Content-Type", ct);
+
         if let Some(ce) = self.compression.content_encoding() {
-            builder.header("Content-Encoding", ce);
+            builder = builder.header("Content-Encoding", ce);
         }
 
         if let Some(headers) = &self.headers {
             for (header, value) in headers.iter() {
-                builder.header(header.as_str(), value.as_str());
+                builder = builder.header(header.as_str(), value.as_str());
             }
         }
 
@@ -230,12 +232,12 @@ impl HttpSink for HttpSinkConfig {
     }
 }
 
-fn healthcheck(
+async fn healthcheck(
     uri: UriSerde,
     auth: Option<Auth>,
     resolver: Resolver,
     tls_settings: TlsSettings,
-) -> crate::Result<super::Healthcheck> {
+) -> crate::Result<()> {
     let uri = build_uri(uri);
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
@@ -244,20 +246,12 @@ fn healthcheck(
     }
 
     let mut client = HttpClient::new(resolver, tls_settings)?;
+    let response = client.send(request).await?;
 
-    let healthcheck = client
-        .call(request)
-        .map_err(|err| err.into())
-        .and_then(|response| {
-            use hyper::StatusCode;
-
-            match response.status() {
-                StatusCode::OK => Ok(()),
-                status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
-            }
-        });
-
-    Ok(Box::new(healthcheck))
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        status => Err(super::HealthcheckError::UnexpectedStatus2 { status }.into()),
+    }
 }
 
 fn validate_headers(
@@ -284,11 +278,7 @@ fn build_uri(base: UriSerde) -> Uri {
     let base: Uri = base.into();
     Uri::builder()
         .scheme(base.scheme_str().unwrap_or("http"))
-        .authority(
-            base.authority_part()
-                .map(|a| a.as_str())
-                .unwrap_or("127.0.0.1"),
-        )
+        .authority(base.authority().map(|a| a.as_str()).unwrap_or("127.0.0.1"))
         .path_and_query(base.path_and_query().map(|pq| pq.as_str()).unwrap_or(""))
         .build()
         .expect("bug building uri")
@@ -299,17 +289,15 @@ mod tests {
     use super::*;
     use crate::{
         assert_downcast_matches,
-        runtime::Runtime,
         sinks::http::HttpSinkConfig,
-        sinks::util::http::HttpSink,
-        test_util::{next_addr, random_lines_with_stream, shutdown_on_idle},
+        sinks::util::http2::HttpSink,
+        sinks::util::test::build_test_server,
+        test_util::{next_addr, random_lines_with_stream, runtime, shutdown_on_idle},
         topology::config::SinkContext,
     };
-    use bytes::Buf;
-    use futures01::{sync::mpsc, Future, Sink, Stream};
-    use headers::{Authorization, HeaderMapExt};
-    use hyper::service::service_fn_ok;
-    use hyper::{Body, Request, Response, Server};
+    use futures01::{Sink, Stream};
+    use headers03::{Authorization, HeaderMapExt};
+    use hyper13::Method;
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
 
@@ -392,7 +380,7 @@ mod tests {
         "#;
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let rt = Runtime::new().unwrap();
+        let rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let _ = config.build(cx).unwrap();
@@ -417,11 +405,11 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let (sink, _) = config.build(cx).unwrap();
-        let (rx, trigger, server) = build_test_server(&in_addr);
+        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
@@ -435,7 +423,7 @@ mod tests {
             .wait()
             .map(Result::unwrap)
             .map(|(parts, body)| {
-                assert_eq!(hyper::Method::POST, parts.method);
+                assert_eq!(Method::POST, parts.method);
                 assert_eq!("/frames", parts.uri.path());
                 assert_eq!(
                     Some(Authorization::basic("waldo", "hunter2")),
@@ -443,7 +431,7 @@ mod tests {
                 );
                 body
             })
-            .map(hyper::Chunk::reader)
+            .map(std::io::Cursor::new)
             .map(flate2::read::GzDecoder::new)
             .map(BufReader::new)
             .flat_map(BufRead::lines)
@@ -480,11 +468,11 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let (sink, _) = config.build(cx).unwrap();
-        let (rx, trigger, server) = build_test_server(&in_addr);
+        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
@@ -498,7 +486,7 @@ mod tests {
             .wait()
             .map(Result::unwrap)
             .map(|(parts, body)| {
-                assert_eq!(hyper::Method::PUT, parts.method);
+                assert_eq!(Method::PUT, parts.method);
                 assert_eq!("/frames", parts.uri.path());
                 assert_eq!(
                     Some(Authorization::basic("waldo", "hunter2")),
@@ -506,7 +494,7 @@ mod tests {
                 );
                 body
             })
-            .map(hyper::Chunk::reader)
+            .map(std::io::Cursor::new)
             .map(flate2::read::GzDecoder::new)
             .map(BufReader::new)
             .flat_map(BufRead::lines)
@@ -540,11 +528,11 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let (sink, _) = config.build(cx).unwrap();
-        let (rx, trigger, server) = build_test_server(&in_addr);
+        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
@@ -558,7 +546,7 @@ mod tests {
             .wait()
             .map(Result::unwrap)
             .map(|(parts, body)| {
-                assert_eq!(hyper::Method::POST, parts.method);
+                assert_eq!(Method::POST, parts.method);
                 assert_eq!("/frames", parts.uri.path());
                 assert_eq!(
                     Some("bar"),
@@ -570,7 +558,7 @@ mod tests {
                 );
                 body
             })
-            .map(hyper::Chunk::reader)
+            .map(std::io::Cursor::new)
             .map(flate2::read::GzDecoder::new)
             .map(BufReader::new)
             .flat_map(BufRead::lines)
@@ -585,40 +573,5 @@ mod tests {
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
-    }
-
-    fn build_test_server(
-        addr: &std::net::SocketAddr,
-    ) -> (
-        mpsc::Receiver<(http::request::Parts, hyper::Chunk)>,
-        stream_cancel::Trigger,
-        impl Future<Item = (), Error = ()>,
-    ) {
-        let (tx, rx) = mpsc::channel(100);
-        let service = move || {
-            let tx = tx.clone();
-            service_fn_ok(move |req: Request<Body>| {
-                let (parts, body) = req.into_parts();
-
-                let tx = tx.clone();
-                tokio01::spawn(
-                    body.concat2()
-                        .map_err(|e| panic!(e))
-                        .and_then(|body| tx.send((parts, body)))
-                        .map(|_| ())
-                        .map_err(|e| panic!(e)),
-                );
-
-                Response::new(Body::empty())
-            })
-        };
-
-        let (trigger, tripwire) = stream_cancel::Tripwire::new();
-        let server = Server::bind(addr)
-            .serve(service)
-            .with_graceful_shutdown(tripwire)
-            .map_err(|e| panic!("server error: {}", e));
-
-        (rx, trigger, server)
     }
 }

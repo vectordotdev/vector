@@ -109,7 +109,6 @@ pub fn send_lines_tls(
                             // and tests will be checking that contents
                             // are received anyways.
                             stream.get_mut().shutdown().ok();
-                            //tokio01::io::shutdown(stream).map_err(|e| panic!("{:}", e))
                             Ok(())
                         })
                         .map(|_| ())

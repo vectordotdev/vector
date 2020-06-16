@@ -1,3 +1,5 @@
+#![allow(clippy::redundant_pattern_matching)]
+
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
@@ -53,8 +55,8 @@ fn benchmark_buffers(c: &mut Criterion) {
                 |(mut rt, writer, read_loop)| {
                     let send = writer.send_all(random_events(line_size).take(num_lines as u64));
 
-                    let read_handle = rt.spawn_handle(read_loop.compat());
-                    let write_handle = rt.spawn_handle(send.compat());
+                    let read_handle = rt.spawn_handle_std(read_loop.compat());
+                    let write_handle = rt.spawn_handle_std(send.compat());
 
                     let (writer, _stream) = rt.block_on_std(write_handle).unwrap().unwrap();
                     drop(writer);
@@ -71,12 +73,14 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let (writer, mut reader) = tokio::sync::mpsc::channel(100);
 
                     let read_handle =
-                        rt.spawn_handle(async move { while let Some(_) = reader.next().await {} });
+                        rt.spawn_handle_std(
+                            async move { while let Some(_) = reader.next().await {} },
+                        );
 
                     (rt, writer, read_handle)
                 },
                 |(mut rt, mut writer, read_handle)| {
-                    let write_handle = rt.spawn_handle(async move {
+                    let write_handle = rt.spawn_handle_std(async move {
                         let mut stream = random_events(line_size).take(num_lines as u64).compat();
                         while let Some(e) = stream.next().await {
                             writer.send(e).await.unwrap();
@@ -108,7 +112,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                 },
                 |(mut rt, writer)| {
                     let send = writer.send_all(random_events(line_size).take(num_lines as u64));
-                    let write_handle = rt.spawn_handle(send.compat());
+                    let write_handle = rt.spawn_handle_std(send.compat());
                     let _ = rt.block_on_std(write_handle).unwrap().unwrap();
                 },
             );
@@ -130,7 +134,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         leveldb_buffer::Buffer::build(path, plenty_of_room).unwrap();
 
                     let send = writer.send_all(random_events(line_size).take(num_lines as u64));
-                    let write_handle = rt.spawn_handle(send.compat());
+                    let write_handle = rt.spawn_handle_std(send.compat());
                     let (writer, _stream) = rt.block_on_std(write_handle).unwrap().unwrap();
                     drop(writer);
 
@@ -139,7 +143,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     (rt, read_loop)
                 },
                 |(mut rt, read_loop)| {
-                    let read_handle = rt.spawn_handle(read_loop.compat());
+                    let read_handle = rt.spawn_handle_std(read_loop.compat());
                     rt.block_on_std(read_handle).unwrap().unwrap();
                 },
             );
@@ -167,8 +171,8 @@ fn benchmark_buffers(c: &mut Criterion) {
                 |(mut rt, writer, read_loop)| {
                     let send = writer.send_all(random_events(line_size).take(num_lines as u64));
 
-                    let read_handle = rt.spawn_handle(read_loop.compat());
-                    let write_handle = rt.spawn_handle(send.compat());
+                    let read_handle = rt.spawn_handle_std(read_loop.compat());
+                    let write_handle = rt.spawn_handle_std(send.compat());
 
                     let _ = rt.block_on_std(write_handle).unwrap().unwrap();
                     rt.block_on_std(read_handle).unwrap().unwrap();
