@@ -320,6 +320,7 @@ mod integration_test {
         test_util::{block_on, random_lines_with_stream, random_string, wait_for},
         tls::TlsOptions,
     };
+    use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
@@ -349,8 +350,7 @@ mod integration_test {
         };
 
         let mut rt = crate::test_util::runtime();
-        use futures::compat::Future01CompatExt;
-        let jh = rt.spawn_handle(super::healthcheck(config).unwrap().compat());
+        let jh = rt.spawn_handle_std(super::healthcheck(config).unwrap());
 
         rt.block_on_std(jh).unwrap().unwrap();
     }
