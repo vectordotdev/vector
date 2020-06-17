@@ -250,6 +250,8 @@ warp = { version = "0.3.1", default-features = false, optional = true }
 zstd = { version = "0.6", default-features = false }
 cfg-if = { version = "1.0.0", default-features = false }
 tonic = { version = "0.4", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
+thiserror = "1.0"
+readonly = "0.1"
 
 # For WASM
 async-stream = "0.3.2"

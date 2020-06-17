@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
-use std::{convert::TryFrom, fs::read_to_string, path::PathBuf};
+use std::{convert::TryFrom, fs::read_to_string};
+use std::path::PathBuf;
 
 #[derive(Default, Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[serde(default, deny_unknown_fields)]
@@ -27,31 +28,31 @@ impl DnstapEventSchema {
         }
     }
 
-    pub fn dnstap_root_data_schema(self: &Self) -> &DnstapRootDataSchema {
+    pub fn dnstap_root_data_schema(&self) -> &DnstapRootDataSchema {
         &self.dnstap_root_data_schema
     }
 
-    pub fn dnstap_message_schema(self: &Self) -> &DnstapMessageSchema {
+    pub fn dnstap_message_schema(&self) -> &DnstapMessageSchema {
         &self.dnstap_message_schema
     }
 
-    pub fn dns_query_message_schema(self: &Self) -> &DnsQueryMessageSchema {
+    pub fn dns_query_message_schema(&self) -> &DnsQueryMessageSchema {
         &self.dns_query_message_schema
     }
 
-    pub fn dns_query_header_schema(self: &Self) -> &DnsQueryHeaderSchema {
+    pub fn dns_query_header_schema(&self) -> &DnsQueryHeaderSchema {
         &self.dns_query_header_schema
     }
 
-    pub fn dns_message_opt_pseudo_section_schema(self: &Self) -> &DnsMessageOptPseudoSectionSchema {
+    pub fn dns_message_opt_pseudo_section_schema(&self) -> &DnsMessageOptPseudoSectionSchema {
         &self.dns_message_opt_pseudo_section_schema
     }
 
-    pub fn dns_message_option_schema(self: &Self) -> &DnsMessageOptionSchema {
+    pub fn dns_message_option_schema(&self) -> &DnsMessageOptionSchema {
         &self.dns_message_option_schema
     }
 
-    pub fn dns_record_schema(self: &Self) -> &DnsRecordSchema {
+    pub fn dns_record_schema(&self) -> &DnsRecordSchema {
         &self.dns_record_schema
     }
 }
@@ -110,22 +111,22 @@ impl Default for DnstapRootDataSchema {
 }
 
 impl DnstapRootDataSchema {
-    pub fn server_identity(self: &Self) -> &str {
+    pub fn server_identity(&self) -> &str {
         &self.server_identity
     }
-    pub fn server_version(self: &Self) -> &str {
+    pub fn server_version(&self) -> &str {
         &self.server_version
     }
-    pub fn extra(self: &Self) -> &str {
+    pub fn extra(&self) -> &str {
         &self.extra
     }
-    pub fn data_type(self: &Self) -> &str {
+    pub fn data_type(&self) -> &str {
         &self.data_type
     }
-    pub fn error(self: &Self) -> &str {
+    pub fn error(&self) -> &str {
         &self.error
     }
-    pub fn raw_data(self: &Self) -> &str {
+    pub fn raw_data(&self) -> &str {
         &self.raw_data
     }
 }
@@ -150,46 +151,46 @@ pub struct DnstapMessageSchema {
 }
 
 impl DnstapMessageSchema {
-    pub fn socket_family(self: &Self) -> &str {
+    pub fn socket_family(&self) -> &str {
         &self.socket_family
     }
-    pub fn socket_protocol(self: &Self) -> &str {
+    pub fn socket_protocol(&self) -> &str {
         &self.socket_protocol
     }
-    pub fn query_address(self: &Self) -> &str {
+    pub fn query_address(&self) -> &str {
         &self.query_address
     }
-    pub fn query_port(self: &Self) -> &str {
+    pub fn query_port(&self) -> &str {
         &self.query_port
     }
-    pub fn response_address(self: &Self) -> &str {
+    pub fn response_address(&self) -> &str {
         &self.response_address
     }
-    pub fn response_port(self: &Self) -> &str {
+    pub fn response_port(&self) -> &str {
         &self.response_port
     }
-    pub fn query_zone(self: &Self) -> &str {
+    pub fn query_zone(&self) -> &str {
         &self.query_zone
     }
-    pub fn query_time_sec(self: &Self) -> &str {
+    pub fn query_time_sec(&self) -> &str {
         &self.query_time_sec
     }
-    pub fn query_time_nsec(self: &Self) -> &str {
+    pub fn query_time_nsec(&self) -> &str {
         &self.query_time_nsec
     }
-    pub fn response_time_sec(self: &Self) -> &str {
+    pub fn response_time_sec(&self) -> &str {
         &self.response_time_sec
     }
-    pub fn response_time_nsec(self: &Self) -> &str {
+    pub fn response_time_nsec(&self) -> &str {
         &self.response_time_nsec
     }
-    pub fn dnstap_message_type(self: &Self) -> &str {
+    pub fn dnstap_message_type(&self) -> &str {
         &self.dnstap_message_type
     }
-    pub fn query_message(self: &Self) -> &str {
+    pub fn query_message(&self) -> &str {
         &self.query_message
     }
-    pub fn response_message(self: &Self) -> &str {
+    pub fn response_message(&self) -> &str {
         &self.response_message
     }
 }
@@ -228,25 +229,25 @@ pub struct DnsQueryMessageSchema {
 }
 
 impl DnsQueryMessageSchema {
-    pub fn raw_data(self: &Self) -> &str {
+    pub fn raw_data(&self) -> &str {
         &self.raw_data
     }
-    pub fn header(self: &Self) -> &str {
+    pub fn header(&self) -> &str {
         &self.header
     }
-    pub fn question_section(self: &Self) -> &str {
+    pub fn question_section(&self) -> &str {
         &self.question_section
     }
-    pub fn answer_section(self: &Self) -> &str {
+    pub fn answer_section(&self) -> &str {
         &self.answer_section
     }
-    pub fn authority_section(self: &Self) -> &str {
+    pub fn authority_section(&self) -> &str {
         &self.authority_section
     }
-    pub fn additional_section(self: &Self) -> &str {
+    pub fn additional_section(&self) -> &str {
         &self.additional_section
     }
-    pub fn opt_pseudo_section(self: &Self) -> &str {
+    pub fn opt_pseudo_section(&self) -> &str {
         &self.opt_pseudo_section
     }
 }
@@ -285,46 +286,46 @@ pub struct DnsQueryHeaderSchema {
 }
 
 impl DnsQueryHeaderSchema {
-    pub fn id(self: &Self) -> &str {
+    pub fn id(&self) -> &str {
         &self.id
     }
-    pub fn opcode(self: &Self) -> &str {
+    pub fn opcode(&self) -> &str {
         &self.opcode
     }
-    pub fn rcode(self: &Self) -> &str {
+    pub fn rcode(&self) -> &str {
         &self.rcode
     }
-    pub fn aa(self: &Self) -> &str {
+    pub fn aa(&self) -> &str {
         &self.aa
     }
-    pub fn tc(self: &Self) -> &str {
+    pub fn tc(&self) -> &str {
         &self.tc
     }
-    pub fn rd(self: &Self) -> &str {
+    pub fn rd(&self) -> &str {
         &self.rd
     }
-    pub fn qr(self: &Self) -> &str {
+    pub fn qr(&self) -> &str {
         &self.qr
     }
-    pub fn ra(self: &Self) -> &str {
+    pub fn ra(&self) -> &str {
         &self.ra
     }
-    pub fn ad(self: &Self) -> &str {
+    pub fn ad(&self) -> &str {
         &self.ad
     }
-    pub fn cd(self: &Self) -> &str {
+    pub fn cd(&self) -> &str {
         &self.cd
     }
-    pub fn question_count(self: &Self) -> &str {
+    pub fn question_count(&self) -> &str {
         &self.question_count
     }
-    pub fn answer_count(self: &Self) -> &str {
+    pub fn answer_count(&self) -> &str {
         &self.answer_count
     }
-    pub fn authority_count(self: &Self) -> &str {
+    pub fn authority_count(&self) -> &str {
         &self.authority_count
     }
-    pub fn additional_count(self: &Self) -> &str {
+    pub fn additional_count(&self) -> &str {
         &self.additional_count
     }
 }
@@ -361,19 +362,19 @@ pub struct DnsMessageOptPseudoSectionSchema {
 }
 
 impl DnsMessageOptPseudoSectionSchema {
-    pub fn extended_rcode(self: &Self) -> &str {
+    pub fn extended_rcode(&self) -> &str {
         &self.extended_rcode
     }
-    pub fn version(self: &Self) -> &str {
+    pub fn version(&self) -> &str {
         &self.version
     }
-    pub fn do_flag(self: &Self) -> &str {
+    pub fn do_flag(&self) -> &str {
         &self.do_flag
     }
-    pub fn udp_max_payload_size(self: &Self) -> &str {
+    pub fn udp_max_payload_size(&self) -> &str {
         &self.udp_max_payload_size
     }
-    pub fn options(self: &Self) -> &str {
+    pub fn options(&self) -> &str {
         &self.options
     }
 }
@@ -400,16 +401,16 @@ pub struct DnsMessageOptionSchema {
 }
 
 impl DnsMessageOptionSchema {
-    pub fn opt_code(self: &Self) -> &str {
+    pub fn opt_code(&self) -> &str {
         &self.opt_code
     }
-    pub fn opt_name(self: &Self) -> &str {
+    pub fn opt_name(&self) -> &str {
         &self.opt_name
     }
-    pub fn supported_algorithms(self: &Self) -> &str {
+    pub fn supported_algorithms(&self) -> &str {
         &self.supported_algorithms
     }
-    pub fn opt_data(self: &Self) -> &str {
+    pub fn opt_data(&self) -> &str {
         &self.opt_data
     }
 }
@@ -430,25 +431,29 @@ impl Default for DnsMessageOptionSchema {
 pub struct DnsRecordSchema {
     name: String,
     record_type: String,
+    record_type_id: String,
     ttl: String,
     class: String,
     rdata: String,
 }
 
 impl DnsRecordSchema {
-    pub fn name(self: &Self) -> &str {
+    pub fn name(&self) -> &str {
         &self.name
     }
-    pub fn record_type(self: &Self) -> &str {
+    pub fn record_type(&self) -> &str {
         &self.record_type
     }
-    pub fn ttl(self: &Self) -> &str {
+    pub fn record_type_id(&self) -> &str {
+        &self.record_type_id
+    }
+    pub fn ttl(&self) -> &str {
         &self.ttl
     }
-    pub fn class(self: &Self) -> &str {
+    pub fn class(&self) -> &str {
         &self.class
     }
-    pub fn rdata(self: &Self) -> &str {
+    pub fn rdata(&self) -> &str {
         &self.rdata
     }
 }
@@ -458,6 +463,7 @@ impl Default for DnsRecordSchema {
         Self {
             name: String::from("name"),
             record_type: String::from("type"),
+            record_type_id: String::from("type_id"),
             ttl: String::from("ttl"),
             class: String::from("class"),
             rdata: String::from("rdata"),

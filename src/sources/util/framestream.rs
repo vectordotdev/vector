@@ -10,7 +10,6 @@ use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use std::convert::TryInto;
 use std::fs;
 use std::marker::{Send, Sync};
-#[cfg(unix)]
 use std::path::PathBuf;
 use tokio01::{
     self,
@@ -342,11 +341,11 @@ impl FrameStreamReader {
 }
 
 pub trait FrameHandler {
-    fn content_type(self: &Self) -> String;
-    fn max_length(self: &Self) -> usize;
-    fn host_key(self: &Self) -> String;
-    fn handle_event(self: &Self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event>;
-    fn socket_path(self: &Self) -> PathBuf;
+    fn content_type(&self) -> String;
+    fn max_length(&self) -> usize;
+    fn host_key(&self) -> String;
+    fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event>;
+    fn socket_path(&self) -> PathBuf;
 }
 
 /**
@@ -472,17 +471,17 @@ mod test {
     }
 
     impl FrameHandler for MockFrameHandler {
-        fn content_type(self: &Self) -> String {
+        fn content_type(&self) -> String {
             self.content_type.clone()
         }
-        fn max_length(self: &Self) -> usize {
+        fn max_length(&self) -> usize {
             self.max_length.clone()
         }
-        fn host_key(self: &Self) -> String {
+        fn host_key(&self) -> String {
             self.host_key.clone()
         }
 
-        fn handle_event(self: &Self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+        fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
             let mut event = Event::from(frame);
             event
                 .as_mut_log()
@@ -493,7 +492,7 @@ mod test {
             Some(event)
         }
 
-        fn socket_path(self: &Self) -> PathBuf {
+        fn socket_path(&self) -> PathBuf {
             self.socket_path.clone()
         }
     }

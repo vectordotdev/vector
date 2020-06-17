@@ -9,12 +9,16 @@ use bytes::Bytes;
 use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 
-#[cfg(unix)]
 use std::path::PathBuf;
 
 mod parser;
+use parser::DnstapParser;
 
-use parser::{schema::DnstapEventSchema, DnstapParser};
+mod schema;
+use schema::DnstapEventSchema;
+
+mod dns_message;
+mod dns_message_parser;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct DnstapConfig {
@@ -33,9 +37,9 @@ impl DnstapConfig {
     pub fn new(socket_path: PathBuf) -> Self {
         Self {
             host_key: None,
-            max_length: default_max_length(),
-            socket_path: socket_path,
+            socket_path,
             schema_path: None,
+            ..Self::default()
         }
     }
 
@@ -126,30 +130,30 @@ impl DnstapFrameHandler {
         }
     }
 
-    pub fn host_key(self: &Self) -> &str {
+    pub fn host_key(&self) -> &str {
         &self.host_key
     }
 
-    pub fn schema_mut(self: &mut Self) -> &mut DnstapEventSchema {
+    pub fn schema_mut(&mut self) -> &mut DnstapEventSchema {
         &mut self.schema
     }
 }
 
 impl FrameHandler for DnstapFrameHandler {
-    fn content_type(self: &Self) -> String {
+    fn content_type(&self) -> String {
         self.content_type.clone()
     }
-    fn max_length(self: &Self) -> usize {
-        self.max_length.clone()
+    fn max_length(&self) -> usize {
+        self.max_length
     }
-    fn host_key(self: &Self) -> String {
+    fn host_key(&self) -> String {
         self.host_key.clone()
     }
     /**
      * Function to pass into util::framestream::build_framestream_unix_source
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
-    fn handle_event(self: &Self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+    fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
         let mut event = Event::new_empty_log();
 
         let log_event = event.as_mut_log();
@@ -167,7 +171,7 @@ impl FrameHandler for DnstapFrameHandler {
             Ok(_) => Some(event),
         }
     }
-    fn socket_path(self: &Self) -> PathBuf {
+    fn socket_path(&self) -> PathBuf {
         self.socket_path.clone()
     }
 }

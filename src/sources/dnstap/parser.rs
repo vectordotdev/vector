@@ -8,15 +8,7 @@ use std::convert::TryInto;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 #[cfg(unix)]
 use trust_dns_proto::{
-    op::{message::Message as TrustDnsMessage, Edns, Query},
-    rr::{
-        dnssec::SupportedAlgorithms,
-        domain::Name,
-        rdata::opt::{EdnsCode, EdnsOption},
-        record_data::RData,
-        resource::Record,
-        RecordType,
-    },
+    rr::domain::Name,
     serialize::binary::{BinDecodable, BinDecoder},
 };
 
@@ -26,9 +18,11 @@ mod proto {
 
 use proto::{dnstap::Type as DnstapDataType, Dnstap, Message as DnstapMessage};
 
-pub mod schema;
-
-use schema::DnstapEventSchema;
+use super::dns_message::{
+    DnsRecord, EdnsOptionEntry, OptPseudoSection, QueryHeader, QueryQuestion,
+};
+use super::dns_message_parser::parse_dns_query_message;
+use super::schema::DnstapEventSchema;
 
 pub struct DnstapParser<'a> {
     event_schema: &'a DnstapEventSchema,
@@ -43,7 +37,7 @@ impl<'a> DnstapParser<'a> {
         }
     }
 
-    pub fn parse_dnstap_data(self: &mut Self, frame: Bytes) -> Result<()> {
+    pub fn parse_dnstap_data(&mut self, frame: Bytes) -> Result<()> {
         //parse frame with dnstap protobuf
         let proto_msg = Dnstap::decode(frame.clone())?;
 
@@ -103,7 +97,7 @@ impl<'a> DnstapParser<'a> {
         Ok(())
     }
 
-    fn parse_dnstap_message(self: &mut Self, dnstap_message: DnstapMessage) -> Result<()> {
+    fn parse_dnstap_message(&mut self, dnstap_message: DnstapMessage) -> Result<()> {
         if let Some(socket_family) = dnstap_message.socket_family {
             // the raw value is reserved intentionally to ensure forward-compatibility
             self.log_event.insert(
@@ -264,7 +258,7 @@ impl<'a> DnstapParser<'a> {
         Ok(())
     }
 
-    fn log_raw_dns_message(self: &mut Self, key_prefix: &str, raw_dns_message: &Vec<u8>) {
+    fn log_raw_dns_message(&mut self, key_prefix: &str, raw_dns_message: &Vec<u8>) {
         self.log_event.insert_path(
             make_event_key_with_prefix(
                 key_prefix,
@@ -275,86 +269,82 @@ impl<'a> DnstapParser<'a> {
     }
 
     fn parse_dns_query_message(
-        self: &mut Self,
+        &mut self,
         key_prefix: &str,
         raw_dns_message: &Vec<u8>,
     ) -> Result<()> {
-        if let Ok(msg) = TrustDnsMessage::from_vec(raw_dns_message) {
+        if let Ok(msg) = parse_dns_query_message(raw_dns_message) {
             println!("Query: {:?}", msg);
 
-            self.parse_dns_query_message_header(
+            self.log_dns_query_message_header(
                 &concat_event_key_paths(
                     key_prefix,
                     self.event_schema.dns_query_message_schema().header(),
                 ),
-                &msg,
+                &msg.header,
             );
 
-            self.parse_dns_query_message_query_section(
+            self.log_dns_query_message_query_section(
                 &concat_event_key_paths(
                     key_prefix,
                     self.event_schema
                         .dns_query_message_schema()
                         .question_section(),
                 ),
-                &msg,
-            )?;
+                &msg.question_section,
+            );
 
-            self.parse_dns_query_message_answer_section(
+            self.log_dns_query_message_record_section(
                 &concat_event_key_paths(
                     key_prefix,
                     self.event_schema
                         .dns_query_message_schema()
                         .answer_section(),
                 ),
-                &msg,
-            )?;
+                &msg.answer_section,
+            );
 
-            self.parse_dns_query_message_authority_section(
+            self.log_dns_query_message_record_section(
                 &concat_event_key_paths(
                     key_prefix,
                     self.event_schema
                         .dns_query_message_schema()
                         .authority_section(),
                 ),
-                &msg,
-            )?;
+                &msg.authority_section,
+            );
 
-            self.parse_dns_query_message_additional_section(
+            self.log_dns_query_message_record_section(
                 &concat_event_key_paths(
                     key_prefix,
                     self.event_schema
                         .dns_query_message_schema()
                         .additional_section(),
                 ),
-                &msg,
-            )?;
+                &msg.additional_section,
+            );
 
-            self.parse_edns(
+            self.log_edns(
                 &concat_event_key_paths(
                     key_prefix,
                     self.event_schema
                         .dns_query_message_schema()
                         .opt_pseudo_section(),
                 ),
-                &msg,
+                &msg.opt_pserdo_section,
             );
         };
 
         Ok(())
     }
 
-    fn parse_dns_query_message_header(
-        self: &mut Self,
-        key_prefix: &str,
-        dns_message: &TrustDnsMessage,
-    ) {
+    fn log_dns_query_message_header(&mut self, key_prefix: &str, header: &QueryHeader) {
         self.log_event.insert_path(
             make_event_key_with_prefix(
                 key_prefix,
                 self.event_schema.dns_query_header_schema().id(),
             ),
-            dns_message.header().id() as i64,
+            header.id as i64,
         );
 
         self.log_event.insert_path(
@@ -362,7 +352,7 @@ impl<'a> DnstapParser<'a> {
                 key_prefix,
                 self.event_schema.dns_query_header_schema().opcode(),
             ),
-            dns_message.header().op_code() as i64,
+            header.opcode as i64,
         );
 
         self.log_event.insert_path(
@@ -370,7 +360,7 @@ impl<'a> DnstapParser<'a> {
                 key_prefix,
                 self.event_schema.dns_query_header_schema().rcode(),
             ),
-            dns_message.header().response_code() as i64,
+            header.rcode as i64,
         );
 
         self.log_event.insert_path(
@@ -378,7 +368,7 @@ impl<'a> DnstapParser<'a> {
                 key_prefix,
                 self.event_schema.dns_query_header_schema().qr(),
             ),
-            dns_message.header().message_type() as i64,
+            header.qr as i64,
         );
 
         self.log_event.insert_path(
@@ -386,7 +376,7 @@ impl<'a> DnstapParser<'a> {
                 key_prefix,
                 self.event_schema.dns_query_header_schema().aa(),
             ),
-            dns_message.header().authoritative() as bool,
+            header.aa as bool,
         );
 
         self.log_event.insert_path(
@@ -394,7 +384,7 @@ impl<'a> DnstapParser<'a> {
                 key_prefix,
                 self.event_schema.dns_query_header_schema().tc(),
             ),
-            dns_message.header().truncated() as bool,
+            header.tc as bool,
         );
 
         self.log_event.insert_path(
@@ -402,7 +392,7 @@ impl<'a> DnstapParser<'a> {
                 key_prefix,
                 self.event_schema.dns_query_header_schema().rd(),
             ),
-            dns_message.header().recursion_desired() as bool,
+            header.rd as bool,
         );
 
         self.log_event.insert_path(
@@ -410,7 +400,7 @@ impl<'a> DnstapParser<'a> {
                 key_prefix,
                 self.event_schema.dns_query_header_schema().ra(),
             ),
-            dns_message.header().recursion_available() as bool,
+            header.ra as bool,
         );
 
         self.log_event.insert_path(
@@ -418,7 +408,7 @@ impl<'a> DnstapParser<'a> {
                 key_prefix,
                 self.event_schema.dns_query_header_schema().ad(),
             ),
-            dns_message.header().authentic_data() as bool,
+            header.ad as bool,
         );
 
         self.log_event.insert_path(
@@ -426,7 +416,7 @@ impl<'a> DnstapParser<'a> {
                 key_prefix,
                 self.event_schema.dns_query_header_schema().cd(),
             ),
-            dns_message.header().checking_disabled() as bool,
+            header.cd as bool,
         );
 
         self.log_event.insert_path(
@@ -434,7 +424,7 @@ impl<'a> DnstapParser<'a> {
                 key_prefix,
                 self.event_schema.dns_query_header_schema().question_count(),
             ),
-            dns_message.header().query_count() as i64,
+            header.question_count as i64,
         );
 
         self.log_event.insert_path(
@@ -442,7 +432,7 @@ impl<'a> DnstapParser<'a> {
                 key_prefix,
                 self.event_schema.dns_query_header_schema().answer_count(),
             ),
-            dns_message.header().answer_count() as i64,
+            header.answer_count as i64,
         );
 
         self.log_event.insert_path(
@@ -452,7 +442,7 @@ impl<'a> DnstapParser<'a> {
                     .dns_query_header_schema()
                     .authority_count(),
             ),
-            dns_message.header().name_server_count() as i64,
+            header.authority_count as i64,
         );
 
         self.log_event.insert_path(
@@ -462,83 +452,55 @@ impl<'a> DnstapParser<'a> {
                     .dns_query_header_schema()
                     .additional_count(),
             ),
-            dns_message.header().additional_count() as i64,
+            header.additional_count as i64,
         );
     }
 
-    fn parse_dns_query_message_query_section(
-        self: &mut Self,
+    fn log_dns_query_message_query_section(
+        &mut self,
         key_path: &str,
-        dns_message: &TrustDnsMessage,
-    ) -> Result<()> {
-        for (i, query) in dns_message.queries().iter().enumerate() {
-            self.parse_dns_query_question(&make_indexed_event_key_path(key_path, i as u32), query)?;
+        questions: &Vec<QueryQuestion>,
+    ) {
+        for (i, query) in questions.iter().enumerate() {
+            self.log_dns_query_question(&make_indexed_event_key_path(key_path, i as u32), query);
         }
-
-        Ok(())
     }
 
-    fn parse_dns_query_question(self: &mut Self, key_path: &str, question: &Query) -> Result<()> {
+    fn log_dns_query_question(&mut self, key_path: &str, question: &QueryQuestion) {
         self.log_event.insert_path(
             make_event_key_with_prefix(key_path, self.event_schema.dns_record_schema().name()),
-            question.name().to_string(),
+            question.name.clone(),
         );
+        if let Some(record_type) = question.record_type.clone() {
+            self.log_event.insert_path(
+                make_event_key_with_prefix(
+                    key_path,
+                    self.event_schema.dns_record_schema().record_type(),
+                ),
+                record_type,
+            );
+        }
         self.log_event.insert_path(
             make_event_key_with_prefix(
                 key_path,
-                self.event_schema.dns_record_schema().record_type(),
+                self.event_schema.dns_record_schema().record_type_id(),
             ),
-            match question.query_type() {
-                RecordType::Unknown( code ) => parse_unknown_record_type(code),
-                _ => question.query_type().to_string(),
-            },
+            question.record_type_id as i64,
         );
         self.log_event.insert_path(
             make_event_key_with_prefix(key_path, self.event_schema.dns_record_schema().class()),
-            question.query_class().to_string(),
+            question.class.clone(),
         );
-
-        Ok(())
     }
 
-    fn parse_dns_query_message_answer_section(
-        self: &mut Self,
-        key_path: &str,
-        dns_message: &TrustDnsMessage,
-    ) -> Result<()> {
-        for (i, record) in dns_message.answers().iter().enumerate() {
-            self.parse_dns_record(&make_indexed_event_key_path(key_path, i as u32), record)?;
+    fn log_dns_query_message_record_section(&mut self, key_path: &str, records: &Vec<DnsRecord>) {
+        for (i, record) in records.iter().enumerate() {
+            self.log_dns_record(&make_indexed_event_key_path(key_path, i as u32), record);
         }
-
-        Ok(())
     }
 
-    fn parse_dns_query_message_authority_section(
-        self: &mut Self,
-        key_path: &str,
-        dns_message: &TrustDnsMessage,
-    ) -> Result<()> {
-        for (i, record) in dns_message.name_servers().iter().enumerate() {
-            self.parse_dns_record(&make_indexed_event_key_path(key_path, i as u32), record)?;
-        }
-
-        Ok(())
-    }
-
-    fn parse_dns_query_message_additional_section(
-        self: &mut Self,
-        key_path: &str,
-        dns_message: &TrustDnsMessage,
-    ) -> Result<()> {
-        for (i, record) in dns_message.additionals().iter().enumerate() {
-            self.parse_dns_record(&make_indexed_event_key_path(key_path, i as u32), record)?;
-        }
-
-        Ok(())
-    }
-
-    fn parse_edns(self: &mut Self, key_prefix: &str, dns_message: &TrustDnsMessage) {
-        if let Some(edns) = dns_message.edns() {
+    fn log_edns(&mut self, key_prefix: &str, opt_section: &Option<OptPseudoSection>) {
+        if let Some(edns) = opt_section {
             self.log_event.insert_path(
                 make_event_key_with_prefix(
                     key_prefix,
@@ -546,7 +508,7 @@ impl<'a> DnstapParser<'a> {
                         .dns_message_opt_pseudo_section_schema()
                         .extended_rcode(),
                 ),
-                edns.rcode_high() as i64,
+                edns.extended_rcode as i64,
             );
             self.log_event.insert_path(
                 make_event_key_with_prefix(
@@ -555,7 +517,7 @@ impl<'a> DnstapParser<'a> {
                         .dns_message_opt_pseudo_section_schema()
                         .version(),
                 ),
-                edns.version() as i64,
+                edns.version as i64,
             );
             self.log_event.insert_path(
                 make_event_key_with_prefix(
@@ -564,7 +526,7 @@ impl<'a> DnstapParser<'a> {
                         .dns_message_opt_pseudo_section_schema()
                         .do_flag(),
                 ),
-                edns.dnssec_ok() as bool,
+                edns.dnssec_ok as bool,
             );
             self.log_event.insert_path(
                 make_event_key_with_prefix(
@@ -573,150 +535,83 @@ impl<'a> DnstapParser<'a> {
                         .dns_message_opt_pseudo_section_schema()
                         .udp_max_payload_size(),
                 ),
-                edns.max_payload() as i64,
+                edns.udp_max_payload_size as i64,
             );
-            self.parse_edns_options(
+            self.log_edns_options(
                 &concat_event_key_paths(
                     key_prefix,
                     self.event_schema
                         .dns_message_opt_pseudo_section_schema()
                         .options(),
                 ),
-                edns,
+                &edns.options,
             );
         }
     }
 
-    fn parse_edns_options(self: &mut Self, key_path: &str, edns: &Edns) {
-        edns.options()
-            .options()
-            .iter()
-            .enumerate()
-            .for_each(|(i, (code, option))| {
-                match option {
-                    EdnsOption::DAU(algorithms) => self.parse_edns_opt_dnssec_algorithms(
-                        &make_indexed_event_key_path(key_path, i as u32),
-                        code,
-                        algorithms,
-                    ),
-                    EdnsOption::DHU(algorithms) => self.parse_edns_opt_dnssec_algorithms(
-                        &make_indexed_event_key_path(key_path, i as u32),
-                        code,
-                        algorithms,
-                    ),
-                    EdnsOption::N3U(algorithms) => self.parse_edns_opt_dnssec_algorithms(
-                        &make_indexed_event_key_path(key_path, i as u32),
-                        code,
-                        algorithms,
-                    ),
-                    EdnsOption::Unknown(_, opt_data) => self.parse_edns_opt(
-                        &make_indexed_event_key_path(key_path, i as u32),
-                        code,
-                        opt_data,
-                    ),
-                };
-            });
-    }
-
-    fn parse_edns_opt_dnssec_algorithms(
-        self: &mut Self,
-        key_prefix: &str,
-        opt_code: &EdnsCode,
-        algorithms: &SupportedAlgorithms,
-    ) {
-        self.log_event.insert_path(
-            make_event_key_with_prefix(
-                key_prefix,
-                self.event_schema.dns_message_option_schema().opt_code(),
-            ),
-            Into::<u16>::into(*opt_code) as i64,
-        );
-        self.log_event.insert_path(
-            make_event_key_with_prefix(
-                key_prefix,
-                self.event_schema.dns_message_option_schema().opt_name(),
-            ),
-            format!("{:?}", opt_code),
-        );
-        algorithms.iter().enumerate().for_each(|(i, alg)| {
-            self.log_event.insert_path(
-                make_event_key_with_index(
-                    &concat_event_key_paths(
-                        key_prefix,
-                        self.event_schema
-                            .dns_message_option_schema()
-                            .supported_algorithms(),
-                    ),
-                    i as u32,
-                ),
-                alg.to_string(),
-            );
+    fn log_edns_options(&mut self, key_path: &str, options: &Vec<EdnsOptionEntry>) {
+        options.iter().enumerate().for_each(|(i, opt)| {
+            self.log_edns_opt(&make_indexed_event_key_path(key_path, i as u32), opt);
         });
     }
 
-    fn parse_edns_opt(self: &mut Self, key_prefix: &str, opt_code: &EdnsCode, opt_data: &Vec<u8>) {
+    fn log_edns_opt(&mut self, key_prefix: &str, opt: &EdnsOptionEntry) {
         self.log_event.insert_path(
             make_event_key_with_prefix(
                 key_prefix,
                 self.event_schema.dns_message_option_schema().opt_code(),
             ),
-            Into::<u16>::into(*opt_code) as i64,
+            opt.opt_code as i64,
         );
         self.log_event.insert_path(
             make_event_key_with_prefix(
                 key_prefix,
                 self.event_schema.dns_message_option_schema().opt_name(),
             ),
-            format!("{:?}", opt_code),
+            opt.opt_name.clone(),
         );
         self.log_event.insert_path(
             make_event_key_with_prefix(
                 key_prefix,
                 self.event_schema.dns_message_option_schema().opt_data(),
             ),
-            format_bytes_as_hex_string(&opt_data),
+            opt.opt_data.clone(),
         );
     }
 
-    fn parse_dns_record(self: &mut Self, key_path: &str, record: &Record) -> Result<()> {
+    fn log_dns_record(&mut self, key_path: &str, record: &DnsRecord) {
         self.log_event.insert_path(
             make_event_key_with_prefix(key_path, self.event_schema.dns_record_schema().name()),
-            record.name().to_string(),
+            record.name.clone(),
         );
+        if let Some(record_type) = record.record_type.clone() {
+            self.log_event.insert_path(
+                make_event_key_with_prefix(
+                    key_path,
+                    self.event_schema.dns_record_schema().record_type(),
+                ),
+                record_type,
+            );
+        }
         self.log_event.insert_path(
             make_event_key_with_prefix(
                 key_path,
-                self.event_schema.dns_record_schema().record_type(),
+                self.event_schema.dns_record_schema().record_type_id(),
             ),
-            match record.rdata() {
-                RData::Unknown { code, rdata: _ } => parse_unknown_record_type(*code),
-                _ => record.record_type().to_string(),
-            },
+            record.record_type_id as i64,
         );
         self.log_event.insert_path(
             make_event_key_with_prefix(key_path, self.event_schema.dns_record_schema().ttl()),
-            record.ttl() as i64,
+            record.ttl as i64,
         );
         self.log_event.insert_path(
             make_event_key_with_prefix(key_path, self.event_schema.dns_record_schema().class()),
-            record.dns_class().to_string(),
+            record.class.clone(),
         );
         self.log_event.insert_path(
             make_event_key_with_prefix(key_path, self.event_schema.dns_record_schema().rdata()),
-            format_rdata(record.rdata())?,
+            record.rdata.clone(),
         );
-
-        Ok(())
-    }
-}
-
-fn parse_unknown_record_type(rtype: u16) -> String {
-    match rtype {
-        13 => String::from("HINFO"),
-        20 => String::from("ISDN"),
-        38 => String::from("A6"),
-        39 => String::from("DNAME"),
-        _ => format!("[#{}]", rtype),
     }
 }
 
@@ -728,96 +623,8 @@ fn format_bytes_as_hex_string(bytes: &Vec<u8>) -> String {
         .join(".")
 }
 
-fn format_rdata(rdata: &RData) -> Result<String> {
-    match rdata {
-        RData::A(ip) => Ok(ip.to_string()),
-        RData::AAAA(ip) => Ok(ip.to_string()),
-        RData::CNAME(name) => Ok(name.to_utf8()),
-        RData::SRV(srv) => Ok(format!(
-            "{} {} {} {}",
-            srv.priority(),
-            srv.weight(),
-            srv.port(),
-            srv.target().to_utf8()
-        )),
-        RData::TXT(txt) => Ok(txt
-            .txt_data()
-            .iter()
-            .map(|value| {
-                format!(
-                    "\"{}\"",
-                    escape_string_for_text_representation(
-                        String::from_utf8_lossy(value).to_string()
-                    )
-                )
-            })
-            .collect::<Vec<String>>()
-            .join(" ")),
-        RData::SOA(soa) => Ok(format!(
-            "{} {} ({} {} {} {} {})",
-            soa.mname().to_utf8(),
-            soa.rname().to_utf8(),
-            soa.serial(),
-            soa.refresh(),
-            soa.retry(),
-            soa.expire(),
-            soa.minimum()
-        )),
-        RData::Unknown { code, rdata } => match code {
-            13 => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = BinDecoder::new(raw_rdata);
-                    let cpu = parse_character_string(&mut decoder)?;
-                    let os = parse_character_string(&mut decoder)?;
-                    Ok(format!(
-                        "\"{}\" \"{}\"",
-                        escape_string_for_text_representation(cpu),
-                        escape_string_for_text_representation(os)
-                    ))
-                }
-                None => Err(Error::from("Empty HINFO rdata")),
-            },
-
-            _ => match rdata.anything() {
-                Some(raw_rdata) => Ok(format_bytes_as_hex_string(raw_rdata)),
-                None => Err(Error::from("Empty rdata")),
-            },
-        },
-        _ => Ok(String::from("unknown yet")),
-    }
-}
-
-fn parse_character_string(decoder: &mut BinDecoder) -> Result<String> {
-    match decoder.read_u8() {
-        Ok(raw_len) => {
-            let len = raw_len.unverified() as usize;
-            match decoder.read_slice(len) {
-                Ok(raw_text) => match raw_text.verify_unwrap(|r| r.len() == len) {
-                    Ok(verified_text) => Ok(String::from_utf8_lossy(verified_text).to_string()),
-                    Err(raw_data) => Err(Error::from(format!(
-                        "Unexpected data length: expected {}, got {}. Raw data {}",
-                        len,
-                        raw_data.len(),
-                        format_bytes_as_hex_string(&raw_data.to_vec())
-                    ))),
-                },
-                Err(error) => Err(Error::from(error.to_string())),
-            }
-        }
-        Err(error) => Err(Error::from(error.to_string())),
-    }
-}
-
-fn escape_string_for_text_representation(original_string: String) -> String {
-    original_string.replace("\\", "\\\\").replace("\"", "\\\"")
-}
-
 fn make_event_key(name: &str) -> Vec<PathComponent> {
     PathIter::new(name).collect()
-}
-
-fn make_event_key_with_index(name: &str, index: u32) -> Vec<PathComponent> {
-    make_event_key(&make_indexed_event_key_path(name, index))
 }
 
 fn make_event_key_with_prefix(prefix: &str, name: &str) -> Vec<PathComponent> {
