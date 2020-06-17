@@ -32,7 +32,7 @@
 //! driven independently from the sink. A oneshot channel is used to tie them back into
 //! the sink to allow it to notify the consumer that the request has succeeded.
 
-use super::batch::{Batch, BatchSettings, PushResult};
+use super::batch::{Batch, BatchSettings, PushResult, StatefulBatch};
 use super::buffer::partition::Partition;
 use crate::buffers::Acker;
 use futures01::{
@@ -136,8 +136,7 @@ impl<T: Sink> Sink for StreamSink<T> {
 /// in all requests will not be acked until r1 has completed.
 pub struct BatchSink<S, B, Request, E = DefaultExecutor> {
     service: ServiceSink<S, Request>,
-    batch: B,
-    batch_was_full: bool,
+    batch: StatefulBatch<B>,
     settings: BatchSettings,
     linger: Option<Delay>,
     closing: bool,
@@ -178,8 +177,7 @@ where
 
         Self {
             service,
-            batch,
-            batch_was_full: false,
+            batch: batch.into(),
             settings,
             linger: None,
             closing: false,
@@ -189,7 +187,7 @@ where
     }
 
     fn should_send(&mut self) -> bool {
-        self.closing || self.batch_was_full || self.linger_elapsed()
+        self.closing || self.batch.is_full() || self.linger_elapsed()
     }
 
     fn linger_elapsed(&mut self) -> bool {
@@ -213,11 +211,11 @@ where
     type SinkError = crate::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        if self.batch_was_full {
+        if self.batch.was_full() {
             trace!("batch full.");
             self.poll_complete()?;
 
-            if self.batch_was_full {
+            if self.batch.is_full() {
                 debug!(message = "Batch full; applying back pressure.", size = %self.settings.size, rate_limit_secs = 10);
                 return Ok(AsyncSink::NotReady(item));
             }
@@ -233,11 +231,7 @@ where
 
         match self.batch.push(item) {
             PushResult::Ok => Ok(AsyncSink::Ready),
-            PushResult::Full(item) => {
-                self.batch_was_full = true;
-                // This will trigger the stanza at the top of this function.
-                self.start_send(item)
-            }
+            PushResult::Full(item) => self.start_send(item),
         }
     }
 
@@ -262,8 +256,6 @@ where
                     let fut = self.service.call(request, batch_size);
 
                     self.exec.spawn(fut).expect("Spawn service future");
-
-                    self.batch_was_full = false;
 
                     // Disable linger timeout
                     self.linger.take();
@@ -325,10 +317,10 @@ type LingerDelay<K> = Box<dyn Future<Item = LingerState<K>, Error = ()> + Send +
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
 pub struct PartitionBatchSink<B, S, K, Request, E = DefaultExecutor> {
-    batch: B,
+    batch: StatefulBatch<B>,
     service: ServiceSink<S, Request>,
     exec: E,
-    partitions: HashMap<K, B>,
+    partitions: HashMap<K, StatefulBatch<B>>,
     settings: BatchSettings,
     closing: bool,
     sending: VecDeque<B>,
@@ -383,7 +375,7 @@ where
         let service = ServiceSink::new(service, acker);
 
         Self {
-            batch,
+            batch: batch.into(),
             service,
             exec,
             partitions: HashMap::new(),
@@ -472,7 +464,7 @@ where
         let partition = item.partition();
 
         if let Some(batch) = self.partitions.get_mut(&partition) {
-            if batch.is_full() {
+            if batch.was_full() {
                 trace!("Batch full; driving service to completion.");
                 self.poll_complete()?;
 
@@ -562,7 +554,7 @@ where
         }
 
         for batch in ready_batches.into_iter().chain(partitions) {
-            self.poll_send(batch)?;
+            self.poll_send(batch.into_inner())?;
         }
 
         // If we still have an inflight partition then
