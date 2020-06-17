@@ -32,10 +32,6 @@ impl<T> Batch for VecBuffer<T> {
         self.batch.is_empty()
     }
 
-    fn is_full(&self) -> bool {
-        self.batch.len() >= self.max_events
-    }
-
     fn fresh(&self) -> Self {
         Self {
             batch: Vec::with_capacity(self.max_events),

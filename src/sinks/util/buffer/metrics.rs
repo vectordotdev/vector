@@ -196,10 +196,6 @@ impl Batch for MetricBuffer {
         self.num_items() == 0
     }
 
-    fn is_full(&self) -> bool {
-        self.num_items() >= self.max_size
-    }
-
     fn fresh(&self) -> Self {
         let mut state = self.state.clone();
         for entry in self.metrics.iter() {

@@ -187,7 +187,7 @@ where
     }
 
     fn should_send(&mut self) -> bool {
-        self.closing || self.batch.is_full() || self.linger_elapsed()
+        self.closing || self.batch.was_full() || self.linger_elapsed()
     }
 
     fn linger_elapsed(&mut self) -> bool {
@@ -215,7 +215,7 @@ where
             trace!("batch full.");
             self.poll_complete()?;
 
-            if self.batch.is_full() {
+            if !self.batch.is_empty() {
                 debug!(message = "Batch full; applying back pressure.", size = %self.settings.size, rate_limit_secs = 10);
                 return Ok(AsyncSink::NotReady(item));
             }
@@ -469,7 +469,7 @@ where
                 self.poll_complete()?;
 
                 if let Some(batch) = self.partitions.get_mut(&partition) {
-                    if batch.is_full() {
+                    if !batch.is_empty() {
                         debug!(
                             message = "Buffer full; applying back pressure.",
                             max_size = %self.settings.size,
@@ -536,7 +536,7 @@ where
         let ready = self
             .partitions
             .iter()
-            .filter(|(_, b)| closing || b.is_full())
+            .filter(|(_, b)| closing || b.was_full())
             .map(|(p, _)| p.clone())
             .collect::<Vec<_>>();
 

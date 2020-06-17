@@ -42,10 +42,6 @@ impl Batch for JsonArrayBuffer {
         self.buffer.is_empty()
     }
 
-    fn is_full(&self) -> bool {
-        self.total_bytes >= self.max_size
-    }
-
     fn fresh(&self) -> Self {
         Self {
             buffer: Vec::new(),

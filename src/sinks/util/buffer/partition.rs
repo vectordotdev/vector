@@ -44,10 +44,6 @@ where
         self.inner.is_empty()
     }
 
-    fn is_full(&self) -> bool {
-        self.inner.is_full()
-    }
-
     fn fresh(&self) -> Self {
         Self {
             inner: self.inner.fresh(),

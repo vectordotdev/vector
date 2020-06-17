@@ -50,7 +50,6 @@ pub trait Batch {
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input>;
     fn is_empty(&self) -> bool;
-    fn is_full(&self) -> bool;
     fn fresh(&self) -> Self;
     fn finish(self) -> Self::Output;
     fn num_items(&self) -> usize;
@@ -109,10 +108,6 @@ where
 
     fn is_empty(&self) -> bool {
         !self.was_full && self.inner.is_empty()
-    }
-
-    fn is_full(&self) -> bool {
-        self.was_full || self.inner.is_full()
     }
 
     fn fresh(&self) -> Self {

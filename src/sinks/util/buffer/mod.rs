@@ -114,10 +114,6 @@ impl Batch for Buffer {
         self.is_empty()
     }
 
-    fn is_full(&self) -> bool {
-        self.size() >= self.max_size
-    }
-
     fn fresh(&self) -> Self {
         let inner = match &self.inner {
             InnerBuffer::Plain(_) => InnerBuffer::Plain(Vec::with_capacity(self.max_size)),
