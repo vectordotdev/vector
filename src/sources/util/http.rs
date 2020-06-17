@@ -123,8 +123,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             let _ = warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
                     incoming.compat().map_ok(|s| s.compat().compat()),
-                    // shutdown.clone().compat().map(|_| ()),
-                    futures::future::pending(),
+                    shutdown.clone().compat().map(|_| ()),
                 )
                 .await;
             // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
