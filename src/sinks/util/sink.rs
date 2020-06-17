@@ -191,10 +191,9 @@ where
     }
 
     fn linger_elapsed(&mut self) -> bool {
-        if let Some(delay) = &mut self.linger {
-            delay.poll().expect("timer error").is_ready()
-        } else {
-            false
+        match &mut self.linger {
+            Some(delay) => delay.poll().expect("timer error").is_ready(),
+            None => false,
         }
     }
 }
