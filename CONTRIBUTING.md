@@ -561,6 +561,7 @@ There are some extra requirements:
 * `linux` system (create an issue if you want to work with another OS and we'll
   help);
 * [`skaffold`](https://skaffold.dev/)
+* [`kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 * [`kustomize`](https://kustomize.io/)
 * [`minikube`](https://minikube.sigs.k8s.io/)-powered or other k8s cluster
 * [`cargo watch`](https://github.com/passcod/cargo-watch)
