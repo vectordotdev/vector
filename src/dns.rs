@@ -30,7 +30,10 @@ impl Resolver {
         // Any port will do, but `9` is a well defined port for discarding
         // packets.
         let dummy_port = 9;
+        // https://tools.ietf.org/html/rfc6761#section-6.3
         if name == "localhost" {
+            // Not all operating systems support `localhost` as IPv6 `::1`, so
+            // we resolving it to it's IPv4 value.
             Ok(LookupIp(
                 vec![SocketAddr::new(Ipv4Addr::LOCALHOST.into(), dummy_port)].into_iter(),
             ))
