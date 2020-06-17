@@ -76,7 +76,8 @@ pub fn start_validated(
     if !running_topology.run_healthchecks(&diff, &mut pieces, rt, require_healthy) {
         return None;
     }
-    running_topology.start_diff(&diff, pieces, rt);
+    running_topology.connect_diff(&diff, &mut pieces);
+    running_topology.spawn_diff(&diff, pieces, rt);
     running_topology.config = config;
 
     Some((running_topology, abort_rx))
@@ -253,7 +254,8 @@ impl RunningTopology {
         // Now let's actually build the new pieces.
         if let Some(mut new_pieces) = validate(&new_config, &diff, rt.executor()) {
             if self.run_healthchecks(&diff, &mut new_pieces, rt, require_healthy) {
-                self.start_diff(&diff, new_pieces, rt);
+                self.connect_diff(&diff, &mut new_pieces);
+                self.spawn_diff(&diff, new_pieces, rt);
                 self.config = new_config;
                 // We have succesfully changed to new config.
                 return Ok(true);
@@ -265,7 +267,8 @@ impl RunningTopology {
         let diff = diff.flip();
         if let Some(mut new_pieces) = validate(&self.config, &diff, rt.executor()) {
             if self.run_healthchecks(&diff, &mut new_pieces, rt, require_healthy) {
-                self.start_diff(&diff, new_pieces, rt);
+                self.connect_diff(&diff, &mut new_pieces);
+                self.spawn_diff(&diff, new_pieces, rt);
                 // We have succesfully returned to old config.
                 return Ok(false);
             }
@@ -383,60 +386,70 @@ impl RunningTopology {
         }
     }
 
-    /// Starts new and replacing pieces of topology.
-    fn start_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces, rt: &mut runtime::Runtime) {
+    /// Rewires topology
+    fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
+        // Sources
+        for name in diff.sources.changed_and_added() {
+            self.setup_outputs(&name, new_pieces);
+        }
+
+        // Transforms
+        // Make sure all transform outputs are set up before another transform might try use
+        // it as an input
+        for name in diff.transforms.changed_and_added() {
+            self.setup_outputs(&name, new_pieces);
+        }
+
+        for name in &diff.transforms.to_change {
+            self.replace_inputs(&name, new_pieces);
+        }
+
+        for name in &diff.transforms.to_add {
+            self.setup_inputs(&name, new_pieces);
+        }
+
+        // Sinks
+        for name in &diff.sinks.to_change {
+            self.replace_inputs(&name, new_pieces);
+        }
+
+        for name in &diff.sinks.to_add {
+            self.setup_inputs(&name, new_pieces);
+        }
+    }
+
+    /// Starts new and changed pieces of topology.
+    fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces, rt: &mut runtime::Runtime) {
         // Sources
         for name in &diff.sources.to_change {
             info!("Rebuilding source {:?}", name);
-
-            self.setup_outputs(name, &mut new_pieces);
             self.spawn_source(name, &mut new_pieces, rt);
         }
 
         for name in &diff.sources.to_add {
             info!("Starting source {:?}", name);
-
-            self.setup_outputs(&name, &mut new_pieces);
             self.spawn_source(&name, &mut new_pieces, rt);
         }
 
         // Transforms
-
-        // Make sure all transform outputs are set up before another transform might try use
-        // it as an input
-        for name in &diff.transforms.to_change {
-            self.setup_outputs(&name, &mut new_pieces);
-        }
-        for name in &diff.transforms.to_add {
-            self.setup_outputs(&name, &mut new_pieces);
-        }
-
         for name in &diff.transforms.to_change {
             info!("Rebuilding transform {:?}", name);
-
-            self.replace_inputs(&name, &mut new_pieces);
             self.spawn_transform(&name, &mut new_pieces, rt);
         }
 
         for name in &diff.transforms.to_add {
             info!("Starting transform {:?}", name);
-
-            self.setup_inputs(&name, &mut new_pieces);
             self.spawn_transform(&name, &mut new_pieces, rt);
         }
 
         // Sinks
         for name in &diff.sinks.to_change {
             info!("Rebuilding sink {:?}", name);
-
             self.spawn_sink(&name, &mut new_pieces, rt);
-            self.replace_inputs(&name, &mut new_pieces);
         }
 
         for name in &diff.sinks.to_add {
             info!("Starting sink {:?}", name);
-
-            self.setup_inputs(&name, &mut new_pieces);
             self.spawn_sink(&name, &mut new_pieces, rt);
         }
     }
@@ -512,9 +525,8 @@ impl RunningTopology {
         if let Some(inputs) = inputs {
             for input in inputs {
                 if let Some(output) = self.outputs.get(input) {
-                    output
-                        .unbounded_send(fanout::ControlMessage::Remove(name.to_string()))
-                        .unwrap();
+                    // This can only fail if we are disconnected, which is a valid situation.
+                    let _ = output.unbounded_send(fanout::ControlMessage::Remove(name.to_string()));
                 }
             }
         }
@@ -529,7 +541,7 @@ impl RunningTopology {
                 if let Some(input) = self.inputs.get(sink_name) {
                     output
                         .unbounded_send(fanout::ControlMessage::Add(sink_name.clone(), input.get()))
-                        .unwrap();
+                        .expect("Components shouldn't be spawned before connecting them together.");
                 }
             }
         }
@@ -542,7 +554,7 @@ impl RunningTopology {
                             transform_name.clone(),
                             input.get(),
                         ))
-                        .unwrap();
+                        .expect("Components shouldn't be spawned before connecting them together.");
                 }
             }
         }
@@ -554,9 +566,9 @@ impl RunningTopology {
         let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
 
         for input in inputs {
-            self.outputs[&input]
-                .unbounded_send(fanout::ControlMessage::Add(name.to_string(), tx.get()))
-                .unwrap();
+            // This can only fail if we are disconnected, which is a valid situation.
+            let _ = self.outputs[&input]
+                .unbounded_send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
         }
 
         self.inputs.insert(name.to_string(), tx);
@@ -581,22 +593,21 @@ impl RunningTopology {
 
         for input in inputs_to_remove {
             if let Some(output) = self.outputs.get(input) {
-                output
-                    .unbounded_send(fanout::ControlMessage::Remove(name.to_string()))
-                    .unwrap();
+                // This can only fail if we are disconnected, which is a valid situation.
+                let _ = output.unbounded_send(fanout::ControlMessage::Remove(name.to_string()));
             }
         }
 
         for input in inputs_to_add {
-            self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Add(name.to_string(), tx.get()))
-                .unwrap();
+            // This can only fail if we are disconnected, which is a valid situation.
+            let _ = self.outputs[input]
+                .unbounded_send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
         }
 
         for &input in inputs_to_replace {
-            self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), tx.get()))
-                .unwrap();
+            // This can only fail if we are disconnected, which is a valid situation.
+            let _ = self.outputs[input]
+                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), tx.get()));
         }
 
         self.inputs.insert(name.to_string(), tx);
@@ -675,6 +686,10 @@ impl Difference {
 
     fn flip(&mut self) {
         std::mem::swap(&mut self.to_remove, &mut self.to_add);
+    }
+
+    fn changed_and_added(&self) -> impl Iterator<Item = &String> {
+        self.to_change.iter().chain(self.to_add.iter())
     }
 }
 
@@ -888,12 +903,104 @@ mod source_finished_tests {
     feature = "transforms-json_parser"
 ))]
 mod transient_state_tests {
+    use crate::event::Event;
+    use crate::shutdown::ShutdownSignal;
     use crate::sinks::blackhole::BlackholeConfig;
     use crate::sources::stdin::StdinConfig;
+    use crate::sources::Source;
     use crate::test_util::runtime;
-    use crate::topology;
-    use crate::topology::config::Config;
+    use crate::topology::config::{Config, DataType, GlobalOptions, SourceConfig};
     use crate::transforms::json_parser::JsonParserConfig;
+    use crate::{topology, Error};
+    use futures01::{sync::mpsc::Sender, Future};
+    use serde::{Deserialize, Serialize};
+    use stream_cancel::{Trigger, Tripwire};
+
+    #[derive(Debug, Deserialize, Serialize)]
+    pub struct MockSourceConfig {
+        #[serde(skip)]
+        tripwire: Option<Tripwire>,
+    }
+
+    impl MockSourceConfig {
+        pub fn new() -> (Trigger, Self) {
+            let (trigger, tripwire) = Tripwire::new();
+            (
+                trigger,
+                Self {
+                    tripwire: Some(tripwire),
+                },
+            )
+        }
+    }
+
+    #[typetag::serde(name = "mock")]
+    impl SourceConfig for MockSourceConfig {
+        fn build(
+            &self,
+            _name: &str,
+            _globals: &GlobalOptions,
+            shutdown: ShutdownSignal,
+            out: Sender<Event>,
+        ) -> Result<Source, Error> {
+            let source = shutdown
+                .map(|_| ())
+                .select(self.tripwire.clone().unwrap())
+                .map(|_| std::mem::drop(out))
+                .map_err(|_| ());
+            Ok(Box::new(source))
+        }
+
+        fn output_type(&self) -> DataType {
+            DataType::Log
+        }
+
+        fn source_type(&self) -> &'static str {
+            "mock"
+        }
+    }
+
+    #[test]
+    fn closed_source() {
+        let mut rt = runtime();
+
+        let mut old_config = Config::empty();
+        let (trigger_old, source) = MockSourceConfig::new();
+        old_config.add_source("in", source);
+        old_config.add_transform(
+            "trans",
+            &["in"],
+            JsonParserConfig {
+                drop_field: true,
+                ..JsonParserConfig::default()
+            },
+        );
+        old_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
+        old_config.add_sink("out2", &["trans"], BlackholeConfig { print_amount: 1000 });
+
+        let mut new_config = Config::empty();
+        let (_trigger_new, source) = MockSourceConfig::new();
+        new_config.add_source("in", source);
+        new_config.add_transform(
+            "trans",
+            &["in"],
+            JsonParserConfig {
+                drop_field: false,
+                ..JsonParserConfig::default()
+            },
+        );
+        new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
+
+        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+
+        trigger_old.cancel();
+
+        rt.block_on(topology.sources_finished()).unwrap();
+
+        assert!(topology
+            .reload_config_and_respawn(new_config, &mut rt, false)
+            .unwrap());
+    }
 
     #[test]
     fn remove_sink() {
