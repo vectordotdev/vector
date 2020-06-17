@@ -1,6 +1,6 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use crate::event::Event;
-use crate::sinks::util::{Batch, BatchSettings};
+use crate::sinks::util::{Batch, BatchSettings, PushResult};
 use std::cmp::Ordering;
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
@@ -111,79 +111,84 @@ impl Batch for MetricBuffer {
     type Input = Event;
     type Output = Vec<Metric>;
 
-    fn push(&mut self, item: Self::Input) {
-        let item = item.into_metric();
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        if self.num_items() >= self.max_size {
+            PushResult::Full(item)
+        } else {
+            let item = item.into_metric();
 
-        match &item.value {
-            MetricValue::Counter { value } if item.kind.is_absolute() => {
-                let new = MetricEntry(item.clone());
-                if let Some(MetricEntry(Metric {
-                    value: MetricValue::Counter { value: value0, .. },
-                    ..
-                })) = self.state.get(&new)
-                {
-                    // Counters are disaggregated. We take the previoud value from the state
-                    // and emit the difference between previous and current as a Counter
-                    let delta = MetricEntry(Metric {
-                        name: item.name.to_string(),
-                        timestamp: item.timestamp,
-                        tags: item.tags.clone(),
-                        kind: MetricKind::Incremental,
-                        value: MetricValue::Counter {
-                            value: value - value0,
-                        },
-                    });
-
-                    // The resulting Counters could be added up normally
-                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&delta) {
-                        existing.add(&item);
-                        self.metrics.insert(MetricEntry(existing));
-                    } else {
-                        self.metrics.insert(delta);
-                    }
-                    self.state.replace(new);
-                } else {
-                    self.state.insert(new);
-                }
-            }
-            MetricValue::Gauge { .. } if item.kind.is_incremental() => {
-                let new = MetricEntry(item.clone().into_absolute());
-                if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                    existing.add(&item);
-                    self.metrics.insert(MetricEntry(existing));
-                } else {
-                    // If the metric is not present in active batch,
-                    // then we look it up in permanent state, where we keep track
-                    // of its values throughout the entire application uptime
-                    let mut initial = if let Some(default) = self.state.get(&new) {
-                        default.0.clone()
-                    } else {
-                        // Otherwise we start from zero value
-                        Metric {
+            match &item.value {
+                MetricValue::Counter { value } if item.kind.is_absolute() => {
+                    let new = MetricEntry(item.clone());
+                    if let Some(MetricEntry(Metric {
+                        value: MetricValue::Counter { value: value0, .. },
+                        ..
+                    })) = self.state.get(&new)
+                    {
+                        // Counters are disaggregated. We take the previoud value from the state
+                        // and emit the difference between previous and current as a Counter
+                        let delta = MetricEntry(Metric {
                             name: item.name.to_string(),
                             timestamp: item.timestamp,
                             tags: item.tags.clone(),
-                            kind: MetricKind::Absolute,
-                            value: MetricValue::Gauge { value: 0.0 },
+                            kind: MetricKind::Incremental,
+                            value: MetricValue::Counter {
+                                value: value - value0,
+                            },
+                        });
+
+                        // The resulting Counters could be added up normally
+                        if let Some(MetricEntry(mut existing)) = self.metrics.take(&delta) {
+                            existing.add(&item);
+                            self.metrics.insert(MetricEntry(existing));
+                        } else {
+                            self.metrics.insert(delta);
                         }
-                    };
-                    initial.add(&item);
-                    self.metrics.insert(MetricEntry(initial));
+                        self.state.replace(new);
+                    } else {
+                        self.state.insert(new);
+                    }
+                }
+                MetricValue::Gauge { .. } if item.kind.is_incremental() => {
+                    let new = MetricEntry(item.clone().into_absolute());
+                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
+                        existing.add(&item);
+                        self.metrics.insert(MetricEntry(existing));
+                    } else {
+                        // If the metric is not present in active batch,
+                        // then we look it up in permanent state, where we keep track
+                        // of its values throughout the entire application uptime
+                        let mut initial = if let Some(default) = self.state.get(&new) {
+                            default.0.clone()
+                        } else {
+                            // Otherwise we start from zero value
+                            Metric {
+                                name: item.name.to_string(),
+                                timestamp: item.timestamp,
+                                tags: item.tags.clone(),
+                                kind: MetricKind::Absolute,
+                                value: MetricValue::Gauge { value: 0.0 },
+                            }
+                        };
+                        initial.add(&item);
+                        self.metrics.insert(MetricEntry(initial));
+                    }
+                }
+                _metric if item.kind.is_absolute() => {
+                    let new = MetricEntry(item);
+                    self.metrics.replace(new);
+                }
+                _ => {
+                    let new = MetricEntry(item.clone());
+                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
+                        existing.add(&item);
+                        self.metrics.insert(MetricEntry(existing));
+                    } else {
+                        self.metrics.insert(new);
+                    }
                 }
             }
-            _metric if item.kind.is_absolute() => {
-                let new = MetricEntry(item);
-                self.metrics.replace(new);
-            }
-            _ => {
-                let new = MetricEntry(item.clone());
-                if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                    existing.add(&item);
-                    self.metrics.insert(MetricEntry(existing));
-                } else {
-                    self.metrics.insert(new);
-                }
-            }
+            PushResult::Ok
         }
     }
 

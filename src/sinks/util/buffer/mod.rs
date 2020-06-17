@@ -1,4 +1,4 @@
-use super::batch::{Batch, BatchSettings};
+use super::batch::{Batch, BatchSettings, PushResult};
 use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -101,8 +101,13 @@ impl Batch for Buffer {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn push(&mut self, item: Self::Input) {
-        self.push(&item)
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        if self.size() + item.len() > self.max_size {
+            PushResult::Full(item)
+        } else {
+            self.push(&item);
+            PushResult::Ok
+        }
     }
 
     fn is_empty(&self) -> bool {

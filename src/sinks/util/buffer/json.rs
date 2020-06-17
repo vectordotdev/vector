@@ -1,4 +1,4 @@
-use crate::sinks::util::{Batch, BatchSettings};
+use crate::sinks::util::{Batch, BatchSettings, PushResult};
 use serde_json::value::{to_raw_value, RawValue, Value};
 
 pub type BoxedRawValue = Box<RawValue>;
@@ -26,10 +26,16 @@ impl Batch for JsonArrayBuffer {
     type Input = Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn push(&mut self, item: Self::Input) {
-        let item = to_raw_value(&item).expect("Value should be valid json");
-        self.total_bytes += item.get().len();
-        self.buffer.push(item);
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        let raw_item = to_raw_value(&item).expect("Value should be valid json");
+        let new_len = self.total_bytes + raw_item.get().len();
+        if new_len > self.max_size {
+            PushResult::Full(item)
+        } else {
+            self.total_bytes += new_len;
+            self.buffer.push(raw_item);
+            PushResult::Ok
+        }
     }
 
     fn is_empty(&self) -> bool {
@@ -59,6 +65,7 @@ impl Batch for JsonArrayBuffer {
 
 #[cfg(test)]
 mod tests {
+    use super::super::PushResult;
     use super::*;
     use serde_json::json;
     use std::time::Duration;
@@ -66,18 +73,26 @@ mod tests {
     #[test]
     fn multi_object_array() {
         let batch = BatchSettings {
-            size: 9999,
+            size: 2,
             timeout: Duration::from_secs(9999),
         };
         let mut buffer = JsonArrayBuffer::new(batch);
 
-        buffer.push(json!({
-            "key1": "value1"
-        }));
+        assert_eq!(
+            buffer.push(json!({
+                "key1": "value1"
+            })),
+            PushResult::Ok
+        );
 
-        buffer.push(json!({
-            "key2": "value2"
-        }));
+        assert_eq!(
+            buffer.push(json!({
+                "key2": "value2"
+            })),
+            PushResult::Ok
+        );
+
+        assert!(matches!(buffer.push(json!({})), PushResult::Full(_)));
 
         assert_eq!(buffer.num_items(), 2);
         assert_eq!(buffer.total_bytes, 34);

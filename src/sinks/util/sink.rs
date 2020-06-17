@@ -32,7 +32,7 @@
 //! driven independently from the sink. A oneshot channel is used to tie them back into
 //! the sink to allow it to notify the consumer that the request has succeeded.
 
-use super::batch::{Batch, BatchSettings};
+use super::batch::{Batch, BatchSettings, PushResult};
 use super::buffer::partition::Partition;
 use crate::buffers::Acker;
 use futures01::{
@@ -137,6 +137,7 @@ impl<T: Sink> Sink for StreamSink<T> {
 pub struct BatchSink<S, B, Request, E = DefaultExecutor> {
     service: ServiceSink<S, Request>,
     batch: B,
+    batch_was_full: bool,
     settings: BatchSettings,
     linger: Option<Delay>,
     closing: bool,
@@ -178,6 +179,7 @@ where
         Self {
             service,
             batch,
+            batch_was_full: false,
             settings,
             linger: None,
             closing: false,
@@ -187,7 +189,7 @@ where
     }
 
     fn should_send(&mut self) -> bool {
-        self.closing || self.batch.is_full() || self.linger_elapsed()
+        self.closing || self.batch_was_full || self.linger_elapsed()
     }
 
     fn linger_elapsed(&mut self) -> bool {
@@ -211,27 +213,32 @@ where
     type SinkError = crate::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        if self.batch.is_full() {
+        if self.batch_was_full {
             trace!("batch full.");
             self.poll_complete()?;
 
-            if self.batch.is_full() {
+            if self.batch_was_full {
                 debug!(message = "Batch full; applying back pressure.", size = %self.settings.size, rate_limit_secs = 10);
                 return Ok(AsyncSink::NotReady(item));
             }
         }
 
-        if self.batch.is_empty() {
-            trace!("Creating new batch.");
+        if self.linger.is_none() {
+            trace!("Starting new batch timer.");
             // We just inserted the first item of a new batch, so set our delay to the longest time
             // we want to allow that item to linger in the batch before being flushed.
             let deadline = Instant::now() + self.settings.timeout;
             self.linger = Some(Delay::new(deadline));
         }
 
-        self.batch.push(item);
-
-        Ok(AsyncSink::Ready)
+        match self.batch.push(item) {
+            PushResult::Ok => Ok(AsyncSink::Ready),
+            PushResult::Full(item) => {
+                self.batch_was_full = true;
+                // This will trigger the stanza at the top of this function.
+                self.start_send(item)
+            }
+        }
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
@@ -255,6 +262,8 @@ where
                     let fut = self.service.call(request, batch_size);
 
                     self.exec.spawn(fut).expect("Spawn service future");
+
+                    self.batch_was_full = false;
 
                     // Disable linger timeout
                     self.linger.take();
@@ -476,14 +485,19 @@ where
                         );
                         return Ok(AsyncSink::NotReady(item));
                     } else {
-                        batch.push(item);
-                        return Ok(AsyncSink::Ready);
+                        return match batch.push(item) {
+                            PushResult::Ok => Ok(AsyncSink::Ready),
+                            // FIXME is this the right behavior here and below?
+                            PushResult::Full(item) => Ok(AsyncSink::NotReady(item)),
+                        };
                     }
                 }
             } else {
                 trace!("adding event to batch.");
-                batch.push(item);
-                return Ok(AsyncSink::Ready);
+                return match batch.push(item) {
+                    PushResult::Ok => Ok(AsyncSink::Ready),
+                    PushResult::Full(item) => Ok(AsyncSink::NotReady(item)),
+                };
             }
         }
 
@@ -492,12 +506,16 @@ where
         // or the batch got submitted by polling_complete above.
         let mut batch = self.batch.fresh();
 
-        batch.push(item);
-        self.set_linger(partition.clone());
+        match batch.push(item) {
+            PushResult::Full(item) => Ok(AsyncSink::NotReady(item)),
+            PushResult::Ok => {
+                self.set_linger(partition.clone());
 
-        self.partitions.insert(partition, batch);
+                self.partitions.insert(partition, batch);
 
-        Ok(AsyncSink::Ready)
+                Ok(AsyncSink::Ready)
+            }
+        }
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {

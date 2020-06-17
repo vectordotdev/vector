@@ -37,11 +37,18 @@ pub struct BatchSettings {
     pub timeout: Duration,
 }
 
+#[must_use]
+#[derive(Debug, Eq, PartialEq)]
+pub enum PushResult<T> {
+    Ok,
+    Full(T),
+}
+
 pub trait Batch {
     type Input;
     type Output;
 
-    fn push(&mut self, item: Self::Input);
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input>;
     fn is_empty(&self) -> bool;
     fn is_full(&self) -> bool;
     fn fresh(&self) -> Self;

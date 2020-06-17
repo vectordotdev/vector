@@ -1,4 +1,4 @@
-use super::super::{Batch, BatchSettings};
+use super::super::{Batch, BatchSettings, PushResult};
 
 #[derive(Clone)]
 pub struct VecBuffer<T> {
@@ -19,8 +19,13 @@ impl<T> Batch for VecBuffer<T> {
     type Input = T;
     type Output = Vec<T>;
 
-    fn push(&mut self, item: Self::Input) {
-        self.batch.push(item)
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        if self.batch.len() >= self.max_events {
+            PushResult::Full(item)
+        } else {
+            self.batch.push(item);
+            PushResult::Ok
+        }
     }
 
     fn is_empty(&self) -> bool {

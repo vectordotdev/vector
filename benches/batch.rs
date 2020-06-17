@@ -5,7 +5,7 @@ use std::convert::Infallible;
 use std::time::Duration;
 use vector::buffers::Acker;
 use vector::sinks::util::{
-    Batch, BatchSettings, BatchSink, Buffer, Compression, Partition, PartitionBatchSink,
+    Batch, BatchSettings, BatchSink, Buffer, Compression, Partition, PartitionBatchSink, PushResult,
 };
 use vector::test_util::random_lines;
 
@@ -180,10 +180,15 @@ impl Batch for PartitionedBuffer {
     type Input = InnerBuffer;
     type Output = InnerBuffer;
 
-    fn push(&mut self, item: Self::Input) {
-        let partition = item.partition();
-        self.key = Some(partition);
-        self.inner.push(&item.inner[..])
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        let key = item.key;
+        match Batch::push(&mut self.inner, item.inner) {
+            PushResult::Ok => {
+                self.key = Some(key);
+                PushResult::Ok
+            }
+            PushResult::Full(inner) => PushResult::Full(InnerBuffer { inner, key }),
+        }
     }
 
     fn is_empty(&self) -> bool {
