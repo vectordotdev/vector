@@ -541,7 +541,7 @@ impl RunningTopology {
                 if let Some(input) = self.inputs.get(sink_name) {
                     output
                         .unbounded_send(fanout::ControlMessage::Add(sink_name.clone(), input.get()))
-                        .expect("Components shuldn't be spawned before connecting them together.");
+                        .expect("Components shouldn't be spawned before connecting them together.");
                 }
             }
         }
@@ -554,7 +554,7 @@ impl RunningTopology {
                             transform_name.clone(),
                             input.get(),
                         ))
-                        .expect("Components shuldn't be spawned before connecting them together.");
+                        .expect("Components shouldn't be spawned before connecting them together.");
                 }
             }
         }
