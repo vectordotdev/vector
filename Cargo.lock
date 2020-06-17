@@ -1388,6 +1388,7 @@ dependencies = [
  "proc-macro-hack",
  "proc-macro-nested",
  "slab",
+ "tokio-io",
 ]
 
 [[package]]
@@ -5246,6 +5247,7 @@ checksum = "be8242891f2b6cbef26a2d7e8605133c2c554cd35b3e4948ea892d6d68436499"
 dependencies = [
  "bytes 0.5.4",
  "futures-core",
+ "futures-io",
  "futures-sink",
  "log",
  "pin-project-lite",
@@ -6000,6 +6002,7 @@ dependencies = [
  "tokio-signal",
  "tokio-test",
  "tokio-uds",
+ "tokio-util",
  "tokio01-test",
  "toml 0.4.10",
  "tower 0.1.1",

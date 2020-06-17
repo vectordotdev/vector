@@ -5,16 +5,15 @@ use crate::{
     tls::TlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
-use bytes::Buf;
+use bytes05::Bytes;
 use chrono::{DateTime, Utc};
 use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::{
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Cursor},
     net::SocketAddr,
     str::FromStr,
 };
-use warp::filters::body::FullBody;
 use warp::http::{HeaderMap, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -27,11 +26,7 @@ pub struct LogplexConfig {
 struct LogplexSource {}
 
 impl HttpSource for LogplexSource {
-    fn build_event(
-        &self,
-        body: FullBody,
-        header_map: HeaderMap,
-    ) -> Result<Vec<Event>, ErrorMessage> {
+    fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
         decode_message(body, header_map)
     }
 }
@@ -58,7 +53,7 @@ impl SourceConfig for LogplexConfig {
     }
 }
 
-fn decode_message(body: FullBody, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
+fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
     // Deal with headers
     let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
         Ok(v) => v,
@@ -106,8 +101,8 @@ fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
     )
 }
 
-fn body_to_events(body: FullBody) -> Vec<Event> {
-    let rdr = BufReader::new(body.reader());
+fn body_to_events(body: Bytes) -> Vec<Event> {
+    let rdr = BufReader::new(Cursor::new(body));
     rdr.lines()
         .filter_map(|res| {
             res.map_err(|error| error!(message = "Error reading request body", ?error))
