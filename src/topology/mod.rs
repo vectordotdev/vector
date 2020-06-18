@@ -234,11 +234,6 @@ impl RunningTopology {
             return Ok(false);
         }
 
-        if self.config.global.dns_servers != new_config.global.dns_servers {
-            error!("dns_servers cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.global.dns_servers);
-            return Ok(false);
-        }
-
         if let Err(errors) = builder::check(&new_config) {
             for error in errors {
                 error!("Configuration error: {}", error);

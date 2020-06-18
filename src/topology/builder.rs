@@ -124,7 +124,7 @@ pub fn build_pieces(
     let mut errors = vec![];
 
     // TODO: remove the unimplemented
-    let resolver = Resolver::new(config.global.dns_servers.clone(), exec.clone()).unwrap();
+    let resolver = Resolver;
 
     // Build sources
     for (name, source) in config

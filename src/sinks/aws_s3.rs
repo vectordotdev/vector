@@ -738,7 +738,7 @@ mod integration_tests {
     #[test]
     fn s3_healthchecks() {
         let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
 
         rt.block_on_std(async move {
             let config = config(1).await;
@@ -749,7 +749,7 @@ mod integration_tests {
     #[test]
     fn s3_healthchecks_invalid_bucket() {
         let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
 
         rt.block_on_std(async move {
             let config = S3SinkConfig {

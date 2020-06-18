@@ -108,7 +108,7 @@ impl TcpSink {
             self.state = match self.state {
                 TcpSinkState::Disconnected => {
                     debug!(message = "resolving dns.", host = %self.host);
-                    let fut = self.resolver.lookup_ip(&self.host);
+                    let fut = self.resolver.lookup_ip_01(self.host.clone());
 
                     TcpSinkState::ResolvingDns(fut)
                 }
@@ -275,7 +275,7 @@ pub fn tcp_healthcheck(host: String, port: u16, resolver: Resolver) -> Healthche
     // Lazy to avoid immediately connecting
     let check = future::lazy(move || {
         resolver
-            .lookup_ip(host)
+            .lookup_ip_01(host)
             .map_err(|source| HealthcheckError::DnsError { source }.into())
             .and_then(|mut ip| {
                 ip.next()
