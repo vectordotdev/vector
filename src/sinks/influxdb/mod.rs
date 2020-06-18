@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use futures::TryFutureExt;
 use futures01::Future;
 use http02::{StatusCode, Uri};
-use hyper13;
+use hyper;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use snafu::Snafu;
@@ -155,9 +155,7 @@ fn healthcheck(
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
-    let request = hyper13::Request::get(uri)
-        .body(hyper13::Body::empty())
-        .unwrap();
+    let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
     let mut client = HttpClient::new(resolver, None)?;
 

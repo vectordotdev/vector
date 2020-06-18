@@ -148,7 +148,7 @@ mod tests {
         topology::config::SinkConfig,
     };
     use futures01::{stream, Sink, Stream};
-    use hyper13::Method;
+    use hyper::Method;
     use serde_json::Value;
     use std::io::BufRead;
 

@@ -1,6 +1,6 @@
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::Future;
-use hyper13::client::connect::dns::Name as Name13;
+use hyper::client::connect::dns::Name as Name13;
 use snafu::ResultExt;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs},

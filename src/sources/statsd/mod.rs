@@ -136,7 +136,7 @@ mod test {
         // Give packets some time to flow through
         thread::sleep(Duration::from_millis(100));
 
-        let client = hyper13::Client::new();
+        let client = hyper::Client::new();
         let response = block_on(
             client
                 .get(format!("http://{}/metrics", out_addr).parse().unwrap())
