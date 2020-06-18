@@ -1,0 +1,5 @@
+namespace: vector
+
+resources:
+  - vector-global.yaml
+  - vector-namespaced.yaml
