@@ -203,3 +203,10 @@ description = "The tag-set for the object."
 type = "string"
 examples = [ {"Tag1" = "Value1"} ]
 description = "A custom tag to be added to the created objects."
+
+[sinks.aws_s3.options.content_type]
+type = "string"
+category = "Content Type"
+common = false
+description = "A standard MIME type describing the format of the contents."
+default = "text/x-log"

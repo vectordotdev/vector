@@ -78,6 +78,7 @@ struct S3Options {
     ssekms_key_id: Option<String>,
     storage_class: Option<S3StorageClass>,
     tags: Option<BTreeMap<String, String>>,
+    content_type: Option<String>, // default `text/x-log`
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
@@ -288,6 +289,9 @@ impl Service<Request> for S3Sink {
             bucket: request.bucket,
             key: request.key,
             content_encoding: request.content_encoding,
+            content_type: options
+                .content_type
+                .or_else(|| Some("text/x-log".to_owned())),
             acl: options.acl.map(to_string),
             grant_full_control: options.grant_full_control,
             grant_read: options.grant_read,

@@ -3733,6 +3733,17 @@ require('custom_module')
     when_full = "drop_newest"
 
   #
+  # Content Type
+  #
+
+  # A standard MIME type describing the format of the contents.
+  #
+  # * optional
+  # * default: "text/x-log"
+  # * type: string
+  content_type = "text/x-log"
+
+  #
   # Encoding
   #
 
