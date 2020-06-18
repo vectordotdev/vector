@@ -322,7 +322,7 @@ optimizations opt-in experiments or configurable.
 ## Prior art
 
 The idea of running full copies of the processing graph in each worker
-thread/task comes from t[imely
+thread/task comes from [timely
 dataflow](https://www.youtube.com/watch?v=yOnPmVf4YWo), [Kafka
 Streams](https://kafka.apache.org/25/documentation/streams/architecture#streams_architecture_threads),
 and
