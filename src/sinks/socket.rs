@@ -182,7 +182,6 @@ mod test {
             atomic::{AtomicUsize, Ordering},
             Arc,
         };
-        use tokio01::io::AsyncWrite;
 
         crate::test_util::trace_init();
 
