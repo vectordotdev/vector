@@ -28,7 +28,7 @@ impl Batch for JsonArrayBuffer {
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         let raw_item = to_raw_value(&item).expect("Value should be valid json");
-        let new_len = self.total_bytes + raw_item.get().len();
+        let new_len = self.total_bytes + raw_item.get().len() + 1;
         if self.buffer.len() >= self.settings.events || new_len > self.settings.bytes {
             PushResult::Full(item)
         } else {
