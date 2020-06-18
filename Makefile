@@ -317,7 +317,7 @@ test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
 bench: ## Run benchmarks in /benches
-	${MAYBE_ENVIRONMENT_EXEC} ${ENVIRONMENT_EXEC} make bench
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES}"
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-wasm

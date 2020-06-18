@@ -692,43 +692,16 @@ dependencies = [
 
 [[package]]
 name = "criterion"
-version = "0.2.11"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0363053954f3e679645fc443321ca128b7b950a6fe288cf5f9335cc22ee58394"
+checksum = "63f696897c88b57f4ffe3c69d8e1a0613c7d0e6c4833363c8560fbde9c47b966"
 dependencies = [
  "atty",
  "cast",
  "clap",
- "criterion-plot 0.3.1",
+ "criterion-plot",
  "csv",
- "itertools",
- "lazy_static",
- "libc",
- "num-traits",
- "rand_core 0.3.1",
- "rand_os",
- "rand_xoshiro",
- "rayon",
- "rayon-core",
- "serde",
- "serde_derive",
- "serde_json",
- "tinytemplate",
- "walkdir",
-]
-
-[[package]]
-name = "criterion"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fc755679c12bda8e5523a71e4d654b6bf2e14bd838dfc48cde6559a05caf7d1"
-dependencies = [
- "atty",
- "cast",
- "clap",
- "criterion-plot 0.4.1",
- "csv",
- "itertools",
+ "itertools 0.9.0",
  "lazy_static",
  "num-traits",
  "oorandom",
@@ -744,23 +717,12 @@ dependencies = [
 
 [[package]]
 name = "criterion-plot"
-version = "0.3.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76f9212ddf2f4a9eb2d401635190600656a1f88a932ef53d06e7fa4c7e02fb8e"
-dependencies = [
- "byteorder",
- "cast",
- "itertools",
-]
-
-[[package]]
-name = "criterion-plot"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a01e15e0ea58e8234f96146b1f91fa9d0e4dd7a38da93ff7a75d42c0b9d3a545"
+checksum = "ddeaf7989f00f2e1d871a26a110f3ed713632feac17f65f03ca938c542618b60"
 dependencies = [
  "cast",
- "itertools",
+ "itertools 0.9.0",
 ]
 
 [[package]]
@@ -1950,6 +1912,15 @@ name = "itertools"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f56a2d0bc861f9165be4eb3442afd3c236d8a98afd426f65d92324ae1091a484"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
 dependencies = [
  "either",
 ]
@@ -3252,7 +3223,7 @@ checksum = "eb788126ea840817128183f8f603dce02cb7aea25c2a0b764359d8e20010702e"
 dependencies = [
  "bytes 0.4.12",
  "heck",
- "itertools",
+ "itertools 0.8.2",
  "log",
  "multimap",
  "petgraph",
@@ -3269,7 +3240,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e7dc378b94ac374644181a2247cebf59a6ec1c88b49ac77f3a94b86b79d0e11"
 dependencies = [
  "failure",
- "itertools",
+ "itertools 0.8.2",
  "proc-macro2 0.4.30",
  "quote 0.6.13",
  "syn 0.15.44",
@@ -3554,16 +3525,6 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cbf7e9e623549b0e21f6e97cf8ecf247c1a8fd2e8a992ae265314300b2455d5c"
 dependencies = [
- "rand_core 0.3.1",
-]
-
-[[package]]
-name = "rand_xoshiro"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03b418169fb9c46533f326efd6eed2576699c44ca92d3052a066214a8d828929"
-dependencies = [
- "byteorder",
  "rand_core 0.3.1",
 ]
 
@@ -5503,7 +5464,7 @@ name = "tracing-limit"
 version = "0.1.0"
 dependencies = [
  "ansi_term",
- "criterion 0.2.11",
+ "criterion",
  "tracing",
  "tracing-core",
  "tracing-subscriber",
@@ -5888,7 +5849,7 @@ dependencies = [
  "chrono",
  "codec",
  "colored",
- "criterion 0.3.1",
+ "criterion",
  "db-key",
  "derivative",
  "derive_is_enum_variant",
