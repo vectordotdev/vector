@@ -1,8 +1,13 @@
+//! Perform a log lookup.
+
 use super::Result;
 use std::process::{ExitStatus, Stdio};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, ChildStdout, Command};
 
+/// Initiate a log lookup (`kubectl log`) with the specified `kubectl_command`
+/// for the specified `resource` at the specified `namespace`.
+/// Returns a [`Reader`] that managed the reading process.
 pub fn logs(kubectl_command: &str, namespace: &str, resource: &str) -> Result<Reader> {
     let mut command = Command::new(kubectl_command);
 
@@ -17,13 +22,17 @@ pub fn logs(kubectl_command: &str, namespace: &str, resource: &str) -> Result<Re
     Ok(reader)
 }
 
+/// Keeps track of the `kubectl logs` invocation, proving the interface to
+/// read the output and send a termination signal.
+#[derive(Debug)]
 pub struct Reader {
     child: Child,
     reader: BufReader<ChildStdout>,
 }
 
 impl Reader {
-    pub fn spawn(mut command: Command) -> std::io::Result<Self> {
+    /// Spawn a new `kubectl logs` process.
+    fn spawn(mut command: Command) -> std::io::Result<Self> {
         Self::prepare_stdout(&mut command);
         let child = command.spawn()?;
         Ok(Self::new(child))
@@ -39,14 +48,17 @@ impl Reader {
         Reader { child, reader }
     }
 
+    /// Wait for the `kubectl logs` process to exit and return the exit code.
     pub async fn wait(&mut self) -> std::io::Result<ExitStatus> {
         (&mut self.child).await
     }
 
+    /// Send a termination signal to the `kubectl logs` process.
     pub fn kill(&mut self) -> std::io::Result<()> {
         self.child.kill()
     }
 
+    /// Read one line from the stdout of the `kubectl logs` process.
     pub async fn read_line(&mut self) -> Option<String> {
         let mut s = String::new();
         let result = self.reader.read_line(&mut s).await;
@@ -56,19 +68,19 @@ impl Reader {
             Err(err) => panic!(err),
         }
     }
-
-    pub async fn collect(&mut self) -> Vec<String> {
-        let mut list = Vec::new();
-        while let Some(line) = self.read_line().await {
-            list.push(line)
-        }
-        list
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    async fn collect(reader: &mut Reader) -> Vec<String> {
+        let mut list = Vec::new();
+        while let Some(line) = reader.read_line().await {
+            list.push(line)
+        }
+        list
+    }
 
     #[tokio::test]
     async fn test_reader_finite() {
@@ -78,7 +90,7 @@ mod tests {
         let mut reader = Reader::spawn(command).expect("unable to spawn");
 
         // Collect all line, expect stream to finish.
-        let lines = reader.collect().await;
+        let lines = collect(&mut reader).await;
         // Assert we got all the lines we expected.
         assert_eq!(lines, vec!["test\n".to_owned()]);
 

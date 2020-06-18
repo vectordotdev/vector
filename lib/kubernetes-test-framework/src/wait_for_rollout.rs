@@ -1,8 +1,13 @@
+//! Wait for a resource rollout to complete.
+
 use super::Result;
 use crate::util::run_command;
 use std::{ffi::OsStr, process::Stdio};
 use tokio::process::Command;
 
+/// Wait for a rollout of a `resource` within a `namespace` to complete via
+/// the specifed `kubectl_command`.
+/// Use `extra` to pass additional arguments to `kubectl`.
 pub async fn run<CMD, NS, R, EX>(
     kubectl_command: CMD,
     namespace: NS,

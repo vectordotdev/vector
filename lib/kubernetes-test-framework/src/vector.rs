@@ -1,7 +1,11 @@
+//! Manage Vector.
+
 use super::{resource_file::ResourceFile, Result};
 use crate::up_down;
 use std::process::{Command, Stdio};
 
+/// Parameters required to build a `kubectl` command to manage Vector in the
+/// Kubernetes cluster.
 #[derive(Debug)]
 pub struct CommandBuilder {
     interface_command: String,
@@ -27,7 +31,7 @@ impl up_down::CommandBuilder for CommandBuilder {
     }
 }
 
-/// Takes care of deploying vector into the kubernetes cluster.
+/// Takes care of deploying Vector into the Kubernetes cluster.
 ///
 /// Manages the config file secret accordingly.
 pub fn manager(

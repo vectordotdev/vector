@@ -1,16 +1,25 @@
+//! Wait for a resource to reach a certain condition.
+
 use super::Result;
 use crate::util::run_command;
 use std::{ffi::OsStr, process::Stdio};
 use tokio::process::Command;
 
+/// Specify what condition to wait for.
+#[derive(Debug)]
 pub enum WaitFor<C>
 where
     C: std::fmt::Display,
 {
+    /// Wait for resource deletion.
     Delete,
+    /// Wait for the specified condition.
     Condition(C),
 }
 
+/// Wait for a set of `resources` within a `namespace` to reach a `wait_for`
+/// condition.
+/// Use `extra` to pass additional arguments to `kubectl`.
 pub async fn namespace<CMD, NS, R, COND, EX>(
     kubectl_command: CMD,
     namespace: NS,
@@ -30,6 +39,9 @@ where
     run_command(command).await
 }
 
+/// Wait for a set of `resources` at any namespace to reach a `wait_for`
+/// condition.
+/// Use `extra` to pass additional arguments to `kubectl`.
 pub async fn all_namespaces<CMD, R, COND, EX>(
     kubectl_command: CMD,
     resources: impl IntoIterator<Item = R>,
@@ -47,7 +59,7 @@ where
     run_command(command).await
 }
 
-pub fn prepare_base_command<CMD, R, COND, EX>(
+fn prepare_base_command<CMD, R, COND, EX>(
     kubectl_command: CMD,
     resources: impl IntoIterator<Item = R>,
     wait_for: WaitFor<COND>,

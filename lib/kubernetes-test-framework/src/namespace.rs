@@ -1,6 +1,9 @@
+//! Manage namespaces.
+
 use crate::up_down;
 use std::process::{Command, Stdio};
 
+/// Parameters required to build a `kubectl` command to manage the namespace.
 #[derive(Debug)]
 pub struct CommandBuilder {
     kubectl_command: String,
@@ -22,6 +25,8 @@ impl up_down::CommandBuilder for CommandBuilder {
     }
 }
 
+/// Create a new [`up_down::Manager`] for the specified `namespace` and using
+/// the specified `kubectl_command`.
 pub fn manager(kubectl_command: &str, namespace: &str) -> up_down::Manager<CommandBuilder> {
     up_down::Manager::new(CommandBuilder {
         kubectl_command: kubectl_command.to_owned(),

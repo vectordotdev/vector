@@ -9,8 +9,7 @@
 //! the opportunity to test e2e - not just the code layer, but also the
 //! deployment configuration.
 
-// TODO: deny
-#![allow(
+#![deny(
     missing_debug_implementations,
     missing_copy_implementations,
     missing_docs
