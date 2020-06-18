@@ -39,8 +39,6 @@ pub struct Config {
 pub struct GlobalOptions {
     #[serde(default = "default_data_dir")]
     pub data_dir: Option<PathBuf>,
-    #[serde(default)]
-    pub dns_servers: Vec<String>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -176,7 +174,7 @@ impl SinkContext {
     pub fn new_test(exec: TaskExecutor) -> Self {
         Self {
             acker: Acker::Null,
-            resolver: Resolver::new(Vec::new(), exec.clone()).unwrap(),
+            resolver: Resolver,
             exec,
         }
     }
@@ -236,7 +234,7 @@ pub struct TransformContext {
 impl TransformContext {
     pub fn new_test(exec: TaskExecutor) -> Self {
         Self {
-            resolver: Resolver::new(Vec::new(), exec.clone()).unwrap(),
+            resolver: Resolver,
             exec,
         }
     }
@@ -312,7 +310,6 @@ impl Config {
         Self {
             global: GlobalOptions {
                 data_dir: None,
-                dns_servers: Vec::new(),
                 log_schema: event::LogSchema::default(),
             },
             sources: IndexMap::new(),
@@ -412,7 +409,7 @@ impl Config {
         toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
     }
 
-    pub fn append(&mut self, mut with: Self) -> Result<(), Vec<String>> {
+    pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
@@ -424,9 +421,6 @@ impl Config {
             // we consider this an error.
             errors.push("conflicting values for 'data_dir' found".to_owned());
         }
-        self.global.dns_servers.append(&mut with.global.dns_servers);
-        self.global.dns_servers.sort();
-        self.global.dns_servers.dedup();
 
         // If the user has multiple config files, we must *merge* log schemas until we meet a
         // conflict, then we are allowed to error.

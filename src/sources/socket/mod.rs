@@ -373,7 +373,7 @@ mod test {
         let sink = TcpSink::new(
             "localhost".to_owned(),
             addr.port(),
-            Resolver::new(Vec::new(), rt.executor()).unwrap(),
+            Resolver,
             MaybeTlsSettings::Raw(()),
         );
         rt.spawn(
@@ -405,6 +405,7 @@ mod test {
 
     #[test]
     fn tcp_gracefull_shutdown() {
+        crate::test_util::trace_init();
         let n = 10000;
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
@@ -438,7 +439,7 @@ mod test {
         let sink = TcpSink::new(
             "localhost".to_owned(),
             addr.port(),
-            Resolver::new(Vec::new(), rt.executor()).unwrap(),
+            Resolver,
             MaybeTlsSettings::Raw(()),
         );
         rt.spawn(

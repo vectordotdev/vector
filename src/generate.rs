@@ -338,7 +338,6 @@ mod tests {
         assert_eq!(
             generate_example(true, "stdin/json_parser/console"),
             Ok(r#"data_dir = "/var/lib/vector/"
-dns_servers = []
 
 [sources.source0]
 max_length = 102400
@@ -366,7 +365,6 @@ when_full = "block"
         assert_eq!(
             generate_example(true, "stdin|json_parser|console"),
             Ok(r#"data_dir = "/var/lib/vector/"
-dns_servers = []
 
 [sources.source0]
 max_length = 102400
@@ -394,7 +392,6 @@ when_full = "block"
         assert_eq!(
             generate_example(true, "stdin//console"),
             Ok(r#"data_dir = "/var/lib/vector/"
-dns_servers = []
 
 [sources.source0]
 max_length = 102400
@@ -416,7 +413,6 @@ when_full = "block"
         assert_eq!(
             generate_example(true, "//console"),
             Ok(r#"data_dir = "/var/lib/vector/"
-dns_servers = []
 
 [sinks.sink0]
 healthcheck = true
@@ -434,7 +430,6 @@ when_full = "block"
         assert_eq!(
             generate_example(true, "/add_fields,json_parser,remove_fields"),
             Ok(r#"data_dir = "/var/lib/vector/"
-dns_servers = []
 
 [transforms.transform0]
 inputs = []
