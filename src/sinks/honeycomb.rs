@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::{log_schema, Event, Value},
     sinks::util::{
-        http2::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, UriSerde,
     },

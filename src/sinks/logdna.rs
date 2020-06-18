@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     sinks::util::{
         encoding::EncodingConfigWithDefault,
-        http2::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, UriSerde,
     },

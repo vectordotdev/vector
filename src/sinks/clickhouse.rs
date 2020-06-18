@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http2::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink, Response},
+        http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink, Response},
         retries2::{RetryAction, RetryLogic},
         service2::TowerRequestConfig,
         BatchBytesConfig, Buffer, Compression,

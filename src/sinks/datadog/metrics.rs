@@ -5,7 +5,7 @@ use crate::{
         Event,
     },
     sinks::util::{
-        http2::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchEventsConfig, MetricBuffer,
     },
@@ -372,7 +372,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
 mod tests {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
-    use crate::sinks::util::{http2::HttpSink, test::load_sink};
+    use crate::sinks::util::{http::HttpSink, test::load_sink};
     use chrono::offset::TimeZone;
     use chrono::Utc;
     use http02::{Method, Uri};

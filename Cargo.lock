@@ -913,17 +913,6 @@ dependencies = [
 
 [[package]]
 name = "dirs"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fd78930633bd1c6e35c4b42b1df7b0cbc6bc191146e512bb3bedf243fcc3901"
-dependencies = [
- "libc",
- "redox_users",
- "winapi 0.3.8",
-]
-
-[[package]]
-name = "dirs"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13aea89a5c93364a98e9b37b2fa237effbb694d5cfe01c5b70941f7eb087d5e3"
@@ -2389,12 +2378,6 @@ checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
 name = "md5"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e6bcd6433cff03a4bfc3d9834d504467db1f1cf6d0ea765d37d330249ed629d"
-
-[[package]]
-name = "md5"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
@@ -3789,38 +3772,8 @@ dependencies = [
  "async-trait",
  "bytes 0.5.4",
  "futures 0.3.4",
- "rusoto_core 0.44.0",
+ "rusoto_core",
  "serde_urlencoded 0.6.1",
- "xml-rs",
-]
-
-[[package]]
-name = "rusoto_core"
-version = "0.41.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "351e97aedcc659bd03168ff7fd3dbb270b6ee812c0c51c7953d2ef6f0a119aa9"
-dependencies = [
- "base64 0.10.1",
- "bytes 0.4.12",
- "futures 0.1.29",
- "hex 0.3.2",
- "hmac",
- "http 0.1.21",
- "hyper 0.12.35",
- "hyper-tls 0.3.2",
- "lazy_static",
- "log",
- "md5 0.6.1",
- "percent-encoding 2.1.0",
- "rusoto_credential 0.41.1",
- "rustc_version",
- "serde",
- "serde_derive",
- "serde_json",
- "sha2",
- "time 0.1.42",
- "tokio 0.1.22",
- "tokio-timer",
  "xml-rs",
 ]
 
@@ -3840,10 +3793,10 @@ dependencies = [
  "hyper-tls 0.4.1",
  "lazy_static",
  "log",
- "md5 0.7.0",
+ "md5",
  "percent-encoding 2.1.0",
  "pin-project",
- "rusoto_credential 0.44.0",
+ "rusoto_credential",
  "rusoto_signature",
  "rustc_version",
  "serde",
@@ -3855,32 +3808,13 @@ dependencies = [
 
 [[package]]
 name = "rusoto_credential"
-version = "0.41.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22a9b3b73099876f50d3de8e0974de71934ddca4d48d11268456b47c4d2fff87"
-dependencies = [
- "chrono",
- "dirs 1.0.5",
- "futures 0.1.29",
- "hyper 0.12.35",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
- "shlex",
- "tokio-process",
- "tokio-timer",
-]
-
-[[package]]
-name = "rusoto_credential"
 version = "0.44.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60669ddc1bdbb83ce225593649d36b4c5f6bf9db47cc1ab3e81281abffc853f4"
 dependencies = [
  "async-trait",
  "chrono",
- "dirs 2.0.2",
+ "dirs",
  "futures 0.3.4",
  "hyper 0.13.4",
  "pin-project",
@@ -3901,7 +3835,7 @@ dependencies = [
  "async-trait",
  "bytes 0.5.4",
  "futures 0.3.4",
- "rusoto_core 0.44.0",
+ "rusoto_core",
  "serde",
  "serde_json",
 ]
@@ -3915,22 +3849,22 @@ dependencies = [
  "async-trait",
  "bytes 0.5.4",
  "futures 0.3.4",
- "rusoto_core 0.44.0",
+ "rusoto_core",
  "serde",
  "serde_json",
 ]
 
 [[package]]
 name = "rusoto_logs"
-version = "0.41.0"
+version = "0.44.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "691f665f2ae401d4fddaac8d6a33c3e7c388e93494242ea937ebdddf9961f7f6"
+checksum = "b9ce5baac7de9c642a5f3c62d2ff85fbb06b1cfee5b61793c1b06d655884a75b"
 dependencies = [
- "bytes 0.4.12",
- "futures 0.1.29",
- "rusoto_core 0.41.0",
+ "async-trait",
+ "bytes 0.5.4",
+ "futures 0.3.4",
+ "rusoto_core",
  "serde",
- "serde_derive",
  "serde_json",
 ]
 
@@ -3943,7 +3877,7 @@ dependencies = [
  "async-trait",
  "bytes 0.5.4",
  "futures 0.3.4",
- "rusoto_core 0.44.0",
+ "rusoto_core",
  "xml-rs",
 ]
 
@@ -3961,29 +3895,15 @@ dependencies = [
  "http 0.2.1",
  "hyper 0.13.4",
  "log",
- "md5 0.7.0",
+ "md5",
  "percent-encoding 2.1.0",
  "pin-project",
- "rusoto_credential 0.44.0",
+ "rusoto_credential",
  "rustc_version",
  "serde",
  "sha2",
  "time 0.2.16",
  "tokio 0.2.13",
-]
-
-[[package]]
-name = "rusoto_sts"
-version = "0.41.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e8cdff317625611de545e91b80a883a7d6fb1cf2d772f64abaf83c0925fa0ff"
-dependencies = [
- "bytes 0.4.12",
- "chrono",
- "futures 0.1.29",
- "rusoto_core 0.41.0",
- "serde_urlencoded 0.5.5",
- "xml-rs",
 ]
 
 [[package]]
@@ -3996,7 +3916,7 @@ dependencies = [
  "bytes 0.5.4",
  "chrono",
  "futures 0.3.4",
- "rusoto_core 0.44.0",
+ "rusoto_core",
  "serde_urlencoded 0.6.1",
  "tempfile",
  "xml-rs",
@@ -5016,25 +4936,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-process"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afbd6ef1b8cc2bd2c2b580d882774d443ebb1c6ceefe35ba9ea4ab586c89dbe8"
-dependencies = [
- "crossbeam-queue 0.1.2",
- "futures 0.1.29",
- "lazy_static",
- "libc",
- "log",
- "mio",
- "mio-named-pipes",
- "tokio-io",
- "tokio-reactor",
- "tokio-signal",
- "winapi 0.3.8",
-]
-
-[[package]]
 name = "tokio-reactor"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5853,7 +5754,7 @@ dependencies = [
  "db-key",
  "derivative",
  "derive_is_enum_variant",
- "dirs 2.0.2",
+ "dirs",
  "elastic_responses",
  "evmap",
  "exitcode",
@@ -5913,17 +5814,14 @@ dependencies = [
  "reqwest 0.9.24",
  "rlua",
  "rusoto_cloudwatch",
- "rusoto_core 0.41.0",
- "rusoto_core 0.44.0",
- "rusoto_credential 0.41.1",
- "rusoto_credential 0.44.0",
+ "rusoto_core",
+ "rusoto_credential",
  "rusoto_firehose",
  "rusoto_kinesis",
  "rusoto_logs",
  "rusoto_s3",
  "rusoto_signature",
- "rusoto_sts 0.41.0",
- "rusoto_sts 0.44.0",
+ "rusoto_sts",
  "schannel",
  "seahash",
  "security-framework 0.4.3",
