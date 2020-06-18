@@ -13,7 +13,7 @@ use futures::{
     stream::Stream,
     task::{Context, Poll},
 };
-use futures01::{stream as stream01, sync::mpsc::Receiver, Stream as Stream01};
+use futures01::{stream as stream01, Stream as Stream01};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
@@ -37,10 +37,10 @@ pub struct TransactionConfig {
     /// An ordered list of fields to distinguish transactions by. Each
     /// transaction has a separate event merging state.
     #[serde(default)]
-    pub identifier_fields: Vec<Atom>,
+    pub identifier_fields: Vec<String>,
 
     #[serde(default)]
-    pub merge_strategies: IndexMap<Atom, MergeStrategy>,
+    pub merge_strategies: IndexMap<String, MergeStrategy>,
 
     /// An optional condition that determines when an event is the end of a
     /// transaction.
@@ -102,8 +102,9 @@ impl TransactionValueMerger for DiscardMerger {
         Ok(())
     }
 
-    fn insert_into(self: Box<Self>, k: Atom, v: &mut LogEvent) -> Result<(), String> {
-        Ok(v.insert(k, self.v))
+    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(k, self.v);
+        Ok(())
     }
 }
 
@@ -134,8 +135,9 @@ impl TransactionValueMerger for ConcatMerger {
         }
     }
 
-    fn insert_into(self: Box<Self>, k: Atom, v: &mut LogEvent) -> Result<(), String> {
-        Ok(v.insert(k, Value::Bytes(self.v.into())))
+    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(k, Value::Bytes(self.v.into()));
+        Ok(())
     }
 }
 
@@ -158,8 +160,9 @@ impl TransactionValueMerger for ArrayMerger {
         Ok(())
     }
 
-    fn insert_into(self: Box<Self>, k: Atom, v: &mut LogEvent) -> Result<(), String> {
-        Ok(v.insert(k, Value::Array(self.v)))
+    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(k, Value::Array(self.v));
+        Ok(())
     }
 }
 
@@ -193,7 +196,7 @@ impl TransactionValueMerger for TimestampWindowMerger {
         Ok(())
     }
 
-    fn insert_into(self: Box<Self>, k: Atom, v: &mut LogEvent) -> Result<(), String> {
+    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
         v.insert(format!("{}_end", k), Value::Timestamp(self.latest));
         v.insert(k, Value::Timestamp(self.started));
         Ok(())
@@ -256,11 +259,12 @@ impl TransactionValueMerger for AddNumbersMerger {
         Ok(())
     }
 
-    fn insert_into(self: Box<Self>, k: Atom, v: &mut LogEvent) -> Result<(), String> {
-        Ok(match self.v {
+    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+        match self.v {
             NumberMergerValue::Float(f) => v.insert(k, Value::Float(f)),
             NumberMergerValue::Int(i) => v.insert(k, Value::Integer(i)),
-        })
+        };
+        Ok(())
     }
 }
 
@@ -316,11 +320,12 @@ impl TransactionValueMerger for MaxNumberMerger {
         Ok(())
     }
 
-    fn insert_into(self: Box<Self>, k: Atom, v: &mut LogEvent) -> Result<(), String> {
-        Ok(match self.v {
+    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+        match self.v {
             NumberMergerValue::Float(f) => v.insert(k, Value::Float(f)),
             NumberMergerValue::Int(i) => v.insert(k, Value::Integer(i)),
-        })
+        };
+        Ok(())
     }
 }
 
@@ -376,11 +381,12 @@ impl TransactionValueMerger for MinNumberMerger {
         Ok(())
     }
 
-    fn insert_into(self: Box<Self>, k: Atom, v: &mut LogEvent) -> Result<(), String> {
-        Ok(match self.v {
+    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+        match self.v {
             NumberMergerValue::Float(f) => v.insert(k, Value::Float(f)),
             NumberMergerValue::Int(i) => v.insert(k, Value::Integer(i)),
-        })
+        };
+        Ok(())
     }
 }
 
@@ -388,7 +394,7 @@ impl TransactionValueMerger for MinNumberMerger {
 
 trait TransactionValueMerger: std::fmt::Debug + Send + Sync {
     fn add(&mut self, v: Value) -> Result<(), String>;
-    fn insert_into(self: Box<Self>, k: Atom, v: &mut LogEvent) -> Result<(), String>;
+    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String>;
 }
 
 impl From<Value> for Box<dyn TransactionValueMerger> {
@@ -453,12 +459,12 @@ fn get_value_merger(
 //------------------------------------------------------------------------------
 
 struct TransactionState {
-    fields: HashMap<Atom, Box<dyn TransactionValueMerger>>,
+    fields: HashMap<String, Box<dyn TransactionValueMerger>>,
     stale_since: Instant,
 }
 
 impl TransactionState {
-    fn new(e: LogEvent, strategies: &IndexMap<Atom, MergeStrategy>) -> Self {
+    fn new(e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) -> Self {
         Self {
             stale_since: Instant::now(),
             // TODO: all_fields alternative that consumes
@@ -481,7 +487,7 @@ impl TransactionState {
         }
     }
 
-    fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<Atom, MergeStrategy>) {
+    fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) {
         for (k, v) in e.all_fields() {
             let strategy = strategies.get(&k);
             match self.fields.entry(k) {
@@ -526,7 +532,7 @@ pub struct Transaction {
     expire_after: Duration,
     flush_period: Duration,
     identifier_fields: Vec<Atom>,
-    merge_strategies: IndexMap<Atom, MergeStrategy>,
+    merge_strategies: IndexMap<String, MergeStrategy>,
     transaction_merge_states: HashMap<Discriminant, TransactionState>,
     ends_when: Option<Box<dyn Condition>>,
 }
@@ -538,13 +544,21 @@ impl Transaction {
         } else {
             None
         };
+
+        let identifier_fields = config
+            .identifier_fields
+            .clone()
+            .into_iter()
+            .map(Atom::from)
+            .collect();
+
         Ok(Transaction {
             expire_after: Duration::from_millis(config.expire_after_ms.unwrap_or(30000)),
             flush_period: Duration::from_millis(config.flush_period_ms.unwrap_or(1000)),
-            identifier_fields: config.identifier_fields.clone(),
+            identifier_fields,
             merge_strategies: config.merge_strategies.clone(),
             transaction_merge_states: HashMap::new(),
-            ends_when: ends_when,
+            ends_when,
         })
     }
 
@@ -618,7 +632,7 @@ impl Transform for Transaction {
 
     fn transform_stream(
         self: Box<Self>,
-        input_rx: Receiver<Event>,
+        input_rx: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
     ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
     where
         Self: 'static,

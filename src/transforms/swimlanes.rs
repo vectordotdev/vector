@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    conditions::{AnyCondition, Condition},
+    conditions::{Condition, DefaultedCondition},
     event::Event,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct SwimlaneConfig {
     #[serde(flatten)]
-    condition: AnyCondition,
+    condition: DefaultedCondition,
 }
 
 #[typetag::serde(name = "swimlane")]
