@@ -359,6 +359,7 @@ fn reconnect() {
 #[test]
 fn healthcheck() {
     let addr = next_addr();
+    let mut rt = runtime();
     let resolver = vector::dns::Resolver;
 
     let _listener = TcpListener::bind(&addr).unwrap();
@@ -366,7 +367,7 @@ fn healthcheck() {
     let healthcheck =
         vector::sinks::util::tcp::tcp_healthcheck(addr.ip().to_string(), addr.port(), resolver);
 
-    assert!(healthcheck.wait().is_ok());
+    assert!(rt.block_on(healthcheck).is_ok());
 
     let bad_addr = next_addr();
     let bad_healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
@@ -375,5 +376,5 @@ fn healthcheck() {
         resolver,
     );
 
-    assert!(bad_healthcheck.wait().is_err());
+    assert!(rt.block_on(bad_healthcheck).is_err());
 }
