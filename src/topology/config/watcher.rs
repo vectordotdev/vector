@@ -122,7 +122,7 @@ mod tests {
 
     fn test(file: &mut File, timeout: Duration) -> bool {
         file.write_all(&[0]).unwrap();
-        std::mem::drop(file);
+        file.sync_all().unwrap();
 
         let mut rt = runtime();
 
