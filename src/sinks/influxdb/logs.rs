@@ -5,7 +5,7 @@ use crate::sinks::influxdb::{
     Field, InfluxDB1Settings, InfluxDB2Settings,
 };
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
-use crate::sinks::util::http2::{BatchedHttpSink, HttpSink};
+use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
 use crate::sinks::util::{service2::TowerRequestConfig, BatchBytesConfig, Buffer, Compression};
 use crate::sinks::Healthcheck;
 use crate::{
@@ -203,7 +203,7 @@ mod tests {
     use super::*;
     use crate::event::Event;
     use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, ts};
-    use crate::sinks::util::http2::HttpSink;
+    use crate::sinks::util::http::HttpSink;
     use crate::sinks::util::test::build_test_server;
     use crate::test_util;
     use chrono::offset::TimeZone;

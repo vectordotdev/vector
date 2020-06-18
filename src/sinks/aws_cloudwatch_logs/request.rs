@@ -1,6 +1,8 @@
 use super::CloudwatchError;
+use futures::compat::Compat;
+use futures::future::BoxFuture;
 use futures01::{sync::oneshot, try_ready, Async, Future, Poll};
-use rusoto_core::{RusotoError, RusotoFuture};
+use rusoto_core::RusotoError;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogGroupRequest,
     CreateLogStreamError, CreateLogStreamRequest, DescribeLogStreamsError,
@@ -23,11 +25,13 @@ struct Client {
     group_name: String,
 }
 
+type ClientResult<T, E> = Compat<BoxFuture<'static, Result<T, RusotoError<E>>>>;
+
 enum State {
-    CreateGroup(RusotoFuture<(), CreateLogGroupError>),
-    CreateStream(RusotoFuture<(), CreateLogStreamError>),
-    DescribeStream(RusotoFuture<DescribeLogStreamsResponse, DescribeLogStreamsError>),
-    Put(RusotoFuture<PutLogEventsResponse, PutLogEventsError>),
+    CreateGroup(ClientResult<(), CreateLogGroupError>),
+    CreateStream(ClientResult<(), CreateLogStreamError>),
+    DescribeStream(ClientResult<DescribeLogStreamsResponse, DescribeLogStreamsError>),
+    Put(ClientResult<PutLogEventsResponse, PutLogEventsError>),
 }
 
 impl CloudwatchFuture {
@@ -193,7 +197,7 @@ impl Client {
         &self,
         sequence_token: Option<String>,
         log_events: Vec<InputLogEvent>,
-    ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
+    ) -> ClientResult<PutLogEventsResponse, PutLogEventsError> {
         let request = PutLogEventsRequest {
             log_events,
             sequence_token,
@@ -201,12 +205,15 @@ impl Client {
             log_stream_name: self.stream_name.clone(),
         };
 
-        self.client.put_log_events(request)
+        let client = self.client.clone();
+        Compat::new(Box::pin(
+            async move { client.put_log_events(request).await },
+        ))
     }
 
     pub fn describe_stream(
         &self,
-    ) -> RusotoFuture<DescribeLogStreamsResponse, DescribeLogStreamsError> {
+    ) -> ClientResult<DescribeLogStreamsResponse, DescribeLogStreamsError> {
         let request = DescribeLogStreamsRequest {
             limit: Some(1),
             log_group_name: self.group_name.clone(),
@@ -214,24 +221,33 @@ impl Client {
             ..Default::default()
         };
 
-        self.client.describe_log_streams(request)
+        let client = self.client.clone();
+        Compat::new(Box::pin(async move {
+            client.describe_log_streams(request).await
+        }))
     }
 
-    pub fn create_log_group(&self) -> RusotoFuture<(), CreateLogGroupError> {
+    pub fn create_log_group(&self) -> ClientResult<(), CreateLogGroupError> {
         let request = CreateLogGroupRequest {
             log_group_name: self.group_name.clone(),
             ..Default::default()
         };
 
-        self.client.create_log_group(request)
+        let client = self.client.clone();
+        Compat::new(Box::pin(
+            async move { client.create_log_group(request).await },
+        ))
     }
 
-    pub fn create_log_stream(&self) -> RusotoFuture<(), CreateLogStreamError> {
+    pub fn create_log_stream(&self) -> ClientResult<(), CreateLogStreamError> {
         let request = CreateLogStreamRequest {
             log_group_name: self.group_name.clone(),
             log_stream_name: self.stream_name.clone(),
         };
 
-        self.client.create_log_stream(request)
+        let client = self.client.clone();
+        Compat::new(Box::pin(
+            async move { client.create_log_stream(request).await },
+        ))
     }
 }

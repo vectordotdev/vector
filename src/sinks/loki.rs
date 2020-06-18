@@ -18,7 +18,7 @@ use crate::{
     runtime::FutureExt,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        http2::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchBytesConfig, UriSerde,
     },
@@ -244,7 +244,7 @@ async fn healthcheck(config: LokiConfig, resolver: Resolver) -> crate::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sinks::util::http2::HttpSink;
+    use crate::sinks::util::http::HttpSink;
     use crate::sinks::util::test::load_sink;
     use crate::Event;
 

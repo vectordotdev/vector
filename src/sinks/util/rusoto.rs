@@ -1,28 +1,33 @@
 #![cfg(feature = "rusoto_core")]
 
 use crate::{dns::Resolver, sinks::util, tls::MaybeTlsSettings};
-use futures01::{
-    future::{self, Future, FutureResult},
-    Async, Poll, Stream,
-};
-use http::{
+use async_trait::async_trait;
+use futures::{Stream, StreamExt};
+use http02::{
     header::{HeaderMap, HeaderName, HeaderValue},
-    Method, Request, Response,
+    Method, Request, Response, StatusCode,
 };
-use hyper::body::Payload;
+use hyper13::body::{Body, HttpBody};
 use rusoto_core::{
-    request::{DispatchSignedRequest, HttpDispatchError, HttpResponse},
-    signature::{SignedRequest, SignedRequestPayload},
-    ByteStream, CredentialsError, Region,
+    request::{
+        DispatchSignedRequest, DispatchSignedRequestFuture, HttpDispatchError, HttpResponse,
+    },
+    ByteStream, Region,
 };
 use rusoto_credential::{
-    AutoRefreshingProvider, AutoRefreshingProviderFuture, AwsCredentials, ChainProvider,
-    ProvideAwsCredentials, StaticProvider,
+    AutoRefreshingProvider, AwsCredentials, ChainProvider, CredentialsError, ProvideAwsCredentials,
+    StaticProvider,
 };
+use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use snafu::{ResultExt, Snafu};
-use std::{io, time::Duration};
-use tower::Service;
+use std::{
+    io,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+use tower03::{Service, ServiceExt};
 
 pub type Client = HttpClient<util::http::HttpClient<RusotoBody>>;
 
@@ -84,32 +89,15 @@ impl AwsCredentialsProvider {
     }
 }
 
+#[async_trait]
 impl ProvideAwsCredentials for AwsCredentialsProvider {
-    type Future = AwsCredentialsProviderFuture;
-    fn credentials(&self) -> Self::Future {
-        match self {
-            Self::Default(p) => AwsCredentialsProviderFuture::Default(p.credentials()),
-            Self::Role(p) => AwsCredentialsProviderFuture::Role(p.credentials()),
-            Self::Static(p) => AwsCredentialsProviderFuture::Static(p.credentials()),
-        }
-    }
-}
-
-pub enum AwsCredentialsProviderFuture {
-    Default(AutoRefreshingProviderFuture<ChainProvider>),
-    Role(AutoRefreshingProviderFuture<StsAssumeRoleSessionCredentialsProvider>),
-    Static(FutureResult<AwsCredentials, CredentialsError>),
-}
-
-impl Future for AwsCredentialsProviderFuture {
-    type Item = AwsCredentials;
-    type Error = CredentialsError;
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        match self {
-            Self::Default(f) => f.poll(),
-            Self::Role(f) => f.poll(),
-            Self::Static(f) => f.poll(),
-        }
+    async fn credentials(&self) -> Result<AwsCredentials, CredentialsError> {
+        let fut = match self {
+            Self::Default(p) => p.credentials(),
+            Self::Role(p) => p.credentials(),
+            Self::Static(p) => p.credentials(),
+        };
+        fut.await
     }
 }
 
@@ -123,10 +111,6 @@ pub struct RusotoBody {
     inner: Option<SignedRequestPayload>,
 }
 
-struct BodyStream {
-    body: hyper::Body,
-}
-
 impl<T> HttpClient<T> {
     pub fn new(client: T) -> Self {
         HttpClient { client }
@@ -135,155 +119,159 @@ impl<T> HttpClient<T> {
 
 impl<T> DispatchSignedRequest for HttpClient<T>
 where
-    T: Service<Request<RusotoBody>, Response = Response<hyper::Body>, Error = hyper::Error>
+    T: Service<Request<RusotoBody>, Response = Response<Body>, Error = hyper13::Error>
         + Clone
         + Send
         + 'static,
     T::Future: Send + 'static,
 {
-    type Future = Box<dyn Future<Item = HttpResponse, Error = HttpDispatchError> + Send + 'static>;
-
-    // Adaptation of https://docs.rs/rusoto_core/0.41.0/src/rusoto_core/request.rs.html#409-522
-    fn dispatch(&self, request: SignedRequest, timeout: Option<Duration>) -> Self::Future {
+    // Adaptation of https://docs.rs/rusoto_core/0.44.0/src/rusoto_core/request.rs.html#314-416
+    fn dispatch(
+        &self,
+        request: SignedRequest,
+        timeout: Option<Duration>,
+    ) -> DispatchSignedRequestFuture {
         assert!(timeout.is_none(), "timeout is not supported at this level");
 
-        let method = match request.method().as_ref() {
-            "POST" => Method::POST,
-            "PUT" => Method::PUT,
-            "DELETE" => Method::DELETE,
-            "GET" => Method::GET,
-            "HEAD" => Method::HEAD,
-            v => unimplemented!("method type: {:?}", v),
-        };
+        let client = self.client.clone();
 
-        let mut headers = HeaderMap::new();
-        for h in request.headers().iter() {
-            let header_name = match h.0.parse::<HeaderName>() {
-                Ok(name) => name,
-                Err(err) => {
-                    return Box::new(future::err(HttpDispatchError::new(format!(
-                        "ParseHeader: {}",
-                        err
-                    ))))
+        Box::pin(async move {
+            let method = match request.method().as_ref() {
+                "POST" => Method::POST,
+                "PUT" => Method::PUT,
+                "DELETE" => Method::DELETE,
+                "GET" => Method::GET,
+                "HEAD" => Method::HEAD,
+                v => {
+                    return Err(HttpDispatchError::new(format!(
+                        "Unsupported HTTP verb {}",
+                        v
+                    )));
                 }
             };
-            for v in h.1.iter() {
-                let header_value = match HeaderValue::from_bytes(v) {
-                    Ok(value) => value,
+
+            let mut headers = HeaderMap::new();
+            for h in request.headers().iter() {
+                let header_name = match h.0.parse::<HeaderName>() {
+                    Ok(name) => name,
                     Err(err) => {
-                        return Box::new(future::err(HttpDispatchError::new(format!(
-                            "HeaderValueParse: {}",
+                        return Err(HttpDispatchError::new(format!(
+                            "error parsing header name: {}",
                             err
-                        ))))
+                        )))
                     }
                 };
-                headers.append(&header_name, header_value);
+                for v in h.1.iter() {
+                    let header_value = match HeaderValue::from_bytes(v) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(HttpDispatchError::new(format!(
+                                "error parsing header value: {}",
+                                err
+                            )))
+                        }
+                    };
+                    headers.append(&header_name, header_value);
+                }
             }
-        }
 
-        let mut uri = format!(
-            "{}://{}{}",
-            request.scheme(),
-            request.hostname(),
-            request.canonical_path()
-        );
+            let mut uri = format!(
+                "{}://{}{}",
+                request.scheme(),
+                request.hostname(),
+                request.canonical_path()
+            );
 
-        if !request.canonical_query_string().is_empty() {
-            uri += &format!("?{}", request.canonical_query_string());
-        }
+            if !request.canonical_query_string().is_empty() {
+                uri += &format!("?{}", request.canonical_query_string());
+            }
 
-        let mut request = Request::builder()
-            .method(method)
-            .uri(uri)
-            .body(RusotoBody::from(request.payload))
-            .map_err(|e| format!("RequestBuildingError: {}", e))
-            .unwrap();
+            let mut request = Request::builder()
+                .method(method)
+                .uri(uri)
+                .body(RusotoBody::from(request.payload))
+                .map_err(|e| format!("error building request: {}", e))
+                .map_err(HttpDispatchError::new)?;
 
-        *request.headers_mut() = headers;
+            *request.headers_mut() = headers;
 
-        let request = {
-            let mut client = self.client.clone();
-            client.call(request)
-        };
+            let response = client
+                .oneshot(request)
+                .await
+                .map_err(|e| HttpDispatchError::new(format!("Error during dispatch: {}", e)))?;
 
-        let fut = request
-            .and_then(|response| {
-                let status = response.status();
-                let headers = response
-                    .headers()
-                    .iter()
-                    .map(|(h, v)| {
-                        let value_string = v.to_str().unwrap().to_owned();
-                        (h.clone(), value_string)
-                    })
-                    .collect();
-                let body = response.into_body();
-                let body = BodyStream { body };
-
-                Ok(HttpResponse {
-                    status,
-                    headers,
-                    body: ByteStream::new(body),
+            let status = StatusCode::from_u16(response.status().as_u16()).unwrap();
+            let headers = response
+                .headers()
+                .iter()
+                .map(|(h, v)| {
+                    let value_string = v.to_str().unwrap().to_owned();
+                    // This should always be valid since we are coming from http.
+                    let name = HeaderName::from_bytes(h.as_ref())
+                        .expect("Should always be a valid header");
+                    (name, value_string)
                 })
-            })
-            .map_err(|e| HttpDispatchError::new(format!("DispatchError: {}", e)));
+                .collect();
 
-        Box::new(fut)
+            let body = response.into_body().map(|try_chunk| {
+                try_chunk
+                    .map(|c| c)
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+            });
+
+            Ok(HttpResponse {
+                status,
+                headers,
+                body: ByteStream::new(body),
+            })
+        })
     }
 }
 
-impl Payload for RusotoBody {
+impl HttpBody for RusotoBody {
     type Data = io::Cursor<Vec<u8>>;
     type Error = io::Error;
 
-    fn poll_data(&mut self) -> Poll<Option<Self::Data>, Self::Error> {
-        match &mut self.inner {
+    fn poll_data(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Self::Data, Self::Error>>> {
+        match self.inner.as_mut() {
             Some(SignedRequestPayload::Buffer(buf)) => {
                 if !buf.is_empty() {
                     let buf = buf.split_off(0);
-                    Ok(Async::Ready(Some(io::Cursor::new(
-                        buf.into_iter().collect(),
-                    ))))
+                    Poll::Ready(Some(Ok(io::Cursor::new(buf.into_iter().collect()))))
                 } else {
-                    Ok(Async::Ready(None))
+                    Poll::Ready(None)
                 }
             }
-            Some(SignedRequestPayload::Stream(stream)) => match stream.poll()? {
-                Async::Ready(Some(buffer)) => Ok(Async::Ready(Some(io::Cursor::new(
-                    buffer.into_iter().collect(),
-                )))),
-                Async::Ready(None) => Ok(Async::Ready(None)),
-                Async::NotReady => Ok(Async::NotReady),
-            },
-            None => Ok(Async::Ready(None)),
+            Some(SignedRequestPayload::Stream(stream)) => {
+                let stream = Pin::new(stream);
+                match stream.poll_next(cx) {
+                    Poll::Ready(Some(result)) => match result {
+                        Ok(buf) => {
+                            Poll::Ready(Some(Ok(io::Cursor::new(buf.into_iter().collect()))))
+                        }
+                        Err(error) => Poll::Ready(Some(Err(error))),
+                    },
+                    Poll::Ready(None) => Poll::Ready(None),
+                    Poll::Pending => Poll::Pending,
+                }
+            }
+            None => Poll::Ready(None),
         }
     }
 
-    fn poll_trailers(&mut self) -> Poll<Option<HeaderMap>, Self::Error> {
-        Ok(Async::Ready(None))
+    fn poll_trailers(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<Option<HeaderMap>, Self::Error>> {
+        Poll::Ready(Ok(None))
     }
 }
 
 impl From<Option<SignedRequestPayload>> for RusotoBody {
     fn from(inner: Option<SignedRequestPayload>) -> Self {
         RusotoBody { inner }
-    }
-}
-
-impl Stream for BodyStream {
-    type Item = bytes::Bytes;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        match self
-            .body
-            .poll_data()
-            // We have to hardcode this error since rusoto wants the error to be `io::Error`
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("hyper error: {}", e)))?
-        {
-            Async::Ready(Some(buf)) => Ok(Async::Ready(Some(buf.into_bytes()))),
-            Async::Ready(None) => Ok(Async::Ready(None)),
-            Async::NotReady => Ok(Async::NotReady),
-        }
     }
 }

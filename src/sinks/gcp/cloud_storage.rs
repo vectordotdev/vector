@@ -5,7 +5,7 @@ use crate::{
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
-            http2::{HttpClient, HttpClientFuture},
+            http::{HttpClient, HttpClientFuture},
             retries2::{RetryAction, RetryLogic},
             service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
             BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,

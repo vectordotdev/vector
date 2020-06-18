@@ -1,12 +1,12 @@
 use crate::{
     dns::Resolver,
     event::{self, Event},
-    region2::RegionOrEndpoint,
+    region::RegionOrEndpoint,
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries2::RetryLogic,
-        rusoto2 as rusoto,
+        rusoto,
         service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
         sink::Response,
         BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
@@ -21,7 +21,7 @@ use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
 use http02::StatusCode;
 use lazy_static::lazy_static;
-use rusoto_core44::{Region, RusotoError};
+use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{
     HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3,
 };
@@ -533,7 +533,7 @@ mod integration_tests {
         assert_downcast_matches,
         dns::Resolver,
         event::Event,
-        region2::RegionOrEndpoint,
+        region::RegionOrEndpoint,
         sinks::aws_s3::{S3Sink, S3SinkConfig},
         test_util::{random_lines_with_stream, random_string, runtime},
         topology::config::SinkContext,
@@ -544,7 +544,7 @@ mod integration_tests {
     use futures::stream::{self, StreamExt};
     use futures01::Sink;
     use pretty_assertions::assert_eq;
-    use rusoto_core44::region::Region;
+    use rusoto_core::region::Region;
     use rusoto_s3::{S3Client, S3};
     use std::io::{BufRead, BufReader, Cursor};
 
@@ -770,8 +770,8 @@ mod integration_tests {
             endpoint: "http://localhost:9000".to_owned(),
         };
 
-        use rusoto_core44::HttpClient;
-        use rusoto_credential44::StaticProvider;
+        use rusoto_core::HttpClient;
+        use rusoto_credential::StaticProvider;
 
         let p = StaticProvider::new_minimal("test-access-key".into(), "test-secret-key".into());
         let d = HttpClient::new().unwrap();

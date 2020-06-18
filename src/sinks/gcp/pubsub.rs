@@ -4,7 +4,7 @@ use crate::{
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http2::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpClient, HttpSink},
             service2::TowerRequestConfig,
             BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
         },

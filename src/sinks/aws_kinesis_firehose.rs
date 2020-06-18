@@ -1,11 +1,11 @@
 use crate::{
     dns::Resolver,
     event::{self, Event},
-    region2::RegionOrEndpoint,
+    region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries2::RetryLogic,
-        rusoto2 as rusoto,
+        rusoto,
         service2::TowerRequestConfig,
         sink::Response,
         BatchEventsConfig,
@@ -16,7 +16,7 @@ use bytes05::Bytes;
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
-use rusoto_core44::{Region, RusotoError};
+use rusoto_core::{Region, RusotoError};
 use rusoto_firehose::{
     DescribeDeliveryStreamError, DescribeDeliveryStreamInput, KinesisFirehose,
     KinesisFirehoseClient, PutRecordBatchError, PutRecordBatchInput, PutRecordBatchOutput, Record,
@@ -266,7 +266,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        region2::RegionOrEndpoint,
+        region::RegionOrEndpoint,
         sinks::{
             elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
             util::BatchEventsConfig,
@@ -275,7 +275,7 @@ mod integration_tests {
         topology::config::SinkContext,
     };
     use futures01::Sink;
-    use rusoto_core44::Region;
+    use rusoto_core::Region;
     use rusoto_firehose::{
         CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
         KinesisFirehoseClient,

@@ -1,10 +1,9 @@
 use crate::{
     dns::Resolver,
     event::metric::{Metric, MetricKind, MetricValue},
-    region2::RegionOrEndpoint,
+    region::RegionOrEndpoint,
     sinks::util::{
-        retries2::RetryLogic, rusoto2 as rusoto, service2::TowerRequestConfig, BatchEventsConfig,
-        MetricBuffer,
+        retries2::RetryLogic, rusoto, service2::TowerRequestConfig, BatchEventsConfig, MetricBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -15,7 +14,7 @@ use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
 };
-use rusoto_core44::{Region, RusotoError};
+use rusoto_core::{Region, RusotoError};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
@@ -437,7 +436,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::event::Event;
-    use crate::region2::RegionOrEndpoint;
+    use crate::region::RegionOrEndpoint;
     use crate::test_util::{random_string, runtime};
     use crate::topology::config::SinkContext;
     use chrono::offset::TimeZone;

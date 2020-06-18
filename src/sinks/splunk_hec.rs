@@ -4,7 +4,7 @@ use crate::{
     internal_events::{SplunkEventEncodeError, SplunkEventSent},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http2::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchBytesConfig, Buffer, Compression,
     },
@@ -238,7 +238,7 @@ fn build_uri(host: &str, path: &str) -> Result<Uri, http02::uri::InvalidUri> {
 mod tests {
     use super::*;
     use crate::event::Event;
-    use crate::sinks::util::{http2::HttpSink, test::load_sink};
+    use crate::sinks::util::{http::HttpSink, test::load_sink};
     use chrono::Utc;
     use serde::Deserialize;
     use std::collections::BTreeMap;

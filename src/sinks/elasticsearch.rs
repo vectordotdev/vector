@@ -3,10 +3,10 @@ use crate::{
     emit,
     event::Event,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
-    region2::{region_from_endpoint, RegionOrEndpoint},
+    region::{region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http2::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpClient, HttpSink},
         retries2::{RetryAction, RetryLogic},
         service2::TowerRequestConfig,
         BatchBytesConfig, Buffer, Compression,
@@ -25,8 +25,8 @@ use http02::{
 };
 use hyper13::Body;
 use lazy_static::lazy_static;
-use rusoto_core44::Region;
-use rusoto_credential44::{
+use rusoto_core::Region;
+use rusoto_credential::{
     AwsCredentials, CredentialsError, DefaultCredentialsProvider, ProvideAwsCredentials,
 };
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
@@ -517,7 +517,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         event,
-        sinks::util::http2::HttpClient,
+        sinks::util::http::HttpClient,
         test_util::{random_events_with_stream, random_string, runtime},
         tls::TlsOptions,
         topology::config::{SinkConfig, SinkContext},

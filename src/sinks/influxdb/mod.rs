@@ -3,7 +3,7 @@ pub mod metrics;
 
 pub(self) use super::{Healthcheck, RouterSink};
 
-use crate::{dns::Resolver, sinks::util::http2::HttpClient};
+use crate::{dns::Resolver, sinks::util::http::HttpClient};
 use chrono::{DateTime, Utc};
 use futures::TryFutureExt;
 use futures01::Future;

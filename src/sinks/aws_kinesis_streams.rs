@@ -2,11 +2,11 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     internal_events::AwsKinesisStreamsEventSent,
-    region2::RegionOrEndpoint,
+    region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries2::RetryLogic,
-        rusoto2 as rusoto,
+        rusoto,
         service2::TowerRequestConfig,
         sink::Response,
         BatchEventsConfig,
@@ -18,7 +18,7 @@ use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rand::random;
-use rusoto_core44::{Region, RusotoError};
+use rusoto_core::{Region, RusotoError};
 use rusoto_kinesis::{
     DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError, PutRecordsInput,
     PutRecordsOutput, PutRecordsRequestEntry,
@@ -336,12 +336,12 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        region2::RegionOrEndpoint,
+        region::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string, runtime},
         topology::config::SinkContext,
     };
     use futures01::Sink;
-    use rusoto_core44::Region;
+    use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
 

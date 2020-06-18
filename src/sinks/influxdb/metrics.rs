@@ -5,7 +5,7 @@ use crate::{
         Field, InfluxDB1Settings, InfluxDB2Settings,
     },
     sinks::util::{
-        http2::{Error as HttpError, HttpBatchService, HttpRetryLogic, Response as HttpResponse},
+        http::{Error as HttpError, HttpBatchService, HttpRetryLogic, Response as HttpResponse},
         service2::TowerRequestConfig,
         BatchEventsConfig, MetricBuffer,
     },
