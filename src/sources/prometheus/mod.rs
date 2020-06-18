@@ -10,7 +10,7 @@ use futures::{FutureExt, TryFutureExt};
 use futures01::{sync::mpsc, Future, Sink, Stream as Stream01};
 use http::Uri;
 use hyper13::{Body, Client, Request};
-use hyper_openssl08::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::time::{Duration, Instant};

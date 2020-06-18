@@ -17,7 +17,7 @@ use http02::{Request, StatusCode};
 use hyper13::body::{self, Body, HttpBody};
 use hyper13::client::HttpConnector;
 use hyper13::Client;
-use hyper_openssl08::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
