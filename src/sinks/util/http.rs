@@ -14,10 +14,10 @@ use futures::future::BoxFuture;
 use futures01::{Async, AsyncSink, Poll as Poll01, Sink, StartSend};
 use http02::header::HeaderValue;
 use http02::{Request, StatusCode};
-use hyper13::body::{self, Body, HttpBody};
-use hyper13::client::HttpConnector;
-use hyper13::Client;
-use hyper_openssl08::HttpsConnector;
+use hyper::body::{self, Body, HttpBody};
+use hyper::client::HttpConnector;
+use hyper::Client;
+use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
@@ -29,7 +29,7 @@ use tracing::Span;
 use tracing_futures::Instrument;
 
 pub type Response = http02::Response<Bytes>;
-pub type Error = hyper13::Error;
+pub type Error = hyper::Error;
 pub type HttpClientFuture = <HttpClient as Service<http02::Request<Body>>>::Future;
 
 pub trait HttpSink: Send + Sync + 'static {
@@ -97,7 +97,7 @@ impl<T, B, L> BatchedHttpSink<T, B, L>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
-    L: RetryLogic<Response = http02::Response<Bytes>, Error = hyper13::Error> + Send + 'static,
+    L: RetryLogic<Response = http02::Response<Bytes>, Error = hyper::Error> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn with_retry_logic(
@@ -278,14 +278,14 @@ impl<B> fmt::Debug for HttpClient<B> {
 #[derive(Clone)]
 pub struct HttpBatchService<B = Vec<u8>> {
     inner: HttpClient<Body>,
-    request_builder: Arc<dyn Fn(B) -> hyper13::Request<Vec<u8>> + Sync + Send>,
+    request_builder: Arc<dyn Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send>,
 }
 
 impl<B> HttpBatchService<B> {
     pub fn new(
         resolver: Resolver,
         tls_settings: impl Into<MaybeTlsSettings>,
-        request_builder: impl Fn(B) -> hyper13::Request<Vec<u8>> + Sync + Send + 'static,
+        request_builder: impl Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     ) -> HttpBatchService<B> {
         let inner =
             HttpClient::new(resolver, tls_settings).expect("Unable to initialize http client");
@@ -314,7 +314,7 @@ impl<B> Service<B> for HttpBatchService<B> {
             let res = response.await?;
             let (parts, body) = res.into_parts();
             let mut body = body::aggregate(body).await?;
-            Ok(hyper13::Response::from_parts(parts, body.to_bytes()))
+            Ok(hyper::Response::from_parts(parts, body.to_bytes()))
         };
 
         Box::pin(fut)
@@ -330,8 +330,8 @@ impl<T: fmt::Debug> sink::Response for http02::Response<T> {
 pub struct HttpRetryLogic;
 
 impl RetryLogic for HttpRetryLogic {
-    type Error = hyper13::Error;
-    type Response = hyper13::Response<Bytes>;
+    type Error = hyper::Error;
+    type Response = hyper::Response<Bytes>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_connect() || error.is_closed()
@@ -385,8 +385,8 @@ mod test {
     use bytes05::Buf;
     use futures01::{Future, Stream};
     use http02::Method;
-    use hyper13::service::{make_service_fn, service_fn};
-    use hyper13::{Body, Response, Server, Uri};
+    use hyper::service::{make_service_fn, service_fn};
+    use hyper::{Body, Response, Server, Uri};
     use tower03::Service;
 
     #[test]
@@ -435,7 +435,7 @@ mod test {
                 let mut tx = tx.clone();
 
                 async move {
-                    let body = hyper13::body::aggregate(req.into_body())
+                    let body = hyper::body::aggregate(req.into_body())
                         .await
                         .map_err(|e| format!("error: {}", e))?;
                     let string = String::from_utf8(body.bytes().into())

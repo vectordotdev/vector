@@ -13,7 +13,7 @@ use crate::{
 };
 use futures::future::BoxFuture;
 use futures01::Sink;
-use hyper13;
+use hyper;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -97,7 +97,7 @@ impl InfluxDBSvc {
         let uri = settings.write_uri(endpoint)?;
 
         let build_request = move |body: Vec<u8>| {
-            hyper13::Request::post(uri.clone())
+            hyper::Request::post(uri.clone())
                 .header("Content-Type", "text/plain")
                 .header("Authorization", format!("Token {}", token))
                 .body(body)

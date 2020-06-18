@@ -1,7 +1,7 @@
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 use futures::TryFutureExt;
 use futures01::Future;
-use hyper13::{
+use hyper::{
     service::{make_service_fn, service_fn},
     Body, Response, Server,
 };

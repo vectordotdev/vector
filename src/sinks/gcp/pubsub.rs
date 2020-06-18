@@ -16,7 +16,7 @@ use crate::{
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http02::{Method, Request, Uri};
-use hyper13::Body;
+use hyper::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};

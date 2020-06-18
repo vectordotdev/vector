@@ -6,7 +6,7 @@ use crate::{
 };
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt, TryStreamExt};
 use futures01::{sync::mpsc, Future, Sink, Stream};
-use hyper13::{
+use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
 };

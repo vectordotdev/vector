@@ -22,7 +22,7 @@ use chrono::Utc;
 use futures::TryFutureExt;
 use futures01::{stream::iter_ok, Future, Sink};
 use http02::{Method, StatusCode, Uri};
-use hyper13::{
+use hyper::{
     header::{HeaderName, HeaderValue},
     Body, Request, Response,
 };
@@ -255,7 +255,7 @@ impl GcsSink {
 
 impl Service<RequestWrapper> for GcsSink {
     type Response = Response<Body>;
-    type Error = hyper13::Error;
+    type Error = hyper::Error;
     type Future = HttpClientFuture;
 
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -443,7 +443,7 @@ struct GcsRetryLogic;
 
 // This is a clone of HttpRetryLogic for the Body type, should get merged
 impl RetryLogic for GcsRetryLogic {
-    type Error = hyper13::Error;
+    type Error = hyper::Error;
     type Response = Response<Body>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

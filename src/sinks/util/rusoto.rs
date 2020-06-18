@@ -7,7 +7,7 @@ use http02::{
     header::{HeaderMap, HeaderName, HeaderValue},
     Method, Request, Response, StatusCode,
 };
-use hyper13::body::{Body, HttpBody};
+use hyper::body::{Body, HttpBody};
 use rusoto_core::{
     request::{
         DispatchSignedRequest, DispatchSignedRequestFuture, HttpDispatchError, HttpResponse,
@@ -119,7 +119,7 @@ impl<T> HttpClient<T> {
 
 impl<T> DispatchSignedRequest for HttpClient<T>
 where
-    T: Service<Request<RusotoBody>, Response = Response<Body>, Error = hyper13::Error>
+    T: Service<Request<RusotoBody>, Response = Response<Body>, Error = hyper::Error>
         + Clone
         + Send
         + 'static,
