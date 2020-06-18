@@ -117,7 +117,7 @@ impl Transform for JsonParser {
                     }
 
                     for (key, value) in object {
-                        log.insert(key, value);
+                        log.insert_flat(key, value);
                     }
                 }
             }
@@ -134,6 +134,7 @@ mod test {
     use super::{JsonParser, JsonParserConfig};
     use crate::event::{self, Event};
     use crate::transforms::Transform;
+    use serde_json::json;
     use string_cache::DefaultAtom as Atom;
 
     #[test]
@@ -183,6 +184,34 @@ mod test {
         assert_eq!(
             event.as_log()[&event::log_schema().message_key()],
             r#"{"greeting": "hello", "name": "bob"}"#.into()
+        );
+    }
+
+    // Ensure the JSON parser doesn't take strings as toml paths.
+    // This is a regression test, see: https://github.com/timberio/vector/issues/2814
+    #[test]
+    fn json_parser_parse_periods() {
+        let mut parser = JsonParser::from(JsonParserConfig {
+            drop_field: false,
+            ..Default::default()
+        });
+
+        let test_json = json!({
+            "field.with.dots": "hello",
+            "sub.field": { "another.one": "bob"},
+        });
+
+        let event = Event::from(test_json.to_string());
+
+        let event = parser.transform(event).unwrap();
+
+        assert_eq!(
+            event.as_log().get_flat(&Atom::from("field.with.dots")),
+            Some(&crate::event::Value::from("hello")),
+        );
+        assert_eq!(
+            event.as_log().get_flat(&Atom::from("sub.field")),
+            Some(&crate::event::Value::from(json!({ "another.one": "bob", }))),
         );
     }
 
