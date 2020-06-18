@@ -1,39 +1,78 @@
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::time::Duration;
 
+#[derive(Debug, Snafu)]
+pub enum BatchError {
+    #[snafu(display("Cannot configure both `max_bytes` and `max_size`"))]
+    BytesAndSize,
+    #[snafu(display("Cannot configure both `max_events` and `max_size`"))]
+    EventsAndSize,
+    #[snafu(display("This sink does not allow setting `max_bytes`"))]
+    BytesNotAllowed,
+}
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct BatchBytesConfig {
+pub struct BatchConfig {
+    pub max_bytes: Option<usize>,
+    pub max_events: Option<usize>, // FIXME: Should this be "events" or "items"?
     pub max_size: Option<usize>,
     pub timeout_secs: Option<u64>,
 }
 
-impl BatchBytesConfig {
-    pub fn unwrap_or(&self, size: u64, timeout: u64) -> BatchSettings {
-        BatchSettings {
-            size: self.max_size.unwrap_or(size as usize),
-            timeout: Duration::from_secs(self.timeout_secs.unwrap_or(timeout)),
+impl BatchConfig {
+    pub fn parse_bytes(&self, bytes: u64) -> Result<usize, BatchError> {
+        match (self.max_bytes, self.max_size) {
+            (Some(_), Some(_)) => Err(BatchError::BytesAndSize),
+            (Some(bytes), None) => Ok(bytes),
+            (None, Some(size)) => Ok(size),
+            (None, None) => Ok(bytes as usize),
         }
     }
-}
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct BatchEventsConfig {
-    pub max_events: Option<usize>,
-    pub timeout_secs: Option<u64>,
-}
-
-impl BatchEventsConfig {
-    pub fn unwrap_or(&self, size: u64, timeout: u64) -> BatchSettings {
-        BatchSettings {
-            size: self.max_events.unwrap_or(size as usize),
+    pub fn parse_with_bytes(
+        &self,
+        bytes: u64,
+        events: usize,
+        timeout: u64,
+    ) -> Result<BatchSettings, BatchError> {
+        Ok(BatchSettings {
+            bytes: self.parse_bytes(bytes)?,
+            events: self.max_events.unwrap_or(events),
             timeout: Duration::from_secs(self.timeout_secs.unwrap_or(timeout)),
+        })
+    }
+
+    pub fn parse_events(&self, events: usize) -> Result<usize, BatchError> {
+        match (self.max_events, self.max_size) {
+            (Some(_), Some(_)) => Err(BatchError::EventsAndSize),
+            (Some(events), None) => Ok(events),
+            (None, Some(size)) => Ok(size),
+            (None, None) => Ok(events),
         }
+    }
+
+    pub fn parse_with_events(
+        &self,
+        bytes: u64,
+        events: usize,
+        timeout: u64,
+    ) -> Result<BatchSettings, BatchError> {
+        if bytes == 0 && self.max_bytes.is_some() {
+            return Err(BatchError::BytesNotAllowed);
+        }
+        Ok(BatchSettings {
+            bytes: self.max_bytes.unwrap_or(bytes as usize),
+            events: self.parse_events(events)?,
+            timeout: Duration::from_secs(self.timeout_secs.unwrap_or(timeout)),
+        })
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct BatchSettings {
-    pub size: usize,
+    pub bytes: usize,
+    pub events: usize,
     pub timeout: Duration,
 }
 

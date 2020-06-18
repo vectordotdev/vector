@@ -3,7 +3,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         service2::TowerRequestConfig,
-        BatchBytesConfig, Compression,
+        BatchConfig, Compression,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -40,7 +40,7 @@ pub struct NewRelicLogsConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
 
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -106,10 +106,12 @@ impl NewRelicLogsConfig {
             NewRelicLogsRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
         };
 
-        let batch = BatchBytesConfig {
+        let batch = BatchConfig {
             // The max request size is 10MiB, so in order to be comfortably
             // within this we batch up to 5MiB.
-            max_size: Some(self.batch.max_size.unwrap_or(bytesize::mib(5u64) as usize)),
+            max_bytes: Some(self.batch.parse_bytes(bytesize::mib(5u64))?),
+            max_size: None,
+            max_events: Some(self.batch.max_events.unwrap_or(50_000)),
             ..self.batch
         };
 

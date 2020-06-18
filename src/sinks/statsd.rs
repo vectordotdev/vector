@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     event::metric::{MetricKind, MetricValue},
     event::Event,
-    sinks::util::{service2::TowerCompat, BatchBytesConfig, BatchSink, Buffer, Compression},
+    sinks::util::{service2::TowerCompat, BatchConfig, BatchSink, Buffer, Compression},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, FutureExt, TryFutureExt};
@@ -51,7 +51,7 @@ pub struct StatsdSinkConfig {
     #[serde(default = "default_address")]
     pub address: SocketAddr,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
 }
 
 pub fn default_address() -> SocketAddr {
@@ -86,7 +86,7 @@ impl StatsdSvc {
         // However we need to leave some space for +1 extra trailing event in the buffer.
         // Also one might keep an eye on server side limitations, like
         // mentioned here https://github.com/DataDog/dd-agent/issues/2638
-        let batch = config.batch.unwrap_or(1300, 1);
+        let batch = config.batch.parse_with_bytes(1300, 1000, 1)?;
         let namespace = config.namespace.clone();
 
         let client = Client::new(config.address)?;
@@ -330,9 +330,10 @@ mod test {
         let config = StatsdSinkConfig {
             namespace: "vector".into(),
             address: default_address(),
-            batch: BatchBytesConfig {
-                max_size: Some(512),
+            batch: BatchConfig {
+                max_bytes: Some(512),
                 timeout_secs: Some(1),
+                ..Default::default()
             },
         };
 

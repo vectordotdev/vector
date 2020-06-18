@@ -216,7 +216,12 @@ where
             self.poll_complete()?;
 
             if !self.batch.is_empty() {
-                debug!(message = "Batch full; applying back pressure.", size = %self.settings.size, rate_limit_secs = 10);
+                debug!(
+                    message = "Batch full; applying back pressure.",
+                    bytes = %self.settings.bytes,
+                    events = %self.settings.events,
+                    rate_limit_secs = 10
+                );
                 return Ok(AsyncSink::NotReady(item));
             }
         }
@@ -472,7 +477,8 @@ where
                     if !batch.is_empty() {
                         debug!(
                             message = "Buffer full; applying back pressure.",
-                            max_size = %self.settings.size,
+                            max_bytes = %self.settings.bytes,
+                            max_events = %self.settings.events,
                             rate_limit_secs = 10
                         );
                         return Ok(AsyncSink::NotReady(item));
@@ -746,7 +752,8 @@ mod tests {
     use tokio01_test::clock::MockClock;
 
     const SETTINGS: BatchSettings = BatchSettings {
-        size: 10,
+        events: 10,
+        bytes: 9999,
         timeout: Duration::from_secs(10),
     };
 
@@ -810,7 +817,7 @@ mod tests {
         });
 
         let settings = BatchSettings {
-            size: 1,
+            events: 1,
             ..SETTINGS
         };
 
@@ -1081,7 +1088,7 @@ mod tests {
         });
 
         let settings = BatchSettings {
-            size: 1,
+            events: 1,
             ..SETTINGS
         };
 
@@ -1121,7 +1128,7 @@ mod tests {
         });
 
         let settings = BatchSettings {
-            size: 2,
+            events: 2,
             ..SETTINGS
         };
 

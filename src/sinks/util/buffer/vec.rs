@@ -9,8 +9,8 @@ pub struct VecBuffer<T> {
 impl<T> VecBuffer<T> {
     pub fn new(settings: BatchSettings) -> Self {
         Self {
-            batch: Vec::with_capacity(settings.size),
-            max_events: settings.size,
+            batch: Vec::with_capacity(settings.events),
+            max_events: settings.events,
         }
     }
 }

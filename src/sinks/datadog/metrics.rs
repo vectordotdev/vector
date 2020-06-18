@@ -7,7 +7,7 @@ use crate::{
     sinks::util::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
-        BatchEventsConfig, MetricBuffer,
+        BatchConfig, MetricBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -41,7 +41,7 @@ pub struct DatadogConfig {
     pub host: String,
     pub api_key: String,
     #[serde(default)]
-    pub batch: BatchEventsConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -109,7 +109,7 @@ impl SinkConfig for DatadogConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
 
-        let batch = self.batch.unwrap_or(20, 1);
+        let batch = self.batch.parse_with_events(0, 20, 1)?; // max bytes is ignored
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = build_uri(&self.host)?;

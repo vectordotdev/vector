@@ -6,7 +6,7 @@ use crate::{
         http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink, Response},
         retries2::{RetryAction, RetryLogic},
         service2::TowerRequestConfig,
-        BatchBytesConfig, Buffer, Compression,
+        BatchConfig, Buffer, Compression,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -33,7 +33,7 @@ pub struct ClickhouseConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     pub auth: Option<Auth>,
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -61,7 +61,9 @@ pub enum Encoding {
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
+        let batch = self
+            .batch
+            .parse_with_bytes(bytesize::mib(10u64), 100_000, 1)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 
@@ -257,9 +259,9 @@ mod integration_tests {
             host: host.clone(),
             table: table.clone(),
             compression: Compression::None,
-            batch: BatchBytesConfig {
-                max_size: Some(1),
-                timeout_secs: None,
+            batch: BatchConfig {
+                max_bytes: Some(1),
+                ..Default::default()
             },
             request: TowerRequestConfig {
                 retry_attempts: Some(1),
@@ -301,9 +303,9 @@ mod integration_tests {
             table: table.clone(),
             compression: Compression::None,
             encoding,
-            batch: BatchBytesConfig {
-                max_size: Some(1),
-                timeout_secs: None,
+            batch: BatchConfig {
+                max_bytes: Some(1),
+                ..Default::default()
             },
             request: TowerRequestConfig {
                 retry_attempts: Some(1),
@@ -417,9 +419,9 @@ compression = "none"
             host: host.clone(),
             table: table.clone(),
             compression: Compression::None,
-            batch: BatchBytesConfig {
-                max_size: Some(1),
-                timeout_secs: None,
+            batch: BatchConfig {
+                max_bytes: Some(1),
+                ..Default::default()
             },
             ..Default::default()
         };

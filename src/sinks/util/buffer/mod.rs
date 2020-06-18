@@ -43,7 +43,8 @@ impl Compression {
 pub struct Buffer {
     inner: InnerBuffer,
     num_items: usize,
-    max_size: usize,
+    max_bytes: usize,
+    max_events: usize,
 }
 
 #[derive(Debug)]
@@ -54,17 +55,18 @@ pub enum InnerBuffer {
 
 impl Buffer {
     pub fn new(settings: BatchSettings, compression: Compression) -> Self {
+        let buffer = Vec::with_capacity(settings.bytes);
         let inner = match compression {
-            Compression::None => InnerBuffer::Plain(Vec::with_capacity(settings.size)),
-            Compression::Gzip => InnerBuffer::Gzip(GzEncoder::new(
-                Vec::with_capacity(settings.size),
-                flate2::Compression::fast(),
-            )),
+            Compression::None => InnerBuffer::Plain(buffer),
+            Compression::Gzip => {
+                InnerBuffer::Gzip(GzEncoder::new(buffer, flate2::Compression::fast()))
+            }
         };
         Self {
             inner,
             num_items: 0,
-            max_size: settings.size,
+            max_bytes: settings.bytes,
+            max_events: settings.events,
         }
     }
 
@@ -102,7 +104,7 @@ impl Batch for Buffer {
     type Output = Vec<u8>;
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
-        if self.size() + item.len() > self.max_size {
+        if self.num_items >= self.max_events || self.size() + item.len() > self.max_bytes {
             PushResult::Full(item)
         } else {
             self.push(&item);
@@ -116,16 +118,17 @@ impl Batch for Buffer {
 
     fn fresh(&self) -> Self {
         let inner = match &self.inner {
-            InnerBuffer::Plain(_) => InnerBuffer::Plain(Vec::with_capacity(self.max_size)),
+            InnerBuffer::Plain(_) => InnerBuffer::Plain(Vec::with_capacity(self.max_bytes)),
             InnerBuffer::Gzip(_) => InnerBuffer::Gzip(GzEncoder::new(
-                Vec::with_capacity(self.max_size),
+                Vec::with_capacity(self.max_bytes),
                 flate2::Compression::default(),
             )),
         };
         Self {
             inner,
             num_items: 0,
-            max_size: self.max_size,
+            max_bytes: self.max_bytes,
+            max_events: self.max_events,
         }
     }
 
@@ -174,7 +177,8 @@ mod test {
         });
         let batch = BatchSettings {
             timeout: Duration::from_secs(0),
-            size: 1000,
+            bytes: 1000,
+            events: 1000,
         };
 
         let buffered = BatchSink::with_executor(

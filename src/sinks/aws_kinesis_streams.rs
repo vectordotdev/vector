@@ -9,7 +9,7 @@ use crate::{
         rusoto,
         service2::TowerRequestConfig,
         sink::Response,
-        BatchEventsConfig, VecBuffer,
+        BatchConfig, VecBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -50,7 +50,7 @@ pub struct KinesisSinkConfig {
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
-    pub batch: BatchEventsConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub assume_role: Option<String>,
@@ -102,7 +102,7 @@ impl KinesisService {
             cx.resolver(),
         )?);
 
-        let batch = config.batch.unwrap_or(500, 1);
+        let batch = config.batch.parse_with_events(0, 500, 1)?; // max bytes is ignored
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();
@@ -368,9 +368,9 @@ mod integration_tests {
             partition_key_field: None,
             region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
             encoding: Encoding::Text.into(),
-            batch: BatchEventsConfig {
+            batch: BatchConfig {
                 max_events: Some(2),
-                timeout_secs: None,
+                ..Default::default()
             },
             request: Default::default(),
             assume_role: None,

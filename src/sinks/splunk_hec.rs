@@ -6,7 +6,7 @@ use crate::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
-        BatchBytesConfig, Buffer, Compression,
+        BatchConfig, Buffer, Compression,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -46,7 +46,7 @@ pub struct HecSinkConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
@@ -82,7 +82,7 @@ impl SinkConfig for HecSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_host(&self.host)?;
 
-        let batch = self.batch.unwrap_or(bytesize::mib(1u64), 1);
+        let batch = self.batch.parse_with_bytes(bytesize::mib(1u64), 10000, 1)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 
@@ -725,9 +725,9 @@ mod integration_tests {
             host_key: "host".into(),
             compression: Compression::None,
             encoding: encoding.into(),
-            batch: BatchBytesConfig {
-                max_size: Some(1),
-                timeout_secs: None,
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
             },
             indexed_fields,
             ..Default::default()

@@ -8,7 +8,7 @@ use crate::{
             http::{HttpClient, HttpClientFuture},
             retries2::{RetryAction, RetryLogic},
             service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
-            BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
+            BatchConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
             PartitionInnerBuffer,
         },
         Healthcheck, RouterSink,
@@ -69,7 +69,7 @@ pub struct GcsSinkConfig {
     #[serde(default)]
     compression: Compression,
     #[serde(default)]
-    batch: BatchBytesConfig,
+    batch: BatchConfig,
     #[serde(default)]
     request: TowerRequestConfig,
     #[serde(flatten)]
@@ -201,7 +201,9 @@ impl GcsSink {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
-        let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
+        let batch = config
+            .batch
+            .parse_with_bytes(bytesize::mib(10u64), 100_000, 300)?;
 
         let key_prefix = config
             .key_prefix

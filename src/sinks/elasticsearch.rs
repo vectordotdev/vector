@@ -9,7 +9,7 @@ use crate::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
         retries2::{RetryAction, RetryLogic},
         service2::TowerRequestConfig,
-        BatchBytesConfig, Buffer, Compression,
+        BatchConfig, Buffer, Compression,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
@@ -53,7 +53,7 @@ pub struct ElasticSearchConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub auth: Option<ElasticSearchAuth>,
@@ -107,7 +107,9 @@ impl SinkConfig for ElasticSearchConfig {
         let healthcheck = healthcheck(cx.resolver(), common.clone()).boxed().compat();
 
         let compression = common.compression;
-        let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
+        let batch = self
+            .batch
+            .parse_with_bytes(bytesize::mib(10u64), 100_000, 1)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = common.tls_settings.clone();
 
@@ -761,9 +763,9 @@ mod integration_tests {
 
     fn config() -> ElasticSearchConfig {
         ElasticSearchConfig {
-            batch: BatchBytesConfig {
-                max_size: Some(1),
-                timeout_secs: None,
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
             },
             ..Default::default()
         }

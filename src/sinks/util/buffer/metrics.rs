@@ -57,9 +57,9 @@ impl PartialEq for MetricEntry {
 
 #[derive(Clone, PartialEq)]
 pub struct MetricBuffer {
-    max_size: usize,
     state: HashSet<MetricEntry>,
     metrics: HashSet<MetricEntry>,
+    max_events: usize,
 }
 
 impl MetricBuffer {
@@ -98,11 +98,10 @@ impl MetricBuffer {
     //   Absolute AggregatedSummary   => Absolute AggregatedSummary
     //
     pub fn new(settings: BatchSettings) -> Self {
-        let max_size = settings.size;
         Self {
             state: HashSet::new(),
-            metrics: HashSet::with_capacity(max_size),
-            max_size,
+            metrics: HashSet::with_capacity(settings.events),
+            max_events: settings.events,
         }
     }
 }
@@ -112,7 +111,7 @@ impl Batch for MetricBuffer {
     type Output = Vec<Metric>;
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
-        if self.num_items() >= self.max_size {
+        if self.num_items() >= self.max_events {
             PushResult::Full(item)
         } else {
             let item = item.into_metric();
@@ -208,8 +207,8 @@ impl Batch for MetricBuffer {
 
         Self {
             state,
-            metrics: HashSet::with_capacity(self.max_size),
-            max_size: self.max_size,
+            metrics: HashSet::with_capacity(self.max_events),
+            max_events: self.max_events,
         }
     }
 
@@ -319,8 +318,9 @@ mod test {
             future::ok::<_, std::io::Error>(())
         });
         let batch = BatchSettings {
+            bytes: 9999,
+            events: 6,
             timeout: Duration::from_secs(0),
-            size: 6,
         };
         let buffered =
             BatchSink::with_executor(svc, MetricBuffer::new(batch), batch, acker, rt.executor());

@@ -9,7 +9,7 @@ use crate::{
         rusoto,
         service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
         sink::Response,
-        BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
+        BatchConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
         PartitionInnerBuffer,
     },
     template::Template,
@@ -61,7 +61,7 @@ pub struct S3SinkConfig {
     #[serde(default = "Compression::default_gzip")]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub assume_role: Option<String>,
@@ -173,7 +173,7 @@ impl S3Sink {
         let compression = config.compression;
         let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
         let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
-        let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
+        let batch = config.batch.parse_with_bytes(10_000_000u64, 100_000, 300)?;
 
         let key_prefix = config
             .key_prefix
@@ -786,9 +786,10 @@ mod integration_tests {
             key_prefix: Some(random_string(10) + "/date=%F/"),
             bucket: BUCKET.to_string(),
             compression: Compression::None,
-            batch: BatchBytesConfig {
-                max_size: Some(batch_size),
+            batch: BatchConfig {
+                max_bytes: Some(batch_size),
                 timeout_secs: Some(5),
+                ..Default::default()
             },
             region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
             ..Default::default()

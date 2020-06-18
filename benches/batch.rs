@@ -12,7 +12,7 @@ use vector::test_util::random_lines;
 fn batching(
     bench_name: &'static str,
     compression: Compression,
-    max_size: usize,
+    max_bytes: usize,
     num_events: usize,
     event_len: usize,
 ) -> Benchmark {
@@ -29,7 +29,8 @@ fn batching(
                 let mut rt = vector::test_util::runtime();
                 let (acker, _) = Acker::new_for_testing();
                 let batch = BatchSettings {
-                    size: max_size,
+                    bytes: max_bytes,
+                    events: num_events,
                     timeout: Duration::from_secs(1),
                 };
                 let batch_sink = BatchSink::new(
@@ -52,7 +53,7 @@ fn batching(
 fn partitioned_batching(
     bench_name: &'static str,
     compression: Compression,
-    max_size: usize,
+    max_bytes: usize,
     num_events: usize,
     event_len: usize,
 ) -> Benchmark {
@@ -74,7 +75,8 @@ fn partitioned_batching(
                 let mut rt = vector::test_util::runtime();
                 let (acker, _) = Acker::new_for_testing();
                 let batch = BatchSettings {
-                    size: max_size,
+                    bytes: max_bytes,
+                    events: num_events,
                     timeout: Duration::from_secs(1),
                 };
                 let batch_sink = PartitionBatchSink::new(

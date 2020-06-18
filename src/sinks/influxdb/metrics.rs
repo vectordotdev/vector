@@ -7,7 +7,7 @@ use crate::{
     sinks::util::{
         http::{Error as HttpError, HttpBatchService, HttpRetryLogic, Response as HttpResponse},
         service2::TowerRequestConfig,
-        BatchEventsConfig, MetricBuffer,
+        BatchConfig, MetricBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -37,7 +37,7 @@ pub struct InfluxDBConfig {
     #[serde(flatten)]
     pub influxdb2_settings: Option<InfluxDB2Settings>,
     #[serde(default)]
-    pub batch: BatchEventsConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -91,7 +91,7 @@ impl InfluxDBSvc {
         let endpoint = config.endpoint.clone();
         let token = settings.token();
 
-        let batch = config.batch.unwrap_or(20, 1);
+        let batch = config.batch.parse_with_events(0, 20, 1)?; // max bytes is ignored
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = settings.write_uri(endpoint)?;

@@ -23,7 +23,7 @@ use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
-pub use batch::{Batch, BatchBytesConfig, BatchEventsConfig, BatchSettings, PushResult};
+pub use batch::{Batch, BatchConfig, BatchSettings, PushResult};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
 pub use buffer::metrics::{MetricBuffer, MetricEntry};
 pub use buffer::partition::Partition;

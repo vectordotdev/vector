@@ -6,7 +6,7 @@ use crate::sinks::influxdb::{
 };
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
-use crate::sinks::util::{service2::TowerRequestConfig, BatchBytesConfig, Buffer, Compression};
+use crate::sinks::util::{service2::TowerRequestConfig, BatchConfig, Buffer, Compression};
 use crate::sinks::Healthcheck;
 use crate::{
     event::{log_schema, Event},
@@ -35,7 +35,7 @@ pub struct InfluxDBLogsConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -77,7 +77,9 @@ impl SinkConfig for InfluxDBLogsConfig {
 
         let healthcheck = self.healthcheck(cx.resolver())?;
 
-        let batch = self.batch.unwrap_or(bytesize::mib(1u64), 1);
+        let batch = self
+            .batch
+            .parse_with_bytes(bytesize::mib(1u64), 10_000, 1)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let settings = influxdb_settings(

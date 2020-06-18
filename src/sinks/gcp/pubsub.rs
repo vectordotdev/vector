@@ -6,7 +6,7 @@ use crate::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
             service2::TowerRequestConfig,
-            BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
+            BatchConfig, BoxedRawValue, JsonArrayBuffer,
         },
         Healthcheck, RouterSink, UriParseError2,
     },
@@ -37,7 +37,7 @@ pub struct PubsubConfig {
     pub auth: GcpAuthConfig,
 
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(
@@ -65,7 +65,7 @@ inventory::submit! {
 impl SinkConfig for PubsubConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self)?;
-        let batch_settings = self.batch.unwrap_or(bytesize::mib(10u64), 1);
+        let batch_settings = self.batch.parse_with_bytes(bytesize::mib(10u64), 1000, 1)?;
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 

@@ -1,8 +1,7 @@
 use crate::{
     sinks::splunk_hec::{self, HecSinkConfig},
     sinks::util::{
-        encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchBytesConfig,
-        Compression,
+        encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchConfig, Compression,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -26,7 +25,7 @@ pub struct HumioLogsConfig {
     request: TowerRequestConfig,
 
     #[serde(default)]
-    batch: BatchBytesConfig,
+    batch: BatchConfig,
 }
 
 inventory::submit! {
