@@ -271,10 +271,10 @@ jobs:
     strategy:
       matrix:
         kubernetes:
-          - v1.18.2
-          - v1.17.5
-          - v1.16.9
-          - v1.15.11
+          - v1.18.4
+          - v1.17.7
+          - v1.16.11
+          - v1.15.12
           - v1.14.10
       fail-fast: false
     steps:
