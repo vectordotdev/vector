@@ -9,8 +9,8 @@ use crate::{
 use futures::{FutureExt, TryFutureExt};
 use futures01::{sync::mpsc, Future, Sink, Stream as Stream01};
 use http::Uri;
-use hyper13::{Body, Client, Request};
-use hyper_openssl08::HttpsConnector;
+use hyper::{Body, Client, Request};
+use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::time::{Duration, Instant};
@@ -118,8 +118,8 @@ mod test {
         Error,
     };
     use futures::TryFutureExt;
-    use hyper13::service::{make_service_fn, service_fn};
-    use hyper13::{Body, Client, Response, Server};
+    use hyper::service::{make_service_fn, service_fn};
+    use hyper::{Body, Client, Response, Server};
     use pretty_assertions::assert_eq;
     use std::{thread, time::Duration};
 

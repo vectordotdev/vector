@@ -23,7 +23,7 @@ use http02::{
     uri::InvalidUri,
     Request, StatusCode, Uri,
 };
-use hyper13::Body;
+use hyper::Body;
 use lazy_static::lazy_static;
 use rusoto_core::Region;
 use rusoto_credential::{
@@ -258,8 +258,8 @@ impl HttpSink for ElasticSearchCommon {
 struct ElasticSearchRetryLogic;
 
 impl RetryLogic for ElasticSearchRetryLogic {
-    type Error = hyper13::Error;
-    type Response = hyper13::Response<Bytes>;
+    type Error = hyper::Error;
+    type Response = hyper::Response<Bytes>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_connect() || error.is_closed()
@@ -526,7 +526,7 @@ mod integration_tests {
     use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
     use http02::{Request, StatusCode};
-    use hyper13::Body;
+    use hyper::Body;
     use serde_json::{json, Value};
     use std::fs::File;
     use std::io::Read;

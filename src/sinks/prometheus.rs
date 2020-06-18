@@ -8,7 +8,7 @@ use crate::{
 use chrono::Utc;
 use futures::{compat::Future01CompatExt, future::FutureExt, TryFutureExt};
 use futures01::{future, Async, AsyncSink, Future, Sink};
-use hyper13::{
+use hyper::{
     header::HeaderValue,
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
@@ -270,7 +270,7 @@ fn handle(
     buckets: &[f64],
     expired: bool,
     metrics: &IndexSet<MetricEntry>,
-) -> Box<dyn Future<Item = Response<Body>, Error = hyper13::Error> + Send> {
+) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
     let mut response = Response::new(Body::empty());
 
     match (req.method(), req.uri().path()) {

@@ -1,7 +1,6 @@
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::Future;
-use hyper::client::connect::dns::{Name, Resolve};
-use hyper13::client::connect::dns::Name as Name13;
+use hyper::client::connect::dns::Name as Name13;
 use snafu::ResultExt;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs},
@@ -52,23 +51,6 @@ impl Iterator for LookupIp {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next().map(|address| address.ip())
-    }
-}
-
-impl Resolve for Resolver {
-    type Addrs = LookupIp;
-    type Future = Box<dyn Future<Item = LookupIp, Error = std::io::Error> + Send + 'static>;
-
-    fn resolve(&self, name: Name) -> Self::Future {
-        let fut = self
-            .lookup_ip(name.as_str().to_owned())
-            .boxed()
-            .compat()
-            .map_err(|e| {
-                use std::io;
-                io::Error::new(io::ErrorKind::Other, e)
-            });
-        Box::new(fut)
     }
 }
 

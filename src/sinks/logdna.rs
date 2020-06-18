@@ -199,7 +199,7 @@ async fn healthcheck(config: LogdnaConfig, resolver: Resolver) -> crate::Result<
 
     let mut client = HttpClient::new(resolver, TlsSettings::from_options(&None)?)?;
 
-    let req = Request::post(uri).body(hyper13::Body::empty()).unwrap();
+    let req = Request::post(uri).body(hyper::Body::empty()).unwrap();
 
     let res = client.send(req).await?;
 

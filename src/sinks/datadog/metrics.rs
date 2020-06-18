@@ -175,7 +175,7 @@ async fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result
 
     let request = Request::get(uri)
         .header("DD-API-KEY", config.api_key)
-        .body(hyper13::Body::empty())
+        .body(hyper::Body::empty())
         .unwrap();
 
     let mut client = HttpClient::new(resolver, None)?;

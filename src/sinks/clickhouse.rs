@@ -14,7 +14,7 @@ use crate::{
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http02::{Method, Request, StatusCode, Uri};
-use hyper13::Body;
+use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -180,7 +180,7 @@ struct ClickhouseRetryLogic {
 
 impl RetryLogic for ClickhouseRetryLogic {
     type Response = Response;
-    type Error = hyper13::Error;
+    type Error = hyper::Error;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         self.inner.is_retriable_error(error)

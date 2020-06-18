@@ -16,7 +16,7 @@ use crate::{
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http02::{Request, Uri};
-use hyper13::Body;
+use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;

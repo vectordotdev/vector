@@ -16,7 +16,7 @@ use http02::{
     header::{self, HeaderName, HeaderValue},
     Method, Request, StatusCode, Uri,
 };
-use hyper13::Body;
+use hyper::Body;
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -297,7 +297,7 @@ mod tests {
     };
     use futures01::{Sink, Stream};
     use headers03::{Authorization, HeaderMapExt};
-    use hyper13::Method;
+    use hyper::Method;
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
 
