@@ -372,7 +372,6 @@ mod integration_tests {
         Event,
     };
     use futures01::Sink;
-    use http::StatusCode;
     use serde_json::Value as JsonValue;
     use std::net::SocketAddr;
     use warp::Filter;
@@ -677,7 +676,7 @@ mod integration_tests {
             let unhealthy = warp::any()
                 .map(|| warp::reply::with_status("i'm sad", StatusCode::SERVICE_UNAVAILABLE));
             let server = warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
-            rt.spawn(server);
+            rt.spawn_std(server);
 
             let healthcheck = sinks::splunk_hec::healthcheck(config, resolver);
             assert_downcast_matches!(
