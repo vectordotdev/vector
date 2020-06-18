@@ -2,6 +2,7 @@
 //! from the `vector` crate, and thus doesn't waste time in a tremendously long
 //! link step.
 
+use futures::{SinkExt, StreamExt};
 use k8s_openapi::{
     api::core::v1::{Container, Pod, PodSpec},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
@@ -575,6 +576,138 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     assert!(got_marker);
 
     drop(test_pod);
+    drop(test_namespace);
+    drop(vector);
+    Ok(())
+}
+
+/// This test validates that vector properly filters out the logs that are
+/// requested to be excluded from collection, based on k8s API `Pod` labels.
+#[tokio::test]
+async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = lock();
+    let framework = make_framework();
+
+    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    framework
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .await?;
+
+    let test_namespace = framework.namespace("test-vector-test-pod").await?;
+
+    let excluded_test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod-excluded",
+            "echo EXCLUDED_MARKER",
+            vec![("vector.dev/exclude", "true")],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod-excluded"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=30s"],
+        )
+        .await?;
+
+    let control_test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod-control",
+            "echo CONTROL_MARKER",
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod-control"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=30s"],
+        )
+        .await?;
+
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
+    smoke_check_first_line(&mut log_reader).await;
+
+    // Read the log lines until the reasoable amount of time passes for us
+    // to be confident that vector shoud've picked up the excluded message
+    // if it wasn't fitlering it.
+    let mut got_control_marker = false;
+    let mut lines_till_we_give_up: usize = 10000;
+    let (stop_tx, mut stop_rx) = futures::channel::mpsc::channel(0);
+    loop {
+        let line = tokio::select! {
+            result = stop_rx.next() => {
+                result.unwrap();
+                log_reader.kill()?;
+                continue;
+            }
+            line = log_reader.read_line() => line,
+        };
+        let line = match line {
+            Some(line) => line,
+            None => break,
+        };
+        println!("Got line: {:?}", line);
+
+        lines_till_we_give_up -= 1;
+        if lines_till_we_give_up <= 0 {
+            println!("Giving up");
+            log_reader.kill()?;
+            break;
+        }
+
+        if !line.starts_with("{") {
+            // This isn't a json, must be an entry from Vector's own log stream.
+            continue;
+        }
+
+        let val = parse_json(&line)?;
+
+        if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
+            // A log from something other than our test pod, predend we don't
+            // see it.
+            continue;
+        }
+
+        // Ensure we got the log event from the control pod.
+        assert_eq!(val["kubernetes"]["pod_name"], "test-pod-control");
+
+        // Ensure the test sanity by validating that we got the control marker.
+        // If we get an excluded marker here - it's an error.
+        assert_eq!(val["message"], "CONTROL_MARKER");
+
+        if got_control_marker {
+            // We've already seen one control marker! This is not good, we only
+            // emitted one.
+            panic!("control marker seen more than once");
+        }
+
+        // Remember that we've seen a control marker.
+        got_control_marker = true;
+
+        // Request termination in a while.
+        let mut stop_tx = stop_tx.clone();
+        tokio::spawn(async move {
+            // Wait for two minutes - a reasonable time for vector internals to
+            // pick up new `Pod` and collect events from them in idle load.
+            println!("Starting stop timer");
+            tokio::time::delay_for(std::time::Duration::from_secs(120)).await;
+            println!("Stop timer complete");
+            stop_tx.send(()).await.unwrap();
+        });
+    }
+
+    // Ensure log reader exited.
+    log_reader.wait().await.expect("log reader wait failed");
+
+    assert!(got_control_marker);
+
+    drop(excluded_test_pod);
+    drop(control_test_pod);
     drop(test_namespace);
     drop(vector);
     Ok(())
