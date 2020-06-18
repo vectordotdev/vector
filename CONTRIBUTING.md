@@ -37,6 +37,8 @@ expanding into more specifics.
    1. [Benchmarking](#benchmarking)
    1. [Profiling](#profiling)
    1. [Kubernetes](#kubernetes)
+      1. [Dev flow](#kubernetes-dev-flow)
+      1. [E2E tests](#kubernetes-e2e-tests)
 1. [Humans](#humans)
    1. [Documentation](#documentation)
    1. [Changelog](#changelog)
@@ -550,13 +552,15 @@ navigated in your favorite web browser.
 
 ### Kubernetes
 
+#### Kubernetes Dev Flow
+
 There is a special flow for when you develop portions of Vector that are
 designed to work with Kubernetes, like `kubernetes_logs` source or the
 `deployment/kubernetes/*.yaml` configs.
 
 This flow facilitates building Vector and deploying it into a cluster.
 
-#### Requirements
+##### Requirements
 
 There are some extra requirements besides what you'd normally need to work on
 Vector:
@@ -570,7 +574,7 @@ Vector:
 * [`minikube`](https://minikube.sigs.k8s.io/)-powered or other k8s cluster
 * [`cargo watch`](https://github.com/passcod/cargo-watch)
 
-#### The dev flow
+##### The dev flow
 
 Once you have the requirements, use the `scripts/skaffold.sh dev` command.
 
@@ -596,7 +600,7 @@ the cluster state and exit.
 `scripts/skaffold.sh` wraps `skaffold`, you can use other `skaffold` subcommands
 if it fits you better.
 
-#### Troubleshooting
+##### Troubleshooting
 
 You might need to tweak `skaffold`, here are some hints:
 
@@ -614,7 +618,7 @@ You might need to tweak `skaffold`, here are some hints:
 * For the rest of the `skaffold` tweaks you might want to apply check out
   [this page](https://skaffold.dev/docs/environment/).
 
-#### Going through the dev flow manually
+##### Going through the dev flow manually
 
 Is some cases `skaffold` may not work. It's possible to go through the dev flow
 manually, without `skaffold`.
@@ -626,6 +630,74 @@ required.
 
 Essentially, the steps you have to take to deploy manually are the same that
 `skaffold` will perform, and they're outlined at the previous section.
+
+#### Kubernetes E2E tests
+
+Kubernetes integration is quite complicated, a lot of things can go wrong.
+
+To cope with the complexity and ensure we maintain high quality, we use
+E2E (end-to-end) tests.
+
+> E2E tests normally run at CI, so there's typically no need to run them
+> manually.
+
+##### Requirements
+
+* `kubernetes` cluster (`minikube` has special support, but any cluster should
+  work)
+* `docker`
+* `kubectl`
+* `bash`
+
+Vector release artifacts are prepared for E2E tests, so the ability to do that
+is required too, see Vector [docs](https://vector.dev) for more details.
+
+##### Running the E2E tests
+
+To run the E2E tests, use the following command:
+
+```shell
+CONTAINER_IMAGE_REPO=<your name>/vector-test make test-e2e-kubernetes
+```
+
+Where `CONTAINER_IMAGE_REPO` is the docker image repo name to use, without part
+after the `:`. Replace `<your name>` with your Docker Hub username.
+
+This will run Kubernetes E2E tests suite. If the command exit with 0 status
+code - tests passed.
+
+You can also pass additional parameters to adjust the behavior of the test:
+
+* `QUICK_BUILD=true` - use development build and a skaffold image from the dev
+  flow instead of a production docker image. Significantly speeds up the
+  preparation process, but doesn't guarantee the correctness in the release
+  build. Useful for development of the tests or Vector code to speed up the
+  iteration cycles.
+
+* `USE_MINIKUBE_DOCKER=true` - instead of pushing the built docker image to the
+  registry under the specified name, directly inject the image into a docker
+  instance running inside of a `minikube`-controlled cluster node.
+  Requires you to test against a `minikube` cluster. Eliminates the need to have
+  a registry to run tests.
+
+* `CONTAINER_IMAGE_REPO=<your name>/vector-test:tag` - completely skip the step
+  of building the Vector docker image, and use the specified image instead.
+  Useful to speed up the iterations speed when you already have a Vector docker
+  image you want to test against.
+
+* `SKIP_CONTAINER_IMAGE_PUBLISHING=true` - completely skip the image publishing
+  step. Useful when you want to speed up the iteration speed and when you know
+  the Vector image you want to test is already available to the cluster you're
+  testing against.
+
+* `SCOPE` - pass a filter to the `cargo test` command to filter out the tests,
+  effectively equivalent to `cargo test -- $SCOPE`.
+
+Passing additional commands is done like so:
+
+```shell
+QUICK_BUILD=true USE_MINIKUBE_DOCKER=true CONTAINER_IMAGE_REPO=<your name>/vector-test make test-e2e-kubernetes
+```
 
 ## Humans
 
