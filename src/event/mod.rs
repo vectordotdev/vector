@@ -299,6 +299,14 @@ impl From<Bytes> for Value {
     }
 }
 
+impl From<bytes05::Bytes> for Value {
+    fn from(bytes: bytes05::Bytes) -> Self {
+        let mut old_bytes = Bytes::new();
+        old_bytes.extend_from_slice(&bytes);
+        Value::Bytes(old_bytes)
+    }
+}
+
 impl From<Vec<u8>> for Value {
     fn from(bytes: Vec<u8>) -> Self {
         Value::Bytes(bytes.into())

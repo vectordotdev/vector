@@ -5,7 +5,7 @@ use crate::{
     tls::TlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
-use bytes::{Buf, Bytes, BytesMut};
+use bytes05::Bytes;
 use chrono::Utc;
 use codec::{self, BytesDelimitedCodec};
 use futures01::sync::mpsc;
@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::net::SocketAddr;
 use tokio_codec::Decoder;
-use warp::filters::body::FullBody;
 use warp::http::{HeaderMap, HeaderValue, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -47,11 +46,7 @@ pub enum Encoding {
 }
 
 impl HttpSource for SimpleHttpSource {
-    fn build_event(
-        &self,
-        body: FullBody,
-        header_map: HeaderMap,
-    ) -> Result<Vec<Event>, ErrorMessage> {
+    fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
         decode_body(body, self.encoding)
             .map(|events| add_headers(events, &self.headers, header_map))
             .map(|mut events| {
@@ -108,7 +103,11 @@ fn add_headers(
     events
 }
 
-fn body_to_lines(mut body: BytesMut) -> impl Iterator<Item = Result<Bytes, ErrorMessage>> {
+fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<bytes::Bytes, ErrorMessage>> {
+    // TODO: remove on bytes 0.4 => 0.5 update
+    let mut body = bytes::BytesMut::new();
+    body.extend_from_slice(&buf);
+
     let mut decoder = BytesDelimitedCodec::new(b'\n');
     std::iter::from_fn(move || {
         match decoder.decode_eof(&mut body) {
@@ -127,9 +126,7 @@ fn body_to_lines(mut body: BytesMut) -> impl Iterator<Item = Result<Bytes, Error
     })
 }
 
-fn decode_body(buf: FullBody, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
-    let body = buf.collect::<BytesMut>();
-
+fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
     match enc {
         Encoding::Text => body_to_lines(body)
             .map(|r| Ok(Event::from(r?)))
@@ -202,7 +199,6 @@ fn json_value_to_type_string(value: &JsonValue) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{Encoding, SimpleHttpConfig};
-    use warp::http::HeaderMap;
 
     use crate::shutdown::ShutdownSignal;
     use crate::{
@@ -212,7 +208,7 @@ mod tests {
         topology::config::{GlobalOptions, SourceConfig},
     };
     use futures01::sync::mpsc;
-    use http::Method;
+    use http::{HeaderMap, Method};
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
     use string_cache::DefaultAtom as Atom;

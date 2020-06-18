@@ -1328,6 +1328,7 @@ dependencies = [
  "proc-macro-hack",
  "proc-macro-nested",
  "slab",
+ "tokio-io",
 ]
 
 [[package]]
@@ -5097,6 +5098,7 @@ checksum = "be8242891f2b6cbef26a2d7e8605133c2c554cd35b3e4948ea892d6d68436499"
 dependencies = [
  "bytes 0.5.4",
  "futures-core",
+ "futures-io",
  "futures-sink",
  "log",
  "pin-project-lite",
@@ -5846,6 +5848,7 @@ dependencies = [
  "tokio-signal",
  "tokio-test",
  "tokio-uds",
+ "tokio-util",
  "tokio01-test",
  "toml 0.4.10",
  "tower 0.1.1",
@@ -5972,24 +5975,25 @@ dependencies = [
 
 [[package]]
 name = "warp"
-version = "0.1.21"
-source = "git+https://github.com/timberio/warp?branch=0.1.x#017965c627047bf0e53062940e7def127cb21649"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e95175b7a927258ecbb816bdada3cc469cb68593e7940b96a60f4af366a9970"
 dependencies = [
- "bytes 0.4.12",
- "futures 0.1.29",
- "headers 0.2.3",
- "http 0.1.21",
- "hyper 0.12.35",
+ "bytes 0.5.4",
+ "futures 0.3.4",
+ "headers 0.3.2",
+ "http 0.2.1",
+ "hyper 0.13.4",
  "log",
  "mime",
  "mime_guess",
+ "pin-project",
  "scoped-tls",
  "serde",
  "serde_json",
  "serde_urlencoded 0.6.1",
- "tokio 0.1.22",
- "tokio-io",
- "tokio-threadpool",
+ "tokio 0.2.13",
+ "tower-service 0.3.0",
  "urlencoding",
 ]
 
