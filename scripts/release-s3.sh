@@ -83,7 +83,7 @@ elif [[ "$CHANNEL" == "latest" ]]; then
   done
   verify_artifact \
     "https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-gnu.tar.gz" --fail \
-    "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+    "$td/vector-x86_64-unknown-linux-gnu.tar.gz"
 fi
 
 #
