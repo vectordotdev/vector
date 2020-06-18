@@ -281,7 +281,7 @@ jobs:
       - name: Setup Minikube
         uses: manusa/actions-setup-minikube@v1.0.2
         with:
-          minikube version: 'v1.9.2'
+          minikube version: 'v1.11.0'
           kubernetes version: '${{ matrix.kubernetes }}'
           github token: '${{ secrets.GITHUB_TOKEN }}'
       - name: Checkout
