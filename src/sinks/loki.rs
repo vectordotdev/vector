@@ -17,7 +17,7 @@ use crate::{
     event::{self, Event, Value},
     runtime::FutureExt,
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchBytesConfig, UriSerde,
@@ -38,7 +38,8 @@ type Labels = Vec<(String, String)>;
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
     endpoint: UriSerde,
-    encoding: EncodingConfig<Encoding>,
+    #[serde(default)]
+    encoding: EncodingConfigWithDefault<Encoding>,
 
     tenant_id: Option<String>,
     labels: HashMap<String, Template>,
