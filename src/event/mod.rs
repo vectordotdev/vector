@@ -723,6 +723,23 @@ impl From<Bytes> for Event {
     }
 }
 
+impl From<bytes05::Bytes> for Event {
+    fn from(message: bytes05::Bytes) -> Self {
+        let mut event = Event::Log(LogEvent {
+            fields: BTreeMap::new(),
+        });
+
+        event
+            .as_mut_log()
+            .insert(log_schema().message_key().clone(), message);
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key().clone(), Utc::now());
+
+        event
+    }
+}
+
 impl From<&str> for Event {
     fn from(line: &str) -> Self {
         line.to_owned().into()
