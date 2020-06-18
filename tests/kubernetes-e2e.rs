@@ -10,6 +10,7 @@ use k8s_openapi::{
 use kubernetes_test_framework::{
     lock, log_lookup, test_pod, wait_for_resource::WaitFor, Framework, Interface,
 };
+use std::collections::HashSet;
 
 const VECTOR_CONFIG: &str = r#"
 apiVersion: v1
@@ -709,6 +710,90 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     drop(excluded_test_pod);
     drop(control_test_pod);
     drop(test_namespace);
+    drop(vector);
+    Ok(())
+}
+
+/// This test validates that vector properly collects logs from multiple
+/// `Namespace`s and `Pod`s.
+#[tokio::test]
+async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = lock();
+    let framework = make_framework();
+
+    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    framework
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .await?;
+
+    const NS_PREFIX: &str = "test-vector-test-pod";
+
+    let mut test_namespaces = vec![];
+    let mut expected_namespaces = HashSet::new();
+    for i in 0..10 {
+        let name = format!("{}-{}", NS_PREFIX, i);
+        test_namespaces.push(framework.namespace(&name).await?);
+        expected_namespaces.insert(name);
+    }
+
+    let mut test_pods = vec![];
+    for ns in &expected_namespaces {
+        let test_pod = framework
+            .test_pod(test_pod::Config::from_pod(&make_test_pod(
+                ns,
+                "test-pod",
+                "echo MARKER",
+                vec![],
+            ))?)
+            .await?;
+        framework
+            .wait(
+                ns,
+                vec!["pods/test-pod"],
+                WaitFor::Condition("initialized"),
+                vec!["--timeout=30s"],
+            )
+            .await?;
+        test_pods.push(test_pod);
+    }
+
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
+    smoke_check_first_line(&mut log_reader).await;
+
+    // Read the rest of the log lines.
+    look_for_log_line(&mut log_reader, |val| {
+        let ns = match val["kubernetes"]["pod_namespace"].as_str() {
+            Some(val) if val.starts_with(NS_PREFIX) => val,
+            _ => {
+                // A log from something other than our test pod, pretend we
+                // don't see it.
+                return FlowControlCommand::GoOn;
+            }
+        };
+
+        // Ensure we got the marker.
+        assert_eq!(val["message"], "MARKER");
+
+        // Remove the namespace from the list of namespaces we still expect to
+        // get.
+        let as_expected = expected_namespaces.remove(ns);
+        assert!(as_expected);
+
+        if expected_namespaces.is_empty() {
+            // We got all the messages we expected, request to stop the flow.
+            FlowControlCommand::Terminate
+        } else {
+            // We didn't get all the messages yet.
+            FlowControlCommand::GoOn
+        }
+    })
+    .await?;
+
+    // Ensure that we have collected messages from all the namespaces.
+    assert!(expected_namespaces.is_empty());
+
+    drop(test_pods);
+    drop(test_namespaces);
     drop(vector);
     Ok(())
 }
