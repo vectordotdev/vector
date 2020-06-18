@@ -266,10 +266,7 @@ jobs:
       - run: make test-integration-splunk
 
   test-e2e-kubernetes:
-    name: E2E - Linux, Kubernetes, flaky
-    # This is an experimental test. Allow it to fail without failing the whole
-    # workflow, but keep it executing on every build to gather stats.
-    continue-on-error: true
+    name: E2E - Linux, Kubernetes
     runs-on: ubuntu-latest
     strategy:
       matrix:
