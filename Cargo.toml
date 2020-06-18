@@ -101,7 +101,7 @@ regex = "1.3.9"
 bytes = { version = "0.4.10", features = ["serde"] }
 bytes05 = { package = "bytes", version = "0.5", features = ["serde"] }
 stream-cancel = "0.4.3"
-hyper = "0.12.35"
+hyper = "0.13.4"
 hyper13 = { package = "hyper", version = "0.13" }
 hyper-openssl = "0.7"
 hyper-openssl08 = { package = "hyper-openssl", version = "0.8" }
