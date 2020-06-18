@@ -758,12 +758,13 @@ mod tests {
 mod reload_tests {
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::splunk_hec::SplunkConfig;
-    use crate::test_util::{next_addr, runtime};
+    use crate::test_util::{next_addr, runtime, trace_init};
     use crate::topology;
     use crate::topology::config::Config;
 
     #[test]
     fn topology_reuse_old_port() {
+        trace_init();
         let address = next_addr();
 
         let mut rt = runtime();
