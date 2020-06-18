@@ -197,7 +197,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     let mut got_marker = false;
     look_for_log_line(&mut log_reader, |val| {
         if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
-            // A log from something other than our test pod, predend we don't
+            // A log from something other than our test pod, pretend we don't
             // see it.
             return FlowControlCommand::GoOn;
         }
@@ -266,7 +266,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     let mut got_expected_line = false;
     look_for_log_line(&mut log_reader, |val| {
         if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
-            // A log from something other than our test pod, predend we don't
+            // A log from something other than our test pod, pretend we don't
             // see it.
             return FlowControlCommand::GoOn;
         }
@@ -334,7 +334,7 @@ async fn no_newline_at_eol() -> Result<(), Box<dyn std::error::Error>> {
     let mut got_expected_line = false;
     look_for_log_line(&mut log_reader, |val| {
         if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
-            // A log from something other than our test pod, predend we don't
+            // A log from something other than our test pod, pretend we don't
             // see it.
             return FlowControlCommand::GoOn;
         }
@@ -405,7 +405,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     let mut got_marker = false;
     look_for_log_line(&mut log_reader, |val| {
         if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
-            // A log from something other than our test pod, predend we don't
+            // A log from something other than our test pod, pretend we don't
             // see it.
             return FlowControlCommand::GoOn;
         }
@@ -474,7 +474,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let mut test_messages_iter = test_messages.into_iter().peekable();
     look_for_log_line(&mut log_reader, |val| {
         if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
-            // A log from something other than our test pod, predend we don't
+            // A log from something other than our test pod, pretend we don't
             // see it.
             return FlowControlCommand::GoOn;
         }
@@ -543,7 +543,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let mut got_marker = false;
     look_for_log_line(&mut log_reader, |val| {
         if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
-            // A log from something other than our test pod, predend we don't
+            // A log from something other than our test pod, pretend we don't
             // see it.
             return FlowControlCommand::GoOn;
         }
@@ -668,7 +668,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         let val = parse_json(&line)?;
 
         if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
-            // A log from something other than our test pod, predend we don't
+            // A log from something other than our test pod, pretend we don't
             // see it.
             continue;
         }
