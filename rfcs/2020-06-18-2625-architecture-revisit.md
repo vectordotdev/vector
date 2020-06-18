@@ -245,7 +245,7 @@ begun to see limitations of that design. A full proposal is outside of the scope
 of this RFC, but future work should explore the relationship between batching,
 encoding, and request building. Their separation in the current design appears
 to be the cause of some limitations and there's likely an improvement to be made
-by evaluating and adjusting to their mutual dependencies. 
+by evaluating and adjusting to their mutual dependencies.
 
 ### Topology design
 
@@ -274,15 +274,14 @@ concurrency of the source.
 
 In an abstract sense, the goal of this change is to transition from a topology
 of individual, heterogeneous tasks to one of many consolidated, homogeneous
-tasks.
+tasks. Take for example the below topology:
 
-Before:
+![Example topology](./2020-06-18-2625-architecture-revisit/combined.png)
 
-![./2020-06-18-2625-architecture-revisit/before.png](./2020-06-18-2625-architecture-revisit/before.png)
-
-After:
-
-![./2020-06-18-2625-architecture-revisit/after.png](./2020-06-18-2625-architecture-revisit/after.png)
+By shifting the stateless transforms up into the connection handling tasks, we
+achieve significantly increased CPU concurrency for that computation. Transforms
+that are stateful remain as their own tasks, but tend to come later in most
+pipelines.
 
 #### Pipeline compilation
 
