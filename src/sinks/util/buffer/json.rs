@@ -1,5 +1,5 @@
 use crate::sinks::util::Batch;
-use serde_json::value::{RawValue, Value};
+use serde_json::value::{to_raw_value, RawValue, Value};
 
 pub type BoxedRawValue = Box<RawValue>;
 
@@ -20,9 +20,8 @@ impl Batch for JsonArrayBuffer {
     }
 
     fn push(&mut self, item: Self::Input) {
-        let encoded = serde_json::to_string(&item).expect("Value should be valid json");
-        self.total_bytes += encoded.len();
-        let item = RawValue::from_string(encoded).expect("Encoded value should be valid json");
+        let item = to_raw_value(&item).expect("Value should be valid json");
+        self.total_bytes += item.get().len();
         self.buffer.push(item);
     }
 
