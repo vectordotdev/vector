@@ -2,7 +2,7 @@ use crate::{
     event::metric::{Metric, MetricValue},
     sinks::influxdb::{
         encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
-        Field, InfluxDB1Settings, InfluxDB2Settings,
+        Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
     },
     sinks::util::{
         http::{Error as HttpError, HttpBatchService, HttpRetryLogic, Response as HttpResponse},
@@ -24,6 +24,7 @@ use tower03::Service;
 #[derive(Clone)]
 struct InfluxDBSvc {
     config: InfluxDBConfig,
+    protocol_version: ProtocolVersion,
     inner: HttpBatchService,
 }
 
@@ -90,6 +91,7 @@ impl InfluxDBSvc {
 
         let endpoint = config.endpoint.clone();
         let token = settings.token();
+        let protocol_version = settings.protocol_version();
 
         let batch = config.batch.unwrap_or(20, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -108,6 +110,7 @@ impl InfluxDBSvc {
 
         let influxdb_http_service = InfluxDBSvc {
             config,
+            protocol_version,
             inner: http_service,
         };
 
@@ -135,14 +138,18 @@ impl Service<Vec<Metric>> for InfluxDBSvc {
     }
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let input = encode_events(items, &self.config.namespace);
+        let input = encode_events(self.protocol_version, items, &self.config.namespace);
         let body: Vec<u8> = input.into_bytes();
 
         self.inner.call(body)
     }
 }
 
-fn encode_events(events: Vec<Metric>, namespace: &str) -> String {
+fn encode_events(
+    protocol_version: ProtocolVersion,
+    events: Vec<Metric>,
+    namespace: &str,
+) -> String {
     let mut output = String::new();
     for event in events.into_iter() {
         let fullname = encode_namespace(namespace, &event.name);
@@ -152,17 +159,41 @@ fn encode_events(events: Vec<Metric>, namespace: &str) -> String {
             MetricValue::Counter { value } => {
                 let fields = to_fields(value);
 
-                influx_line_protocol(fullname, "counter", tags, Some(fields), ts, &mut output)
+                influx_line_protocol(
+                    protocol_version,
+                    fullname,
+                    "counter",
+                    tags,
+                    Some(fields),
+                    ts,
+                    &mut output,
+                )
             }
             MetricValue::Gauge { value } => {
                 let fields = to_fields(value);
 
-                influx_line_protocol(fullname, "gauge", tags, Some(fields), ts, &mut output);
+                influx_line_protocol(
+                    protocol_version,
+                    fullname,
+                    "gauge",
+                    tags,
+                    Some(fields),
+                    ts,
+                    &mut output,
+                );
             }
             MetricValue::Set { values } => {
                 let fields = to_fields(values.len() as f64);
 
-                influx_line_protocol(fullname, "set", tags, Some(fields), ts, &mut output);
+                influx_line_protocol(
+                    protocol_version,
+                    fullname,
+                    "set",
+                    tags,
+                    Some(fields),
+                    ts,
+                    &mut output,
+                );
             }
             MetricValue::AggregatedHistogram {
                 buckets,
@@ -178,7 +209,15 @@ fn encode_events(events: Vec<Metric>, namespace: &str) -> String {
                 fields.insert("count".to_owned(), Field::UnsignedInt(count));
                 fields.insert("sum".to_owned(), Field::Float(sum));
 
-                influx_line_protocol(fullname, "histogram", tags, Some(fields), ts, &mut output);
+                influx_line_protocol(
+                    protocol_version,
+                    fullname,
+                    "histogram",
+                    tags,
+                    Some(fields),
+                    ts,
+                    &mut output,
+                );
             }
             MetricValue::AggregatedSummary {
                 quantiles,
@@ -194,7 +233,15 @@ fn encode_events(events: Vec<Metric>, namespace: &str) -> String {
                 fields.insert("count".to_owned(), Field::UnsignedInt(count));
                 fields.insert("sum".to_owned(), Field::Float(sum));
 
-                influx_line_protocol(fullname, "summary", tags, Some(fields), ts, &mut output);
+                influx_line_protocol(
+                    protocol_version,
+                    fullname,
+                    "summary",
+                    tags,
+                    Some(fields),
+                    ts,
+                    &mut output,
+                );
             }
             MetricValue::Distribution {
                 values,
@@ -202,7 +249,15 @@ fn encode_events(events: Vec<Metric>, namespace: &str) -> String {
             } => {
                 let fields = encode_distribution(&values, &sample_rates);
 
-                influx_line_protocol(fullname, "distribution", tags, fields, ts, &mut output);
+                influx_line_protocol(
+                    protocol_version,
+                    fullname,
+                    "distribution",
+                    tags,
+                    fields,
+                    ts,
+                    &mut output,
+                );
             }
         }
     }
@@ -306,7 +361,7 @@ mod tests {
             },
         ];
 
-        let line_protocols = encode_events(events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
         assert_eq!(
             line_protocols,
             "ns.total,metric_type=counter value=1.5 1542182950000000011\n\
@@ -324,7 +379,7 @@ mod tests {
             value: MetricValue::Gauge { value: -1.5 },
         }];
 
-        let line_protocols = encode_events(events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
         assert_eq!(
             line_protocols,
             "ns.meter,metric_type=gauge,normal_tag=value,true_tag=true value=-1.5 1542182950000000011"
@@ -343,11 +398,50 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
         assert_eq!(
             line_protocols,
             "ns.users,metric_type=set,normal_tag=value,true_tag=true value=2 1542182950000000011"
         );
+    }
+
+    #[test]
+    fn test_encode_histogram_v1() {
+        let events = vec![Metric {
+            name: "requests".to_owned(),
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+            kind: MetricKind::Absolute,
+            value: MetricValue::AggregatedHistogram {
+                buckets: vec![1.0, 2.1, 3.0],
+                counts: vec![1, 2, 3],
+                count: 6,
+                sum: 12.5,
+            },
+        }];
+
+        let line_protocols = encode_events(ProtocolVersion::V1, events, "ns");
+        let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
+        assert_eq!(line_protocols.len(), 1);
+
+        let line_protocol1 = split_line_protocol(line_protocols[0]);
+        assert_eq!("ns.requests", line_protocol1.0);
+        assert_eq!(
+            "metric_type=histogram,normal_tag=value,true_tag=true",
+            line_protocol1.1
+        );
+        assert_fields(
+            line_protocol1.2.to_string(),
+            [
+                "bucket_1=1i",
+                "bucket_2.1=2i",
+                "bucket_3=3i",
+                "count=6i",
+                "sum=12.5",
+            ]
+            .to_vec(),
+        );
+        assert_eq!("1542182950000000011", line_protocol1.3);
     }
 
     #[test]
@@ -365,7 +459,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -390,6 +484,45 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_summary_v1() {
+        let events = vec![Metric {
+            name: "requests_sum".to_owned(),
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+            kind: MetricKind::Absolute,
+            value: MetricValue::AggregatedSummary {
+                quantiles: vec![0.01, 0.5, 0.99],
+                values: vec![1.5, 2.0, 3.0],
+                count: 6,
+                sum: 12.0,
+            },
+        }];
+
+        let line_protocols = encode_events(ProtocolVersion::V1, events, "ns");
+        let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
+        assert_eq!(line_protocols.len(), 1);
+
+        let line_protocol1 = split_line_protocol(line_protocols[0]);
+        assert_eq!("ns.requests_sum", line_protocol1.0);
+        assert_eq!(
+            "metric_type=summary,normal_tag=value,true_tag=true",
+            line_protocol1.1
+        );
+        assert_fields(
+            line_protocol1.2.to_string(),
+            [
+                "count=6i",
+                "quantile_0.01=1.5",
+                "quantile_0.5=2",
+                "quantile_0.99=3",
+                "sum=12",
+            ]
+            .to_vec(),
+        );
+        assert_eq!("1542182950000000011", line_protocol1.3);
+    }
+
+    #[test]
     fn test_encode_summary() {
         let events = vec![Metric {
             name: "requests_sum".to_owned(),
@@ -404,7 +537,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -463,7 +596,7 @@ mod tests {
             },
         ];
 
-        let line_protocols = encode_events(events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 3);
 
@@ -538,7 +671,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -555,7 +688,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -572,7 +705,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
         assert_eq!(line_protocols.len(), 0);
     }
 }
