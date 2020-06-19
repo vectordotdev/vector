@@ -71,15 +71,14 @@ The following table lists the configurable parameters of the Vector chart and th
 | `extraVolumeMounts`      | Extra volume mounts for the vector container.                  | `{}` |
 | **ConfigMap**            |
 | `existingConfigMap`           | Name of the exising configmap to be used for Vector configuration. | `nil` |
-| `globalOptions.dataDir`       | Vector's data directory.                | `/var/tmp/vector` |
-| `logSchema.hostKey`           | Log host field.                         | `host`            |
-| `logSchema.messageKey`        | Log message field.                      | `log`             |
-| `logSchema.timestampKey`      | Log generation timestamp field.         | `time`            |
-| `sources.kubernetes.enabled`                | Enables Kubernetes source.                      | `true`       |
-| `sources.kubernetes.sourceId`               | Kubernetes source ID.                           | `kubernetes` |
-| `sources.kubernetes.includeNamespaces`      | A list of namespaces to collect logs from.      | `[]`         |
-| `sources.kubernetes.includeContainerNames`  | A list of container names to collect logs from. | `[]`         |
-| `sources.kubernetes.rawConfig`              | Raw config to be used for the source.           | `nil`        |
+| `globalOptions.dataDir`       | Vector's data directory.                | `/vector-data-dir` |
+| `logSchema.hostKey`           | The key used to hold the log host.                     | `host`            |
+| `logSchema.messageKey`        | The key used to hold the log message.                  | `message`         |
+| `logSchema.sourceTypeKey`     | The key used to hold the log source type.              | `source_type`     |
+| `logSchema.timestampKey`      | The key used to represent when the log was generated.  | `timestamp`       |
+| `sources.kubernetesLogs.enabled`                | Enables Kubernetes Logs source.                 | `true`       |
+| `sources.kubernetesLogs.sourceId`               | Kubernetes source ID.                           | `kubernetes` |
+| `sources.kubernetesLogs.rawConfig`              | Raw config to be used for the source.           | `nil`        |
 | `sources.additionalSources`                 | An object of additional sources. Key will be used as source ID. | `{}`         |
 | `sources.additionalSources.type`            | Source type.                                                    |              |
 | `sources.additionalSources.rawConfig`       | Raw config to be used for the additional source.                | `nil`        |

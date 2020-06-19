@@ -41,19 +41,18 @@ extraVolumeMounts: []
 existingConfigMap: ""
 
 globalOptions:
-  dataDir: "/var/tmp/vector"
+  dataDir: "/vector-data-dir"
 
 logSchema:
   hostKey: "host"
   messageKey: "message"
+  sourceTypeKey: "source_type"
   timestampKey: "timestamp"
 
 sources:
-  kubernetes:
+  kubernetesLogs:
     enabled: true
     sourceId: kubernetes
-    includeNamespaces: []
-    includeContainerNames: []
 
   additionalSources: {}
 
