@@ -2,8 +2,8 @@
 
 [Vector](https://vector.dev/) - a lightweight and ultra-fast tool for building observability pipelines.
 
-- [Chart Details](#chartdetails)
-- [Installing the cart](#installingthechart)
+- [Chart Details](#chart-details)
+- [Installing the chart](#installing-the-chart)
 - [Configuration](#configuration)
 - [Examples](#examples)
 
@@ -11,8 +11,8 @@
 
 This chart will do the following:
 
-- Create a ConfigMap with Vector configuration;
-- Install a Daemonset that provisions Vector;
+- Create a `ConfigMap` with Vector configuration;
+- Install a `DaemonSet` that provisions Vector;
 - Deploy service and service monitor for integration with prometheus-operator (if enabled);
 
 ## Installing the Chart
