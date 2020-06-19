@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-24"
+last_modified_on: "2020-06-18"
 delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
@@ -97,6 +97,10 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
+
+  # Content Type
+  content_encoding = "gzip" # optional, no default
+  content_type = "text/x-log" # optional, default
 
   # Encoding
   encoding.codec = "ndjson" # required
@@ -412,6 +416,54 @@ The behavior when the buffer becomes full.
 
 The compression strategy used to compress the encoded event data before
 transmission.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["gzip"]}
+  groups={[]}
+  name={"content_encoding"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### content_encoding
+
+Specifies what content encodings have been applied to the object and thus what
+decoding mechanisms must be applied to obtain the media-type referenced by the
+Content-Type header field. By default calculated from [`compression`](#compression) value.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"text/x-log"}
+  enumValues={null}
+  examples={["text/x-log"]}
+  groups={[]}
+  name={"content_type"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### content_type
+
+A standard MIME type describing the format of the contents.
 
 
 

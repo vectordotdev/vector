@@ -203,3 +203,17 @@ description = "The tag-set for the object."
 type = "string"
 examples = [ {"Tag1" = "Value1"} ]
 description = "A custom tag to be added to the created objects."
+
+[sinks.aws_s3.options.content_encoding]
+type = "string"
+category = "Content Type"
+common = false
+description = "Specifies what content encodings have been applied to the object and thus what decoding mechanisms must be applied to obtain the media-type referenced by the Content-Type header field. By default calculated from `compression` value."
+examples = ["gzip"]
+
+[sinks.aws_s3.options.content_type]
+type = "string"
+category = "Content Type"
+common = false
+description = "A standard MIME type describing the format of the contents."
+default = "text/x-log"
