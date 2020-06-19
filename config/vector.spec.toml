@@ -2970,9 +2970,9 @@ require('custom_module')
     #
     # * required
     # * type: string
-    # * enum: "array", "append", "discard", "sum", "max", and "min"
+    # * enum: "array", "concat", "discard", "sum", "max", and "min"
     `[field_name]` = "array"
-    `[field_name]` = "append"
+    `[field_name]` = "concat"
     `[field_name]` = "discard"
     `[field_name]` = "sum"
     `[field_name]` = "max"

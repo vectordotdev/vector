@@ -89,7 +89,7 @@ events of a matching transaction into a single event.
   ends_when."environment.starts_with" = ["staging-", "running-"] # example
 
   # Merge strategies
-  merge_strategies = {message = "append", username = "append"} # optional, no default
+  merge_strategies = {message = "concat", username = "array"} # optional, no default
 ```
 
 </TabItem>
@@ -424,7 +424,7 @@ events from unrelated transactions from combining.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"message":"append","username":"append"}]}
+  examples={[{"message":"concat","username":"array"}]}
   groups={[]}
   name={"merge_strategies"}
   path={null}
@@ -444,7 +444,7 @@ strategy will be used for combining events rather than the default behavior.
 The default behavior is as follows:
 
 1. The first value of a string field is kept, subsequent values are discarded.
-2. For timestamp fields the first is kept and a new field `<field_name>_end` is
+2. For timestamp fields the first is kept and a new field `[field_name]_end` is
    added with the last received timestamp value.
 3. Numeric values are added.
 
@@ -453,8 +453,8 @@ The default behavior is as follows:
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"array":"Each value is appended to an array.","append":"Append each string value (delimited with a space).","discard":"Discard all but the first value found.","sum":"Sum all number values.","max":"The maximum of all number values.","min":"The minimum of all number values."}}
-  examples={["array","append","discard","sum","max","min"]}
+  enumValues={{"array":"Each value is appended to an array.","concat":"Concatenate each string value (delimited with a space).","discard":"Discard all but the first value found.","sum":"Sum all number values.","max":"The maximum of all number values.","min":"The minimum of all number values."}}
+  examples={["array","concat","discard","sum","max","min"]}
   groups={[]}
   name={"`[field_name]`"}
   path={"merge_strategies"}
