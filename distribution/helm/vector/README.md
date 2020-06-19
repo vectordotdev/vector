@@ -17,20 +17,20 @@ This chart will do the following:
 
 ## Installing the Chart
 
-To install the chart with the release name `vector` and namespace `logging`:
+To install the chart with the release name `vector` and namespace `vector`:
 
 ### Helm 2
 
 ```bash
 $ cd distribution/helm/vector
-$ helm install --namespace logging --name vector .
+$ helm install --namespace vector --name vector .
 ```
 
 ### Helm 3
 
 ```bash
 $ cd distribution/helm/vector
-$ helm install --namespace logging vector .
+$ helm install --namespace vector vector .
 ```
 
 ## Configuration
