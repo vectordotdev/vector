@@ -1,28 +1,57 @@
+# Default values for vector.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
 image:
   repository: timberio/vector
-  tag: 0.8.X-debian
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
 
 updateStrategy: RollingUpdate
 
-rbac:
-  enabled: true
-  serviceAccount:
-    annotation: {}
-    name:
-  psp:
-    enabled: false
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
 
 env: []
 
-tolerations: []
-nodeSelector: {}
-affinity: {}
 resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
 
 extraVolumes: []
 
 extraVolumeMounts: []
+
+rbac:
+  enabled: true
+
+psp:
+  enabled: false
 
 existingConfigMap: ""
 
@@ -35,13 +64,25 @@ logSchema:
   sourceTypeKey: "source_type"
   timestampKey: "timestamp"
 
-sources:
-  kubernetesLogs:
-    enabled: true
-    sourceId: kubernetes
+# The built-in kubernetes logs source.
+kubernetesLogsSource:
+  enabled: true
+  sourceId: kubernetes_logs
+  rawConfig: null
 
-  additionalSources: {}
+sources: {}
+  # type: "source_type"
+  # rawConfig: |
+  #   option = "value"
 
 transforms: {}
+  # type: "transform_type"
+  # inputs: ["input1", "input2"]
+  # rawConfig: |
+  #   option = "value"
 
 sinks: {}
+  # type: "sink_type"
+  # inputs: ["input1", "input2"]
+  # rawConfig: |
+  #   option = "value"

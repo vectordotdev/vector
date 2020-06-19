@@ -30,7 +30,7 @@ $ helm install --namespace vector --name vector .
 
 ```bash
 $ cd distribution/helm/vector
-$ helm install --namespace vector vector .
+$ helm install --create-namespace --namespace vector vector .
 ```
 
 ## Configuration

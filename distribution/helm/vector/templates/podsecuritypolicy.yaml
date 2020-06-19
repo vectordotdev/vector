@@ -1,8 +1,8 @@
-{{- if .Values.rbac.psp.enabled }}
-apiVersion: {{ default (include "psp.apiVersion" .) .Values.rbac.psp.apiVersion }}
+{{- if .Values.psp.enabled }}
+apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
-  name: {{ template "vector.fullname" . }}
+  name: {{ include "vector.fullname" . }}
 spec:
   privileged: false
   allowPrivilegeEscalation: false
@@ -40,5 +40,4 @@ spec:
     ranges:
       - min: 1
         max: 65535
-{{- end }}
 {{- end }}
