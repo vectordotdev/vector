@@ -301,9 +301,7 @@ impl From<Bytes> for Value {
 
 impl From<bytes05::Bytes> for Value {
     fn from(bytes: bytes05::Bytes) -> Self {
-        let mut old_bytes = Bytes::new();
-        old_bytes.extend_from_slice(&bytes);
-        Value::Bytes(old_bytes)
+        Value::Bytes(bytes.as_ref().into())
     }
 }
 
@@ -708,6 +706,23 @@ impl From<Event> for Vec<u8> {
 
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
+        let mut event = Event::Log(LogEvent {
+            fields: BTreeMap::new(),
+        });
+
+        event
+            .as_mut_log()
+            .insert(log_schema().message_key().clone(), message);
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key().clone(), Utc::now());
+
+        event
+    }
+}
+
+impl From<bytes05::Bytes> for Event {
+    fn from(message: bytes05::Bytes) -> Self {
         let mut event = Event::Log(LogEvent {
             fields: BTreeMap::new(),
         });

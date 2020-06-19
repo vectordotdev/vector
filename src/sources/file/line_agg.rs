@@ -1,4 +1,4 @@
-use bytes::{Bytes, BytesMut};
+use bytes05::{Bytes, BytesMut};
 use futures01::{Async, Poll, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
@@ -186,7 +186,7 @@ where
                             add_next_line(buffered, line);
                             return None;
                         } else {
-                            let buffered = entry.insert(line.into());
+                            let buffered = entry.insert(line.as_ref().into());
                             return Some((buffered.freeze(), entry.key().clone()));
                         }
                     }
@@ -207,7 +207,7 @@ where
                     // in the group.
                     Mode::HaltBefore => {
                         if condition_matched {
-                            let buffered = entry.insert(line.into());
+                            let buffered = entry.insert(line.as_ref().into());
                             return Some((buffered.freeze(), entry.key().clone()));
                         } else {
                             let buffered = entry.get_mut();
@@ -237,7 +237,7 @@ where
                     // Set the timeout and buffer this line.
                     self.timeouts
                         .insert(entry.key().clone(), self.config.timeout.clone());
-                    entry.insert(line.into());
+                    entry.insert(line.as_ref().into());
                     return None;
                 } else {
                     // It's just a regular line we don't really care about.

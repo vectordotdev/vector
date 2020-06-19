@@ -5,7 +5,7 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     trace::{current_span, Instrument},
 };
-use bytes::Bytes;
+use bytes05::Bytes;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
     FileServer, Fingerprinter,
