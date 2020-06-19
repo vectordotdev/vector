@@ -45,10 +45,7 @@ where
     }
 
     fn fresh(&self) -> Self {
-        Self {
-            inner: self.inner.fresh(),
-            key: None,
-        }
+        Self::new(self.inner.fresh())
     }
 
     fn finish(mut self) -> Self::Output {

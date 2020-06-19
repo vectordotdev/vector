@@ -45,6 +45,7 @@ pub struct Buffer {
     num_items: usize,
     max_bytes: usize,
     max_events: usize,
+    compression: Compression,
 }
 
 #[derive(Debug)]
@@ -55,7 +56,11 @@ pub enum InnerBuffer {
 
 impl Buffer {
     pub fn new(settings: BatchSettings, compression: Compression) -> Self {
-        let buffer = Vec::with_capacity(settings.bytes);
+        Self::new_with_settings(settings.bytes, settings.events, compression)
+    }
+
+    fn new_with_settings(max_bytes: usize, max_events: usize, compression: Compression) -> Self {
+        let buffer = Vec::with_capacity(max_bytes);
         let inner = match compression {
             Compression::None => InnerBuffer::Plain(buffer),
             Compression::Gzip => {
@@ -65,8 +70,9 @@ impl Buffer {
         Self {
             inner,
             num_items: 0,
-            max_bytes: settings.bytes,
-            max_events: settings.events,
+            max_bytes,
+            max_events,
+            compression,
         }
     }
 
@@ -117,19 +123,7 @@ impl Batch for Buffer {
     }
 
     fn fresh(&self) -> Self {
-        let inner = match &self.inner {
-            InnerBuffer::Plain(_) => InnerBuffer::Plain(Vec::with_capacity(self.max_bytes)),
-            InnerBuffer::Gzip(_) => InnerBuffer::Gzip(GzEncoder::new(
-                Vec::with_capacity(self.max_bytes),
-                flate2::Compression::default(),
-            )),
-        };
-        Self {
-            inner,
-            num_items: 0,
-            max_bytes: self.max_bytes,
-            max_events: self.max_events,
-        }
+        Self::new_with_settings(self.max_bytes, self.max_events, self.compression)
     }
 
     fn finish(self) -> Self::Output {

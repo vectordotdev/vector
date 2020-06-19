@@ -43,11 +43,7 @@ impl Batch for JsonArrayBuffer {
     }
 
     fn fresh(&self) -> Self {
-        Self {
-            buffer: Vec::new(),
-            total_bytes: 0,
-            settings: self.settings,
-        }
+        Self::new(self.settings)
     }
 
     fn finish(self) -> Self::Output {

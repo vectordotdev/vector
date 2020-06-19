@@ -8,10 +8,12 @@ pub struct VecBuffer<T> {
 
 impl<T> VecBuffer<T> {
     pub fn new(settings: BatchSettings) -> Self {
-        Self {
-            batch: Vec::with_capacity(settings.events),
-            max_events: settings.events,
-        }
+        Self::new_with_max(settings.events)
+    }
+
+    fn new_with_max(max_events: usize) -> Self {
+        let batch = Vec::with_capacity(max_events);
+        Self { batch, max_events }
     }
 }
 
@@ -33,10 +35,7 @@ impl<T> Batch for VecBuffer<T> {
     }
 
     fn fresh(&self) -> Self {
-        Self {
-            batch: Vec::with_capacity(self.max_events),
-            max_events: self.max_events,
-        }
+        Self::new_with_max(self.max_events)
     }
 
     fn finish(self) -> Self::Output {

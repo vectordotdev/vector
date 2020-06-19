@@ -98,10 +98,14 @@ impl MetricBuffer {
     //   Absolute AggregatedSummary   => Absolute AggregatedSummary
     //
     pub fn new(settings: BatchSettings) -> Self {
+        Self::new_with_state(settings.events, HashSet::new())
+    }
+
+    fn new_with_state(max_events: usize, state: HashSet<MetricEntry>) -> Self {
         Self {
-            state: HashSet::new(),
-            metrics: HashSet::with_capacity(settings.events),
-            max_events: settings.events,
+            state,
+            metrics: HashSet::with_capacity(max_events),
+            max_events,
         }
     }
 }
@@ -205,11 +209,7 @@ impl Batch for MetricBuffer {
             }
         }
 
-        Self {
-            state,
-            metrics: HashSet::with_capacity(self.max_events),
-            max_events: self.max_events,
-        }
+        Self::new_with_state(self.max_events, state)
     }
 
     fn finish(self) -> Self::Output {
