@@ -64,13 +64,13 @@ The following table lists the configurable parameters of the Vector chart and th
 | `rbac.apiVersion`                   | Overrides K8S API version for PSP (by default it's determined using `Capabilities`).         | `nil`     |
 | `env`                    | A list of environment variables to be used for the DaemonSet.  | `[]` |
 | `resources`              | Pod resource requests & limits.                                | `{}` |
-| `tolerations`            | Optional daemonset tolerations.                                | `[]` |
+| `tolerations`            | Optional DaemonSet tolerations.                                | `[]` |
 | `nodeSelector`           | Node labels for pod assignment.                                | `{}` |
 | `affinity`               | Expressions for affinity.                                      | `{}` |
-| `extraVolumes`           | Extra volumes to be assignet to pods.                          | `{}` |
+| `extraVolumes`           | Extra volumes to be assigned to pods.                          | `{}` |
 | `extraVolumeMounts`      | Extra volume mounts for the vector container.                  | `{}` |
 | **ConfigMap**            |
-| `existingConfigMap`           | Name of the exising configmap to be used for Vector configuration. | `nil` |
+| `existingConfigMap`           | Name of the existing ConfigMap to be used for Vector configuration. | `nil` |
 | `globalOptions.dataDir`       | Vector's data directory.                | `/vector-data-dir` |
 | `logSchema.hostKey`           | The key used to hold the log host.                     | `host`            |
 | `logSchema.messageKey`        | The key used to hold the log message.                  | `message`         |
@@ -83,8 +83,8 @@ The following table lists the configurable parameters of the Vector chart and th
 | `sources.additionalSources.type`            | Source type.                                                    |              |
 | `sources.additionalSources.rawConfig`       | Raw config to be used for the additional source.                | `nil`        |
 | `transforms`                 | An object of transforms. Key will be used as transform ID. | `{}`  |
-| `transforms.type`            | Tranform type.                                             |       |
-| `transforms.inputs`          | A list of transfor data sources.                           |       |
+| `transforms.type`            | Transform type.                                            |       |
+| `transforms.inputs`          | A list of transform data sources.                          |       |
 | `transforms.rawConfig`       | Raw config to be used for the transform.                   | `nil` |
 | `sinks`                      | An object of sinks. Entry key will be used as sink ID.     | `{}`  |
 | `sinks.type`                 | Sink type.                                                 |       |
