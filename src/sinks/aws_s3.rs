@@ -78,6 +78,8 @@ struct S3Options {
     ssekms_key_id: Option<String>,
     storage_class: Option<S3StorageClass>,
     tags: Option<BTreeMap<String, String>>,
+    content_encoding: Option<String>, // inherit from compression value
+    content_type: Option<String>,     // default `text/x-log`
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
@@ -274,6 +276,14 @@ impl Service<Request> for S3Sink {
     fn call(&mut self, request: Request) -> Self::Future {
         let options = request.options;
 
+        let content_encoding = request.content_encoding;
+        let content_encoding = options
+            .content_encoding
+            .or_else(|| content_encoding.map(|ce| ce.to_string()));
+        let content_type = options
+            .content_type
+            .or_else(|| Some("text/x-log".to_owned()));
+
         let mut tagging = url::form_urlencoded::Serializer::new(String::new());
         if let Some(tags) = options.tags {
             for (p, v) in tags {
@@ -287,7 +297,8 @@ impl Service<Request> for S3Sink {
             body: Some(request.body.into()),
             bucket: request.bucket,
             key: request.key,
-            content_encoding: request.content_encoding,
+            content_encoding,
+            content_type,
             acl: options.acl.map(to_string),
             grant_full_control: options.grant_full_control,
             grant_read: options.grant_read,
@@ -342,7 +353,7 @@ fn build_request(
         body: inner,
         bucket,
         key,
-        content_encoding: compression.content_encoding().map(|ce| ce.to_string()),
+        content_encoding: compression.content_encoding(),
         options,
     }
 }
@@ -352,7 +363,7 @@ struct Request {
     body: Vec<u8>,
     bucket: String,
     key: String,
-    content_encoding: Option<String>,
+    content_encoding: Option<&'static str>,
     options: S3Options,
 }
 

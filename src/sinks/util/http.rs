@@ -136,15 +136,15 @@ where
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         if self.slot.is_some() {
-            self.poll_complete()?;
-            return Ok(AsyncSink::NotReady(item));
+            if self.poll_complete()?.is_not_ready() {
+                return Ok(AsyncSink::NotReady(item));
+            }
         }
+        assert!(self.slot.is_none(), "poll_complete did not clear slot");
 
         if let Some(item) = self.sink.encode_event(item) {
-            if let AsyncSink::NotReady(item) = self.inner.start_send(item)? {
-                self.poll_complete()?;
-                self.slot = Some(item);
-            }
+            self.slot = Some(item);
+            self.poll_complete()?;
         }
 
         Ok(AsyncSink::Ready)
