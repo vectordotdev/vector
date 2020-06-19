@@ -26,10 +26,6 @@ spec:
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
           args:
             - "-w"
-            {{- if .Values.metrics.enabled }}
-            - "-m"
-            - "0.0.0.0:{{ .Values.metrics.service.port }}"
-            {{- end }}
           env:
             {{- toYaml .Values.env | nindent 12 }}
           resources:

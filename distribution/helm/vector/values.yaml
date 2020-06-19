@@ -5,20 +5,6 @@ image:
 
 updateStrategy: RollingUpdate
 
-metrics:
-  enabled: false
-  service:
-    port: 2020
-    type: ClusterIP
-    annotations: {}
-    additionalLabels: {}
-  serviceMonitor:
-    enabled: false
-    endpoint: /
-    additionalLabels: {}
-    interval: 60s
-    scrapeTimeout: 10s
-
 rbac:
   enabled: true
   serviceAccount:

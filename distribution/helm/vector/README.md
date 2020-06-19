@@ -45,17 +45,6 @@ The following table lists the configurable parameters of the Vector chart and th
 | `image.pullPolicy`            | Image pull policy                  | `Always`                |
 | `image.pullSecrets`           | Image pull secrets                 | `nil`                   |
 | `updateStrategy`              | DaemonSet update strategy          | `RollingUpdate`         |
-| `metrics.enabled`                         | Specifies whether a service for metrics should be exposed                            | `true`      |
-| `metrics.service.type`                    | Metrics service type                                                                 | `ClusterIP` |
-| `metrics.service.port`                    | Metrics service port                                                                 | `2020`      |
-| `metrics.service.annotations`             | Optional metrics service annotations                                                 | `nil`       |
-| `metrics.service.labels`                  | Additional labels for the metrics service definition, specified as a map.            | `nil`       |
-| `metrics.serviceMonitor.enabled`          | Set this to `true` to create ServiceMonitor for Prometheus operator.                 | `true`      |
-| `metrics.serviceMonitor.endpoint`         | Endpoint to be used by Prometheus to scrape metrics.                                 | `true`      |
-| `metrics.serviceMonitor.additionalLabels` | Additional labels that can be used for ServiceMonitor discovery by Prometheus.       | `nil`       |
-| `metrics.serviceMonitor.namespace`        | Optional namespace in which to create ServiceMonito (default: current namespace).    | `nil`       |
-| `metrics.serviceMonitor.interval`         | Scrape interval. If not set, the Prometheus default scrape interval is used.         | `60s`       |
-| `metrics.serviceMonitor.scrapeTimeout`    | Scrape timeout. If not set, the Prometheus default scrape timeout is used.           | `10s`       |
 | `rbac.enabled`                      | Specifies whether RBAC should be enabled.                                                    | `true`    |
 | `rbac.apiVersion`                   | Overrides K8S API version for RBAC (by default it's determined using `Capabilities`)         | `nil`     |
 | `rbac.serviceAccount.name`          | Overrides service acount name, if not provided and RBAC is disabled, `default` will be used. | `nil`     |
