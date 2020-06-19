@@ -15,7 +15,8 @@ pub enum BatchError {
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub struct BatchConfig {
     pub max_bytes: Option<usize>,
-    pub max_events: Option<usize>, // FIXME: Should this be "events" or "items"?
+    pub max_events: Option<usize>,
+    // This field is deprecated, left in for backwards compatibility
     pub max_size: Option<usize>,
     pub timeout_secs: Option<u64>,
 }
