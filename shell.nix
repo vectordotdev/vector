@@ -1,10 +1,9 @@
 scope@{ pkgs ? import <nixpkgs> {} }:
 
 let
-  env = (import ./default.nix scope);
   definition = (import ./scripts/environment/definition.nix scope);
 in
 
 pkgs.mkShell ({
-  buildInputs = [ env ];
+  buildInputs = definition.developmentTools;
 } // definition.environmentVariables)

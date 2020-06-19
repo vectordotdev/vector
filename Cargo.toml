@@ -207,6 +207,7 @@ default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain"
 default-cmake = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 default-msvc = ["sources", "transforms", "sinks", "vendored", "leveldb-cmake", "rdkafka-cmake"]
+default-nix = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain", "rdkafka", "rdkafka/dynamic_linking"]
 
 # Enables features that work only on systems providing `cfg(unix)
 unix = ["jemallocator", "shiplift/unix-socket"]
@@ -217,7 +218,7 @@ rdkafka-plain = ["rdkafka"]
 # Enables `rdkafka` dependency.
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
 # The `sasl` feature has to be added because of the limitations of `librdkafka` build scripts for `cmake`.
-rdkafka-cmake = ["rdkafka", "rdkafka/cmake_build"]
+rdkafka-cmake = ["rdkafka", "rdkafka/cmake-build"]
 # This feature is less portable, but doesn't require `cmake` as build dependency
 leveldb-plain = ["leveldb", "leveldb/leveldb-sys-2"]
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `leveldb-plain` doesn't work.

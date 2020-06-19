@@ -1,6 +1,9 @@
 scope@{ pkgs ? import <nixpkgs> {} }:
 
-{
+rec {
+  # Our Cargo.toml as nix!
+  cargoToml = (builtins.fromTOML (builtins.readFile ../../Cargo.toml));
+
   environmentVariables =  {
     # We must set some protoc related env vars for the prost crate.
     PROTOC = "${pkgs.protobuf}/bin/protoc";
@@ -36,7 +39,7 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     "";
   };
 
-  packages = with pkgs; [
+  developmentTools = with pkgs; [
     # Core CLI tools
     dnsutils
     curl
@@ -53,26 +56,41 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     # Build Env
     git
     cacert
-    cmake
-    rustup
-    pkg-config
-    openssl
-    protobuf
-    rdkafka
-    openssl
     ruby_2_7
     nodejs
-    perl
     yarn
-    snappy
-    gnumake
-    autoconf
     shellcheck
     # Container tools
     docker
     docker-compose
     # Wasm
     llvmPackages.libclang
+  ] ++ nativeBuildInputs ++ buildInputs;
+
+  # From: https://nixos.org/nixpkgs/manual/
+  #
+  # A list of dependencies whose host platform is the new derivation's build platform, and target
+  # platform is the new derivation's host platform. This means a -1 host offset and 0 target
+  # offset from the new derivation's platforms. These are programs and libraries used at build-time
+  # that, if they are a compiler or similar tool, produce code to run at run-time—i.e. tools used
+  # to build the new derivation. If the dependency doesn't care about the target platform (i.e.
+  # isn't a compiler or similar tool), put it here, rather than in depsBuildBuild or
+  # depsBuildTarget. This could be called depsBuildHost but nativeBuildInputs is used for
+  # historical continuity.
+  #
+  # Since these packages are able to be run at build-time, they are added to the PATH, as described
+  # above. But since these packages are only guaranteed to be able to run then, they shouldn't
+  # persist as run-time dependencies. This isn't currently enforced, but could be in the future.
+  nativeBuildInputs = with pkgs; [
+    pkg-config
+    protobuf
+    openssl
+    perl
+    cmake
+    snappy
+    gnumake
+    autoconf
+    git
   ] ++ (if stdenv.isDarwin then [
     darwin.cf-private
     darwin.apple_sdk.frameworks.CoreServices
@@ -89,4 +107,21 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     podman-compose
     linuxHeaders
   ]);
+
+  # From: https://nixos.org/nixpkgs/manual/
+  #
+  # A list of dependencies whose host platform and target platform match the new derivation's.
+  # This means a 0 host offset and a 1 target offset from the new derivation's host platform. This
+  # would be called depsHostTarget but for historical continuity. If the dependency doesn't care
+  # about the target platform (i.e. isn't a compiler or similar tool), put it here, rather than in
+  # depsBuildBuild.
+  #
+  # These are often programs and libraries used by the new derivation at run-time, but that isn't
+  # always the case. For example, the machine code in a statically-linked library is only used at
+  # run-time, but the derivation containing the library is only needed at build-time. Even in the
+  # dynamic case, the library may also be needed at build-time to appease the linker.
+  buildInputs = with pkgs; [
+    rdkafka
+  ];
+
 }

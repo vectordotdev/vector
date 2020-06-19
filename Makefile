@@ -5,11 +5,11 @@ RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/r
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
-	export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
+	export RUST_TARGET ?= x86_64-unknown-windows-msvc
     export DEFAULT_FEATURES = default-msvc
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
-	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
+	export RUST_TARGET ?= x86_64-unknown-linux-gnu
     export DEFAULT_FEATURES = default
 endif
 
@@ -366,7 +366,6 @@ package-all: package-archive-all package-deb-all package-rpm-all ## Build all pa
 
 package-x86_64-unknown-linux-musl-all: package-archive-x86_64-unknown-linux-musl package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 MUSL packages
 
-
 package-x86_64-unknown-linux-musl-all: package-archive-x86_64-unknown-linux-musl # Build all x86_64 MUSL packages
 
 package-x86_64-unknown-linux-gnu-all: package-archive-x86_64-unknown-linux-gnu package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 GNU packages
@@ -377,8 +376,10 @@ package-aarch64-unknown-linux-musl-all: package-archive-aarch64-unknown-linux-mu
 
 # archives
 
-package-archive: build ## Build the Vector archive
-	$(RUN) package-archive
+package-archive: export NATIVE_BUILD=true
+package-archive: export TARGET=${RUST_TARGET}
+package-archive: build ## Build the Vector archive (for your native platform)
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/package-archive.sh
 
 package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-x86_64-unknown-linux-gnu package-archive-armv7-unknown-linux-musleabihf package-archive-aarch64-unknown-linux-musl ## Build all archives
 
@@ -434,7 +435,7 @@ release-commit: ## Commits release changes
 	$(RUN) release-commit
 
 release-docker: ## Release to Docker Hub
-	$(RUN) release-docker
+	./scripts/release-docker.sh
 
 release-github: ## Release to Github
 	$(RUN) release-github
@@ -443,7 +444,7 @@ release-homebrew: ## Release to timberio Homebrew tap
 	$(RUN) release-homebrew
 
 release-prepare: ## Prepares the release with metadata and highlights
-	@scripts/release-prepare.sh
+	@scripts/release-prepare.rb
 
 release-push: ## Push new Vector version
 	@scripts/release-push.sh

@@ -58,7 +58,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait());
+                    output_lines.wait();
                 },
             );
         })
@@ -100,7 +100,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait());
+                    output_lines.wait();
                 },
             );
         })
@@ -141,7 +141,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait());
+                    output_lines.wait();
                 },
             );
         })
