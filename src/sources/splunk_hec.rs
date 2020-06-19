@@ -85,7 +85,7 @@ impl SourceConfig for SplunkConfig {
         let health_service = source.health_service(out.clone());
         let options = SplunkSource::options();
 
-        let services = path!("services" / "collector")
+        let services = path!("services" / "collector" / ..)
             .and(
                 event_service
                     .or(raw_service)
@@ -140,11 +140,7 @@ impl SplunkSource {
 
     fn event_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response,)> {
         warp::post()
-            .and(
-                warp::path::end()
-                    .or(path!("event").and(warp::path::end()))
-                    .or(path!("event" / "1.0").and(warp::path::end())),
-            )
+            .and(path!("event").or(path!("event" / "1.0")))
             .and(self.authorization())
             .and(warp::header::optional::<String>("x-splunk-request-channel"))
             .and(warp::header::optional::<String>("host"))
@@ -182,10 +178,7 @@ impl SplunkSource {
 
     fn raw_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response,)> {
         warp::post()
-            .and(
-                (path!("raw" / "1.0").and(warp::path::end()))
-                    .or(path!("raw").and(warp::path::end())),
-            )
+            .and(path!("raw" / "1.0").or(path!("raw")))
             .and(self.authorization())
             .and(
                 warp::header::optional::<String>("x-splunk-request-channel").and_then(
@@ -235,10 +228,7 @@ impl SplunkSource {
             });
 
         warp::get()
-            .and(
-                (path!("health" / "1.0").and(warp::path::end()))
-                    .or(path!("health").and(warp::path::end())),
-            )
+            .and(path!("health" / "1.0").or(path!("health")))
             .and(authorize)
             .and_then(move |_, _| {
                 let out = out.clone();
@@ -263,19 +253,15 @@ impl SplunkSource {
     fn options() -> BoxedFilter<(Response,)> {
         let post = warp::options()
             .and(
-                warp::path::end()
-                    .or(path!("event").and(warp::path::end()))
-                    .or(path!("event" / "1.0").and(warp::path::end()))
-                    .or(path!("raw" / "1.0").and(warp::path::end()))
-                    .or(path!("raw").and(warp::path::end())),
+                path!("event")
+                    .or(path!("event" / "1.0"))
+                    .or(path!("raw" / "1.0"))
+                    .or(path!("raw")),
             )
             .map(|_| warp::reply::with_header(warp::reply(), "Allow", "POST").into_response());
 
         let get = warp::options()
-            .and(
-                (path!("health").and(warp::path::end()))
-                    .or(path!("health" / "1.0").and(warp::path::end())),
-            )
+            .and(path!("health").or(path!("health" / "1.0")))
             .map(|_| warp::reply::with_header(warp::reply(), "Allow", "GET").into_response());
 
         post.or(get).unify().boxed()
