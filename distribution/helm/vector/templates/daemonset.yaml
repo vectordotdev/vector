@@ -24,8 +24,6 @@ spec:
         - name: vector
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
-          args:
-            - "-w"
           env:
             {{- toYaml .Values.env | nindent 12 }}
           resources:
