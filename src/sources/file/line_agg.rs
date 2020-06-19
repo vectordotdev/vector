@@ -186,7 +186,7 @@ where
                             add_next_line(buffered, line);
                             return None;
                         } else {
-                            let buffered = entry.insert(make_mut(line));
+                            let buffered = entry.insert(line.as_ref().into());
                             return Some((buffered.freeze(), entry.key().clone()));
                         }
                     }
@@ -207,7 +207,7 @@ where
                     // in the group.
                     Mode::HaltBefore => {
                         if condition_matched {
-                            let buffered = entry.insert(make_mut(line));
+                            let buffered = entry.insert(line.as_ref().into());
                             return Some((buffered.freeze(), entry.key().clone()));
                         } else {
                             let buffered = entry.get_mut();
@@ -237,7 +237,7 @@ where
                     // Set the timeout and buffer this line.
                     self.timeouts
                         .insert(entry.key().clone(), self.config.timeout.clone());
-                    entry.insert(make_mut(line));
+                    entry.insert(line.as_ref().into());
                     return None;
                 } else {
                     // It's just a regular line we don't really care about.
@@ -246,12 +246,6 @@ where
             }
         }
     }
-}
-
-fn make_mut(bytes: Bytes) -> BytesMut {
-    let mut bytes_mut = BytesMut::new();
-    bytes_mut.extend_from_slice(&bytes);
-    bytes_mut
 }
 
 fn add_next_line(buffered: &mut BytesMut, line: Bytes) {

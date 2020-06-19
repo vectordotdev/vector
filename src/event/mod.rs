@@ -301,9 +301,7 @@ impl From<Bytes> for Value {
 
 impl From<bytes05::Bytes> for Value {
     fn from(bytes: bytes05::Bytes) -> Self {
-        let mut old_bytes = Bytes::new();
-        old_bytes.extend_from_slice(&bytes);
-        Value::Bytes(old_bytes)
+        Value::Bytes(bytes.as_ref().into())
     }
 }
 
