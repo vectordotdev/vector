@@ -162,6 +162,7 @@ lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a
 lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
 lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
 anyhow = { version = "1.0.28", optional = true }
+async-stream = "0.2.1"
 
 
 [target.'cfg(windows)'.dependencies]

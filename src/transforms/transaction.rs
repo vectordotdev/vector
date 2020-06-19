@@ -5,23 +5,19 @@ use crate::{
     event::{Event, LogEvent, Value},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
+use async_stream::stream;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::{
     compat::{Compat, Compat01As03},
     stream,
-    stream::Stream,
-    task::{Context, Poll},
+    stream::StreamExt,
 };
-use futures01::{stream as stream01, Stream as Stream01};
+use futures01::Stream as Stream01;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
-use std::{
-    pin::Pin,
-    thread,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 use string_cache::DefaultAtom as Atom;
 
 //------------------------------------------------------------------------------
@@ -583,12 +579,6 @@ impl Transaction {
     }
 }
 
-enum StreamEvent {
-    Flush,
-    FlushAll,
-    Event(Event),
-}
-
 impl Transform for Transaction {
     // Only used in tests
     fn transform(&mut self, event: Event) -> Option<Event> {
@@ -640,54 +630,42 @@ impl Transform for Transaction {
         let mut me = self;
 
         let poll_period = me.flush_period.clone();
-        let mut last_flush = Instant::now();
 
-        let mut input_rx = Compat01As03::new(input_rx);
+        let mut flush_stream = tokio::time::interval(poll_period);
+        let mut input_stream = Compat01As03::new(input_rx);
 
-        let poll_flush = move |ctx: &mut Context| -> Poll<Option<Result<StreamEvent, ()>>> {
-            let p = Pin::new(&mut input_rx).poll_next(ctx);
-            match p {
-                Poll::Pending => {
-                    // If our input channel hasn't yielded anything
-                    let now = Instant::now();
-                    let since_last_flush = now.duration_since(last_flush);
-
-                    // But it hasn't been long enough to flush again yet.
-                    if let Some(flush_in) = poll_period.checked_sub(since_last_flush) {
-                        // Wake up when we're ready.
-                        let thread_waker = ctx.waker().clone();
-                        thread::spawn(move || {
-                            thread::sleep(flush_in);
-                            thread_waker.wake();
-                        });
-                        Poll::Pending
-                    } else {
-                        // Otherwise, it has been long enough since the last
-                        // flush to trigger another.
-                        last_flush = now;
-                        Poll::Ready(Some(Ok(StreamEvent::Flush)))
+        let stream = stream! {
+          loop {
+            let mut output = Vec::new();
+            let done = tokio::select! {
+                _ = flush_stream.next() => {
+                  me.flush_into(&mut output);
+                  false
+                }
+                maybe_event = input_stream.next() => {
+                  match maybe_event {
+                    None => {
+                      me.flush_all_into(&mut output);
+                      true
                     }
+                    Some(Ok(event)) => {
+                      me.transform_into(&mut output, event);
+                      false
+                    }
+                    Some(Err(())) => unreachable!(),
+                  }
                 }
-                // Pass `Poll<Option<Result<Event>>>` as `Poll<Option<Result<StreamEvent, ()>>>`
-                _ => return p.map(|p| p.map(|p| p.map(|p| StreamEvent::Event(p)))),
-            }
-        };
+            };
+            yield stream::iter(output.into_iter());
+            if done { break }
+          }
+        }
+        .flatten();
 
-        Box::new(Stream01::flatten(Stream01::map(
-            Stream01::chain(
-                Compat::new(stream::poll_fn(poll_flush)),
-                stream01::iter_ok(vec![StreamEvent::FlushAll]),
-            ),
-            move |event_opt| {
-                let mut output = Vec::new();
-                match event_opt {
-                    StreamEvent::Flush => me.flush_into(&mut output),
-                    StreamEvent::FlushAll => me.flush_all_into(&mut output),
-                    StreamEvent::Event(event) => me.transform_into(&mut output, event),
-                }
-                stream01::iter_ok(output.into_iter())
-            },
-        )))
+        // Needed for compat
+        let try_stream = Box::pin(stream.map::<Result<Event, ()>, _>(Ok));
+
+        Box::new(Compat::new(try_stream))
     }
 }
 
