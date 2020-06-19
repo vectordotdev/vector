@@ -364,14 +364,9 @@ impl CheckFieldsPredicate for IpCidrPredicate {
         match event {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| {
                 let v = v.to_string_lossy();
-                let ip_addr = match IpAddr::from_str(&v) {
-                    Ok(addr) => addr,
-                    Err(e) => {
-                        error!("Invalid IP \"{}\": {}", v, e);
-                        return false;
-                    }
-                };
-                self.cidrs.iter().any(|cidr| cidr.contains(ip_addr))
+                IpAddr::from_str(&v).map_or(false, |ip_addr| {
+                    self.cidrs.iter().any(|cidr| cidr.contains(ip_addr))
+                })
             }),
             _ => false,
         }
