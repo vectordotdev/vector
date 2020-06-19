@@ -26,7 +26,6 @@ pub struct DnstapConfig {
     pub max_length: usize,
     pub host_key: Option<String>,
     pub socket_path: PathBuf,
-    pub schema_path: Option<PathBuf>,
 }
 
 fn default_max_length() -> usize {
@@ -38,7 +37,6 @@ impl DnstapConfig {
         Self {
             host_key: None,
             socket_path,
-            schema_path: None,
             ..Self::default()
         }
     }
@@ -54,7 +52,6 @@ impl Default for DnstapConfig {
             host_key: Some("host".to_string()),
             max_length: default_max_length(),
             socket_path: PathBuf::from("/run/bind/dnstap.sock"),
-            schema_path: Some(PathBuf::from("/var/tmp/example.dnstap")),
         }
     }
 }
@@ -77,19 +74,12 @@ impl SourceConfig for DnstapConfig {
             .clone()
             .unwrap_or(event::log_schema().host_key().to_string());
 
-        let mut frame_handler = DnstapFrameHandler::new(
+        let frame_handler = DnstapFrameHandler::new(
             self.max_length,
             host_key.clone(),
             self.socket_path.clone(),
-            self.schema_path.clone(),
             self.content_type(),
         );
-
-        let schema: DnstapEventSchema = match self.schema_path.clone() {
-            Some(path) => std::convert::TryInto::try_into(path)?,
-            None => DnstapEventSchema::new(),
-        };
-        *frame_handler.schema_mut() = schema;
         Ok(build_framestream_unix_source(frame_handler, shutdown, out))
     }
 
@@ -107,7 +97,6 @@ pub struct DnstapFrameHandler {
     max_length: usize,
     host_key: String,
     socket_path: PathBuf,
-    schema_path: Option<PathBuf>,
     content_type: String,
     schema: DnstapEventSchema,
 }
@@ -117,25 +106,15 @@ impl DnstapFrameHandler {
         max_length: usize,
         host_key: String,
         socket_path: PathBuf,
-        schema_path: Option<PathBuf>,
         content_type: String,
     ) -> Self {
         Self {
             max_length,
             host_key,
             socket_path,
-            schema_path,
             content_type,
             schema: DnstapEventSchema::new(),
         }
-    }
-
-    pub fn host_key(&self) -> &str {
-        &self.host_key
-    }
-
-    pub fn schema_mut(&mut self) -> &mut DnstapEventSchema {
-        &mut self.schema
     }
 }
 

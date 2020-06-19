@@ -1,6 +1,8 @@
 #[readonly::make]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DnsQueryMessage {
+    pub response_code: u16,
+    pub response: Option<&'static str>,
     pub header: QueryHeader,
     pub question_section: Vec<QueryQuestion>,
     pub answer_section: Vec<DnsRecord>,
@@ -11,6 +13,8 @@ pub struct DnsQueryMessage {
 
 impl DnsQueryMessage {
     pub fn new(
+        response_code: u16,
+        response: Option<&'static str>,
         header: QueryHeader,
         question_section: Vec<QueryQuestion>,
         answer_section: Vec<DnsRecord>,
@@ -19,6 +23,8 @@ impl DnsQueryMessage {
         opt_pserdo_section: Option<OptPseudoSection>,
     ) -> Self {
         Self {
+            response_code,
+            response,
             header,
             question_section,
             answer_section,
@@ -30,7 +36,7 @@ impl DnsQueryMessage {
 }
 
 #[readonly::make]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct QueryHeader {
     pub id: u16,
     pub opcode: u8,
@@ -85,7 +91,7 @@ impl QueryHeader {
 }
 
 #[readonly::make]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct OptPseudoSection {
     pub extended_rcode: u8,
     pub version: u8,
@@ -113,7 +119,7 @@ impl OptPseudoSection {
 }
 
 #[readonly::make]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct QueryQuestion {
     pub name: String,
     pub class: String,
@@ -138,14 +144,15 @@ impl QueryQuestion {
 }
 
 #[readonly::make]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DnsRecord {
     pub name: String,
     pub class: String,
     pub record_type: Option<String>,
     pub record_type_id: u16,
     pub ttl: u32,
-    pub rdata: String,
+    pub rdata: Option<String>,
+    pub rdata_bytes: Option<Vec<u8>>,
 }
 
 impl DnsRecord {
@@ -155,7 +162,8 @@ impl DnsRecord {
         record_type: Option<String>,
         record_type_id: u16,
         ttl: u32,
-        rdata: String,
+        rdata: Option<String>,
+        rdata_bytes: Option<Vec<u8>>,
     ) -> Self {
         Self {
             name,
@@ -164,12 +172,13 @@ impl DnsRecord {
             record_type_id,
             ttl,
             rdata,
+            rdata_bytes,
         }
     }
 }
 
 #[readonly::make]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct EdnsOptionEntry {
     pub opt_code: u16,
     pub opt_name: String,
