@@ -31,7 +31,7 @@ use rusoto_credential::{
 };
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -257,6 +257,25 @@ impl HttpSink for ElasticSearchCommon {
 #[derive(Clone)]
 struct ElasticSearchRetryLogic;
 
+#[derive(Deserialize, Debug)]
+struct ESResultResponse {
+    items: Vec<ESResultItem>,
+}
+#[derive(Deserialize, Debug)]
+struct ESResultItem {
+    index: ESIndexResult,
+}
+#[derive(Deserialize, Debug)]
+struct ESIndexResult {
+    error: Option<ESErrorDetails>,
+}
+#[derive(Deserialize, Debug)]
+struct ESErrorDetails {
+    reason: String,
+    #[serde(rename = "type")]
+    err_type: String,
+}
+
 impl RetryLogic for ElasticSearchRetryLogic {
     type Error = hyper::Error;
     type Response = hyper::Response<Bytes>;
@@ -276,14 +295,46 @@ impl RetryLogic for ElasticSearchRetryLogic {
             _ if status.is_server_error() => RetryAction::Retry(
                 format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
             ),
+            _ if status.is_client_error() => {
+                let body = String::from_utf8_lossy(response.body());
+                warn!(
+                    message = "client error",
+                    body = %body,
+                    rate_limit_secs = 30
+                );
+                RetryAction::DontRetry("client error".into())
+            }
             _ if status.is_success() => {
                 let body = String::from_utf8_lossy(response.body());
                 match body.find("\"errors\":true") {
-                    Some(_) => match serde_json::from_str::<Value>(&body) {
-                        Err(_) => RetryAction::DontRetry(
-                            "some messages failed, and invalid response from elasticsearch".into(),
-                        ),
-                        Ok(_data) => RetryAction::DontRetry("some messages failed".into()),
+                    Some(_) => match serde_json::from_str::<ESResultResponse>(&body) {
+                        Err(json_error) => {
+                            warn!(
+                                message = "ElasticSearch unparsable error response",
+                                %json_error,
+                                rate_limit_secs = 30
+                            );
+                            RetryAction::DontRetry(
+                                "some messages failed, and invalid response from elasticsearch"
+                                    .into(),
+                            )
+                        }
+                        Ok(esrr) => {
+                            match esrr.items.into_iter().find_map(|item| item.index.error) {
+                                Some(error) => warn!(
+                                    message = "ElasticSearch error response",
+                                    err_type = %error.err_type,
+                                    reason = %error.reason,
+                                    rate_limit_secs = 30
+                                ),
+                                _ => warn!(
+                                    message = "Unusual ElasticSearch error response",
+                                    %body,
+                                    rate_limit_secs = 30
+                                ),
+                            };
+                            RetryAction::DontRetry("some messages failed".into())
+                        }
                     },
                     None => RetryAction::Successful,
                 }
