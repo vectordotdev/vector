@@ -2,8 +2,8 @@ apiVersion: v1
 name: vector
 type: application
 icon: https://vector.dev/press/vector-icon.svg
-description: A Helm chart to collect Kubernetes logs with vector
-version: 0.0.1
+description: A Helm chart to collect Kubernetes logs with Vector
+version: 0.1.0
 appVersion: 0.8
 home: https://vector.dev/
 sources:
