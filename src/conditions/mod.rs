@@ -8,24 +8,6 @@ pub mod is_metric;
 
 pub use check_fields::CheckFieldsConfig;
 
-/// A condition enum that can be optionally parsed without a `type` field, and
-/// defaults to a `check_fields` condition.
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(untagged)]
-pub enum DefaultedCondition {
-    FromType(Box<dyn ConditionConfig>),
-    NoTypeCondition(CheckFieldsConfig),
-}
-
-impl DefaultedCondition {
-    pub fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        Ok(match self {
-            DefaultedCondition::FromType(c) => c.build()?,
-            DefaultedCondition::NoTypeCondition(c) => c.build()?,
-        })
-    }
-}
-
 pub trait Condition: Send + Sync {
     fn check(&self, e: &Event) -> bool;
 

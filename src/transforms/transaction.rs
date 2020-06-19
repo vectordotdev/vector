@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    conditions::{Condition, DefaultedCondition},
+    conditions::{AnyCondition, Condition},
     event::discriminant::Discriminant,
     event::{Event, LogEvent, Value},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
@@ -40,7 +40,7 @@ pub struct TransactionConfig {
 
     /// An optional condition that determines when an event is the end of a
     /// transaction.
-    pub ends_when: Option<DefaultedCondition>,
+    pub ends_when: Option<AnyCondition>,
 }
 
 inventory::submit! {

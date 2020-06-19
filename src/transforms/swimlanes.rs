@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    conditions::{Condition, DefaultedCondition},
+    conditions::{AnyCondition, Condition},
     event::Event,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct SwimlaneConfig {
     #[serde(flatten)]
-    condition: DefaultedCondition,
+    condition: AnyCondition,
 }
 
 #[typetag::serde(name = "swimlane")]
@@ -60,7 +60,7 @@ impl Transform for Swimlane {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SwimlanesConfig {
-    lanes: IndexMap<String, DefaultedCondition>,
+    lanes: IndexMap<String, AnyCondition>,
 }
 
 inventory::submit! {
