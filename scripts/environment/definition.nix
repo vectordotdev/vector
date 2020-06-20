@@ -1,60 +1,16 @@
 args@{
-  rustTarget ? "stable",
+  rustTarget ? null,
   linking ? "dynamic",
-  crossSystem ? builtins.currentSystem,
-  pkgs ? null,
+  cross ? null,
+  pkgs ? (import <nixpkgs> {
+    overlays = [
+      (import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz))
+    ];
+  }),
   ...
 }:
 
 rec {
-  pkgs = import <nixpkgs> { 
-      overlays = [
-        (import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz))
-      ];
-    } //
-      (if args ? crossSystem then {
-        crossSystem = {
-          config = crossSystem;
-        };
-      } else {}) //
-      (if args ? linking && args.linking == "static" then {
-        static = builtins.trace "Enabling static build..." true;
-      } else {});
-
-  # Our Cargo.toml as nix!
-  cargoToml = (builtins.fromTOML (builtins.readFile ../../Cargo.toml));
-  
-  features = rec {
-    derived = {
-      components = rec {
-        sources = cargoToml.features.sources;
-        sinks = cargoToml.features.sinks;
-        transforms = cargoToml.features.transforms;
-        all = sources ++ sinks ++ transforms;
-      };
-    };
-    byLinking = {
-      static = [];
-      dynamic = ["rdkafka" "rdkafka/dynamic_linking"];
-    };
-    byOs = {
-      linux = ["unix"];
-      mac = ["unix"];
-      windows = [];
-    };
-    presets = {
-      x86_64-unknown-linux-gnu = 
-        features.derived.components.all ++
-        features.byOs.linux ++
-        (builtins.getAttr args.linking features.byLinking);
-      x86_64-unknown-linux-musl =
-        features.derived.components.all ++
-        features.byOs.linux ++
-        (builtins.getAttr args.linking features.byLinking);
-    };
-  };
-
-
   environmentVariables =  {
     # We must set some protoc related env vars for the prost crate.
     PROTOC = "${pkgs.protobuf}/bin/protoc";
@@ -117,7 +73,13 @@ rec {
     docker-compose
     # Wasm
     llvmPackages.libclang
-  ] ++ nativeBuildInputs ++ buildInputs;
+  ]  ++ (if stdenv.isDarwin then [
+    # Mac only
+  ] else [
+    # Linux
+    podman
+    podman-compose
+  ]) ++ nativeBuildInputs ++ buildInputs;
 
   # From: https://nixos.org/nixpkgs/manual/
   #
@@ -133,39 +95,36 @@ rec {
   # Since these packages are able to be run at build-time, they are added to the PATH, as described
   # above. But since these packages are only guaranteed to be able to run then, they shouldn't
   # persist as run-time dependencies. This isn't currently enforced, but could be in the future.
-  nativeBuildInputs = with pkgs; [
+  nativeBuildInputs = with (if args ? cross && args.cross != null then cross else pkgs); [
     pkg-config
     protobuf
     openssl
-    perl
-    cmake
     rdkafka
-    snappy
-    gnumake
-    autoconf
-    git
-    (if args ? rustTarget then 
-      pkgs.latest.rustChannels.stable.rust.override {
-        targets = [
-          args.rustTarget
-        ];
-      }
-    else
-      pkgs.latest.rustChannels.stable.rust
-    )
+    jemalloc
+    gcc
+    # Note the `pkgs.` here always brings us to the **host** Rust, since it's a cross compiler.
+    (pkgs.latest.rustChannels.stable.rust.override {
+      targets = (if args ? rustTarget && args.rustTarget != null then 
+        builtins.trace args.rustTarget
+        [ args.rustTarget ]
+      else
+        [ ]);
+      extensions = [
+        "rust-std"
+      ];
+      targetExtensions = [
+        "rust-std"
+      ];
+    })
   ] ++ (if stdenv.isDarwin then [
     darwin.cf-private
     darwin.apple_sdk.frameworks.CoreServices
     darwin.apple_sdk.frameworks.Security
     darwin.apple_sdk.frameworks.SecurityFoundation
   ] else [
-    # Build
-    gcc
     # Testing
     systemd
     # Container tools
-    podman
-    podman-compose
     linuxHeaders
   ]); 
   # ++ (if pkgs.glibcLocales != null then [
@@ -185,10 +144,14 @@ rec {
   # run-time, but the derivation containing the library is only needed at build-time. Even in the
   # dynamic case, the library may also be needed at build-time to appease the linker.
   buildInputs = with pkgs; [
+    pkg-config
     rdkafka
     protobuf
     snappy
     leveldb
-  ];
-
+    snappy
+  ] ++ (if stdenv.isDarwin then [
+  ] else [
+    linuxHeaders
+  ]);
 }

@@ -431,25 +431,24 @@ package-rpm-aarch64: package-archive-aarch64-unknown-linux-musl ## Build the aar
 
 .PHONY: neu-release-binary
 neu-release-binary: DRY_RUN ?= false
-neu-release-binary:
+neu-release-binary: RUST_TARGET ?= ${RUST_TARGET}
+neu-release-binary: target/releases/binaries/${RUST_TARGET}
+
+target/releases/binaries/%: BUILD_TYPE ?= "debug"
+target/releases/binaries/%:
 	nix build \
 		$(if $(findstring true,$(VERBOSE)),--verbose --show-trace --print-build-logs,) \
 		$(if $(findstring true,$(DRY_RUN)),--dry-run,) \
+		--argstr buildType $(BUILD_TYPE) \
 		--file default.nix \
-		--out-link target/releases/binary/$(RUST_TARGET) \
-		binaries.$(RUST_TARGET)
+		--out-link $@ \
+		releases.binaries.$(notdir $@)
 
-.PHONY: neu-release-binary-native
-neu-release-binary-native: override CROSS_SYSTEM ?= "builtins.currentSystem"
-neu-release-binary-native: neu-release-binary
-
-.PHONY: neu-release-binary-x86_64-unknown-linux-gn
-neu-release-binary-x86_64-unknown-linux-gnu: RUST_TARGET = x86_64-unknown-linux-gnu
-neu-release-binary-x86_64-unknown-linux-gnu: neu-release-binary
+.PHONY: neu-release-binary-x86_64-unknown-linux-gnu
+neu-release-binary-x86_64-unknown-linux-gnu: target/releases/binaries/x86_64-unknown-linux-gnu
 
 .PHONY: neu-release-binary-x86_64-unknown-linux-musl
-neu-release-binary-x86_64-unknown-linux-musl: RUST_TARGET = x86_64-unknown-linux-musl
-neu-release-binary-x86_64-unknown-linux-musl: neu-release-binary
+neu-release-binary-x86_64-unknown-linux-musl: target/releases/binaries/x86_64-unknown-linux-musl
 
 release: release-prepare generate release-commit ## Release a new Vector version
 
