@@ -177,11 +177,13 @@ mod test {
         use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
         use futures01::{Async, Stream};
         use std::io::{ErrorKind, Read};
+        use std::net::Shutdown;
         use std::sync::{
             atomic::{AtomicUsize, Ordering},
             Arc,
         };
-        use tokio01::io::AsyncWrite;
+
+        crate::test_util::trace_init();
 
         let addr = next_addr();
         let config = SocketSinkConfig {
@@ -230,8 +232,7 @@ mod test {
                 conn_counter1.fetch_add(1, Ordering::SeqCst);
                 loop {
                     if let Ok(Async::Ready(_)) = close_rx.poll() {
-                        socket.shutdown().unwrap();
-                        break;
+                        socket.get_ref().unwrap().shutdown(Shutdown::Write).unwrap();
                     }
 
                     let mut buf = vec![0u8; 11];
