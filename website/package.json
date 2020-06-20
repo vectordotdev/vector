@@ -10,9 +10,9 @@
     "deploy": "docusaurus deploy"
   },
   "dependencies": {
-    "@docusaurus/core": "^2.0.0-alpha.54",
-    "@docusaurus/preset-classic": "^2.0.0-alpha.54",
-    "@docusaurus/utils": "^2.0.0-alpha.54",
+    "@docusaurus/core": "^2.0.0-alpha.58",
+    "@docusaurus/preset-classic": "^2.0.0-alpha.58",
+    "@docusaurus/utils": "^2.0.0-alpha.58",
     "@types/fs-extra": "^8.1.0",
     "@types/lodash": "^4.14.149",
     "@types/semver": "^7.1.0",
@@ -23,6 +23,7 @@
     "d3-timer": "^1.0.9",
     "dateformat": "^3.0.3",
     "humanize-string": "^2.1.0",
+    "markdownlint-cli": "0.22",
     "pluralize": "^8.0.0",
     "prismjs": "^1.17.1",
     "qs": "^6.9.1",
@@ -36,8 +37,7 @@
     "strftime": "^0.10.0",
     "svg.js": "^2.6.2",
     "timeago-react": "^3.0.0",
-    "titleize": "^2.1.0",
-    "markdownlint-cli": "0.22"
+    "titleize": "^2.1.0"
   },
   "browserslist": {
     "production": [

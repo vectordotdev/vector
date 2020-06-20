@@ -1,12 +1,16 @@
-import {PluginOptions, Release} from './types';
-import {LoadContext} from '@docusaurus/types';
+import { PluginOptions, Release } from "./types";
+import { LoadContext } from "@docusaurus/types";
 
-import _ from 'lodash';
-import fs from 'fs-extra';
-import globby from 'globby';
-import path from 'path';
-import {parse, normalizeUrl, aliasedSitePath} from '@docusaurus/utils';
-import semver from 'semver';
+import _ from "lodash";
+import fs from "fs-extra";
+import globby from "globby";
+import path from "path";
+import {
+  parseMarkdownFile,
+  normalizeUrl,
+  aliasedSitePath,
+} from "@docusaurus/utils";
+import semver from "semver";
 
 export function truncate(fileString: string, truncateMarker: RegExp) {
   return fileString.split(truncateMarker, 1).shift()!;
@@ -14,16 +18,16 @@ export function truncate(fileString: string, truncateMarker: RegExp) {
 
 export async function generateReleases(
   releaseDir: string,
-  {siteConfig, siteDir}: LoadContext,
-  options: PluginOptions,
+  { siteConfig, siteDir }: LoadContext,
+  options: PluginOptions
 ) {
-  const {include, routeBasePath, truncateMarker} = options;
+  const { include, routeBasePath, truncateMarker } = options;
 
   if (!fs.existsSync(releaseDir)) {
     return [];
   }
 
-  const {baseUrl = ''} = siteConfig;
+  const { baseUrl = "" } = siteConfig;
   const releaseFiles = await globby(include, {
     cwd: releaseDir,
   });
@@ -34,16 +38,17 @@ export async function generateReleases(
     releaseFiles.map(async (relativeSource: string) => {
       const source = path.join(releaseDir, relativeSource);
       const aliasedSource = aliasedSitePath(source, siteDir);
-      const fileString = await fs.readFile(source, 'utf-8');
-      const {frontMatter, content, excerpt} = parse(fileString);
+      const { frontMatter, content, excerpt } = await parseMarkdownFile(source);
 
-      if (frontMatter.draft && process.env.NODE_ENV === 'production') {
+      if (frontMatter.draft && process.env.NODE_ENV === "production") {
         return;
       }
 
-      let date = new Date(frontMatter.date ? Date.parse(frontMatter.date) : Date.now());
+      let date = new Date(
+        frontMatter.date ? Date.parse(frontMatter.date) : Date.now()
+      );
       let description = frontMatter.description || excerpt;
-      let version = relativeSource.replace(/\.mdx?$/, '');
+      let version = relativeSource.replace(/\.mdx?$/, "");
       let title = frontMatter.title || version;
 
       releases.push({
@@ -62,21 +67,23 @@ export async function generateReleases(
           version: version,
         },
       });
-    }),
+    })
   );
 
-  return releases.sort((a, b) => semver.compare(a.metadata.version, b.metadata.version));
+  return releases.sort((a, b) =>
+    semver.compare(a.metadata.version, b.metadata.version)
+  );
 }
 
 export function linkify(
   fileContent: string,
   siteDir: string,
   releasePath: string,
-  releases: Release[],
+  releases: Release[]
 ) {
   let fencedBlock = false;
-  const lines = fileContent.split('\n').map(line => {
-    if (line.trim().startsWith('```')) {
+  const lines = fileContent.split("\n").map((line) => {
+    if (line.trim().startsWith("```")) {
       fencedBlock = !fencedBlock;
     }
 
@@ -90,11 +97,11 @@ export function linkify(
       const mdLink = mdMatch[1];
       const aliasedPostSource = `@site/${path.relative(
         siteDir,
-        path.resolve(releasePath, mdLink),
+        path.resolve(releasePath, mdLink)
       )}`;
       let releasePermalink = null;
 
-      releases.forEach(release => {
+      releases.forEach((release) => {
         if (release.metadata.source === aliasedPostSource) {
           releasePermalink = release.metadata.permalink;
         }
@@ -110,5 +117,5 @@ export function linkify(
     return modifiedLine;
   });
 
-  return lines.join('\n');
+  return lines.join("\n");
 }

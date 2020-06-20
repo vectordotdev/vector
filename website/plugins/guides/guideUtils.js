@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.linkify = exports.generateGuides = exports.truncate = void 0;
 const lodash_1 = __importDefault(require("lodash"));
 const fs_extra_1 = __importDefault(require("fs-extra"));
 const globby_1 = __importDefault(require("globby"));
@@ -20,7 +21,7 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
     if (!fs_extra_1.default.existsSync(guideDir)) {
         return [];
     }
-    const { baseUrl = '' } = siteConfig;
+    const { baseUrl = "" } = siteConfig;
     const guideFiles = await globby_1.default(include, {
         cwd: guideDir,
     });
@@ -28,38 +29,43 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
     await Promise.all(guideFiles.map(async (relativeSource) => {
         const source = path_1.default.join(guideDir, relativeSource);
         const aliasedSource = utils_1.aliasedSitePath(source, siteDir);
-        const fileString = await fs_extra_1.default.readFile(source, 'utf-8');
-        const readingStats = reading_time_1.default(fileString);
-        const { frontMatter, content, excerpt } = utils_1.parse(fileString);
-        if (frontMatter.draft && process.env.NODE_ENV === 'production') {
+        const { frontMatter, content, excerpt } = await utils_1.parseMarkdownFile(source);
+        const readingStats = reading_time_1.default(content);
+        if (frontMatter.draft && process.env.NODE_ENV === "production") {
             return;
         }
-        let categoryParts = relativeSource.split('/').slice(0, -1);
+        let categoryParts = relativeSource.split("/").slice(0, -1);
         let categories = [];
         while (categoryParts.length > 0) {
             let name = categoryParts[categoryParts.length - 1];
             let title = titleize_1.default(humanize_string_1.default(name));
             let description = null;
             switch (name) {
-                case 'advanced':
-                    description = 'Go beyond the basics, become a Vector pro, and extract the full potential of Vector.';
+                case "advanced":
+                    description =
+                        "Go beyond the basics, become a Vector pro, and extract the full potential of Vector.";
                     break;
-                case 'getting-started':
-                    description = 'Take Vector from zero to production in under 10 minutes.';
+                case "getting-started":
+                    description =
+                        "Take Vector from zero to production in under 10 minutes.";
                     break;
-                case 'integrate':
-                    description = 'Simple step-by-step integration guides.';
+                case "integrate":
+                    description = "Simple step-by-step integration guides.";
                     break;
             }
             categories.unshift({
                 name: name,
                 title: title,
                 description: description,
-                permalink: utils_1.normalizeUrl([baseUrl, routeBasePath, categoryParts.join('/')])
+                permalink: utils_1.normalizeUrl([
+                    baseUrl,
+                    routeBasePath,
+                    categoryParts.join("/"),
+                ]),
             });
             categoryParts.pop();
         }
-        let linkName = relativeSource.replace(/\.mdx?$/, '');
+        let linkName = relativeSource.replace(/\.mdx?$/, "");
         let seriesPosition = frontMatter.series_position;
         let tags = frontMatter.tags || [];
         let title = frontMatter.title || linkName;
@@ -86,24 +92,24 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
         });
     }));
     return lodash_1.default.sortBy(guides, [
-        ((guide) => {
+        (guide) => {
             let categories = guide.metadata.categories;
-            if (categories[0].name == 'getting-started') {
-                return ['AA'].concat(categories.map(category => category.name).slice(1));
+            if (categories[0].name == "getting-started") {
+                return ["AA"].concat(categories.map((category) => category.name).slice(1));
             }
             else {
                 return categories;
             }
-        }),
-        'metadata.seriesPosition',
-        ((guide) => guide.metadata.coverLabel.toLowerCase())
+        },
+        "metadata.seriesPosition",
+        (guide) => guide.metadata.coverLabel.toLowerCase(),
     ]);
 }
 exports.generateGuides = generateGuides;
 function linkify(fileContent, siteDir, guidePath, guides) {
     let fencedBlock = false;
-    const lines = fileContent.split('\n').map(line => {
-        if (line.trim().startsWith('```')) {
+    const lines = fileContent.split("\n").map((line) => {
+        if (line.trim().startsWith("```")) {
             fencedBlock = !fencedBlock;
         }
         if (fencedBlock)
@@ -115,7 +121,7 @@ function linkify(fileContent, siteDir, guidePath, guides) {
             const mdLink = mdMatch[1];
             const aliasedPostSource = `@site/${path_1.default.relative(siteDir, path_1.default.resolve(guidePath, mdLink))}`;
             let guidePermalink = null;
-            guides.forEach(guide => {
+            guides.forEach((guide) => {
                 if (guide.metadata.source === aliasedPostSource) {
                     guidePermalink = guide.metadata.permalink;
                 }
@@ -127,6 +133,6 @@ function linkify(fileContent, siteDir, guidePath, guides) {
         }
         return modifiedLine;
     });
-    return lines.join('\n');
+    return lines.join("\n");
 }
 exports.linkify = linkify;

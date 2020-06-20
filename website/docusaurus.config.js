@@ -142,14 +142,14 @@ module.exports = {
   presets: [],
   plugins: [
     [
-      "@docusaurus/plugin-content-docs",
+      require.resolve("@docusaurus/plugin-content-docs"),
       {
         editUrl: "https://github.com/timberio/vector/edit/master/website/",
         sidebarPath: require.resolve("./sidebars.js"),
       },
     ],
     [
-      "@docusaurus/plugin-content-blog",
+      require.resolve("@docusaurus/plugin-content-blog"),
       {
         feedOptions: {
           type: "all",
@@ -159,7 +159,7 @@ module.exports = {
     ],
     path.resolve(__dirname, "./plugins/guides"),
     path.resolve(__dirname, "./plugins/highlights"),
-    ["@docusaurus/plugin-content-pages", {}],
+    [require.resolve("@docusaurus/plugin-content-pages"), {}],
     path.resolve(__dirname, "./plugins/releases"),
     [path.resolve(__dirname, "./plugins/sitemap"), {}],
   ],

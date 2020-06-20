@@ -1,28 +1,28 @@
-import React from 'react';
+import React from "react";
 
-import AnnouncementBar from '@theme/AnnouncementBar';
-import Head from '@docusaurus/Head';
-import Navbar from '@theme/Navbar';
-import Footer from '@theme/Footer';
-import TabGroupChoiceProvider from '@theme/TabGroupChoiceProvider';
-import ThemeProvider from '@theme/ThemeProvider';
+import AnnouncementBar from "@theme/AnnouncementBar";
+import Head from "@docusaurus/Head";
+import Navbar from "@theme/Navbar";
+import Footer from "@theme/Footer";
+import ThemeProvider from "@theme/ThemeProvider";
+import UserPreferencesProvider from "@theme/UserPreferencesProvider";
 
-import useBaseUrl from '@docusaurus/useBaseUrl';
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
-import { useLocation } from 'react-router-dom';
+import useBaseUrl from "@docusaurus/useBaseUrl";
+import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
+import { useLocation } from "react-router-dom";
 
-import './styles.css';
+import "./styles.css";
 
 // purposefully hardcoded to protect against people copying our site
-const VECTOR_HOST = 'https://vector.dev';
+const VECTOR_HOST = "https://vector.dev";
 
 function Layout(props) {
-  const {siteConfig = {}} = useDocusaurusContext();
+  const { siteConfig = {} } = useDocusaurusContext();
   const {
     favicon,
     tagline,
     title: siteTitle,
-    themeConfig: {image: defaultImage},
+    themeConfig: { image: defaultImage },
     url: siteUrl,
   } = siteConfig;
   const {
@@ -40,13 +40,16 @@ function Layout(props) {
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
   const faviconUrl = useBaseUrl(favicon);
   const location = useLocation();
-  let canonURL = location ?
-    (VECTOR_HOST + (location.pathname.endsWith('/') ? location.pathname : (location.pathname + '/'))) :
-    null;
+  let canonURL = location
+    ? VECTOR_HOST +
+      (location.pathname.endsWith("/")
+        ? location.pathname
+        : location.pathname + "/")
+    : null;
 
   return (
     <ThemeProvider>
-      <TabGroupChoiceProvider>
+      <UserPreferencesProvider>
         <Head>
           {/* TODO: Do not assume that it is in english language */}
           <html lang="en" />
@@ -61,7 +64,7 @@ function Layout(props) {
           )}
           {version && <meta name="docsearch:version" content={version} />}
           {keywords && keywords.length && (
-            <meta name="keywords" content={keywords.join(',')} />
+            <meta name="keywords" content={keywords.join(",")} />
           )}
           {metaImage && <meta property="og:image" content={metaImageUrl} />}
           {metaImage && (
@@ -70,25 +73,17 @@ function Layout(props) {
           {metaImage && (
             <meta name="twitter:image:alt" content={`Image for ${metaTitle}`} />
           )}
-          {metaImage && (
-            <meta name="twitter:site" content="@vectordotdev" />
-          )}
-          {metaImage && (
-            <meta name="twitter:creator" content="@vectordotdev" />
-          )}
-          {canonURL && (
-            <meta property="og:url" content={canonURL} />
-          )}
+          {metaImage && <meta name="twitter:site" content="@vectordotdev" />}
+          {metaImage && <meta name="twitter:creator" content="@vectordotdev" />}
+          {canonURL && <meta property="og:url" content={canonURL} />}
           <meta name="twitter:card" content="summary" />
-          {canonURL && (
-            <link rel="canonical" href={canonURL} />
-          )}
+          {canonURL && <link rel="canonical" href={canonURL} />}
         </Head>
         <AnnouncementBar />
         <Navbar />
         <div className="main-wrapper">{children}</div>
         {!noFooter && <Footer />}
-      </TabGroupChoiceProvider>
+      </UserPreferencesProvider>
     </ThemeProvider>
   );
 }

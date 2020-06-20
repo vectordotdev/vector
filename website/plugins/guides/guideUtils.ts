@@ -1,14 +1,18 @@
-import {PluginOptions, Guide} from './types';
-import {LoadContext} from '@docusaurus/types';
+import { PluginOptions, Guide } from "./types";
+import { LoadContext } from "@docusaurus/types";
 
-import _ from 'lodash';
-import fs from 'fs-extra';
-import globby from 'globby';
-import humanizeString from 'humanize-string';
-import path from 'path';
-import {parse, normalizeUrl, aliasedSitePath} from '@docusaurus/utils';
-import readingTime from 'reading-time';
-import titleize from 'titleize';
+import _ from "lodash";
+import fs from "fs-extra";
+import globby from "globby";
+import humanizeString from "humanize-string";
+import path from "path";
+import {
+  parseMarkdownFile,
+  normalizeUrl,
+  aliasedSitePath,
+} from "@docusaurus/utils";
+import readingTime from "reading-time";
+import titleize from "titleize";
 
 export function truncate(fileString: string, truncateMarker: RegExp) {
   return fileString.split(truncateMarker, 1).shift()!;
@@ -16,16 +20,16 @@ export function truncate(fileString: string, truncateMarker: RegExp) {
 
 export async function generateGuides(
   guideDir: string,
-  {siteConfig, siteDir}: LoadContext,
-  options: PluginOptions,
+  { siteConfig, siteDir }: LoadContext,
+  options: PluginOptions
 ) {
-  const {include, routeBasePath, truncateMarker} = options;
+  const { include, routeBasePath, truncateMarker } = options;
 
   if (!fs.existsSync(guideDir)) {
     return [];
   }
 
-  const {baseUrl = ''} = siteConfig;
+  const { baseUrl = "" } = siteConfig;
   const guideFiles = await globby(include, {
     cwd: guideDir,
   });
@@ -36,15 +40,14 @@ export async function generateGuides(
     guideFiles.map(async (relativeSource: string) => {
       const source = path.join(guideDir, relativeSource);
       const aliasedSource = aliasedSitePath(source, siteDir);
-      const fileString = await fs.readFile(source, 'utf-8');
-      const readingStats = readingTime(fileString);
-      const {frontMatter, content, excerpt} = parse(fileString);
+      const { frontMatter, content, excerpt } = await parseMarkdownFile(source);
+      const readingStats = readingTime(content);
 
-      if (frontMatter.draft && process.env.NODE_ENV === 'production') {
+      if (frontMatter.draft && process.env.NODE_ENV === "production") {
         return;
       }
 
-      let categoryParts = relativeSource.split('/').slice(0, -1);
+      let categoryParts = relativeSource.split("/").slice(0, -1);
       let categories = [];
 
       while (categoryParts.length > 0) {
@@ -53,17 +56,19 @@ export async function generateGuides(
 
         let description = null;
 
-        switch(name) {
-          case 'advanced':
-            description = 'Go beyond the basics, become a Vector pro, and extract the full potential of Vector.';
+        switch (name) {
+          case "advanced":
+            description =
+              "Go beyond the basics, become a Vector pro, and extract the full potential of Vector.";
             break;
 
-          case 'getting-started':
-            description = 'Take Vector from zero to production in under 10 minutes.';
+          case "getting-started":
+            description =
+              "Take Vector from zero to production in under 10 minutes.";
             break;
 
-          case 'integrate':
-            description = 'Simple step-by-step integration guides.'
+          case "integrate":
+            description = "Simple step-by-step integration guides.";
             break;
         }
 
@@ -71,12 +76,16 @@ export async function generateGuides(
           name: name,
           title: title,
           description: description,
-          permalink: normalizeUrl([baseUrl, routeBasePath, categoryParts.join('/')])
+          permalink: normalizeUrl([
+            baseUrl,
+            routeBasePath,
+            categoryParts.join("/"),
+          ]),
         });
         categoryParts.pop();
       }
 
-      let linkName = relativeSource.replace(/\.mdx?$/, '');
+      let linkName = relativeSource.replace(/\.mdx?$/, "");
       let seriesPosition = frontMatter.series_position;
       let tags = frontMatter.tags || [];
       let title = frontMatter.title || linkName;
@@ -102,21 +111,23 @@ export async function generateGuides(
           truncated: truncateMarker?.test(content) || false,
         },
       });
-    }),
+    })
   );
 
   return _.sortBy(guides, [
-    ((guide) => {
+    (guide) => {
       let categories = guide.metadata.categories;
 
-      if (categories[0].name == 'getting-started') {
-        return ['AA'].concat(categories.map(category => category.name).slice(1));
+      if (categories[0].name == "getting-started") {
+        return ["AA"].concat(
+          categories.map((category) => category.name).slice(1)
+        );
       } else {
         return categories;
       }
-    }),
-    'metadata.seriesPosition',
-    ((guide) => guide.metadata.coverLabel.toLowerCase())
+    },
+    "metadata.seriesPosition",
+    (guide) => guide.metadata.coverLabel.toLowerCase(),
   ]);
 }
 
@@ -124,11 +135,11 @@ export function linkify(
   fileContent: string,
   siteDir: string,
   guidePath: string,
-  guides: Guide[],
+  guides: Guide[]
 ) {
   let fencedBlock = false;
-  const lines = fileContent.split('\n').map(line => {
-    if (line.trim().startsWith('```')) {
+  const lines = fileContent.split("\n").map((line) => {
+    if (line.trim().startsWith("```")) {
       fencedBlock = !fencedBlock;
     }
 
@@ -142,11 +153,11 @@ export function linkify(
       const mdLink = mdMatch[1];
       const aliasedPostSource = `@site/${path.relative(
         siteDir,
-        path.resolve(guidePath, mdLink),
+        path.resolve(guidePath, mdLink)
       )}`;
       let guidePermalink = null;
 
-      guides.forEach(guide => {
+      guides.forEach((guide) => {
         if (guide.metadata.source === aliasedPostSource) {
           guidePermalink = guide.metadata.permalink;
         }
@@ -162,5 +173,5 @@ export function linkify(
     return modifiedLine;
   });
 
-  return lines.join('\n');
+  return lines.join("\n");
 }

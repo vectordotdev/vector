@@ -1,12 +1,16 @@
-import {PluginOptions, Highlight} from './types';
-import {LoadContext} from '@docusaurus/types';
+import { PluginOptions, Highlight } from "./types";
+import { LoadContext } from "@docusaurus/types";
 
-import _ from 'lodash';
-import fs from 'fs-extra';
-import globby from 'globby';
-import path from 'path';
-import {parse, normalizeUrl, aliasedSitePath} from '@docusaurus/utils';
-import readingTime from 'reading-time';
+import _ from "lodash";
+import fs from "fs-extra";
+import globby from "globby";
+import path from "path";
+import {
+  parseMarkdownFile,
+  normalizeUrl,
+  aliasedSitePath,
+} from "@docusaurus/utils";
+import readingTime from "reading-time";
 
 // YYYY-MM-DD-{name}.mdx?
 // Prefer named capture, but older Node versions do not support it.
@@ -18,16 +22,16 @@ export function truncate(fileString: string, truncateMarker: RegExp) {
 
 export async function generateHighlights(
   highlightDir: string,
-  {siteConfig, siteDir}: LoadContext,
-  options: PluginOptions,
+  { siteConfig, siteDir }: LoadContext,
+  options: PluginOptions
 ) {
-  const {include, routeBasePath, truncateMarker} = options;
+  const { include, routeBasePath, truncateMarker } = options;
 
   if (!fs.existsSync(highlightDir)) {
     return [];
   }
 
-  const {baseUrl = ''} = siteConfig;
+  const { baseUrl = "" } = siteConfig;
   const highlightFiles = await globby(include, {
     cwd: highlightDir,
   });
@@ -38,20 +42,21 @@ export async function generateHighlights(
     highlightFiles.map(async (relativeSource: string) => {
       const source = path.join(highlightDir, relativeSource);
       const aliasedSource = aliasedSitePath(source, siteDir);
-      const fileString = await fs.readFile(source, 'utf-8');
-      const readingStats = readingTime(fileString);
-      const {frontMatter, content, excerpt} = parse(fileString);
+      const { frontMatter, content, excerpt } = await parseMarkdownFile(source);
+      const readingStats = readingTime(content);
       const fileName = path.basename(relativeSource);
       const fileNameMatch = fileName.match(FILENAME_PATTERN);
 
-      if (frontMatter.draft && process.env.NODE_ENV === 'production') {
+      if (frontMatter.draft && process.env.NODE_ENV === "production") {
         return;
       }
 
-      let date = fileNameMatch ? new Date(fileNameMatch[1]) : new Date(Date.now());
+      let date = fileNameMatch
+        ? new Date(fileNameMatch[1])
+        : new Date(Date.now());
       let description = frontMatter.description || excerpt;
       let id = frontMatter.id || frontMatter.title;
-      let linkName = relativeSource.replace(/\.mdx?$/, '');
+      let linkName = relativeSource.replace(/\.mdx?$/, "");
       let tags = frontMatter.tags || [];
       let title = frontMatter.title || linkName;
 
@@ -72,21 +77,23 @@ export async function generateHighlights(
           truncated: truncateMarker?.test(content) || false,
         },
       });
-    }),
+    })
   );
 
-  return highlights.sort((a, b) => b.metadata.date.getTime() - a.metadata.date.getTime());
+  return highlights.sort(
+    (a, b) => b.metadata.date.getTime() - a.metadata.date.getTime()
+  );
 }
 
 export function linkify(
   fileContent: string,
   siteDir: string,
   highlightPath: string,
-  highlights: Highlight[],
+  highlights: Highlight[]
 ) {
   let fencedBlock = false;
-  const lines = fileContent.split('\n').map(line => {
-    if (line.trim().startsWith('```')) {
+  const lines = fileContent.split("\n").map((line) => {
+    if (line.trim().startsWith("```")) {
       fencedBlock = !fencedBlock;
     }
 
@@ -100,11 +107,11 @@ export function linkify(
       const mdLink = mdMatch[1];
       const aliasedPostSource = `@site/${path.relative(
         siteDir,
-        path.resolve(highlightPath, mdLink),
+        path.resolve(highlightPath, mdLink)
       )}`;
       let highlightPermalink = null;
 
-      highlights.forEach(highlight => {
+      highlights.forEach((highlight) => {
         if (highlight.metadata.source === aliasedPostSource) {
           highlightPermalink = highlight.metadata.permalink;
         }
@@ -120,5 +127,5 @@ export function linkify(
     return modifiedLine;
   });
 
-  return lines.join('\n');
+  return lines.join("\n");
 }

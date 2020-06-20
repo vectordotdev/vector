@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.linkify = exports.generateHighlights = exports.truncate = void 0;
 const fs_extra_1 = __importDefault(require("fs-extra"));
 const globby_1 = __importDefault(require("globby"));
 const path_1 = __importDefault(require("path"));
@@ -20,7 +21,7 @@ async function generateHighlights(highlightDir, { siteConfig, siteDir }, options
     if (!fs_extra_1.default.existsSync(highlightDir)) {
         return [];
     }
-    const { baseUrl = '' } = siteConfig;
+    const { baseUrl = "" } = siteConfig;
     const highlightFiles = await globby_1.default(include, {
         cwd: highlightDir,
     });
@@ -28,18 +29,19 @@ async function generateHighlights(highlightDir, { siteConfig, siteDir }, options
     await Promise.all(highlightFiles.map(async (relativeSource) => {
         const source = path_1.default.join(highlightDir, relativeSource);
         const aliasedSource = utils_1.aliasedSitePath(source, siteDir);
-        const fileString = await fs_extra_1.default.readFile(source, 'utf-8');
-        const readingStats = reading_time_1.default(fileString);
-        const { frontMatter, content, excerpt } = utils_1.parse(fileString);
+        const { frontMatter, content, excerpt } = await utils_1.parseMarkdownFile(source);
+        const readingStats = reading_time_1.default(content);
         const fileName = path_1.default.basename(relativeSource);
         const fileNameMatch = fileName.match(FILENAME_PATTERN);
-        if (frontMatter.draft && process.env.NODE_ENV === 'production') {
+        if (frontMatter.draft && process.env.NODE_ENV === "production") {
             return;
         }
-        let date = fileNameMatch ? new Date(fileNameMatch[1]) : new Date(Date.now());
+        let date = fileNameMatch
+            ? new Date(fileNameMatch[1])
+            : new Date(Date.now());
         let description = frontMatter.description || excerpt;
         let id = frontMatter.id || frontMatter.title;
-        let linkName = relativeSource.replace(/\.mdx?$/, '');
+        let linkName = relativeSource.replace(/\.mdx?$/, "");
         let tags = frontMatter.tags || [];
         let title = frontMatter.title || linkName;
         highlights.push({
@@ -65,8 +67,8 @@ async function generateHighlights(highlightDir, { siteConfig, siteDir }, options
 exports.generateHighlights = generateHighlights;
 function linkify(fileContent, siteDir, highlightPath, highlights) {
     let fencedBlock = false;
-    const lines = fileContent.split('\n').map(line => {
-        if (line.trim().startsWith('```')) {
+    const lines = fileContent.split("\n").map((line) => {
+        if (line.trim().startsWith("```")) {
             fencedBlock = !fencedBlock;
         }
         if (fencedBlock)
@@ -78,7 +80,7 @@ function linkify(fileContent, siteDir, highlightPath, highlights) {
             const mdLink = mdMatch[1];
             const aliasedPostSource = `@site/${path_1.default.relative(siteDir, path_1.default.resolve(highlightPath, mdLink))}`;
             let highlightPermalink = null;
-            highlights.forEach(highlight => {
+            highlights.forEach((highlight) => {
                 if (highlight.metadata.source === aliasedPostSource) {
                     highlightPermalink = highlight.metadata.permalink;
                 }
@@ -90,6 +92,6 @@ function linkify(fileContent, siteDir, highlightPath, highlights) {
         }
         return modifiedLine;
     });
-    return lines.join('\n');
+    return lines.join("\n");
 }
 exports.linkify = linkify;

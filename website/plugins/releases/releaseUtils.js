@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.linkify = exports.generateReleases = exports.truncate = void 0;
 const fs_extra_1 = __importDefault(require("fs-extra"));
 const globby_1 = __importDefault(require("globby"));
 const path_1 = __importDefault(require("path"));
@@ -17,7 +18,7 @@ async function generateReleases(releaseDir, { siteConfig, siteDir }, options) {
     if (!fs_extra_1.default.existsSync(releaseDir)) {
         return [];
     }
-    const { baseUrl = '' } = siteConfig;
+    const { baseUrl = "" } = siteConfig;
     const releaseFiles = await globby_1.default(include, {
         cwd: releaseDir,
     });
@@ -25,14 +26,13 @@ async function generateReleases(releaseDir, { siteConfig, siteDir }, options) {
     await Promise.all(releaseFiles.map(async (relativeSource) => {
         const source = path_1.default.join(releaseDir, relativeSource);
         const aliasedSource = utils_1.aliasedSitePath(source, siteDir);
-        const fileString = await fs_extra_1.default.readFile(source, 'utf-8');
-        const { frontMatter, content, excerpt } = utils_1.parse(fileString);
-        if (frontMatter.draft && process.env.NODE_ENV === 'production') {
+        const { frontMatter, content, excerpt } = await utils_1.parseMarkdownFile(source);
+        if (frontMatter.draft && process.env.NODE_ENV === "production") {
             return;
         }
         let date = new Date(frontMatter.date ? Date.parse(frontMatter.date) : Date.now());
         let description = frontMatter.description || excerpt;
-        let version = relativeSource.replace(/\.mdx?$/, '');
+        let version = relativeSource.replace(/\.mdx?$/, "");
         let title = frontMatter.title || version;
         releases.push({
             id: frontMatter.id || frontMatter.title,
@@ -56,8 +56,8 @@ async function generateReleases(releaseDir, { siteConfig, siteDir }, options) {
 exports.generateReleases = generateReleases;
 function linkify(fileContent, siteDir, releasePath, releases) {
     let fencedBlock = false;
-    const lines = fileContent.split('\n').map(line => {
-        if (line.trim().startsWith('```')) {
+    const lines = fileContent.split("\n").map((line) => {
+        if (line.trim().startsWith("```")) {
             fencedBlock = !fencedBlock;
         }
         if (fencedBlock)
@@ -69,7 +69,7 @@ function linkify(fileContent, siteDir, releasePath, releases) {
             const mdLink = mdMatch[1];
             const aliasedPostSource = `@site/${path_1.default.relative(siteDir, path_1.default.resolve(releasePath, mdLink))}`;
             let releasePermalink = null;
-            releases.forEach(release => {
+            releases.forEach((release) => {
                 if (release.metadata.source === aliasedPostSource) {
                     releasePermalink = release.metadata.permalink;
                 }
@@ -81,6 +81,6 @@ function linkify(fileContent, siteDir, releasePath, releases) {
         }
         return modifiedLine;
     });
-    return lines.join('\n');
+    return lines.join("\n");
 }
 exports.linkify = linkify;
