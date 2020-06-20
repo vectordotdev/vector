@@ -429,6 +429,28 @@ package-rpm-aarch64: package-archive-aarch64-unknown-linux-musl ## Build the aar
 
 ##@ Releasing
 
+.PHONY: neu-release-binary
+neu-release-binary: DRY_RUN ?= false
+neu-release-binary:
+	nix build \
+		$(if $(findstring true,$(VERBOSE)),--verbose --show-trace --print-build-logs,) \
+		$(if $(findstring true,$(DRY_RUN)),--dry-run,) \
+		--file default.nix \
+		--out-link target/releases/binary/$(RUST_TARGET) \
+		binaries.$(RUST_TARGET)
+
+.PHONY: neu-release-binary-native
+neu-release-binary-native: override CROSS_SYSTEM ?= "builtins.currentSystem"
+neu-release-binary-native: neu-release-binary
+
+.PHONY: neu-release-binary-x86_64-unknown-linux-gn
+neu-release-binary-x86_64-unknown-linux-gnu: RUST_TARGET = x86_64-unknown-linux-gnu
+neu-release-binary-x86_64-unknown-linux-gnu: neu-release-binary
+
+.PHONY: neu-release-binary-x86_64-unknown-linux-musl
+neu-release-binary-x86_64-unknown-linux-musl: RUST_TARGET = x86_64-unknown-linux-musl
+neu-release-binary-x86_64-unknown-linux-musl: neu-release-binary
+
 release: release-prepare generate release-commit ## Release a new Vector version
 
 release-commit: ## Commits release changes

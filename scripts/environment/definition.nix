@@ -1,18 +1,69 @@
-scope@{ pkgs ? import <nixpkgs> {} }:
+args@{
+  rustTarget ? "stable",
+  linking ? "dynamic",
+  crossSystem ? builtins.currentSystem,
+  pkgs ? null,
+  ...
+}:
 
 rec {
+  pkgs = import <nixpkgs> { 
+      overlays = [
+        (import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz))
+      ];
+    } //
+      (if args ? crossSystem then {
+        crossSystem = {
+          config = crossSystem;
+        };
+      } else {}) //
+      (if args ? linking && args.linking == "static" then {
+        static = builtins.trace "Enabling static build..." true;
+      } else {});
+
   # Our Cargo.toml as nix!
   cargoToml = (builtins.fromTOML (builtins.readFile ../../Cargo.toml));
+  
+  features = rec {
+    derived = {
+      components = rec {
+        sources = cargoToml.features.sources;
+        sinks = cargoToml.features.sinks;
+        transforms = cargoToml.features.transforms;
+        all = sources ++ sinks ++ transforms;
+      };
+    };
+    byLinking = {
+      static = [];
+      dynamic = ["rdkafka" "rdkafka/dynamic_linking"];
+    };
+    byOs = {
+      linux = ["unix"];
+      mac = ["unix"];
+      windows = [];
+    };
+    presets = {
+      x86_64-unknown-linux-gnu = 
+        features.derived.components.all ++
+        features.byOs.linux ++
+        (builtins.getAttr args.linking features.byLinking);
+      x86_64-unknown-linux-musl =
+        features.derived.components.all ++
+        features.byOs.linux ++
+        (builtins.getAttr args.linking features.byLinking);
+    };
+  };
+
 
   environmentVariables =  {
     # We must set some protoc related env vars for the prost crate.
     PROTOC = "${pkgs.protobuf}/bin/protoc";
     PROTOC_INCLUDE = "${pkgs.protobuf}/include";
     # On Linux builds, we need some level of localization.
-    LOCALE_ARCHIVE= if pkgs.stdenv.isLinux then
-    "${pkgs.glibcLocales}/lib/locale/locale-archive"
+    LOCALE_ARCHIVE = if pkgs.stdenv.isLinux && pkgs.glibcLocales != null then
+      "${pkgs.glibcLocales}/lib/locale/locale-archive"
     else
-    "";
+      "";
     LC_ALL = "en_US.UTF-8";
     # Without setting a tzdata folder, some tests will fail.
     TZDIR = "${pkgs.tzdata}/share/zoneinfo";
@@ -34,9 +85,9 @@ rec {
     # Lucet (for wasm) depends on libclang
     LIBCLANG_PATH="${pkgs.llvmPackages.libclang}/lib";
     CPATH= if pkgs.stdenv.isLinux then
-    "${pkgs.linuxHeaders}/include"
+      "${pkgs.linuxHeaders}/include"
     else
-    "";
+      "";
   };
 
   developmentTools = with pkgs; [
@@ -53,6 +104,7 @@ rec {
     jq
     stdenv
     bashInteractive
+    rustup
     # Build Env
     git
     cacert
@@ -87,10 +139,20 @@ rec {
     openssl
     perl
     cmake
+    rdkafka
     snappy
     gnumake
     autoconf
     git
+    (if args ? rustTarget then 
+      pkgs.latest.rustChannels.stable.rust.override {
+        targets = [
+          args.rustTarget
+        ];
+      }
+    else
+      pkgs.latest.rustChannels.stable.rust
+    )
   ] ++ (if stdenv.isDarwin then [
     darwin.cf-private
     darwin.apple_sdk.frameworks.CoreServices
@@ -99,14 +161,16 @@ rec {
   ] else [
     # Build
     gcc
-    (glibcLocales.override { locales = ["en_US.UTF-8"]; })
     # Testing
     systemd
     # Container tools
     podman
     podman-compose
     linuxHeaders
-  ]);
+  ]); 
+  # ++ (if pkgs.glibcLocales != null then [
+  #   glibcLocales.override { locales = ["en_US.UTF-8"]; }
+  # ] else []);
 
   # From: https://nixos.org/nixpkgs/manual/
   #
@@ -122,6 +186,9 @@ rec {
   # dynamic case, the library may also be needed at build-time to appease the linker.
   buildInputs = with pkgs; [
     rdkafka
+    protobuf
+    snappy
+    leveldb
   ];
 
 }
