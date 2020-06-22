@@ -32,9 +32,9 @@ where
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         let key = item.key;
         match self.inner.push(item.inner) {
-            PushResult::Ok => {
+            PushResult::Ok(full) => {
                 self.key = Some(key);
-                PushResult::Ok
+                PushResult::Ok(full)
             }
             PushResult::Overflow(inner) => PushResult::Overflow(Self::Input { inner, key }),
         }

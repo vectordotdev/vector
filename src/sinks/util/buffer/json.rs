@@ -36,7 +36,9 @@ impl Batch for JsonArrayBuffer {
         } else {
             self.total_bytes = new_len;
             self.buffer.push(raw_item);
-            PushResult::Ok
+            PushResult::Ok(
+                self.buffer.len() >= self.settings.events || new_len >= self.settings.bytes,
+            )
         }
     }
 
@@ -75,14 +77,14 @@ mod tests {
             buffer.push(json!({
                 "key1": "value1"
             })),
-            PushResult::Ok
+            PushResult::Ok(false)
         );
 
         assert_eq!(
             buffer.push(json!({
                 "key2": "value2"
             })),
-            PushResult::Ok
+            PushResult::Ok(true)
         );
 
         assert!(matches!(buffer.push(json!({})), PushResult::Overflow(_)));

@@ -26,7 +26,7 @@ impl<T> Batch for VecBuffer<T> {
             PushResult::Overflow(item)
         } else {
             self.batch.push(item);
-            PushResult::Ok
+            PushResult::Ok(self.batch.len() >= self.max_events)
         }
     }
 

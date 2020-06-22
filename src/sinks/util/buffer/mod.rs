@@ -123,7 +123,7 @@ impl Batch for Buffer {
         } else {
             self.push(&item);
             self.num_bytes = new_bytes;
-            PushResult::Ok
+            PushResult::Ok(self.num_items >= self.max_events || new_bytes >= self.max_bytes)
         }
     }
 

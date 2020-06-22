@@ -191,7 +191,7 @@ impl Batch for MetricBuffer {
                     }
                 }
             }
-            PushResult::Ok
+            PushResult::Ok(self.num_items() >= self.max_events)
         }
     }
 

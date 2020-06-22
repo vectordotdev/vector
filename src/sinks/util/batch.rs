@@ -111,13 +111,19 @@ impl BatchSettings {
 
 pub(super) fn err_event_too_large<T>(length: usize) -> PushResult<T> {
     error!(message = "Event larger than batch size, dropping", %length, rate_limit_secs = 1);
-    PushResult::Ok
+    PushResult::Ok(false)
 }
 
+/// This enum provides the result of a push operation, indicating if the
+/// event was added and the fullness state of the buffer.
 #[must_use]
 #[derive(Debug, Eq, PartialEq)]
 pub enum PushResult<T> {
-    Ok,
+    /// Event was added, with an indicator if the buffer is now full
+    Ok(bool),
+    /// Event could not be added because it would overflow the
+    /// buffer. Since push takes ownership of the event, it must be
+    /// returned here.
     Overflow(T),
 }
 
@@ -178,7 +184,8 @@ where
             PushResult::Overflow(item)
         } else {
             let result = self.inner.push(item);
-            self.was_full = matches!(result, PushResult::Overflow(_));
+            self.was_full =
+                matches!(result, PushResult::Overflow(_)) || matches!(result, PushResult::Ok(true));
             result
         }
     }

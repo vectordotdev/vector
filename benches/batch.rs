@@ -183,9 +183,9 @@ impl Batch for PartitionedBuffer {
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         let key = item.key;
         match Batch::push(&mut self.inner, item.inner) {
-            PushResult::Ok => {
+            PushResult::Ok(full) => {
                 self.key = Some(key);
-                PushResult::Ok
+                PushResult::Ok(full)
             }
             PushResult::Overflow(inner) => PushResult::Overflow(InnerBuffer { inner, key }),
         }
