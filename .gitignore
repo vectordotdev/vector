@@ -5,10 +5,10 @@
 .idea/
 .vscode/
 checkpoints/*
-logs*/
+./logs*/
 miniodat
 sample.log
-target
-node_modules
+./target
+./website/node_modules
 tests/data/wasm/*/target
 result/

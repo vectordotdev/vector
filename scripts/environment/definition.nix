@@ -12,6 +12,7 @@ args@{
 
 rec {
   environmentVariables =  {
+    PKG_CONFIG_ALLOW_CROSS=true;
     # We must set some protoc related env vars for the prost crate.
     PROTOC = "${pkgs.protobuf}/bin/protoc";
     PROTOC_INCLUDE = "${pkgs.protobuf}/include";
@@ -97,35 +98,18 @@ rec {
   # persist as run-time dependencies. This isn't currently enforced, but could be in the future.
   nativeBuildInputs = with (if args ? cross && args.cross != null then cross else pkgs); [
     pkg-config
-    protobuf
-    openssl
     rdkafka
+    openssl.dev
     jemalloc
-    gcc
-    # Note the `pkgs.` here always brings us to the **host** Rust, since it's a cross compiler.
-    (pkgs.latest.rustChannels.stable.rust.override {
-      targets = (if args ? rustTarget && args.rustTarget != null then 
-        builtins.trace args.rustTarget
-        [ args.rustTarget ]
-      else
-        [ ]);
-      extensions = [
-        "rust-std"
-      ];
-      targetExtensions = [
-        "rust-std"
-      ];
-    })
   ] ++ (if stdenv.isDarwin then [
     darwin.cf-private
     darwin.apple_sdk.frameworks.CoreServices
     darwin.apple_sdk.frameworks.Security
     darwin.apple_sdk.frameworks.SecurityFoundation
   ] else [
-    # Testing
-    systemd
-    # Container tools
     linuxHeaders
+    musl
+    libgcc
   ]); 
   # ++ (if pkgs.glibcLocales != null then [
   #   glibcLocales.override { locales = ["en_US.UTF-8"]; }
@@ -144,14 +128,11 @@ rec {
   # run-time, but the derivation containing the library is only needed at build-time. Even in the
   # dynamic case, the library may also be needed at build-time to appease the linker.
   buildInputs = with pkgs; [
-    pkg-config
-    rdkafka
     protobuf
-    snappy
-    leveldb
-    snappy
+    rustup
+    rdkafka
   ] ++ (if stdenv.isDarwin then [
   ] else [
-    linuxHeaders
+    systemd
   ]);
 }

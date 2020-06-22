@@ -12,7 +12,10 @@ rec {
   cargoToml = (builtins.fromTOML (builtins.readFile ./Cargo.toml));
 
   overlays = rec {
-    mozilla = (import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz));
+    mozilla = import (builtins.fetchGit {
+        url = "https://github.com/mozilla/nixpkgs-mozilla/";
+        rev = "e912ed483e980dfb4666ae0ed17845c4220e5e7c";
+      });
   };
 
   pkgs = import <nixpkgs> {
@@ -64,15 +67,13 @@ rec {
         features.byLinking.dynamic;
     };
     x86_64-unknown-linux-musl = {
-      linking = "dynamic";
+      linking = "static";
       buildType = "debug";
       rustTarget = "x86_64-unknown-linux-musl";
       pkgs = pkgs;
       cross = if pkgs.targetPlatform.config == pkgs.pkgsCross.musl64.targetPlatform.config then
-          pkgs
-        else if pkgs.targetPlatform.config == pkgs.pkgsCross.gnu64.targetPlatform.config then
-          pkgs
-        else 
+          null
+        else
           pkgs.pkgsCross.musl64;
       logLevel = "debug";
       runCheckPhase = false;
@@ -89,7 +90,7 @@ rec {
       features ? null,
       linking ? "dynamic",
       rustChannel ? null, # Defaulted below
-      rustTarget ? null,
+      rustTarget,
       pkgs ? pkgs,
       cross ? null,
       buildType ? "debug",
@@ -111,16 +112,44 @@ rec {
           # Configurables
           buildType = args.buildType;
           logLevel = args.logLevel;
+          cargoSha256 = "0azdb6pbq87v78c079qq2m83x91r8xlynhry308hkbbqijap98fp";
           
           target = args.rustTarget;
           # Rest
-          root = ./.;
-          cargoBuildOptions = currentOptions: currentOptions ++ [ "--no-default-features" "--features" "${pkgs.lib.concatStringsSep "," features}" ];
-          cargoTestOptions = currentOptions: currentOptions ++ [ "--no-default-features" "--features" "${pkgs.lib.concatStringsSep "," features}" ];
-          cargoTestCommands = currentOptions: if runCheckPhase then
-            currentOptions
-          else
-            [];
+          src = tools.gitignore.gitignoreSource ./.;
+
+          cargoBuildFlags = [ "--no-default-features" "--features" "${pkgs.lib.concatStringsSep "," features}" ];
+          checkPhase = if runCheckPhase then
+              ''
+              # Configurables
+              export TZDIR=${pkgs.tzdata}/share/zoneinfo
+              cargo test --no-default-features --features ${pkgs.lib.concatStringsSep "," features} -- --test-threads 1
+              ''
+            else
+              "";
+
+
+          rustc = (pkgs.latest.rustChannels.stable.rust.override {
+            targets = (if args ? rustTarget && args.rustTarget != null then 
+              builtins.trace args.rustTarget
+              [ args.rustTarget ]
+            else
+              [ ]);
+              extensions = [
+                "rust-std"
+              ];
+              targetExtensions = [
+                "rust-std"
+              ];
+          });
+          cargo = pkgs.latest.rustChannels.stable.cargo;
+          
+          # cargoBuildOptions = currentOptions: currentOptions ++ [ "--no-default-features" "--features" "${pkgs.lib.concatStringsSep "," features}" ];
+          # cargoTestOptions = currentOptions: currentOptions ++ [ "--no-default-features" "--features" "${pkgs.lib.concatStringsSep "," features}" ];
+          # cargoTestCommands = currentOptions: if runCheckPhase then
+          #   currentOptions
+          # else
+          #   [];
           meta = with pkgs.stdenv.lib; {
             description = "A high-performance logs, metrics, and events router";
             homepage    = "https://github.com/timberio/vector";
@@ -130,11 +159,20 @@ rec {
           };
         } // definition.environmentVariables;
       in
-        (tools.naersk.buildPackage packageDefinition);
-        #pkgs.rustPlatform.buildRustPackage packageDefinition;
+        # (tools.naersk.buildPackage packageDefinition);
+        pkgs.rustPlatform.buildRustPackage packageDefinition;
   };
 
   tools = {
-    naersk = pkgs.callPackage (builtins.fetchTarball https://github.com/nmattia/naersk/archive/master.tar.gz) {};
+  #   naersk = pkgs.callPackage (builtins.fetchTarball https://github.com/nmattia/naersk/archive/master.tar.gz) {};
+      # naersk = import (builtins.fetchGit {
+      #   url = "https://github.com/nmattia/naersk/";
+      #   rev = "647d0821b590ee96056f4593640534542d8700e5";
+      # }) { inherit (pkgs) lib; }
+      # This tool lets us ignore things in our `.gitignore` during a nix build. Very Handy.
+      gitignore = import (builtins.fetchGit {
+        url = "https://github.com/hercules-ci/gitignore/";
+        rev = "647d0821b590ee96056f4593640534542d8700e5";
+      }) { inherit (pkgs) lib; };
   };
 }
