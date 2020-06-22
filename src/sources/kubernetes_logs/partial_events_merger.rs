@@ -1,8 +1,9 @@
 #![deny(missing_docs)]
 
+use super::transform_utils::optional::Optional;
 use super::FILE_KEY;
+use crate::event;
 use crate::transforms::merge::{Merge, MergeConfig};
-use crate::{event, transforms::util::optional::Optional};
 use string_cache::Atom;
 
 /// Partial event merger.

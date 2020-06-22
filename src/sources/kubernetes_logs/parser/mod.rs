@@ -1,7 +1,5 @@
-use crate::transforms::{
-    util::pick::{IterPicker, Passthrough, PickOnce},
-    Transform,
-};
+use super::transform_utils::pick::{IterPicker, Passthrough, PickOnce};
+use crate::transforms::Transform;
 
 mod cri;
 mod docker;

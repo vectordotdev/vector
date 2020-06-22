@@ -10,6 +10,7 @@ mod parser;
 mod partial_events_merger;
 mod path_helpers;
 mod pod_metadata_annotator;
+mod transform_utils;
 
 use crate::event::{self, Event};
 use crate::internal_events::{KubernetesLogsEventAnnotationFailed, KubernetesLogsEventReceived};
