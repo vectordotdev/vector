@@ -1,7 +1,8 @@
-scope@{ pkgs ? import <nixpkgs> {} }:
+args@{ pkgs ? import <nixpkgs> {} }:
 
 let
-  definition = (import ./scripts/environment/definition.nix scope);
+  general = (import ./default.nix);
+  definition = (import ./scripts/environment/definition.nix { inherit (general) pkgs tools; });
 in
 
 pkgs.mkShell ({

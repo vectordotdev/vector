@@ -5,6 +5,15 @@ rec {
       x86_64-unknown-linux-gnu = tasks.binary targets.x86_64-unknown-linux-gnu;
       x86_64-unknown-linux-musl = tasks.binary targets.x86_64-unknown-linux-musl;
     };
+    containers = rec {
+      nix = pkgs.dockerTools.buildLayeredImage {
+        name = "timberio/vector";
+        tag = "nixish";
+        contents = releases.binaries.x86_64-unknown-linux-gnu.out;
+
+        config.Cmd = [ "${releases.binaries.x86_64-unknown-linux-gnu.out}/bin/vector" ];
+      };
+    };
   };
 
   ### Development code.
@@ -52,7 +61,6 @@ rec {
   targets = rec {
     # See `rustup target list`
     x86_64-unknown-linux-gnu = {
-      linking = "dynamic";
       buildType = "debug";
       rustTarget = "x86_64-unknown-linux-gnu";
       pkgs = pkgs;
@@ -67,7 +75,6 @@ rec {
         features.byLinking.dynamic;
     };
     x86_64-unknown-linux-musl = {
-      linking = "static";
       buildType = "debug";
       rustTarget = "x86_64-unknown-linux-musl";
       pkgs = pkgs;
@@ -99,7 +106,7 @@ rec {
     }:
       let
 
-        definition = import ./scripts/environment/definition.nix args;
+        definition = import ./scripts/environment/definition.nix { inherit tools pkgs rustTarget cross; };
         features = (builtins.getAttr args.rustTarget targets).features;
         
         packageDefinition = rec {
@@ -174,5 +181,9 @@ rec {
         url = "https://github.com/hercules-ci/gitignore/";
         rev = "647d0821b590ee96056f4593640534542d8700e5";
       }) { inherit (pkgs) lib; };
+      # cargo2nix = import (builtins.fetchGit {
+      #   url = "https://github.com/tenx-tech/cargo2nix/";
+      #   rev = "f6d835482fbced7a9c2aa4fa270a179ed4f9c0f3";
+      # }) {};
   };
 }

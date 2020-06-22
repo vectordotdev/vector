@@ -450,6 +450,19 @@ neu-release-binary-x86_64-unknown-linux-gnu: target/releases/binaries/x86_64-unk
 .PHONY: neu-release-binary-x86_64-unknown-linux-musl
 neu-release-binary-x86_64-unknown-linux-musl: target/releases/binaries/x86_64-unknown-linux-musl
 
+target/releases/containers/%: BUILD_TYPE ?= "debug"
+target/releases/containers/%:
+	nix build \
+		$(if $(findstring true,$(VERBOSE)),--verbose --show-trace --print-build-logs,) \
+		$(if $(findstring true,$(DRY_RUN)),--dry-run,) \
+		--argstr buildType $(BUILD_TYPE) \
+		--file default.nix \
+		--out-link $@ \
+		releases.containers.$(notdir $@)
+
+.PHONY: neu-release-binary-x86_64-unknown-linux-musl
+neu-release-container-nix: target/releases/containers/nix
+
 release: release-prepare generate release-commit ## Release a new Vector version
 
 release-commit: ## Commits release changes

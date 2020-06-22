@@ -1,13 +1,8 @@
 args@{
   rustTarget ? null,
-  linking ? "dynamic",
   cross ? null,
-  pkgs ? (import <nixpkgs> {
-    overlays = [
-      (import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz))
-    ];
-  }),
-  ...
+  pkgs,
+  tools
 }:
 
 rec {
@@ -48,6 +43,7 @@ rec {
   };
 
   developmentTools = with pkgs; [
+    # tools.cargo2nix.package
     # Core CLI tools
     dnsutils
     curl
