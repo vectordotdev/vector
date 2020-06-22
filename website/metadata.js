@@ -32677,7 +32677,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Accepts log events and allows you to reduce events of a matching transaction into a single event.",
+      "short_description": "Accepts log events and allows you to combines events of a matching transaction into a single event.",
       "status": "beta",
       "title": "Transaction",
       "type": "transform",

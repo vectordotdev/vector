@@ -1,6 +1,6 @@
 [transforms.transaction]
 title = "Transaction"
-allow_you_to_description = "reduce events of a matching transaction into a single event"
+allow_you_to_description = "combines events of a matching transaction into a single event"
 beta = true
 common = false
 function_category = "aggregate"
