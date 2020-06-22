@@ -246,7 +246,7 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-kafka
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	cargo test --no-default-features --features kafka-integration-tests ::kafka:: -- --nocapture
+	cargo test --no-default-features --features "kafka-integration-tests rdkafka-plain" ::kafka:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif

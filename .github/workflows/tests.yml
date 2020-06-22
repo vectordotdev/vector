@@ -232,7 +232,7 @@ jobs:
       - run: nix-shell --run "make test-integration-influxdb"
 
   test-integration-kafka:
-    name: Integration - Linux, Kafka)
+    name: Integration - Linux, Kafka
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

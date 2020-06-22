@@ -58,8 +58,6 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     pkg-config
     openssl
     protobuf
-    rdkafka
-    openssl
     ruby_2_7
     nodejs
     perl
