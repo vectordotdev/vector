@@ -429,6 +429,24 @@ where
             self.service.poll_complete()
         }
     }
+
+    fn push_if_empty(
+        batch: &mut StatefulBatch<B>,
+        item: B::Input,
+    ) -> StartSend<B::Input, crate::Error> {
+        if batch.is_empty() {
+            match batch.push(item) {
+                PushResult::Ok => Ok(AsyncSink::Ready),
+                PushResult::Overflow(_) => unreachable!("Empty buffer overflowed"),
+            }
+        } else {
+            debug!(
+                message = "Send buffer full; applying back pressure.",
+                rate_limit_secs = 10
+            );
+            Ok(AsyncSink::NotReady(item))
+        }
+    }
 }
 
 impl<B, S, K, Request, E> Sink for PartitionBatchSink<B, S, K, Request, E>
@@ -468,35 +486,33 @@ where
 
         let partition = item.partition();
 
-        if let Some(batch) = self.partitions.get_mut(&partition) {
+        let item = if let Some(batch) = self.partitions.get_mut(&partition) {
             if batch.was_full() {
                 trace!("Batch full; driving service to completion.");
                 self.poll_complete()?;
 
                 if let Some(batch) = self.partitions.get_mut(&partition) {
-                    if !batch.is_empty() {
-                        debug!(
-                            message = "Buffer full; applying back pressure.",
-                            max_bytes = %self.settings.bytes,
-                            max_events = %self.settings.events,
-                            rate_limit_secs = 10
-                        );
-                        return Ok(AsyncSink::NotReady(item));
-                    } else {
-                        return match batch.push(item) {
-                            PushResult::Ok => Ok(AsyncSink::Ready),
-                            PushResult::Overflow(_) => unreachable!("Empty buffer overflowed"),
-                        };
-                    }
+                    return Self::push_if_empty(batch, item);
                 }
+                item
             } else {
                 trace!("adding event to batch.");
-                return match batch.push(item) {
-                    PushResult::Ok => Ok(AsyncSink::Ready),
-                    PushResult::Overflow(item) => Ok(AsyncSink::NotReady(item)),
-                };
+                match batch.push(item) {
+                    PushResult::Ok => return Ok(AsyncSink::Ready),
+                    PushResult::Overflow(item) => {
+                        trace!("Batch full; driving service to completion.");
+                        self.poll_complete()?;
+
+                        if let Some(batch) = self.partitions.get_mut(&partition) {
+                            return Self::push_if_empty(batch, item);
+                        }
+                        item
+                    }
+                }
             }
-        }
+        } else {
+            item
+        };
 
         trace!("replacing batch.");
         // We fall through to this case, when there is no batch already
