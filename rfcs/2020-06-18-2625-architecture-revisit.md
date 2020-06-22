@@ -130,8 +130,8 @@ from HTTP servers to file tailing to stdin.
 The only thing we seek to change with this proposal is the implementation of the
 output channel. Instead of a literal concrete channel sender, sources will
 receive an implementation of a new `Push` trait (similar to the one in the
-`[timely_communication`
-crate](https://docs.rs/timely_communication/0.11.1/timely_communication/trait.Push.html)).
+[`timely_communication`
+crate](https://docs.rs/timely_communication/0.11.1/timely_communication/trait.Push.html).
 The API will be roughly the same as before, but give us more flexibility in
 implementation behind the scenes.
 
