@@ -485,8 +485,7 @@ where
                     } else {
                         return match batch.push(item) {
                             PushResult::Ok => Ok(AsyncSink::Ready),
-                            // FIXME is this the right behavior here and below?
-                            PushResult::Overflow(item) => Ok(AsyncSink::NotReady(item)),
+                            PushResult::Overflow(_) => unreachable!("Empty buffer overflowed"),
                         };
                     }
                 }
@@ -505,7 +504,7 @@ where
         let mut batch = self.batch.fresh();
 
         match batch.push(item) {
-            PushResult::Overflow(item) => Ok(AsyncSink::NotReady(item)),
+            PushResult::Overflow(_) => unreachable!("Empty buffer overflowed"),
             PushResult::Ok => {
                 self.set_linger(partition.clone());
 
