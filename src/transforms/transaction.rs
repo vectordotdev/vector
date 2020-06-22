@@ -22,9 +22,8 @@ use string_cache::DefaultAtom as Atom;
 
 //------------------------------------------------------------------------------
 
-#[derive(Deserialize, Serialize, Debug, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
-#[derivative(Default)]
 pub struct TransactionConfig {
     pub expire_after_ms: Option<u64>,
 
