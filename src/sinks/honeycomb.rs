@@ -9,7 +9,10 @@ use crate::{
     tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::TryFutureExt;
+use futures::{
+    future::{ready, BoxFuture},
+    TryFutureExt,
+};
 use futures01::Sink;
 use http02::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
@@ -88,13 +91,16 @@ impl HttpSink for HoneycombConfig {
         }))
     }
 
-    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
+    fn build_request(
+        &self,
+        events: Self::Output,
+    ) -> BoxFuture<'static, crate::Result<http02::Request<Vec<u8>>>> {
         let uri = self.build_uri();
         let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
 
         let buf = serde_json::to_vec(&events).unwrap();
 
-        request.body(buf).unwrap()
+        Box::pin(ready(request.body(buf).map_err(Into::into)))
     }
 }
 
@@ -110,7 +116,10 @@ impl HoneycombConfig {
 async fn healthcheck(config: HoneycombConfig, resolver: Resolver) -> crate::Result<()> {
     let mut client = HttpClient::new(resolver, TlsSettings::from_options(&None)?)?;
 
-    let req = config.build_request(Vec::new()).map(hyper::Body::from);
+    let req = config
+        .build_request(Vec::new())
+        .await?
+        .map(hyper::Body::from);
 
     let res = client.send(req).await?;
 

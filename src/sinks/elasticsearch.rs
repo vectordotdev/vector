@@ -16,7 +16,10 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes05::Bytes;
-use futures::{FutureExt, TryFutureExt};
+use futures::{
+    future::{ready, BoxFuture},
+    FutureExt, TryFutureExt,
+};
 use futures01::Sink;
 use http02::{
     header::{HeaderName, HeaderValue},
@@ -206,7 +209,10 @@ impl HttpSink for ElasticSearchCommon {
         Some(body)
     }
 
-    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
+    fn build_request(
+        &self,
+        events: Self::Output,
+    ) -> BoxFuture<'static, crate::Result<http02::Request<Vec<u8>>>> {
         let mut builder = Request::post(&self.bulk_uri);
 
         if let Some(credentials) = &self.credentials {
@@ -229,7 +235,9 @@ impl HttpSink for ElasticSearchCommon {
             // to play games here
             let body = request.payload.take().unwrap();
             match body {
-                SignedRequestPayload::Buffer(body) => builder.body(body.to_vec()).unwrap(),
+                SignedRequestPayload::Buffer(body) => {
+                    Box::pin(ready(builder.body(body.to_vec()).map_err(Into::into)))
+                }
                 _ => unreachable!(),
             }
         } else {
@@ -249,7 +257,7 @@ impl HttpSink for ElasticSearchCommon {
                 builder = builder.header("Authorization", &auth[..]);
             }
 
-            builder.body(events).unwrap()
+            Box::pin(ready(builder.body(events).map_err(Into::into)))
         }
     }
 }

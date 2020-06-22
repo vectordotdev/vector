@@ -10,7 +10,10 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::{
+    future::{ok as ready_ok, BoxFuture},
+    FutureExt, TryFutureExt,
+};
 use futures01::{future, Sink};
 use http02::{
     header::{self, HeaderName, HeaderValue},
@@ -189,7 +192,10 @@ impl HttpSink for HttpSinkConfig {
         Some(body)
     }
 
-    fn build_request(&self, mut body: Self::Output) -> http02::Request<Vec<u8>> {
+    fn build_request(
+        &self,
+        mut body: Self::Output,
+    ) -> BoxFuture<'static, crate::Result<http02::Request<Vec<u8>>>> {
         let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
             HttpMethod::Post => Method::POST,
             HttpMethod::Put => Method::PUT,
@@ -228,7 +234,7 @@ impl HttpSink for HttpSinkConfig {
             auth.apply(&mut request);
         }
 
-        request
+        Box::pin(ready_ok(request))
     }
 }
 

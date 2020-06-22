@@ -28,8 +28,6 @@ use tower03::Service;
 use tracing::Span;
 use tracing_futures::Instrument;
 
-pub type Response = http02::Response<Bytes>;
-pub type Error = hyper::Error;
 pub type HttpClientFuture = <HttpClient as Service<http02::Request<Body>>>::Future;
 
 pub trait HttpSink: Send + Sync + 'static {
@@ -37,7 +35,10 @@ pub trait HttpSink: Send + Sync + 'static {
     type Output;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input>;
-    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>>;
+    fn build_request(
+        &self,
+        events: Self::Output,
+    ) -> BoxFuture<'static, crate::Result<http02::Request<Vec<u8>>>>;
 }
 
 /// Provides a simple wrapper around internal tower and
@@ -110,7 +111,7 @@ where
         cx: &SinkContext,
     ) -> Self {
         let sink = Arc::new(sink);
-        let sink1 = sink.clone();
+        let sink1 = Arc::clone(&sink);
         let svc =
             HttpBatchService::new(cx.resolver(), tls_settings, move |b| sink1.build_request(b));
 
@@ -221,11 +222,11 @@ where
     B::Error: Into<crate::Error>,
 {
     type Response = http02::Response<Body>;
-    type Error = Error;
+    type Error = hyper::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Ok(()).into()
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, mut request: Request<B>) -> Self::Future {
@@ -278,14 +279,18 @@ impl<B> fmt::Debug for HttpClient<B> {
 #[derive(Clone)]
 pub struct HttpBatchService<B = Vec<u8>> {
     inner: HttpClient<Body>,
-    request_builder: Arc<dyn Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send>,
+    request_builder:
+        Arc<dyn Fn(B) -> BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>> + Sync + Send>,
 }
 
 impl<B> HttpBatchService<B> {
     pub fn new(
         resolver: Resolver,
         tls_settings: impl Into<MaybeTlsSettings>,
-        request_builder: impl Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
+        request_builder: impl Fn(B) -> BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>
+            + Sync
+            + Send
+            + 'static,
     ) -> HttpBatchService<B> {
         let inner =
             HttpClient::new(resolver, tls_settings).expect("Unable to initialize http client");
@@ -297,27 +302,26 @@ impl<B> HttpBatchService<B> {
     }
 }
 
-impl<B> Service<B> for HttpBatchService<B> {
-    type Response = Response;
-    type Error = Error;
+impl<B: Send + 'static> Service<B> for HttpBatchService<B> {
+    type Response = http02::Response<Bytes>;
+    type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Ok(()).into()
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, body: B) -> Self::Future {
-        let request = (self.request_builder)(body).map(Body::from);
+        let request_builder = Arc::clone(&self.request_builder);
+        let mut http_client = self.inner.clone();
 
-        let response = self.inner.call(request);
-        let fut = async move {
-            let res = response.await?;
-            let (parts, body) = res.into_parts();
+        Box::pin(async move {
+            let request = request_builder(body).await?.map(Body::from);
+            let response = http_client.call(request).await?;
+            let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;
             Ok(hyper::Response::from_parts(parts, body.to_bytes()))
-        };
-
-        Box::pin(fut)
+        })
     }
 }
 
@@ -326,6 +330,7 @@ impl<T: fmt::Debug> sink::Response for http02::Response<T> {
         self.status().is_success()
     }
 }
+
 #[derive(Clone)]
 pub struct HttpRetryLogic;
 
@@ -383,6 +388,7 @@ mod test {
     use super::*;
     use crate::test_util::runtime;
     use bytes05::Buf;
+    use futures::future::ready;
     use futures01::{Future, Stream};
     use http02::Method;
     use hyper::service::{make_service_fn, service_fn};
@@ -419,11 +425,13 @@ mod test {
 
         let request = b"hello".to_vec();
         let mut service = HttpBatchService::new(resolver, None, move |body: Vec<u8>| {
-            Request::builder()
-                .method(Method::POST)
-                .uri(uri.clone())
-                .body(body.into())
-                .unwrap()
+            Box::pin(ready(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri(uri.clone())
+                    .body(body.into())
+                    .map_err(Into::into),
+            ))
         });
 
         let (tx, rx) = futures01::sync::mpsc::channel(10);

@@ -10,7 +10,10 @@ use crate::{
     tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::{
+    future::{ok as ready_ok, BoxFuture},
+    FutureExt, TryFutureExt,
+};
 use futures01::Sink;
 use http02::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
@@ -132,7 +135,10 @@ impl HttpSink for LogdnaConfig {
         Some(map.into())
     }
 
-    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
+    fn build_request(
+        &self,
+        events: Self::Output,
+    ) -> BoxFuture<'static, crate::Result<http02::Request<Vec<u8>>>> {
         let mut query = url::form_urlencoded::Serializer::new(String::new());
 
         let now = SystemTime::now()
@@ -179,7 +185,7 @@ impl HttpSink for LogdnaConfig {
 
         auth.apply(&mut request);
 
-        request
+        Box::pin(ready_ok(request))
     }
 }
 

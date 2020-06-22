@@ -12,6 +12,7 @@ use crate::{
     event::{log_schema, Event},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
+use futures::future::{ready, BoxFuture};
 use futures01::Sink;
 use http02::{Method, Request, Uri};
 use lazy_static::lazy_static;
@@ -165,14 +166,19 @@ impl HttpSink for InfluxDBLogsSink {
         Some(output.into_bytes())
     }
 
-    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
-        Request::builder()
-            .method(Method::POST)
-            .uri(&self.uri)
-            .header("Content-Type", "text/plain")
-            .header("Authorization", format!("Token {}", &self.token))
-            .body(events)
-            .unwrap()
+    fn build_request(
+        &self,
+        events: Self::Output,
+    ) -> BoxFuture<'static, crate::Result<Request<Vec<u8>>>> {
+        Box::pin(ready(
+            Request::builder()
+                .method(Method::POST)
+                .uri(&self.uri)
+                .header("Content-Type", "text/plain")
+                .header("Authorization", format!("Token {}", &self.token))
+                .body(events)
+                .map_err(Into::into),
+        ))
     }
 }
 

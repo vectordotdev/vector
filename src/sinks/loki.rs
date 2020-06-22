@@ -27,6 +27,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use derivative::Derivative;
+use futures::future::{ok as ready_ok, BoxFuture};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -165,7 +166,10 @@ impl HttpSink for LokiConfig {
         Some((labels, (ts, event)))
     }
 
-    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
+    fn build_request(
+        &self,
+        events: Self::Output,
+    ) -> BoxFuture<'static, crate::Result<http02::Request<Vec<u8>>>> {
         let mut streams: HashMap<Labels, Vec<(i64, String)>> = HashMap::new();
 
         for (mut labels, event) in events {
@@ -219,7 +223,7 @@ impl HttpSink for LokiConfig {
             auth.apply(&mut req);
         }
 
-        req
+        Box::pin(ready_ok(req))
     }
 }
 

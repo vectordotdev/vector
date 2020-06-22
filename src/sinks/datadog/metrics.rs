@@ -12,7 +12,10 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
-use futures::{FutureExt, TryFutureExt};
+use futures::{
+    future::{ready, BoxFuture},
+    FutureExt, TryFutureExt,
+};
 use futures01::Sink;
 use http02::{uri::InvalidUri, Request, StatusCode, Uri};
 use lazy_static::lazy_static;
@@ -144,7 +147,10 @@ impl HttpSink for DatadogSink {
         Some(event)
     }
 
-    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
+    fn build_request(
+        &self,
+        events: Self::Output,
+    ) -> BoxFuture<'static, crate::Result<Request<Vec<u8>>>> {
         let now = Utc::now().timestamp();
         let interval = now - self.last_sent_timestamp.load(SeqCst);
         self.last_sent_timestamp.store(now, SeqCst);
@@ -152,11 +158,13 @@ impl HttpSink for DatadogSink {
         let input = encode_events(events, interval, &self.config.namespace);
         let body = serde_json::to_vec(&input).unwrap();
 
-        Request::post(self.uri.clone())
-            .header("Content-Type", "application/json")
-            .header("DD-API-KEY", self.config.api_key.clone())
-            .body(body)
-            .unwrap()
+        Box::pin(ready(
+            Request::post(self.uri.clone())
+                .header("Content-Type", "application/json")
+                .header("DD-API-KEY", self.config.api_key.clone())
+                .body(body)
+                .map_err(Into::into),
+        ))
     }
 }
 
@@ -373,6 +381,7 @@ mod tests {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
     use crate::sinks::util::{http::HttpSink, test::load_sink};
+    use crate::test_util::runtime;
     use chrono::offset::TimeZone;
     use chrono::Utc;
     use http02::{Method, Uri};
@@ -434,7 +443,8 @@ mod tests {
             },
         ];
 
-        let req = sink.build_request(events);
+        let mut rt = runtime();
+        let req = rt.block_on_std(sink.build_request(events)).unwrap();
 
         assert_eq!(req.method(), Method::POST);
         assert_eq!(
