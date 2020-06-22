@@ -88,20 +88,6 @@ where
         let body = response.into_body();
         Ok(k8s_stream::body(body))
     }
-
-    async fn invoke_boxed_stream(
-        &mut self,
-        watch_optional: WatchOptional<'_>,
-    ) -> Result<
-        BoxStream<
-            'static,
-            Result<WatchResponse<<B as WatchRequestBuilder>::Object>, k8s_stream::Error<BodyError>>,
-        >,
-        watcher::invocation::Error<invocation::Error>,
-    > {
-        let stream = self.invoke(watch_optional).await?;
-        Ok(Box::pin(stream))
-    }
 }
 
 impl<B> Watcher for ApiWatcher<B>
@@ -121,7 +107,12 @@ where
         watch_optional: WatchOptional<'a>,
     ) -> BoxFuture<'a, Result<Self::Stream, watcher::invocation::Error<Self::InvocationError>>>
     {
-        Box::pin(self.invoke_boxed_stream(watch_optional))
+        Box::pin(async move {
+            self.invoke(watch_optional)
+                .await
+                .map(Box::pin)
+                .map(|stream| stream as BoxStream<_>)
+        })
     }
 }
 
