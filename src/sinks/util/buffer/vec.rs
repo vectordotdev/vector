@@ -23,7 +23,7 @@ impl<T> Batch for VecBuffer<T> {
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         if self.batch.len() >= self.max_events {
-            PushResult::Full(item)
+            PushResult::Overflow(item)
         } else {
             self.batch.push(item);
             PushResult::Ok

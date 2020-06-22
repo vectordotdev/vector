@@ -236,7 +236,7 @@ where
 
         match self.batch.push(item) {
             PushResult::Ok => Ok(AsyncSink::Ready),
-            PushResult::Full(item) => self.start_send(item),
+            PushResult::Overflow(item) => self.start_send(item),
         }
     }
 
@@ -486,7 +486,7 @@ where
                         return match batch.push(item) {
                             PushResult::Ok => Ok(AsyncSink::Ready),
                             // FIXME is this the right behavior here and below?
-                            PushResult::Full(item) => Ok(AsyncSink::NotReady(item)),
+                            PushResult::Overflow(item) => Ok(AsyncSink::NotReady(item)),
                         };
                     }
                 }
@@ -494,7 +494,7 @@ where
                 trace!("adding event to batch.");
                 return match batch.push(item) {
                     PushResult::Ok => Ok(AsyncSink::Ready),
-                    PushResult::Full(item) => Ok(AsyncSink::NotReady(item)),
+                    PushResult::Overflow(item) => Ok(AsyncSink::NotReady(item)),
                 };
             }
         }
@@ -505,7 +505,7 @@ where
         let mut batch = self.batch.fresh();
 
         match batch.push(item) {
-            PushResult::Full(item) => Ok(AsyncSink::NotReady(item)),
+            PushResult::Overflow(item) => Ok(AsyncSink::NotReady(item)),
             PushResult::Ok => {
                 self.set_linger(partition.clone());
 

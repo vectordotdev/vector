@@ -111,7 +111,7 @@ impl Batch for Buffer {
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         if self.num_items >= self.max_events || self.size() + item.len() > self.max_bytes {
-            PushResult::Full(item)
+            PushResult::Overflow(item)
         } else {
             self.push(&item);
             PushResult::Ok

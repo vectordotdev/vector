@@ -189,7 +189,7 @@ impl Batch for PartitionedBuffer {
                 self.key = Some(key);
                 PushResult::Ok
             }
-            PushResult::Full(inner) => PushResult::Full(InnerBuffer { inner, key }),
+            PushResult::Overflow(inner) => PushResult::Overflow(InnerBuffer { inner, key }),
         }
     }
 

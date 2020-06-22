@@ -36,7 +36,7 @@ where
                 self.key = Some(key);
                 PushResult::Ok
             }
-            PushResult::Full(inner) => PushResult::Full(Self::Input { inner, key }),
+            PushResult::Overflow(inner) => PushResult::Overflow(Self::Input { inner, key }),
         }
     }
 

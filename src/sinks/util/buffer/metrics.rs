@@ -116,7 +116,7 @@ impl Batch for MetricBuffer {
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         if self.num_items() >= self.max_events {
-            PushResult::Full(item)
+            PushResult::Overflow(item)
         } else {
             let item = item.into_metric();
 

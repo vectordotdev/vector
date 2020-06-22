@@ -30,7 +30,7 @@ impl Batch for JsonArrayBuffer {
         let raw_item = to_raw_value(&item).expect("Value should be valid json");
         let new_len = self.total_bytes + raw_item.get().len() + 1;
         if self.buffer.len() >= self.settings.events || new_len > self.settings.bytes {
-            PushResult::Full(item)
+            PushResult::Overflow(item)
         } else {
             self.total_bytes = new_len;
             self.buffer.push(raw_item);
@@ -85,7 +85,7 @@ mod tests {
             PushResult::Ok
         );
 
-        assert!(matches!(buffer.push(json!({})), PushResult::Full(_)));
+        assert!(matches!(buffer.push(json!({})), PushResult::Overflow(_)));
 
         assert_eq!(buffer.num_items(), 2);
         assert_eq!(buffer.total_bytes, 34);

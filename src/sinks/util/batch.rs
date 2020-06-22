@@ -81,7 +81,7 @@ pub struct BatchSettings {
 #[derive(Debug, Eq, PartialEq)]
 pub enum PushResult<T> {
     Ok,
-    Full(T),
+    Overflow(T),
 }
 
 pub trait Batch {
@@ -138,10 +138,10 @@ where
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         if self.was_full {
-            PushResult::Full(item)
+            PushResult::Overflow(item)
         } else {
             let result = self.inner.push(item);
-            self.was_full = matches!(result, PushResult::Full(_));
+            self.was_full = matches!(result, PushResult::Overflow(_));
             result
         }
     }
