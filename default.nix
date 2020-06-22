@@ -6,12 +6,13 @@ rec {
       x86_64-unknown-linux-musl = tasks.binary targets.x86_64-unknown-linux-musl;
     };
     containers = rec {
-      nix = pkgs.dockerTools.buildLayeredImage {
-        name = "timberio/vector";
-        tag = "nixish";
-        contents = releases.binaries.x86_64-unknown-linux-gnu.out;
-
-        config.Cmd = [ "${releases.binaries.x86_64-unknown-linux-gnu.out}/bin/vector" ];
+      x86_64-unknown-linux-gnu = tasks.docker {
+        tag = "gnu";
+        binary = releases.binaries.x86_64-unknown-linux-gnu;
+      };
+      x86_64-unknown-linux-musl = tasks.docker {
+        tag = "musl";
+        binary = releases.binaries.x86_64-unknown-linux-musl;
       };
     };
   };
@@ -91,6 +92,13 @@ rec {
   
   # Jobs used to build artifacts
   tasks = rec {
+    docker = args@{ binary, tag }:
+      pkgs.dockerTools.buildLayeredImage {
+        name = "neu-timberio/vector";
+        tag = args.tag;
+        contents = args.binary.out;
+        config.Cmd = [ "${args.binary.out}/bin/vector" ];
+      };
     # Build a binary Vector artifact
     binary = args@{
       # This will be set dynamically!

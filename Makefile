@@ -460,8 +460,8 @@ target/releases/containers/%:
 		--out-link $@ \
 		releases.containers.$(notdir $@)
 
-.PHONY: neu-release-binary-x86_64-unknown-linux-musl
-neu-release-container-nix: target/releases/containers/nix
+.PHONY: neu-release-container-x86_64-unknown-linux-gnu
+neu-release-container-x86_64-unknown-linux-gnu: target/releases/containers/x86_64-unknown-linux-gnu
 
 release: release-prepare generate release-commit ## Release a new Vector version
 
