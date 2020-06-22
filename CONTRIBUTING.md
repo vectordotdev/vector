@@ -600,8 +600,9 @@ if it fits you better.
 
 You might need to tweak `skaffold`, here are some hints:
 
-* `skaffold` will try to detect whether a local cluster is used; in local
-  cluster is used it won't push the docker images it builds to a registry.
+* `skaffold` will try to detect whether a local cluster is used; if a local
+  cluster is used, `skaffold` won't push the docker images it builds to a
+  registry.
   See [this page](https://skaffold.dev/docs/environment/local-cluster/)
   for how you can troubleshoot and tweak this behavior.
 
