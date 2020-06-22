@@ -78,9 +78,7 @@ pub enum BuildError {
     #[snafu(display("Socket address problem: {}", source))]
     SocketAddressError { source: std::io::Error },
     #[snafu(display("URI parse error: {}", source))]
-    UriParseError { source: ::http::uri::InvalidUri },
-    #[snafu(display("URI parse error: {}", source))]
-    UriParseError2 { source: ::http02::uri::InvalidUri },
+    UriParseError { source: ::http02::uri::InvalidUri },
 }
 
 /// Common healthcheck errors

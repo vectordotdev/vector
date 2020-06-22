@@ -67,12 +67,6 @@ pub struct InfluxDB2Settings {
 
 trait InfluxDBSettings {
     fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
-    fn write_uri2(self: &Self, endpoint: String) -> crate::Result<http02::Uri> {
-        let uri = self.write_uri(endpoint)?;
-        Ok(format!("{}", uri)
-            .parse::<http02::Uri>()
-            .context(super::UriParseError2)?)
-    }
     fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
     fn token(self: &Self) -> String;
     fn protocol_version(self: &Self) -> ProtocolVersion;
@@ -329,7 +323,7 @@ fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> c
         url.pop();
     }
 
-    Ok(url.parse::<Uri>().context(super::UriParseError2)?)
+    Ok(url.parse::<Uri>().context(super::UriParseError)?)
 }
 
 #[cfg(test)]

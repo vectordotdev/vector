@@ -202,7 +202,7 @@ enum HealthcheckError {
 
 pub async fn healthcheck(config: HecSinkConfig, resolver: Resolver) -> crate::Result<()> {
     let uri =
-        build_uri(&config.host, "/services/collector/health/1.0").context(super::UriParseError2)?;
+        build_uri(&config.host, "/services/collector/health/1.0").context(super::UriParseError)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", config.token))
@@ -222,7 +222,7 @@ pub async fn healthcheck(config: HecSinkConfig, resolver: Resolver) -> crate::Re
 }
 
 pub fn validate_host(host: &str) -> crate::Result<()> {
-    let uri = Uri::try_from(host).context(super::UriParseError2)?;
+    let uri = Uri::try_from(host).context(super::UriParseError)?;
 
     match uri.scheme() {
         Some(_) => Ok(()),
