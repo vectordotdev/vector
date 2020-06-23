@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-24"
+last_modified_on: "2020-06-23"
 delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
@@ -52,7 +52,8 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   region = "us-east-1" # required, required when endpoint = ""
 
   # Batch
-  batch.max_size = 10490000 # optional, default, bytes
+  batch.max_bytes = 10000000 # optional, default, bytes
+  batch.max_events = 100000 # optional, default, events
   batch.timeout_secs = 300 # optional, default, seconds
 
   # Buffer
@@ -89,7 +90,8 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   grant_write_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
 
   # Batch
-  batch.max_size = 10490000 # optional, default, bytes
+  batch.max_bytes = 10000000 # optional, default, bytes
+  batch.max_events = 100000 # optional, default, events
   batch.timeout_secs = 300 # optional, default, seconds
 
   # Buffer
@@ -205,11 +207,11 @@ Configures the sink batching behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={10490000}
+  defaultValue={10000000}
   enumValues={null}
-  examples={[10490000]}
+  examples={[10000000]}
   groups={[]}
-  name={"max_size"}
+  name={"max_bytes"}
   path={"batch"}
   relevantWhen={null}
   required={false}
@@ -219,9 +221,32 @@ Configures the sink batching behavior.
   warnings={[]}
   >
 
-#### max_size
+#### max_bytes
 
 The maximum size of a batch, in bytes, before it is flushed.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={100000}
+  enumValues={null}
+  examples={[100000]}
+  groups={[]}
+  name={"max_events"}
+  path={"batch"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={"events"}
+  warnings={[]}
+  >
+
+#### max_events
+
+The maximum size of a batch, in events, before it is flushed.
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -316,7 +341,7 @@ Configures the sink specific buffer behavior.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
+ See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -339,7 +364,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
- See [Buffers & Batches](#buffers--batches) for more info.
+
 
 
 </Field>
@@ -1207,7 +1232,7 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 *Batches* are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured [`timeout_secs`](#timeout_secs).
-2. The batch size meets or exceeds the configured [`max_size`](#max_size).
+2. The batch size meets or exceeds the configured [`max_events`](#max_events).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 

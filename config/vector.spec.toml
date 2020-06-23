@@ -3679,10 +3679,18 @@ require('custom_module')
     # The maximum size of a batch, in bytes, before it is flushed.
     #
     # * optional
-    # * default: 10490000
+    # * default: 10000000
     # * type: uint
     # * unit: bytes
-    max_size = 10490000
+    max_bytes = 10000000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 100000
+    # * type: uint
+    # * unit: events
+    max_events = 100000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -4002,7 +4010,15 @@ require('custom_module')
     # * default: 1049000
     # * type: uint
     # * unit: bytes
-    max_size = 1049000
+    max_bytes = 1049000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 100000
+    # * type: uint
+    # * unit: events
+    max_events = 100000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -4709,7 +4725,15 @@ require('custom_module')
     # * default: 10490000
     # * type: uint
     # * unit: bytes
-    max_size = 10490000
+    max_bytes = 10490000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 100000
+    # * type: uint
+    # * unit: events
+    max_events = 100000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -5144,7 +5168,15 @@ require('custom_module')
     # * default: 10485760
     # * type: uint
     # * unit: bytes
-    max_size = 10485760
+    max_bytes = 10485760
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 100000
+    # * type: uint
+    # * unit: events
+    max_events = 100000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -5524,7 +5556,15 @@ require('custom_module')
     # * default: 10485760
     # * type: uint
     # * unit: bytes
-    max_size = 10485760
+    max_bytes = 10485760
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 1000
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -5740,7 +5780,15 @@ require('custom_module')
     # * default: 5242880
     # * type: uint
     # * unit: bytes
-    max_size = 5242880
+    max_bytes = 5242880
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 50000
+    # * type: uint
+    # * unit: events
+    max_events = 50000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -6130,7 +6178,15 @@ require('custom_module')
     # * default: 5242880
     # * type: uint
     # * unit: bytes
-    max_size = 5242880
+    max_bytes = 5242880
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 2000
+    # * type: uint
+    # * unit: events
+    max_events = 2000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -6296,7 +6352,15 @@ require('custom_module')
     # * default: 1049000
     # * type: uint
     # * unit: bytes
-    max_size = 1049000
+    max_bytes = 1049000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 100000
+    # * type: uint
+    # * unit: events
+    max_events = 100000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -6583,7 +6647,15 @@ require('custom_module')
     # * default: 1049000
     # * type: uint
     # * unit: bytes
-    max_size = 1049000
+    max_bytes = 1049000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 10000
+    # * type: uint
+    # * unit: events
+    max_events = 10000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -6800,10 +6872,18 @@ require('custom_module')
     # The maximum size of a batch, in bytes, before it is flushed.
     #
     # * optional
-    # * default: 10490000
+    # * default: 1049000
     # * type: uint
     # * unit: bytes
-    max_size = 10490000
+    max_bytes = 1049000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 10000
+    # * type: uint
+    # * unit: events
+    max_events = 10000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -7578,7 +7658,15 @@ require('custom_module')
     # * default: 10490000
     # * type: uint
     # * unit: bytes
-    max_size = 10490000
+    max_bytes = 10490000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 100000
+    # * type: uint
+    # * unit: events
+    max_events = 100000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -7774,7 +7862,15 @@ require('custom_module')
     # * default: 10490000
     # * type: uint
     # * unit: bytes
-    max_size = 10490000
+    max_bytes = 10490000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 100000
+    # * type: uint
+    # * unit: events
+    max_events = 100000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -8070,10 +8166,18 @@ require('custom_module')
     # The maximum size of a batch, in bytes, before it is flushed.
     #
     # * optional
-    # * default: 524000
+    # * default: 5240000
     # * type: uint
     # * unit: bytes
-    max_size = 524000
+    max_bytes = 5240000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 50000
+    # * type: uint
+    # * unit: events
+    max_events = 50000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -8555,7 +8659,15 @@ require('custom_module')
     # * default: 10490000
     # * type: uint
     # * unit: bytes
-    max_size = 10490000
+    max_bytes = 10490000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 100000
+    # * type: uint
+    # * unit: events
+    max_events = 100000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -8957,7 +9069,15 @@ require('custom_module')
     # * default: 1049000
     # * type: uint
     # * unit: bytes
-    max_size = 1049000
+    max_bytes = 1049000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 10000
+    # * type: uint
+    # * unit: events
+    max_events = 10000
 
     # The maximum age of a batch before it is flushed.
     #
