@@ -7,8 +7,8 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto, BatchConfig, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-        TowerRequestConfig, TowerRequestSettings, VecBuffer,
+        rusoto, BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer,
+        PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext},
@@ -145,7 +145,9 @@ pub enum CloudwatchError {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let batch = self.batch.parse_with_events(0, 1000, 1)?; // max bytes is ignored
+        let batch = self
+            .batch
+            .parse_with_events(BatchSettings::default().events(1000).timeout(1))?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let log_group = self.group_name.clone();

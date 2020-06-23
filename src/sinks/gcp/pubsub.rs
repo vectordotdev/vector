@@ -6,7 +6,7 @@ use crate::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
             service2::TowerRequestConfig,
-            BatchConfig, BoxedRawValue, JsonArrayBuffer,
+            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer,
         },
         Healthcheck, RouterSink, UriParseError2,
     },
@@ -65,7 +65,12 @@ inventory::submit! {
 impl SinkConfig for PubsubConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self)?;
-        let batch_settings = self.batch.parse_with_bytes(bytesize::mib(10u64), 1000, 1)?;
+        let batch_settings = self.batch.parse_with_bytes(
+            BatchSettings::default()
+                .bytes(bytesize::mib(10u64))
+                .events(1000)
+                .timeout(1),
+        )?;
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 

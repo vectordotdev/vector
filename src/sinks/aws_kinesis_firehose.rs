@@ -8,7 +8,7 @@ use crate::{
         rusoto,
         service2::TowerRequestConfig,
         sink::Response,
-        BatchConfig, VecBuffer,
+        BatchConfig, BatchSettings, VecBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -97,7 +97,9 @@ impl KinesisFirehoseService {
             cx.resolver(),
         )?;
 
-        let batch = config.batch.parse_with_events(0, 500, 1)?; // max bytes is ignored
+        let batch = config
+            .batch
+            .parse_with_events(BatchSettings::default().events(500).timeout(1))?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 

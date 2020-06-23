@@ -9,7 +9,7 @@ use crate::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
         retries2::{RetryAction, RetryLogic},
         service2::TowerRequestConfig,
-        BatchConfig, Buffer, Compression,
+        BatchConfig, BatchSettings, Buffer, Compression,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
@@ -107,9 +107,12 @@ impl SinkConfig for ElasticSearchConfig {
         let healthcheck = healthcheck(cx.resolver(), common.clone()).boxed().compat();
 
         let compression = common.compression;
-        let batch = self
-            .batch
-            .parse_with_bytes(bytesize::mib(10u64), 100_000, 1)?;
+        let batch = self.batch.parse_with_bytes(
+            BatchSettings::default()
+                .bytes(bytesize::mib(10u64))
+                .events(100_000)
+                .timeout(1),
+        )?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = common.tls_settings.clone();
 

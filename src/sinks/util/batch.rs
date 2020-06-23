@@ -31,16 +31,14 @@ impl BatchConfig {
         }
     }
 
-    pub fn parse_with_bytes(
-        &self,
-        bytes: u64,
-        events: usize,
-        timeout: u64,
-    ) -> Result<BatchSettings, BatchError> {
+    pub fn parse_with_bytes(&self, defaults: BatchSettings) -> Result<BatchSettings, BatchError> {
         Ok(BatchSettings {
-            bytes: self.get_bytes_or(bytes)?,
-            events: self.max_events.unwrap_or(events),
-            timeout: Duration::from_secs(self.timeout_secs.unwrap_or(timeout)),
+            bytes: self.get_bytes_or(defaults.bytes as u64)?,
+            events: self.max_events.unwrap_or(defaults.events),
+            timeout: self
+                .timeout_secs
+                .map(|secs| Duration::from_secs(secs))
+                .unwrap_or(defaults.timeout),
         })
     }
 
@@ -53,28 +51,51 @@ impl BatchConfig {
         }
     }
 
-    pub fn parse_with_events(
-        &self,
-        bytes: u64,
-        events: usize,
-        timeout: u64,
-    ) -> Result<BatchSettings, BatchError> {
-        if bytes == 0 && self.max_bytes.is_some() {
+    pub fn parse_with_events(&self, defaults: BatchSettings) -> Result<BatchSettings, BatchError> {
+        if defaults.bytes == 0 && self.max_bytes.is_some() {
             return Err(BatchError::BytesNotAllowed);
         }
         Ok(BatchSettings {
-            bytes: self.max_bytes.unwrap_or(bytes as usize),
-            events: self.get_events_or(events)?,
-            timeout: Duration::from_secs(self.timeout_secs.unwrap_or(timeout)),
+            bytes: self.max_bytes.unwrap_or(defaults.bytes),
+            events: self.get_events_or(defaults.events)?,
+            timeout: self
+                .timeout_secs
+                .map(|secs| Duration::from_secs(secs))
+                .unwrap_or(defaults.timeout),
         })
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct BatchSettings {
     pub bytes: usize,
     pub events: usize,
     pub timeout: Duration,
+}
+
+impl BatchSettings {
+    // Fake the builder pattern
+    pub fn bytes(self, bytes: u64) -> Self {
+        Self {
+            bytes: bytes as usize,
+            events: self.events,
+            timeout: self.timeout,
+        }
+    }
+    pub fn events(self, events: usize) -> Self {
+        Self {
+            bytes: self.bytes,
+            events,
+            timeout: self.timeout,
+        }
+    }
+    pub fn timeout(self, secs: u64) -> Self {
+        Self {
+            bytes: self.bytes,
+            events: self.events,
+            timeout: Duration::from_secs(secs),
+        }
+    }
 }
 
 #[must_use]

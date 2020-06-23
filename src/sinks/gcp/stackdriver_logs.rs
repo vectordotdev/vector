@@ -6,7 +6,7 @@ use crate::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
             service2::TowerRequestConfig,
-            BatchConfig, BoxedRawValue, JsonArrayBuffer,
+            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer,
         },
         Healthcheck, RouterSink,
     },
@@ -112,9 +112,12 @@ impl SinkConfig for StackdriverConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let creds = self.auth.make_credentials(Scope::LoggingWrite)?;
 
-        let batch = self
-            .batch
-            .parse_with_bytes(bytesize::kib(5000u64), 50_000, 1)?;
+        let batch = self.batch.parse_with_bytes(
+            BatchSettings::default()
+                .bytes(bytesize::kib(5000u64))
+                .events(50_000)
+                .timeout(1),
+        )?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 

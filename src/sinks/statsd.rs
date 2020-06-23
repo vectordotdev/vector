@@ -2,7 +2,9 @@ use crate::{
     buffers::Acker,
     event::metric::{MetricKind, MetricValue},
     event::Event,
-    sinks::util::{service2::TowerCompat, BatchConfig, BatchSink, Buffer, Compression},
+    sinks::util::{
+        service2::TowerCompat, BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, FutureExt, TryFutureExt};
@@ -86,7 +88,9 @@ impl StatsdSvc {
         // However we need to leave some space for +1 extra trailing event in the buffer.
         // Also one might keep an eye on server side limitations, like
         // mentioned here https://github.com/DataDog/dd-agent/issues/2638
-        let batch = config.batch.parse_with_bytes(1300, 1000, 1)?;
+        let batch = config
+            .batch
+            .parse_with_bytes(BatchSettings::default().bytes(1300).events(1000).timeout(1))?;
         let namespace = config.namespace.clone();
 
         let client = Client::new(config.address)?;

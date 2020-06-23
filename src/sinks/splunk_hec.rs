@@ -6,7 +6,7 @@ use crate::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
-        BatchConfig, Buffer, Compression,
+        BatchConfig, BatchSettings, Buffer, Compression,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -82,7 +82,12 @@ impl SinkConfig for HecSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_host(&self.host)?;
 
-        let batch = self.batch.parse_with_bytes(bytesize::mib(1u64), 10000, 1)?;
+        let batch = self.batch.parse_with_bytes(
+            BatchSettings::default()
+                .bytes(bytesize::mib(1u64))
+                .events(10000)
+                .timeout(1),
+        )?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 

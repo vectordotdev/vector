@@ -9,7 +9,7 @@ use crate::{
         rusoto,
         service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
         sink::Response,
-        BatchConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
+        BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
         PartitionInnerBuffer,
     },
     template::Template,
@@ -173,7 +173,12 @@ impl S3Sink {
         let compression = config.compression;
         let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
         let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
-        let batch = config.batch.parse_with_bytes(10_000_000u64, 100_000, 300)?;
+        let batch = config.batch.parse_with_bytes(
+            BatchSettings::default()
+                .bytes(10_000_000)
+                .events(100_000)
+                .timeout(300),
+        )?;
 
         let key_prefix = config
             .key_prefix
