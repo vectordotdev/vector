@@ -83,7 +83,7 @@ pub struct BatchSettings {
 
 impl BatchSettings {
     // Fake the builder pattern
-    pub fn bytes(self, bytes: u64) -> Self {
+    pub const fn bytes(self, bytes: u64) -> Self {
         Self {
             size: BatchSize {
                 bytes: bytes as usize,
@@ -92,7 +92,7 @@ impl BatchSettings {
             ..self
         }
     }
-    pub fn events(self, events: usize) -> Self {
+    pub const fn events(self, events: usize) -> Self {
         Self {
             size: BatchSize {
                 events,
@@ -101,7 +101,7 @@ impl BatchSettings {
             ..self
         }
     }
-    pub fn timeout(self, secs: u64) -> Self {
+    pub const fn timeout(self, secs: u64) -> Self {
         Self {
             timeout: Duration::from_secs(secs),
             ..self
