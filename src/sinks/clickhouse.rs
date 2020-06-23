@@ -263,7 +263,7 @@ mod integration_tests {
             table: table.clone(),
             compression: Compression::None,
             batch: BatchConfig {
-                max_bytes: Some(1),
+                max_events: Some(1),
                 ..Default::default()
             },
             request: TowerRequestConfig {
@@ -307,7 +307,7 @@ mod integration_tests {
             compression: Compression::None,
             encoding,
             batch: BatchConfig {
-                max_bytes: Some(1),
+                max_events: Some(1),
                 ..Default::default()
             },
             request: TowerRequestConfig {
@@ -368,7 +368,7 @@ compression = "none"
 [request]
   retry_attempts = 1
 [batch]
-  max_size = 1
+  max_events = 1
 [encoding]
   timestamp_format = "unix""#,
             host, table
@@ -423,7 +423,7 @@ compression = "none"
             table: table.clone(),
             compression: Compression::None,
             batch: BatchConfig {
-                max_bytes: Some(1),
+                max_events: Some(1),
                 ..Default::default()
             },
             ..Default::default()
