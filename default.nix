@@ -12,10 +12,6 @@ rec {
         docker = tasks.docker { tag = "musl"; binary = binary; };
         all = [ binary docker ];
       };
-      x86_64-pc-windows-gnu = rec {
-        binary = tasks.binary configurations.x86_64-pc-windows-gnu;
-        all = [ binary ];
-      };
       all = [ x86_64-unknown-linux-gnu x86_64-unknown-linux-musl ];
     };
   };
@@ -90,20 +86,6 @@ rec {
       runCheckPhase = false;
       features = features.components.all ++
         features.byOs.linux.musl;
-    };
-    x86_64-pc-windows-gnu = {
-      buildType = "debug";
-      rustTarget = "x86_64-pc-windows-gnu";
-      pkgs = pkgs;
-      cross = if pkgs.targetPlatform.config == pkgs.pkgsCross.darwin.targetPlatform.config then
-          null
-        else
-          pkgs.pkgsCross.darwin;
-      logLevel = "debug";
-      runCheckPhase = false;
-      features = features.components.all ++
-        features.byOs.linux.gnu ++
-        features.byLinking.dynamic;
     };
   };
   
