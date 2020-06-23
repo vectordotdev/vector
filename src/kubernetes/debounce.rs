@@ -23,11 +23,9 @@ impl Debounce {
 
     /// Trigger a signal to debounce.
     pub fn signal(&mut self) {
-        if self.sequence_start.is_some() {
-            return;
+        if self.sequence_start.is_none() {
+            self.sequence_start = Some(Instant::now() + self.time);
         }
-
-        self.sequence_start = Some(Instant::now() + self.time);
     }
 
     /// Debounced signal.
