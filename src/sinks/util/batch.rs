@@ -22,7 +22,7 @@ pub struct BatchConfig {
 }
 
 impl BatchConfig {
-    pub fn parse_bytes(&self, bytes: u64) -> Result<usize, BatchError> {
+    pub fn get_bytes_or(&self, bytes: u64) -> Result<usize, BatchError> {
         match (self.max_bytes, self.max_size) {
             (Some(_), Some(_)) => Err(BatchError::BytesAndSize),
             (Some(bytes), None) => Ok(bytes),
@@ -38,13 +38,13 @@ impl BatchConfig {
         timeout: u64,
     ) -> Result<BatchSettings, BatchError> {
         Ok(BatchSettings {
-            bytes: self.parse_bytes(bytes)?,
+            bytes: self.get_bytes_or(bytes)?,
             events: self.max_events.unwrap_or(events),
             timeout: Duration::from_secs(self.timeout_secs.unwrap_or(timeout)),
         })
     }
 
-    pub fn parse_events(&self, events: usize) -> Result<usize, BatchError> {
+    pub fn get_events_or(&self, events: usize) -> Result<usize, BatchError> {
         match (self.max_events, self.max_size) {
             (Some(_), Some(_)) => Err(BatchError::EventsAndSize),
             (Some(events), None) => Ok(events),
@@ -64,7 +64,7 @@ impl BatchConfig {
         }
         Ok(BatchSettings {
             bytes: self.max_bytes.unwrap_or(bytes as usize),
-            events: self.parse_events(events)?,
+            events: self.get_events_or(events)?,
             timeout: Duration::from_secs(self.timeout_secs.unwrap_or(timeout)),
         })
     }
