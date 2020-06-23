@@ -12,6 +12,10 @@ rec {
         docker = tasks.docker { tag = "musl"; binary = binary; };
         all = [ binary docker ];
       };
+      x86_64-pc-windows-gnu = rec {
+        binary = tasks.binary configurations.x86_64-pc-windows-gnu;
+        all = [ binary ];
+      };
       all = [ x86_64-unknown-linux-gnu x86_64-unknown-linux-musl ];
     };
   };
@@ -20,6 +24,7 @@ rec {
   cargoToml = (builtins.fromTOML (builtins.readFile ./Cargo.toml));
 
   overlays = rec {
+    # mozilla = import (builtins.fetchTarball "https://github.com/matthewbauer/nixpkgs-mozilla/archive/91629591f14262e4d6059c5407d065407b12c5d6.tar.gz");
     mozilla = import (builtins.fetchGit {
         url = "https://github.com/mozilla/nixpkgs-mozilla/";
         rev = "e912ed483e980dfb4666ae0ed17845c4220e5e7c";
@@ -86,6 +91,20 @@ rec {
       features = features.components.all ++
         features.byOs.linux.musl;
     };
+    x86_64-pc-windows-gnu = {
+      buildType = "debug";
+      rustTarget = "x86_64-pc-windows-gnu";
+      pkgs = pkgs;
+      cross = if pkgs.targetPlatform.config == pkgs.pkgsCross.darwin.targetPlatform.config then
+          null
+        else
+          pkgs.pkgsCross.darwin;
+      logLevel = "debug";
+      runCheckPhase = false;
+      features = features.components.all ++
+        features.byOs.linux.gnu ++
+        features.byLinking.dynamic;
+    };
   };
   
   # Jobs used to build artifacts
@@ -110,7 +129,16 @@ rec {
       runCheckPhase ? true,
     }:
       let
-
+        rustChannel = (pkgs.rustChannelOf {
+          rustToolchain = ./rust-toolchain;
+          targets = [ args.rustTarget ];
+          extensions = [
+            "rust-std"
+          ];
+          targetExtensions = [
+            "rust-std"
+          ];
+        });
         definition = import ./scripts/environment/definition.nix { inherit tools pkgs rustTarget cross; };
         features = (builtins.getAttr args.rustTarget configurations).features;
         
@@ -128,7 +156,7 @@ rec {
           
           target = args.rustTarget;
           # Rest
-          src = tools.gitignore.gitignoreSource ./.;
+          src = pkgs.lib.cleanSource (tools.gitignore.gitignoreSource ./.);
 
           cargoBuildFlags = [ "--no-default-features" "--features" "${pkgs.lib.concatStringsSep "," features}" ];
           checkPhase = if runCheckPhase then
@@ -139,17 +167,6 @@ rec {
               ''
             else
               "";
-
-          rustc = (pkgs.latest.rustChannels.stable.rust.override {
-            targets = builtins.trace args.rustTarget [ args.rustTarget ];
-            extensions = [
-              "rust-std"
-            ];
-            targetExtensions = [
-              "rust-std"
-            ];
-          });
-          cargo = pkgs.latest.rustChannels.stable.cargo;
           
           # cargoBuildOptions = currentOptions: currentOptions ++ [ "--no-default-features" "--features" "${pkgs.lib.concatStringsSep "," features}" ];
           # cargoTestOptions = currentOptions: currentOptions ++ [ "--no-default-features" "--features" "${pkgs.lib.concatStringsSep "," features}" ];
@@ -167,7 +184,10 @@ rec {
         } // definition.environmentVariables;
       in
         # (tools.naersk.buildPackage packageDefinition);
-        pkgs.rustPlatform.buildRustPackage packageDefinition;
+        ((if args ? cross then cross else pkgs).makeRustPlatform {
+          cargo = rustChannel.cargo;
+          rustc = rustChannel.rustc;
+        }).buildRustPackage packageDefinition;
   };
 
   tools = {

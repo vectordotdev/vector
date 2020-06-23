@@ -98,6 +98,7 @@ rec {
     jemalloc
     snappy
     rdkafka
+    (pkgs.rustChannelOf { rustToolchain = ../../rust-toolchain; }).rust-std
   ] ++ (if stdenv.isDarwin then [
     darwin.cf-private
     darwin.apple_sdk.frameworks.CoreServices
@@ -129,6 +130,7 @@ rec {
     rdkafka
     cmake
     openssl.dev
+    (pkgs.rustChannelOf { rustToolchain = ../../rust-toolchain; }).rust-std
   ] ++ (if stdenv.isDarwin then [
   ] else [
     systemd
