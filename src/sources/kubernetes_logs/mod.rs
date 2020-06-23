@@ -6,11 +6,13 @@
 #![deny(missing_docs)]
 
 mod k8s_paths_provider;
+mod lifecycle;
 mod parser;
 mod partial_events_merger;
 mod path_helpers;
 mod pod_metadata_annotator;
 mod transform_utils;
+mod util;
 
 use crate::event::{self, Event};
 use crate::internal_events::{KubernetesLogsEventAnnotationFailed, KubernetesLogsEventReceived};
@@ -22,17 +24,18 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     transforms::Transform,
 };
+use bytes05::Bytes;
 use evmap10::{self as evmap};
 use file_source::{FileServer, FileServerShutdown, Fingerprinter};
-use futures::{future::FutureExt, pin_mut, sink::Sink, stream::StreamExt};
+use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use futures01::sync::mpsc;
 use k8s_openapi::api::core::v1::Pod;
 use k8s_paths_provider::K8sPathsProvider;
+use lifecycle::Lifecycle;
 use pod_metadata_annotator::PodMetadataAnnotator;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
-use tokio::task::spawn_blocking;
 
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
@@ -147,9 +150,9 @@ impl Source {
         })
     }
 
-    async fn run<O>(self, out: O, shutdown: ShutdownSignal) -> crate::Result<()>
+    async fn run<O>(self, out: O, global_shutdown: ShutdownSignal) -> crate::Result<()>
     where
-        O: Sink<Event> + Send,
+        O: Sink<Event> + Send + 'static,
         <O as Sink<Event>>::Error: std::error::Error,
     {
         let Self {
@@ -202,15 +205,8 @@ impl Source {
             remove_after: None,
         };
 
-        let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel(100);
-
-        let span = info_span!("file_server");
-        let file_server_join_handle = spawn_blocking(move || {
-            let _enter = span.enter();
-            let result =
-                file_server.run(file_source_tx, futures::compat::Compat01As03::new(shutdown));
-            result.expect("file server exited with an error")
-        });
+        let (file_source_tx, file_source_rx) =
+            futures::channel::mpsc::channel::<(Bytes, String)>(100);
 
         let mut parser = parser::build();
         let mut partial_events_merger = partial_events_merger::build(auto_partial_merge);
@@ -234,50 +230,58 @@ impl Source {
 
         let event_processing_loop = events.map(Ok).forward(out);
 
-        let (reflector_process_shutdown_signal_tx, reflector_process_shutdown_signal_rx) =
-            futures::channel::oneshot::channel();
-        pin_mut!(reflector_process);
-        let reflector_process_with_shutdown =
-            cancel_on_signal(reflector_process, reflector_process_shutdown_signal_rx);
-
-        use std::future::Future;
-        use std::pin::Pin;
-        let list: Vec<Pin<Box<dyn Future<Output = ()> + Send>>> = vec![
-            Box::pin(reflector_process_with_shutdown.map(|result| match result {
-                Ok(()) => info!(message = "reflector process completed gracefully"),
-                Err(error) => error!(message = "reflector process exited with an error", ?error),
-            })),
-            Box::pin(file_server_join_handle.map(|result| match result {
-                Ok(FileServerShutdown) => {
-                    info!(message = "file server completed gracefully");
-                    reflector_process_shutdown_signal_tx
-                        .send(())
-                        .expect("unable to trigger reflector shutdown");
-                }
-                Err(error) => error!(message = "file server exited with an error", ?error),
-            })),
-            Box::pin(event_processing_loop.map(|result| {
+        let mut lifecycle = Lifecycle::new();
+        {
+            let (slot, shutdown) = lifecycle.add();
+            let fut =
+                util::cancel_on_signal(reflector_process, shutdown).map(|result| match result {
+                    Ok(()) => info!(message = "reflector process completed gracefully"),
+                    Err(error) => {
+                        error!(message = "reflector process exited with an error", ?error)
+                    }
+                });
+            slot.bind(Box::pin(fut));
+        }
+        {
+            let (slot, shutdown) = lifecycle.add();
+            let fut = util::run_file_server(file_server, file_source_tx, shutdown).map(|result| {
                 match result {
-                    Ok(()) => info!(message = "event processing loop completed gracefully"),
-                    Err(error) => error!(
+                    Ok(FileServerShutdown) => info!(message = "file server completed gracefully"),
+                    Err(error) => error!(message = "file server exited with an error", ?error),
+                }
+            });
+            slot.bind(Box::pin(fut));
+        }
+        {
+            let (slot, shutdown) = lifecycle.add();
+            let fut = util::complete_with_deadline_on_signal(
+                event_processing_loop,
+                shutdown,
+                Duration::from_secs(30), // more than enough time to propagate
+            )
+            .map(|result| {
+                match result {
+                    Ok(Ok(())) => info!(message = "event processing loop completed gracefully"),
+                    Ok(Err(error)) => error!(
                         message = "event processing loop exited with an error",
                         ?error
                     ),
+                    Err(error) => error!(
+                        message = "event processing loop timed out during the shutdown",
+                        ?error
+                    ),
                 };
-            })),
-        ];
-        let mut futs: futures::stream::FuturesUnordered<_> = list.into_iter().collect();
-
-        while let Some(()) = futs.next().await {
-            trace!(message = "another future complete");
+            });
+            slot.bind(Box::pin(fut));
         }
 
+        lifecycle.run(global_shutdown).await;
         info!(message = "done");
         Ok(())
     }
 }
 
-fn create_event(line: bytes05::Bytes, file: String) -> Event {
+fn create_event(line: Bytes, file: String) -> Event {
     let mut event = Event::from(line);
 
     // Add source type.
@@ -289,27 +293,6 @@ fn create_event(line: bytes05::Bytes, file: String) -> Event {
     event.as_mut_log().insert(FILE_KEY, file);
 
     event
-}
-
-/// Takes a `future` and a oneshot channel as a `signal`, and returns a future
-/// that completes when the `future` errors or `signal` is sent or cancelled.
-/// If `signal` is sent or cancelled, the `future` is dropped (and not polled
-/// anymore).
-async fn cancel_on_signal<E, F>(
-    future: F,
-    signal: futures::channel::oneshot::Receiver<()>,
-) -> Result<(), E>
-where
-    F: std::future::Future<Output = Result<std::convert::Infallible, E>> + Unpin,
-{
-    use futures::future::Either;
-    match futures::future::select(future, signal).await {
-        Either::Left((future_result, _)) => match future_result {
-            Ok(_infallible) => unreachable!("ok value is infallible, thus impossible to reach"),
-            Err(err) => Err(err),
-        },
-        Either::Right((_signal_result, _)) => Ok(()),
-    }
 }
 
 /// This function returns the default value for `self_node_name` variable
