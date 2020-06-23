@@ -288,8 +288,6 @@ jobs:
         run: |
           set -xeuo pipefail
 
-          sudo apt-get install conntrack
-
           curl -Lo kubectl \
             'https://storage.googleapis.com/kubernetes-release/release/${{ matrix.kubernetes_version }}/bin/linux/amd64/kubectl'
           sudo install kubectl /usr/local/bin/
@@ -299,16 +297,16 @@ jobs:
           sudo install minikube /usr/local/bin/
 
           minikube config set profile minikube
-          minikube config set vm-driver none
+          minikube config set vm-driver docker
           minikube config set kubernetes-version '${{ matrix.kubernetes_version }}'
           minikube config set container-runtime '${{ matrix.container_runtime }}'
-          sudo minikube start
+          minikube start
           kubectl cluster-info
       - name: Checkout
         uses: actions/checkout@v1
       - run: USE_CONTAINER=none make slim-builds
       - run: make test-e2e-kubernetes
         env:
-          SKIP_CONTAINER_IMAGE_PUBLISHING: "true"
+          USE_MINIKUBE_CACHE: "true"
           CONTAINER_IMAGE_REPO: vector-test
           PACKAGE_DEB_USE_CONTAINER: docker
