@@ -1,4 +1,4 @@
-use super::batch::{Batch, BatchSize, PushResult};
+use super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
 use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -116,7 +116,9 @@ impl Batch for Buffer {
         // can't track compressed sizes. Keep a running count of the
         // number of bytes written instead.
         let new_bytes = self.num_bytes + item.len();
-        if self.num_items >= self.max_events || new_bytes > self.max_bytes {
+        if self.is_empty() && item.len() > self.max_bytes {
+            err_event_too_large(item.len())
+        } else if self.num_items >= self.max_events || new_bytes > self.max_bytes {
             PushResult::Overflow(item)
         } else {
             self.push(&item);
