@@ -266,24 +266,44 @@ jobs:
       - run: make test-integration-splunk
 
   test-e2e-kubernetes:
-    name: E2E - Linux, Kubernetes ${{ matrix.kubernetes }}
+    name: E2E - Kubernetes ${{ matrix.kubernetes_version }} / ${{ matrix.container_runtime }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        kubernetes:
-          - v1.18.4
-          - v1.17.7
-          - v1.16.11
-          - v1.15.12
-          - v1.14.10
+        minikube_version:
+          - 'v1.11.0'
+        kubernetes_version:
+          - 'v1.18.4'
+          - 'v1.17.7'
+          - 'v1.16.11'
+          - 'v1.15.12'
+          - 'v1.14.10'
+        container_runtime:
+          - docker
+          - crio
+          - containerd
       fail-fast: false
     steps:
       - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@v1.0.2
-        with:
-          minikube version: 'v1.11.0'
-          kubernetes version: '${{ matrix.kubernetes }}'
-          github token: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          set -xeuo pipefail
+
+          sudo apt-get install conntrack
+
+          curl -Lo kubectl \
+            'https://storage.googleapis.com/kubernetes-release/release/${{ matrix.kubernetes_version }}/bin/linux/amd64/kubectl'
+          sudo install kubectl /usr/local/bin/
+
+          curl -Lo minikube \
+            'https://storage.googleapis.com/minikube/releases/${{ matrix.minikube_version }}/minikube-linux-amd64'
+          sudo install minikube /usr/local/bin/
+
+          minikube config set profile minikube
+          minikube config set vm-driver none
+          minikube config set kubernetes-version '${{ matrix.kubernetes_version }}'
+          minikube config set container-runtime '${{ matrix.container_runtime }}'
+          sudo minikube start
+          kubectl cluster-info
       - name: Checkout
         uses: actions/checkout@v1
       - run: USE_CONTAINER=none make slim-builds
