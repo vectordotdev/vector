@@ -419,6 +419,43 @@ where
             self.service.poll_complete()
         }
     }
+
+    fn handle_full_batch(&mut self, item: B::Input, partition: &K) -> FullBatchResult<B::Input> {
+        trace!("Batch full; driving service to completion.");
+        if let Err(error) = self.poll_complete() {
+            return FullBatchResult::Result(Err(error));
+        }
+
+        match self.partitions.get_mut(partition) {
+            Some(batch) => {
+                if !batch.is_empty() {
+                    debug!(
+                        message = "Send buffer full; applying back pressure.",
+                        rate_limit_secs = 10
+                    );
+                    FullBatchResult::Result(Ok(AsyncSink::NotReady(item)))
+                } else {
+                    match batch.push(item) {
+                        PushResult::Ok(full) => {
+                            if full {
+                                if let Err(error) = self.poll_complete() {
+                                    return FullBatchResult::Result(Err(error));
+                                }
+                            }
+                            FullBatchResult::Result(Ok(AsyncSink::Ready))
+                        }
+                        PushResult::Overflow(_) => unreachable!("Empty buffer overflowed"),
+                    }
+                }
+            }
+            None => FullBatchResult::Continue(item),
+        }
+    }
+}
+
+enum FullBatchResult<T> {
+    Continue(T),
+    Result(StartSend<T, crate::Error>),
 }
 
 impl<B, S, K, Request, E> Sink for PartitionBatchSink<B, S, K, Request, E>
@@ -458,71 +495,32 @@ where
 
         let partition = item.partition();
 
-        let item = if let Some(batch) = self.partitions.get_mut(&partition) {
-            if batch.was_full() {
-                trace!("Batch full; driving service to completion.");
-                self.poll_complete()?;
-
-                if let Some(batch) = self.partitions.get_mut(&partition) {
-                    return if !batch.is_empty() {
-                        debug!(
-                            message = "Send buffer full; applying back pressure.",
-                            rate_limit_secs = 10
-                        );
-                        Ok(AsyncSink::NotReady(item))
-                    } else {
-                        match batch.push(item) {
-                            PushResult::Ok(full) => {
-                                if full {
-                                    self.poll_complete()?;
-                                }
-                                Ok(AsyncSink::Ready)
-                            }
-                            PushResult::Overflow(_) => unreachable!("Empty buffer overflowed"),
-                        }
-                    };
-                }
-                item
-            } else {
-                trace!("adding event to batch.");
-                match batch.push(item) {
-                    PushResult::Ok(full) => {
-                        if full {
-                            self.poll_complete()?;
-                        }
-                        return Ok(AsyncSink::Ready);
+        let item = match self.partitions.get_mut(&partition) {
+            Some(batch) => {
+                if batch.was_full() {
+                    match self.handle_full_batch(item, &partition) {
+                        FullBatchResult::Result(result) => return result,
+                        FullBatchResult::Continue(item) => item,
                     }
-                    PushResult::Overflow(item) => {
-                        trace!("Batch full; driving service to completion.");
-                        self.poll_complete()?;
-
-                        if let Some(batch) = self.partitions.get_mut(&partition) {
-                            return if batch.is_empty() {
-                                match batch.push(item) {
-                                    PushResult::Ok(full) => {
-                                        if full {
-                                            self.poll_complete()?;
-                                        }
-                                        Ok(AsyncSink::Ready)
-                                    }
-                                    PushResult::Overflow(_) => {
-                                        unreachable!("Empty buffer overflowed")
-                                    }
-                                }
-                            } else {
-                                debug!(
-                                    message = "Send buffer full; applying back pressure.",
-                                    rate_limit_secs = 10
-                                );
-                                Ok(AsyncSink::NotReady(item))
-                            };
+                } else {
+                    trace!("adding event to batch.");
+                    match batch.push(item) {
+                        PushResult::Ok(full) => {
+                            if full {
+                                self.poll_complete()?;
+                            }
+                            return Ok(AsyncSink::Ready);
                         }
-                        item
+                        PushResult::Overflow(item) => {
+                            match self.handle_full_batch(item, &partition) {
+                                FullBatchResult::Result(result) => return result,
+                                FullBatchResult::Continue(item) => item,
+                            }
+                        }
                     }
                 }
             }
-        } else {
-            item
+            None => item,
         };
 
         trace!("replacing batch.");
