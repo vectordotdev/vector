@@ -43,6 +43,7 @@ impl Compression {
 pub struct Buffer {
     inner: InnerBuffer,
     num_items: usize,
+    num_bytes: usize,
     max_bytes: usize,
     max_events: usize,
     compression: Compression,
@@ -70,6 +71,7 @@ impl Buffer {
         Self {
             inner,
             num_items: 0,
+            num_bytes: 0,
             max_bytes,
             max_events,
             compression,
@@ -110,10 +112,15 @@ impl Batch for Buffer {
     type Output = Vec<u8>;
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
-        if self.num_items >= self.max_events || self.size() + item.len() > self.max_bytes {
+        // The compressed encoders don't flush bytes immediately, so we
+        // can't track compressed sizes. Keep a running count of the
+        // number of bytes written instead.
+        let new_bytes = self.num_bytes + item.len();
+        if self.num_items >= self.max_events || new_bytes > self.max_bytes {
             PushResult::Overflow(item)
         } else {
             self.push(&item);
+            self.num_bytes = new_bytes;
             PushResult::Ok
         }
     }
