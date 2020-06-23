@@ -101,8 +101,8 @@ impl StatsdSvc {
 
         let sink = BatchSink::new(
             TowerCompat::new(svc),
-            Buffer::new(batch, Compression::None),
-            batch,
+            Buffer::new(batch.size, Compression::None),
+            batch.timeout,
             acker,
         )
         .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))

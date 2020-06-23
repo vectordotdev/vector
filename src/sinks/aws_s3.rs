@@ -212,11 +212,12 @@ impl S3Sink {
             .settings(request, S3RetryLogic)
             .service(s3);
 
-        let buffer = PartitionBuffer::new(Buffer::new(batch, config.compression));
+        let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
 
-        let sink = PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch, cx.acker())
-            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
-            .sink_map_err(|error| error!("Sink failed to flush: {}", error));
+        let sink =
+            PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch.timeout, cx.acker())
+                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
+                .sink_map_err(|error| error!("Sink failed to flush: {}", error));
 
         Ok(Box::new(sink))
     }

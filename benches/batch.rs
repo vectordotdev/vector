@@ -5,7 +5,7 @@ use std::convert::Infallible;
 use std::time::Duration;
 use vector::buffers::Acker;
 use vector::sinks::util::{
-    Batch, BatchSettings, BatchSink, Buffer, Compression, Partition, PartitionBatchSink, PushResult,
+    Batch, BatchSink, BatchSize, Buffer, Compression, Partition, PartitionBatchSink, PushResult,
 };
 use vector::test_util::random_lines;
 
@@ -28,15 +28,14 @@ fn batching(
             |input| {
                 let mut rt = vector::test_util::runtime();
                 let (acker, _) = Acker::new_for_testing();
-                let batch = BatchSettings {
+                let batch = BatchSize {
                     bytes: max_bytes,
                     events: num_events,
-                    timeout: Duration::from_secs(1),
                 };
                 let batch_sink = BatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
                     Buffer::new(batch, compression),
-                    batch,
+                    Duration::from_secs(1),
                     acker,
                 )
                 .sink_map_err(|e| panic!(e));
@@ -74,15 +73,14 @@ fn partitioned_batching(
             |input| {
                 let mut rt = vector::test_util::runtime();
                 let (acker, _) = Acker::new_for_testing();
-                let batch = BatchSettings {
+                let batch = BatchSize {
                     bytes: max_bytes,
                     events: num_events,
-                    timeout: Duration::from_secs(1),
                 };
                 let batch_sink = PartitionBatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
                     PartitionedBuffer::new(batch, compression),
-                    batch,
+                    Duration::from_secs(1),
                     acker,
                 )
                 .sink_map_err(|e| panic!(e));
@@ -170,7 +168,7 @@ impl Partition<Bytes> for InnerBuffer {
 }
 
 impl PartitionedBuffer {
-    pub fn new(batch: BatchSettings, compression: Compression) -> Self {
+    pub fn new(batch: BatchSize, compression: Compression) -> Self {
         Self {
             inner: Buffer::new(batch, compression),
             key: None,

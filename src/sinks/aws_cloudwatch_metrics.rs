@@ -95,8 +95,8 @@ impl CloudWatchMetricsSvc {
             .batch_sink(
                 CloudWatchMetricsRetryLogic,
                 cloudwatch_metrics,
-                MetricBuffer::new(batch),
-                batch,
+                MetricBuffer::new(batch.size),
+                batch.timeout,
                 cx.acker(),
             )
             .sink_map_err(|e| error!("CloudwatchMetrics sink error: {}", e));

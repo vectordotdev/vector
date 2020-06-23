@@ -110,8 +110,8 @@ impl KinesisFirehoseService {
             .batch_sink(
                 KinesisFirehoseRetryLogic,
                 kinesis,
-                VecBuffer::new(batch),
-                batch,
+                VecBuffer::new(batch.size),
+                batch.timeout,
                 cx.acker(),
             )
             .sink_map_err(|e| error!("Fatal kinesis firehose sink error: {}", e))

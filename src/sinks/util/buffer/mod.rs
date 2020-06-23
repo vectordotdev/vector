@@ -1,4 +1,4 @@
-use super::batch::{Batch, BatchSettings, PushResult};
+use super::batch::{Batch, BatchSize, PushResult};
 use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -55,7 +55,7 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
-    pub fn new(settings: BatchSettings, compression: Compression) -> Self {
+    pub fn new(settings: BatchSize, compression: Compression) -> Self {
         Self::new_with_settings(settings.bytes, settings.events, compression)
     }
 
@@ -144,7 +144,7 @@ impl Batch for Buffer {
 mod test {
     use super::{Buffer, Compression};
     use crate::buffers::Acker;
-    use crate::sinks::util::{BatchSettings, BatchSink};
+    use crate::sinks::util::{BatchSink, BatchSize};
     use crate::test_util::runtime;
     use futures01::{future, Future, Sink};
     use std::io::Read;
@@ -169,16 +169,16 @@ mod test {
 
             future::ok::<_, std::io::Error>(())
         });
-        let batch = BatchSettings {
-            timeout: Duration::from_secs(0),
+        let batch_size = BatchSize {
             bytes: 1000,
             events: 1000,
         };
+        let timeout = Duration::from_secs(0);
 
         let buffered = BatchSink::with_executor(
             svc,
-            Buffer::new(batch, Compression::Gzip),
-            batch,
+            Buffer::new(batch_size, Compression::Gzip),
+            timeout,
             acker,
             rt.executor(),
         );

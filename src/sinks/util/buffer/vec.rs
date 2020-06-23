@@ -1,4 +1,4 @@
-use super::super::{Batch, BatchSettings, PushResult};
+use super::super::{Batch, BatchSize, PushResult};
 
 #[derive(Clone)]
 pub struct VecBuffer<T> {
@@ -7,7 +7,7 @@ pub struct VecBuffer<T> {
 }
 
 impl<T> VecBuffer<T> {
-    pub fn new(settings: BatchSettings) -> Self {
+    pub fn new(settings: BatchSize) -> Self {
         Self::new_with_max(settings.events)
     }
 

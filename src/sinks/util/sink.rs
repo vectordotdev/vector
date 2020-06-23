@@ -32,7 +32,7 @@
 //! driven independently from the sink. A oneshot channel is used to tie them back into
 //! the sink to allow it to notify the consumer that the request has succeeded.
 
-use super::batch::{Batch, BatchSettings, PushResult, StatefulBatch};
+use super::batch::{Batch, PushResult, StatefulBatch};
 use super::buffer::partition::Partition;
 use crate::buffers::Acker;
 use futures01::{
@@ -46,7 +46,7 @@ use std::{
     fmt,
     hash::Hash,
     marker::PhantomData,
-    time::Instant,
+    time::{Duration, Instant},
 };
 use tokio01::{
     executor::{DefaultExecutor, Executor},
@@ -137,7 +137,7 @@ impl<T: Sink> Sink for StreamSink<T> {
 pub struct BatchSink<S, B, Request, E = DefaultExecutor> {
     service: ServiceSink<S, Request>,
     batch: StatefulBatch<B>,
-    settings: BatchSettings,
+    timeout: Duration,
     linger: Option<Delay>,
     closing: bool,
     exec: E,
@@ -152,8 +152,8 @@ where
     S::Response: Response,
     B: Batch<Output = Request>,
 {
-    pub fn new(service: S, batch: B, settings: BatchSettings, acker: Acker) -> Self {
-        BatchSink::with_executor(service, batch, settings, acker, DefaultExecutor::current())
+    pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
+        BatchSink::with_executor(service, batch, timeout, acker, DefaultExecutor::current())
     }
 }
 
@@ -166,19 +166,13 @@ where
     B: Batch<Output = Request>,
     E: Executor,
 {
-    pub fn with_executor(
-        service: S,
-        batch: B,
-        settings: BatchSettings,
-        acker: Acker,
-        exec: E,
-    ) -> Self {
+    pub fn with_executor(service: S, batch: B, timeout: Duration, acker: Acker, exec: E) -> Self {
         let service = ServiceSink::new(service, acker);
 
         Self {
             service,
             batch: batch.into(),
-            settings,
+            timeout,
             linger: None,
             closing: false,
             exec,
@@ -217,9 +211,7 @@ where
 
             if !self.batch.is_empty() {
                 debug!(
-                    message = "Batch full; applying back pressure.",
-                    bytes = %self.settings.bytes,
-                    events = %self.settings.events,
+                    message = "Batch buffer full; applying back pressure.",
                     rate_limit_secs = 10
                 );
                 return Ok(AsyncSink::NotReady(item));
@@ -230,7 +222,7 @@ where
             trace!("Starting new batch timer.");
             // We just inserted the first item of a new batch, so set our delay to the longest time
             // we want to allow that item to linger in the batch before being flushed.
-            let deadline = Instant::now() + self.settings.timeout;
+            let deadline = Instant::now() + self.timeout;
             self.linger = Some(Delay::new(deadline));
         }
 
@@ -298,7 +290,7 @@ where
         f.debug_struct("BatchSink")
             .field("service", &self.service)
             .field("batch", &self.batch)
-            .field("settings", &self.settings)
+            .field("timeout", &self.timeout)
             .finish()
     }
 }
@@ -326,7 +318,7 @@ pub struct PartitionBatchSink<B, S, K, Request, E = DefaultExecutor> {
     service: ServiceSink<S, Request>,
     exec: E,
     partitions: HashMap<K, StatefulBatch<B>>,
-    settings: BatchSettings,
+    timeout: Duration,
     closing: bool,
     sending: VecDeque<B>,
     lingers: FuturesUnordered<LingerDelay<K>>,
@@ -348,11 +340,11 @@ where
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
 {
-    pub fn new(service: S, batch: B, settings: BatchSettings, acker: Acker) -> Self {
+    pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
         PartitionBatchSink::with_executor(
             service,
             batch,
-            settings,
+            timeout,
             acker,
             DefaultExecutor::current(),
         )
@@ -370,13 +362,7 @@ where
     S::Response: Response,
     E: Executor,
 {
-    pub fn with_executor(
-        service: S,
-        batch: B,
-        settings: BatchSettings,
-        acker: Acker,
-        exec: E,
-    ) -> Self {
+    pub fn with_executor(service: S, batch: B, timeout: Duration, acker: Acker, exec: E) -> Self {
         let service = ServiceSink::new(service, acker);
 
         Self {
@@ -384,7 +370,7 @@ where
             service,
             exec,
             partitions: HashMap::new(),
-            settings,
+            timeout,
             closing: false,
             sending: VecDeque::new(),
             lingers: FuturesUnordered::new(),
@@ -396,7 +382,7 @@ where
         let (tx, rx) = oneshot::channel();
         let partition_clone = partition.clone();
 
-        let deadline = Instant::now() + self.settings.timeout;
+        let deadline = Instant::now() + self.timeout;
         let delay = Delay::new(deadline)
             .map(move |_| LingerState::Elapsed(partition_clone))
             .map_err(|_| ());
@@ -609,7 +595,7 @@ where
         f.debug_struct("PartitionedBatchSink")
             .field("batch", &self.batch)
             .field("service", &self.service)
-            .field("settings", &self.settings)
+            .field("timeout", &self.timeout)
             .finish()
     }
 }
@@ -755,7 +741,7 @@ mod tests {
     use super::*;
     use crate::buffers::Acker;
     use crate::sinks::util::{
-        buffer::partition::Partition, BatchSettings, Buffer, Compression, VecBuffer,
+        buffer::partition::Partition, BatchSize, Buffer, Compression, VecBuffer,
     };
     use crate::test_util::runtime;
     use bytes::Bytes;
@@ -766,11 +752,11 @@ mod tests {
     };
     use tokio01_test::clock::MockClock;
 
-    const SETTINGS: BatchSettings = BatchSettings {
+    const BATCH_SIZE: BatchSize = BatchSize {
         events: 10,
         bytes: 9999,
-        timeout: Duration::from_secs(10),
     };
+    const TIMEOUT: Duration = Duration::from_secs(10);
 
     #[test]
     fn batch_sink_acking_sequential() {
@@ -783,8 +769,8 @@ mod tests {
         let svc = tower::service_fn(|_| future::ok::<_, std::io::Error>(()));
         let buffered = BatchSink::with_executor(
             svc,
-            VecBuffer::new(SETTINGS),
-            SETTINGS,
+            VecBuffer::new(BATCH_SIZE),
+            TIMEOUT,
             acker,
             rt.executor(),
         );
@@ -831,13 +817,18 @@ mod tests {
             Delay::new(deadline).map(drop)
         });
 
-        let settings = BatchSettings {
+        let batch_size = BatchSize {
             events: 1,
-            ..SETTINGS
+            ..BATCH_SIZE
         };
 
-        let mut sink =
-            BatchSink::with_executor(svc, VecBuffer::new(settings), settings, acker, exec.clone());
+        let mut sink = BatchSink::with_executor(
+            svc,
+            VecBuffer::new(batch_size),
+            TIMEOUT,
+            acker,
+            exec.clone(),
+        );
 
         let _ = clock.enter(|handle| {
             assert!(sink.start_send(0).unwrap().is_ready());
@@ -904,8 +895,8 @@ mod tests {
         });
         let buffered = BatchSink::with_executor(
             svc,
-            VecBuffer::new(SETTINGS),
-            SETTINGS,
+            VecBuffer::new(BATCH_SIZE),
+            TIMEOUT,
             acker,
             rt.executor(),
         );
@@ -946,8 +937,8 @@ mod tests {
         });
         let mut buffered = BatchSink::with_executor(
             svc,
-            VecBuffer::new(SETTINGS),
-            SETTINGS,
+            VecBuffer::new(BATCH_SIZE),
+            TIMEOUT,
             acker,
             rt.executor(),
         );
@@ -980,8 +971,8 @@ mod tests {
         });
         let mut buffered = BatchSink::with_executor(
             svc,
-            VecBuffer::new(SETTINGS),
-            SETTINGS,
+            VecBuffer::new(BATCH_SIZE),
+            TIMEOUT,
             acker,
             rt.executor(),
         );
@@ -991,7 +982,7 @@ mod tests {
             assert!(buffered.start_send(1).unwrap().is_ready());
 
             // Move clock forward by linger timeout + 1 sec
-            handle.advance(SETTINGS.timeout + Duration::from_secs(1));
+            handle.advance(TIMEOUT + Duration::from_secs(1));
 
             future::poll_fn(|| buffered.poll_complete()).wait().unwrap();
         });
@@ -1017,8 +1008,8 @@ mod tests {
         });
         let buffered = BatchSink::with_executor(
             svc,
-            Buffer::new(SETTINGS, Compression::None),
-            SETTINGS,
+            Buffer::new(BATCH_SIZE, Compression::None),
+            TIMEOUT,
             acker,
             rt.executor(),
         );
@@ -1065,8 +1056,8 @@ mod tests {
         });
         let buffered = PartitionBatchSink::with_executor(
             svc,
-            VecBuffer::new(SETTINGS),
-            SETTINGS,
+            VecBuffer::new(BATCH_SIZE),
+            TIMEOUT,
             acker,
             rt.executor(),
         );
@@ -1102,15 +1093,15 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
 
-        let settings = BatchSettings {
+        let batch_size = BatchSize {
             events: 1,
-            ..SETTINGS
+            ..BATCH_SIZE
         };
 
         let buffered = PartitionBatchSink::with_executor(
             svc,
-            VecBuffer::new(settings),
-            settings,
+            VecBuffer::new(batch_size),
+            TIMEOUT,
             acker,
             rt.executor(),
         );
@@ -1142,15 +1133,15 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
 
-        let settings = BatchSettings {
+        let batch_size = BatchSize {
             events: 2,
-            ..SETTINGS
+            ..BATCH_SIZE
         };
 
         let buffered = PartitionBatchSink::with_executor(
             svc,
-            VecBuffer::new(settings),
-            settings,
+            VecBuffer::new(batch_size),
+            TIMEOUT,
             acker,
             rt.executor(),
         );
@@ -1191,8 +1182,8 @@ mod tests {
 
         let mut buffered = PartitionBatchSink::with_executor(
             svc,
-            VecBuffer::new(SETTINGS),
-            SETTINGS,
+            VecBuffer::new(BATCH_SIZE),
+            TIMEOUT,
             acker,
             rt.executor(),
         );

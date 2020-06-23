@@ -118,8 +118,8 @@ impl InfluxDBSvc {
             .batch_sink(
                 HttpRetryLogic,
                 influxdb_http_service,
-                MetricBuffer::new(batch),
-                batch,
+                MetricBuffer::new(batch.size),
+                batch.timeout,
                 cx.acker(),
             )
             .sink_map_err(|e| error!("Fatal influxdb sink error: {}", e));

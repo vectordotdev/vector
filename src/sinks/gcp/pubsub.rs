@@ -85,9 +85,9 @@ impl SinkConfig for PubsubConfig {
 
         let sink = BatchedHttpSink::new(
             sink,
-            JsonArrayBuffer::new(batch_settings),
+            JsonArrayBuffer::new(batch_settings.size),
             request_settings,
-            batch_settings,
+            batch_settings.timeout,
             Some(tls_settings),
             &cx,
         )

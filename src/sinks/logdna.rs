@@ -73,9 +73,9 @@ impl SinkConfig for LogdnaConfig {
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            JsonArrayBuffer::new(batch_settings),
+            JsonArrayBuffer::new(batch_settings.size),
             request_settings,
-            batch_settings,
+            batch_settings.timeout,
             None,
             &cx,
         )

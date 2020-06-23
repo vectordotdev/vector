@@ -57,8 +57,10 @@ impl BatchConfig {
 
     pub fn get_settings_or_default(&self, defaults: BatchSettings) -> BatchSettings {
         BatchSettings {
-            bytes: self.max_bytes.unwrap_or(defaults.bytes),
-            events: self.max_events.unwrap_or(defaults.events),
+            size: BatchSize {
+                bytes: self.max_bytes.unwrap_or(defaults.size.bytes),
+                events: self.max_events.unwrap_or(defaults.size.events),
+            },
             timeout: self
                 .timeout_secs
                 .map(|secs| Duration::from_secs(secs))
@@ -68,9 +70,14 @@ impl BatchConfig {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct BatchSettings {
+pub struct BatchSize {
     pub bytes: usize,
     pub events: usize,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BatchSettings {
+    pub size: BatchSize,
     pub timeout: Duration,
 }
 
@@ -78,12 +85,21 @@ impl BatchSettings {
     // Fake the builder pattern
     pub fn bytes(self, bytes: u64) -> Self {
         Self {
-            bytes: bytes as usize,
+            size: BatchSize {
+                bytes: bytes as usize,
+                ..self.size
+            },
             ..self
         }
     }
     pub fn events(self, events: usize) -> Self {
-        Self { events, ..self }
+        Self {
+            size: BatchSize {
+                events,
+                ..self.size
+            },
+            ..self
+        }
     }
     pub fn timeout(self, secs: u64) -> Self {
         Self {

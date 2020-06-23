@@ -222,11 +222,12 @@ impl GcsSink {
             .settings(request, GcsRetryLogic)
             .service(self);
 
-        let buffer = PartitionBuffer::new(Buffer::new(batch, config.compression));
+        let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
 
-        let sink = PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch, cx.acker())
-            .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
-            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
+        let sink =
+            PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch.timeout, cx.acker())
+                .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
+                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(Box::new(sink))
     }

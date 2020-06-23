@@ -91,9 +91,9 @@ impl SinkConfig for LokiConfig {
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            VecBuffer::new(batch_settings),
+            VecBuffer::new(batch_settings.size),
             request_settings,
-            batch_settings,
+            batch_settings.timeout,
             Some(tls),
             &cx,
         )

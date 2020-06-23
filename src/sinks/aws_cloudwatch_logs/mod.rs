@@ -162,8 +162,8 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             )?);
 
         let sink = {
-            let buffer = PartitionBuffer::new(VecBuffer::new(batch));
-            let svc_sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+            let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
+            let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
                 .sink_map_err(|e| error!("Fatal cloudwatchlogs sink error: {}", e))
                 .with_flat_map(move |event| iter_ok(partition(event, &log_group, &log_stream)));
             Box::new(svc_sink)

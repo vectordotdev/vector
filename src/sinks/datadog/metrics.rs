@@ -124,8 +124,15 @@ impl SinkConfig for DatadogConfig {
             last_sent_timestamp: AtomicI64::new(timestamp),
         };
 
-        let sink = BatchedHttpSink::new(sink, MetricBuffer::new(batch), request, batch, None, &cx)
-            .sink_map_err(|e| error!("Fatal datadog error: {}", e));
+        let sink = BatchedHttpSink::new(
+            sink,
+            MetricBuffer::new(batch.size),
+            request,
+            batch.timeout,
+            None,
+            &cx,
+        )
+        .sink_map_err(|e| error!("Fatal datadog error: {}", e));
 
         Ok((Box::new(sink), Box::new(healthcheck)))
     }

@@ -108,9 +108,9 @@ impl SinkConfig for InfluxDBLogsConfig {
 
         let sink = BatchedHttpSink::new(
             sink,
-            Buffer::new(batch, Compression::None),
+            Buffer::new(batch.size, Compression::None),
             request,
-            batch,
+            batch.timeout,
             None,
             &cx,
         )
