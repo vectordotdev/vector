@@ -266,7 +266,7 @@ jobs:
       - run: make test-integration-splunk
 
   test-e2e-kubernetes:
-    name: E2E - Kubernetes ${{ matrix.kubernetes_version }} / ${{ matrix.container_runtime }}
+    name: E2E - K8s ${{ matrix.kubernetes_version }} / ${{ matrix.container_runtime }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
