@@ -688,8 +688,9 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         tokio::spawn(async move {
             // Wait for two minutes - a reasonable time for vector internals to
             // pick up new `Pod` and collect events from them in idle load.
-            println!("Starting stop timer");
-            tokio::time::delay_for(std::time::Duration::from_secs(120)).await;
+            let duration = std::time::Duration::from_secs(120);
+            println!("Starting stop timer, due in {} seconds", duration.as_secs());
+            tokio::time::delay_for(duration).await;
             println!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
