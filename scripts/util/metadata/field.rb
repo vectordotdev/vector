@@ -101,7 +101,7 @@ class Field
     end
 
     if wildcard? && !object?
-      if @examples.any? { |example| !example.is_a?(Hash) }
+      if !@examples.any? { |example| example.is_a?(Hash) }
         raise ArgumentError.new("#{@name}#examples must be a hash with name/value keys when the name is \"*\"")
       end
     end

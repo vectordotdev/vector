@@ -2971,12 +2971,10 @@ require('custom_module')
     # * required
     # * type: string
     # * enum: "array", "concat", "discard", "sum", "max", and "min"
-    `[field_name]` = "array"
-    `[field_name]` = "concat"
-    `[field_name]` = "discard"
-    `[field_name]` = "sum"
-    `[field_name]` = "max"
-    `[field_name]` = "min"
+    method = "discard"
+    path = "discard"
+    duration_ms = "sum"
+    query = "array"
 
 # Accepts and outputs `log` events, allowing you to execute **experimental** WASM plugins.
 [transforms.wasm]
