@@ -16,7 +16,8 @@ pub enum BatchError {
 pub struct BatchConfig {
     pub max_bytes: Option<usize>,
     pub max_events: Option<usize>,
-    // This field is deprecated, left in for backwards compatibility
+    /// Deprecated. Left in for backwards compatibility, use `max_bytes`
+    /// or `max_events` instead.
     pub max_size: Option<usize>,
     pub timeout_secs: Option<u64>,
 }
