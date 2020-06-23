@@ -72,3 +72,15 @@ Define the name of the ConfigMap
 {{- .Values.existingConfigMap }}
 {{- end }}
 {{- end }}
+
+{{/*
+Resolve the actual image tag to use.
+*/}}
+{{- define "vector.imageTag" -}}
+{{- if .Values.image.tag }}
+{{- .Values.image.tag }}
+{{- else }}
+{{- $version := default .Chart.AppVersion .Values.image.version }}
+{{- printf "%s-%s" $version .Values.image.base }}
+{{- end }}
+{{- end }}

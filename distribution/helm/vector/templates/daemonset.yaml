@@ -32,7 +32,7 @@ spec:
         - name: vector
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.repository }}:{{ include "vector.imageTag" . }}"
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
           env:
             - name: VECTOR_SELF_NODE_NAME
