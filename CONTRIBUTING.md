@@ -674,9 +674,9 @@ You can also pass additional parameters to adjust the behavior of the test:
   build. Useful for development of the tests or Vector code to speed up the
   iteration cycles.
 
-* `USE_MINIKUBE_DOCKER=true` - instead of pushing the built docker image to the
-  registry under the specified name, directly inject the image into a docker
-  instance running inside of a `minikube`-controlled cluster node.
+* `USE_MINIKUBE_CACHE=true` - instead of pushing the built docker image to the
+  registry under the specified name, directly load the image into
+  a `minikube`-controlled cluster node.
   Requires you to test against a `minikube` cluster. Eliminates the need to have
   a registry to run tests.
 

@@ -25,7 +25,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
   # also not work if you k8s cluster doesn't have network connectivity to the
   # registry.
   #
-  # Hint #2: if using with minikube, set `USE_MINIKUBE_DOCKER` to `true` and use
+  # Hint #2: if using with minikube, set `USE_MINIKUBE_CACHE` to `true` and use
   # any value for `CONTAINER_IMAGE_REPO` (for instance, `vector-test` will do).
   #
   CONTAINER_IMAGE_REPO="${CONTAINER_IMAGE_REPO:?"You have to specify CONTAINER_IMAGE_REPO to upload the test image to."}"
@@ -70,18 +70,16 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
 fi
 
 if [[ -z "${SKIP_CONTAINER_IMAGE_PUBLISHING:-}" ]]; then
-  # Whether to use minikube docker.
+  # Whether to use minikube cache to pass image to the k8s cluster.
   # After we build vector docker image, instead of pushing to the remote repo,
-  # we'll be exporting it to a file after (from the "host" docker engine), and
-  # then importing that file into the minikube in-cluster docker engine, that
-  # nodes have access to.
+  # we'll be using `minikube cache` to make image available to the cluster.
   # This effectively eliminates the requirement to have a docker registry, but
   # it requires that we run against minikube cluster.
-  USE_MINIKUBE_DOCKER="${USE_MINIKUBE_DOCKER:-"false"}"
+  USE_MINIKUBE_CACHE="${USE_MINIKUBE_CACHE:-"false"}"
 
   # Make the container image accessible to the k8s cluster.
-  if [[ "$USE_MINIKUBE_DOCKER" == "true" ]]; then
-    scripts/copy-docker-image-to-minikube.sh "$CONTAINER_IMAGE"
+  if [[ "$USE_MINIKUBE_CACHE" == "true" ]]; then
+    minikube cache add "$CONTAINER_IMAGE"
   else
     docker push "$CONTAINER_IMAGE"
   fi
