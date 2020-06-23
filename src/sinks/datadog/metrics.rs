@@ -173,7 +173,7 @@ impl HttpSink for DatadogSink {
 fn build_uri(host: &str) -> crate::Result<Uri> {
     let uri = format!("{}/api/v1/series", host)
         .parse::<Uri>()
-        .context(super::UriParseError2)?;
+        .context(super::UriParseError)?;
 
     Ok(uri)
 }
@@ -181,7 +181,7 @@ fn build_uri(host: &str) -> crate::Result<Uri> {
 async fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result<()> {
     let uri = format!("{}/api/v1/validate", config.host)
         .parse::<Uri>()
-        .context(super::UriParseError2)?;
+        .context(super::UriParseError)?;
 
     let request = Request::get(uri)
         .header("DD-API-KEY", config.api_key)

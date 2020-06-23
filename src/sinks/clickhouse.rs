@@ -175,7 +175,7 @@ fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
         format!("{}/?{}", host, query)
     };
 
-    Ok(url.parse::<Uri>().context(super::UriParseError2)?)
+    Ok(url.parse::<Uri>().context(super::UriParseError)?)
 }
 
 #[derive(Clone)]
