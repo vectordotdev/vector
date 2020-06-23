@@ -197,12 +197,11 @@ impl Source {
             max_line_bytes: 32 * 1024, // 32 KiB
             data_dir,
             glob_minimum_cooldown: Duration::from_secs(10),
-            fingerprinter: Fingerprinter::Checksum {
-                // This value is based on the smallest meaningful log file size,
-                // taking into account Docker and CRI log formats.
-                fingerprint_bytes: 40,
-                ignored_header_bytes: 0,
-            },
+            // Use device inodes for fingerprinting.
+            // - Docker recreates files on rotation: https://github.com/moby/moby/blob/75d655320e2a443185f8fa4992dc89bd2da0ea68/daemon/logger/loggerutils/logfile.go#L182-L222
+            // - CRI-O recreates files on rotation: https://github.com/cri-o/cri-o/blob/ad83d2a35a30b8a336b16a0ea5f7afc6aebfb9b7/internal/oci/runtime_oci.go#L988-L1042
+            // The rest should do the same.
+            fingerprinter: Fingerprinter::DevInode,
             oldest_first: false,
             remove_after: None,
         };
