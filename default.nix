@@ -1,22 +1,20 @@
 rec {
-  # Output Artifacts
-  releases = rec {
-    binaries = rec {
-      x86_64-unknown-linux-gnu = tasks.binary targets.x86_64-unknown-linux-gnu;
-      x86_64-unknown-linux-musl = tasks.binary targets.x86_64-unknown-linux-musl;
-    };
-    containers = rec {
-      x86_64-unknown-linux-gnu = tasks.docker {
-        tag = "gnu";
-        binary = releases.binaries.x86_64-unknown-linux-gnu;
+  target = {
+    # Output Artifacts
+    releases = rec {
+      x86_64-unknown-linux-gnu = rec {
+        binary = tasks.binary targets.x86_64-unknown-linux-gnu;
+        docker = tasks.docker { tag = "gnu"; binary = binary; };
+        all = [ binary docker ];
       };
-      x86_64-unknown-linux-musl = tasks.docker {
-        tag = "musl";
-        binary = releases.binaries.x86_64-unknown-linux-musl;
+      x86_64-unknown-linux-musl = rec {
+        binary = tasks.binary targets.x86_64-unknown-linux-musl;
+        docker = tasks.docker { tag = "gnu"; binary = binary; };
+        all = [ binary docker ];
       };
+      all = [ x86_64-unknown-linux-gnu x86_64-unknown-linux-musl ];
     };
   };
-
   ### Development code.
 
   cargoToml = (builtins.fromTOML (builtins.readFile ./Cargo.toml));

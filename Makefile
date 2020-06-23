@@ -13,6 +13,8 @@ else
     export DEFAULT_FEATURES = default
 endif
 
+# Build type to use
+BUILD_TYPE ?= "debug"
 # Override this with any scopes for testing/benching.
 export SCOPE ?= ""
 # Override to false to disable autospawning services on integration tests.
@@ -428,42 +430,44 @@ package-rpm-aarch64: package-archive-aarch64-unknown-linux-musl ## Build the aar
 	$(RUN) package-rpm-aarch64
 
 ##@ Releasing
-
-.PHONY: neu-release-binary
-neu-release-binary: DRY_RUN ?= false
-neu-release-binary: RUST_TARGET ?= ${RUST_TARGET}
-neu-release-binary: target/releases/binaries/${RUST_TARGET}
-
-target/releases/binaries/%: BUILD_TYPE ?= "debug"
-target/releases/binaries/%:
+define NIX_BUILD
 	nix build \
 		$(if $(findstring true,$(VERBOSE)),--verbose --show-trace --print-build-logs,) \
 		$(if $(findstring true,$(DRY_RUN)),--dry-run,) \
 		--argstr buildType $(BUILD_TYPE) \
 		--file default.nix \
-		--out-link $@ \
-		releases.binaries.$(notdir $@)
+		--out-link target/releases/
+endef
 
-.PHONY: neu-release-binary-x86_64-unknown-linux-gnu
-neu-release-binary-x86_64-unknown-linux-gnu: target/releases/binaries/x86_64-unknown-linux-gnu
+.PHONY: release-all
+release:
+	$(NIX_BUILD) target.releases.all
 
-.PHONY: neu-release-binary-x86_64-unknown-linux-musl
-neu-release-binary-x86_64-unknown-linux-musl: target/releases/binaries/x86_64-unknown-linux-musl
+.PHONY: release-x86_64-unknown-linux-gnu
+release-x86_64-unknown-linux-gnu:
+	$(NIX_BUILD) target.releases.x86_64-unknown-linux-gnu.all
 
-target/releases/containers/%: BUILD_TYPE ?= "debug"
-target/releases/containers/%:
-	nix build \
-		$(if $(findstring true,$(VERBOSE)),--verbose --show-trace --print-build-logs,) \
-		$(if $(findstring true,$(DRY_RUN)),--dry-run,) \
-		--argstr buildType $(BUILD_TYPE) \
-		--file default.nix \
-		--out-link $@ \
-		releases.containers.$(notdir $@)
+.PHONY: release-x86_64-unknown-linux-gnu-binary
+release-x86_64-unknown-linux-gnu-binary:
+	$(NIX_BUILD) target.releases.x86_64-unknown-linux-gnu.binary
 
-.PHONY: neu-release-container-x86_64-unknown-linux-gnu
-neu-release-container-x86_64-unknown-linux-gnu: target/releases/containers/x86_64-unknown-linux-gnu
+.PHONY: release-x86_64-unknown-linux-gnu-docker
+release-x86_64-unknown-linux-gnu-docker:
+	$(NIX_BUILD) target.releases.x86_64-unknown-linux-gnu.docker
 
-release: release-prepare generate release-commit ## Release a new Vector version
+.PHONY: release-x86_64-unknown-linux-musl
+release-x86_64-unknown-linux-musl:
+	$(NIX_BUILD) target.releases.x86_64-unknown-linux-musl.all
+
+.PHONY: release-x86_64-unknown-linux-musl-binary
+release-x86_64-unknown-linux-musl-binary:
+	$(NIX_BUILD) target.releases.x86_64-unknown-linux-musl.binary
+
+.PHONY: release-x86_64-unknown-linux-musl-docker
+release-x86_64-unknown-linux-musl-docker:
+	$(NIX_BUILD) target.releases.x86_64-unknown-linux-musl.docker
+
+# release: release-prepare generate release-commit ## Release a new Vector version
 
 release-commit: ## Commits release changes
 	$(RUN) release-commit
