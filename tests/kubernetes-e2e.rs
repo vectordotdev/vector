@@ -28,13 +28,6 @@ data:
 
 const BUSYBOX_IMAGE: &str = "busybox:1.28";
 
-fn repeating_echo_cmd(marker: &str) -> String {
-    format!(
-        r#"echo before; i=0; while [ $i -le 600 ]; do sleep 0.1; echo "{}"; i=$((i+1)); done"#,
-        marker
-    )
-}
-
 fn make_framework() -> Framework {
     let interface = Interface::from_env().expect("interface is not ready");
     Framework::new(interface)
