@@ -79,22 +79,16 @@ impl BatchSettings {
     pub fn bytes(self, bytes: u64) -> Self {
         Self {
             bytes: bytes as usize,
-            events: self.events,
-            timeout: self.timeout,
+            ..self
         }
     }
     pub fn events(self, events: usize) -> Self {
-        Self {
-            bytes: self.bytes,
-            events,
-            timeout: self.timeout,
-        }
+        Self { events, ..self }
     }
     pub fn timeout(self, secs: u64) -> Self {
         Self {
-            bytes: self.bytes,
-            events: self.events,
             timeout: Duration::from_secs(secs),
+            ..self
         }
     }
 }
