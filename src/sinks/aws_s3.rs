@@ -594,7 +594,7 @@ mod integration_tests {
                 key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
                 filename_time_format: Some("waitsforfullbatch".into()),
                 filename_append_uuid: Some(false),
-                ..config(1000).await
+                ..config(1010).await
             };
             let prefix = config.key_prefix.clone();
             let sink = S3Sink::new(&config, cx).unwrap();
@@ -646,7 +646,7 @@ mod integration_tests {
                 key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
                 filename_time_format: Some("waitsforfullbatch".into()),
                 filename_append_uuid: Some(false),
-                ..config(1000).await
+                ..config(1010).await
             }
         });
 
@@ -714,7 +714,7 @@ mod integration_tests {
             let config = S3SinkConfig {
                 compression: Compression::Gzip,
                 filename_time_format: Some("%S%f".into()),
-                ..config(1000).await
+                ..config(10000).await
             };
 
             let prefix = config.key_prefix.clone();
@@ -725,7 +725,7 @@ mod integration_tests {
             let _ = sink.send_all(events).compat().await.unwrap();
 
             let keys = get_keys(prefix.unwrap()).await;
-            assert_eq!(keys.len(), 2);
+            assert_eq!(keys.len(), 6);
 
             let response_lines = stream::iter(keys).fold(Vec::new(), |mut acc, key| async {
                 assert!(key.ends_with(".log.gz"));
