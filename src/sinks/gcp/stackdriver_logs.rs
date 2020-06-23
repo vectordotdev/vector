@@ -13,10 +13,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{
-    future::{ok as ready_ok, BoxFuture},
-    FutureExt, TryFutureExt,
-};
+use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http02::{Request, Uri};
 use hyper::Body;
@@ -158,6 +155,7 @@ impl SinkConfig for StackdriverConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for StackdriverSink {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
@@ -180,10 +178,7 @@ impl HttpSink for StackdriverSink {
         Some(entry)
     }
 
-    fn build_request(
-        &self,
-        events: Self::Output,
-    ) -> BoxFuture<'static, crate::Result<Request<Vec<u8>>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let events = serde_json::json!({
             "log_name": self.config.log_name(),
             "entries": events,
@@ -204,7 +199,7 @@ impl HttpSink for StackdriverSink {
             creds.apply2(&mut request);
         }
 
-        Box::pin(ready_ok(request))
+        Ok(request)
     }
 }
 
@@ -372,7 +367,9 @@ mod tests {
         let events = vec![raw1, raw2];
 
         let mut rt = runtime();
-        let request = rt.block_on_std(sink.build_request(events)).unwrap();
+        let request = rt
+            .block_on_std(async move { sink.build_request(events).await })
+            .unwrap();
 
         let (parts, body) = request.into_parts();
 

@@ -21,6 +21,7 @@ use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
+    future::Future,
     sync::Arc,
     task::{Context, Poll},
 };
@@ -30,15 +31,13 @@ use tracing_futures::Instrument;
 
 pub type HttpClientFuture = <HttpClient as Service<http02::Request<Body>>>::Future;
 
+#[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
     type Input;
     type Output;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input>;
-    fn build_request(
-        &self,
-        events: Self::Output,
-    ) -> BoxFuture<'static, crate::Result<http02::Request<Vec<u8>>>>;
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http02::Request<Vec<u8>>>;
 }
 
 /// Provides a simple wrapper around internal tower and
@@ -61,7 +60,12 @@ where
     L: RetryLogic<Response = http02::Response<Bytes>> + Send + 'static,
 {
     sink: Arc<T>,
-    inner: TowerBatchedSink<HttpBatchService<B::Output>, B, L, B::Output>,
+    inner: TowerBatchedSink<
+        HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
+        B,
+        L,
+        B::Output,
+    >,
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
     // sink combinator. https://docs.rs/futures/0.1.29/src/futures/sink/with_flat_map.rs.html#20
@@ -111,10 +115,15 @@ where
         cx: &SinkContext,
     ) -> Self {
         let sink = Arc::new(sink);
-        let sink1 = Arc::clone(&sink);
-        let svc =
-            HttpBatchService::new(cx.resolver(), tls_settings, move |b| sink1.build_request(b));
 
+        let sink1 = Arc::clone(&sink);
+        let request_builder =
+            move |b| -> BoxFuture<'static, crate::Result<http02::Request<Vec<u8>>>> {
+                let sink = Arc::clone(&sink1);
+                Box::pin(async move { sink.build_request(b).await })
+            };
+
+        let svc = HttpBatchService::new(cx.resolver(), tls_settings, request_builder);
         let inner = request_settings.batch_sink(logic, svc, batch, batch_settings, cx.acker());
 
         Self {
@@ -276,22 +285,17 @@ impl<B> fmt::Debug for HttpClient<B> {
     }
 }
 
-#[derive(Clone)]
-pub struct HttpBatchService<B = Vec<u8>> {
+pub struct HttpBatchService<F, B = Vec<u8>> {
     inner: HttpClient<Body>,
-    request_builder:
-        Arc<dyn Fn(B) -> BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>> + Sync + Send>,
+    request_builder: Arc<dyn Fn(B) -> F + Send + Sync>,
 }
 
-impl<B> HttpBatchService<B> {
+impl<F, B> HttpBatchService<F, B> {
     pub fn new(
         resolver: Resolver,
         tls_settings: impl Into<MaybeTlsSettings>,
-        request_builder: impl Fn(B) -> BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>
-            + Sync
-            + Send
-            + 'static,
-    ) -> HttpBatchService<B> {
+        request_builder: impl Fn(B) -> F + Send + Sync + 'static,
+    ) -> Self {
         let inner =
             HttpClient::new(resolver, tls_settings).expect("Unable to initialize http client");
 
@@ -302,7 +306,11 @@ impl<B> HttpBatchService<B> {
     }
 }
 
-impl<B: Send + 'static> Service<B> for HttpBatchService<B> {
+impl<F, B> Service<B> for HttpBatchService<F, B>
+where
+    F: Future<Output = crate::Result<hyper::Request<Vec<u8>>>> + Send + 'static,
+    B: Send + 'static,
+{
     type Response = http02::Response<Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -322,6 +330,15 @@ impl<B: Send + 'static> Service<B> for HttpBatchService<B> {
             let mut body = body::aggregate(body).await?;
             Ok(hyper::Response::from_parts(parts, body.to_bytes()))
         })
+    }
+}
+
+impl<F, B> Clone for HttpBatchService<F, B> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            request_builder: self.request_builder.clone(),
+        }
     }
 }
 

@@ -24,7 +24,7 @@ use tower03::Service;
 struct InfluxDBSvc {
     config: InfluxDBConfig,
     protocol_version: ProtocolVersion,
-    inner: HttpBatchService,
+    inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]

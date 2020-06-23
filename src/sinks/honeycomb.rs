@@ -9,10 +9,7 @@ use crate::{
     tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{
-    future::{ready, BoxFuture},
-    TryFutureExt,
-};
+use futures::TryFutureExt;
 use futures01::Sink;
 use http02::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
@@ -71,6 +68,7 @@ impl SinkConfig for HoneycombConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for HoneycombConfig {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
@@ -91,16 +89,13 @@ impl HttpSink for HoneycombConfig {
         }))
     }
 
-    fn build_request(
-        &self,
-        events: Self::Output,
-    ) -> BoxFuture<'static, crate::Result<http02::Request<Vec<u8>>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http02::Request<Vec<u8>>> {
         let uri = self.build_uri();
         let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
 
         let buf = serde_json::to_vec(&events).unwrap();
 
-        Box::pin(ready(request.body(buf).map_err(Into::into)))
+        request.body(buf).map_err(Into::into)
     }
 }
 

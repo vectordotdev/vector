@@ -13,10 +13,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{
-    future::{ok as ready_ok, BoxFuture},
-    FutureExt, TryFutureExt,
-};
+use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http02::{Method, Request, Uri};
 use hyper::Body;
@@ -146,6 +143,7 @@ impl PubsubSink {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for PubsubSink {
     type Input = Value;
     type Output = Vec<BoxedRawValue>;
@@ -158,10 +156,7 @@ impl HttpSink for PubsubSink {
         Some(json!({ "data": base64::encode(&json) }))
     }
 
-    fn build_request(
-        &self,
-        events: Self::Output,
-    ) -> BoxFuture<'static, crate::Result<Request<Vec<u8>>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let body = json!({ "messages": events });
         let body = serde_json::to_vec(&body).unwrap();
 
@@ -175,7 +170,7 @@ impl HttpSink for PubsubSink {
             creds.apply2(&mut request);
         }
 
-        Box::pin(ready_ok(request))
+        Ok(request)
     }
 }
 

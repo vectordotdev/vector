@@ -12,10 +12,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
-use futures::{
-    future::{ready, BoxFuture},
-    FutureExt, TryFutureExt,
-};
+use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http02::{uri::InvalidUri, Request, StatusCode, Uri};
 use lazy_static::lazy_static;
@@ -139,6 +136,7 @@ impl SinkConfig for DatadogConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for DatadogSink {
     type Input = Event;
     type Output = Vec<Metric>;
@@ -147,10 +145,7 @@ impl HttpSink for DatadogSink {
         Some(event)
     }
 
-    fn build_request(
-        &self,
-        events: Self::Output,
-    ) -> BoxFuture<'static, crate::Result<Request<Vec<u8>>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let now = Utc::now().timestamp();
         let interval = now - self.last_sent_timestamp.load(SeqCst);
         self.last_sent_timestamp.store(now, SeqCst);
@@ -158,13 +153,11 @@ impl HttpSink for DatadogSink {
         let input = encode_events(events, interval, &self.config.namespace);
         let body = serde_json::to_vec(&input).unwrap();
 
-        Box::pin(ready(
-            Request::post(self.uri.clone())
-                .header("Content-Type", "application/json")
-                .header("DD-API-KEY", self.config.api_key.clone())
-                .body(body)
-                .map_err(Into::into),
-        ))
+        Request::post(self.uri.clone())
+            .header("Content-Type", "application/json")
+            .header("DD-API-KEY", self.config.api_key.clone())
+            .body(body)
+            .map_err(Into::into)
     }
 }
 
@@ -444,7 +437,9 @@ mod tests {
         ];
 
         let mut rt = runtime();
-        let req = rt.block_on_std(sink.build_request(events)).unwrap();
+        let req = rt
+            .block_on_std(async move { sink.build_request(events).await })
+            .unwrap();
 
         assert_eq!(req.method(), Method::POST);
         assert_eq!(

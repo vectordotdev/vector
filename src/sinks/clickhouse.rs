@@ -11,10 +11,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{
-    future::{ok as ready_ok, BoxFuture},
-    FutureExt, TryFutureExt,
-};
+use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http02::{Method, Request, StatusCode, Uri};
 use hyper::Body;
@@ -92,6 +89,7 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for ClickhouseConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
@@ -106,10 +104,7 @@ impl HttpSink for ClickhouseConfig {
         Some(body)
     }
 
-    fn build_request(
-        &self,
-        events: Self::Output,
-    ) -> BoxFuture<'static, crate::Result<http02::Request<Vec<u8>>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http02::Request<Vec<u8>>> {
         let database = if let Some(database) = &self.database {
             database.as_str()
         } else {
@@ -133,7 +128,7 @@ impl HttpSink for ClickhouseConfig {
             auth.apply(&mut request);
         }
 
-        Box::pin(ready_ok(request))
+        Ok(request)
     }
 }
 

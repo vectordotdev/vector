@@ -11,10 +11,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{
-    future::{ready, BoxFuture},
-    FutureExt, TryFutureExt,
-};
+use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http02::{Request, StatusCode, Uri};
 use hyper::Body;
@@ -113,6 +110,7 @@ impl SinkConfig for HecSinkConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for HecSinkConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
@@ -180,10 +178,7 @@ impl HttpSink for HecSinkConfig {
         }
     }
 
-    fn build_request(
-        &self,
-        events: Self::Output,
-    ) -> BoxFuture<'static, crate::Result<Request<Vec<u8>>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let uri = build_uri(&self.host, "/services/collector/event").expect("Unable to parse URI");
 
         let mut builder = Request::post(uri)
@@ -194,7 +189,7 @@ impl HttpSink for HecSinkConfig {
             builder = builder.header("Content-Encoding", ce);
         }
 
-        Box::pin(ready(builder.body(events).map_err(Into::into)))
+        builder.body(events).map_err(Into::into)
     }
 }
 
