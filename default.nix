@@ -3,13 +3,13 @@ rec {
     # Output Artifacts
     releases = rec {
       x86_64-unknown-linux-gnu = rec {
-        binary = tasks.binary targets.x86_64-unknown-linux-gnu;
+        binary = tasks.binary configurations.x86_64-unknown-linux-gnu;
         docker = tasks.docker { tag = "gnu"; binary = binary; };
         all = [ binary docker ];
       };
       x86_64-unknown-linux-musl = rec {
-        binary = tasks.binary targets.x86_64-unknown-linux-musl;
-        docker = tasks.docker { tag = "gnu"; binary = binary; };
+        binary = tasks.binary configurations.x86_64-unknown-linux-musl;
+        docker = tasks.docker { tag = "musl"; binary = binary; };
         all = [ binary docker ];
       };
       all = [ x86_64-unknown-linux-gnu x86_64-unknown-linux-musl ];
@@ -32,7 +32,7 @@ rec {
     ];
   };
 
-  # Handy feature aliases for use in `targets`
+  # Handy feature aliases for use in `configurations`
   features = {
     components = rec {
       sources = cargoToml.features.sources;
@@ -56,8 +56,8 @@ rec {
     };
   };
 
-  # Available compile targets for Vector, leading to their config input for `binary`
-  targets = rec {
+  # Available compile configurations for Vector, leading to their config input for `binary`
+  configurations = rec {
     # See `rustup target list`
     x86_64-unknown-linux-gnu = {
       buildType = "debug";
@@ -91,10 +91,9 @@ rec {
   # Jobs used to build artifacts
   tasks = rec {
     docker = args@{ binary, tag }:
-      pkgs.dockerTools.buildLayeredImage {
+      pkgs.dockerTools.buildImage {
         name = "neu-timberio/vector";
         tag = args.tag;
-        contents = args.binary.out;
         config.Cmd = [ "${args.binary.out}/bin/vector" ];
       };
     # Build a binary Vector artifact
@@ -113,7 +112,7 @@ rec {
       let
 
         definition = import ./scripts/environment/definition.nix { inherit tools pkgs rustTarget cross; };
-        features = (builtins.getAttr args.rustTarget targets).features;
+        features = (builtins.getAttr args.rustTarget configurations).features;
         
         packageDefinition = rec {
           pname = cargoToml.package.name;
@@ -141,19 +140,14 @@ rec {
             else
               "";
 
-
           rustc = (pkgs.latest.rustChannels.stable.rust.override {
-            targets = (if args ? rustTarget && args.rustTarget != null then 
-              builtins.trace args.rustTarget
-              [ args.rustTarget ]
-            else
-              [ ]);
-              extensions = [
-                "rust-std"
-              ];
-              targetExtensions = [
-                "rust-std"
-              ];
+            targets = builtins.trace args.rustTarget [ args.rustTarget ];
+            extensions = [
+              "rust-std"
+            ];
+            targetExtensions = [
+              "rust-std"
+            ];
           });
           cargo = pkgs.latest.rustChannels.stable.cargo;
           

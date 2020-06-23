@@ -435,7 +435,7 @@ define NIX_BUILD
 		$(if $(findstring true,$(DRY_RUN)),--dry-run,) \
 		--argstr buildType $(BUILD_TYPE) \
 		--file default.nix \
-		--out-link target/releases/
+		--out-link target/releases
 endef
 
 .PHONY: release
