@@ -5,15 +5,6 @@
 
 #![deny(missing_docs)]
 
-mod k8s_paths_provider;
-mod lifecycle;
-mod parser;
-mod partial_events_merger;
-mod path_helpers;
-mod pod_metadata_annotator;
-mod transform_utils;
-mod util;
-
 use crate::event::{self, Event};
 use crate::internal_events::{KubernetesLogsEventAnnotationFailed, KubernetesLogsEventReceived};
 use crate::kubernetes as k8s;
@@ -30,12 +21,22 @@ use file_source::{FileServer, FileServerShutdown, Fingerprinter};
 use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use futures01::sync::mpsc;
 use k8s_openapi::api::core::v1::Pod;
-use k8s_paths_provider::K8sPathsProvider;
-use lifecycle::Lifecycle;
-use pod_metadata_annotator::PodMetadataAnnotator;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
+
+mod k8s_paths_provider;
+mod lifecycle;
+mod parser;
+mod partial_events_merger;
+mod path_helpers;
+mod pod_metadata_annotator;
+mod transform_utils;
+mod util;
+
+use k8s_paths_provider::K8sPathsProvider;
+use lifecycle::Lifecycle;
+use pod_metadata_annotator::PodMetadataAnnotator;
 
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
