@@ -13,8 +13,7 @@ else
     export DEFAULT_FEATURES = default
 endif
 
-# Build type to use
-BUILD_TYPE ?= "debug"
+export BUILD_TYPE ?= debug
 # Override this with any scopes for testing/benching.
 export SCOPE ?= ""
 # Override to false to disable autospawning services on integration tests.
@@ -439,7 +438,7 @@ define NIX_BUILD
 		--out-link target/releases/
 endef
 
-.PHONY: release-all
+.PHONY: release
 release:
 	$(NIX_BUILD) target.releases.all
 
@@ -466,6 +465,7 @@ release-x86_64-unknown-linux-musl-binary:
 .PHONY: release-x86_64-unknown-linux-musl-docker
 release-x86_64-unknown-linux-musl-docker:
 	$(NIX_BUILD) target.releases.x86_64-unknown-linux-musl.docker
+
 
 # release: release-prepare generate release-commit ## Release a new Vector version
 

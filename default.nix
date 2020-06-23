@@ -47,7 +47,7 @@ rec {
     byOs = {
       linux = {
         # Linux is *special* and has two of differing characteristics.
-        gnu = [ "unix" ];
+        gnu = [ "unix" "leveldb" ];
         musl = [ ];
       };
       mac = ["unix"];
@@ -125,7 +125,7 @@ rec {
           # Configurables
           buildType = args.buildType;
           logLevel = args.logLevel;
-          cargoSha256 = "0azdb6pbq87v78c079qq2m83x91r8xlynhry308hkbbqijap98fp";
+          cargoSha256 = "0yld7dczz27i5bzi39pr1fxxxfmdaqxl80hymxbqxdnwhhq0hjch";
           
           target = args.rustTarget;
           # Rest
@@ -177,11 +177,10 @@ rec {
   };
 
   tools = {
-  #   naersk = pkgs.callPackage (builtins.fetchTarball https://github.com/nmattia/naersk/archive/master.tar.gz) {};
-      # naersk = import (builtins.fetchGit {
-      #   url = "https://github.com/nmattia/naersk/";
-      #   rev = "647d0821b590ee96056f4593640534542d8700e5";
-      # }) { inherit (pkgs) lib; }
+      naersk = pkgs.callPackage (import (builtins.fetchGit {
+        url = "https://github.com/nmattia/naersk/";
+        rev = "a82fd7dc31a58c462b6dfa9d9d886fa2cc75dfd4";
+      })) {};
       # This tool lets us ignore things in our `.gitignore` during a nix build. Very Handy.
       gitignore = import (builtins.fetchGit {
         url = "https://github.com/hercules-ci/gitignore/";

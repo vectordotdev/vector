@@ -45,12 +45,12 @@ rec {
   developmentTools = with pkgs; [
     # tools.cargo2nix.package
     # Core CLI tools
+    file
     dnsutils
     curl
     bash
     nix
     direnv
-    binutils
     remarshal
     libiconv
     tzdata
@@ -76,7 +76,7 @@ rec {
     # Linux
     podman
     podman-compose
-  ]) ++ nativeBuildInputs ++ buildInputs;
+  ]);
 
   # From: https://nixos.org/nixpkgs/manual/
   #
@@ -94,9 +94,10 @@ rec {
   # persist as run-time dependencies. This isn't currently enforced, but could be in the future.
   nativeBuildInputs = with (if args ? cross && args.cross != null then cross else pkgs); [
     pkg-config
-    rdkafka
     openssl.dev
     jemalloc
+    snappy
+    rdkafka
   ] ++ (if stdenv.isDarwin then [
     darwin.cf-private
     darwin.apple_sdk.frameworks.CoreServices
@@ -104,8 +105,6 @@ rec {
     darwin.apple_sdk.frameworks.SecurityFoundation
   ] else [
     linuxHeaders
-    musl
-    libgcc
   ]); 
   # ++ (if pkgs.glibcLocales != null then [
   #   glibcLocales.override { locales = ["en_US.UTF-8"]; }
@@ -124,11 +123,15 @@ rec {
   # run-time, but the derivation containing the library is only needed at build-time. Even in the
   # dynamic case, the library may also be needed at build-time to appease the linker.
   buildInputs = with pkgs; [
+    pkg-config
     protobuf
     rustup
     rdkafka
+    cmake
+    openssl.dev
   ] ++ (if stdenv.isDarwin then [
   ] else [
     systemd
+    gcc
   ]);
 }

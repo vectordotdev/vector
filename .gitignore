@@ -8,7 +8,6 @@ checkpoints/*
 ./logs*/
 miniodat
 sample.log
-./target
+target/
 ./website/node_modules
 tests/data/wasm/*/target
-result/
