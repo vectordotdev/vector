@@ -88,7 +88,7 @@ impl SinkConfig for InfluxDBLogsConfig {
         .unwrap();
 
         let endpoint = self.endpoint.clone();
-        let uri = settings.write_uri2(endpoint).unwrap();
+        let uri = settings.write_uri(endpoint).unwrap();
 
         let token = settings.token();
         let protocol_version = settings.protocol_version();
