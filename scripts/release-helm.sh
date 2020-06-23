@@ -26,6 +26,10 @@ WORKDIR="target/helm"
 REPO_DIR="$WORKDIR/repo"
 PREVIOUS_MANIFEST="$WORKDIR/previous-manifest.yaml"
 
+cature_stderr() {
+  { OUTPUT=$("$@" 2>&1 1>&3-); } 3>&1
+}
+
 # Prepare work directory.
 rm -rf "$REPO_DIR"
 mkdir -p "$REPO_DIR"
@@ -38,7 +42,19 @@ helm package \
   --destination "$REPO_DIR"
 
 # Download previous manifest.
-aws s3 cp "$AWS_REPO_URL/index.yaml" "$PREVIOUS_MANIFEST"
+# If it doesn't exist - ignore the error and continue.
+if ! cature_stderr aws s3 cp "$AWS_REPO_URL/index.yaml" "$PREVIOUS_MANIFEST"; then
+  EXPECTED="^fatal error:"
+  EXPECTED="$EXPECTED An error occurred \(404\) when calling the HeadObject operation:"
+  EXPECTED="$EXPECTED Key \".*/index\.yaml\" does not exist$"
+  if ! grep -Eq "$EXPECTED" <<<"$OUTPUT"; then
+    echo "$OUTPUT" >&2
+    exit 1
+  else
+    echo "Warning: repo index file doesn't exist, but we ignore the error" \
+      "because we will initialize it"
+  fi
+fi
 
 # Update the repo index file.
 helm repo index \
