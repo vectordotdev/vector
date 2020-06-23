@@ -13,6 +13,15 @@ set -x
 CHANNEL="${CHANNEL:-"$(scripts/util/release-channel.sh)"}"
 VERSION="${VERSION:-"$(scripts/version.sh)"}"
 
+if [[ "$CHANNEL" == "nightly" ]]; then
+  DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
+  APP_VERSION="nightly-$DATE" # matches the version part of the image tag
+  CHART_VERSION="$VERSION-$DATE"
+else
+  APP_VERSION="$VERSION" # matches the version part of the image tag
+  CHART_VERSION="$VERSION"
+fi
+
 if [[ "${USE_TEST_REPO:-"false"}" == "true" ]]; then
   PUBLIC_URL="https://vector-helm-repo-tests.s3.amazonaws.com/helm/$CHANNEL"
   AWS_REPO_URL="s3://vector-helm-repo-tests/helm/$CHANNEL"
@@ -37,8 +46,8 @@ mkdir -p "$REPO_DIR"
 # Package our chart.
 helm package \
   distribution/helm/vector \
-  --version "$VERSION" \
-  --app-version "$VERSION" \
+  --version "$CHART_VERSION" \
+  --app-version "$APP_VERSION" \
   --destination "$REPO_DIR"
 
 # Download previous manifest.
