@@ -276,3 +276,17 @@ jobs:
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
           USE_CONTAINER: none
         run: make release-s3
+
+  release-helm:
+    runs-on: ubuntu-latest
+    needs:
+      # This is not strictly required, but ensures that Helm Chart doesn't
+      # appear before the image it refers to.
+      - release-docker
+    steps:
+      - uses: actions/checkout@v1
+      - env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
+          USE_CONTAINER: none
+        run: make release-helm
