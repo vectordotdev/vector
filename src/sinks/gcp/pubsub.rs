@@ -65,12 +65,12 @@ inventory::submit! {
 impl SinkConfig for PubsubConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self)?;
-        let batch_settings = self.batch.parse_with_bytes(
+        let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
             BatchSettings::default()
                 .bytes(bytesize::mib(10u64))
                 .events(1000)
                 .timeout(1),
-        )?;
+        );
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 

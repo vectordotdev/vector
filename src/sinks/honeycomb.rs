@@ -42,12 +42,12 @@ inventory::submit! {
 impl SinkConfig for HoneycombConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch_settings = self.batch.parse_with_bytes(
+        let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
             BatchSettings::default()
                 .bytes(bytesize::kib(100u64))
                 .events(2000)
                 .timeout(1),
-        )?;
+        );
 
         let sink = BatchedHttpSink::new(
             self.clone(),

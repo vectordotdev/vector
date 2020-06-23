@@ -90,7 +90,8 @@ impl StatsdSvc {
         // mentioned here https://github.com/DataDog/dd-agent/issues/2638
         let batch = config
             .batch
-            .parse_with_bytes(BatchSettings::default().bytes(1300).events(1000).timeout(1))?;
+            .use_size_as_bytes()?
+            .get_settings_or_default(BatchSettings::default().bytes(1300).events(1000).timeout(1));
         let namespace = config.namespace.clone();
 
         let client = Client::new(config.address)?;

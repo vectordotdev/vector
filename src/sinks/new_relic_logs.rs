@@ -106,13 +106,13 @@ impl NewRelicLogsConfig {
             NewRelicLogsRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
         };
 
+        let batch = self.batch.use_size_as_bytes()?;
         let batch = BatchConfig {
             // The max request size is 10MiB, so in order to be comfortably
             // within this we batch up to 5MiB.
-            max_bytes: Some(self.batch.get_bytes_or(bytesize::mib(5u64))?),
-            max_size: None,
-            max_events: Some(self.batch.max_events.unwrap_or(50_000)),
-            ..self.batch
+            max_bytes: Some(batch.max_bytes.unwrap_or(bytesize::mib(5u64) as usize)),
+            max_events: Some(batch.max_events.unwrap_or(50_000)),
+            ..batch
         };
 
         let request = TowerRequestConfig {

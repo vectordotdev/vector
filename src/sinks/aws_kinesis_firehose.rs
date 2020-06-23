@@ -99,7 +99,8 @@ impl KinesisFirehoseService {
 
         let batch = config
             .batch
-            .parse_with_events(BatchSettings::default().events(500).timeout(1))?;
+            .use_size_as_events()?
+            .get_settings_or_default(BatchSettings::default().events(500).timeout(1));
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 

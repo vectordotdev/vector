@@ -93,7 +93,8 @@ impl InfluxDBSvc {
 
         let batch = config
             .batch
-            .parse_with_events(BatchSettings::default().events(20).timeout(1))?;
+            .use_size_as_events()?
+            .get_settings_or_default(BatchSettings::default().events(20).timeout(1));
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = settings.write_uri(endpoint)?;

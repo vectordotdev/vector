@@ -22,47 +22,48 @@ pub struct BatchConfig {
 }
 
 impl BatchConfig {
-    pub fn get_bytes_or(&self, bytes: u64) -> Result<usize, BatchError> {
-        match (self.max_bytes, self.max_size) {
-            (Some(_), Some(_)) => Err(BatchError::BytesAndSize),
-            (Some(bytes), None) => Ok(bytes),
-            (None, Some(size)) => Ok(size),
-            (None, None) => Ok(bytes as usize),
-        }
+    pub fn use_size_as_bytes(&self) -> Result<Self, BatchError> {
+        let max_bytes = match (self.max_bytes, self.max_size) {
+            (Some(_), Some(_)) => return Err(BatchError::BytesAndSize),
+            (Some(bytes), None) => Some(bytes),
+            (None, Some(size)) => Some(size),
+            (None, None) => None,
+        };
+        Ok(Self {
+            max_bytes,
+            max_size: None,
+            ..*self
+        })
     }
 
-    pub fn parse_with_bytes(&self, defaults: BatchSettings) -> Result<BatchSettings, BatchError> {
-        Ok(BatchSettings {
-            bytes: self.get_bytes_or(defaults.bytes as u64)?,
+    pub fn use_size_as_events(&self) -> Result<Self, BatchError> {
+        let max_events = match (self.max_events, self.max_size) {
+            (Some(_), Some(_)) => return Err(BatchError::EventsAndSize),
+            (Some(events), None) => Some(events),
+            (None, Some(size)) => Some(size),
+            (None, None) => None,
+        };
+        // Sinks that used `max_size` for an event count cannot count
+        // bytes, so err if `max_bytes` is set.
+        if self.max_bytes.is_some() {
+            return Err(BatchError::BytesNotAllowed);
+        }
+        Ok(Self {
+            max_events: max_events,
+            max_size: None,
+            ..*self
+        })
+    }
+
+    pub fn get_settings_or_default(&self, defaults: BatchSettings) -> BatchSettings {
+        BatchSettings {
+            bytes: self.max_bytes.unwrap_or(defaults.bytes),
             events: self.max_events.unwrap_or(defaults.events),
             timeout: self
                 .timeout_secs
                 .map(|secs| Duration::from_secs(secs))
                 .unwrap_or(defaults.timeout),
-        })
-    }
-
-    pub fn get_events_or(&self, events: usize) -> Result<usize, BatchError> {
-        match (self.max_events, self.max_size) {
-            (Some(_), Some(_)) => Err(BatchError::EventsAndSize),
-            (Some(events), None) => Ok(events),
-            (None, Some(size)) => Ok(size),
-            (None, None) => Ok(events),
         }
-    }
-
-    pub fn parse_with_events(&self, defaults: BatchSettings) -> Result<BatchSettings, BatchError> {
-        if defaults.bytes == 0 && self.max_bytes.is_some() {
-            return Err(BatchError::BytesNotAllowed);
-        }
-        Ok(BatchSettings {
-            bytes: self.max_bytes.unwrap_or(defaults.bytes),
-            events: self.get_events_or(defaults.events)?,
-            timeout: self
-                .timeout_secs
-                .map(|secs| Duration::from_secs(secs))
-                .unwrap_or(defaults.timeout),
-        })
     }
 }
 

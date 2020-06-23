@@ -79,12 +79,12 @@ impl SinkConfig for InfluxDBLogsConfig {
 
         let healthcheck = self.healthcheck(cx.resolver())?;
 
-        let batch = self.batch.parse_with_bytes(
+        let batch = self.batch.use_size_as_bytes()?.get_settings_or_default(
             BatchSettings::default()
                 .bytes(bytesize::mib(1u64))
                 .events(10_000)
                 .timeout(1),
-        )?;
+        );
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let settings = influxdb_settings(
