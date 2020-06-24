@@ -22,6 +22,26 @@ impl Opts {
         ]);
         Opts::from_clap(&app.get_matches())
     }
+
+    pub fn log_level(&self) -> &'static str {
+        let (quiet_level, verbose_level) = match self.sub_command {
+            Some(SubCommand::Validate(_)) if self.root.verbose == 0 => {
+                (self.root.quiet + 1, self.root.verbose)
+            }
+            Some(SubCommand::Validate(_)) => (self.root.quiet, self.root.verbose - 1),
+            _ => (self.root.quiet, self.root.verbose),
+        };
+        match quiet_level {
+            0 => match verbose_level {
+                0 => "info",
+                1 => "debug",
+                2..=255 => "trace",
+            },
+            1 => "warn",
+            2 => "error",
+            3..=255 => "off",
+        }
+    }
 }
 
 #[derive(StructOpt, Debug)]

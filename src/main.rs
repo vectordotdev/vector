@@ -26,25 +26,12 @@ use vector::{
 
 fn main() {
     openssl_probe::init_ssl_cert_env_vars();
+
     let root_opts = Opts::get_matches();
+    let level = root_opts.log_level();
+
     let opts = root_opts.root;
     let sub_command = root_opts.sub_command;
-
-    let (quiet_level, verbose_level) = match sub_command {
-        Some(SubCommand::Validate(_)) if opts.verbose == 0 => (opts.quiet + 1, opts.verbose),
-        Some(SubCommand::Validate(_)) => (opts.quiet, opts.verbose - 1),
-        _ => (opts.quiet, opts.verbose),
-    };
-    let level = match quiet_level {
-        0 => match verbose_level {
-            0 => "info",
-            1 => "debug",
-            2..=255 => "trace",
-        },
-        1 => "warn",
-        2 => "error",
-        3..=255 => "off",
-    };
 
     let levels = match std::env::var("LOG").ok() {
         Some(level) => level,
