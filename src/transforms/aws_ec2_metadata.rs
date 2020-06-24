@@ -147,7 +147,7 @@ impl TransformConfig for Ec2Metadata {
 
         let http_client = HttpClient::new(cx.resolver(), None)?;
 
-        cx.executor().spawn_std(
+        tokio::spawn(
             async move {
                 let mut client =
                     MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);

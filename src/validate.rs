@@ -1,6 +1,5 @@
 use crate::{
     config_paths, event,
-    runtime::Runtime,
     topology::{self, builder::Pieces, Config, ConfigDiff},
 };
 use colored::*;
@@ -52,7 +51,7 @@ impl NoCheck {
 }
 
 /// Performs topology, component, and health checks.
-pub fn validate(opts: &Opts, color: bool) -> ExitCode {
+pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
     let mut validated = true;
@@ -71,7 +70,7 @@ pub fn validate(opts: &Opts, color: bool) -> ExitCode {
     }
 
     if !(opts.no_environment || opts.no.environment) {
-        validated &= validate_environment(&config, &mut fmt);
+        validated &= validate_environment(&config, &mut fmt).await;
     }
 
     if validated {
@@ -186,30 +185,24 @@ fn validate_topology(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool 
     }
 }
 
-fn validate_environment(config: &Config, fmt: &mut Formatter) -> bool {
-    let mut rt = Runtime::with_thread_count(1).expect("Unable to create async runtime");
+async fn validate_environment(config: &Config, fmt: &mut Formatter) -> bool {
     let diff = ConfigDiff::initial(config);
 
-    let mut pieces = if let Some(pieces) = validate_components(config, &diff, &mut rt, fmt) {
+    let mut pieces = if let Some(pieces) = validate_components(config, &diff, fmt) {
         pieces
     } else {
         return false;
     };
 
-    validate_healthchecks(config, &diff, &mut pieces, &mut rt, fmt)
+    validate_healthchecks(config, &diff, &mut pieces, fmt).await
 }
 
-fn validate_components(
-    config: &Config,
-    diff: &ConfigDiff,
-    rt: &mut Runtime,
-    fmt: &mut Formatter,
-) -> Option<Pieces> {
+fn validate_components(config: &Config, diff: &ConfigDiff, fmt: &mut Formatter) -> Option<Pieces> {
     event::LOG_SCHEMA
         .set(config.global.log_schema.clone())
         .expect("Couldn't set schema");
 
-    match topology::builder::build_pieces(config, diff, rt.executor()) {
+    match topology::builder::build_pieces(config, diff) {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)
@@ -222,11 +215,10 @@ fn validate_components(
     }
 }
 
-fn validate_healthchecks(
+async fn validate_healthchecks(
     config: &Config,
     diff: &ConfigDiff,
     pieces: &mut Pieces,
-    rt: &mut Runtime,
     fmt: &mut Formatter,
 ) -> bool {
     let healthchecks = topology::take_healthchecks(diff, pieces);
@@ -239,8 +231,7 @@ fn validate_healthchecks(
             fmt.error(error);
         };
 
-        let handle = rt.spawn_handle_std(healthcheck.compat());
-        match rt.block_on_std(handle) {
+        match tokio::spawn(healthcheck.compat()).await {
             Ok(Ok(())) => {
                 if config
                     .sinks

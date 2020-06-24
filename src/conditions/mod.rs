@@ -24,7 +24,7 @@ pub trait Condition: Send + Sync {
 }
 
 #[typetag::serde(tag = "type")]
-pub trait ConditionConfig: std::fmt::Debug {
+pub trait ConditionConfig: std::fmt::Debug + Send + Sync {
     fn build(&self) -> crate::Result<Box<dyn Condition>>;
 }
 

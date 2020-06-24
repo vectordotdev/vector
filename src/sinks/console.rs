@@ -49,7 +49,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    fn build(&self, mut cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let encoding = self.encoding.clone();
 
         let output: Box<dyn io::AsyncWrite + Send + Sync + Unpin> = match self.target {
@@ -58,7 +58,7 @@ impl SinkConfig for ConsoleSinkConfig {
         };
 
         let sink = WriterSink { output, encoding };
-        let sink = streaming_sink::compat::adapt_to_topology(&mut cx, sink);
+        let sink = streaming_sink::compat::adapt_to_topology(sink);
         let sink = StreamSink::new(sink, cx.acker());
 
         Ok((Box::new(sink), Box::new(future::ok(()))))
