@@ -4,7 +4,7 @@ use super::{
     task::Task,
     ConfigDiff,
 };
-use crate::{buffers, dns::Resolver, event::Event, runtime, shutdown::SourceShutdownCoordinator};
+use crate::{buffers, dns::Resolver, event::Event, shutdown::SourceShutdownCoordinator};
 use futures01::{
     future::{lazy, Either},
     sync::mpsc,
@@ -26,9 +26,8 @@ pub struct Pieces {
 pub fn check_build(
     config: &super::Config,
     diff: &ConfigDiff,
-    exec: runtime::TaskExecutor,
 ) -> Result<(Pieces, Vec<String>), Vec<String>> {
-    match (check(config), build_pieces(config, diff, exec)) {
+    match (check(config), build_pieces(config, diff)) {
         (Ok(warnings), Ok(new_pieces)) => Ok((new_pieces, warnings)),
         (Err(t_errors), Err(p_errors)) => Err(t_errors.into_iter().chain(p_errors).collect()),
         (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
@@ -109,11 +108,7 @@ pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
-pub fn build_pieces(
-    config: &super::Config,
-    diff: &ConfigDiff,
-    exec: runtime::TaskExecutor,
-) -> Result<Pieces, Vec<String>> {
+pub fn build_pieces(config: &super::Config, diff: &ConfigDiff) -> Result<Pieces, Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
     let mut tasks = HashMap::new();
@@ -178,7 +173,6 @@ pub fn build_pieces(
 
         let cx = TransformContext {
             resolver: resolver.clone(),
-            exec: exec.clone(),
         };
 
         let input_type = transform.inner.input_type();
@@ -230,7 +224,6 @@ pub fn build_pieces(
         let cx = SinkContext {
             resolver: resolver.clone(),
             acker,
-            exec: exec.clone(),
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx) {

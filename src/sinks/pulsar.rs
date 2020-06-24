@@ -1,7 +1,6 @@
 use crate::{
     buffers::Acker,
     event::{self, Event},
-    runtime::TaskExecutor,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -14,6 +13,7 @@ use pulsar::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashSet;
+use tokio_executor::DefaultExecutor;
 
 type MetadataFuture<F, M> = future::Join<F, future::FutureResult<M, <F as Future>::Error>>;
 
@@ -69,7 +69,7 @@ inventory::submit! {
 #[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = PulsarSink::new(self.clone(), cx.acker(), cx.exec())?;
+        let sink = PulsarSink::new(self.clone(), cx.acker())?;
         let hc = healthcheck(self.clone(), sink.pulsar.clone());
         Ok((Box::new(sink), hc))
     }
@@ -84,16 +84,12 @@ impl SinkConfig for PulsarSinkConfig {
 }
 
 impl PulsarSink {
-    pub(crate) fn new(
-        config: PulsarSinkConfig,
-        acker: Acker,
-        exec: TaskExecutor,
-    ) -> crate::Result<Self> {
+    pub(crate) fn new(config: PulsarSinkConfig, acker: Acker) -> crate::Result<Self> {
         let auth = config.auth.map(|auth| Authentication {
             name: auth.name,
             data: auth.token.as_bytes().to_vec(),
         });
-        let pulsar = Pulsar::new(config.address.parse()?, auth, exec)
+        let pulsar = Pulsar::new(config.address.parse()?, auth, DefaultExecutor::current())
             .wait()
             .context(CreatePulsarSink)?;
         let producer = pulsar.producer(Some(ProducerOptions::default()));
@@ -234,7 +230,7 @@ mod integration_tests {
         let (acker, ack_counter) = Acker::new_for_testing();
         let rt = runtime();
 
-        let sink = PulsarSink::new(cnf, acker, rt.executor()).unwrap();
+        let sink = PulsarSink::new(cnf, acker).unwrap();
 
         let num_events = 1_000;
         let (_input, events) = random_lines_with_stream(100, num_events);

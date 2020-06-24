@@ -50,6 +50,8 @@ tokio-openssl = "0.3.0"
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-compat = { version = "0.1", features = ["rt-full"] }
+# TODO: remove when pulsar is upgraded
+tokio-executor = "0.1.10"
 tokio-util = { version = "0.3.1", features = ["compat"] }
 async-trait = "0.1"
 
