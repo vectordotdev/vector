@@ -8,7 +8,7 @@ rec {
           buildType = "debug";
           rustTarget = "x86_64-unknown-linux-gnu";
           hostPkgs = pkgs;
-          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.gnu64.targetPlatform.config then
+          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.gnu64.stdenv.targetPlatform.config then
               pkgs
             else
               pkgs.pkgsCross.gnu64;
@@ -26,8 +26,8 @@ rec {
           buildType = "debug";
           rustTarget = "x86_64-unknown-linux-musl";
           hostPkgs = pkgs;
-          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.musl64.targetPlatform.config then
-              pkgs
+          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.gnu64.stdenv.targetPlatform.config then
+              pkgs.pkgsStatic  # Yes, this is musl!
             else
               pkgs.pkgsCross.musl64;
           logLevel = "debug";
@@ -43,7 +43,7 @@ rec {
           buildType = "debug";
           rustTarget = "aarch64-unknown-linux-gnu";
           hostPkgs = pkgs;
-          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.aarch64-multiplatform.targetPlatform.config then
+          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.aarch64-multiplatform.stdenv.targetPlatform.config then
               pkgs
             else
               pkgs.pkgsCross.aarch64-multiplatform;
@@ -58,16 +58,50 @@ rec {
       aarch64-unknown-linux-musl = rec {
         configuration = {
           buildType = "debug";
-          rustTarget = "aarch64-unknown-linux-gnu";
+          rustTarget = "aarch64-unknown-linux-musl";
           hostPkgs = pkgs;
-          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.aarch64-multiplatform-musl.targetPlatform.config then
+          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.aarch64-multiplatform-musl.stdenv.targetPlatform.config then
               pkgs
             else
               pkgs.pkgsCross.aarch64-multiplatform-musl;
           logLevel = "debug";
           runCheckPhase = false;
           features = features.components.all ++
-            features.byOs.linux.gnu;
+            features.byOs.linux.musl;
+        };
+        binary = tasks.binary configuration;
+        docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
+      };
+      armv7-unknown-linux-gnueabihf = rec {
+        configuration = {
+          buildType = "debug";
+          rustTarget = "armv7-unknown-linux-gnueabihf";
+          hostPkgs = pkgs;
+          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.armv7l-hf-multiplatform.stdenv.targetPlatform.config then
+              pkgs
+            else
+              pkgs.pkgsCross.armv7l-hf-multiplatform;
+          logLevel = "debug";
+          runCheckPhase = false;
+          features = features.components.all ++
+            features.byOs.linux.musl;
+        };
+        binary = tasks.binary configuration;
+        docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
+      };
+      armv7-unknown-linux-musleabihf = rec {
+        configuration = {
+          buildType = "debug";
+          rustTarget = "armv7-unknown-linux-musleabihf";
+          hostPkgs = pkgs;
+          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.armv7l-hf-multiplatform.stdenv.targetPlatform.config then
+              pkgs.pkgsStatic
+            else
+              pkgs.pkgsCross.armv7l-hf-multiplatform.pkgsStatic;
+          logLevel = "debug";
+          runCheckPhase = false;
+          features = features.components.all ++
+            features.byOs.linux.musl;
         };
         binary = tasks.binary configuration;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
@@ -89,7 +123,7 @@ rec {
           "${targetPkgs.glibcLocales}/lib/locale/locale-archive"
         else
           "";
-        LC_ALL = "en_US.UTF-8";
+        # LC_ALL = "en_US.UTF-8";
         # Without setting a tzdata folder, some tests will fail.
         TZDIR = "${targetPkgs.tzdata}/share/zoneinfo";
         # Crates expect information about OpenSSL in these vars.
@@ -109,10 +143,10 @@ rec {
         AWS_SECRET_ACCESS_KEY = "dummy";
         # Lucet (for wasm) depends on libclang
         # LIBCLANG_PATH="${targetPkgs.llvmPackages.libclang}/lib";
-        CPATH= if targetPkgs.stdenv.isLinux then
-          "${targetPkgs.linuxHeaders}/include"
-        else
-          "";
+        # CPATH = if targetPkgs.stdenv.isLinux then
+        #   "${targetPkgs.linuxHeaders}/include"
+        # else
+        #   "";
       };
     developmentTools = targetPkgs:
       with targetPkgs;
@@ -171,6 +205,7 @@ rec {
           ++ (
             if stdenv.isDarwin then
               [
+                # TODO: These are probably in the wrong place.
                 darwin.cf-private
                 darwin.apple_sdk.frameworks.CoreServices
                 darwin.apple_sdk.frameworks.Security
@@ -254,6 +289,9 @@ rec {
       sinks = cargoToml.features.sinks;
       transforms = cargoToml.features.transforms;
       all = sources ++ sinks ++ transforms;
+      portable = sources ++ sinks ++
+        # rlua fails on 
+        (builtins.filter (val: val != "transforms-lua") transforms);
     };
     byLinking = {
       static = ["rdkafka"];
@@ -314,6 +352,7 @@ rec {
           buildType = args.buildType;
           logLevel = args.logLevel;
           cargoSha256 = "0xg43s4vdhzqz6gqbakr7c7jbr1jlmwr15ykrsl1clgywpg3rm8r";
+          # TODO: There seems to be a cargoVendorDir option: https://github.com/NixOS/nixpkgs/blob/a7fa6f60c4df3fde0ab46cfe79294c1d65042fa4/pkgs/build-support/rust/default.nix#L30
           
           target = args.rustTarget;
           # Rest

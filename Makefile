@@ -441,7 +441,7 @@ target/artifacts/%:
 	$(NIX_BUILD) --out-link $@ $(subst /,.,$@)
 
 .PHONY: artifacts
-artifacts: artifacts-x86_64-unknown-linux-gnu artifacts-x86_64-unknown-linux-musl artifacts-aarch64-unknown-linux-gnu artifacts-aarch64-unknown-linux-musl
+artifacts: artifacts-x86_64-unknown-linux artifacts-aarch64-unknown-linux artifacts-armv7-unknown-linux
 
 ### X86
 ## Linux
@@ -479,6 +479,24 @@ artifacts-aarch64-unknown-linux-musl: target/artifacts/aarch64-unknown-linux-mus
 artifacts-aarch64-unknown-linux-musl-binary: target/artifacts/aarch64-unknown-linux-musl/binary
 .PHONY: artifacts-aarch64-unknown-linux-musl-docker
 artifacts-aarch64-unknown-linux-musl-docker: target/artifacts/aarch64-unknown-linux-musl/docker
+### ARMv
+## Linux
+.PHONY: artifacts-armv7-unknown-linux
+artifacts-armv7-unknown-linux: artifacts-armv7-unknown-linux-gnueabihf artifacts-armv7-unknown-linux-musleabihf
+# GLIBC
+.PHONY: artifacts-armv7-unknown-linux-gnueabihf
+artifacts-armv7-unknown-linux-gnueabihf: target/artifacts/armv7-unknown-linux-gnueabihf/binary target/artifacts/armv7-unknown-linux-gnueabihf/docker
+.PHONY: artifacts-armv7-unknown-linux-gnueabihf-binary
+artifacts-armv7-unknown-linux-gnueabihf-binary: target/artifacts/armv7-unknown-linux-gnueabihf/binary
+.PHONY: artifacts-armv7-unknown-linux-gnueabihf-docker
+artifacts-armv7-unknown-linux-gnueabihf-docker: target/artifacts/armv7-unknown-linux-gnueabihf/docker
+# MUSL
+.PHONY: artifacts-armv7-unknown-linux-musleabihf
+artifacts-armv7-unknown-linux-musleabihf: target/artifacts/armv7-unknown-linux-musleabihf/binary target/artifacts/armv7-unknown-linux-musleabihf/docker
+.PHONY: artifacts-armv7-unknown-linux-musleabihf-binary
+artifacts-armv7-unknown-linux-musleabihf-binary: target/artifacts/armv7-unknown-linux-musleabihf/binary
+.PHONY: artifacts-armv7-unknown-linux-musleabihf-docker
+artifacts-armv7-unknown-linux-musleabihf-docker: target/artifacts/armv7-unknown-linux-musleabihf/docker
 
 
 # release: release-prepare generate release-commit ## Release a new Vector version
