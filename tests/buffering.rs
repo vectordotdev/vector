@@ -4,11 +4,10 @@
 
 use futures01::{Future, Sink};
 use prost::Message;
-use std::sync::atomic::Ordering;
 use tempfile::tempdir;
 use tracing::trace;
 use vector::event;
-use vector::test_util::{self, next_addr, wait_for, wait_for_atomic_usize};
+use vector::test_util::{self, next_addr, wait_for_atomic_usize};
 use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, runtime, sinks};
 
