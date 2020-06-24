@@ -8,7 +8,7 @@ use std::sync::atomic::Ordering;
 use tempfile::tempdir;
 use tracing::trace;
 use vector::event;
-use vector::test_util::{self, next_addr, wait_for};
+use vector::test_util::{self, next_addr, wait_for, wait_for_atomic_usize};
 use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, runtime, sinks};
 
@@ -71,8 +71,17 @@ fn test_buffering() {
     let _ = rt.block_on(send).unwrap();
 
     // We need to wait for at least the source to process events.
-    wait_for(|| source_event_counter.load(Ordering::Acquire) == num_events);
-    // Now we give it some time for the events to propagate to Disk.
+    // This is to avoid a race after we send all events, at that point two things
+    // can happen in any order, we reaching `terminate_abruptly` and source processing
+    // all of the events. We need for the source to process events before `terminate_abruptly`
+    // so we wait for that here.
+    wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    // Now we give it some time for the events to propagate to File.
+    // This is to avoid a race after the source processes all events, at that point two things
+    // can happen in any order, we reaching `terminate_abruptly` and events being written
+    // to file. We need for the events to be written to the file before `terminate_abruptly`.
+    // We can't know when exactly all of the events have been written, so we have to guess.
+    // But it should be shortly after source processing all of the events.
     std::thread::sleep(std::time::Duration::from_secs(1));
     // Simulate a crash.
     terminate_abruptly(rt, topology);
@@ -162,8 +171,17 @@ fn test_max_size() {
     let _ = rt.block_on(send).unwrap();
 
     // We need to wait for at least the source to process events.
-    wait_for(|| source_event_counter.load(Ordering::Acquire) == num_events);
-    // Now we give it some time for the events to propagate to Disk.
+    // This is to avoid a race after we send all events, at that point two things
+    // can happen in any order, we reaching `terminate_abruptly` and source processing
+    // all of the events. We need for the source to process events before `terminate_abruptly`
+    // so we wait for that here.
+    wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    // Now we give it some time for the events to propagate to File.
+    // This is to avoid a race after the source processes all events, at that point two things
+    // can happen in any order, we reaching `terminate_abruptly` and events being written
+    // to file. We need for the events to be written to the file before `terminate_abruptly`.
+    // We can't know when exactly all of the events have been written, so we have to guess.
+    // But it should be shortly after source processing all of the events.
     std::thread::sleep(std::time::Duration::from_secs(1));
     // Simulate a crash.
     terminate_abruptly(rt, topology);
@@ -298,8 +316,17 @@ fn test_reclaim_disk_space() {
     let _ = rt.block_on(send).unwrap();
 
     // We need to wait for at least the source to process events.
-    wait_for(|| source_event_counter.load(Ordering::Acquire) == num_events);
-    // Now we give it some time for the events to propagate to Disk.
+    // This is to avoid a race after we send all events, at that point two things
+    // can happen in any order, we reaching `terminate_abruptly` and source processing
+    // all of the events. We need for the source to process events before `terminate_abruptly`
+    // so we wait for that here.
+    wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    // Now we give it some time for the events to propagate to File.
+    // This is to avoid a race after the source processes all events, at that point two things
+    // can happen in any order, we reaching `terminate_abruptly` and events being written
+    // to file. We need for the events to be written to the file before `terminate_abruptly`.
+    // We can't know when exactly all of the events have been written, so we have to guess.
+    // But it should be shortly after source processing all of the events.
     std::thread::sleep(std::time::Duration::from_secs(1));
     // Simulate a crash.
     terminate_abruptly(rt, topology);
