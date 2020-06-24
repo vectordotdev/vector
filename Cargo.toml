@@ -43,7 +43,7 @@ tracing-limit = { path = "lib/tracing-limit" }
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio01 = { package = "tokio", version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing"], default-features = false }
+tokio01 = { package = "tokio", version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing", "codec", "udp"], default-features = false }
 tokio = { version = "0.2.13", features = ["blocking", "fs", "sync", "macros", "test-util", "rt-core", "io-std"] }
 tokio-codec = "0.1.2"
 tokio-openssl = "0.3.0"
@@ -194,9 +194,6 @@ tokio01-test = "0.1.1"
 tower-test03 = { package = "tower-test", version = "0.3" }
 tower-test01 = { package = "tower-test", version = "0.1" }
 serde_yaml = "0.8.9"
-trust-dns-server = "0.17.0"
-trust-dns = "0.17.0"
-trust-dns-proto = "0.8.0"
 dirs = "2.0.2"
 tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
