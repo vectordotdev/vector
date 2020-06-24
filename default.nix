@@ -19,8 +19,7 @@ rec {
             features.byLinking.dynamic;
         };
         binary = tasks.binary configuration;
-        docker = tasks.docker { tag = "gnu"; binary = binary; };
-        all = [ binary docker ];
+        docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
       };
       x86_64-unknown-linux-musl = rec {
         configuration = {
@@ -37,10 +36,42 @@ rec {
             features.byOs.linux.musl;
         };
         binary = tasks.binary configuration;
-        docker = tasks.docker { tag = "musl"; binary = binary; };
-        all = [ binary docker ];
+        docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
       };
-      all = [ x86_64-unknown-linux-gnu x86_64-unknown-linux-musl ];
+      aarch64-unknown-linux-gnu = rec {
+        configuration = {
+          buildType = "debug";
+          rustTarget = "aarch64-unknown-linux-gnu";
+          hostPkgs = pkgs;
+          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.aarch64-multiplatform.targetPlatform.config then
+              pkgs
+            else
+              pkgs.pkgsCross.aarch64-multiplatform;
+          logLevel = "debug";
+          runCheckPhase = false;
+          features = features.components.all ++
+            features.byOs.linux.gnu;
+        };
+        binary = tasks.binary configuration;
+        docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
+      };
+      aarch64-unknown-linux-musl = rec {
+        configuration = {
+          buildType = "debug";
+          rustTarget = "aarch64-unknown-linux-gnu";
+          hostPkgs = pkgs;
+          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.aarch64-multiplatform-musl.targetPlatform.config then
+              pkgs
+            else
+              pkgs.pkgsCross.aarch64-multiplatform-musl;
+          logLevel = "debug";
+          runCheckPhase = false;
+          features = features.components.all ++
+            features.byOs.linux.gnu;
+        };
+        binary = tasks.binary configuration;
+        docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
+      };
     };
   };
 
@@ -136,8 +167,9 @@ rec {
             pkg-config
             openssl.dev
             jemalloc
-            snappy
             rdkafka
+            leveldb
+            snappy
           ]
           ++ (
             if stdenv.isDarwin then
@@ -170,20 +202,14 @@ rec {
       buildInputs = targetPkgs:
         with targetPkgs;
         [
-          # pkg-config
-          # protobuf
-          # rustup
-          # rdkafka
-          # cmake
-          # openssl.dev
+            rdkafka
+            leveldb
+            snappy
         ] ++ (
           if stdenv.isDarwin then
             []
           else if stdenv.isLinux then
-            [
-              # systemd
-              # gcc
-            ]
+            []
           else
             []
         );
@@ -272,13 +298,13 @@ rec {
           # Configurables
           buildType = args.buildType;
           logLevel = args.logLevel;
-          cargoSha256 = "0yld7dczz27i5bzi39pr1fxxxfmdaqxl80hymxbqxdnwhhq0hjch";
+          cargoSha256 = "0xg43s4vdhzqz6gqbakr7c7jbr1jlmwr15ykrsl1clgywpg3rm8r";
           
           target = args.rustTarget;
           # Rest
           src = hostPkgs.lib.cleanSource (tools.gitignore.gitignoreSource ./.);
 
-          cargoBuildFlags = [ "--verbose" "--no-default-features" "--features" "${hostPkgs.lib.concatStringsSep "," features}" ];
+          cargoBuildFlags = [ "--no-default-features" "--features" "${hostPkgs.lib.concatStringsSep "," features}" ];
           checkPhase = if runCheckPhase then
               ''
               # Configurables
@@ -303,7 +329,6 @@ rec {
           };
         } // (environment.variables targetPkgs);
       in
-        # (tools.naersk.buildPackage packageDefinition);
         (targetPkgs.makeRustPlatform {
           cargo = rustChannel.rust.override {
             targets = [ args.rustTarget ];
@@ -315,10 +340,10 @@ rec {
   };
 
   tools = {
-      naersk = pkgs.callPackage (import (builtins.fetchGit {
-        url = "https://github.com/nmattia/naersk/";
-        rev = "a82fd7dc31a58c462b6dfa9d9d886fa2cc75dfd4";
-      })) {};
+      # naersk = import (builtins.fetchGit {
+      #   url = "https://github.com/nmattia/naersk/";
+      #   rev = "a82fd7dc31a58c462b6dfa9d9d886fa2cc75dfd4";
+      # });
       # This tool lets us ignore things in our `.gitignore` during a nix build. Very Handy.
       gitignore = import (builtins.fetchGit {
         url = "https://github.com/hercules-ci/gitignore/";

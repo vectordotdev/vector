@@ -434,37 +434,47 @@ define NIX_BUILD
 		$(if $(findstring true,$(VERBOSE)),--verbose --show-trace --print-build-logs,) \
 		$(if $(findstring true,$(DRY_RUN)),--dry-run,) \
 		--argstr buildType $(BUILD_TYPE) \
-		--file default.nix \
-		--out-link target/releases
+		--file default.nix
 endef
 
+target/releases/%:
+	$(NIX_BUILD) --out-link $@ $(subst /,.,$@)
+
 .PHONY: release
-release:
-	$(NIX_BUILD) target.releases.all
+release: release-x86_64-unknown-linux-gnu release-x86_64-unknown-linux-musl release-aarch64-unknown-linux-gnu release-aarch64-unknown-linux-musl
 
+### X86
+## Linux
+# GLIBC
 .PHONY: release-x86_64-unknown-linux-gnu
-release-x86_64-unknown-linux-gnu:
-	$(NIX_BUILD) target.releases.x86_64-unknown-linux-gnu.all
-
+release-x86_64-unknown-linux-gnu: target/releases/x86_64-unknown-linux-gnu/binary target/releases/x86_64-unknown-linux-gnu/docker
 .PHONY: release-x86_64-unknown-linux-gnu-binary
-release-x86_64-unknown-linux-gnu-binary:
-	$(NIX_BUILD) target.releases.x86_64-unknown-linux-gnu.binary
-
+release-x86_64-unknown-linux-gnu-binary: target/releases/x86_64-unknown-linux-gnu/binary
 .PHONY: release-x86_64-unknown-linux-gnu-docker
-release-x86_64-unknown-linux-gnu-docker:
-	$(NIX_BUILD) target.releases.x86_64-unknown-linux-gnu.docker
-
+release-x86_64-unknown-linux-gnu-docker: target/releases/x86_64-unknown-linux-gnu/docker
+# MUSL
 .PHONY: release-x86_64-unknown-linux-musl
-release-x86_64-unknown-linux-musl:
-	$(NIX_BUILD) target.releases.x86_64-unknown-linux-musl.all
-
+release-x86_64-unknown-linux-musl: target/releases/x86_64-unknown-linux-musl/binary target/releases/x86_64-unknown-linux-musl/docker
 .PHONY: release-x86_64-unknown-linux-musl-binary
-release-x86_64-unknown-linux-musl-binary:
-	$(NIX_BUILD) target.releases.x86_64-unknown-linux-musl.binary
-
+release-x86_64-unknown-linux-musl-binary: target/releases/x86_64-unknown-linux-musl/binary
 .PHONY: release-x86_64-unknown-linux-musl-docker
-release-x86_64-unknown-linux-musl-docker:
-	$(NIX_BUILD) target.releases.x86_64-unknown-linux-musl.docker
+release-x86_64-unknown-linux-musl-docker: target/releases/x86_64-unknown-linux-musl/docker
+### AARCH64
+## Linux
+# GLIBC
+.PHONY: release-aarch64-unknown-linux-gnu
+release-aarch64-unknown-linux-gnu: target/releases/aarch64-unknown-linux-gnu/binary target/releases/aarch64-unknown-linux-gnu/docker
+.PHONY: release-aarch64-unknown-linux-gnu-binary
+release-aarch64-unknown-linux-gnu-binary: target/releases/aarch64-unknown-linux-gnu/binary
+.PHONY: release-aarch64-unknown-linux-gnu-docker
+release-aarch64-unknown-linux-gnu-docker: target/releases/aarch64-unknown-linux-gnu/docker
+# MUSL
+.PHONY: release-aarch64-unknown-linux-musl
+release-aarch64-unknown-linux-musl: target/releases/aarch64-unknown-linux-musl/binary target/releases/aarch64-unknown-linux-musl/docker
+.PHONY: release-aarch64-unknown-linux-musl-binary
+release-aarch64-unknown-linux-musl-binary: target/releases/aarch64-unknown-linux-musl/binary
+.PHONY: release-aarch64-unknown-linux-musl-docker
+release-aarch64-unknown-linux-musl-docker: target/releases/aarch64-unknown-linux-musl/docker
 
 
 # release: release-prepare generate release-commit ## Release a new Vector version
