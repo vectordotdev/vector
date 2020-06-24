@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-03"
+last_modified_on: "2020-06-24"
 delivery_guarantee: "at_least_once"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
@@ -78,6 +78,7 @@ endpoint][urls.elasticsearch_bulk].
   pipeline = "pipeline-name" # optional, no default
 
   # Auth
+  auth.assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default, relevant when strategy = "aws"
   auth.password = "${ELASTICSEARCH_PASSWORD}" # required, required when strategy = "basic"
   auth.strategy = "aws" # required
   auth.user = "${ELASTICSEARCH_USERNAME}" # required, required when strategy = "basic"
@@ -151,6 +152,29 @@ Options for the authentication strategy.
 
 
 <Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={"auth"}
+  relevantWhen={{"strategy":"aws"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+
+
+
+</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -1407,6 +1431,7 @@ You can learn more about the complete syntax in the
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_elasticsearch]: https://aws.amazon.com/elasticsearch-service/
+[urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch

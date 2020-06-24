@@ -4703,6 +4703,14 @@ require('custom_module')
   #
 
   [sinks.elasticsearch.auth]
+    # The ARN of an IAM role to assume at startup.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when strategy = "aws"
+    assume_role = "arn:aws:iam::123456789098:role/my_role"
+
     # The basic authentication password.
     #
     # * required

@@ -323,7 +323,7 @@ mod integration_tests {
         thread::sleep(Duration::from_secs(1));
 
         let config = ElasticSearchConfig {
-            auth: Some(ElasticSearchAuth::Aws),
+            auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
             host: "http://localhost:4571".into(),
             index: Some(stream.clone()),
             ..Default::default()
