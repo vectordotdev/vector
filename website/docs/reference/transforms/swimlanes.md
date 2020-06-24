@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-16"
+last_modified_on: "2020-06-24"
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events, allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
@@ -46,9 +46,9 @@ events across parallel streams using logical filters.
 
   # Lanes
   [transforms.my_transform_id.lanes.`[swimlane-id]`]
+    type = "check_fields" # optional, default
     "message.eq" = "this is the content to match against" # example
     "message.eq" = ["match this", "or this"] # example
-    type = "check_fields" # optional, default
     "message.contains" = "foo" # example
     "message.contains" = ["foo", "bar"] # example
     "environment.ends_with" = "-staging" # example
@@ -69,9 +69,9 @@ events across parallel streams using logical filters.
 
   # Lanes
   [transforms.my_transform_id.lanes.`[swimlane-id]`]
+    type = "check_fields" # optional, default
     "message.eq" = "this is the content to match against" # example
     "message.eq" = ["match this", "or this"] # example
-    type = "check_fields" # optional, default
     "host.exists" = true # example
     "method.neq" = "POST" # example
     "method.neq" = ["POST", "GET"] # example
@@ -141,6 +141,29 @@ The identifier of a swimlane.
 <Fields filters={false}>
 <Field
   common={true}
+  defaultValue={"check_fields"}
+  enumValues={{"check_fields":"Allows you to check individual fields against a list of conditions.","is_log":"Returns true if the event is a log.","is_metric":"Returns true if the event is a metric."}}
+  examples={["check_fields","is_log","is_metric"]}
+  groups={[]}
+  name={"type"}
+  path={"lanes.`[swimlane-id]`"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### type
+
+The type of the condition to execute.
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[{"message.eq":"this is the content to match against"},{"message.eq":["match this","or this"]}]}
@@ -160,29 +183,6 @@ The identifier of a swimlane.
 Check whether a fields contents exactly matches the value specified. This may
 be a single string or a list of strings, in which case this evaluates to true
 if any of the list matches.
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"check_fields"}
-  enumValues={{"check_fields":"Allows you to check individual fields against a list of conditions.","is_log":"Returns true if the event is a log.","is_metric":"Returns true if the event is a metric."}}
-  examples={["check_fields","is_log","is_metric"]}
-  groups={[]}
-  name={"type"}
-  path={"lanes.`[swimlane-id]`"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-##### type
-
-The type of the condition to execute.
 
 
 

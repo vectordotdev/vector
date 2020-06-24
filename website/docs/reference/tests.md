@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-16"
+last_modified_on: "2020-06-24"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
@@ -60,9 +60,9 @@ vector test /etc/vector/*.toml
   # Outputs
   [[tests.outputs]]
     # Conditions
+    conditions.type = "check_fields" # optional, default
     conditions."message.eq" = "this is the content to match against" # example
     conditions."message.eq" = ["match this", "or this"] # example
-    conditions.type = "check_fields" # optional, default
     conditions."message.contains" = "foo" # example
     conditions."message.contains" = ["foo", "bar"] # example
     conditions."environment.ends_with" = "-staging" # example
@@ -115,9 +115,9 @@ vector test /etc/vector/*.toml
   # Outputs
   [[tests.outputs]]
     # Conditions
+    conditions.type = "check_fields" # optional, default
     conditions."message.eq" = "this is the content to match against" # example
     conditions."message.eq" = ["match this", "or this"] # example
-    conditions.type = "check_fields" # optional, default
     conditions."host.exists" = true # example
     conditions."method.neq" = "POST" # example
     conditions."method.neq" = ["POST", "GET"] # example
@@ -596,6 +596,29 @@ target without checking its values.
 <Fields filters={false}>
 <Field
   common={true}
+  defaultValue={"check_fields"}
+  enumValues={{"check_fields":"Allows you to check individual fields against a list of conditions.","is_log":"Returns true if the event is a log.","is_metric":"Returns true if the event is a metric."}}
+  examples={["check_fields","is_log","is_metric"]}
+  groups={[]}
+  name={"type"}
+  path={"outputs.conditions"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### type
+
+The type of the condition to execute.
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[{"message.eq":"this is the content to match against"},{"message.eq":["match this","or this"]}]}
@@ -615,29 +638,6 @@ target without checking its values.
 Check whether a fields contents exactly matches the value specified. This may
 be a single string or a list of strings, in which case this evaluates to true
 if any of the list matches.
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"check_fields"}
-  enumValues={{"check_fields":"Allows you to check individual fields against a list of conditions.","is_log":"Returns true if the event is a log.","is_metric":"Returns true if the event is a metric."}}
-  examples={["check_fields","is_log","is_metric"]}
-  groups={[]}
-  name={"type"}
-  path={"outputs.conditions"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-##### type
-
-The type of the condition to execute.
 
 
 

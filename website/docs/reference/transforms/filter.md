@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-16"
+last_modified_on: "2020-06-24"
 component_title: "Filter"
 description: "The Vector `filter` transform accepts and outputs `log` and `metric` events, allowing you to select events based on a set of logical conditions."
 event_types: ["log","metric"]
@@ -46,9 +46,9 @@ on a set of logical conditions.
   inputs = ["my-source-or-transform-id"] # required
 
   # Condition
+  condition.type = "check_fields" # optional, default
   condition."message.eq" = "this is the content to match against" # example
   condition."message.eq" = ["match this", "or this"] # example
-  condition.type = "check_fields" # optional, default
   condition."message.contains" = "foo" # example
   condition."message.contains" = ["foo", "bar"] # example
   condition."environment.ends_with" = "-staging" # example
@@ -68,9 +68,9 @@ on a set of logical conditions.
   inputs = ["my-source-or-transform-id"] # required
 
   # Condition
+  condition.type = "check_fields" # optional, default
   condition."message.eq" = "this is the content to match against" # example
   condition."message.eq" = ["match this", "or this"] # example
-  condition.type = "check_fields" # optional, default
   condition."host.exists" = true # example
   condition."method.neq" = "POST" # example
   condition."method.neq" = ["POST", "GET"] # example
@@ -117,6 +117,29 @@ messages that pass all conditions will be forwarded.
 <Fields filters={false}>
 <Field
   common={true}
+  defaultValue={"check_fields"}
+  enumValues={{"check_fields":"Allows you to check individual fields against a list of conditions.","is_log":"Returns true if the event is a log.","is_metric":"Returns true if the event is a metric."}}
+  examples={["check_fields","is_log","is_metric"]}
+  groups={[]}
+  name={"type"}
+  path={"condition"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The type of the condition to execute.
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[{"message.eq":"this is the content to match against"},{"message.eq":["match this","or this"]}]}
@@ -136,29 +159,6 @@ messages that pass all conditions will be forwarded.
 Check whether a fields contents exactly matches the value specified. This may
 be a single string or a list of strings, in which case this evaluates to true
 if any of the list matches.
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"check_fields"}
-  enumValues={{"check_fields":"Allows you to check individual fields against a list of conditions.","is_log":"Returns true if the event is a log.","is_metric":"Returns true if the event is a metric."}}
-  examples={["check_fields","is_log","is_metric"]}
-  groups={[]}
-  name={"type"}
-  path={"condition"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The type of the condition to execute.
 
 
 
