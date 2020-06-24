@@ -437,44 +437,48 @@ define NIX_BUILD
 		--file default.nix
 endef
 
-target/releases/%:
+target/artifacts/%:
 	$(NIX_BUILD) --out-link $@ $(subst /,.,$@)
 
-.PHONY: release
-release: release-x86_64-unknown-linux-gnu release-x86_64-unknown-linux-musl release-aarch64-unknown-linux-gnu release-aarch64-unknown-linux-musl
+.PHONY: artifacts
+artifacts: artifacts-x86_64-unknown-linux-gnu artifacts-x86_64-unknown-linux-musl artifacts-aarch64-unknown-linux-gnu artifacts-aarch64-unknown-linux-musl
 
 ### X86
 ## Linux
+.PHONY: artifacts-x86_64-unknown-linux-gnu artifacts-x86_64-unknown-linux-musl
+artifacts-x86_64-unknown-linux: artifacts-x86_64-unknown-linux-gnu artifacts-x86_64-unknown-linux-musl
 # GLIBC
-.PHONY: release-x86_64-unknown-linux-gnu
-release-x86_64-unknown-linux-gnu: target/releases/x86_64-unknown-linux-gnu/binary target/releases/x86_64-unknown-linux-gnu/docker
-.PHONY: release-x86_64-unknown-linux-gnu-binary
-release-x86_64-unknown-linux-gnu-binary: target/releases/x86_64-unknown-linux-gnu/binary
-.PHONY: release-x86_64-unknown-linux-gnu-docker
-release-x86_64-unknown-linux-gnu-docker: target/releases/x86_64-unknown-linux-gnu/docker
+.PHONY: artifacts-x86_64-unknown-linux-gnu
+artifacts-x86_64-unknown-linux-gnu: target/artifacts/x86_64-unknown-linux-gnu/binary target/artifacts/x86_64-unknown-linux-gnu/docker
+.PHONY: artifacts-x86_64-unknown-linux-gnu-binary
+artifacts-x86_64-unknown-linux-gnu-binary: target/artifacts/x86_64-unknown-linux-gnu/binary
+.PHONY: artifacts-x86_64-unknown-linux-gnu-docker
+artifacts-x86_64-unknown-linux-gnu-docker: target/artifacts/x86_64-unknown-linux-gnu/docker
 # MUSL
-.PHONY: release-x86_64-unknown-linux-musl
-release-x86_64-unknown-linux-musl: target/releases/x86_64-unknown-linux-musl/binary target/releases/x86_64-unknown-linux-musl/docker
-.PHONY: release-x86_64-unknown-linux-musl-binary
-release-x86_64-unknown-linux-musl-binary: target/releases/x86_64-unknown-linux-musl/binary
-.PHONY: release-x86_64-unknown-linux-musl-docker
-release-x86_64-unknown-linux-musl-docker: target/releases/x86_64-unknown-linux-musl/docker
+.PHONY: artifacts-x86_64-unknown-linux-musl
+artifacts-x86_64-unknown-linux-musl: target/artifacts/x86_64-unknown-linux-musl/binary target/artifacts/x86_64-unknown-linux-musl/docker
+.PHONY: artifacts-x86_64-unknown-linux-musl-binary
+artifacts-x86_64-unknown-linux-musl-binary: target/artifacts/x86_64-unknown-linux-musl/binary
+.PHONY: artifacts-x86_64-unknown-linux-musl-docker
+artifacts-x86_64-unknown-linux-musl-docker: target/artifacts/x86_64-unknown-linux-musl/docker
 ### AARCH64
 ## Linux
+.PHONY: artifacts-aarch64-unknown-linux-gnu
+artifacts-aarch64-unknown-linux: artifacts-aarch64-unknown-linux-gnu artifacts-aarch64-unknown-linux-musl
 # GLIBC
-.PHONY: release-aarch64-unknown-linux-gnu
-release-aarch64-unknown-linux-gnu: target/releases/aarch64-unknown-linux-gnu/binary target/releases/aarch64-unknown-linux-gnu/docker
-.PHONY: release-aarch64-unknown-linux-gnu-binary
-release-aarch64-unknown-linux-gnu-binary: target/releases/aarch64-unknown-linux-gnu/binary
-.PHONY: release-aarch64-unknown-linux-gnu-docker
-release-aarch64-unknown-linux-gnu-docker: target/releases/aarch64-unknown-linux-gnu/docker
+.PHONY: artifacts-aarch64-unknown-linux-gnu
+artifacts-aarch64-unknown-linux-gnu: target/artifacts/aarch64-unknown-linux-gnu/binary target/artifacts/aarch64-unknown-linux-gnu/docker
+.PHONY: artifacts-aarch64-unknown-linux-gnu-binary
+artifacts-aarch64-unknown-linux-gnu-binary: target/artifacts/aarch64-unknown-linux-gnu/binary
+.PHONY: artifacts-aarch64-unknown-linux-gnu-docker
+artifacts-aarch64-unknown-linux-gnu-docker: target/artifacts/aarch64-unknown-linux-gnu/docker
 # MUSL
-.PHONY: release-aarch64-unknown-linux-musl
-release-aarch64-unknown-linux-musl: target/releases/aarch64-unknown-linux-musl/binary target/releases/aarch64-unknown-linux-musl/docker
-.PHONY: release-aarch64-unknown-linux-musl-binary
-release-aarch64-unknown-linux-musl-binary: target/releases/aarch64-unknown-linux-musl/binary
-.PHONY: release-aarch64-unknown-linux-musl-docker
-release-aarch64-unknown-linux-musl-docker: target/releases/aarch64-unknown-linux-musl/docker
+.PHONY: artifacts-aarch64-unknown-linux-musl
+artifacts-aarch64-unknown-linux-musl: target/artifacts/aarch64-unknown-linux-musl/binary target/artifacts/aarch64-unknown-linux-musl/docker
+.PHONY: artifacts-aarch64-unknown-linux-musl-binary
+artifacts-aarch64-unknown-linux-musl-binary: target/artifacts/aarch64-unknown-linux-musl/binary
+.PHONY: artifacts-aarch64-unknown-linux-musl-docker
+artifacts-aarch64-unknown-linux-musl-docker: target/artifacts/aarch64-unknown-linux-musl/docker
 
 
 # release: release-prepare generate release-commit ## Release a new Vector version

@@ -1,7 +1,7 @@
 rec {
   target = {
     # Output Artifacts
-    releases = rec {
+    artifacts = rec {
       # See `rustup target list`
       x86_64-unknown-linux-gnu = rec {
         configuration = {
@@ -76,41 +76,44 @@ rec {
   };
 
   environment = {
-    variables =  targetPkgs: {
-      PKG_CONFIG_ALLOW_CROSS=true;
-      # We must set some protoc related env vars for the prost crate.
-      PROTOC = "${targetPkgs.protobuf}/bin/protoc";
-      PROTOC_INCLUDE = "${targetPkgs.protobuf}/include";
-      # On Linux builds, we need some level of localization.
-      LOCALE_ARCHIVE = if targetPkgs.stdenv.isLinux && targetPkgs.glibcLocales != null then
-        "${targetPkgs.glibcLocales}/lib/locale/locale-archive"
-      else
-        "";
-      LC_ALL = "en_US.UTF-8";
-      # Without setting a tzdata folder, some tests will fail.
-      TZDIR = "${targetPkgs.tzdata}/share/zoneinfo";
-      # Crates expect information about OpenSSL in these vars.
-      OPENSSL_DIR = "${targetPkgs.openssl.dev}";
-      OPENSSL_LIB_DIR = "${targetPkgs.openssl.out}/lib";
-      SSL_CERT_FILE = "${targetPkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-      # Git looks to this env var for SSL certificates.
-      GIT_SSL_CAINFO = "${targetPkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-      # Curl looks to this env var for SSL certificates.
-      CURL_CA_BUNDLE = "${targetPkgs.cacert}/etc/ca-bundle.crt";
-      # Encourage Cargo to be pretty.
-      CARGO_TERM_COLOR = "always";
-      # Enable backtraces in the environment.
-      RUST_BACKTRACE = "full";
-      # Vector gets very angry if you don't set these and use the AWS components.
-      AWS_ACCESS_KEY_ID = "dummy";
-      AWS_SECRET_ACCESS_KEY = "dummy";
-      # Lucet (for wasm) depends on libclang
-      # LIBCLANG_PATH="${targetPkgs.llvmPackages.libclang}/lib";
-      CPATH= if targetPkgs.stdenv.isLinux then
-        "${targetPkgs.linuxHeaders}/include"
-      else
-        "";
-    };
+    variables = {
+        targetPkgs,
+        hostPkgs,
+      }: {
+        PKG_CONFIG_ALLOW_CROSS=true;
+        # We must set some protoc related env vars for the prost crate.
+        PROTOC = "${hostPkgs.protobuf}/bin/protoc"; # NOTE: `targetPkgs.pkgs` points to the 'host' packages.
+        PROTOC_INCLUDE = "${hostPkgs.protobuf}/include"; # NOTE: `targetPkgs.pkgs` points to the 'host' packages.
+        # On Linux builds, we need some level of localization.
+        LOCALE_ARCHIVE = if targetPkgs.stdenv.isLinux && targetPkgs.glibcLocales != null then
+          "${targetPkgs.glibcLocales}/lib/locale/locale-archive"
+        else
+          "";
+        LC_ALL = "en_US.UTF-8";
+        # Without setting a tzdata folder, some tests will fail.
+        TZDIR = "${targetPkgs.tzdata}/share/zoneinfo";
+        # Crates expect information about OpenSSL in these vars.
+        OPENSSL_DIR = "${targetPkgs.openssl.dev}";
+        OPENSSL_LIB_DIR = "${targetPkgs.openssl.out}/lib";
+        SSL_CERT_FILE = "${targetPkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+        # Git looks to this env var for SSL certificates.
+        GIT_SSL_CAINFO = "${targetPkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+        # Curl looks to this env var for SSL certificates.
+        CURL_CA_BUNDLE = "${targetPkgs.cacert}/etc/ca-bundle.crt";
+        # Encourage Cargo to be pretty.
+        CARGO_TERM_COLOR = "always";
+        # Enable backtraces in the environment.
+        RUST_BACKTRACE = "full";
+        # Vector gets very angry if you don't set these and use the AWS components.
+        AWS_ACCESS_KEY_ID = "dummy";
+        AWS_SECRET_ACCESS_KEY = "dummy";
+        # Lucet (for wasm) depends on libclang
+        # LIBCLANG_PATH="${targetPkgs.llvmPackages.libclang}/lib";
+        CPATH= if targetPkgs.stdenv.isLinux then
+          "${targetPkgs.linuxHeaders}/include"
+        else
+          "";
+      };
     developmentTools = targetPkgs:
       with targetPkgs;
       [
@@ -161,15 +164,9 @@ rec {
       # Since these packages are able to be run at build-time, they are added to the PATH, as described
       # above. But since these packages are only guaranteed to be able to run then, they shouldn't
       # persist as run-time dependencies. This isn't currently enforced, but could be in the future.
-      nativeBuildInputs = targetPkgs:
-        with targetPkgs;
+      depsBuildHost = passedPkgs:
+        with passedPkgs.buildPackages;
           [
-            pkg-config
-            openssl.dev
-            jemalloc
-            rdkafka
-            leveldb
-            snappy
           ]
           ++ (
             if stdenv.isDarwin then
@@ -199,12 +196,15 @@ rec {
       # always the case. For example, the machine code in a statically-linked library is only used at
       # run-time, but the derivation containing the library is only needed at build-time. Even in the
       # dynamic case, the library may also be needed at build-time to appease the linker.
-      buildInputs = targetPkgs:
-        with targetPkgs;
+      depsBuildBuild = passedPkgs:
+        with passedPkgs.buildPackages;
         [
+            pkg-config
             rdkafka
             leveldb
             snappy
+            openssl.dev
+            jemalloc
         ] ++ (
           if stdenv.isDarwin then
             []
@@ -213,6 +213,19 @@ rec {
           else
             []
         );
+
+      depsHostTarget = passedPkgs:
+        with passedPkgs.buildPackages;
+          [
+          ];
+      depsHostBuild = passedPkgs:
+        with passedPkgs.buildPackages;
+          [
+          ];
+      nativeBuildInputs = passedPkgs:
+        with passedPkgs.buildPackages;
+          [
+          ];
     };
   };
 
@@ -270,7 +283,7 @@ rec {
     # Build a binary Vector artifact
     binary = args@{
       # This will be set dynamically!
-      features ? null,
+      features,
       linking ? "dynamic",
       rustChannel ? null, # Defaulted below
       rustTarget,
@@ -286,15 +299,17 @@ rec {
           # DO NOT TRY TO PUT THIS HERE. PUT IT IN THE `(this).rust.override { ... }`
           # targets = [ args.rustTarget ];
         };
-        features = (builtins.getAttr args.rustTarget target.releases).configuration.features;
-        
         packageDefinition = rec {
           pname = cargoToml.package.name;
           version = cargoToml.package.version;
-          # See `definition.nix` for details on these.
-          nativeBuildInputs = (environment.dependencies.nativeBuildInputs targetPkgs);
-          buildInputs = (environment.dependencies.buildInputs hostPkgs);
-          passthru = (environment.variables targetPkgs);
+
+          depsBuildHost = (environment.dependencies.depsBuildHost targetPkgs);
+          depsBuildBuild = (environment.dependencies.depsBuildBuild hostPkgs);
+          depsHostTarget = (environment.dependencies.depsHostTarget targetPkgs);
+          depsHostBuild = (environment.dependencies.depsHostBuild targetPkgs);
+          nativeBuildInputs =  (environment.dependencies.nativeBuildInputs hostPkgs);
+
+          passthru = (environment.variables { inherit (args) targetPkgs hostPkgs; });
           # Configurables
           buildType = args.buildType;
           logLevel = args.logLevel;
@@ -327,7 +342,7 @@ rec {
             maintainers = [];
             platforms = platforms.all;
           };
-        } // (environment.variables targetPkgs);
+        } // (environment.variables { inherit (args) targetPkgs hostPkgs; });
       in
         (targetPkgs.makeRustPlatform {
           cargo = rustChannel.rust.override {
