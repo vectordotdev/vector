@@ -8,6 +8,7 @@ use crate::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
         retries2::{RetryAction, RetryLogic},
+        rusoto,
         service2::TowerRequestConfig,
         BatchBytesConfig, Buffer, Compression,
     },
@@ -26,9 +27,7 @@ use http02::{
 use hyper::Body;
 use lazy_static::lazy_static;
 use rusoto_core::Region;
-use rusoto_credential::{
-    AwsCredentials, CredentialsError, DefaultCredentialsProvider, ProvideAwsCredentials,
-};
+use rusoto_credential::{AwsCredentials, CredentialsError, ProvideAwsCredentials};
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -83,7 +82,7 @@ pub enum Encoding {
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum ElasticSearchAuth {
     Basic { user: String, password: String },
-    Aws,
+    Aws { assume_role: Option<String> },
 }
 
 impl ElasticSearchAuth {
@@ -155,8 +154,6 @@ enum ParseError {
     InvalidHost { host: String, source: InvalidUri },
     #[snafu(display("Host {:?} must include hostname", host))]
     HostMustIncludeHostname { host: String },
-    #[snafu(display("Could not create AWS credentials provider: {:?}", source))]
-    AWSCredentialsProviderFailed { source: CredentialsError },
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
     #[snafu(display("Compression can not be used with AWS hosted Elasticsearch"))]
@@ -377,9 +374,8 @@ impl ElasticSearchCommon {
 
         let credentials = match &config.auth {
             Some(ElasticSearchAuth::Basic { .. }) | None => None,
-            Some(ElasticSearchAuth::Aws) => {
-                let provider =
-                    DefaultCredentialsProvider::new().context(AWSCredentialsProviderFailed)?;
+            Some(ElasticSearchAuth::Aws { assume_role }) => {
+                let provider = rusoto::AwsCredentialsProvider::new(&region, assume_role.clone())?;
 
                 let mut rt = tokio_compat::runtime::current_thread::Runtime::new()?;
                 let credentials = rt
@@ -691,7 +687,7 @@ mod integration_tests {
     fn insert_events_on_aws() {
         run_insert_tests(
             ElasticSearchConfig {
-                auth: Some(ElasticSearchAuth::Aws),
+                auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
                 host: "http://localhost:4571".into(),
                 ..config()
             },
