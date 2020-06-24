@@ -7,8 +7,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto::{self, AwsCredentialsProvider},
-        BatchEventsConfig, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+        rusoto, BatchEventsConfig, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
         TowerRequestConfig, TowerRequestSettings,
     },
     template::Template,
@@ -16,7 +15,8 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::{Duration, Utc};
-use futures01::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
+use futures::future::{FutureExt, TryFutureExt};
+use futures01::{stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{request::BufferedHttpResponse, Region, RusotoError};
 use rusoto_logs::{
@@ -50,7 +50,7 @@ pub(self) enum CloudwatchLogsError {
     },
     #[snafu(display("{}", source))]
     InvalidCloudwatchCredentials {
-        source: rusoto_core::CredentialsError,
+        source: rusoto_credential::CredentialsError,
     },
     #[snafu(display("Encoded event is too long, length={}", length))]
     EventTooLong { length: usize },
@@ -166,9 +166,9 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             Box::new(svc_sink)
         };
 
-        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
+        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
 
-        Ok((sink, healthcheck))
+        Ok((sink, Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -461,43 +461,28 @@ enum HealthcheckError {
     GroupNameMismatch { expected: String, name: String },
 }
 
-fn healthcheck(
-    config: CloudwatchLogsSinkConfig,
-    resolver: Resolver,
-) -> crate::Result<super::Healthcheck> {
+async fn healthcheck(config: CloudwatchLogsSinkConfig, resolver: Resolver) -> crate::Result<()> {
     if config.group_name.is_dynamic() {
         info!("cloudwatch group_name is dynamic; skipping healthcheck.");
-        return Ok(Box::new(future::ok(())));
+        return Ok(());
     }
 
     let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
+    let expected_group_name = group_name.clone();
 
-    let client = create_client(
-        config.region.clone().try_into()?,
-        config.assume_role,
-        resolver,
-    )?;
+    let client = create_client((&config.region).try_into()?, config.assume_role, resolver)?;
 
     let request = DescribeLogGroupsRequest {
         limit: Some(1),
-        log_group_name_prefix: Some(group_name.clone()),
+        log_group_name_prefix: Some(group_name),
         ..Default::default()
     };
 
-    let expected_group_name = group_name;
-
     // This will attempt to find the group name passed in and verify that
     // it matches the one that AWS sends back.
-    let fut = client
-        .describe_log_groups(request)
-        .map_err(|source| HealthcheckError::DescribeLogStreamsFailed { source }.into())
-        .and_then(|response| {
-            response
-                .log_groups
-                .ok_or_else(|| HealthcheckError::NoLogGroup.into())
-        })
-        .and_then(move |groups| {
-            if let Some(group) = groups.into_iter().next() {
+    match client.describe_log_groups(request).await {
+        Ok(resp) => match resp.log_groups.and_then(|g| g.into_iter().next()) {
+            Some(group) => {
                 if let Some(name) = group.log_group_name {
                     if name == expected_group_name {
                         Ok(())
@@ -511,12 +496,11 @@ fn healthcheck(
                 } else {
                     Err(HealthcheckError::GroupNameError.into())
                 }
-            } else {
-                Err(HealthcheckError::NoLogGroup.into())
             }
-        });
-
-    Ok(Box::new(fut))
+            None => Err(HealthcheckError::NoLogGroup.into()),
+        },
+        Err(source) => Err(HealthcheckError::DescribeLogStreamsFailed { source }.into()),
+    }
 }
 
 fn create_client(
@@ -525,7 +509,7 @@ fn create_client(
     resolver: Resolver,
 ) -> crate::Result<CloudWatchLogsClient> {
     let http = rusoto::client(resolver)?;
-    let creds = AwsCredentialsProvider::new(&region, assume_role)?;
+    let creds = rusoto::AwsCredentialsProvider::new(&region, assume_role)?;
     Ok(CloudWatchLogsClient::new_with(http, creds, region))
 }
 
@@ -551,7 +535,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
                 RusotoError::Unknown(res)
                     if res.status.is_server_error()
-                        || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+                        || res.status == http02::StatusCode::TOO_MANY_REQUESTS =>
                 {
                     let BufferedHttpResponse { status, body, .. } = res;
                     let body = String::from_utf8_lossy(&body[..]);
@@ -580,7 +564,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
                 RusotoError::Unknown(res)
                     if res.status.is_server_error()
-                        || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+                        || res.status == http02::StatusCode::TOO_MANY_REQUESTS =>
                 {
                     let BufferedHttpResponse { status, body, .. } = res;
                     let body = String::from_utf8_lossy(&body[..]);
@@ -606,7 +590,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
                 RusotoError::Unknown(res)
                     if res.status.is_server_error()
-                        || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+                        || res.status == http02::StatusCode::TOO_MANY_REQUESTS =>
                 {
                     let BufferedHttpResponse { status, body, .. } = res;
                     let body = String::from_utf8_lossy(&body[..]);
@@ -669,7 +653,6 @@ mod tests {
         dns::Resolver,
         event::{self, Event, Value},
         region::RegionOrEndpoint,
-        test_util::runtime,
     };
     use std::collections::HashMap;
     use std::convert::{TryFrom, TryInto};
@@ -769,8 +752,7 @@ mod tests {
             stream: "stream".into(),
             group: "group".into(),
         };
-        let rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
         CloudwatchLogsSvc::new(&config, &key, resolver).unwrap()
     }
 
@@ -859,7 +841,7 @@ mod integration_tests {
     #[test]
     fn cloudwatch_insert_log_event() {
         let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
 
         let stream_name = gen_name();
 
@@ -899,7 +881,9 @@ mod integration_tests {
 
         let client = create_client(region, None, resolver).unwrap();
 
-        let response = rt.block_on(client.get_log_events(request)).unwrap();
+        let response = rt
+            .block_on_std(async move { client.get_log_events(request).await })
+            .unwrap();
 
         let events = response.events.unwrap();
 
@@ -914,7 +898,7 @@ mod integration_tests {
     #[test]
     fn cloudwatch_insert_log_events_sorted() {
         let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
 
         let stream_name = gen_name();
 
@@ -969,7 +953,9 @@ mod integration_tests {
 
         let client = create_client(region, None, resolver).unwrap();
 
-        let response = rt.block_on(client.get_log_events(request)).unwrap();
+        let response = rt
+            .block_on_std(async move { client.get_log_events(request).await })
+            .unwrap();
 
         let events = response.events.unwrap();
 
@@ -987,7 +973,7 @@ mod integration_tests {
     #[test]
     fn cloudwatch_insert_out_of_range_timestamp() {
         let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
 
         let stream_name = gen_name();
 
@@ -1051,7 +1037,9 @@ mod integration_tests {
 
         let client = create_client(region, None, resolver).unwrap();
 
-        let response = rt.block_on(client.get_log_events(request)).unwrap();
+        let response = rt
+            .block_on_std(async move { client.get_log_events(request).await })
+            .unwrap();
 
         let events = response.events.unwrap();
 
@@ -1066,7 +1054,7 @@ mod integration_tests {
     #[test]
     fn cloudwatch_dynamic_group_and_stream_creation() {
         let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
 
         let group_name = gen_name();
         let stream_name = gen_name();
@@ -1106,7 +1094,9 @@ mod integration_tests {
 
         let client = create_client(region, None, resolver).unwrap();
 
-        let response = rt.block_on(client.get_log_events(request)).unwrap();
+        let response = rt
+            .block_on_std(async move { client.get_log_events(request).await })
+            .unwrap();
 
         let events = response.events.unwrap();
 
@@ -1121,7 +1111,7 @@ mod integration_tests {
     #[test]
     fn cloudwatch_insert_log_event_batched() {
         let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
 
         let group_name = gen_name();
         let stream_name = gen_name();
@@ -1165,7 +1155,9 @@ mod integration_tests {
 
         let client = create_client(region, None, resolver).unwrap();
 
-        let response = rt.block_on(client.get_log_events(request)).unwrap();
+        let response = rt
+            .block_on_std(async move { client.get_log_events(request).await })
+            .unwrap();
 
         let events = response.events.unwrap();
 
@@ -1181,7 +1173,7 @@ mod integration_tests {
     fn cloudwatch_insert_log_event_partitioned() {
         crate::test_util::trace_init();
         let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
 
         let stream_name = gen_name();
 
@@ -1234,7 +1226,10 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt.block_on(client.get_log_events(request)).unwrap();
+        let client2 = client.clone();
+        let response = rt
+            .block_on_std(async move { client2.get_log_events(request).await })
+            .unwrap();
         let events = response.events.unwrap();
         let output_lines = events
             .into_iter()
@@ -1255,7 +1250,9 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt.block_on(client.get_log_events(request)).unwrap();
+        let response = rt
+            .block_on_std(async move { client.get_log_events(request).await })
+            .unwrap();
         let events = response.events.unwrap();
         let output_lines = events
             .into_iter()
@@ -1293,14 +1290,14 @@ mod integration_tests {
         };
 
         let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
 
-        rt.block_on(healthcheck(config, resolver).unwrap()).unwrap();
+        rt.block_on_std(healthcheck(config, resolver)).unwrap();
     }
 
     fn ensure_group(region: Region) {
         let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
 
         let client = create_client(region, None, resolver).unwrap();
 
@@ -1309,7 +1306,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let _ = rt.block_on(client.create_log_group(req));
+        let _ = rt.block_on_std(async move { client.create_log_group(req).await });
     }
 
     fn gen_name() -> String {

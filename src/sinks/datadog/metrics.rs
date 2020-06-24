@@ -5,7 +5,7 @@ use crate::{
         Event,
     },
     sinks::util::{
-        http2::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchEventsConfig, MetricBuffer,
     },
@@ -163,7 +163,7 @@ impl HttpSink for DatadogSink {
 fn build_uri(host: &str) -> crate::Result<Uri> {
     let uri = format!("{}/api/v1/series", host)
         .parse::<Uri>()
-        .context(super::UriParseError2)?;
+        .context(super::UriParseError)?;
 
     Ok(uri)
 }
@@ -171,11 +171,11 @@ fn build_uri(host: &str) -> crate::Result<Uri> {
 async fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result<()> {
     let uri = format!("{}/api/v1/validate", config.host)
         .parse::<Uri>()
-        .context(super::UriParseError2)?;
+        .context(super::UriParseError)?;
 
     let request = Request::get(uri)
         .header("DD-API-KEY", config.api_key)
-        .body(hyper13::Body::empty())
+        .body(hyper::Body::empty())
         .unwrap();
 
     let mut client = HttpClient::new(resolver, None)?;
@@ -372,7 +372,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
 mod tests {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
-    use crate::sinks::util::{http2::HttpSink, test::load_sink};
+    use crate::sinks::util::{http::HttpSink, test::load_sink};
     use chrono::offset::TimeZone;
     use chrono::Utc;
     use http02::{Method, Uri};

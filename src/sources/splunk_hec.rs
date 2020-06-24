@@ -4,21 +4,26 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
-use bytes::{Buf, Bytes};
+use bytes05::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
+use futures::{
+    compat::{AsyncRead01CompatExt, Future01CompatExt, Stream01CompatExt},
+    FutureExt, TryFutureExt, TryStreamExt,
+};
 use futures01::{sync::mpsc, Async, Future, Sink, Stream};
-use http::StatusCode;
+use http02::StatusCode;
 use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
 use serde_json::{de::IoRead, json, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use std::{
-    io::Read,
+    io::{Cursor, Read},
     net::{Ipv4Addr, SocketAddr},
 };
 use string_cache::DefaultAtom as Atom;
-use warp::{body::FullBody, filters::BoxedFilter, path, reply::Response, Filter, Rejection, Reply};
+use tokio_util::compat::FuturesAsyncReadCompatExt;
+use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 // Event fields unique to splunk_hec source
 lazy_static! {
@@ -80,7 +85,7 @@ impl SourceConfig for SplunkConfig {
         let health_service = source.health_service(out.clone());
         let options = SplunkSource::options();
 
-        let services = path!("services" / "collector")
+        let services = path!("services" / "collector" / ..)
             .and(
                 event_service
                     .or(raw_service)
@@ -95,11 +100,18 @@ impl SourceConfig for SplunkConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let incoming = tls.bind(&self.address)?.incoming();
 
-        let server = warp::serve(services)
-            .serve_incoming_with_graceful_shutdown(incoming, shutdown.clone().map(|_| ()));
-
-        // We should drop the last copy of ShutdownSignalToken only after the server has shut down.
-        Ok(Box::new(server.map(move |()| drop(shutdown))))
+        let fut = async move {
+            let _ = warp::serve(services)
+                .serve_incoming_with_graceful_shutdown(
+                    incoming.compat().map_ok(|s| s.compat().compat()),
+                    shutdown.clone().compat().map(|_| ()),
+                )
+                .await;
+            // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
+            drop(shutdown);
+            Ok(())
+        };
+        Ok(Box::new(fut.boxed().compat()))
     }
 
     fn output_type(&self) -> DataType {
@@ -127,39 +139,36 @@ impl SplunkSource {
     }
 
     fn event_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response,)> {
-        warp::post2()
-            .and(
-                warp::path::end()
-                    .or(path!("event").and(warp::path::end()))
-                    .or(path!("event" / "1.0").and(warp::path::end())),
-            )
+        warp::post()
+            .and(path!("event").or(path!("event" / "1.0")))
             .and(self.authorization())
             .and(warp::header::optional::<String>("x-splunk-request-channel"))
             .and(warp::header::optional::<String>("host"))
             .and(self.gzip())
-            .and(warp::body::concat())
+            .and(warp::body::bytes())
             .and_then(
                 move |_,
                       _,
                       channel: Option<String>,
                       host: Option<String>,
                       gzip: bool,
-                      body: FullBody| {
-                    // Construct event parser
-                    if gzip {
-                        Box::new(
-                            EventStream::new(GzDecoder::new(body.reader()), channel, host)
+                      body: Bytes| {
+                    let out = out.clone();
+                    async move {
+                        // Construct event parser
+                        if gzip {
+                            EventStream::new(GzDecoder::new(Cursor::new(body)), channel, host)
                                 .forward(out.clone().sink_map_err(|_| ApiError::ServerShutdown))
-                                .map(|_| ()),
-                        )
-                            as Box<dyn Future<Item = (), Error = Rejection> + Send>
-                    } else {
-                        Box::new(
-                            EventStream::new(body.reader(), channel, host)
+                                .map(|_| ())
+                                .compat()
+                                .await
+                        } else {
+                            EventStream::new(Cursor::new(body), channel, host)
                                 .forward(out.clone().sink_map_err(|_| ApiError::ServerShutdown))
-                                .map(|_| ()),
-                        )
-                            as Box<dyn Future<Item = (), Error = Rejection> + Send>
+                                .map(|_| ())
+                                .compat()
+                                .await
+                        }
                     }
                 },
             )
@@ -168,15 +177,12 @@ impl SplunkSource {
     }
 
     fn raw_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response,)> {
-        warp::post2()
-            .and(
-                (path!("raw" / "1.0").and(warp::path::end()))
-                    .or(path!("raw").and(warp::path::end())),
-            )
+        warp::post()
+            .and(path!("raw" / "1.0").or(path!("raw")))
             .and(self.authorization())
             .and(
                 warp::header::optional::<String>("x-splunk-request-channel").and_then(
-                    |channel: Option<String>| {
+                    |channel: Option<String>| async {
                         if let Some(channel) = channel {
                             Ok(channel)
                         } else {
@@ -187,13 +193,18 @@ impl SplunkSource {
             )
             .and(warp::header::optional::<String>("host"))
             .and(self.gzip())
-            .and(warp::body::concat())
+            .and(warp::body::bytes())
             .and_then(
-                move |_, _, channel: String, host: Option<String>, gzip: bool, body: FullBody| {
-                    // Construct event parser
-                    futures01::stream::once(raw_event(body, gzip, channel, host))
-                        .forward(out.clone().sink_map_err(|_| ApiError::ServerShutdown))
-                        .map(|_| ())
+                move |_, _, channel: String, host: Option<String>, gzip: bool, body: Bytes| {
+                    let out = out.clone();
+                    async move {
+                        // Construct event parser
+                        futures01::stream::once(raw_event(body, gzip, channel, host))
+                            .forward(out.clone().sink_map_err(|_| ApiError::ServerShutdown))
+                            .map(|_| ())
+                            .compat()
+                            .await
+                    }
                 },
             )
             .map(finish_ok)
@@ -204,33 +215,36 @@ impl SplunkSource {
         let credentials = self.credentials.clone();
         let authorize =
             warp::header::optional("Authorization").and_then(move |token: Option<String>| {
-                match (token, credentials.as_ref()) {
-                    (_, None) => Ok(()),
-                    (Some(token), Some(password)) if token.as_bytes() == password.as_ref() => {
-                        Ok(())
+                let credentials = credentials.clone();
+                async move {
+                    match (token, credentials) {
+                        (_, None) => Ok(()),
+                        (Some(token), Some(password)) if token.as_bytes() == password.as_ref() => {
+                            Ok(())
+                        }
+                        _ => Err(Rejection::from(ApiError::BadRequest)),
                     }
-                    _ => Err(Rejection::from(ApiError::BadRequest)),
                 }
             });
 
-        warp::get2()
-            .and(
-                (path!("health" / "1.0").and(warp::path::end()))
-                    .or(path!("health").and(warp::path::end())),
-            )
+        warp::get()
+            .and(path!("health" / "1.0").or(path!("health")))
             .and(authorize)
             .and_then(move |_, _| {
-                match out.clone().poll_ready() {
-                    Ok(Async::Ready(())) => Ok(warp::reply().into_response()),
-                    // Since channel of mpsc::Sender increase by one with each sender, technically
-                    // channel will never be full, and this will never be returned.
-                    // This behavior dosn't fulfill one of purposes of healthcheck.
-                    Ok(Async::NotReady) => Ok(warp::reply::with_status(
-                        warp::reply(),
-                        StatusCode::SERVICE_UNAVAILABLE,
-                    )
-                    .into_response()),
-                    Err(_) => Err(Rejection::from(ApiError::ServerShutdown)),
+                let out = out.clone();
+                async move {
+                    match out.clone().poll_ready() {
+                        Ok(Async::Ready(())) => Ok(warp::reply().into_response()),
+                        // Since channel of mpsc::Sender increase by one with each sender, technically
+                        // channel will never be full, and this will never be returned.
+                        // This behavior dosn't fulfill one of purposes of healthcheck.
+                        Ok(Async::NotReady) => Ok(warp::reply::with_status(
+                            warp::reply(),
+                            StatusCode::SERVICE_UNAVAILABLE,
+                        )
+                        .into_response()),
+                        Err(_) => Err(Rejection::from(ApiError::ServerShutdown)),
+                    }
                 }
             })
             .boxed()
@@ -239,19 +253,15 @@ impl SplunkSource {
     fn options() -> BoxedFilter<(Response,)> {
         let post = warp::options()
             .and(
-                warp::path::end()
-                    .or(path!("event").and(warp::path::end()))
-                    .or(path!("event" / "1.0").and(warp::path::end()))
-                    .or(path!("raw" / "1.0").and(warp::path::end()))
-                    .or(path!("raw").and(warp::path::end())),
+                path!("event")
+                    .or(path!("event" / "1.0"))
+                    .or(path!("raw" / "1.0"))
+                    .or(path!("raw")),
             )
             .map(|_| warp::reply::with_header(warp::reply(), "Allow", "POST").into_response());
 
         let get = warp::options()
-            .and(
-                (path!("health").and(warp::path::end()))
-                    .or(path!("health" / "1.0").and(warp::path::end())),
-            )
+            .and(path!("health").or(path!("health" / "1.0")))
             .map(|_| warp::reply::with_header(warp::reply(), "Allow", "GET").into_response());
 
         post.or(get).unify().boxed()
@@ -261,26 +271,31 @@ impl SplunkSource {
     fn authorization(&self) -> BoxedFilter<((),)> {
         let credentials = self.credentials.clone();
         warp::header::optional("Authorization")
-            .and_then(
-                move |token: Option<String>| match (token, credentials.as_ref()) {
-                    (_, None) => Ok(()),
-                    (Some(token), Some(password)) if token.as_bytes() == password.as_ref() => {
-                        Ok(())
+            .and_then(move |token: Option<String>| {
+                let credentials = credentials.clone();
+                async move {
+                    match (token, credentials) {
+                        (_, None) => Ok(()),
+                        (Some(token), Some(password)) if token.as_bytes() == password.as_ref() => {
+                            Ok(())
+                        }
+                        (Some(_), Some(_)) => Err(Rejection::from(ApiError::InvalidAuthorization)),
+                        (None, Some(_)) => Err(Rejection::from(ApiError::MissingAuthorization)),
                     }
-                    (Some(_), Some(_)) => Err(Rejection::from(ApiError::InvalidAuthorization)),
-                    (None, Some(_)) => Err(Rejection::from(ApiError::MissingAuthorization)),
-                },
-            )
+                }
+            })
             .boxed()
     }
 
     /// Is body encoded with gzip
     fn gzip(&self) -> BoxedFilter<(bool,)> {
         warp::header::optional::<String>("Content-Encoding")
-            .and_then(|encoding: Option<String>| match encoding {
-                Some(s) if s.as_bytes() == b"gzip" => Ok(true),
-                Some(_) => Err(Rejection::from(ApiError::UnsupportedEncoding)),
-                None => Ok(false),
+            .and_then(|encoding: Option<String>| async move {
+                match encoding {
+                    Some(s) if s.as_bytes() == b"gzip" => Ok(true),
+                    Some(_) => Err(Rejection::from(ApiError::UnsupportedEncoding)),
+                    None => Ok(false),
+                }
             })
             .boxed()
     }
@@ -542,7 +557,7 @@ enum Time {
 
 /// Creates event from raw request
 fn raw_event(
-    bytes: FullBody,
+    bytes: Bytes,
     gzip: bool,
     channel: String,
     host: Option<String>,
@@ -550,7 +565,7 @@ fn raw_event(
     // Process gzip
     let message: Value = if gzip {
         let mut data = Vec::new();
-        match GzDecoder::new(bytes.reader()).read_to_end(&mut data) {
+        match GzDecoder::new(Cursor::new(bytes)).read_to_end(&mut data) {
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => data.into(),
             Err(error) => {
@@ -559,7 +574,7 @@ fn raw_event(
             }
         }
     } else {
-        bytes.bytes().into()
+        bytes.into()
     };
 
     // Construct event
@@ -608,6 +623,8 @@ impl From<ApiError> for Rejection {
     }
 }
 
+impl warp::reject::Reject for ApiError {}
+
 /// Cached bodies for common responses
 mod splunk_response {
     use bytes::Bytes;
@@ -640,8 +657,8 @@ fn finish_ok(_: ()) -> Response {
     response_json(StatusCode::OK, splunk_response::SUCCESS.as_ref())
 }
 
-fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
-    if let Some(error) = rejection.find_cause::<ApiError>() {
+async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
+    if let Some(error) = rejection.find::<ApiError>() {
         Ok((match error {
             ApiError::MissingAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,

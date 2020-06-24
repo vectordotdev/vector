@@ -246,7 +246,7 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-kafka
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	cargo test --no-default-features --features kafka-integration-tests ::kafka:: -- --nocapture
+	cargo test --no-default-features --features "kafka-integration-tests rdkafka-plain" ::kafka:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -290,7 +290,7 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-kafka
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --features shutdown-tests  --test shutdown -- --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --features shutdown-tests --test shutdown -- --test-threads 4
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -317,7 +317,7 @@ test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
 bench: ## Run benchmarks in /benches
-	${MAYBE_ENVIRONMENT_EXEC} ${ENVIRONMENT_EXEC} make bench
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES}"
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-wasm

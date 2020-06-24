@@ -4,7 +4,7 @@ use crate::{
     internal_events::{SplunkEventEncodeError, SplunkEventSent},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http2::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchBytesConfig, Buffer, Compression,
     },
@@ -14,7 +14,7 @@ use crate::{
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http02::{Request, StatusCode, Uri};
-use hyper13::Body;
+use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -202,7 +202,7 @@ enum HealthcheckError {
 
 pub async fn healthcheck(config: HecSinkConfig, resolver: Resolver) -> crate::Result<()> {
     let uri =
-        build_uri(&config.host, "/services/collector/health/1.0").context(super::UriParseError2)?;
+        build_uri(&config.host, "/services/collector/health/1.0").context(super::UriParseError)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", config.token))
@@ -222,7 +222,7 @@ pub async fn healthcheck(config: HecSinkConfig, resolver: Resolver) -> crate::Re
 }
 
 pub fn validate_host(host: &str) -> crate::Result<()> {
-    let uri = Uri::try_from(host).context(super::UriParseError2)?;
+    let uri = Uri::try_from(host).context(super::UriParseError)?;
 
     match uri.scheme() {
         Some(_) => Ok(()),
@@ -238,7 +238,7 @@ fn build_uri(host: &str, path: &str) -> Result<Uri, http02::uri::InvalidUri> {
 mod tests {
     use super::*;
     use crate::event::Event;
-    use crate::sinks::util::{http2::HttpSink, test::load_sink};
+    use crate::sinks::util::{http::HttpSink, test::load_sink};
     use chrono::Utc;
     use serde::Deserialize;
     use std::collections::BTreeMap;
@@ -372,7 +372,6 @@ mod integration_tests {
         Event,
     };
     use futures01::Sink;
-    use http::StatusCode;
     use serde_json::Value as JsonValue;
     use std::net::SocketAddr;
     use warp::Filter;
@@ -634,7 +633,7 @@ mod integration_tests {
     #[test]
     fn splunk_healthcheck() {
         let mut rt = runtime();
-        let resolver = crate::dns::Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = crate::dns::Resolver;
 
         // OK
         {
@@ -677,7 +676,7 @@ mod integration_tests {
             let unhealthy = warp::any()
                 .map(|| warp::reply::with_status("i'm sad", StatusCode::SERVICE_UNAVAILABLE));
             let server = warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
-            rt.spawn(server);
+            rt.spawn_std(server);
 
             let healthcheck = sinks::splunk_hec::healthcheck(config, resolver);
             assert_downcast_matches!(

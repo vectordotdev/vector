@@ -6,7 +6,7 @@ use goauth::{
     credentials::Credentials,
     GoErr,
 };
-use hyper13::{
+use hyper::{
     header::{HeaderValue, AUTHORIZATION},
     Request, StatusCode,
 };
@@ -176,7 +176,7 @@ fn make_jwt(creds: &Credentials, scope: &Scope) -> crate::Result<Jwt<JwtClaims>>
 pub fn healthcheck_response(
     creds: Option<GcpCredentials>,
     not_found_error: crate::Error,
-) -> impl FnOnce(http02::Response<hyper13::Body>) -> crate::Result<()> {
+) -> impl FnOnce(http02::Response<hyper::Body>) -> crate::Result<()> {
     move |response| match response.status() {
         StatusCode::OK => {
             // If there are credentials configured, the
@@ -197,7 +197,7 @@ pub fn healthcheck_response(
 pub fn healthcheck_response2(
     creds: Option<GcpCredentials>,
     not_found_error: crate::Error,
-) -> impl FnOnce(http02::Response<hyper13::Body>) -> crate::Result<()> {
+) -> impl FnOnce(http02::Response<hyper::Body>) -> crate::Result<()> {
     move |response| match response.status() {
         StatusCode::OK => {
             // If there are credentials configured, the

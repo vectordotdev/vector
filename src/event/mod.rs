@@ -106,6 +106,10 @@ impl LogEvent {
         util::log::get(&self.fields, key)
     }
 
+    pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
+        self.fields.get(key.as_ref())
+    }
+
     pub fn get_mut(&mut self, key: &Atom) -> Option<&mut Value> {
         util::log::get_mut(&mut self.fields, key)
     }
@@ -292,6 +296,12 @@ impl Serialize for Value {
 impl From<Bytes> for Value {
     fn from(bytes: Bytes) -> Self {
         Value::Bytes(bytes)
+    }
+}
+
+impl From<bytes05::Bytes> for Value {
+    fn from(bytes: bytes05::Bytes) -> Self {
+        Value::Bytes(bytes.as_ref().into())
     }
 }
 
@@ -696,6 +706,23 @@ impl From<Event> for Vec<u8> {
 
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
+        let mut event = Event::Log(LogEvent {
+            fields: BTreeMap::new(),
+        });
+
+        event
+            .as_mut_log()
+            .insert(log_schema().message_key().clone(), message);
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key().clone(), Utc::now());
+
+        event
+    }
+}
+
+impl From<bytes05::Bytes> for Event {
+    fn from(message: bytes05::Bytes) -> Self {
         let mut event = Event::Log(LogEvent {
             fields: BTreeMap::new(),
         });

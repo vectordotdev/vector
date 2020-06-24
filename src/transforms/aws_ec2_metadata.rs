@@ -2,13 +2,13 @@ use super::Transform;
 use crate::{
     event::Event,
     hyper::body_to_bytes,
-    sinks::util::http2::HttpClient,
+    sinks::util::http::HttpClient,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
 use http02::{uri::PathAndQuery, Request, StatusCode, Uri};
-use hyper13::Body;
+use hyper::Body;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::RandomState, HashSet};
 use std::time::{Duration, Instant};

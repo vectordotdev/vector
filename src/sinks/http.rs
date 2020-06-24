@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        http2::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchBytesConfig, Buffer, Compression, UriSerde,
     },
@@ -16,7 +16,7 @@ use http02::{
     header::{self, HeaderName, HeaderValue},
     Method, Request, StatusCode, Uri,
 };
-use hyper13::Body;
+use hyper::Body;
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -290,14 +290,14 @@ mod tests {
     use crate::{
         assert_downcast_matches,
         sinks::http::HttpSinkConfig,
-        sinks::util::http2::HttpSink,
+        sinks::util::http::HttpSink,
         sinks::util::test::build_test_server,
         test_util::{next_addr, random_lines_with_stream, runtime, shutdown_on_idle},
         topology::config::SinkContext,
     };
     use futures01::{Sink, Stream};
     use headers03::{Authorization, HeaderMapExt};
-    use hyper13::Method;
+    use hyper::Method;
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
 

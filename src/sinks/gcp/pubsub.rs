@@ -4,11 +4,11 @@ use crate::{
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http2::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpClient, HttpSink},
             service2::TowerRequestConfig,
             BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
         },
-        Healthcheck, RouterSink, UriParseError2,
+        Healthcheck, RouterSink, UriParseError,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -16,7 +16,7 @@ use crate::{
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http02::{Method, Request, Uri};
-use hyper13::Body;
+use hyper::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
@@ -138,7 +138,7 @@ impl PubsubSink {
             uri = format!("{}?key={}", uri, key);
         }
         uri.parse::<Uri>()
-            .context(UriParseError2)
+            .context(UriParseError)
             .map_err(Into::into)
     }
 }

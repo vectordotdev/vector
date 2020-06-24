@@ -442,8 +442,11 @@ pub struct CountReceiver {
 }
 
 impl CountReceiver {
-    pub fn wait(self) -> usize {
+    pub fn cancel(self) {
         self.trigger.cancel();
+    }
+
+    pub fn wait(self) -> usize {
         self.handle.wait().unwrap()
     }
 }

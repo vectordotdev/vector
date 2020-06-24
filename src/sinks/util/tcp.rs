@@ -7,7 +7,7 @@ use crate::{
     },
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink},
     sinks::{Healthcheck, RouterSink},
-    tls::{MaybeTls, MaybeTlsConnector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
+    tls::{MaybeTlsConnector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -108,7 +108,7 @@ impl TcpSink {
             self.state = match self.state {
                 TcpSinkState::Disconnected => {
                     debug!(message = "resolving dns.", host = %self.host);
-                    let fut = self.resolver.lookup_ip(&self.host);
+                    let fut = self.resolver.lookup_ip_01(self.host.clone());
 
                     TcpSinkState::ResolvingDns(fut)
                 }
@@ -175,14 +175,6 @@ impl Sink for TcpSink {
 
         match self.poll_connection() {
             Ok(Async::Ready(connection)) => {
-                // This type internally is either a `TcpStream` or a
-                // `SslStream<TcpStream>`. This match will provide the inner
-                // `TcpStream`.
-                let conn = match connection.get_mut() {
-                    MaybeTls::Raw(t) => t,
-                    MaybeTls::Tls(t) => t.get_mut().get_mut(),
-                };
-
                 // Test if the remote has issued a disconnect by calling read(2)
                 // with a 1 sized buffer.
                 //
@@ -191,7 +183,7 @@ impl Sink for TcpSink {
                 //
                 // If this returns `WouldBlock` we know the connection is still
                 // valid and the write will most likely succeed.
-                match conn.read(&mut [0u8; 1]) {
+                match connection.get_mut().read(&mut [0u8; 1]) {
                     Err(error) if error.kind() != ErrorKind::WouldBlock => {
                         emit!(TcpConnectionDisconnected { error });
                         self.state = TcpSinkState::Disconnected;
@@ -283,7 +275,7 @@ pub fn tcp_healthcheck(host: String, port: u16, resolver: Resolver) -> Healthche
     // Lazy to avoid immediately connecting
     let check = future::lazy(move || {
         resolver
-            .lookup_ip(host)
+            .lookup_ip_01(host)
             .map_err(|source| HealthcheckError::DnsError { source }.into())
             .and_then(|mut ip| {
                 ip.next()

@@ -3,10 +3,10 @@ use crate::{
     emit,
     event::Event,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
-    region2::{region_from_endpoint, RegionOrEndpoint},
+    region::{region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http2::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpClient, HttpSink},
         retries2::{RetryAction, RetryLogic},
         service2::TowerRequestConfig,
         BatchBytesConfig, Buffer, Compression,
@@ -23,15 +23,15 @@ use http02::{
     uri::InvalidUri,
     Request, StatusCode, Uri,
 };
-use hyper13::Body;
+use hyper::Body;
 use lazy_static::lazy_static;
-use rusoto_core44::Region;
-use rusoto_credential44::{
+use rusoto_core::Region;
+use rusoto_credential::{
     AwsCredentials, CredentialsError, DefaultCredentialsProvider, ProvideAwsCredentials,
 };
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -257,9 +257,28 @@ impl HttpSink for ElasticSearchCommon {
 #[derive(Clone)]
 struct ElasticSearchRetryLogic;
 
+#[derive(Deserialize, Debug)]
+struct ESResultResponse {
+    items: Vec<ESResultItem>,
+}
+#[derive(Deserialize, Debug)]
+struct ESResultItem {
+    index: ESIndexResult,
+}
+#[derive(Deserialize, Debug)]
+struct ESIndexResult {
+    error: Option<ESErrorDetails>,
+}
+#[derive(Deserialize, Debug)]
+struct ESErrorDetails {
+    reason: String,
+    #[serde(rename = "type")]
+    err_type: String,
+}
+
 impl RetryLogic for ElasticSearchRetryLogic {
-    type Error = hyper13::Error;
-    type Response = hyper13::Response<Bytes>;
+    type Error = hyper::Error;
+    type Response = hyper::Response<Bytes>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_connect() || error.is_closed()
@@ -276,14 +295,46 @@ impl RetryLogic for ElasticSearchRetryLogic {
             _ if status.is_server_error() => RetryAction::Retry(
                 format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
             ),
+            _ if status.is_client_error() => {
+                let body = String::from_utf8_lossy(response.body());
+                warn!(
+                    message = "client error",
+                    body = %body,
+                    rate_limit_secs = 30
+                );
+                RetryAction::DontRetry("client error".into())
+            }
             _ if status.is_success() => {
                 let body = String::from_utf8_lossy(response.body());
                 match body.find("\"errors\":true") {
-                    Some(_) => match serde_json::from_str::<Value>(&body) {
-                        Err(_) => RetryAction::DontRetry(
-                            "some messages failed, and invalid response from elasticsearch".into(),
-                        ),
-                        Ok(_data) => RetryAction::DontRetry("some messages failed".into()),
+                    Some(_) => match serde_json::from_str::<ESResultResponse>(&body) {
+                        Err(json_error) => {
+                            warn!(
+                                message = "ElasticSearch unparsable error response",
+                                %json_error,
+                                rate_limit_secs = 30
+                            );
+                            RetryAction::DontRetry(
+                                "some messages failed, and invalid response from elasticsearch"
+                                    .into(),
+                            )
+                        }
+                        Ok(esrr) => {
+                            match esrr.items.into_iter().find_map(|item| item.index.error) {
+                                Some(error) => warn!(
+                                    message = "ElasticSearch error response",
+                                    err_type = %error.err_type,
+                                    reason = %error.reason,
+                                    rate_limit_secs = 30
+                                ),
+                                _ => warn!(
+                                    message = "Unusual ElasticSearch error response",
+                                    %body,
+                                    rate_limit_secs = 30
+                                ),
+                            };
+                            RetryAction::DontRetry("some messages failed".into())
+                        }
                     },
                     None => RetryAction::Successful,
                 }
@@ -517,7 +568,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         event,
-        sinks::util::http2::HttpClient,
+        sinks::util::http::HttpClient,
         test_util::{random_events_with_stream, random_string, runtime},
         tls::TlsOptions,
         topology::config::{SinkConfig, SinkContext},
@@ -526,7 +577,7 @@ mod integration_tests {
     use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
     use http02::{Request, StatusCode};
-    use hyper13::Body;
+    use hyper::Body;
     use serde_json::{json, Value};
     use std::fs::File;
     use std::io::Read;

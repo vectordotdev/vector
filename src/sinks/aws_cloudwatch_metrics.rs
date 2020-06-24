@@ -1,10 +1,9 @@
 use crate::{
     dns::Resolver,
     event::metric::{Metric, MetricKind, MetricValue},
-    region2::RegionOrEndpoint,
+    region::RegionOrEndpoint,
     sinks::util::{
-        retries2::RetryLogic, rusoto2 as rusoto, service2::TowerRequestConfig, BatchEventsConfig,
-        MetricBuffer,
+        retries2::RetryLogic, rusoto, service2::TowerRequestConfig, BatchEventsConfig, MetricBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -15,7 +14,7 @@ use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
 };
-use rusoto_core44::{Region, RusotoError};
+use rusoto_core::{Region, RusotoError};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
@@ -272,7 +271,6 @@ mod tests {
     use super::*;
     use crate::dns::Resolver;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
-    use crate::test_util::runtime;
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
     use rusoto_cloudwatch::PutMetricDataInput;
@@ -286,8 +284,7 @@ mod tests {
     }
 
     fn svc() -> CloudWatchMetricsSvc {
-        let rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
         let config = config();
         let region = (&config.region).try_into().unwrap();
         let client = CloudWatchMetricsSvc::create_client(region, None, resolver).unwrap();
@@ -437,7 +434,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::event::Event;
-    use crate::region2::RegionOrEndpoint;
+    use crate::region::RegionOrEndpoint;
     use crate::test_util::{random_string, runtime};
     use crate::topology::config::SinkContext;
     use chrono::offset::TimeZone;
@@ -454,7 +451,7 @@ mod integration_tests {
     #[test]
     fn cloudwatch_metrics_healthchecks() {
         let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
         let _ = rt.block_on_std(CloudWatchMetricsSvc::healthcheck(config(), resolver));
     }
 

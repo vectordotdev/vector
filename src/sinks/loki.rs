@@ -17,8 +17,8 @@ use crate::{
     event::{self, Event, Value},
     runtime::FutureExt,
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        http2::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchBytesConfig, UriSerde,
     },
@@ -38,7 +38,8 @@ type Labels = Vec<(String, String)>;
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
     endpoint: UriSerde,
-    encoding: EncodingConfig<Encoding>,
+    #[serde(default)]
+    encoding: EncodingConfigWithDefault<Encoding>,
 
     tenant_id: Option<String>,
     labels: HashMap<String, Template>,
@@ -229,7 +230,7 @@ async fn healthcheck(config: LokiConfig, resolver: Resolver) -> crate::Result<()
     let mut client = HttpClient::new(resolver, tls)?;
 
     let req = http02::Request::get(uri)
-        .body(hyper13::Body::empty())
+        .body(hyper::Body::empty())
         .unwrap();
 
     let res = client.send(req).await?;
@@ -244,7 +245,7 @@ async fn healthcheck(config: LokiConfig, resolver: Resolver) -> crate::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sinks::util::http2::HttpSink;
+    use crate::sinks::util::http::HttpSink;
     use crate::sinks::util::test::load_sink;
     use crate::Event;
 

@@ -1,12 +1,12 @@
 use crate::{
     dns::Resolver,
     event::{self, Event},
-    region2::RegionOrEndpoint,
+    region::RegionOrEndpoint,
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries2::RetryLogic,
-        rusoto2 as rusoto,
+        rusoto,
         service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
         sink::Response,
         BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
@@ -21,7 +21,7 @@ use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
 use http02::StatusCode;
 use lazy_static::lazy_static;
-use rusoto_core44::{Region, RusotoError};
+use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{
     HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3,
 };
@@ -78,6 +78,8 @@ struct S3Options {
     ssekms_key_id: Option<String>,
     storage_class: Option<S3StorageClass>,
     tags: Option<BTreeMap<String, String>>,
+    content_encoding: Option<String>, // inherit from compression value
+    content_type: Option<String>,     // default `text/x-log`
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
@@ -274,6 +276,14 @@ impl Service<Request> for S3Sink {
     fn call(&mut self, request: Request) -> Self::Future {
         let options = request.options;
 
+        let content_encoding = request.content_encoding;
+        let content_encoding = options
+            .content_encoding
+            .or_else(|| content_encoding.map(|ce| ce.to_string()));
+        let content_type = options
+            .content_type
+            .or_else(|| Some("text/x-log".to_owned()));
+
         let mut tagging = url::form_urlencoded::Serializer::new(String::new());
         if let Some(tags) = options.tags {
             for (p, v) in tags {
@@ -287,7 +297,8 @@ impl Service<Request> for S3Sink {
             body: Some(request.body.into()),
             bucket: request.bucket,
             key: request.key,
-            content_encoding: request.content_encoding,
+            content_encoding,
+            content_type,
             acl: options.acl.map(to_string),
             grant_full_control: options.grant_full_control,
             grant_read: options.grant_read,
@@ -342,7 +353,7 @@ fn build_request(
         body: inner,
         bucket,
         key,
-        content_encoding: compression.content_encoding().map(|ce| ce.to_string()),
+        content_encoding: compression.content_encoding(),
         options,
     }
 }
@@ -352,7 +363,7 @@ struct Request {
     body: Vec<u8>,
     bucket: String,
     key: String,
-    content_encoding: Option<String>,
+    content_encoding: Option<&'static str>,
     options: S3Options,
 }
 
@@ -533,7 +544,7 @@ mod integration_tests {
         assert_downcast_matches,
         dns::Resolver,
         event::Event,
-        region2::RegionOrEndpoint,
+        region::RegionOrEndpoint,
         sinks::aws_s3::{S3Sink, S3SinkConfig},
         test_util::{random_lines_with_stream, random_string, runtime},
         topology::config::SinkContext,
@@ -544,7 +555,7 @@ mod integration_tests {
     use futures::stream::{self, StreamExt};
     use futures01::Sink;
     use pretty_assertions::assert_eq;
-    use rusoto_core44::region::Region;
+    use rusoto_core::region::Region;
     use rusoto_s3::{S3Client, S3};
     use std::io::{BufRead, BufReader, Cursor};
 
@@ -738,7 +749,7 @@ mod integration_tests {
     #[test]
     fn s3_healthchecks() {
         let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
 
         rt.block_on_std(async move {
             let config = config(1).await;
@@ -749,7 +760,7 @@ mod integration_tests {
     #[test]
     fn s3_healthchecks_invalid_bucket() {
         let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let resolver = Resolver;
 
         rt.block_on_std(async move {
             let config = S3SinkConfig {
@@ -770,8 +781,8 @@ mod integration_tests {
             endpoint: "http://localhost:9000".to_owned(),
         };
 
-        use rusoto_core44::HttpClient;
-        use rusoto_credential44::StaticProvider;
+        use rusoto_core::HttpClient;
+        use rusoto_credential::StaticProvider;
 
         let p = StaticProvider::new_minimal("test-access-key".into(), "test-secret-key".into());
         let d = HttpClient::new().unwrap();

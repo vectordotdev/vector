@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::{log_schema, Event, Value},
     sinks::util::{
-        http2::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, UriSerde,
     },
@@ -110,12 +110,12 @@ impl HoneycombConfig {
 async fn healthcheck(config: HoneycombConfig, resolver: Resolver) -> crate::Result<()> {
     let mut client = HttpClient::new(resolver, TlsSettings::from_options(&None)?)?;
 
-    let req = config.build_request(Vec::new()).map(hyper13::Body::from);
+    let req = config.build_request(Vec::new()).map(hyper::Body::from);
 
     let res = client.send(req).await?;
 
     let status = res.status();
-    let body = hyper13::body::to_bytes(res.into_body()).await?;
+    let body = hyper::body::to_bytes(res.into_body()).await?;
 
     if status == StatusCode::BAD_REQUEST {
         Ok(())

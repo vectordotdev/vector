@@ -74,7 +74,8 @@ be globally set via the \
 type = "uint"
 common = true
 default = 102400
-groups = ["tcp", "udp", "unix"]
+groups = ["tcp", "unix"]
+relevant_when = {mode = ["tcp", "unix"]}
 unit = "bytes"
 description = """\
 The maximum bytes size of incoming messages before they are discarded.\

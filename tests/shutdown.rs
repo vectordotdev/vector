@@ -145,7 +145,7 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce()) {
 
 #[test]
 fn auto_shutdown() {
-    let mut cmd = Command::cargo_bin("vector").unwrap();
+    let mut cmd = assert_cmd::Command::cargo_bin("vector").unwrap();
     cmd.arg("--quiet")
         .arg("-c")
         .arg(create_file(STDIO_CONFIG))
@@ -154,7 +154,7 @@ fn auto_shutdown() {
     // Once `stdin source` reads whole buffer it will automatically
     // shutdown which will also cause vector process to shutdown
     // because all sources have shutdown.
-    let assert = cmd.with_stdin().buffer("42").assert();
+    let assert = cmd.write_stdin("42").assert();
 
     assert.success().stdout("42\n");
 }
