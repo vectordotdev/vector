@@ -684,7 +684,7 @@ mod integration_tests {
     fn insert_events_on_aws() {
         run_insert_tests(
             ElasticSearchConfig {
-                auth: Some(ElasticSearchAuth::Aws),
+                auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
                 host: "http://localhost:4571".into(),
                 ..config()
             },
