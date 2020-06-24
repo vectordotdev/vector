@@ -155,6 +155,7 @@ impl SinkConfig for StackdriverConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for StackdriverSink {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
@@ -177,7 +178,7 @@ impl HttpSink for StackdriverSink {
         Some(entry)
     }
 
-    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let events = serde_json::json!({
             "log_name": self.config.log_name(),
             "entries": events,
@@ -198,7 +199,7 @@ impl HttpSink for StackdriverSink {
             creds.apply2(&mut request);
         }
 
-        request
+        Ok(request)
     }
 }
 
@@ -247,7 +248,7 @@ async fn healthcheck(
     sink: StackdriverSink,
     tls: TlsSettings,
 ) -> crate::Result<()> {
-    let request = sink.build_request(vec![]).map(Body::from);
+    let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let mut client = HttpClient::new(cx.resolver(), tls)?;
     let response = client.send(request).await?;
@@ -365,7 +366,10 @@ mod tests {
 
         let events = vec![raw1, raw2];
 
-        let request = sink.build_request(events);
+        let mut rt = runtime();
+        let request = rt
+            .block_on_std(async move { sink.build_request(events).await })
+            .unwrap();
 
         let (parts, body) = request.into_parts();
 

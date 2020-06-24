@@ -143,6 +143,7 @@ impl PubsubSink {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for PubsubSink {
     type Input = Value;
     type Output = Vec<BoxedRawValue>;
@@ -155,7 +156,7 @@ impl HttpSink for PubsubSink {
         Some(json!({ "data": base64::encode(&json) }))
     }
 
-    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let body = json!({ "messages": events });
         let body = serde_json::to_vec(&body).unwrap();
 
@@ -169,7 +170,7 @@ impl HttpSink for PubsubSink {
             creds.apply2(&mut request);
         }
 
-        request
+        Ok(request)
     }
 }
 

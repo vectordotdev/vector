@@ -8,7 +8,6 @@ use chrono::{DateTime, Utc};
 use futures::TryFutureExt;
 use futures01::Future;
 use http02::{StatusCode, Uri};
-use hyper;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use snafu::Snafu;

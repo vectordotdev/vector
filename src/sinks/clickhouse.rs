@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink, Response},
+        http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink},
         retries2::{RetryAction, RetryLogic},
         service2::TowerRequestConfig,
         BatchBytesConfig, Buffer, Compression,
@@ -89,6 +89,7 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for ClickhouseConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
@@ -103,7 +104,7 @@ impl HttpSink for ClickhouseConfig {
         Some(body)
     }
 
-    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http02::Request<Vec<u8>>> {
         let database = if let Some(database) = &self.database {
             database.as_str()
         } else {
@@ -127,7 +128,7 @@ impl HttpSink for ClickhouseConfig {
             auth.apply(&mut request);
         }
 
-        request
+        Ok(request)
     }
 }
 
@@ -179,7 +180,7 @@ struct ClickhouseRetryLogic {
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
-    type Response = Response;
+    type Response = http02::Response<bytes05::Bytes>;
     type Error = hyper::Error;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

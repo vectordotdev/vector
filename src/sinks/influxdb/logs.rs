@@ -124,6 +124,7 @@ impl SinkConfig for InfluxDBLogsConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for InfluxDBLogsSink {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
@@ -165,14 +166,14 @@ impl HttpSink for InfluxDBLogsSink {
         Some(output.into_bytes())
     }
 
-    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         Request::builder()
             .method(Method::POST)
             .uri(&self.uri)
             .header("Content-Type", "text/plain")
             .header("Authorization", format!("Token {}", &self.token))
             .body(events)
-            .unwrap()
+            .map_err(Into::into)
     }
 }
 
