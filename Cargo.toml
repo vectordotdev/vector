@@ -196,7 +196,7 @@ tower-test01 = { package = "tower-test", version = "0.1" }
 serde_yaml = "0.8.9"
 trust-dns-server = "0.17.0"
 trust-dns = "0.17.0"
-trust-dns-proto = "0.8.0"
+trust-dns-proto = "0.19.3"
 dirs = "2.0.2"
 tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
