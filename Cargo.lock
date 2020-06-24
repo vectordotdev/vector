@@ -853,34 +853,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "data-encoding"
-version = "2.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f47ca1860a761136924ddd2422ba77b2ea54fe8cc75b9040804a0d9d32ad97"
-
-[[package]]
-name = "data-encoding-macro"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1995a2e32b5306e4f49cf55ffcf4365a4dab2c7ca3a97163a4f099ec2fee3453"
-dependencies = [
- "data-encoding",
- "data-encoding-macro-internal",
- "proc-macro-hack",
-]
-
-[[package]]
-name = "data-encoding-macro-internal"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd41a6f6a292f3d5be0cd1562bd6007652279d6afe3246f2722749e927338f7a"
-dependencies = [
- "data-encoding",
- "proc-macro-hack",
- "syn 0.15.44",
-]
-
-[[package]]
 name = "db-key"
 version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -998,12 +970,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "endian-type"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c34f04666d835ff5d62e058c3995147c06f42fe86ff053337632bca83e42702d"
-
-[[package]]
 name = "enum-as-inner"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1114,18 +1080,6 @@ name = "fake-simd"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
-
-[[package]]
-name = "fallible-iterator"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
-
-[[package]]
-name = "fallible-streaming-iterator"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
 
 [[package]]
 name = "file-source"
@@ -2100,17 +2054,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libsqlite3-sys"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e5b95e89c330291768dc840238db7f9e204fd208511ab6319b56193a7f2ae25"
-dependencies = [
- "cc",
- "pkg-config",
- "vcpkg",
-]
-
-[[package]]
 name = "libz-sys"
 version = "1.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2687,12 +2630,6 @@ name = "new_debug_unreachable"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
-
-[[package]]
-name = "nibble_vec"
-version = "0.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8d77f3db4bce033f4d04db08079b2ef1c3d02b44e86f25d08886fafa7756ffa"
 
 [[package]]
 name = "nix"
@@ -3372,16 +3309,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "radix_trie"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d3681b28cd95acfb0560ea9441f82d6a4504fa3b15b97bd7b6e952131820e95"
-dependencies = [
- "endian-type",
- "nibble_vec",
-]
-
-[[package]]
 name = "rand"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3963,21 +3890,6 @@ dependencies = [
  "serde_urlencoded 0.6.1",
  "tempfile",
  "xml-rs",
-]
-
-[[package]]
-name = "rusqlite"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a194373ef527035645a1bc21b10dc2125f73497e6e155771233eb187aedd051"
-dependencies = [
- "bitflags",
- "fallible-iterator",
- "fallible-streaming-iterator",
- "libsqlite3-sys",
- "lru-cache",
- "memchr",
- "time 0.1.42",
 ]
 
 [[package]]
@@ -5477,33 +5389,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7f741b240f1a48843f9b8e0444fb55fb2a4ff67293b50a9179dfd5ea67f8d41"
 
 [[package]]
-name = "trust-dns"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f006aceba2c2dedfccede277aa03f74b25ff89ab53ceb1cc5889aea29d7e55f"
-dependencies = [
- "chrono",
- "data-encoding",
- "data-encoding-macro",
- "failure",
- "futures 0.1.29",
- "lazy_static",
- "log",
- "radix_trie",
- "rand 0.7.3",
- "tokio 0.1.22",
- "tokio-tcp",
- "tokio-udp",
- "trust-dns-proto",
-]
-
-[[package]]
 name = "trust-dns-proto"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05457ece29839d056d8cb66ec080209d34492b3d2e7e00641b486977be973db9"
 dependencies = [
- "data-encoding",
  "enum-as-inner",
  "failure",
  "futures 0.1.29",
@@ -5511,7 +5401,6 @@ dependencies = [
  "lazy_static",
  "log",
  "rand 0.7.3",
- "serde",
  "smallvec 0.6.13",
  "socket2",
  "tokio-executor",
@@ -5537,46 +5426,12 @@ dependencies = [
  "log",
  "lru-cache",
  "resolv-conf",
- "serde",
  "smallvec 0.6.13",
  "tokio 0.1.22",
  "tokio-executor",
  "tokio-tcp",
  "tokio-udp",
  "trust-dns-proto",
-]
-
-[[package]]
-name = "trust-dns-server"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e526ea9c9203633a7818e9d459ff29a3fca050281f6de24db07d873f9d95792e"
-dependencies = [
- "backtrace",
- "bytes 0.4.12",
- "chrono",
- "clap",
- "enum-as-inner",
- "env_logger 0.6.2",
- "failure",
- "futures 0.1.29",
- "lazy_static",
- "log",
- "rand 0.7.3",
- "rusqlite",
- "serde",
- "time 0.1.42",
- "tokio 0.1.22",
- "tokio-executor",
- "tokio-io",
- "tokio-reactor",
- "tokio-tcp",
- "tokio-timer",
- "tokio-udp",
- "toml 0.5.6",
- "trust-dns",
- "trust-dns-proto",
- "trust-dns-resolver",
 ]
 
 [[package]]
@@ -5904,9 +5759,6 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "tracing-tower",
- "trust-dns",
- "trust-dns-proto",
- "trust-dns-server",
  "typetag",
  "url 1.7.2",
  "uuid 0.7.4",
