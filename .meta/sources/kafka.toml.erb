@@ -26,13 +26,6 @@ through_description = "[Kafka][urls.kafka]"
   namespace: "sources.kafka.options"
 ) %>
 
-<%= render("_partials/fields/_tls_connector_options.toml",
-  namespace: "sources.kafka.options",
-  can_enable: true,
-  can_verify_certificate: false,
-  can_verify_hostname: false
-) %>
-
 [sources.kafka.options.topics]
 type = "[string]"
 common = true

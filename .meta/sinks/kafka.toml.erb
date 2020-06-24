@@ -60,13 +60,6 @@ randomly generated. If the field does not exist on the log, a blank value \
 will be used.\
 """
 
-<%= render("_partials/fields/_tls_connector_options.toml",
-  namespace: "sinks.kafka.options",
-  can_enable: true,
-  can_verify_certificate: false,
-  can_verify_hostname: false
-) %>
-
 [sinks.kafka.options.topic]
 type = "string"
 common = true

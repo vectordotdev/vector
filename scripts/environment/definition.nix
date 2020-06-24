@@ -57,6 +57,7 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     rustup
     pkg-config
     openssl
+    cyrus_sasl
     protobuf
     ruby_2_7
     nodejs
