@@ -16,138 +16,17 @@ use std::{
     fs::File,
     path::{Path, PathBuf},
 };
-use structopt::{clap::AppSettings, StructOpt};
 #[cfg(unix)]
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use vector::{
+    cli::{Color, LogFormat, Opts, SubCommand},
     config_paths, event, generate, list, metrics, runtime, topology, trace, unit_test, validate,
 };
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
-struct Opts {
-    #[structopt(flatten)]
-    root: RootOpts,
-
-    #[structopt(subcommand)]
-    sub_command: Option<SubCommand>,
-}
-
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
-struct RootOpts {
-    /// Read configuration from one or more files. Wildcard paths are supported.
-    /// If zero files are specified the default config path
-    /// `/etc/vector/vector.toml` will be targeted.
-    #[structopt(name = "config", short, long)]
-    config_paths: Vec<PathBuf>,
-
-    /// Exit on startup if any sinks fail healthchecks
-    #[structopt(short, long)]
-    require_healthy: bool,
-
-    /// Number of threads to use for processing (default is number of available cores)
-    #[structopt(short, long)]
-    threads: Option<usize>,
-
-    /// Enable more detailed internal logging. Repeat to increase level. Overridden by `--quiet`.
-    #[structopt(short, long, parse(from_occurrences))]
-    verbose: u8,
-
-    /// Reduce detail of internal logging. Repeat to reduce further. Overrides `--verbose`.
-    #[structopt(short, long, parse(from_occurrences))]
-    quiet: u8,
-
-    /// Set the logging format
-    #[structopt(long, default_value = "text", possible_values = &["text", "json"])]
-    log_format: LogFormat,
-
-    /// Control when ANSI terminal formatting is used.
-    ///
-    /// By default `vector` will try and detect if `stdout` is a terminal, if it is
-    /// ANSI will be enabled. Otherwise it will be disabled. By providing this flag with
-    /// the `--color always` option will always enable ANSI terminal formatting. `--color never`
-    /// will disable all ANSI terminal formatting. `--color auto` will attempt
-    /// to detect it automatically.
-    #[structopt(long, default_value = "auto", possible_values = &["auto", "always", "never"])]
-    color: Color,
-
-    /// Watch for changes in configuration file, and reload accordingly.
-    #[structopt(short, long)]
-    watch_config: bool,
-}
-
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
-enum SubCommand {
-    /// Validate the target config, then exit.
-    Validate(validate::Opts),
-
-    /// Generate a Vector configuration containing a list of components.
-    Generate(generate::Opts),
-
-    /// List available components, then exit.
-    List(list::Opts),
-
-    /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
-    /// For guidance on how to write unit tests check out: https://vector.dev/docs/setup/guides/unit-testing/
-    Test(unit_test::Opts),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-enum Color {
-    Auto,
-    Always,
-    Never,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-enum LogFormat {
-    Text,
-    Json,
-}
-
-impl std::str::FromStr for Color {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "auto" => Ok(Color::Auto),
-            "always" => Ok(Color::Always),
-            "never" => Ok(Color::Never),
-            s => Err(format!(
-                "{} is not a valid option, expected `auto`, `always` or `never`",
-                s
-            )),
-        }
-    }
-}
-
-impl std::str::FromStr for LogFormat {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "text" => Ok(LogFormat::Text),
-            "json" => Ok(LogFormat::Json),
-            s => Err(format!(
-                "{} is not a valid option, expected `text` or `json`",
-                s
-            )),
-        }
-    }
-}
-
 fn main() {
     openssl_probe::init_ssl_cert_env_vars();
-    let version = vector::get_version();
-    let app = Opts::clap().version(&version[..]).global_settings(&[
-        AppSettings::ColoredHelp,
-        AppSettings::InferSubcommands,
-        AppSettings::DeriveDisplayOrder,
-    ]);
-    let root_opts = Opts::from_clap(&app.get_matches());
+    let root_opts = Opts::get_matches();
     let opts = root_opts.root;
     let sub_command = root_opts.sub_command;
 
