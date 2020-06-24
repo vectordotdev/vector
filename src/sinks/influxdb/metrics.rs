@@ -5,15 +5,14 @@ use crate::{
         Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
     },
     sinks::util::{
-        http::{Error as HttpError, HttpBatchService, HttpRetryLogic, Response as HttpResponse},
+        http::{HttpBatchService, HttpRetryLogic},
         service2::TowerRequestConfig,
         BatchEventsConfig, MetricBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::future::BoxFuture;
+use futures::future::{ready, BoxFuture};
 use futures01::Sink;
-use hyper;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -25,7 +24,7 @@ use tower03::Service;
 struct InfluxDBSvc {
     config: InfluxDBConfig,
     protocol_version: ProtocolVersion,
-    inner: HttpBatchService,
+    inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -98,15 +97,8 @@ impl InfluxDBSvc {
 
         let uri = settings.write_uri(endpoint)?;
 
-        let build_request = move |body: Vec<u8>| {
-            hyper::Request::post(uri.clone())
-                .header("Content-Type", "text/plain")
-                .header("Authorization", format!("Token {}", token))
-                .body(body)
-                .unwrap()
-        };
-
-        let http_service = HttpBatchService::new(cx.resolver(), None, build_request);
+        let http_service =
+            HttpBatchService::new(cx.resolver(), None, create_build_request(uri, token));
 
         let influxdb_http_service = InfluxDBSvc {
             config,
@@ -129,8 +121,8 @@ impl InfluxDBSvc {
 }
 
 impl Service<Vec<Metric>> for InfluxDBSvc {
-    type Response = HttpResponse;
-    type Error = HttpError;
+    type Response = http02::Response<bytes05::Bytes>;
+    type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut std::task::Context) -> Poll<Result<(), Self::Error>> {
@@ -142,6 +134,23 @@ impl Service<Vec<Metric>> for InfluxDBSvc {
         let body: Vec<u8> = input.into_bytes();
 
         self.inner.call(body)
+    }
+}
+
+fn create_build_request(
+    uri: http02::Uri,
+    token: String,
+) -> impl Fn(Vec<u8>) -> BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>> + Sync + Send + 'static
+{
+    let auth = format!("Token {}", token);
+    move |body| {
+        Box::pin(ready(
+            hyper::Request::post(uri.clone())
+                .header("Content-Type", "text/plain")
+                .header("Authorization", auth.clone())
+                .body(body)
+                .map_err(Into::into),
+        ))
     }
 }
 

@@ -165,6 +165,7 @@ enum ParseError {
     IndexTemplate { source: TemplateError },
 }
 
+#[async_trait::async_trait]
 impl HttpSink for ElasticSearchCommon {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
@@ -206,7 +207,7 @@ impl HttpSink for ElasticSearchCommon {
         Some(body)
     }
 
-    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http02::Request<Vec<u8>>> {
         let mut builder = Request::post(&self.bulk_uri);
 
         if let Some(credentials) = &self.credentials {
@@ -229,7 +230,9 @@ impl HttpSink for ElasticSearchCommon {
             // to play games here
             let body = request.payload.take().unwrap();
             match body {
-                SignedRequestPayload::Buffer(body) => builder.body(body.to_vec()).unwrap(),
+                SignedRequestPayload::Buffer(body) => {
+                    builder.body(body.to_vec()).map_err(Into::into)
+                }
                 _ => unreachable!(),
             }
         } else {
@@ -249,7 +252,7 @@ impl HttpSink for ElasticSearchCommon {
                 builder = builder.header("Authorization", &auth[..]);
             }
 
-            builder.body(events).unwrap()
+            builder.body(events).map_err(Into::into)
         }
     }
 }
