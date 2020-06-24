@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-10"
+last_modified_on: "2020-06-16"
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events, allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
@@ -82,6 +82,8 @@ events across parallel streams using logical filters.
     "message.contains" = ["foo", "bar"] # example
     "environment.ends_with" = "-staging" # example
     "environment.ends_with" = ["-staging", "-running"] # example
+    "message.ip_cidr_contains" = "10.0.0.0/8" # example
+    "message.ip_cidr_contains" = ["2000::/10", "192.168.0.0/16"] # example
     "message.regex" = " (any|of|these|five|words) " # example
     "environment.starts_with" = "staging-" # example
     "environment.starts_with" = ["staging-", "running-"] # example
@@ -308,6 +310,32 @@ list matches.
 
 </Field>
 <Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.ip_cidr_contains":"10.0.0.0/8"},{"message.ip_cidr_contains":["2000::/10","192.168.0.0/16"]}]}
+  groups={[]}
+  name={"`[field_name]`.ip_cidr_contains"}
+  path={"lanes.`[swimlane-id]`"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[field_name]`.ip_cidr_contains
+
+Checks whether an IP field is contained within a given [IP CIDR][urls.cidr]
+(works with IPv4 and IPv6). This may be a single string or a list of strings,
+in which case this evaluates to true if the IP field is contained within any of
+the CIDRs in the list.
+
+
+
+</Field>
+<Field
   common={true}
   defaultValue={null}
   enumValues={null}
@@ -469,6 +497,7 @@ You can learn more in the
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[urls.cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax
 [urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

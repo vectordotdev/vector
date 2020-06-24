@@ -116,3 +116,16 @@ Note that this condition is considerably more expensive than \
 a regular string match (such as `starts_with` or `contains`) \
 so the use of those conditions are preferred where possible.\
 """
+
+[<%= namespace %>."`[field_name]`.ip_cidr_contains"]
+type = "string"
+examples = [
+  { "message.ip_cidr_contains" = "10.0.0.0/8" },
+  { "message.ip_cidr_contains" = ["2000::/10", "192.168.0.0/16"] }
+]
+common = false
+relevant_when = {type = "check_fields"}
+description = """\
+Checks whether an IP field is contained within a given [IP CIDR][urls.cidr] (works with IPv4 and IPv6). \
+This may be a single string or a list of strings, in which case this evaluates to true if the IP field is contained within any of the CIDRs in the list.\
+"""

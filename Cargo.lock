@@ -410,6 +410,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cidr-utils"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb12ab7bf03caa851a9cf9bd6a87d9b196d05ed738a312c357c4f822ff9956ee"
+dependencies = [
+ "debug-helper",
+ "enum-ordinalize",
+ "lazy_static",
+ "regex",
+]
+
+[[package]]
 name = "clang-sys"
 version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -875,6 +887,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b72465f46d518f6015d9cf07f7f3013a95dd6b9c2747c3d65ae0cce43929d14f"
 
 [[package]]
+name = "debug-helper"
+version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c145f713353a46b2e649e0b1eff34c488602466c8c2359f5d94faa00079cd02"
+
+[[package]]
 name = "derivative"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -994,6 +1012,19 @@ dependencies = [
  "proc-macro2 0.4.30",
  "quote 0.6.13",
  "syn 0.15.44",
+]
+
+[[package]]
+name = "enum-ordinalize"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d06f2ad28be2174a108c29425212ab669080ee656504ea46f9252ac612f21ca9"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "proc-macro2 1.0.8",
+ "quote 1.0.2",
+ "syn 1.0.14",
 ]
 
 [[package]]
@@ -2732,6 +2763,17 @@ dependencies = [
  "mio-extras",
  "walkdir",
  "winapi 0.3.8",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "090c7f9998ee0ff65aa5b723e4009f7b217707f1fb5ea551329cc4d6231fb304"
+dependencies = [
+ "autocfg 1.0.0",
+ "num-integer",
+ "num-traits",
 ]
 
 [[package]]
@@ -5750,6 +5792,7 @@ dependencies = [
  "bytes 0.5.4",
  "bytesize",
  "chrono",
+ "cidr-utils",
  "codec",
  "colored",
  "criterion",

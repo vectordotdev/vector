@@ -156,6 +156,8 @@ lru = "0.4.3"
 bloom = "0.3.2"
 pulsar = { version = "0.3.0", optional = true }
 task-compat = "0.1"
+cidr-utils = "0.4.1"
+
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
 lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }

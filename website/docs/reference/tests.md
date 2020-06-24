@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-08"
+last_modified_on: "2020-06-16"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
@@ -128,6 +128,8 @@ vector test /etc/vector/*.toml
     conditions."message.contains" = ["foo", "bar"] # example
     conditions."environment.ends_with" = "-staging" # example
     conditions."environment.ends_with" = ["-staging", "-running"] # example
+    conditions."message.ip_cidr_contains" = "10.0.0.0/8" # example
+    conditions."message.ip_cidr_contains" = ["2000::/10", "192.168.0.0/16"] # example
     conditions."message.regex" = " (any|of|these|five|words) " # example
     conditions."environment.starts_with" = "staging-" # example
     conditions."environment.starts_with" = ["staging-", "running-"] # example
@@ -763,6 +765,32 @@ list matches.
 
 </Field>
 <Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.ip_cidr_contains":"10.0.0.0/8"},{"message.ip_cidr_contains":["2000::/10","192.168.0.0/16"]}]}
+  groups={[]}
+  name={"`[field_name]`.ip_cidr_contains"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[field_name]`.ip_cidr_contains
+
+Checks whether an IP field is contained within a given [IP CIDR][urls.cidr]
+(works with IPv4 and IPv6). This may be a single string or a list of strings,
+in which case this evaluates to true if the IP field is contained within any of
+the CIDRs in the list.
+
+
+
+</Field>
+<Field
   common={true}
   defaultValue={null}
   enumValues={null}
@@ -853,5 +881,6 @@ transform will be checked against a table of conditions.
 [docs.data-model.metric#set]: /docs/about/data-model/metric/#set
 [docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
 [guides.advanced.unit-testing]: /guides/advanced/unit-testing/
+[urls.cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax
