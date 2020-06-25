@@ -16,7 +16,7 @@ rec {
           runCheckPhase = false;
           features = features.components.all ++
             features.byOs.linux.gnu ++
-            features.byLinking.dynamic;
+            features.byLinking.static;
         };
         binary = tasks.binary configuration;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
@@ -33,7 +33,8 @@ rec {
           logLevel = "debug";
           runCheckPhase = false;
           features = features.components.all ++
-            features.byOs.linux.musl;
+            features.byOs.linux.musl ++
+            features.byLinking.static;
         };
         binary = tasks.binary configuration;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
@@ -50,7 +51,8 @@ rec {
           logLevel = "debug";
           runCheckPhase = false;
           features = features.components.all ++
-            features.byOs.linux.gnu;
+            features.byOs.linux.gnu ++
+            features.byLinking.static;
         };
         binary = tasks.binary configuration;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
@@ -67,7 +69,8 @@ rec {
           logLevel = "debug";
           runCheckPhase = false;
           features = features.components.all ++
-            features.byOs.linux.musl;
+            features.byOs.linux.musl ++
+            features.byLinking.static;
         };
         binary = tasks.binary configuration;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
@@ -84,7 +87,8 @@ rec {
           logLevel = "debug";
           runCheckPhase = false;
           features = features.components.all ++
-            features.byOs.linux.musl;
+            features.byOs.linux.musl ++
+            features.byLinking.static;
         };
         binary = tasks.binary configuration;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
@@ -101,7 +105,8 @@ rec {
           logLevel = "debug";
           runCheckPhase = false;
           features = features.components.all ++
-            features.byOs.linux.musl;
+            features.byOs.linux.musl ++
+            features.byLinking.static;
         };
         binary = tasks.binary configuration;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
@@ -110,10 +115,7 @@ rec {
   };
 
   environment = {
-    variables = {
-        targetPkgs,
-        hostPkgs,
-      }: {
+    variables = { targetPkgs, hostPkgs, }: {
         PKG_CONFIG_ALLOW_CROSS=true;
         # We must set some protoc related env vars for the prost crate.
         PROTOC = "${hostPkgs.protobuf}/bin/protoc"; # NOTE: `targetPkgs.pkgs` points to the 'host' packages.
@@ -201,6 +203,9 @@ rec {
       depsBuildHost = passedPkgs:
         with passedPkgs.buildPackages;
           [
+            pkg-config
+            leveldb
+            snappy
           ]
           ++ (
             if stdenv.isDarwin then
@@ -214,6 +219,17 @@ rec {
             else if stdenv.isLinux then
               [
                 # linuxHeaders
+              ]
+            else
+              []
+          ) ++ (
+            if passedPkgs.targetPlatform.libc == "glibc" then
+              [
+                glibc.static
+              ]
+            else if passedPkgs.targetPlatform.libc == "musl" then
+              [
+                musl
               ]
             else
               []
@@ -234,12 +250,18 @@ rec {
       depsBuildBuild = passedPkgs:
         with passedPkgs.buildPackages;
         [
-            pkg-config
+            # This is required for rdkafka
             rdkafka
-            leveldb
-            snappy
             openssl.dev
             jemalloc
+            perl
+            autoconf
+            gcc
+            gnumake
+            zlib
+            zstd
+            libgssglue
+            cmake
         ] ++ (
           if stdenv.isDarwin then
             []
@@ -269,16 +291,17 @@ rec {
   cargoToml = (builtins.fromTOML (builtins.readFile ./Cargo.toml));
 
   overlays = rec {
-    # mozilla = import (builtins.fetchTarball "https://github.com/matthewbauer/nixpkgs-mozilla/archive/91629591f14262e4d6059c5407d065407b12c5d6.tar.gz");
     mozilla = import (builtins.fetchGit {
         url = "https://github.com/mozilla/nixpkgs-mozilla/";
         rev = "e912ed483e980dfb4666ae0ed17845c4220e5e7c";
       });
+    vector = import ./nix/overlay/default.nix;
   };
 
   pkgs = import <nixpkgs> {
     overlays = [
       overlays.mozilla
+      overlays.vector
     ];
   };
 
@@ -294,8 +317,8 @@ rec {
         (builtins.filter (val: val != "transforms-lua") transforms);
     };
     byLinking = {
-      static = ["rdkafka"];
-      dynamic = ["rdkafka" "rdkafka/dynamic_linking"];
+      static = [ "rdkafka" "rdkafka-cmake" "vendored" ];
+      dynamic = [ "rdkafka" "rdkafka/dynamic_linking" ];
     };
     byOs = {
       linux = {
@@ -367,6 +390,7 @@ rec {
               ''
             else
               "";
+          stdenv = pkgs.stdenvAdapters.makeStaticBinaries;
           
           # cargoBuildOptions = currentOptions: currentOptions ++ [ "--no-default-features" "--features" "${pkgs.lib.concatStringsSep "," features}" ];
           # cargoTestOptions = currentOptions: currentOptions ++ [ "--no-default-features" "--features" "${pkgs.lib.concatStringsSep "," features}" ];
@@ -390,6 +414,8 @@ rec {
           rustc = rustChannel.rust.override {
             targets = [ args.rustTarget ];
           };
+          stdenv = pkgs.stdenvAdapters.makeStaticBinaries;
+          # stdenv = overrideCC stdenv (stdenv.cc.override { bintools = stdenv.cc.bintools.override { libc = stdenv.libc; }; };
         }).buildRustPackage packageDefinition;
   };
 

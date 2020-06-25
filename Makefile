@@ -452,6 +452,8 @@ artifacts-x86_64-unknown-linux: artifacts-x86_64-unknown-linux-gnu artifacts-x86
 artifacts-x86_64-unknown-linux-gnu: target/artifacts/x86_64-unknown-linux-gnu/binary target/artifacts/x86_64-unknown-linux-gnu/docker
 .PHONY: artifacts-x86_64-unknown-linux-gnu-binary
 artifacts-x86_64-unknown-linux-gnu-binary: target/artifacts/x86_64-unknown-linux-gnu/binary
+.PHONY: artifacts-x86_64-unknown-linux-gnu-tarball
+artifacts-x86_64-unknown-linux-gnu-tarball: target/artifacts/x86_64-unknown-linux-gnu/binary
 .PHONY: artifacts-x86_64-unknown-linux-gnu-docker
 artifacts-x86_64-unknown-linux-gnu-docker: target/artifacts/x86_64-unknown-linux-gnu/docker
 # MUSL
