@@ -37,7 +37,7 @@ write_to_description = "[InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_
   common: false,
   groups: ["v1", "v2"],
   max_bytes: 1049000,
-  max_events: 10000,
+  max_events: nil,
   namespace: "sinks.influxdb_logs.options",
   timeout_secs: 1
 ) %>

@@ -16,15 +16,17 @@ unit = "bytes"
 description = "The maximum size of a batch, in bytes, before it is flushed."
 <%- end -%>
 
-<%- if max_events -%>
 [<%= namespace %>.batch.children.max_events]
 type = "uint"
 common = true
+<%- if max_events -%>
 default = <%= max_events.to_toml %>
+<%- else -%>
+examples = [ 1000 ]
+<%- end -%>
 groups = <%= groups.to_toml %>
 unit = "events"
 description = "The maximum size of a batch, in events, before it is flushed."
-<%- end -%>
 
 [<%= namespace %>.batch.children.timeout_secs]
 type = "uint"

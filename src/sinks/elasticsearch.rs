@@ -114,7 +114,6 @@ impl SinkConfig for ElasticSearchConfig {
             .get_settings_or_default(
                 BatchSettings::default()
                     .bytes(bytesize::mib(10u64))
-                    .events(100_000)
                     .timeout(1),
             );
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);

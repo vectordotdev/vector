@@ -45,7 +45,6 @@ impl SinkConfig for HoneycombConfig {
         let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
             BatchSettings::default()
                 .bytes(bytesize::kib(100u64))
-                .events(2000)
                 .timeout(1),
         );
 

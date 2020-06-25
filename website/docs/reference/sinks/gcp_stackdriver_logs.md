@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-23"
+last_modified_on: "2020-06-25"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
@@ -68,7 +68,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
 
   # Batch
   batch.max_bytes = 5242880 # optional, default, bytes
-  batch.max_events = 50000 # optional, default, events
+  batch.max_events = 1000 # optional, no default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
@@ -156,9 +156,9 @@ The maximum size of a batch, in bytes, before it is flushed.
 </Field>
 <Field
   common={true}
-  defaultValue={50000}
+  defaultValue={null}
   enumValues={null}
-  examples={[50000]}
+  examples={[1000]}
   groups={[]}
   name={"max_events"}
   path={"batch"}

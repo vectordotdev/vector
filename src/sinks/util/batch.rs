@@ -1,3 +1,4 @@
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::time::Duration;
@@ -70,9 +71,12 @@ impl BatchConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
 pub struct BatchSize {
+    #[derivative(Default(value = "usize::max_value()"))]
     pub bytes: usize,
+    #[derivative(Default(value = "usize::max_value()"))]
     pub events: usize,
 }
 

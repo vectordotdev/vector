@@ -88,7 +88,7 @@ endpoint][urls.elasticsearch_bulk].
 
   # Batch
   batch.max_bytes = 10490000 # optional, default, bytes
-  batch.max_events = 100000 # optional, default, events
+  batch.max_events = 1000 # optional, no default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
@@ -346,9 +346,9 @@ The maximum size of a batch, in bytes, before it is flushed.
 </Field>
 <Field
   common={true}
-  defaultValue={100000}
+  defaultValue={null}
   enumValues={null}
-  examples={[100000]}
+  examples={[1000]}
   groups={[]}
   name={"max_events"}
   path={"batch"}

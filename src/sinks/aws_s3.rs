@@ -175,12 +175,10 @@ impl S3Sink {
         let compression = config.compression;
         let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
         let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
-        let batch = config.batch.use_size_as_bytes()?.get_settings_or_default(
-            BatchSettings::default()
-                .bytes(10_000_000)
-                .events(100_000)
-                .timeout(300),
-        );
+        let batch = config
+            .batch
+            .use_size_as_bytes()?
+            .get_settings_or_default(BatchSettings::default().bytes(10_000_000).timeout(300));
 
         let key_prefix = config
             .key_prefix

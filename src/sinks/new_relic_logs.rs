@@ -111,7 +111,7 @@ impl NewRelicLogsConfig {
             // The max request size is 10MiB, so in order to be comfortably
             // within this we batch up to 5MiB.
             max_bytes: Some(batch.max_bytes.unwrap_or(bytesize::mib(5u64) as usize)),
-            max_events: Some(batch.max_events.unwrap_or(50_000)),
+            max_events: None,
             ..batch
         };
 

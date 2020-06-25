@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-23"
+last_modified_on: "2020-06-25"
 delivery_guarantee: "at_least_once"
 component_title: "Honeycomb"
 description: "The Vector `honeycomb` sink batches `log` events to Honeycomb via the batch events API."
@@ -63,7 +63,7 @@ The Vector `honeycomb` sink
 
   # Batch
   batch.max_bytes = 5242880 # optional, default, bytes
-  batch.max_events = 2000 # optional, default, events
+  batch.max_events = 1000 # optional, no default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
@@ -156,9 +156,9 @@ The maximum size of a batch, in bytes, before it is flushed.
 </Field>
 <Field
   common={true}
-  defaultValue={2000}
+  defaultValue={null}
   enumValues={null}
-  examples={[2000]}
+  examples={[1000]}
   groups={[]}
   name={"max_events"}
   path={"batch"}

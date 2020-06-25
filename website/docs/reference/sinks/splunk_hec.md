@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-23"
+last_modified_on: "2020-06-25"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."
@@ -75,7 +75,7 @@ HTTP Event Collector][urls.splunk_hec].
 
   # Batch
   batch.max_bytes = 1049000 # optional, default, bytes
-  batch.max_events = 10000 # optional, default, events
+  batch.max_events = 1000 # optional, no default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
@@ -162,9 +162,9 @@ The maximum size of a batch, in bytes, before it is flushed.
 </Field>
 <Field
   common={true}
-  defaultValue={10000}
+  defaultValue={null}
   enumValues={null}
-  examples={[10000]}
+  examples={[1000]}
   groups={[]}
   name={"max_events"}
   path={"batch"}

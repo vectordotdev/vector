@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-23"
+last_modified_on: "2020-06-25"
 delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Logs"
 description: "The Vector `influxdb_logs` sink batches `log` events to InfluxDB using v1 or v2 HTTP API."
@@ -80,7 +80,7 @@ The Vector `influxdb_logs` sink
 
   # Batch
   batch.max_bytes = 1049000 # optional, default, bytes
-  batch.max_events = 10000 # optional, default, events
+  batch.max_events = 1000 # optional, no default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
@@ -146,7 +146,7 @@ The Vector `influxdb_logs` sink
 
   # Batch
   batch.max_bytes = 1049000 # optional, default, bytes
-  batch.max_events = 10000 # optional, default, events
+  batch.max_events = 1000 # optional, no default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
@@ -221,9 +221,9 @@ The maximum size of a batch, in bytes, before it is flushed.
 </Field>
 <Field
   common={true}
-  defaultValue={10000}
+  defaultValue={null}
   enumValues={null}
-  examples={[10000]}
+  examples={[1000]}
   groups={["v1","v2"]}
   name={"max_events"}
   path={"batch"}

@@ -85,7 +85,6 @@ impl SinkConfig for HecSinkConfig {
         let batch = self.batch.use_size_as_bytes()?.get_settings_or_default(
             BatchSettings::default()
                 .bytes(bytesize::mib(1u64))
-                .events(10000)
                 .timeout(1),
         );
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
