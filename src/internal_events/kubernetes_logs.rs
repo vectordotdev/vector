@@ -11,8 +11,8 @@ pub struct KubernetesLogsEventReceived<'a> {
 impl InternalEvent for KubernetesLogsEventReceived<'_> {
     fn emit_logs(&self) {
         trace!(
-            message = "received one event.",
-            %self.file,
+            message = "received one event",
+            file = %self.file
         );
     }
 
