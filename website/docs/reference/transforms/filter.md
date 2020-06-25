@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-16"
+last_modified_on: "2020-06-24"
 component_title: "Filter"
 description: "The Vector `filter` transform accepts and outputs `log` and `metric` events, allowing you to select events based on a set of logical conditions."
 event_types: ["log","metric"]
@@ -156,9 +156,9 @@ The type of the condition to execute.
 
 #### `[field-name]`.eq
 
-Check whether a fields contents exactly matches the value specified.This may be
-a single string or a list of strings, in which case this evaluates to true if
-any of the list matches.
+Check whether a fields contents exactly matches the value specified. This may
+be a single string or a list of strings, in which case this evaluates to true
+if any of the list matches.
 
 
 
@@ -205,7 +205,7 @@ being `true` or `false` respectively.
 
 #### `[field-name]`.neq
 
-Check whether a fields contents does not match the value specified.This may be
+Check whether a fields contents does not match the value specified. This may be
 a single string or a list of strings, in which case this evaluates to false if
 any of the list matches.
 
@@ -253,7 +253,7 @@ Check if the given `[condition]` does not match.
 
 #### `[field_name]`.contains
 
-Checks whether a string field contains a string argument.This may be a single
+Checks whether a string field contains a string argument. This may be a single
 string or a list of strings, in which case this evaluates to true if any of the
 list matches.
 
@@ -278,7 +278,7 @@ list matches.
 
 #### `[field_name]`.ends_with
 
-Checks whether a string field ends with a string argument.This may be a single
+Checks whether a string field ends with a string argument. This may be a single
 string or a list of strings, in which case this evaluates to true if any of the
 list matches.
 
@@ -356,7 +356,7 @@ preferred where possible.
 
 #### `[field_name]`.starts_with
 
-Checks whether a string field starts with a string argument.This may be a
+Checks whether a string field starts with a string argument. This may be a
 single string or a list of strings, in which case this evaluates to true if any
 of the list matches.
 
