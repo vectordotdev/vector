@@ -280,8 +280,10 @@ jobs:
           - 'v1.14.10'
         container_runtime:
           - docker
-          - crio
           - containerd
+          # TODO: re-enable crio when
+          # https://github.com/kubernetes/minikube/issues/8554 is fixed
+          # - crio
       fail-fast: false
     steps:
       - name: Setup Minikube
