@@ -1551,4 +1551,48 @@ mod tests {
             Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::NotFound),
         }
     }
+
+    #[test]
+    fn skip_first_lines() {
+        let n = 5;
+        let skip_first_lines = 3;
+
+        let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            skip_first_lines,
+            ..test_default_file_config(&dir)
+        };
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let mut rt = runtime();
+        rt.spawn(source);
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        sleep(); // The files must be observed at their original lengths before writing to them
+
+        for i in 0..n {
+            writeln!(&mut file, "{}", i).unwrap();
+        }
+
+        sleep();
+
+        drop(trigger_shutdown);
+        shutdown_on_idle(rt);
+
+        let received = wait_with_timeout(rx.collect());
+
+        let mut count = 0;
+        for (i, event) in (skip_first_lines..n).into_iter().zip(received) {
+            let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
+            assert_eq!(line, format!("{}", i));
+            count += 1;
+        }
+        assert_eq!(count, n - skip_first_lines);
+    }
 }
