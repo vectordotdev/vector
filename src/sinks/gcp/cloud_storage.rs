@@ -21,7 +21,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::TryFutureExt;
 use futures01::{stream::iter_ok, Future, Sink};
-use http::{Method, StatusCode, Uri};
+use http::{StatusCode, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
     Body, Request, Response,
@@ -225,9 +225,8 @@ impl GcsSink {
     }
 
     fn healthcheck(&mut self) -> crate::Result<Healthcheck> {
-        let builder = Request::builder()
-            .method(Method::HEAD)
-            .uri(self.base_url.parse::<Uri>()?);
+        let uri = self.base_url.parse::<Uri>()?;
+        let builder = Request::head(uri);
 
         let mut request = builder.body(Body::empty()).unwrap();
         if let Some(creds) = &self.creds {
@@ -266,7 +265,7 @@ impl Service<RequestWrapper> for GcsSink {
         let uri = format!("{}{}", self.base_url, request.key)
             .parse::<Uri>()
             .unwrap();
-        let mut builder = Request::builder().method(Method::PUT).uri(uri);
+        let mut builder = Request::put(uri);
         let headers = builder.headers_mut().unwrap();
         headers.insert("content-type", settings.content_type);
         headers.insert(

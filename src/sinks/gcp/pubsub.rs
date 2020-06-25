@@ -15,7 +15,7 @@ use crate::{
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
-use http::{Method, Request, Uri};
+use http::{Request, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -160,10 +160,8 @@ impl HttpSink for PubsubSink {
         let body = json!({ "messages": events });
         let body = serde_json::to_vec(&body).unwrap();
 
-        let builder = Request::builder()
-            .method(Method::POST)
-            .uri(self.uri(":publish").unwrap())
-            .header("Content-Type", "application/json");
+        let uri = self.uri(":publish").unwrap();
+        let builder = Request::post(uri).header("Content-Type", "application/json");
 
         let mut request = builder.body(body).unwrap();
         if let Some(creds) = &self.creds {

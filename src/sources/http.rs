@@ -241,7 +241,7 @@ mod tests {
 
     fn send(address: SocketAddr, body: &str) -> u16 {
         reqwest::Client::new()
-            .request(Method::POST, &format!("http://{}/", address))
+            .post(&format!("http://{}/", address))
             .body(body.to_owned())
             .send()
             .unwrap()

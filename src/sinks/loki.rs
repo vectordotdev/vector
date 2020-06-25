@@ -230,9 +230,7 @@ async fn healthcheck(config: LokiConfig, resolver: Resolver) -> crate::Result<()
     let tls = TlsSettings::from_options(&config.tls)?;
     let mut client = HttpClient::new(resolver, tls)?;
 
-    let req = http::Request::get(uri)
-        .body(hyper::Body::empty())
-        .unwrap();
+    let req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
     let res = client.send(req).await?;
 

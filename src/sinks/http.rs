@@ -190,10 +190,7 @@ impl HttpSink for HttpSinkConfig {
         Some(body)
     }
 
-    async fn build_request(
-        &self,
-        mut body: Self::Output,
-    ) -> crate::Result<http::Request<Vec<u8>>> {
+    async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
             HttpMethod::Post => Method::POST,
             HttpMethod::Put => Method::PUT,

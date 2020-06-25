@@ -407,7 +407,6 @@ mod test {
     use bytes05::Buf;
     use futures::future::ready;
     use futures01::{Future, Stream};
-    use http::Method;
     use hyper::service::{make_service_fn, service_fn};
     use hyper::{Body, Response, Server, Uri};
     use tower03::Service;
@@ -443,11 +442,7 @@ mod test {
         let request = b"hello".to_vec();
         let mut service = HttpBatchService::new(resolver, None, move |body: Vec<u8>| {
             Box::pin(ready(
-                Request::builder()
-                    .method(Method::POST)
-                    .uri(uri.clone())
-                    .body(body.into())
-                    .map_err(Into::into),
+                Request::post(&uri).body(body.into()).map_err(Into::into),
             ))
         });
 

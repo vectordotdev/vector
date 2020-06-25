@@ -13,7 +13,7 @@ use crate::{
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
-use http::{Method, Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -113,10 +113,7 @@ impl HttpSink for ClickhouseConfig {
 
         let uri = encode_uri(&self.host, database, &self.table).expect("Unable to encode uri");
 
-        let mut builder = Request::builder()
-            .method(Method::POST)
-            .uri(uri.clone())
-            .header("Content-Type", "application/x-ndjson");
+        let mut builder = Request::post(&uri).header("Content-Type", "application/x-ndjson");
 
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);
