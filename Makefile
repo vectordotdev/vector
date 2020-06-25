@@ -449,11 +449,11 @@ artifacts: artifacts-x86_64-unknown-linux artifacts-aarch64-unknown-linux artifa
 artifacts-x86_64-unknown-linux: artifacts-x86_64-unknown-linux-gnu artifacts-x86_64-unknown-linux-musl
 # GLIBC
 .PHONY: artifacts-x86_64-unknown-linux-gnu
-artifacts-x86_64-unknown-linux-gnu: target/artifacts/x86_64-unknown-linux-gnu/binary target/artifacts/x86_64-unknown-linux-gnu/docker
+artifacts-x86_64-unknown-linux-gnu: target/artifacts/x86_64-unknown-linux-gnu/binary target/artifacts/x86_64-unknown-linux-gnu/binary-portable target/artifacts/x86_64-unknown-linux-gnu/docker
 .PHONY: artifacts-x86_64-unknown-linux-gnu-binary
 artifacts-x86_64-unknown-linux-gnu-binary: target/artifacts/x86_64-unknown-linux-gnu/binary
-.PHONY: artifacts-x86_64-unknown-linux-gnu-tarball
-artifacts-x86_64-unknown-linux-gnu-tarball: target/artifacts/x86_64-unknown-linux-gnu/binary
+.PHONY: artifacts-x86_64-unknown-linux-gnu-binary-portable
+artifacts-x86_64-unknown-linux-gnu-binary-portable: target/artifacts/x86_64-unknown-linux-gnu/binary-portable
 .PHONY: artifacts-x86_64-unknown-linux-gnu-docker
 artifacts-x86_64-unknown-linux-gnu-docker: target/artifacts/x86_64-unknown-linux-gnu/docker
 # MUSL
@@ -461,7 +461,7 @@ artifacts-x86_64-unknown-linux-gnu-docker: target/artifacts/x86_64-unknown-linux
 artifacts-x86_64-unknown-linux-musl: target/artifacts/x86_64-unknown-linux-musl/binary target/artifacts/x86_64-unknown-linux-musl/docker
 .PHONY: artifacts-x86_64-unknown-linux-musl-binary
 artifacts-x86_64-unknown-linux-musl-binary: target/artifacts/x86_64-unknown-linux-musl/binary
-.PHONY: artifacts-x86_64-unknown-linux-musl-docker
+.PHONY: artifacts-x86_64-unknown-linux-musl-binary-portable
 artifacts-x86_64-unknown-linux-musl-docker: target/artifacts/x86_64-unknown-linux-musl/docker
 ### AARCH64
 ## Linux
@@ -469,9 +469,11 @@ artifacts-x86_64-unknown-linux-musl-docker: target/artifacts/x86_64-unknown-linu
 artifacts-aarch64-unknown-linux: artifacts-aarch64-unknown-linux-gnu artifacts-aarch64-unknown-linux-musl
 # GLIBC
 .PHONY: artifacts-aarch64-unknown-linux-gnu
-artifacts-aarch64-unknown-linux-gnu: target/artifacts/aarch64-unknown-linux-gnu/binary target/artifacts/aarch64-unknown-linux-gnu/docker
+artifacts-aarch64-unknown-linux-gnu: target/artifacts/aarch64-unknown-linux-gnu/binary target/artifacts/aarch64-unknown-linux-gnu/binary-portable target/artifacts/aarch64-unknown-linux-gnu/docker
 .PHONY: artifacts-aarch64-unknown-linux-gnu-binary
 artifacts-aarch64-unknown-linux-gnu-binary: target/artifacts/aarch64-unknown-linux-gnu/binary
+.PHONY: artifacts--aarch64-unknown-linux-gnu-binary-portable
+artifacts--aarch64-unknown-linux-gnu-binary-portable: target/artifacts/-aarch64-unknown-linux-gnu/binary-portable
 .PHONY: artifacts-aarch64-unknown-linux-gnu-docker
 artifacts-aarch64-unknown-linux-gnu-docker: target/artifacts/aarch64-unknown-linux-gnu/docker
 # MUSL
@@ -487,9 +489,11 @@ artifacts-aarch64-unknown-linux-musl-docker: target/artifacts/aarch64-unknown-li
 artifacts-armv7-unknown-linux: artifacts-armv7-unknown-linux-gnueabihf artifacts-armv7-unknown-linux-musleabihf
 # GLIBC
 .PHONY: artifacts-armv7-unknown-linux-gnueabihf
-artifacts-armv7-unknown-linux-gnueabihf: target/artifacts/armv7-unknown-linux-gnueabihf/binary target/artifacts/armv7-unknown-linux-gnueabihf/docker
+artifacts-armv7-unknown-linux-gnueabihf: target/artifacts/armv7-unknown-linux-gnueabihf/binary target/artifacts/armv7-unknown-linux-gnueabihf/binary-portable target/artifacts/armv7-unknown-linux-gnueabihf/docker
 .PHONY: artifacts-armv7-unknown-linux-gnueabihf-binary
 artifacts-armv7-unknown-linux-gnueabihf-binary: target/artifacts/armv7-unknown-linux-gnueabihf/binary
+.PHONY: artifacts-armv7-unknown-linux-gnueabihf-binary-portable
+artifacts-armv7-unknown-linux-gnueabihf-binary-portable: target/artifacts/armv7-unknown-linux-gnueabihf/binary-portable
 .PHONY: artifacts-armv7-unknown-linux-gnueabihf-docker
 artifacts-armv7-unknown-linux-gnueabihf-docker: target/artifacts/armv7-unknown-linux-gnueabihf/docker
 # MUSL

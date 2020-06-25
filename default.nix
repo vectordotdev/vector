@@ -5,8 +5,6 @@ rec {
       # See `rustup target list`
       x86_64-unknown-linux-gnu = rec {
         configuration = {
-          setInterpreterPath = "/lib64/ld-linux-x86-64.so.2";
-          buildType = "debug";
           rustTarget = "x86_64-unknown-linux-gnu";
           hostPkgs = pkgs;
           targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.gnu64.stdenv.targetPlatform.config then
@@ -20,19 +18,17 @@ rec {
             features.byLinking.static;
         };
         binary = tasks.binary configuration;
-        docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
+        binary-portable = tasks.binaryWithMappedInterpreter { binary = binary; path = "/lib64/ld-linux-x86-64.so.2"; };
+        docker = tasks.docker { tag = configuration.rustTarget; binary = binary-portable; };
       };
       x86_64-unknown-linux-musl = rec {
         configuration = {
-          setInterpreterPath = null;
-          buildType = "debug";
           rustTarget = "x86_64-unknown-linux-musl";
           hostPkgs = pkgs;
           targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.gnu64.stdenv.targetPlatform.config then
               pkgs.pkgsStatic  # Yes, this is musl!
             else
               pkgs.pkgsCross.musl64;
-          logLevel = "debug";
           runCheckPhase = false;
           features = features.components.all ++
             features.byOs.linux.musl ++
@@ -43,34 +39,29 @@ rec {
       };
       aarch64-unknown-linux-gnu = rec {
         configuration = {
-          setInterpreterPath = "/lib64/ld-linux-aarch64.so.2";
-          buildType = "debug";
           rustTarget = "aarch64-unknown-linux-gnu";
           hostPkgs = pkgs;
           targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.aarch64-multiplatform.stdenv.targetPlatform.config then
               pkgs
             else
               pkgs.pkgsCross.aarch64-multiplatform;
-          logLevel = "debug";
           runCheckPhase = false;
           features = features.components.all ++
             features.byOs.linux.gnu ++
             features.byLinking.static;
         };
         binary = tasks.binary configuration;
-        docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
+        binary-portable = tasks.binary (configuration // { setInterpreterPath = "/lib64/ld-linux-aarch64.so.2"; });
+        docker = tasks.docker { tag = configuration.rustTarget; binary = binary-portable; };
       };
       aarch64-unknown-linux-musl = rec {
         configuration = {
-          setInterpreterPath = null;
-          buildType = "debug";
           rustTarget = "aarch64-unknown-linux-musl";
           hostPkgs = pkgs;
           targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.aarch64-multiplatform-musl.stdenv.targetPlatform.config then
               pkgs
             else
               pkgs.pkgsCross.aarch64-multiplatform-musl;
-          logLevel = "debug";
           runCheckPhase = false;
           features = features.components.all ++
             features.byOs.linux.musl ++
@@ -82,14 +73,12 @@ rec {
       armv7-unknown-linux-gnueabihf = rec {
         configuration = {
           setInterpreterPath = "/lib64/ld-linux-armv7.so.2";
-          buildType = "debug";
           rustTarget = "armv7-unknown-linux-gnueabihf";
           hostPkgs = pkgs;
           targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.armv7l-hf-multiplatform.stdenv.targetPlatform.config then
               pkgs
             else
               pkgs.pkgsCross.armv7l-hf-multiplatform;
-          logLevel = "debug";
           runCheckPhase = false;
           features = features.components.all ++
             features.byOs.linux.musl ++
@@ -101,21 +90,20 @@ rec {
       armv7-unknown-linux-musleabihf = rec {
         setInterpreterPath = null;
         configuration = {
-          buildType = "debug";
           rustTarget = "armv7-unknown-linux-musleabihf";
           hostPkgs = pkgs;
           targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.armv7l-hf-multiplatform.stdenv.targetPlatform.config then
               pkgs.pkgsStatic
             else
               pkgs.pkgsCross.armv7l-hf-multiplatform.pkgsStatic;
-          logLevel = "debug";
           runCheckPhase = false;
           features = features.components.all ++
             features.byOs.linux.musl ++
             features.byLinking.static;
         };
         binary = tasks.binary configuration;
-        docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
+        binary-portable = tasks.binary (configuration // { setInterpreterPath = "/lib64/ld-linux-armv7.so.2"; });
+        docker = tasks.docker { tag = configuration.rustTarget; binary = binary-portable; };
       };
     };
   };
@@ -347,10 +335,24 @@ rec {
         tag = args.tag;
         config.Cmd = [ "${args.binary.out}/bin/vector" ];
       };
+    # We do this to make our builds portable to non-NixOS machines.
+    # If `setInterpreterPath = false` the output binaries will refer to NixOS's `ld-linux` interpreter, this is a problem if you want to send this to others!
+    # Instead, set it to `setInterpreterPath = "/lib64/ld-linux-x86-64.so.2"` and then Ubuntu/Centos can launch it.
+    # 
+    # Aren't computers fun?
+    binaryWithMappedInterpreter = { binary, path}:
+      pkgs.stdenv.mkDerivation {
+        name = "vector-portable";
+        src = binary;
+        phases = [ "postFixup" ];
+        postFixup = ''
+          install -D -C ${binary}/bin/vector $out/bin/vector
+          ${pkgs.patchelf}/bin/patchelf --set-interpreter ${path} $out/bin/vector
+        '';
+      };
+
     # Build a binary Vector artifact
     binary = args@{
-      # This will be set dynamically!
-      setInterpreterPath,
       features,
       rustChannel ? null, # Defaulted below
       rustTarget,
@@ -366,7 +368,7 @@ rec {
           # DO NOT TRY TO PUT THIS HERE. PUT IT IN THE `(this).rust.override { ... }`
           # targets = [ args.rustTarget ];
         };
-        packageDefinition = rec {
+        packageDefinition = {
           pname = cargoToml.package.name;
           version = cargoToml.package.version;
 
@@ -378,22 +380,10 @@ rec {
 
           passthru = (environment.variables { inherit (args) targetPkgs hostPkgs; });
           # Configurables
-          buildType = args.buildType;
-          logLevel = args.logLevel;
+          buildType = buildType;
+          logLevel = logLevel;
           cargoSha256 = "0xg43s4vdhzqz6gqbakr7c7jbr1jlmwr15ykrsl1clgywpg3rm8r";
           # TODO: There seems to be a cargoVendorDir option: https://github.com/NixOS/nixpkgs/blob/a7fa6f60c4df3fde0ab46cfe79294c1d65042fa4/pkgs/build-support/rust/default.nix#L30
-          
-          # We do this to make our builds portable to non-NixOS machines.
-          # If `setInterpreterPath = false` the output binaries will refer to NixOS's `ld-linux` interpreter, this is a problem if you want to send this to others!
-          # Instead, set it to `setInterpreterPath = "/lib64/ld-linux-x86-64.so.2"` and then Ubuntu/Centos can launch it.
-          # 
-          # Aren't computers fun?
-          postFixup = (if (builtins.isString setInterpreterPath) then
-              ''
-                ${hostPkgs.patchelf}/bin/patchelf --set-interpreter ${setInterpreterPath} $out/bin/vector
-              ''
-            else
-              "");
 
           target = args.rustTarget;
           # Rest
