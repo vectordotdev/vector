@@ -13,7 +13,6 @@ impl InternalEvent for KubernetesLogsEventReceived<'_> {
         trace!(
             message = "received one event.",
             %self.file,
-            rate_limit_secs = 10
         );
     }
 
