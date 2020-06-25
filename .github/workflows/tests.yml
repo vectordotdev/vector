@@ -281,9 +281,7 @@ jobs:
         container_runtime:
           - docker
           - containerd
-          # TODO: re-enable crio when
-          # https://github.com/kubernetes/minikube/issues/8554 is fixed
-          # - crio
+          - crio
       fail-fast: false
     steps:
       - name: Setup Minikube
@@ -310,5 +308,9 @@ jobs:
       - run: make test-e2e-kubernetes
         env:
           USE_MINIKUBE_CACHE: "true"
-          CONTAINER_IMAGE_REPO: vector-test
+          # CRIO prefixes the image name with `localhost/` when it's passed via
+          # `minikube cache`, so we specify the prefix ourselves so that
+          # the effective image name on the minikube node matches the one we
+          # expect in tests.
+          CONTAINER_IMAGE_REPO: localhost/vector-test
           PACKAGE_DEB_USE_CONTAINER: docker
