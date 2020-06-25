@@ -3,7 +3,7 @@
 use crate::{dns::Resolver, sinks::util, tls::MaybeTlsSettings};
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
-use http02::{
+use http::{
     header::{HeaderMap, HeaderName, HeaderValue},
     Method, Request, Response, StatusCode,
 };

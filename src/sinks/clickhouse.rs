@@ -13,7 +13,7 @@ use crate::{
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
-use http02::{Method, Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -104,7 +104,7 @@ impl HttpSink for ClickhouseConfig {
         Some(body)
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http02::Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let database = if let Some(database) = &self.database {
             database.as_str()
         } else {
@@ -113,10 +113,7 @@ impl HttpSink for ClickhouseConfig {
 
         let uri = encode_uri(&self.host, database, &self.table).expect("Unable to encode uri");
 
-        let mut builder = Request::builder()
-            .method(Method::POST)
-            .uri(uri.clone())
-            .header("Content-Type", "application/x-ndjson");
+        let mut builder = Request::post(&uri).header("Content-Type", "application/x-ndjson");
 
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);
@@ -148,7 +145,7 @@ async fn healthcheck(resolver: Resolver, config: ClickhouseConfig) -> crate::Res
 
     match response.status() {
         StatusCode::OK => Ok(()),
-        status => Err(super::HealthcheckError::UnexpectedStatus2 { status }.into()),
+        status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
     }
 }
 
@@ -180,7 +177,7 @@ struct ClickhouseRetryLogic {
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
-    type Response = http02::Response<bytes05::Bytes>;
+    type Response = http::Response<bytes05::Bytes>;
     type Error = hyper::Error;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

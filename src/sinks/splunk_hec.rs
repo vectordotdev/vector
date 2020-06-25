@@ -13,7 +13,7 @@ use crate::{
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
-use http02::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -218,7 +218,7 @@ pub async fn healthcheck(config: HecSinkConfig, resolver: Resolver) -> crate::Re
         StatusCode::OK => Ok(()),
         StatusCode::BAD_REQUEST => Err(HealthcheckError::InvalidToken.into()),
         StatusCode::SERVICE_UNAVAILABLE => Err(HealthcheckError::QueuesFull.into()),
-        other => Err(super::HealthcheckError::UnexpectedStatus2 { status: other }.into()),
+        other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }
 
@@ -231,7 +231,7 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
     }
 }
 
-fn build_uri(host: &str, path: &str) -> Result<Uri, http02::uri::InvalidUri> {
+fn build_uri(host: &str, path: &str) -> Result<Uri, http::uri::InvalidUri> {
     format!("{}{}", host.trim_end_matches('/'), path).parse::<Uri>()
 }
 

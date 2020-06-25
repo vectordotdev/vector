@@ -19,9 +19,9 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::TryFutureExt;
-use futures01::{stream::iter_ok, Future, Sink};
-use http02::{Method, StatusCode, Uri};
+use futures::{FutureExt, TryFutureExt};
+use futures01::{stream::iter_ok, Sink};
+use http::{StatusCode, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
     Body, Request, Response,
@@ -152,11 +152,11 @@ inventory::submit! {
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let mut sink = GcsSink::new(self, &cx)?;
-        let healthcheck = sink.healthcheck()?;
+        let sink = GcsSink::new(self, &cx)?;
+        let healthcheck = sink.clone().healthcheck().boxed().compat();
         let service = sink.service(self, &cx)?;
 
-        Ok((service, healthcheck))
+        Ok((service, Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -174,8 +174,6 @@ enum HealthcheckError {
     InvalidCredentials,
     #[snafu(display("Unknown bucket: {:?}", bucket))]
     UnknownBucket { bucket: String },
-    #[snafu(display("Unknown status code: {}", status))]
-    UnknownStatus { status: http::StatusCode },
     #[snafu(display("key_prefix template parse error: {}", source))]
     KeyPrefixTemplate { source: TemplateError },
 }
@@ -226,30 +224,19 @@ impl GcsSink {
         Ok(Box::new(sink))
     }
 
-    fn healthcheck(&mut self) -> crate::Result<Healthcheck> {
-        let builder = Request::builder()
-            .method(Method::HEAD)
-            .uri(self.base_url.parse::<Uri>()?);
+    async fn healthcheck(mut self) -> crate::Result<()> {
+        let uri = self.base_url.parse::<Uri>()?;
+        let mut request = http::Request::head(uri).body(Body::empty())?;
 
-        let mut request = builder.body(Body::empty()).unwrap();
-        if let Some(creds) = &self.creds {
+        if let Some(creds) = self.creds.as_ref() {
             creds.apply(&mut request);
         }
 
-        let healthcheck = self
-            .client
-            .call(request)
-            .compat()
-            .map_err(Into::into)
-            .and_then(healthcheck_response(
-                self.creds.clone(),
-                GcsError::BucketNotFound {
-                    bucket: self.bucket.clone(),
-                }
-                .into(),
-            ));
+        let bucket = self.bucket;
+        let not_found_error = GcsError::BucketNotFound { bucket }.into();
 
-        Ok(Box::new(healthcheck))
+        let response = self.client.send(request).await?;
+        healthcheck_response(self.creds, not_found_error)(response)
     }
 }
 
@@ -268,7 +255,7 @@ impl Service<RequestWrapper> for GcsSink {
         let uri = format!("{}{}", self.base_url, request.key)
             .parse::<Uri>()
             .unwrap();
-        let mut builder = Request::builder().method(Method::PUT).uri(uri);
+        let mut builder = Request::put(uri);
         let headers = builder.headers_mut().unwrap();
         headers.insert("content-type", settings.content_type);
         headers.insert(

@@ -166,7 +166,7 @@ impl HttpSink for LokiConfig {
         Some((labels, (ts, event)))
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http02::Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let mut streams: HashMap<Labels, Vec<(i64, String)>> = HashMap::new();
 
         for (mut labels, event) in events {
@@ -208,7 +208,7 @@ impl HttpSink for LokiConfig {
 
         let uri = format!("{}loki/api/v1/push", self.endpoint);
 
-        let mut req = http02::Request::post(uri).header("Content-Type", "application/json");
+        let mut req = http::Request::post(uri).header("Content-Type", "application/json");
 
         if let Some(tenant_id) = &self.tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);
@@ -230,13 +230,11 @@ async fn healthcheck(config: LokiConfig, resolver: Resolver) -> crate::Result<()
     let tls = TlsSettings::from_options(&config.tls)?;
     let mut client = HttpClient::new(resolver, tls)?;
 
-    let req = http02::Request::get(uri)
-        .body(hyper::Body::empty())
-        .unwrap();
+    let req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
     let res = client.send(req).await?;
 
-    if res.status() != http02::StatusCode::OK {
+    if res.status() != http::StatusCode::OK {
         return Err(format!("A non-successful status returned: {}", res.status()).into());
     }
 

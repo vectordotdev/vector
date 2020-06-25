@@ -13,7 +13,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::Sink;
-use http02::{Method, Request, Uri};
+use http::{Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -167,9 +167,7 @@ impl HttpSink for InfluxDBLogsSink {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
-        Request::builder()
-            .method(Method::POST)
-            .uri(&self.uri)
+        Request::post(&self.uri)
             .header("Content-Type", "text/plain")
             .header("Authorization", format!("Token {}", &self.token))
             .body(events)
