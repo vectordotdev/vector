@@ -3,9 +3,12 @@ use crate::{
     event::Value,
     Event,
 };
+use cidr_utils::cidr::IpCidr;
 use indexmap::IndexMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
+use std::str::FromStr;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
@@ -326,6 +329,52 @@ impl CheckFieldsPredicate for ExistsPredicate {
 
 //------------------------------------------------------------------------------
 
+#[derive(Debug, Clone)]
+struct IpCidrPredicate {
+    target: Atom,
+    cidrs: Vec<IpCidr>,
+}
+
+impl IpCidrPredicate {
+    pub fn new(
+        target: String,
+        arg: &CheckFieldsPredicateArg,
+    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+        let cidr_strings = match arg {
+            CheckFieldsPredicateArg::String(s) => vec![s.clone()],
+            CheckFieldsPredicateArg::VecString(ss) => ss.clone(),
+            _ => {
+                return Err(
+                    "ip_cidr_contains predicate requires a string or list of string argument"
+                        .to_owned(),
+                )
+            }
+        };
+        let cidrs = match cidr_strings.iter().map(|s| IpCidr::from_str(s)).collect() {
+            Ok(v) => v,
+            Err(e) => return Err(format!("Invalid IP CIDR: {}", e)),
+        };
+        let target = target.into();
+        Ok(Box::new(Self { target, cidrs }))
+    }
+}
+
+impl CheckFieldsPredicate for IpCidrPredicate {
+    fn check(&self, event: &Event) -> bool {
+        match event {
+            Event::Log(l) => l.get(&self.target).map_or(false, |v| {
+                let v = v.to_string_lossy();
+                IpAddr::from_str(&v).map_or(false, |ip_addr| {
+                    self.cidrs.iter().any(|cidr| cidr.contains(ip_addr))
+                })
+            }),
+            _ => false,
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
 #[derive(Debug)]
 struct NegatePredicate {
     subpred: Box<dyn CheckFieldsPredicate>,
@@ -370,6 +419,7 @@ fn build_predicate(
         "ends_with" => EndsWithPredicate::new(target, arg),
         "exists" => ExistsPredicate::new(target, arg),
         "regex" => RegexPredicate::new(target, arg),
+        "ip_cidr_contains" => IpCidrPredicate::new(target, arg),
         _ if predicate.starts_with("not_") => NegatePredicate::new(&predicate[4..], target, arg),
         _ => Err(format!("predicate type '{}' not recognized", predicate)),
     }
@@ -909,6 +959,60 @@ mod test {
                 r#"predicates failed: [ message.regex: "^start", other_thing.regex: "end$" ]"#
                     .to_owned()
             )
+        );
+    }
+
+    #[test]
+    fn check_ip_cidr() {
+        let mut preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
+        preds.insert(
+            "foo.ip_cidr_contains".into(),
+            CheckFieldsPredicateArg::String("10.0.0.0/8".into()),
+        );
+        preds.insert(
+            "bar.ip_cidr_contains".into(),
+            CheckFieldsPredicateArg::VecString(vec!["2000::/3".into(), "192.168.0.0/16".into()]),
+        );
+
+        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+
+        let mut event = Event::from("ignored message");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\", bar.ip_cidr_contains: [\"2000::/3\", \"192.168.0.0/16\"] ]".to_owned()),
+        );
+
+        event.as_mut_log().insert("foo", "10.1.2.3");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err(
+                "predicates failed: [ bar.ip_cidr_contains: [\"2000::/3\", \"192.168.0.0/16\"] ]"
+                    .to_owned()
+            ),
+        );
+
+        event.as_mut_log().insert("bar", "2000::");
+        assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
+
+        event.as_mut_log().insert("bar", "192.168.255.255");
+        assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
+
+        event.as_mut_log().insert("foo", "192.200.200.200");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\" ]".to_owned()),
+        );
+
+        event.as_mut_log().insert("foo", "not an ip");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\" ]".to_owned()),
         );
     }
 

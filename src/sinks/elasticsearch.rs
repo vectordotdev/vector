@@ -8,6 +8,7 @@ use crate::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
         retries2::{RetryAction, RetryLogic},
+        rusoto,
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, Buffer, Compression,
     },
@@ -26,9 +27,7 @@ use http02::{
 use hyper::Body;
 use lazy_static::lazy_static;
 use rusoto_core::Region;
-use rusoto_credential::{
-    AwsCredentials, CredentialsError, DefaultCredentialsProvider, ProvideAwsCredentials,
-};
+use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -83,7 +82,7 @@ pub enum Encoding {
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum ElasticSearchAuth {
     Basic { user: String, password: String },
-    Aws,
+    Aws { assume_role: Option<String> },
 }
 
 impl ElasticSearchAuth {
@@ -104,8 +103,9 @@ inventory::submit! {
 impl SinkConfig for ElasticSearchConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
-        let healthcheck = healthcheck(cx.resolver(), common.clone()).boxed().compat();
+        let healthcheck = healthcheck(cx.resolver(), common).boxed().compat();
 
+        let common = ElasticSearchCommon::parse_config(&self)?;
         let compression = common.compression;
         let batch = self
             .batch
@@ -143,12 +143,12 @@ impl SinkConfig for ElasticSearchConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ElasticSearchCommon {
     pub base_url: String,
     bulk_uri: Uri,
     authorization: Option<String>,
-    credentials: Option<AwsCredentials>,
+    credentials: Option<rusoto::AwsCredentialsProvider>,
     index: Template,
     doc_type: String,
     tls_settings: TlsSettings,
@@ -164,8 +164,6 @@ enum ParseError {
     InvalidHost { host: String, source: InvalidUri },
     #[snafu(display("Host {:?} must include hostname", host))]
     HostMustIncludeHostname { host: String },
-    #[snafu(display("Could not create AWS credentials provider: {:?}", source))]
-    AWSCredentialsProviderFailed { source: CredentialsError },
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
     #[snafu(display("Compression can not be used with AWS hosted Elasticsearch"))]
@@ -174,6 +172,7 @@ enum ParseError {
     IndexTemplate { source: TemplateError },
 }
 
+#[async_trait::async_trait]
 impl HttpSink for ElasticSearchCommon {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
@@ -215,10 +214,10 @@ impl HttpSink for ElasticSearchCommon {
         Some(body)
     }
 
-    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http02::Request<Vec<u8>>> {
         let mut builder = Request::post(&self.bulk_uri);
 
-        if let Some(credentials) = &self.credentials {
+        if let Some(credentials_provider) = &self.credentials {
             let mut request = self.signed_request("POST", &self.bulk_uri, true);
 
             request.add_header("Content-Type", "application/x-ndjson");
@@ -232,13 +231,15 @@ impl HttpSink for ElasticSearchCommon {
             request.set_payload(Some(events));
 
             // mut builder?
-            builder = finish_signer(&mut request, &credentials, builder);
+            builder = finish_signer(&mut request, &credentials_provider, builder).await?;
 
             // The SignedRequest ends up owning the body, so we have
             // to play games here
             let body = request.payload.take().unwrap();
             match body {
-                SignedRequestPayload::Buffer(body) => builder.body(body.to_vec()).unwrap(),
+                SignedRequestPayload::Buffer(body) => {
+                    builder.body(body.to_vec()).map_err(Into::into)
+                }
                 _ => unreachable!(),
             }
         } else {
@@ -258,7 +259,7 @@ impl HttpSink for ElasticSearchCommon {
                 builder = builder.header("Authorization", &auth[..]);
             }
 
-            builder.body(events).unwrap()
+            builder.body(events).map_err(Into::into)
         }
     }
 }
@@ -383,17 +384,9 @@ impl ElasticSearchCommon {
 
         let credentials = match &config.auth {
             Some(ElasticSearchAuth::Basic { .. }) | None => None,
-            Some(ElasticSearchAuth::Aws) => {
-                let provider =
-                    DefaultCredentialsProvider::new().context(AWSCredentialsProviderFailed)?;
-
-                let mut rt = tokio_compat::runtime::current_thread::Runtime::new()?;
-                let credentials = rt
-                    .block_on_std(provider.credentials())
-                    .context(AWSCredentialsGenerateFailed)?;
-
-                Some(credentials)
-            }
+            Some(ElasticSearchAuth::Aws { assume_role }) => Some(
+                rusoto::AwsCredentialsProvider::new(&region, assume_role.clone())?,
+            ),
         };
 
         // Only allow compression if we are running with no AWS credentials.
@@ -465,9 +458,9 @@ async fn healthcheck(resolver: Resolver, common: ElasticSearchCommon) -> crate::
                 builder = builder.header("Authorization", authorization.clone());
             }
         }
-        Some(credentials) => {
+        Some(credentials_provider) => {
             let mut signer = common.signed_request("GET", builder.uri_ref().unwrap(), false);
-            builder = finish_signer(&mut signer, &credentials, builder);
+            builder = finish_signer(&mut signer, &credentials_provider, builder).await?;
         }
     }
     let request = builder.body(Body::empty())?;
@@ -480,11 +473,16 @@ async fn healthcheck(resolver: Resolver, common: ElasticSearchCommon) -> crate::
     }
 }
 
-fn finish_signer(
+async fn finish_signer(
     signer: &mut SignedRequest,
-    credentials: &AwsCredentials,
+    credentials_provider: &rusoto::AwsCredentialsProvider,
     mut builder: http02::request::Builder,
-) -> http02::request::Builder {
+) -> crate::Result<http02::request::Builder> {
+    let credentials = credentials_provider
+        .credentials()
+        .await
+        .context(AWSCredentialsGenerateFailed)?;
+
     signer.sign(&credentials);
 
     for (name, values) in signer.headers() {
@@ -498,7 +496,7 @@ fn finish_signer(
         }
     }
 
-    builder
+    Ok(builder)
 }
 
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event: &mut Event) {
@@ -621,6 +619,7 @@ mod integration_tests {
             ..config()
         };
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+        let base_url = common.base_url.clone();
 
         let cx = SinkContext::new_test(rt.executor());
         let (sink, _hc) = config.build(cx.clone()).unwrap();
@@ -633,11 +632,10 @@ mod integration_tests {
         rt.block_on(pump).unwrap();
 
         // make sure writes all all visible
-        rt.block_on_std(flush(cx.resolver(), common.clone()))
-            .unwrap();
+        rt.block_on_std(flush(cx.resolver(), common)).unwrap();
 
         let response = reqwest::Client::new()
-            .get(&format!("{}/{}/_search", common.base_url, index))
+            .get(&format!("{}/{}/_search", base_url, index))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
@@ -697,7 +695,7 @@ mod integration_tests {
     fn insert_events_on_aws() {
         run_insert_tests(
             ElasticSearchConfig {
-                auth: Some(ElasticSearchAuth::Aws),
+                auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
                 host: "http://localhost:4571".into(),
                 ..config()
             },
@@ -725,6 +723,7 @@ mod integration_tests {
         let index = gen_index();
         config.index = Some(index.clone());
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+        let base_url = common.base_url.clone();
 
         let cx = SinkContext::new_test(rt.executor());
         let (sink, healthcheck) = config.build(cx.clone()).expect("Building config failed");
@@ -759,7 +758,7 @@ mod integration_tests {
             };
 
             // make sure writes all all visible
-            flush(cx.resolver(), common.clone())
+            flush(cx.resolver(), common)
                 .await
                 .expect("Flushing writes failed");
 
@@ -776,7 +775,7 @@ mod integration_tests {
                 .expect("Could not build HTTP client");
 
             let response = client
-                .get(&format!("{}/{}/_search", common.base_url, index))
+                .get(&format!("{}/{}/_search", base_url, index))
                 .json(&json!({
                     "query": { "query_string": { "query": "*" } }
                 }))
