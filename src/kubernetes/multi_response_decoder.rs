@@ -407,4 +407,45 @@ mod tests {
 
         assert_eq!(dec.finish().unwrap_err(), b"{");
     }
+
+    #[test]
+    fn test_memory_usage() {
+        let mut dec = MultiResponseDecoder::<TO>::new();
+
+        let chunk = br#"{
+            "type": "ADDED",
+            "object": {
+                "kind": "Pod",
+                "apiVersion": "v1",
+                "metadata": {
+                    "uid": "uid0"
+                }
+            }
+        }"#;
+        let mut chunks = chunk.iter().cycle();
+
+        let max_chunks_per_iter = 15;
+
+        // Simulate processing a huge number of items.
+        for _ in 0..100_000 {
+            // Take random amout of bytes from the chunks iter and prepare the
+            // next chunk.
+            let to_take = rand::random::<usize>() % (chunk.len() * max_chunks_per_iter);
+            let next_chunk = (&mut chunks).take(to_take).cloned().collect::<Box<_>>();
+
+            // Process the chunk data.
+            let stream = dec.process_next_chunk(next_chunk.as_ref());
+            drop(stream); // consume all the emitted items
+        }
+
+        // Check that `pending_data` capacity didn't grow out way of hand.
+        // If we had issues with memory management, it would be the one
+        // to blow first.
+        assert!(dec.pending_data.capacity() <= chunk.len() * 100);
+
+        // Ensure that response buffer never grows beyond it's capacitty limit.
+        // Capacity limit is set based on heuristics about `Vec` internals, and
+        // is adjusted to be as low as possible.
+        assert!(dec.responses_buffer.capacity() <= (max_chunks_per_iter + 2).next_power_of_two());
+    }
 }
