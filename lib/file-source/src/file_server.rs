@@ -378,6 +378,9 @@ pub enum Fingerprinter {
         fingerprint_bytes: usize,
         ignored_header_bytes: usize,
     },
+    FirstLineChecksum {
+        max_line_length: usize,
+    },
     DevInode,
 }
 
@@ -407,6 +410,11 @@ impl Fingerprinter {
                 fp.seek(io::SeekFrom::Start(i))?;
                 fp.read_exact(&mut buffer[..b])?;
             }
+            Fingerprinter::FirstLineChecksum { max_line_length } => {
+                buffer.resize(max_line_length, 0u8);
+                let fp = fs::File::open(path)?;
+                fingerprinter_read_until(fp, b'\n', buffer)?;
+            }
         }
         let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
         Ok(fingerprint)
@@ -431,6 +439,28 @@ impl Fingerprinter {
             })
             .ok()
     }
+}
+
+fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> io::Result<()> {
+    while !buf.is_empty() {
+        let read = match r.read(buf) {
+            Ok(0) => return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "EOF reached")),
+            Ok(n) => n,
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        };
+
+        if let Some((pos, _)) = buf[..read].iter().enumerate().find(|(_, &c)| c == delim) {
+            for el in &mut buf[(pos + 1)..] {
+                *el = 0;
+            }
+            break;
+        }
+
+        let tmp = buf;
+        buf = &mut tmp[read..];
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -475,6 +505,73 @@ mod test {
             fingerprinter
                 .get_fingerprint_of_file(&duplicate_path, &mut buf)
                 .unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_first_line_checksum_fingerprinting() {
+        let max_line_length = 64;
+        let fingerprinter = Fingerprinter::FirstLineChecksum { max_line_length };
+
+        let target_dir = tempdir().unwrap();
+        let prepare_test = |file: &str, contents: &[u8]| {
+            let path = target_dir.path().join(file);
+            fs::write(&path, contents).unwrap();
+            path
+        };
+        let prepare_test_long = |file: &str, amount| {
+            prepare_test(
+                file,
+                b"hello world "
+                    .iter()
+                    .cloned()
+                    .cycle()
+                    .clone()
+                    .take(amount)
+                    .collect::<Box<_>>()
+                    .as_ref(),
+            )
+        };
+
+        let empty = prepare_test("empty.log", b"");
+        let incomlete_line = prepare_test("incomlete_line.log", b"missing newline char");
+        let one_line = prepare_test("one_line.log", b"hello world\n");
+        let one_line_duplicate = prepare_test("one_line_duplicate.log", b"hello world\n");
+        let one_line_continuied =
+            prepare_test("one_line_continuied.log", b"hello world\nthe next line\n");
+        let different_two_lines = prepare_test("different_two_lines.log", b"line one\nline two\n");
+
+        let exactly_max_line_length =
+            prepare_test_long("exactly_max_line_length.log", max_line_length);
+        let exceeding_max_line_length =
+            prepare_test_long("exceeding_max_line_length.log", max_line_length + 1);
+        let incomplete_under_max_line_length_by_one = prepare_test_long(
+            "incomplete_under_max_line_length_by_one.log",
+            max_line_length - 1,
+        );
+
+        let mut buf = Vec::new();
+        let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
+
+        assert!(run(&empty).is_err());
+        assert!(run(&incomlete_line).is_err());
+        assert!(run(&incomplete_under_max_line_length_by_one).is_err());
+
+        assert!(run(&one_line).is_ok());
+        assert!(run(&one_line_duplicate).is_ok());
+        assert!(run(&one_line_continuied).is_ok());
+        assert!(run(&different_two_lines).is_ok());
+        assert!(run(&exactly_max_line_length).is_ok());
+        assert!(run(&exceeding_max_line_length).is_ok());
+
+        assert_eq!(run(&one_line).unwrap(), run(&one_line_duplicate).unwrap());
+        assert_eq!(run(&one_line).unwrap(), run(&one_line_continuied).unwrap());
+
+        assert_ne!(run(&one_line).unwrap(), run(&different_two_lines).unwrap());
+
+        assert_eq!(
+            run(&exactly_max_line_length).unwrap(),
+            run(&exceeding_max_line_length).unwrap()
         );
     }
 
