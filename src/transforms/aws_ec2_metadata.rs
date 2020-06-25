@@ -513,9 +513,7 @@ mod integration_tests {
             host: Some(HOST.clone()),
             ..Default::default()
         };
-        let mut transform = config
-            .build(TransformContext::new_test())
-            .unwrap();
+        let mut transform = config.build(TransformContext::new_test()).unwrap();
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -563,9 +561,7 @@ mod integration_tests {
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
-        let mut transform = config
-            .build(TransformContext::new_test())
-            .unwrap();
+        let mut transform = config.build(TransformContext::new_test()).unwrap();
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -595,9 +591,7 @@ mod integration_tests {
             namespace: Some("ec2.metadata".into()),
             ..Default::default()
         };
-        let mut transform = config
-            .build(TransformContext::new_test())
-            .unwrap();
+        let mut transform = config.build(TransformContext::new_test()).unwrap();
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -622,9 +616,7 @@ mod integration_tests {
             namespace: Some("".into()),
             ..Default::default()
         };
-        let mut transform = config
-            .build(TransformContext::new_test())
-            .unwrap();
+        let mut transform = config.build(TransformContext::new_test()).unwrap();
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
