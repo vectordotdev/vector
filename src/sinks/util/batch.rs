@@ -64,7 +64,7 @@ impl BatchConfig {
             },
             timeout: self
                 .timeout_secs
-                .map(|secs| Duration::from_secs(secs))
+                .map(Duration::from_secs)
                 .unwrap_or(defaults.timeout),
         }
     }
