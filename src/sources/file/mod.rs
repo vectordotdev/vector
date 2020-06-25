@@ -18,6 +18,7 @@ use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
@@ -93,6 +94,7 @@ pub struct FileConfig {
     pub max_read_bytes: usize,
     pub oldest_first: bool,
     pub remove_after: Option<u64>,
+    pub skip_first_lines: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -183,6 +185,7 @@ impl Default for FileConfig {
             max_read_bytes: 2048,
             oldest_first: false,
             remove_after: None,
+            skip_first_lines: 0,
         }
     }
 }
@@ -265,28 +268,45 @@ pub fn file_source(
     let multiline_config = config.multiline.clone();
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
+    let skip_first_lines = config.skip_first_lines;
     Box::new(future::lazy(move || {
         info!(message = "Starting file server.", ?include, ?exclude);
 
         // sizing here is just a guess
         let (tx, rx) = futures01::sync::mpsc::channel(100);
 
+        // Skips first lines per file
+        let skipped: Box<dyn Stream<Item = (Bytes, String, u64), Error = ()> + Send> =
+            if skip_first_lines > 0 {
+                let mut map = HashMap::new();
+                Box::new(rx.filter(move |&(_, _, file_id)| {
+                    let entry = map.entry(file_id).or_insert(skip_first_lines);
+                    entry
+                        .checked_sub(1)
+                        .map(|remaining| *entry = remaining)
+                        .is_none()
+                }))
+            } else {
+                Box::new(rx)
+            };
+        let downsized = skipped.map(|(msg, file, _)| (msg, file));
+
         let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
             if let Some(ref multiline_config) = multiline_config {
                 Box::new(LineAgg::new(
-                    rx,
+                    downsized,
                     multiline_config.try_into().unwrap(), // validated in build
                 ))
             } else if let Some(msi) = message_start_indicator {
                 Box::new(LineAgg::new(
-                    rx,
+                    downsized,
                     line_agg::Config::for_legacy(
                         Regex::new(&msi).unwrap(), // validated in build
                         multi_line_timeout,
                     ),
                 ))
             } else {
-                Box::new(rx)
+                Box::new(downsized)
             };
 
         // Once file server ends this will run until it has finished processing remaining
