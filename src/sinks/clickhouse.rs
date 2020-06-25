@@ -271,7 +271,7 @@ mod integration_tests {
         let client = ClickhouseClient::new(host);
         client.create_table(&table, "host String, timestamp String, message String");
 
-        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
@@ -318,7 +318,7 @@ mod integration_tests {
             "host String, timestamp DateTime('UTC'), message String",
         );
 
-        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
@@ -376,7 +376,7 @@ compression = "none"
             "host String, timestamp DateTime('UTC'), message String",
         );
 
-        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
@@ -429,7 +429,7 @@ compression = "none"
         // fail the request.
         client.create_table(&table, "host String, timestamp String");
 
-        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");

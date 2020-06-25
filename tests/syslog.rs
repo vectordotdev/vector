@@ -4,6 +4,7 @@
 
 use approx::assert_relative_eq;
 #[cfg(unix)]
+use futures::compat::Future01CompatExt;
 use futures01::{Future, Sink, Stream};
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
@@ -15,18 +16,15 @@ use std::{collections::HashMap, str::FromStr, thread, time::Duration};
 use tokio01::codec::{FramedWrite, LinesCodec};
 #[cfg(unix)]
 use tokio_uds::UnixStream;
-use vector::test_util::{
-    block_on, next_addr, random_maps, random_string, receive, runtime, send_lines,
-    shutdown_on_idle, wait_for_tcp,
-};
+use vector::test_util::{next_addr, random_maps, random_string, receive, send_lines, wait_for_tcp};
 use vector::topology::{self, config};
 use vector::{
     sinks,
     sources::syslog::{Mode, SyslogConfig},
 };
 
-#[test]
-fn test_tcp_syslog() {
+#[tokio::test]
+async fn test_tcp_syslog() {
     let num_messages: usize = 10000;
 
     let in_addr = next_addr();
@@ -42,11 +40,9 @@ fn test_tcp_syslog() {
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
-    let mut rt = runtime();
-
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -56,12 +52,14 @@ fn test_tcp_syslog() {
 
     let input_lines: Vec<String> = input_messages.iter().map(|msg| msg.to_string()).collect();
 
-    block_on(send_lines(in_addr, input_lines.clone().into_iter())).unwrap();
+    send_lines(in_addr, input_lines.clone().into_iter())
+        .compat()
+        .await
+        .unwrap();
 
     // Shut down server
-    block_on(topology.stop()).unwrap();
+    topology.stop().compat().await.unwrap();
 
-    shutdown_on_idle(rt);
     let output_lines = output_lines.wait();
     assert_eq!(output_lines.len(), num_messages);
 
@@ -77,8 +75,8 @@ fn test_tcp_syslog() {
     assert_eq!(output_messages, input_messages);
 }
 
-#[test]
-fn test_udp_syslog() {
+#[tokio::test]
+async fn test_udp_syslog() {
     let num_messages: usize = 1000;
 
     let in_addr = next_addr();
@@ -88,11 +86,9 @@ fn test_udp_syslog() {
     config.add_source("in", SyslogConfig::new(Mode::Udp { address: in_addr }));
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
-    let mut rt = runtime();
-
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
     let input_messages: Vec<SyslogMessageRFC5424> = (0..num_messages)
         .map(|i| SyslogMessageRFC5424::random(i, 30, 4, 3, 3))
@@ -112,9 +108,8 @@ fn test_udp_syslog() {
     thread::sleep(Duration::from_millis(300));
 
     // Shut down server
-    block_on(topology.stop()).unwrap();
+    topology.stop().compat().await.unwrap();
 
-    shutdown_on_idle(rt);
     let output_lines = output_lines.wait();
 
     // Account for some dropped packets :(
@@ -141,8 +136,8 @@ fn test_udp_syslog() {
 }
 
 #[cfg(unix)]
-#[test]
-fn test_unix_stream_syslog() {
+#[tokio::test]
+async fn test_unix_stream_syslog() {
     let num_messages: usize = 10000;
 
     let in_path = tempfile::tempdir().unwrap().into_path().join("stream_test");
@@ -157,11 +152,9 @@ fn test_unix_stream_syslog() {
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
-    let mut rt = runtime();
-
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
     // Wait for server to accept traffic
     while std::os::unix::net::UnixStream::connect(&in_path).is_err() {}
 
@@ -192,13 +185,13 @@ fn test_unix_stream_syslog() {
                         .map_err(|e| panic!("{:}", e))
                 })
         })
-        .wait()
+        .compat()
+        .await
         .unwrap();
 
     // Shut down server
-    block_on(topology.stop()).unwrap();
+    topology.stop().compat().await.unwrap();
 
-    shutdown_on_idle(rt);
     let output_lines = output_lines.wait();
     assert_eq!(output_lines.len(), num_messages);
 

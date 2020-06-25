@@ -564,7 +564,7 @@ mod integration_tests {
     #[test]
     fn s3_insert_message_into() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         rt.block_on_std(async move {
             let config = config(1000000).await;
@@ -592,7 +592,7 @@ mod integration_tests {
     #[test]
     fn s3_rotate_files_after_the_buffer_size_is_reached() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         rt.block_on_std(async move {
             let config = S3SinkConfig {
@@ -644,7 +644,7 @@ mod integration_tests {
     #[test]
     fn s3_waits_for_full_batch_or_timeout_before_sending() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let config = rt.block_on_std(async {
             S3SinkConfig {
@@ -713,7 +713,7 @@ mod integration_tests {
     #[test]
     fn s3_gzip() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         rt.block_on_std(async {
             let config = S3SinkConfig {

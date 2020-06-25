@@ -90,12 +90,11 @@ fn field_filter(c: &mut Criterion) {
         Benchmark::new("native", move |b| {
             b.iter_with_setup(
                 || {
-                    let rt = vector::runtime::Runtime::single_threaded().unwrap();
                     transforms::field_filter::FieldFilterConfig {
                         field: "the_field".to_string(),
                         value: "0".to_string(),
                     }
-                    .build(TransformContext::new_test(rt.executor()))
+                    .build(TransformContext::new_test())
                     .unwrap()
                 },
                 |mut transform| {

@@ -514,7 +514,7 @@ mod integration_tests {
             ..Default::default()
         };
         let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
+            .build(TransformContext::new_test())
             .unwrap();
 
         // We need to sleep to let the background task fetch the data.
@@ -564,7 +564,7 @@ mod integration_tests {
             ..Default::default()
         };
         let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
+            .build(TransformContext::new_test())
             .unwrap();
 
         // We need to sleep to let the background task fetch the data.
@@ -596,7 +596,7 @@ mod integration_tests {
             ..Default::default()
         };
         let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
+            .build(TransformContext::new_test())
             .unwrap();
 
         // We need to sleep to let the background task fetch the data.
@@ -623,7 +623,7 @@ mod integration_tests {
             ..Default::default()
         };
         let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
+            .build(TransformContext::new_test())
             .unwrap();
 
         // We need to sleep to let the background task fetch the data.

@@ -2,6 +2,7 @@
 #![allow(clippy::redundant_clone)]
 #![cfg(feature = "leveldb")]
 
+use futures::compat::Future01CompatExt;
 use futures01::{Future, Sink};
 use prost::Message;
 use tempfile::tempdir;
@@ -9,22 +10,20 @@ use tracing::trace;
 use vector::event;
 use vector::test_util::{self, next_addr, wait_for_atomic_usize};
 use vector::topology::{self, config};
-use vector::{buffers::BufferConfig, runtime, sinks};
+use vector::{buffers::BufferConfig, sinks};
 
 mod support;
 
-fn terminate_gracefully(mut rt: runtime::Runtime, topology: topology::RunningTopology) {
-    rt.block_on(topology.stop()).unwrap();
-    test_util::shutdown_on_idle(rt);
+async fn terminate_gracefully(topology: topology::RunningTopology) {
+    topology.stop().compat().await.unwrap();
 }
 
-fn terminate_abruptly(rt: runtime::Runtime, topology: topology::RunningTopology) {
-    rt.shutdown_now().wait().unwrap();
+async fn terminate_abruptly(topology: topology::RunningTopology) {
     drop(topology);
 }
 
-#[test]
-fn test_buffering() {
+#[tokio::test]
+async fn test_buffering() {
     test_util::trace_init();
 
     let data_dir = tempdir().unwrap();
@@ -58,16 +57,14 @@ fn test_buffering() {
         config
     };
 
-    let mut rt = test_util::runtime();
-
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
     let (input_events, input_events_stream) =
         test_util::random_events_with_stream(line_length, num_events);
     let send = in_tx
         .sink_map_err(|err| panic!(err))
         .send_all(input_events_stream);
-    let _ = rt.block_on(send).unwrap();
+    let _ = send.compat().await.unwrap();
 
     // We need to wait for at least the source to process events.
     // This is to avoid a race after we send all events, at that point two things
@@ -83,7 +80,7 @@ fn test_buffering() {
     // But it should be shortly after source processing all of the events.
     std::thread::sleep(std::time::Duration::from_secs(1));
     // Simulate a crash.
-    terminate_abruptly(rt, topology);
+    terminate_abruptly(topology).await;
 
     // Then run vector again with a sink that accepts events now. It should
     // send all of the events from the first run.
@@ -101,9 +98,7 @@ fn test_buffering() {
         config
     };
 
-    let mut rt = test_util::runtime();
-
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
     let (input_events2, input_events_stream) =
         test_util::random_events_with_stream(line_length, num_events);
@@ -111,11 +106,11 @@ fn test_buffering() {
     let send = in_tx
         .sink_map_err(|err| panic!(err))
         .send_all(input_events_stream);
-    let _ = rt.block_on(send).unwrap();
+    let _ = send.compat().await.unwrap();
 
     let output_events = test_util::receive_events(out_rx);
 
-    terminate_gracefully(rt, topology);
+    terminate_gracefully(topology).await;
 
     let output_events = output_events.wait();
     assert_eq!(expected_events_count, output_events.len());
@@ -123,8 +118,8 @@ fn test_buffering() {
     assert_eq!(input_events2, &output_events[num_events..]);
 }
 
-#[test]
-fn test_max_size() {
+#[tokio::test]
+async fn test_max_size() {
     test_util::trace_init();
 
     let data_dir = tempdir().unwrap();
@@ -160,14 +155,12 @@ fn test_max_size() {
         config
     };
 
-    let mut rt = test_util::runtime();
-
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
     let send = in_tx
         .sink_map_err(|err| panic!(err))
         .send_all(input_events_stream);
-    let _ = rt.block_on(send).unwrap();
+    let _ = send.compat().await.unwrap();
 
     // We need to wait for at least the source to process events.
     // This is to avoid a race after we send all events, at that point two things
@@ -183,7 +176,7 @@ fn test_max_size() {
     // But it should be shortly after source processing all of the events.
     std::thread::sleep(std::time::Duration::from_secs(1));
     // Simulate a crash.
-    terminate_abruptly(rt, topology);
+    terminate_abruptly(topology).await;
 
     // Then run vector again with a sink that accepts events now. It should
     // send all of the events from the first run that fit in the limited buffer
@@ -202,21 +195,19 @@ fn test_max_size() {
         config
     };
 
-    let mut rt = test_util::runtime();
-
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
     let output_events = test_util::receive_events(out_rx);
 
-    terminate_gracefully(rt, topology);
+    terminate_gracefully(topology).await;
 
     let output_events = output_events.wait();
     assert_eq!(num_events / 2, output_events.len());
     assert_eq!(&input_events[..num_events / 2], &output_events[..]);
 }
 
-#[test]
-fn test_max_size_resume() {
+#[tokio::test]
+async fn test_max_size_resume() {
     test_util::trace_init();
 
     let data_dir = tempdir().unwrap();
@@ -247,9 +238,7 @@ fn test_max_size_resume() {
     config.global.data_dir = Some(data_dir.clone());
 
     // Use a multi-thread runtime here.
-    let mut rt = runtime::Runtime::new().unwrap();
-
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
     // Send all of the input events _before_ the output sink is ready.
     // This causes the writers to stop writing to the on-disk buffer, and once
@@ -263,21 +252,21 @@ fn test_max_size_resume() {
     let send2 = in2_tx
         .sink_map_err(|err| panic!(err))
         .send_all(input_events_stream);
-    let _ = rt.block_on(send1.join(send2)).unwrap();
+    let _ = send1.join(send2).compat().await.unwrap();
 
     // Simulate a delay before enabling the sink as if sink server is going up.
     std::thread::sleep(std::time::Duration::from_millis(1000));
 
     let output_lines = test_util::receive(&out_addr);
 
-    terminate_gracefully(rt, topology);
+    terminate_gracefully(topology).await;
 
     let output_lines = output_lines.wait();
     assert_eq!(num_events * 2, output_lines.len());
 }
 
-#[test]
-fn test_reclaim_disk_space() {
+#[tokio::test]
+async fn test_reclaim_disk_space() {
     test_util::trace_init();
 
     let data_dir = tempdir().unwrap();
@@ -303,16 +292,14 @@ fn test_reclaim_disk_space() {
         config
     };
 
-    let mut rt = test_util::runtime();
-
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
     let (input_events, input_events_stream) =
         test_util::random_events_with_stream(line_length, num_events);
     let send = in_tx
         .sink_map_err(|err| panic!(err))
         .send_all(input_events_stream);
-    let _ = rt.block_on(send).unwrap();
+    let _ = send.compat().await.unwrap();
 
     // We need to wait for at least the source to process events.
     // This is to avoid a race after we send all events, at that point two things
@@ -328,7 +315,7 @@ fn test_reclaim_disk_space() {
     // But it should be shortly after source processing all of the events.
     std::thread::sleep(std::time::Duration::from_secs(1));
     // Simulate a crash.
-    terminate_abruptly(rt, topology);
+    terminate_abruptly(topology).await;
 
     let before_disk_size: u64 = compute_disk_size(&data_dir);
 
@@ -348,9 +335,7 @@ fn test_reclaim_disk_space() {
         config
     };
 
-    let mut rt = test_util::runtime();
-
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
     let (input_events2, input_events_stream) =
         test_util::random_events_with_stream(line_length, num_events);
@@ -358,11 +343,11 @@ fn test_reclaim_disk_space() {
     let send = in_tx
         .sink_map_err(|err| panic!(err))
         .send_all(input_events_stream);
-    let _ = rt.block_on(send).unwrap();
+    let _ = send.compat().await.unwrap();
 
     let output_events = test_util::receive_events(out_rx);
 
-    terminate_gracefully(rt, topology);
+    terminate_gracefully(topology).await;
 
     let output_events = output_events.wait();
     assert_eq!(num_events * 2, output_events.len());

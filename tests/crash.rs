@@ -1,13 +1,11 @@
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
+use futures::compat::Future01CompatExt;
 use futures01::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use vector::{
     shutdown::ShutdownSignal,
-    test_util::{
-        block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
-        wait_for_tcp,
-    },
+    test_util::{next_addr, random_lines, receive, send_lines, wait_for_tcp},
     topology::{
         self,
         config::{self, GlobalOptions, SinkContext},
@@ -52,8 +50,8 @@ impl Sink for PanicSink {
     }
 }
 
-#[test]
-fn test_sink_panic() {
+#[tokio::test]
+async fn test_sink_panic() {
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
@@ -71,26 +69,22 @@ fn test_sink_panic() {
     );
     config.add_sink("panic", &["in"], PanicSink);
 
-    let mut rt = runtime();
-
     let output_lines = receive(&out_addr);
     std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, crash) = topology::start(config, false).await.unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
-    let mut rt2 = runtime();
-    rt2.block_on(send).unwrap();
+    send.compat().await.unwrap();
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     let _ = std::panic::take_hook();
     assert!(crash.wait().next().is_some());
-    block_on(topology.stop()).unwrap();
+    topology.stop().compat().await.unwrap();
     std::thread::sleep(std::time::Duration::from_millis(100));
-    shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
     assert_eq!(num_lines, output_lines.len());
@@ -134,8 +128,8 @@ impl Sink for ErrorSink {
     }
 }
 
-#[test]
-fn test_sink_error() {
+#[tokio::test]
+async fn test_sink_error() {
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
@@ -153,25 +147,21 @@ fn test_sink_error() {
     );
     config.add_sink("error", &["in"], ErrorSink);
 
-    let mut rt = runtime();
-
     let output_lines = receive(&out_addr);
 
-    let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, crash) = topology::start(config, false).await.unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
-    let mut rt2 = runtime();
-    rt2.block_on(send).unwrap();
+    send.compat().await.unwrap();
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     assert!(crash.wait().next().is_some());
-    block_on(topology.stop()).unwrap();
+    topology.stop().compat().await.unwrap();
     std::thread::sleep(std::time::Duration::from_millis(100));
-    shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
     assert_eq!(num_lines, output_lines.len());
@@ -202,8 +192,8 @@ impl config::SourceConfig for ErrorSourceConfig {
     }
 }
 
-#[test]
-fn test_source_error() {
+#[tokio::test]
+async fn test_source_error() {
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
@@ -221,25 +211,21 @@ fn test_source_error() {
         sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
 
-    let mut rt = runtime();
-
     let output_lines = receive(&out_addr);
 
-    let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, crash) = topology::start(config, false).await.unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
-    let mut rt2 = runtime();
-    rt2.block_on(send).unwrap();
+    send.compat().await.unwrap();
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     assert!(crash.wait().next().is_some());
-    block_on(topology.stop()).unwrap();
+    topology.stop().compat().await.unwrap();
     std::thread::sleep(std::time::Duration::from_millis(100));
-    shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
     assert_eq!(num_lines, output_lines.len());
@@ -272,8 +258,8 @@ impl config::SourceConfig for PanicSourceConfig {
     }
 }
 
-#[test]
-fn test_source_panic() {
+#[tokio::test]
+async fn test_source_panic() {
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
@@ -291,27 +277,23 @@ fn test_source_panic() {
         sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
 
-    let mut rt = runtime();
-
     let output_lines = receive(&out_addr);
 
     std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, crash) = topology::start(config, false).await.unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
-    let mut rt2 = runtime();
-    rt2.block_on(send).unwrap();
+    send.compat().await.unwrap();
     std::thread::sleep(std::time::Duration::from_millis(100));
     let _ = std::panic::take_hook();
 
     assert!(crash.wait().next().is_some());
-    block_on(topology.stop()).unwrap();
+    topology.stop().compat().await.unwrap();
     std::thread::sleep(std::time::Duration::from_millis(100));
-    shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
     assert_eq!(num_lines, output_lines.len());

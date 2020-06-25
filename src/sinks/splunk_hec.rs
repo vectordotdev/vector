@@ -382,7 +382,7 @@ mod integration_tests {
     #[test]
     fn splunk_insert_message() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let config = config(Encoding::Text, vec![]);
         let (sink, _) = config.build(cx).unwrap();
@@ -415,7 +415,7 @@ mod integration_tests {
     #[test]
     fn splunk_insert_index() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let mut config = config(Encoding::Text, vec![]);
         config.index = Some("custom_index".to_string());
@@ -448,7 +448,7 @@ mod integration_tests {
     #[test]
     fn splunk_insert_many() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let config = config(Encoding::Text, vec![]);
         let (sink, _) = config.build(cx).unwrap();
@@ -482,7 +482,7 @@ mod integration_tests {
     #[test]
     fn splunk_custom_fields() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let indexed_fields = vec![Atom::from("asdf")];
         let config = config(Encoding::Json, indexed_fields);
@@ -516,7 +516,7 @@ mod integration_tests {
     #[test]
     fn splunk_hostname() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let indexed_fields = vec![Atom::from("asdf")];
         let config = config(Encoding::Json, indexed_fields);
@@ -553,7 +553,7 @@ mod integration_tests {
     #[test]
     fn splunk_sourcetype() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let indexed_fields = vec![Atom::from("asdf")];
         let config = config(Encoding::Json, indexed_fields);
@@ -592,7 +592,7 @@ mod integration_tests {
     #[test]
     fn splunk_configure_hostname() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let config = super::HecSinkConfig {
             host_key: "roast".into(),

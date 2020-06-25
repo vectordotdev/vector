@@ -311,7 +311,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let sink = KinesisFirehoseService::new(config, cx).unwrap();
 

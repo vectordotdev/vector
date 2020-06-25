@@ -613,7 +613,7 @@ mod integration_tests {
         };
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let (sink, _hc) = config.build(cx.clone()).unwrap();
 
         let mut input_event = Event::from("raw log line");
@@ -717,7 +717,7 @@ mod integration_tests {
         config.index = Some(index.clone());
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let (sink, healthcheck) = config.build(cx.clone()).expect("Building config failed");
 
         rt.block_on_std(async move {

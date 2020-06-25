@@ -80,11 +80,10 @@ mod test {
     use super::StatsdConfig;
     use crate::{
         sinks::prometheus::PrometheusSinkConfig,
-        test_util::{block_on, next_addr, runtime, shutdown_on_idle},
+        test_util::next_addr,
         topology::{self, config},
     };
-    use futures::{TryFutureExt, TryStreamExt};
-    use futures01::Stream;
+    use futures::StreamExt;
     use std::{thread, time::Duration};
 
     fn parse_count(lines: &Vec<&str>, prefix: &str) -> usize {
@@ -97,8 +96,8 @@ mod test {
             .unwrap()
     }
 
-    #[test]
-    fn test_statsd() {
+    #[tokio::test]
+    async fn test_statsd() {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
@@ -115,9 +114,7 @@ mod test {
             },
         );
 
-        let mut rt = runtime();
-
-        let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+        let (_topology, _crash) = topology::start(config, false).await.unwrap();
 
         let bind_addr = next_addr();
         let socket = std::net::UdpSocket::bind(&bind_addr).unwrap();
@@ -137,22 +134,17 @@ mod test {
         thread::sleep(Duration::from_millis(100));
 
         let client = hyper::Client::new();
-        let response = block_on(
-            client
-                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                .compat(),
-        )
-        .unwrap();
+        let response = client
+            .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+            .await
+            .unwrap();
         assert!(response.status().is_success());
 
-        let body = block_on(
-            response
-                .into_body()
-                .compat()
-                .map(|bytes| bytes.to_vec())
-                .concat2(),
-        )
-        .unwrap();
+        let body = response
+            .into_body()
+            .map(|bytes| bytes.unwrap().to_vec())
+            .concat()
+            .await;
         let lines = std::str::from_utf8(&body)
             .unwrap()
             .lines()
@@ -193,22 +185,17 @@ mod test {
             // Wait for flush to happen
             thread::sleep(Duration::from_millis(2000));
 
-            let response = block_on(
-                client
-                    .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                    .compat(),
-            )
-            .unwrap();
+            let response = client
+                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+                .await
+                .unwrap();
             assert!(response.status().is_success());
 
-            let body = block_on(
-                response
-                    .into_body()
-                    .compat()
-                    .map(|bytes| bytes.to_vec())
-                    .concat2(),
-            )
-            .unwrap();
+            let body = response
+                .into_body()
+                .map(|bytes| bytes.unwrap().to_vec())
+                .concat()
+                .await;
             let lines = std::str::from_utf8(&body)
                 .unwrap()
                 .lines()
@@ -225,22 +212,17 @@ mod test {
             // Give packets some time to flow through
             thread::sleep(Duration::from_millis(100));
 
-            let response = block_on(
-                client
-                    .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                    .compat(),
-            )
-            .unwrap();
+            let response = client
+                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+                .await
+                .unwrap();
             assert!(response.status().is_success());
 
-            let body = block_on(
-                response
-                    .into_body()
-                    .compat()
-                    .map(|bytes| bytes.to_vec())
-                    .concat2(),
-            )
-            .unwrap();
+            let body = response
+                .into_body()
+                .map(|bytes| bytes.unwrap().to_vec())
+                .concat()
+                .await;
             let lines = std::str::from_utf8(&body)
                 .unwrap()
                 .lines()
@@ -249,9 +231,5 @@ mod test {
             // Set test
             assert_eq!(parse_count(&lines, "vector_set"), 2);
         }
-
-        // Shut down server
-        block_on(topology.stop()).unwrap();
-        shutdown_on_idle(rt);
     }
 }

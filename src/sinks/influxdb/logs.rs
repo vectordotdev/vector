@@ -603,7 +603,7 @@ mod integration_tests {
         let ns = format!("ns-{}", Utc::now().timestamp_nanos());
 
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let config = InfluxDBLogsConfig {
             namespace: ns.clone(),

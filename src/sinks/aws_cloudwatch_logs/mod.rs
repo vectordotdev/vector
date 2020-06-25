@@ -863,7 +863,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -920,7 +920,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
 
         let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
@@ -995,7 +995,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
 
         let now = chrono::Utc::now();
 
@@ -1076,7 +1076,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -1137,7 +1137,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -1197,7 +1197,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
 
         let timestamp = chrono::Utc::now();
 
