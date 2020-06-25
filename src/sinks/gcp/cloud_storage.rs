@@ -226,7 +226,7 @@ impl GcsSink {
 
     async fn healthcheck(mut self) -> crate::Result<()> {
         let uri = self.base_url.parse::<Uri>()?;
-        let mut request = http::Request::get(uri).body(Body::empty())?;
+        let mut request = http::Request::head(uri).body(Body::empty())?;
 
         if let Some(creds) = self.creds.as_ref() {
             creds.apply(&mut request);
