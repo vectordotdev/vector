@@ -14,7 +14,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
-use http02::{uri::InvalidUri, Request, StatusCode, Uri};
+use http::{uri::InvalidUri, Request, StatusCode, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -184,7 +184,7 @@ async fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result
 
     match response.status() {
         StatusCode::OK => Ok(()),
-        other => Err(super::HealthcheckError::UnexpectedStatus2 { status: other }.into()),
+        other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }
 
@@ -377,7 +377,7 @@ mod tests {
     use crate::test_util::runtime;
     use chrono::offset::TimeZone;
     use chrono::Utc;
-    use http02::{Method, Uri};
+    use http::{Method, Uri};
     use pretty_assertions::assert_eq;
     use std::sync::atomic::AtomicI64;
 

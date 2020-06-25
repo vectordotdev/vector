@@ -535,7 +535,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
                 RusotoError::Unknown(res)
                     if res.status.is_server_error()
-                        || res.status == http02::StatusCode::TOO_MANY_REQUESTS =>
+                        || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
                 {
                     let BufferedHttpResponse { status, body, .. } = res;
                     let body = String::from_utf8_lossy(&body[..]);
@@ -564,7 +564,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
                 RusotoError::Unknown(res)
                     if res.status.is_server_error()
-                        || res.status == http02::StatusCode::TOO_MANY_REQUESTS =>
+                        || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
                 {
                     let BufferedHttpResponse { status, body, .. } = res;
                     let body = String::from_utf8_lossy(&body[..]);
@@ -590,7 +590,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
                 RusotoError::Unknown(res)
                     if res.status.is_server_error()
-                        || res.status == http02::StatusCode::TOO_MANY_REQUESTS =>
+                        || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
                 {
                     let BufferedHttpResponse { status, body, .. } = res;
                     let body = String::from_utf8_lossy(&body[..]);

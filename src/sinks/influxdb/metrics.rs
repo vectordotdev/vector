@@ -121,7 +121,7 @@ impl InfluxDBSvc {
 }
 
 impl Service<Vec<Metric>> for InfluxDBSvc {
-    type Response = http02::Response<bytes05::Bytes>;
+    type Response = http::Response<bytes05::Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -138,7 +138,7 @@ impl Service<Vec<Metric>> for InfluxDBSvc {
 }
 
 fn create_build_request(
-    uri: http02::Uri,
+    uri: http::Uri,
     token: String,
 ) -> impl Fn(Vec<u8>) -> BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>> + Sync + Send + 'static
 {

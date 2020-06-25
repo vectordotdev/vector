@@ -12,8 +12,8 @@ use crate::{
 use bytes05::{Buf, Bytes};
 use futures::future::BoxFuture;
 use futures01::{Async, AsyncSink, Poll as Poll01, Sink, StartSend};
-use http02::header::HeaderValue;
-use http02::{Request, StatusCode};
+use http::header::HeaderValue;
+use http::{Request, StatusCode};
 use hyper::body::{self, Body, HttpBody};
 use hyper::client::HttpConnector;
 use hyper::Client;
@@ -29,7 +29,7 @@ use tower03::Service;
 use tracing::Span;
 use tracing_futures::Instrument;
 
-pub type HttpClientFuture = <HttpClient as Service<http02::Request<Body>>>::Future;
+pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
 
 #[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
@@ -37,7 +37,7 @@ pub trait HttpSink: Send + Sync + 'static {
     type Output;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input>;
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http02::Request<Vec<u8>>>;
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>>;
 }
 
 /// Provides a simple wrapper around internal tower and
@@ -57,7 +57,7 @@ pub struct BatchedHttpSink<T, B, L = HttpRetryLogic>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
-    L: RetryLogic<Response = http02::Response<Bytes>> + Send + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     sink: Arc<T>,
     inner: TowerBatchedSink<
@@ -102,7 +102,7 @@ impl<T, B, L> BatchedHttpSink<T, B, L>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
-    L: RetryLogic<Response = http02::Response<Bytes>, Error = hyper::Error> + Send + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>, Error = hyper::Error> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn with_retry_logic(
@@ -118,7 +118,7 @@ where
 
         let sink1 = Arc::clone(&sink);
         let request_builder =
-            move |b| -> BoxFuture<'static, crate::Result<http02::Request<Vec<u8>>>> {
+            move |b| -> BoxFuture<'static, crate::Result<http::Request<Vec<u8>>>> {
                 let sink = Arc::clone(&sink1);
                 Box::pin(async move { sink.build_request(b).await })
             };
@@ -139,7 +139,7 @@ where
     B: Batch,
     B::Output: Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
-    L: RetryLogic<Response = http02::Response<Bytes>> + Send + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     type SinkItem = crate::Event;
     type SinkError = crate::Error;
@@ -219,7 +219,7 @@ where
         })
     }
 
-    pub async fn send(&mut self, request: Request<B>) -> crate::Result<http02::Response<Body>> {
+    pub async fn send(&mut self, request: Request<B>) -> crate::Result<http::Response<Body>> {
         self.call(request).await.map_err(Into::into)
     }
 }
@@ -230,7 +230,7 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error>,
 {
-    type Response = http02::Response<Body>;
+    type Response = http::Response<Body>;
     type Error = hyper::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -311,7 +311,7 @@ where
     F: Future<Output = crate::Result<hyper::Request<Vec<u8>>>> + Send + 'static,
     B: Send + 'static,
 {
-    type Response = http02::Response<Bytes>;
+    type Response = http::Response<Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -342,7 +342,7 @@ impl<F, B> Clone for HttpBatchService<F, B> {
     }
 }
 
-impl<T: fmt::Debug> sink::Response for http02::Response<T> {
+impl<T: fmt::Debug> sink::Response for http::Response<T> {
     fn is_successful(&self) -> bool {
         self.status().is_success()
     }
@@ -407,7 +407,6 @@ mod test {
     use bytes05::Buf;
     use futures::future::ready;
     use futures01::{Future, Stream};
-    use http02::Method;
     use hyper::service::{make_service_fn, service_fn};
     use hyper::{Body, Response, Server, Uri};
     use tower03::Service;
@@ -443,11 +442,7 @@ mod test {
         let request = b"hello".to_vec();
         let mut service = HttpBatchService::new(resolver, None, move |body: Vec<u8>| {
             Box::pin(ready(
-                Request::builder()
-                    .method(Method::POST)
-                    .uri(uri.clone())
-                    .body(body.into())
-                    .map_err(Into::into),
+                Request::post(&uri).body(body.into()).map_err(Into::into),
             ))
         });
 

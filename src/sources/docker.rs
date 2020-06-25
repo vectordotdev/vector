@@ -11,7 +11,7 @@ use futures01::{
     sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     Async, Future, Sink, Stream,
 };
-use http::StatusCode;
+use http01::StatusCode;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use shiplift::{

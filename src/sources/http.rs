@@ -208,7 +208,7 @@ mod tests {
         topology::config::{GlobalOptions, SourceConfig},
     };
     use futures01::sync::mpsc;
-    use http::{HeaderMap, Method};
+    use http01::{HeaderMap, Method};
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
     use string_cache::DefaultAtom as Atom;
@@ -241,7 +241,7 @@ mod tests {
 
     fn send(address: SocketAddr, body: &str) -> u16 {
         reqwest::Client::new()
-            .request(Method::POST, &format!("http://{}/", address))
+            .post(&format!("http://{}/", address))
             .body(body.to_owned())
             .send()
             .unwrap()

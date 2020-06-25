@@ -19,7 +19,7 @@ use bytes05::Bytes;
 use chrono::Utc;
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
-use http02::StatusCode;
+use http::StatusCode;
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{
