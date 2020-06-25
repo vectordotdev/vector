@@ -22,7 +22,7 @@ use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use snafu::{ResultExt, Snafu};
 use std::{
-    io,
+    fmt, io,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
@@ -48,6 +48,20 @@ pub enum AwsCredentialsProvider {
     Default(AutoRefreshingProvider<ChainProvider>),
     Role(AutoRefreshingProvider<StsAssumeRoleSessionCredentialsProvider>),
     Static(StaticProvider),
+}
+
+impl fmt::Debug for AwsCredentialsProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::Default(_) => "default",
+            Self::Role(_) => "role",
+            Self::Static(_) => "static",
+        };
+
+        f.debug_tuple("AwsCredentialsProvider")
+            .field(&name)
+            .finish()
+    }
 }
 
 impl AwsCredentialsProvider {
