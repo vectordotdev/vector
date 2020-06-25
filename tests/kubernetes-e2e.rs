@@ -162,7 +162,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
 
     let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=30s"])
         .await?;
 
     let test_namespace = framework.namespace("test-vector-test-pod").await?;
@@ -230,7 +230,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
 
     let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=30s"])
         .await?;
 
     let test_namespace = framework.namespace("test-vector-test-pod").await?;
@@ -321,7 +321,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
 
     let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=30s"])
         .await?;
 
     let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
@@ -370,7 +370,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
 
     let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=30s"])
         .await?;
 
     let test_namespace = framework.namespace("test-vector-test-pod").await?;
@@ -440,7 +440,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
 
     let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=30s"])
         .await?;
 
     let test_namespace = framework.namespace("test-vector-test-pod").await?;
@@ -516,7 +516,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 
     let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=30s"])
         .await?;
 
     let test_namespace = framework.namespace("test-vector-test-pod").await?;
@@ -649,7 +649,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
 
     let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=10s"])
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=30s"])
         .await?;
 
     const NS_PREFIX: &str = "test-vector-test-pod";
