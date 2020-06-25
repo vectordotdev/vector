@@ -19,8 +19,8 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::TryFutureExt;
-use futures01::{stream::iter_ok, Future, Sink};
+use futures::{FutureExt, TryFutureExt};
+use futures01::{stream::iter_ok, Sink};
 use http::{StatusCode, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
@@ -152,11 +152,11 @@ inventory::submit! {
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let mut sink = GcsSink::new(self, &cx)?;
-        let healthcheck = sink.healthcheck()?;
+        let sink = GcsSink::new(self, &cx)?;
+        let healthcheck = sink.clone().healthcheck().boxed().compat();
         let service = sink.service(self, &cx)?;
 
-        Ok((service, healthcheck))
+        Ok((service, Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -224,29 +224,19 @@ impl GcsSink {
         Ok(Box::new(sink))
     }
 
-    fn healthcheck(&mut self) -> crate::Result<Healthcheck> {
+    async fn healthcheck(mut self) -> crate::Result<()> {
         let uri = self.base_url.parse::<Uri>()?;
-        let builder = Request::head(uri);
+        let mut request = http::Request::get(uri).body(Body::empty())?;
 
-        let mut request = builder.body(Body::empty()).unwrap();
-        if let Some(creds) = &self.creds {
+        if let Some(creds) = self.creds.as_ref() {
             creds.apply(&mut request);
         }
 
-        let healthcheck = self
-            .client
-            .call(request)
-            .compat()
-            .map_err(Into::into)
-            .and_then(healthcheck_response(
-                self.creds.clone(),
-                GcsError::BucketNotFound {
-                    bucket: self.bucket.clone(),
-                }
-                .into(),
-            ));
+        let bucket = self.bucket;
+        let not_found_error = GcsError::BucketNotFound { bucket }.into();
 
-        Ok(Box::new(healthcheck))
+        let response = self.client.send(request).await?;
+        healthcheck_response(self.creds, not_found_error)(response)
     }
 }
 

@@ -1,4 +1,4 @@
-use super::{healthcheck_response2, GcpAuthConfig, GcpCredentials, Scope};
+use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::Event,
     sinks::{
@@ -165,7 +165,7 @@ impl HttpSink for PubsubSink {
 
         let mut request = builder.body(body).unwrap();
         if let Some(creds) = &self.creds {
-            creds.apply2(&mut request);
+            creds.apply(&mut request);
         }
 
         Ok(request)
@@ -180,12 +180,12 @@ async fn healthcheck(
 ) -> crate::Result<()> {
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
     if let Some(creds) = creds.as_ref() {
-        creds.apply2(&mut request);
+        creds.apply(&mut request);
     }
 
     let mut client = HttpClient::new(cx.resolver(), tls.clone())?;
     let response = client.send(request).await?;
-    healthcheck_response2(creds, HealthcheckError::TopicNotFound.into())(response)
+    healthcheck_response(creds, HealthcheckError::TopicNotFound.into())(response)
 }
 
 #[cfg(test)]

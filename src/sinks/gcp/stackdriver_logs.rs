@@ -1,4 +1,4 @@
-use super::{healthcheck_response2, GcpAuthConfig, GcpCredentials, Scope};
+use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::{Event, Value},
     sinks::{
@@ -196,7 +196,7 @@ impl HttpSink for StackdriverSink {
             .unwrap();
 
         if let Some(creds) = &self.creds {
-            creds.apply2(&mut request);
+            creds.apply(&mut request);
         }
 
         Ok(request)
@@ -252,7 +252,7 @@ async fn healthcheck(
 
     let mut client = HttpClient::new(cx.resolver(), tls)?;
     let response = client.send(request).await?;
-    healthcheck_response2(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
+    healthcheck_response(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
 }
 
 impl StackdriverConfig {
