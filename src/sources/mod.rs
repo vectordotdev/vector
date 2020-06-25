@@ -40,5 +40,5 @@ pub type Source = Box<dyn Future<Item = (), Error = ()> + Send>;
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("URI parse error: {}", source))]
-    UriParseError { source: ::http::uri::InvalidUri },
+    UriParseError { source: ::http02::uri::InvalidUri },
 }

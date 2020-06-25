@@ -85,7 +85,5 @@ pub enum BuildError {
 #[derive(Debug, Snafu)]
 pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
-    UnexpectedStatus { status: ::http::StatusCode },
-    #[snafu(display("Unexpected status: {}", status))]
     UnexpectedStatus2 { status: ::http02::StatusCode },
 }

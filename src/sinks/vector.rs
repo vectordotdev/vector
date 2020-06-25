@@ -40,7 +40,7 @@ inventory::submit! {
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let uri = self.address.parse::<http::Uri>()?;
+        let uri = self.address.parse::<http02::Uri>()?;
 
         let host = uri.host().ok_or(BuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(BuildError::MissingPort)?;

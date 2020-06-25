@@ -174,8 +174,6 @@ enum HealthcheckError {
     InvalidCredentials,
     #[snafu(display("Unknown bucket: {:?}", bucket))]
     UnknownBucket { bucket: String },
-    #[snafu(display("Unknown status code: {}", status))]
-    UnknownStatus { status: http::StatusCode },
     #[snafu(display("key_prefix template parse error: {}", source))]
     KeyPrefixTemplate { source: TemplateError },
 }

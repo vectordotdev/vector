@@ -164,7 +164,6 @@ mod tests {
     };
     use chrono::{DateTime, Utc};
     use futures01::sync::mpsc;
-    use http::Method;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
 
@@ -188,7 +187,7 @@ mod tests {
     fn send(address: SocketAddr, body: &str) -> u16 {
         let len = body.lines().count();
         reqwest::Client::new()
-            .request(Method::POST, &format!("http://{}/events", address))
+            .post(&format!("http://{}/events", address))
             .header("Logplex-Msg-Count", len)
             .header("Logplex-Frame-Id", "frame-foo")
             .header("Logplex-Drain-Token", "drain-bar")

@@ -44,7 +44,7 @@ impl TcpSinkConfig {
     }
 
     pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let uri = self.address.parse::<http::Uri>()?;
+        let uri = self.address.parse::<http02::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
