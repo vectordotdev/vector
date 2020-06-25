@@ -78,12 +78,12 @@ pub enum BuildError {
     #[snafu(display("Socket address problem: {}", source))]
     SocketAddressError { source: std::io::Error },
     #[snafu(display("URI parse error: {}", source))]
-    UriParseError { source: ::http02::uri::InvalidUri },
+    UriParseError { source: ::http::uri::InvalidUri },
 }
 
 /// Common healthcheck errors
 #[derive(Debug, Snafu)]
 pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
-    UnexpectedStatus2 { status: ::http02::StatusCode },
+    UnexpectedStatus { status: ::http::StatusCode },
 }

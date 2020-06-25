@@ -11,7 +11,7 @@ use crate::{
 };
 use futures::TryFutureExt;
 use futures01::Sink;
-use http02::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -89,7 +89,7 @@ impl HttpSink for HoneycombConfig {
         }))
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http02::Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let uri = self.build_uri();
         let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
 
@@ -103,7 +103,7 @@ impl HoneycombConfig {
     fn build_uri(&self) -> Uri {
         let uri = format!("{}/{}", HOST.clone(), self.dataset);
 
-        uri.parse::<http02::Uri>()
+        uri.parse::<http::Uri>()
             .expect("This should be a valid uri")
     }
 }

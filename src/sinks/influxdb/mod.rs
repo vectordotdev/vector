@@ -7,7 +7,7 @@ use crate::{dns::Resolver, sinks::util::http::HttpClient};
 use chrono::{DateTime, Utc};
 use futures::TryFutureExt;
 use futures01::Future;
-use http02::{StatusCode, Uri};
+use http::{StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use snafu::Snafu;
@@ -174,7 +174,7 @@ fn healthcheck(
         .and_then(|response| match response.status() {
             StatusCode::OK => Ok(()),
             StatusCode::NO_CONTENT => Ok(()),
-            other => Err(super::HealthcheckError::UnexpectedStatus2 { status: other }.into()),
+            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
         });
 
     Ok(Box::new(healthcheck))
@@ -404,7 +404,8 @@ pub mod test_util {
         let status = res.status();
 
         assert!(
-            status == http::StatusCode::CREATED || status == http::StatusCode::UNPROCESSABLE_ENTITY,
+            status == http01::StatusCode::CREATED
+                || status == http01::StatusCode::UNPROCESSABLE_ENTITY,
             format!("UnexpectedStatus: {}", status)
         );
     }

@@ -12,7 +12,7 @@ use crate::{
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
-use http02::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::SystemTime;
@@ -133,7 +133,7 @@ impl HttpSink for LogdnaConfig {
         Some(map.into())
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http02::Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let mut query = url::form_urlencoded::Serializer::new(String::new());
 
         let now = SystemTime::now()
@@ -190,7 +190,7 @@ impl LogdnaConfig {
 
         let uri = format!("{}{}?{}", host, PATH, query);
 
-        uri.parse::<http02::Uri>()
+        uri.parse::<http::Uri>()
             .expect("This should be a valid uri")
     }
 }
@@ -275,7 +275,7 @@ mod tests {
         let addr = test_util::next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        let host = format!("http://{}", addr).parse::<http02::Uri>().unwrap();
+        let host = format!("http://{}", addr).parse::<http::Uri>().unwrap();
         config.host = Some(host.into());
 
         let (sink, _) = config.build(cx).unwrap();

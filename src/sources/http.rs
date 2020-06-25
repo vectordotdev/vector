@@ -208,7 +208,7 @@ mod tests {
         topology::config::{GlobalOptions, SourceConfig},
     };
     use futures01::sync::mpsc;
-    use http::{HeaderMap, Method};
+    use http01::{HeaderMap, Method};
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
     use string_cache::DefaultAtom as Atom;

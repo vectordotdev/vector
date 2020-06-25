@@ -7,7 +7,7 @@ use crate::{
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use http02::Uri;
+use http::Uri;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -266,7 +266,7 @@ mod tests {
         nr_config.license_key = Some("foo".to_owned());
         let mut http_config = nr_config.create_config().unwrap();
         http_config.uri = format!("http://{}/fake_nr", in_addr)
-            .parse::<http02::Uri>()
+            .parse::<http::Uri>()
             .unwrap()
             .into();
 

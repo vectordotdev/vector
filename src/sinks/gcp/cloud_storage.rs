@@ -21,7 +21,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::TryFutureExt;
 use futures01::{stream::iter_ok, Future, Sink};
-use http02::{Method, StatusCode, Uri};
+use http::{Method, StatusCode, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
     Body, Request, Response,

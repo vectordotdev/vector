@@ -39,7 +39,7 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
     ) -> crate::Result<super::Source> {
         let mut urls = Vec::new();
         for host in self.hosts.iter() {
-            let base_uri = host.parse::<http02::Uri>().context(super::UriParseError)?;
+            let base_uri = host.parse::<http::Uri>().context(super::UriParseError)?;
             urls.push(format!("{}metrics", base_uri));
         }
         Ok(prometheus(urls, self.scrape_interval_secs, shutdown, out))

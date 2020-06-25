@@ -19,7 +19,7 @@ use crate::{
 use bytes05::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
-use http02::{
+use http::{
     header::{HeaderName, HeaderValue},
     uri::InvalidUri,
     Request, StatusCode, Uri,
@@ -204,7 +204,7 @@ impl HttpSink for ElasticSearchCommon {
         Some(body)
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http02::Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let mut builder = Request::post(&self.bulk_uri);
 
         if let Some(credentials) = &self.credentials {
@@ -466,15 +466,15 @@ async fn healthcheck(resolver: Resolver, common: ElasticSearchCommon) -> crate::
 
     match response.status() {
         StatusCode::OK => Ok(()),
-        status => Err(super::HealthcheckError::UnexpectedStatus2 { status }.into()),
+        status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
     }
 }
 
 fn finish_signer(
     signer: &mut SignedRequest,
     credentials: &AwsCredentials,
-    mut builder: http02::request::Builder,
-) -> http02::request::Builder {
+    mut builder: http::request::Builder,
+) -> http::request::Builder {
     signer.sign(&credentials);
 
     for (name, values) in signer.headers() {
@@ -505,7 +505,7 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
 mod tests {
     use super::*;
     use crate::{sinks::util::retries2::RetryAction, Event};
-    use http02::{Response, StatusCode};
+    use http::{Response, StatusCode};
     use serde_json::json;
     use string_cache::DefaultAtom as Atom;
 
@@ -575,7 +575,7 @@ mod integration_tests {
     };
     use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
-    use http02::{Request, StatusCode};
+    use http::{Request, StatusCode};
     use hyper::Body;
     use serde_json::{json, Value};
     use std::fs::File;
@@ -805,7 +805,7 @@ mod integration_tests {
         let response = client.send(request).await?;
         match response.status() {
             StatusCode::OK => Ok(()),
-            status => Err(super::super::HealthcheckError::UnexpectedStatus2 { status }.into()),
+            status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
         }
     }
 

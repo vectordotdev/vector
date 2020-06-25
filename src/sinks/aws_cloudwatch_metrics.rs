@@ -242,7 +242,7 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
             RusotoError::Service(PutMetricDataError::InternalServiceFault(_)) => true,
             RusotoError::Unknown(res)
                 if res.status.is_server_error()
-                    || res.status == http02::StatusCode::TOO_MANY_REQUESTS =>
+                    || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
             {
                 true
             }

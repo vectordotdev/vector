@@ -12,7 +12,7 @@ use crate::{
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::{future, Sink};
-use http02::{
+use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Request, StatusCode, Uri,
 };
@@ -193,7 +193,7 @@ impl HttpSink for HttpSinkConfig {
     async fn build_request(
         &self,
         mut body: Self::Output,
-    ) -> crate::Result<http02::Request<Vec<u8>>> {
+    ) -> crate::Result<http::Request<Vec<u8>>> {
         let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
             HttpMethod::Post => Method::POST,
             HttpMethod::Put => Method::PUT,
@@ -254,7 +254,7 @@ async fn healthcheck(
 
     match response.status() {
         StatusCode::OK => Ok(()),
-        status => Err(super::HealthcheckError::UnexpectedStatus2 { status }.into()),
+        status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
     }
 }
 

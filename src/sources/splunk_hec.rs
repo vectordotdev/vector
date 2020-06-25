@@ -12,7 +12,7 @@ use futures::{
     FutureExt, TryFutureExt, TryStreamExt,
 };
 use futures01::{sync::mpsc, Async, Future, Sink, Stream};
-use http02::StatusCode;
+use http::StatusCode;
 use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
 use serde_json::{de::IoRead, json, Deserializer, Value as JsonValue};
@@ -746,7 +746,7 @@ mod tests {
     };
     use chrono::{TimeZone, Utc};
     use futures01::{stream, sync::mpsc, Sink};
-    use http::Method;
+    use http01::Method;
     use std::net::SocketAddr;
 
     /// Splunk token
