@@ -252,6 +252,14 @@ If not specified, files will not be removed.\
 """
 warnings = [{visibility_level = "option", text = "Vector's process must have permission to delete files."}]
 
+[sources.file.options.skip_first_lines]
+type = "uint"
+common = false
+default = 0
+description = """\
+Number of first lines per file that should be skipped.\
+"""
+
 [sources.file.fields.log.fields.file]
 type = "string"
 examples = ["/var/log/nginx.log"]
