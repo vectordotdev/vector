@@ -46,12 +46,12 @@ impl InternalEvent for StateResynced {
 
 impl InternalEvent for StateMaintenanceRequested {
     fn emit_metrics(&self) {
-        counter!("k8s_state_ops", 1, "op_kind" => "maintenace_requested");
+        counter!("k8s_state_ops", 1, "op_kind" => "maintenance_requested");
     }
 }
 
 impl InternalEvent for StateMaintenancePerformed {
     fn emit_metrics(&self) {
-        counter!("k8s_state_ops", 1, "op_kind" => "maintenace_performed");
+        counter!("k8s_state_ops", 1, "op_kind" => "maintenance_performed");
     }
 }
