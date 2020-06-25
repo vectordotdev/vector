@@ -92,6 +92,7 @@ pub struct FileConfig {
     pub multiline: Option<MultilineConfig>,
     pub max_read_bytes: usize,
     pub oldest_first: bool,
+    pub remove_after: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -181,6 +182,7 @@ impl Default for FileConfig {
             multiline: None,
             max_read_bytes: 2048,
             oldest_first: false,
+            remove_after: None,
         }
     }
 }
@@ -248,6 +250,7 @@ pub fn file_source(
         glob_minimum_cooldown,
         fingerprinter: config.fingerprinting.clone().into(),
         oldest_first: config.oldest_first,
+        remove_after: config.remove_after.map(Duration::from_secs),
     };
 
     let file_key = config.file_key.clone();
