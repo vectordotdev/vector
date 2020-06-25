@@ -5,9 +5,12 @@ pub struct DnstapEventSchema {
     pub dnstap_message_schema: DnstapMessageSchema,
     pub dns_query_message_schema: DnsQueryMessageSchema,
     pub dns_query_header_schema: DnsQueryHeaderSchema,
+    pub dns_update_message_schema: DnsUpdateMessageSchema,
+    pub dns_update_header_schema: DnsUpdateHeaderSchema,
     pub dns_message_opt_pseudo_section_schema: DnsMessageOptPseudoSectionSchema,
     pub dns_message_option_schema: DnsMessageOptionSchema,
     pub dns_record_schema: DnsRecordSchema,
+    pub dns_update_zone_info_schema: DnsUpdateZoneInfoSchema,
 }
 
 impl DnstapEventSchema {
@@ -17,9 +20,12 @@ impl DnstapEventSchema {
             dnstap_message_schema: DnstapMessageSchema::default(),
             dns_query_message_schema: DnsQueryMessageSchema::default(),
             dns_query_header_schema: DnsQueryHeaderSchema::default(),
+            dns_update_message_schema: DnsUpdateMessageSchema::default(),
+            dns_update_header_schema: DnsUpdateHeaderSchema::default(),
             dns_message_opt_pseudo_section_schema: DnsMessageOptPseudoSectionSchema::default(),
             dns_message_option_schema: DnsMessageOptionSchema::default(),
             dns_record_schema: DnsRecordSchema::default(),
+            dns_update_zone_info_schema: DnsUpdateZoneInfoSchema::default(),
         }
     }
 }
@@ -45,7 +51,7 @@ impl Default for DnstapRootDataSchema {
             extra: String::from("extraInfo"),
             data_type: String::from("type"),
             timestamp: String::from("time"),
-            time_precision: String::from("time_precision"),
+            time_precision: String::from("timePrecision"),
             error: String::from("error"),
             raw_data: String::from("rawData"),
         }
@@ -63,23 +69,29 @@ pub struct DnstapMessageSchema {
     pub response_port: String,
     pub query_zone: String,
     pub dnstap_message_type: String,
+    pub dnstap_message_type_id: String,
     pub query_message: String,
     pub response_message: String,
+    pub update_request_message: String,
+    pub update_response_message: String,
 }
 
 impl Default for DnstapMessageSchema {
     fn default() -> Self {
         Self {
-            socket_family: String::from("data.socketFamily"),
-            socket_protocol: String::from("data.socketProtocol"),
-            query_address: String::from("data.sourceAddress"),
-            query_port: String::from("data.sourcePport"),
-            response_address: String::from("data.responseAddress"),
-            response_port: String::from("data.responsePort"),
-            query_zone: String::from("data.queryZone"),
+            socket_family: String::from("socketFamily"),
+            socket_protocol: String::from("socketProtocol"),
+            query_address: String::from("sourceAddress"),
+            query_port: String::from("sourcePort"),
+            response_address: String::from("responseAddress"),
+            response_port: String::from("responsePort"),
+            query_zone: String::from("queryZone"),
             dnstap_message_type: String::from("data.type"),
+            dnstap_message_type_id: String::from("data.typeId"),
             query_message: String::from("data.requestData"),
             response_message: String::from("data.responseData"),
+            update_request_message: String::from("data.updateRequestData"),
+            update_response_message: String::from("data.udpateResponseData"),
         }
     }
 }
@@ -103,7 +115,7 @@ pub struct DnsQueryMessageSchema {
 impl Default for DnsQueryMessageSchema {
     fn default() -> Self {
         Self {
-            response_code: String::from("responseCode"),
+            response_code: String::from("fullRcode"),
             response: String::from("rcodeName"),
             timestamp: String::from("time"),
             time_precision: String::from("timePrecision"),
@@ -154,6 +166,68 @@ impl Default for DnsQueryHeaderSchema {
             answer_count: String::from("anCount"),
             authority_count: String::from("nsCount"),
             additional_count: String::from("arCount"),
+        }
+    }
+}
+
+#[readonly::make]
+#[derive(Debug, Clone)]
+pub struct DnsUpdateMessageSchema {
+    pub response_code: String,
+    pub response: String,
+    pub timestamp: String,
+    pub time_precision: String,
+    pub raw_data: String,
+    pub header: String,
+    pub zone_section: String,
+    pub prerequisite_section: String,
+    pub update_section: String,
+    pub additional_section: String,
+    pub opt_pseudo_section: String,
+}
+
+impl Default for DnsUpdateMessageSchema {
+    fn default() -> Self {
+        Self {
+            response_code: String::from("fullRcode"),
+            response: String::from("rcodeName"),
+            timestamp: String::from("time"),
+            time_precision: String::from("timePrecision"),
+            raw_data: String::from("rawData"),
+            header: String::from("header"),
+            zone_section: String::from("zone"),
+            prerequisite_section: String::from("prerequisite"),
+            update_section: String::from("update"),
+            additional_section: String::from("additional"),
+            opt_pseudo_section: String::from("opt"),
+        }
+    }
+}
+
+#[readonly::make]
+#[derive(Debug, Clone)]
+pub struct DnsUpdateHeaderSchema {
+    pub id: String,
+    pub opcode: String,
+    pub rcode: String,
+    pub qr: String,
+    pub zone_count: String,
+    pub prerequisite_count: String,
+    pub udpate_count: String,
+    pub additional_count: String,
+}
+
+impl Default for DnsUpdateHeaderSchema {
+    fn default() -> Self {
+        Self {
+            id: String::from("id"),
+            opcode: String::from("opcode"),
+            rcode: String::from("rcode"),
+            qr: String::from("qr"),
+            zone_count: String::from("zoCount"),
+            prerequisite_count: String::from("prCount"),
+            udpate_count: String::from("upCount"),
+            additional_count: String::from("adCount"),
         }
     }
 }
@@ -220,6 +294,26 @@ impl Default for DnsRecordSchema {
             class: String::from("class"),
             rdata: String::from("rData"),
             rdata_bytes: String::from("rDataBytes"),
+        }
+    }
+}
+
+#[readonly::make]
+#[derive(Debug, Clone)]
+pub struct DnsUpdateZoneInfoSchema {
+    pub name: String,
+    pub class: String,
+    pub record_type: String,
+    pub record_type_id: String,
+}
+
+impl Default for DnsUpdateZoneInfoSchema {
+    fn default() -> Self {
+        Self {
+            name: String::from("zName"),
+            class: String::from("zClass"),
+            record_type: String::from("zType"),
+            record_type_id: String::from("zTypeId"),
         }
     }
 }

@@ -251,7 +251,7 @@ zstd = { version = "0.6", default-features = false }
 cfg-if = { version = "1.0.0", default-features = false }
 tonic = { version = "0.4", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 thiserror = "1.0"
-readonly = "0.1"
+readonly = { version = "0.1", optional = true }
 
 # For WASM
 async-stream = "0.3.2"
@@ -410,7 +410,7 @@ sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
 sources-datadog = ["sources-utils-http"]
-sources-dnstap = ["bytesize", "listenfd", "tokio-uds", "sources-tls"]
+sources-dnstap = ["bytesize", "listenfd", "tokio-uds", "sources-tls", "base64", "readonly"]
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-exec = []
 sources-file = ["bytesize", "file-source"]

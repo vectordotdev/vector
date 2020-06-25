@@ -1,9 +1,8 @@
-extern crate base64;
 use super::dns_message::{
-    DnsQueryMessage, DnsRecord, EdnsOptionEntry, OptPseudoSection, QueryHeader, QueryQuestion,
+    DnsQueryMessage, DnsRecord, DnsUpdateMessage, EdnsOptionEntry, OptPseudoSection, QueryHeader,
+    QueryQuestion, UpdateHeader, ZoneInfo,
 };
-use thiserror::Error as ThisError;
-#[cfg(unix)]
+use snafu::Snafu;
 use trust_dns_proto::{
     error::ProtoError,
     op::{message::Message as TrustDnsMessage, Edns, Query},
@@ -17,12 +16,12 @@ use trust_dns_proto::{
     serialize::binary::BinDecoder,
 };
 
-#[derive(ThisError, Debug)]
+#[derive(Debug, Snafu)]
 pub enum DnsMessageParserError {
-    #[error("Encountered error : {0}")]
-    SimpleError(String),
-    #[error("Encountered error from TrustDns: {0}")]
-    TrustDnsError(ProtoError),
+    #[snafu(display("Encountered error : {}", cause))]
+    SimpleError { cause: String },
+    #[snafu(display("Encountered error from TrustDns: {}", failure_source.to_string()))]
+    TrustDnsError { failure_source: ProtoError },
 }
 
 pub fn parse_dns_query_message(
@@ -30,7 +29,6 @@ pub fn parse_dns_query_message(
 ) -> Result<DnsQueryMessage, DnsMessageParserError> {
     match TrustDnsMessage::from_vec(raw_dns_message) {
         Ok(msg) => {
-            // println!("Query: {:?}", msg);
             let header = parse_dns_query_message_header(&msg);
             let edns_section = parse_edns(&msg);
             let rcode_high = if let Some(edns) = edns_section.clone() {
@@ -45,13 +43,42 @@ pub fn parse_dns_query_message(
                 parse_response_code(response_code),
                 header,
                 parse_dns_query_message_question_section(&msg)?,
-                parse_dns_query_message_section(msg.answers())?,
-                parse_dns_query_message_section(&msg.name_servers())?,
-                parse_dns_query_message_section(&msg.additionals())?,
+                parse_dns_message_section(msg.answers())?,
+                parse_dns_message_section(&msg.name_servers())?,
+                parse_dns_message_section(&msg.additionals())?,
                 edns_section,
             ))
         }
-        Err(e) => Err(DnsMessageParserError::TrustDnsError(e)),
+        Err(e) => Err(DnsMessageParserError::TrustDnsError { failure_source: e }),
+    }
+}
+
+pub fn parse_dns_update_message(
+    raw_dns_message: &Vec<u8>,
+) -> Result<DnsUpdateMessage, DnsMessageParserError> {
+    match TrustDnsMessage::from_vec(raw_dns_message) {
+        Ok(msg) => {
+            let header = parse_dns_update_message_header(&msg);
+            let edns_section = parse_edns(&msg);
+            let rcode_high = if let Some(edns) = edns_section.clone() {
+                edns.extended_rcode
+            } else {
+                0
+            };
+            let response_code = (u16::from(rcode_high) << 4) | ((u16::from(header.rcode)) & 0x000F);
+
+            Ok(DnsUpdateMessage::new(
+                response_code,
+                parse_response_code(response_code),
+                header,
+                parse_dns_update_message_zone_section(&msg)?,
+                parse_dns_message_section(msg.answers())?,
+                parse_dns_message_section(&msg.name_servers())?,
+                parse_dns_message_section(&msg.additionals())?,
+                edns_section,
+            ))
+        }
+        Err(e) => Err(DnsMessageParserError::TrustDnsError { failure_source: e }),
     }
 }
 
@@ -81,6 +108,7 @@ fn parse_response_code(rcode: u16) -> Option<&'static str> {
         _ => None,
     }
 }
+
 fn parse_dns_query_message_header(dns_message: &TrustDnsMessage) -> QueryHeader {
     QueryHeader::new(
         dns_message.header().id(),
@@ -100,6 +128,19 @@ fn parse_dns_query_message_header(dns_message: &TrustDnsMessage) -> QueryHeader 
     )
 }
 
+fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeader {
+    UpdateHeader::new(
+        dns_message.header().id(),
+        dns_message.header().op_code() as u8,
+        dns_message.header().response_code(),
+        dns_message.header().message_type() as u8,
+        dns_message.header().query_count(),
+        dns_message.header().answer_count(),
+        dns_message.header().name_server_count(),
+        dns_message.header().additional_count(),
+    )
+}
+
 fn parse_dns_query_message_question_section(
     dns_message: &TrustDnsMessage,
 ) -> Result<Vec<QueryQuestion>, DnsMessageParserError> {
@@ -110,9 +151,28 @@ fn parse_dns_query_message_question_section(
     Ok(questions)
 }
 
-fn parse_dns_query_message_section(
-    records: &[Record],
-) -> Result<Vec<DnsRecord>, DnsMessageParserError> {
+fn parse_dns_update_message_zone_section(
+    dns_message: &TrustDnsMessage,
+) -> Result<ZoneInfo, DnsMessageParserError> {
+    let mut zones: Vec<ZoneInfo> = Vec::new();
+
+    for query in dns_message.queries().iter() {
+        zones.push(parse_dns_query_question(query)?.into());
+    }
+
+    if zones.len() != 1 {
+        Err(DnsMessageParserError::SimpleError {
+            cause: format!(
+                "Unexpected number of records in update section: {}",
+                zones.len()
+            ),
+        })
+    } else {
+        Ok(zones.get(0).unwrap().to_owned())
+    }
+}
+
+fn parse_dns_message_section(records: &[Record]) -> Result<Vec<DnsRecord>, DnsMessageParserError> {
     let mut answers: Vec<DnsRecord> = Vec::new();
     for record in records.iter() {
         answers.push(parse_dns_record(record)?);
@@ -192,14 +252,47 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
     match rdata {
         RData::A(ip) => Ok((Some(ip.to_string()), None)),
         RData::AAAA(ip) => Ok((Some(ip.to_string()), None)),
-        RData::CNAME(name) => Ok((Some(name.to_utf8()), None)),
+        RData::ANAME(name) => Ok((Some(name.to_string()), None)),
+        RData::CNAME(name) => Ok((Some(name.to_string()), None)),
+        RData::MX(mx) => {
+            let srv_rdata = format!("{} {}", mx.preference(), mx.exchange().to_string(),);
+            Ok((Some(srv_rdata), None))
+        }
+        RData::NULL(null) => match null.anything() {
+            Some(raw_rdata) => Ok((Some(base64::encode(raw_rdata)), None)),
+            None => Ok((Some(String::from("")), None)),
+        },
+        RData::NS(ns) => Ok((Some(ns.to_string()), None)),
+        RData::OPENPGPKEY(key) => {
+            if let Ok(key_string) = String::from_utf8(Vec::from(key.public_key())) {
+                Ok((Some(format!("({})", &key_string)), None))
+            } else {
+                Err(DnsMessageParserError::SimpleError {
+                    cause: String::from("Invalid OPENPGPKEY rdata"),
+                })
+            }
+        }
+        RData::PTR(ptr) => Ok((Some(ptr.to_string()), None)),
+        RData::SOA(soa) => Ok((
+            Some(format!(
+                "{} {} ({} {} {} {} {})",
+                soa.mname().to_string(),
+                soa.rname().to_string(),
+                soa.serial(),
+                soa.refresh(),
+                soa.retry(),
+                soa.expire(),
+                soa.minimum()
+            )),
+            None,
+        )),
         RData::SRV(srv) => {
             let srv_rdata = format!(
                 "{} {} {} {}",
                 srv.priority(),
                 srv.weight(),
                 srv.port(),
-                srv.target().to_utf8()
+                srv.target().to_string()
             );
             Ok((Some(srv_rdata), None))
         }
@@ -219,19 +312,6 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
                 .join(" ");
             Ok((Some(txt_rdata), None))
         }
-        RData::SOA(soa) => Ok((
-            Some(format!(
-                "{} {} ({} {} {} {} {})",
-                soa.mname().to_utf8(),
-                soa.rname().to_utf8(),
-                soa.serial(),
-                soa.refresh(),
-                soa.retry(),
-                soa.expire(),
-                soa.minimum()
-            )),
-            None,
-        )),
         RData::Unknown { code, rdata } => match code {
             13 => match rdata.anything() {
                 Some(raw_rdata) => {
@@ -247,21 +327,21 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
                         None,
                     ))
                 }
-                None => Err(DnsMessageParserError::SimpleError(String::from(
-                    "Empty HINFO rdata",
-                ))),
+                None => Err(DnsMessageParserError::SimpleError {
+                    cause: String::from("Empty HINFO rdata"),
+                }),
             },
 
             _ => match rdata.anything() {
                 Some(raw_rdata) => Ok((None, Some(raw_rdata.clone()))),
-                None => Err(DnsMessageParserError::SimpleError(String::from(
-                    "Empty rdata",
-                ))),
+                None => Err(DnsMessageParserError::SimpleError {
+                    cause: String::from("Empty rdata"),
+                }),
             },
         },
-        _ => Err(DnsMessageParserError::SimpleError(String::from(
-            "Unsupported rdata",
-        ))),
+        _ => Err(DnsMessageParserError::SimpleError {
+            cause: format!("Unsupported rdata {:?}", rdata),
+        }),
     }
 }
 
@@ -272,17 +352,23 @@ fn parse_character_string(decoder: &mut BinDecoder) -> Result<String, DnsMessage
             match decoder.read_slice(len) {
                 Ok(raw_text) => match raw_text.verify_unwrap(|r| r.len() == len) {
                     Ok(verified_text) => Ok(String::from_utf8_lossy(verified_text).to_string()),
-                    Err(raw_data) => Err(DnsMessageParserError::SimpleError(format!(
-                        "Unexpected data length: expected {}, got {}. Raw data {}",
-                        len,
-                        raw_data.len(),
-                        format_bytes_as_hex_string(&raw_data.to_vec())
-                    ))),
+                    Err(raw_data) => Err(DnsMessageParserError::SimpleError {
+                        cause: format!(
+                            "Unexpected data length: expected {}, got {}. Raw data {}",
+                            len,
+                            raw_data.len(),
+                            format_bytes_as_hex_string(&raw_data.to_vec())
+                        ),
+                    }),
                 },
-                Err(error) => Err(DnsMessageParserError::TrustDnsError(error)),
+                Err(error) => Err(DnsMessageParserError::TrustDnsError {
+                    failure_source: error,
+                }),
             }
         }
-        Err(error) => Err(DnsMessageParserError::TrustDnsError(error)),
+        Err(error) => Err(DnsMessageParserError::TrustDnsError {
+            failure_source: error,
+        }),
     }
 }
 
@@ -301,10 +387,94 @@ fn parse_dns_query_question(question: &Query) -> Result<QueryQuestion, DnsMessag
 
 fn parse_unknown_record_type(rtype: u16) -> Option<String> {
     match rtype {
+        1 => Some(String::from("A")),
+        2 => Some(String::from("NS")),
+        3 => Some(String::from("MD")),
+        4 => Some(String::from("MF")),
+        5 => Some(String::from("CNAME")),
+        6 => Some(String::from("SOA")),
+        7 => Some(String::from("MB")),
+        8 => Some(String::from("MG")),
+        9 => Some(String::from("MR")),
+        10 => Some(String::from("NULL")),
+        11 => Some(String::from("WKS")),
+        12 => Some(String::from("PTR")),
         13 => Some(String::from("HINFO")),
+        14 => Some(String::from("MINFO")),
+        15 => Some(String::from("MX")),
+        16 => Some(String::from("TXT")),
+        17 => Some(String::from("RP")),
+        18 => Some(String::from("AFSDB")),
+        19 => Some(String::from("X25")),
         20 => Some(String::from("ISDN")),
+        21 => Some(String::from("RT")),
+        22 => Some(String::from("NSAP")),
+        23 => Some(String::from("NSAP-PTR")),
+        24 => Some(String::from("SIG")),
+        25 => Some(String::from("KEY")),
+        26 => Some(String::from("PX")),
+        27 => Some(String::from("GPOS")),
+        28 => Some(String::from("AAAA")),
+        29 => Some(String::from("LOC")),
+        30 => Some(String::from("NXT")),
+        31 => Some(String::from("EID")),
+        32 => Some(String::from("NIMLOC")),
+        33 => Some(String::from("SRV")),
+        34 => Some(String::from("ATMA")),
+        35 => Some(String::from("NAPTR")),
+        36 => Some(String::from("KX")),
+        37 => Some(String::from("CERT")),
         38 => Some(String::from("A6")),
         39 => Some(String::from("DNAME")),
+        40 => Some(String::from("SINK")),
+        41 => Some(String::from("OPT")),
+        42 => Some(String::from("APL")),
+        43 => Some(String::from("DS")),
+        44 => Some(String::from("SSHFP")),
+        45 => Some(String::from("IPSECKEY")),
+        46 => Some(String::from("RRSIG")),
+        47 => Some(String::from("NSEC")),
+        48 => Some(String::from("DNSKEY")),
+        49 => Some(String::from("DHCID")),
+        50 => Some(String::from("NSEC3")),
+        51 => Some(String::from("NSEC3PARAM")),
+        52 => Some(String::from("TLSA")),
+        53 => Some(String::from("SMIMEA")),
+        55 => Some(String::from("HIP")),
+        56 => Some(String::from("NINFO")),
+        57 => Some(String::from("RKEY")),
+        58 => Some(String::from("TALINK")),
+        59 => Some(String::from("CDS")),
+        60 => Some(String::from("CDNSKEY")),
+        61 => Some(String::from("OPENPGPKEY")),
+        62 => Some(String::from("CSYNC")),
+        63 => Some(String::from("ZONEMD")),
+        99 => Some(String::from("SPF")),
+        100 => Some(String::from("UINFO")),
+        101 => Some(String::from("UID")),
+        102 => Some(String::from("GID")),
+        103 => Some(String::from("UNSPEC")),
+        104 => Some(String::from("NID")),
+        105 => Some(String::from("L32")),
+        106 => Some(String::from("L64")),
+        107 => Some(String::from("LP")),
+        108 => Some(String::from("EUI48")),
+        109 => Some(String::from("EUI64")),
+        249 => Some(String::from("TKEY")),
+        250 => Some(String::from("TSIG")),
+        251 => Some(String::from("IXFR")),
+        252 => Some(String::from("AXFR")),
+        253 => Some(String::from("MAILB")),
+        254 => Some(String::from("MAILA")),
+        255 => Some(String::from("ANY")),
+        256 => Some(String::from("URI")),
+        257 => Some(String::from("CAA")),
+        258 => Some(String::from("AVC")),
+        259 => Some(String::from("DOA")),
+        260 => Some(String::from("AMTRELAY")),
+        32768 => Some(String::from("TA")),
+        32769 => Some(String::from("DLV")),
+
         _ => None,
     }
 }
@@ -320,21 +490,190 @@ fn format_bytes_as_hex_string(bytes: &Vec<u8>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{
+        net::{Ipv4Addr, Ipv6Addr},
+        str::FromStr,
+    };
+    use trust_dns_proto::rr::{domain::Name, rdata::TXT};
+
+    #[test]
+    fn test_parse_dns_query_message() {
+        let raw_dns_message = "szgAAAABAAAAAAAAAmg1B2V4YW1wbGUDY29tAAAGAAE=";
+        if let Ok(raw_qeury_message) = base64::decode(raw_dns_message) {
+            let parse_result = parse_dns_query_message(&raw_qeury_message);
+            assert!(parse_result.is_ok());
+            if let Some(message) = parse_result.ok() {
+                assert_eq!(message.header.qr, 0);
+                assert_eq!(message.question_section.len(), 1);
+                assert_eq!(
+                    &message.question_section.first().unwrap().name,
+                    "h5.example.com."
+                );
+                assert_eq!(
+                    &message
+                        .question_section
+                        .first()
+                        .unwrap()
+                        .record_type
+                        .clone()
+                        .unwrap(),
+                    "SOA"
+                );
+            } else {
+                error!("Message is not parsed");
+            }
+        } else {
+            error!("Invalid base64 encoded data");
+        }
+    }
 
     #[test]
     fn test_parse_dns_query_message_with_invalid_data() {
         if let Err(err) = parse_dns_query_message(&vec![1, 2, 3]) {
             assert!(err.to_string().contains("unexpected end of input"));
             match err {
-                DnsMessageParserError::TrustDnsError(e) => {
+                DnsMessageParserError::TrustDnsError { failure_source: e } => {
                     assert!(e.to_string().contains("unexpected end of input"))
                 }
-                DnsMessageParserError::SimpleError(e) => {
+                DnsMessageParserError::SimpleError { cause: e } => {
                     error!("Expected TrustDnsError, got {}", &e)
                 }
             }
         } else {
             error!("Expected TrustDnsError");
+        }
+    }
+
+    #[test]
+    fn test_parse_dns_query_message_with_unsupported_rdata() {
+        let raw_query_message_base64 = "S9iAAAABAAAADwAbAV8DY29tAAABAAHADgACAAEAAqMAABQBYQxndGxkLX\
+        NlcnZlcnMDbmV0AMAOAAIAAQACowAABAFiwCXADgACAAEAAqMAAAQBY8AlwA4AAgABAAKjAAAEAWTAJcAOAAIAAQACowAABA\
+        FlwCXADgACAAEAAqMAAAQBZsAlwA4AAgABAAKjAAAEAWfAJcAOAAIAAQACowAABAFowCXADgACAAEAAqMAAAQBacAlwA4AAg\
+        ABAAKjAAAEAWrAJcAOAAIAAQACowAABAFrwCXADgACAAEAAqMAAAQBbMAlwA4AAgABAAKjAAAEAW3AJcAOACsAAQABUYAAJH\
+        i9CALi08kW9t7qxzKU6CaPtYhQRKgz/FRZWI9KkYTPxBpXZsAOAC4AAQABUYABEwArCAEAAVGAXwVS0F70IUC/BwCNcUk9rv\
+        6TfbDiupYh7mlNIozd6xvNJLF7rJYhXTtCmw0eonl5dDZ5MWsIy11VHRQlwDMLYD691Imn8Pc+FqPBeWxT2ooZn2PT6dFiMo\
+        D9lRGid8In5x5x7xqDOC0yORGXGq1slMk1yB+SXYU5GSBGc455QZT4m/voD8WcG8KFQNmb/J8RwVOLcHveQl+7BMF2ol0Uzg\
+        TinFFfG4icEw5lMySS9HCCezFVxU1BFBF6pMqNAa/725+1VyfHbN1OVw5I47+IIvtn+nw3tiCJQLPo7hWlenKUUqFpHHL7II\
+        sS5Z+fY2EFjjoZdqKMBBvcbqZkhyHUYDf01xsDPGDx6g/YwCMAAQABAAKjAAAEwAUGHsBDAAEAAQACowAABMAhDh7AUwABAA\
+        EAAqMAAATAGlwewGMAAQABAAKjAAAEwB9QHsBzAAEAAQACowAABMAMXh7AgwABAAEAAqMAAATAIzMewJMAAQABAAKjAAAEwC\
+        pdHsCjAAEAAQACowAABMA2cB7AswABAAEAAqMAAATAK6wewMMAAQABAAKjAAAEwDBPHsDTAAEAAQACowAABMA0sh7A4wABAA\
+        EAAqMAAATAKaIewPMAAQABAAKjAAAEwDdTHsAjABwAAQACowAAECABBQOoPgAAAAAAAAACADDAQwAcAAEAAqMAABAgAQUDIx\
+        0AAAAAAAAAAgAwwFMAHAABAAKjAAAQIAEFA4PrAAAAAAAAAAAAMMBjABwAAQACowAAECABBQCFbgAAAAAAAAAAADDAcwAcAA\
+        EAAqMAABAgAQUCHKEAAAAAAAAAAAAwwIMAHAABAAKjAAAQIAEFA9QUAAAAAAAAAAAAMMCTABwAAQACowAAECABBQPuowAAAA\
+        AAAAAAADDAowAcAAEAAqMAABAgAQUCCMwAAAAAAAAAAAAwwLMAHAABAAKjAAAQIAEFAznBAAAAAAAAAAAAMMDDABwAAQACow\
+        AAECABBQJwlAAAAAAAAAAAADDA0wAcAAEAAqMAABAgAQUDDS0AAAAAAAAAAAAwwOMAHAABAAKjAAAQIAEFANk3AAAAAAAAAA\
+        AAMMDzABwAAQACowAAECABBQGx+QAAAAAAAAAAADAAACkFqgAAgAAAAA==";
+        if let Ok(raw_query_message) = base64::decode(raw_query_message_base64) {
+            if let Err(err) = parse_dns_query_message(&raw_query_message) {
+                assert!(err.to_string().contains("Unsupported rdata"));
+                match err {
+                    DnsMessageParserError::TrustDnsError { failure_source: e } => {
+                        error!("Expected TrustDnsError, got {}", &e)
+                    }
+                    DnsMessageParserError::SimpleError { cause: e } => {
+                        assert!(e.to_string().contains("Unsupported rdata"))
+                    }
+                }
+            } else {
+                error!("Expected Error");
+            }
+        } else {
+            error!("Invalid base64 encoded data");
+        }
+    }
+
+    #[test]
+    fn test_format_bytes_as_hex_string() {
+        assert_eq!(
+            "01.02.03.AB.CD.EF",
+            &format_bytes_as_hex_string(&vec![1, 2, 3, 0xab, 0xcd, 0xef])
+        );
+    }
+
+    #[test]
+    fn test_parse_unknown_record_type() {
+        assert_eq!("A", parse_unknown_record_type(1).unwrap());
+        assert_eq!("ANY", parse_unknown_record_type(255).unwrap());
+        assert!(parse_unknown_record_type(22222).is_none());
+    }
+
+    #[test]
+    fn test_parse_dns_udpate_message_failure() {
+        let raw_dns_message = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcq0ICAQQARgBIgSsFDetKgTAN1MeMMn/Ajg1QL6m6fcFTQLEKhVS+QMSSIIAAAEAAAAFAAUJZmFjZWJvb2sxA2NvbQAAAQABwAwAAgABAAKjAAAPA25zMQhyZW50b25kY8AWwAwAAgABAAKjAAAGA25zMsAvIENLMFBPSk1HODc0TEpSRUY3RUZOODQzMFFWSVQ4QlNNwBYAMgABAAFRgAAjAQEAAAAUZQGgwlcg7hVvbE45Y2s62gMS2SoAByIAAAAAApDATAAuAAEAAVGAALcAMggCAAFRgF8ACGFe9r15m6QDY29tAFOih16McCzogcR6RZIu3kqZa27Bo1jtfzwzDENJIZItSCRuLqRO6oA90sCLItOEQv0skpQKtJQXmTZUnqe3XK+1t/Op8G9cmeMXgCvynTJmm0WouSv+SuwBOjgqCaNuWpwbiIcaXY/NlId1lPpl8LJyTIRtFqGifW0FnYFe/Lzs3pfZLoKMAG4/8Upqqv4F+Ij1oue1C6KWe0hn+beIKkIgN0pLMjVFTUhITThBMDFNTzBBRVFRTjdHMlVQSjI4NjfAFgAyAAEAAVGAACIBAQAAABQ86ELf24DH1kAfgQ4dyyuf0+6y5wAGIAAAAAASwCsAAQABAAKjAAAEbD0TCsArAAEAAQACowAABKxiwCLARgABAAEAAqMAAAQuprYzwEYAAQABAAKjAAAEXXMcaAAAKRAAAACAAAAAWgUDY29tAGC+pun3BW2/LUQYcvkDEkiCAAABAAAABQAFCWZhY2Vib29rMQNjb20AAAEAAcAMAAIAAQACowAADwNuczEIcmVudG9uZGPAFsAMAAIAAQACowAABgNuczLALyBDSzBQT0pNRzg3NExKUkVGN0VGTjg0MzBRVklUOEJTTcAWADIAAQABUYAAIwEBAAAAFGUBoMJXIO4Vb2xOOWNrOtoDEtkqAAciAAAAAAKQwEwALgABAAFRgAC3ADIIAgABUYBfAAhhXva9eZukA2NvbQBToodejHAs6IHEekWSLt5KmWtuwaNY7X88MwxDSSGSLUgkbi6kTuqAPdLAiyLThEL9LJKUCrSUF5k2VJ6nt1yvtbfzqfBvXJnjF4Ar8p0yZptFqLkr/krsATo4KgmjblqcG4iHGl2PzZSHdZT6ZfCyckyEbRahon1tBZ2BXvy87N6X2S6CjABuP/FKaqr+BfiI9aLntQuilntIZ/m3iCpCIDdKSzI1RU1ISE04QTAxTU8wQUVRUU43RzJVUEoyODY3wBYAMgABAAFRgAAiAQEAAAAUPOhC39uAx9ZAH4EOHcsrn9PusucABiAAAAAAEsArAAEAAQACowAABGw9EwrAKwABAAEAAqMAAASsYsAiwEYAAQABAAKjAAAELqa2M8BGAAEAAQACowAABF1zHGgAACkQAAAAgAAAAHgB";
+        if let Ok(raw_update_message) = base64::decode(raw_dns_message) {
+            assert!(parse_dns_update_message(&raw_update_message).is_err());
+        } else {
+            error!("Invalid base64 encoded data");
+        }
+    }
+
+    #[test]
+    fn test_parse_dns_udpate_message() {
+        let raw_dns_message = "xjUoAAABAAAAAQAAB2V4YW1wbGUDY29tAAAGAAECaDXADAD/AP8AAAAAAAA=";
+        if let Ok(raw_update_message) = base64::decode(raw_dns_message) {
+            let parse_result = parse_dns_update_message(&raw_update_message);
+            assert!(parse_result.is_ok());
+            if let Some(message) = parse_result.ok() {
+                assert_eq!(message.header.qr, 0);
+                assert_eq!(message.update_section.len(), 1);
+                assert_eq!(&message.update_section.first().unwrap().class, "ANY");
+                assert_eq!(&message.zone_to_update.zone_type.clone().unwrap(), "SOA");
+                assert_eq!(&message.zone_to_update.name, "example.com.");
+            } else {
+                error!("Message is not parsed");
+            }
+        } else {
+            error!("Invalid base64 encoded data");
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_a_type() {
+        let rdata = RData::A(Ipv4Addr::from_str("1.2.3.4").unwrap());
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!("1.2.3.4", parsed.unwrap());
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_aaaa_type() {
+        let rdata = RData::AAAA(Ipv6Addr::from_str("2001::1234").unwrap());
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!("2001::1234", parsed.unwrap());
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_cname_type() {
+        let rdata = RData::CNAME(Name::from_str("www.example.com.").unwrap());
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!("www.example.com.", parsed.unwrap());
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_txt_type() {
+        let rdata = RData::TXT(TXT::new(vec![
+            "abc\"def".to_string(),
+            "gh\\i".to_string(),
+            "".to_string(),
+            "j".to_string(),
+        ]));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            // println!("{}", parsed.unwrap());
+            assert_eq!(r#""abc\"def" "gh\\i" "" "j""#, parsed.unwrap());
         }
     }
 }
