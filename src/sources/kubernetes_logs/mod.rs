@@ -212,21 +212,21 @@ impl Source {
         let mut parser = parser::build();
         let mut partial_events_merger = partial_events_merger::build(auto_partial_merge);
 
-        let events = file_source_rx.map(|(bytes, file)| {
+        let events = file_source_rx.map(move |(bytes, file)| {
             emit!(KubernetesLogsEventReceived {
                 file: &file,
                 byte_size: bytes.len(),
             });
-            create_event(bytes, file)
+            let mut event = create_event(bytes, &file);
+            if annotator.annotate(&mut event, &file).is_none() {
+                emit!(KubernetesLogsEventAnnotationFailed { event: &event });
+            }
+            event
         });
         let events = events
             .filter_map(move |event| futures::future::ready(parser.transform(event)))
-            .filter_map(move |event| futures::future::ready(partial_events_merger.transform(event)))
-            .map(move |mut event| {
-                if annotator.annotate(&mut event).is_none() {
-                    emit!(KubernetesLogsEventAnnotationFailed { event: &event });
-                }
-                event
+            .filter_map(move |event| {
+                futures::future::ready(partial_events_merger.transform(event))
             });
 
         let event_processing_loop = events.map(Ok).forward(out);
@@ -282,7 +282,7 @@ impl Source {
     }
 }
 
-fn create_event(line: Bytes, file: String) -> Event {
+fn create_event(line: Bytes, file: &str) -> Event {
     let mut event = Event::from(line);
 
     // Add source type.
