@@ -1,15 +1,15 @@
-args@{ pkgs ? import <nixpkgs> {} }:
+args@{ ... }:
 
 let
   general = (import ./default.nix);
 in
 
-pkgs.libcxxStdenv.mkDerivation ({
+general.pkgs.libcxxStdenv.mkDerivation ({
   name = "vector-env";
-  depsBuildHost = (general.environment.dependencies.depsBuildHost pkgs);
-  depsBuildBuild = (general.environment.dependencies.depsBuildBuild pkgs);
-  depsHostTarget = (general.environment.dependencies.depsHostTarget pkgs);
-  depsHostBuild = (general.environment.dependencies.depsHostBuild pkgs);
-  nativeBuildInputs = (general.environment.developmentTools pkgs) ++ (general.environment.dependencies.nativeBuildInputs pkgs);
+  depsBuildHost = (general.environment.dependencies.depsBuildHost general.pkgs);
+  depsBuildBuild = (general.environment.dependencies.depsBuildBuild general.pkgs);
+  depsHostTarget = (general.environment.dependencies.depsHostTarget general.pkgs);
+  depsHostBuild = (general.environment.dependencies.depsHostBuild general.pkgs);
+  nativeBuildInputs = (general.environment.developmentTools general.pkgs) ++ (general.environment.dependencies.nativeBuildInputs general.pkgs);
   
-} // (general.environment.variables { targetPkgs = pkgs; hostPkgs = pkgs; }))
+} // (general.environment.variables { targetPkgs = general.pkgs; hostPkgs = general.pkgs; }))

@@ -5,6 +5,7 @@ rec {
       # See `rustup target list`
       x86_64-unknown-linux-gnu = rec {
         configuration = {
+          setInterpreterPath = "/lib64/ld-linux-x86-64.so.2";
           buildType = "debug";
           rustTarget = "x86_64-unknown-linux-gnu";
           hostPkgs = pkgs;
@@ -23,6 +24,7 @@ rec {
       };
       x86_64-unknown-linux-musl = rec {
         configuration = {
+          setInterpreterPath = null;
           buildType = "debug";
           rustTarget = "x86_64-unknown-linux-musl";
           hostPkgs = pkgs;
@@ -41,6 +43,7 @@ rec {
       };
       aarch64-unknown-linux-gnu = rec {
         configuration = {
+          setInterpreterPath = "/lib64/ld-linux-aarch64.so.2";
           buildType = "debug";
           rustTarget = "aarch64-unknown-linux-gnu";
           hostPkgs = pkgs;
@@ -59,6 +62,7 @@ rec {
       };
       aarch64-unknown-linux-musl = rec {
         configuration = {
+          setInterpreterPath = null;
           buildType = "debug";
           rustTarget = "aarch64-unknown-linux-musl";
           hostPkgs = pkgs;
@@ -77,6 +81,7 @@ rec {
       };
       armv7-unknown-linux-gnueabihf = rec {
         configuration = {
+          setInterpreterPath = "/lib64/ld-linux-armv7.so.2";
           buildType = "debug";
           rustTarget = "armv7-unknown-linux-gnueabihf";
           hostPkgs = pkgs;
@@ -94,6 +99,7 @@ rec {
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
       };
       armv7-unknown-linux-musleabihf = rec {
+        setInterpreterPath = null;
         configuration = {
           buildType = "debug";
           rustTarget = "armv7-unknown-linux-musleabihf";
@@ -344,8 +350,8 @@ rec {
     # Build a binary Vector artifact
     binary = args@{
       # This will be set dynamically!
+      setInterpreterPath,
       features,
-      linking ? "dynamic",
       rustChannel ? null, # Defaulted below
       rustTarget,
       hostPkgs,
@@ -377,6 +383,18 @@ rec {
           cargoSha256 = "0xg43s4vdhzqz6gqbakr7c7jbr1jlmwr15ykrsl1clgywpg3rm8r";
           # TODO: There seems to be a cargoVendorDir option: https://github.com/NixOS/nixpkgs/blob/a7fa6f60c4df3fde0ab46cfe79294c1d65042fa4/pkgs/build-support/rust/default.nix#L30
           
+          # We do this to make our builds portable to non-NixOS machines.
+          # If `setInterpreterPath = false` the output binaries will refer to NixOS's `ld-linux` interpreter, this is a problem if you want to send this to others!
+          # Instead, set it to `setInterpreterPath = "/lib64/ld-linux-x86-64.so.2"` and then Ubuntu/Centos can launch it.
+          # 
+          # Aren't computers fun?
+          postFixup = (if (builtins.isString setInterpreterPath) then
+              ''
+                ${hostPkgs.patchelf}/bin/patchelf --set-interpreter ${setInterpreterPath} $out/bin/vector
+              ''
+            else
+              "");
+
           target = args.rustTarget;
           # Rest
           src = hostPkgs.lib.cleanSource (tools.gitignore.gitignoreSource ./.);
