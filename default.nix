@@ -18,7 +18,7 @@ rec {
             features.byLinking.static;
         };
         binary = tasks.binary configuration;
-        binary-portable = tasks.binaryWithMappedInterpreter { binary = binary; path = "/lib64/ld-linux-x86-64.so.2"; };
+        binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-x86-64.so.2"; };
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary-portable; };
       };
       x86_64-unknown-linux-musl = rec {
@@ -51,7 +51,7 @@ rec {
             features.byLinking.static;
         };
         binary = tasks.binary configuration;
-        binary-portable = tasks.binary (configuration // { setInterpreterPath = "/lib64/ld-linux-aarch64.so.2"; });
+        binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-aarch64.so.2"; };
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary-portable; };
       };
       aarch64-unknown-linux-musl = rec {
@@ -102,7 +102,7 @@ rec {
             features.byLinking.static;
         };
         binary = tasks.binary configuration;
-        binary-portable = tasks.binary (configuration // { setInterpreterPath = "/lib64/ld-linux-armv7.so.2"; });
+        binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-armv7.so.2"; };
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary-portable; };
       };
     };
@@ -329,18 +329,34 @@ rec {
   
   # Jobs used to build artifacts
   tasks = rec {
-    docker = args@{ binary, tag }:
+
+    # Build a docker container of Vector
+    docker = args@{
+      # The binary used as input
+      binary,
+      # The tag for the container
+      tag
+    }:
       pkgs.dockerTools.buildImage {
-        name = "neu-timberio/vector";
+        name = "timberio/vector";
         tag = args.tag;
         config.Cmd = [ "${args.binary.out}/bin/vector" ];
       };
+    
+    # Make a static glibc binary portable to other distros.
+    #
     # We do this to make our builds portable to non-NixOS machines.
-    # If `setInterpreterPath = false` the output binaries will refer to NixOS's `ld-linux` interpreter, this is a problem if you want to send this to others!
-    # Instead, set it to `setInterpreterPath = "/lib64/ld-linux-x86-64.so.2"` and then Ubuntu/Centos can launch it.
+    #
+    # Want to run a Nix produced binary on something not Nix?
+    # You gotta run this and set `path = "/lib64/ld-linux-x86-64.so.2"` (where `x86-64` is your arch) and then Ubuntu/Centos can launch it.
     # 
     # Aren't computers fun?
-    binaryWithMappedInterpreter = { binary, path}:
+    binaryWithPortableInterpeterPath = {
+      # The binary to patch
+      binary,
+      # The interpreter path
+      path
+    }:
       pkgs.stdenv.mkDerivation {
         name = "vector-portable";
         src = binary;
@@ -350,7 +366,7 @@ rec {
           ${pkgs.patchelf}/bin/patchelf --set-interpreter ${path} $out/bin/vector
         '';
       };
-
+    
     # Build a binary Vector artifact
     binary = args@{
       features,
