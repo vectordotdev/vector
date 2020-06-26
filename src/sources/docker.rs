@@ -339,7 +339,7 @@ impl DockerSource {
                     }
 
                     // Include image check
-                    if let Some(images) = self.esb.core.config.include_images.as_ref() {
+                    if let Some(images) = &self.esb.core.config.include_images {
                         let image_check = images.iter().any(|image| &container.image == image);
                         if !images.is_empty() && !image_check {
                             continue;
@@ -927,7 +927,7 @@ impl ContainerMetadata {
 
         Ok(ContainerMetadata {
             labels,
-            name: remove_slash(details.name.as_str()).into(),
+            name: details.name.as_str().trim_start_matches("/").into(),
             image: details.config.image.as_str().into(),
             created_at: DateTime::parse_from_rfc3339(details.created.as_str())?
                 .with_timezone(&Utc)
@@ -936,27 +936,25 @@ impl ContainerMetadata {
     }
 }
 
-/// Removes / at the start of str
-fn remove_slash(s: &str) -> &str {
-    s.trim_start_matches("/")
-}
-
 #[cfg(all(test, feature = "docker-integration-tests"))]
 mod tests {
     use super::*;
     use crate::runtime::Runtime;
-    use crate::test_util::{self, collect_n, runtime, trace_init};
-    use futures01::future;
+    use crate::test_util::{collect_n, runtime, trace_init};
+    use futures::compat::Future01CompatExt;
 
     static BUXYBOX_IMAGE_TAG: &'static str = "latest";
 
-    fn pull(image: &str, docker: &Docker, rt: &mut Runtime) {
+    async fn pull(image: &str, docker: &Docker) {
         let list_option = shiplift::ImageListOptions::builder()
             .filter_name(image)
             .build();
 
-        if let Ok(images) = rt
-            .block_on(docker.images().list(&list_option))
+        if let Ok(images) = docker
+            .images()
+            .list(&list_option)
+            .compat()
+            .await
             .map_err(|e| error!(%e))
         {
             if images.is_empty() {
@@ -965,22 +963,16 @@ mod tests {
                     .image(image)
                     .tag(BUXYBOX_IMAGE_TAG)
                     .build();
-                let _ = rt
-                    .block_on(docker.images().pull(&options).collect())
+                let _ = docker
+                    .images()
+                    .pull(&options)
+                    .collect()
+                    .compat()
+                    .await
                     .map_err(|e| error!(%e));
             }
         }
         // Try running the tests in any case.
-    }
-
-    /// None if docker is not present on the system
-    fn source<'a, L: Into<Option<&'a str>>>(
-        names: &[&str],
-        label: L,
-    ) -> (mpsc::Receiver<Event>, Runtime) {
-        let mut rt = runtime();
-        let source = source_with(names, label, &mut rt);
-        (source, rt)
     }
 
     /// None if docker is not present on the system
@@ -1001,7 +993,7 @@ mod tests {
 
     /// None if docker is not present on the system
     fn source_with_config(config: DockerConfig, rt: &mut Runtime) -> mpsc::Receiver<Event> {
-        trace_init();
+        // trace_init();
         let (sender, recv) = mpsc::channel(100);
         rt.spawn(
             config
@@ -1016,35 +1008,23 @@ mod tests {
         recv
     }
 
-    fn docker() -> Docker {
-        Docker::new()
-    }
-
     /// Users should ensure to remove container before exiting.
-    fn log_container<'a, L: Into<Option<&'a str>>>(
+    async fn log_container<'a, L: Into<Option<&'a str>>>(
         name: &str,
         label: L,
         log: &str,
         docker: &Docker,
-        rt: &mut Runtime,
     ) -> String {
-        cmd_container(
-            name,
-            label,
-            vec!["echo".to_owned(), log.to_owned()],
-            docker,
-            rt,
-        )
+        cmd_container(name, label, vec!["echo".to_owned(), log.to_owned()], docker).await
     }
 
     /// Users should ensure to remove container before exiting.
     /// Will resend message every so often.
-    fn eternal_container<'a, L: Into<Option<&'a str>>>(
+    async fn eternal_container<'a, L: Into<Option<&'a str>>>(
         name: &str,
         label: L,
         log: &str,
         docker: &Docker,
-        rt: &mut Runtime,
     ) -> String {
         cmd_container(
             name,
@@ -1055,19 +1035,17 @@ mod tests {
                 format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {}; i=$((i+1)); done", log),
             ],
             docker,
-            rt,
-        )
+        ).await
     }
 
     /// Users should ensure to remove container before exiting.
-    fn cmd_container<'a, L: Into<Option<&'a str>>>(
+    async fn cmd_container<'a, L: Into<Option<&'a str>>>(
         name: &str,
         label: L,
         cmd: Vec<String>,
         docker: &Docker,
-        rt: &mut Runtime,
     ) -> String {
-        if let Some(id) = cmd_container_for_real(name, label, cmd, docker, rt) {
+        if let Some(id) = cmd_container_for_real(name, label, cmd, docker).await {
             id
         } else {
             // Maybe a before created container is present
@@ -1080,27 +1058,31 @@ mod tests {
     }
 
     /// Users should ensure to remove container before exiting.
-    fn cmd_container_for_real<'a, L: Into<Option<&'a str>>>(
+    async fn cmd_container_for_real<'a, L: Into<Option<&'a str>>>(
         name: &str,
         label: L,
         cmd: Vec<String>,
         docker: &Docker,
-        rt: &mut Runtime,
     ) -> Option<String> {
-        pull("busybox", docker, rt);
+        pull("busybox", docker).await;
+
         trace!("Creating container");
+
         let mut options = shiplift::builder::ContainerOptions::builder("busybox");
         options
             .name(name)
             .cmd(cmd.iter().map(|s| s.as_str()).collect());
-        label.into().map(|l| {
+        label.into().map(|label| {
             let mut map = HashMap::new();
-            map.insert(l, "");
+            map.insert(label, "");
             options.labels(&map);
         });
 
-        let future = docker.containers().create(&options.build());
-        rt.block_on(future)
+        docker
+            .containers()
+            .create(&options.build())
+            .compat()
+            .await
             .map_err(|e| error!(%e))
             .ok()
             .map(|c| c.id)
@@ -1108,76 +1090,67 @@ mod tests {
 
     /// Returns once container has started
     #[must_use]
-    fn container_start(
-        id: &str,
-        docker: &Docker,
-        rt: &mut Runtime,
-    ) -> Result<(), shiplift::errors::Error> {
+    async fn container_start(id: &str, docker: &Docker) -> Result<(), shiplift::errors::Error> {
         trace!("Starting container");
-        let future = docker.containers().get(id).start();
-        rt.block_on(future)
+
+        docker.containers().get(id).start().compat().await
     }
 
     /// Returns once container is done running
     #[must_use]
-    fn container_wait(
-        id: &str,
-        docker: &Docker,
-        rt: &mut Runtime,
-    ) -> Result<(), shiplift::errors::Error> {
+    async fn container_wait(id: &str, docker: &Docker) -> Result<(), shiplift::errors::Error> {
         trace!("Waiting container");
-        let future = docker.containers().get(id).wait();
-        rt.block_on(future)
+
+        docker
+            .containers()
+            .get(id)
+            .wait()
+            .compat()
+            .await
             .map(|exit| info!("Container exited with status code: {}", exit.status_code))
     }
 
     /// Returns once container is killed
     #[must_use]
-    fn container_kill(
-        id: &str,
-        docker: &Docker,
-        rt: &mut Runtime,
-    ) -> Result<(), shiplift::errors::Error> {
+    async fn container_kill(id: &str, docker: &Docker) -> Result<(), shiplift::errors::Error> {
         trace!("Waiting container");
-        let future = docker.containers().get(id).kill(None);
-        rt.block_on(future)
+
+        docker.containers().get(id).kill(None).compat().await
     }
 
     /// Returns once container is done running
     #[must_use]
-    fn container_run(
-        id: &str,
-        docker: &Docker,
-        rt: &mut Runtime,
-    ) -> Result<(), shiplift::errors::Error> {
-        container_start(id, docker, rt)?;
-        container_wait(id, docker, rt)
+    async fn container_run(id: &str, docker: &Docker) -> Result<(), shiplift::errors::Error> {
+        container_start(id, docker).await?;
+        container_wait(id, docker).await
     }
 
-    fn container_remove(id: &str, docker: &Docker, rt: &mut Runtime) {
+    async fn container_remove(id: &str, docker: &Docker) {
         trace!("Removing container");
-        let future = docker
+
+        // Don't panick, as this is unreleated to test, and there possibly other containers that need to be removed
+        let _ = docker
             .containers()
             .get(id)
-            .remove(shiplift::builder::RmContainerOptions::builder().build());
-        // Don't panick, as this is unreleated to test, and there possibly other containers that need to be removed
-        let _ = rt.block_on(future).map_err(|e| error!(%e));
+            .remove(shiplift::builder::RmContainerOptions::builder().build())
+            .compat()
+            .await
+            .map_err(|e| error!(%e));
     }
 
     /// Returns once it's certain that log has been made
     /// Expects that this is the only one with a container
-    fn container_log_n<'a, L: Into<Option<&'a str>>>(
+    async fn container_log_n<'a, L: Into<Option<&'a str>>>(
         n: usize,
         name: &str,
         label: L,
         log: &str,
         docker: &Docker,
-        rt: &mut Runtime,
     ) -> String {
-        let id = log_container(name, label, log, docker, rt);
+        let id = log_container(name, label, log, docker).await;
         for _ in 0..n {
-            if let Err(error) = container_run(&id, docker, rt) {
-                container_remove(&id, docker, rt);
+            if let Err(error) = container_run(&id, docker).await {
+                container_remove(&id, docker).await;
                 panic!("Container failed to start with error: {:?}", error);
             }
         }
@@ -1186,165 +1159,191 @@ mod tests {
 
     /// Once function returns, the container has entered into running state.
     /// Container must be killed before removed.
-    fn running_container<'a, L: Into<Option<&'a str>>>(
-        name: &str,
+    fn running_container<'a, L: Into<Option<&'a str>> + Send + 'static>(
+        name: &'static str,
         label: L,
-        log: &str,
+        log: &'static str,
         docker: &Docker,
         rt: &mut Runtime,
     ) -> String {
         let out = source_with(&[name], None, rt);
+        let docker = docker.clone();
 
-        let id = eternal_container(name, label, log, &docker, rt);
-        if let Err(error) = container_start(&id, &docker, rt) {
-            container_remove(&id, &docker, rt);
-            panic!("Container start failed with error: {:?}", error);
-        }
+        rt.block_on_std(async move {
+            let id = eternal_container(name, label, log, &docker).await;
+            if let Err(error) = container_start(&id, &docker).await {
+                container_remove(&id, &docker).await;
+                panic!("Container start failed with error: {:?}", error);
+            }
 
-        // Wait for before message
-        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
-        assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
-            "before".into()
-        );
+            // Wait for before message
+            let events = collect_n(out, 1).compat().await.ok().unwrap();
+            assert_eq!(
+                events[0].as_log()[&event::log_schema().message_key()],
+                "before".into()
+            );
 
-        id
+            id
+        })
     }
 
-    fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> impl Future<Item = bool, Error = ()> {
-        future::poll_fn(move || Ok(Async::Ready(rx.poll()?.is_not_ready())))
+    async fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> Result<bool, ()> {
+        futures01::future::poll_fn(move || Ok(Async::Ready(rx.poll()?.is_not_ready())))
+            .compat()
+            .await
     }
 
     #[test]
     fn newly_started() {
+        trace_init();
+
         let message = "9";
         let name = "vector_test_newly_started";
         let label = "vector_test_label_newly_started";
 
-        let (out, mut rt) = source(&[name], None);
-        let docker = docker();
+        let mut rt = runtime();
+        let out = source_with(&[name], None, &mut rt);
 
-        let id = container_log_n(1, name, label, message, &docker, &mut rt);
+        rt.block_on_std(async move {
+            let docker = Docker::new();
 
-        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+            let id = container_log_n(1, name, label, message, &docker).await;
+            let events = collect_n(out, 1).compat().await.ok().unwrap();
+            container_remove(&id, &docker).await;
 
-        container_remove(&id, &docker, &mut rt);
-
-        let log = events[0].as_log();
-        assert_eq!(log[&event::log_schema().message_key()], message.into());
-        assert_eq!(log[&super::CONTAINER], id.into());
-        assert!(log.get(&super::CREATED_AT).is_some());
-        assert_eq!(log[&super::IMAGE], "busybox".into());
-        assert!(log.get(&format!("label.{}", label).into()).is_some());
-        assert_eq!(events[0].as_log()[&super::NAME], name.into());
-        assert_eq!(
-            events[0].as_log()[event::log_schema().source_type_key()],
-            "docker".into()
-        );
+            let log = events[0].as_log();
+            assert_eq!(log[&event::log_schema().message_key()], message.into());
+            assert_eq!(log[&super::CONTAINER], id.into());
+            assert!(log.get(&super::CREATED_AT).is_some());
+            assert_eq!(log[&super::IMAGE], "busybox".into());
+            assert!(log.get(&format!("label.{}", label).into()).is_some());
+            assert_eq!(events[0].as_log()[&super::NAME], name.into());
+            assert_eq!(
+                events[0].as_log()[event::log_schema().source_type_key()],
+                "docker".into()
+            );
+        });
     }
 
     #[test]
     fn restart() {
+        trace_init();
+
         let message = "10";
         let name = "vector_test_restart";
 
-        let (out, mut rt) = source(&[name], None);
-        let docker = docker();
+        let mut rt = runtime();
+        let out = source_with(&[name], None, &mut rt);
 
-        let id = container_log_n(2, name, None, message, &docker, &mut rt);
+        rt.block_on_std(async move {
+            let docker = Docker::new();
 
-        let events = rt.block_on(collect_n(out, 2)).ok().unwrap();
+            let id = container_log_n(2, name, None, message, &docker).await;
+            let events = collect_n(out, 2).compat().await.ok().unwrap();
+            container_remove(&id, &docker).await;
 
-        container_remove(&id, &docker, &mut rt);
-
-        assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
-            message.into()
-        );
-        assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
-            message.into()
-        );
+            assert_eq!(
+                events[0].as_log()[&event::log_schema().message_key()],
+                message.into()
+            );
+            assert_eq!(
+                events[1].as_log()[&event::log_schema().message_key()],
+                message.into()
+            );
+        });
     }
 
     #[test]
     fn include_containers() {
+        trace_init();
+
         let message = "11";
         let name0 = "vector_test_include_container_0";
         let name1 = "vector_test_include_container_1";
 
-        let (out, mut rt) = source(&[name1], None);
-        let docker = docker();
+        let mut rt = runtime();
+        let out = source_with(&[name1], None, &mut rt);
 
-        let id0 = container_log_n(1, name0, None, "13", &docker, &mut rt);
-        let id1 = container_log_n(1, name1, None, message, &docker, &mut rt);
+        rt.block_on_std(async move {
+            let docker = Docker::new();
 
-        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+            let id0 = container_log_n(1, name0, None, "13", &docker).await;
+            let id1 = container_log_n(1, name1, None, message, &docker).await;
+            let events = collect_n(out, 1).compat().await.ok().unwrap();
+            container_remove(&id0, &docker).await;
+            container_remove(&id1, &docker).await;
 
-        container_remove(&id0, &docker, &mut rt);
-        container_remove(&id1, &docker, &mut rt);
-
-        assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
-            message.into()
-        )
+            assert_eq!(
+                events[0].as_log()[&event::log_schema().message_key()],
+                message.into()
+            );
+        });
     }
 
     #[test]
     fn include_labels() {
+        trace_init();
+
         let message = "12";
         let name0 = "vector_test_include_labels_0";
         let name1 = "vector_test_include_labels_1";
         let label = "vector_test_include_label";
 
-        let (out, mut rt) = source(&[name0, name1], label);
-        let docker = docker();
+        let mut rt = runtime();
+        let out = source_with(&[name0, name1], label, &mut rt);
 
-        let id0 = container_log_n(1, name0, None, "13", &docker, &mut rt);
-        let id1 = container_log_n(1, name1, label, message, &docker, &mut rt);
+        rt.block_on_std(async move {
+            let docker = Docker::new();
 
-        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+            let id0 = container_log_n(1, name0, None, "13", &docker).await;
+            let id1 = container_log_n(1, name1, label, message, &docker).await;
+            let events = collect_n(out, 1).compat().await.ok().unwrap();
+            container_remove(&id0, &docker).await;
+            container_remove(&id1, &docker).await;
 
-        container_remove(&id0, &docker, &mut rt);
-        container_remove(&id1, &docker, &mut rt);
-
-        assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
-            message.into()
-        )
+            assert_eq!(
+                events[0].as_log()[&event::log_schema().message_key()],
+                message.into()
+            );
+        });
     }
 
     #[test]
     fn currently_running() {
+        trace_init();
+
         let message = "14";
         let name = "vector_test_currently_running";
         let label = "vector_test_label_currently_running";
 
-        let mut rt = test_util::runtime();
-        let docker = docker();
-
+        let mut rt = runtime();
+        let docker = Docker::new();
         let id = running_container(name, label, message, &docker, &mut rt);
-
         let out = source_with(&[name], None, &mut rt);
-        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
-        let _ = container_kill(&id, &docker, &mut rt);
-        container_remove(&id, &docker, &mut rt);
 
-        let log = events[0].as_log();
-        assert_eq!(log[&event::log_schema().message_key()], message.into());
-        assert_eq!(log[&super::CONTAINER], id.into());
-        assert!(log.get(&super::CREATED_AT).is_some());
-        assert_eq!(log[&super::IMAGE], "busybox".into());
-        assert!(log.get(&format!("label.{}", label).into()).is_some());
-        assert_eq!(events[0].as_log()[&super::NAME], name.into());
-        assert_eq!(
-            events[0].as_log()[event::log_schema().source_type_key()],
-            "docker".into()
-        );
+        rt.block_on_std(async move {
+            let events = collect_n(out, 1).compat().await.ok().unwrap();
+            let _ = container_kill(&id, &docker).await;
+            container_remove(&id, &docker).await;
+
+            let log = events[0].as_log();
+            assert_eq!(log[&event::log_schema().message_key()], message.into());
+            assert_eq!(log[&super::CONTAINER], id.into());
+            assert!(log.get(&super::CREATED_AT).is_some());
+            assert_eq!(log[&super::IMAGE], "busybox".into());
+            assert!(log.get(&format!("label.{}", label).into()).is_some());
+            assert_eq!(events[0].as_log()[&super::NAME], name.into());
+            assert_eq!(
+                events[0].as_log()[event::log_schema().source_type_key()],
+                "docker".into()
+            );
+        });
     }
 
     #[test]
     fn include_image() {
+        trace_init();
+
         let message = "15";
         let name = "vector_test_include_image";
         let config = DockerConfig {
@@ -1353,24 +1352,27 @@ mod tests {
             ..DockerConfig::default()
         };
 
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let out = source_with_config(config, &mut rt);
-        let docker = docker();
 
-        let id = container_log_n(1, name, None, message, &docker, &mut rt);
+        rt.block_on_std(async move {
+            let docker = Docker::new();
 
-        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+            let id = container_log_n(1, name, None, message, &docker).await;
+            let events = collect_n(out, 1).compat().await.ok().unwrap();
+            container_remove(&id, &docker).await;
 
-        container_remove(&id, &docker, &mut rt);
-
-        assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
-            message.into()
-        )
+            assert_eq!(
+                events[0].as_log()[&event::log_schema().message_key()],
+                message.into()
+            );
+        });
     }
 
     #[test]
     fn not_include_image() {
+        trace_init();
+
         let message = "16";
         let name = "vector_test_not_include_image";
         let config_ex = DockerConfig {
@@ -1378,18 +1380,23 @@ mod tests {
             ..DockerConfig::default()
         };
 
-        let mut rt = test_util::runtime();
+        let mut rt = runtime();
         let exclude_out = source_with_config(config_ex, &mut rt);
-        let docker = docker();
 
-        let id = container_log_n(1, name, None, message, &docker, &mut rt);
-        container_remove(&id, &docker, &mut rt);
+        rt.block_on_std(async move {
+            let docker = Docker::new();
 
-        assert!(rt.block_on(is_empty(exclude_out)).unwrap());
+            let id = container_log_n(1, name, None, message, &docker).await;
+            container_remove(&id, &docker).await;
+
+            assert!(is_empty(exclude_out).await.unwrap());
+        });
     }
 
     #[test]
     fn not_include_running_image() {
+        trace_init();
+
         let message = "17";
         let name = "vector_test_not_include_running_image";
         let config_ex = DockerConfig {
@@ -1402,18 +1409,19 @@ mod tests {
             ..DockerConfig::default()
         };
 
-        let mut rt = test_util::runtime();
-        let docker = docker();
+        let mut rt = runtime();
+        let docker = Docker::new();
 
         let id = running_container(name, None, message, &docker, &mut rt);
-
         let exclude_out = source_with_config(config_ex, &mut rt);
         let include_out = source_with_config(config_in, &mut rt);
 
-        let _ = rt.block_on(collect_n(include_out, 1)).ok().unwrap();
-        let _ = container_kill(&id, &docker, &mut rt);
-        container_remove(&id, &docker, &mut rt);
+        rt.block_on_std(async move {
+            let _ = collect_n(include_out, 1).compat().await.ok().unwrap();
+            let _ = container_kill(&id, &docker).await;
+            container_remove(&id, &docker).await;
 
-        assert!(rt.block_on(is_empty(exclude_out)).unwrap());
+            assert!(is_empty(exclude_out).await.unwrap());
+        });
     }
 }
