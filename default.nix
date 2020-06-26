@@ -11,11 +11,11 @@ rec {
               pkgs
             else
               pkgs.pkgsCross.gnu64;
-          logLevel = "trace";
           runCheckPhase = false;
           features = features.components.all ++
             features.byOs.linux.gnu ++
             features.byLinking.static;
+          buildType = "debug";
         };
         binary = tasks.binary configuration;
         binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-x86-64.so.2"; };
@@ -33,6 +33,7 @@ rec {
           features = features.components.all ++
             features.byOs.linux.musl ++
             features.byLinking.static;
+          buildType = "debug";
         };
         binary = tasks.binary configuration;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
@@ -49,6 +50,7 @@ rec {
           features = features.components.all ++
             features.byOs.linux.gnu ++
             features.byLinking.static;
+          buildType = "debug";
         };
         binary = tasks.binary configuration;
         binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-aarch64.so.2"; };
@@ -66,13 +68,13 @@ rec {
           features = features.components.all ++
             features.byOs.linux.musl ++
             features.byLinking.static;
+          buildType = "debug";
         };
         binary = tasks.binary configuration;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
       };
       armv7-unknown-linux-gnueabihf = rec {
         configuration = {
-          setInterpreterPath = "/lib64/ld-linux-armv7.so.2";
           rustTarget = "armv7-unknown-linux-gnueabihf";
           hostPkgs = pkgs;
           targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.armv7l-hf-multiplatform.stdenv.targetPlatform.config then
@@ -83,9 +85,11 @@ rec {
           features = features.components.all ++
             features.byOs.linux.musl ++
             features.byLinking.static;
+          buildType = "debug";
         };
         binary = tasks.binary configuration;
-        docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
+        binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-armv7.so.2"; };
+        docker = tasks.docker { tag = configuration.rustTarget; binary = binary-portable; };
       };
       armv7-unknown-linux-musleabihf = rec {
         setInterpreterPath = null;
@@ -100,10 +104,10 @@ rec {
           features = features.components.all ++
             features.byOs.linux.musl ++
             features.byLinking.static;
+          buildType = "debug";
         };
         binary = tasks.binary configuration;
-        binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-armv7.so.2"; };
-        docker = tasks.docker { tag = configuration.rustTarget; binary = binary-portable; };
+        docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
       };
     };
   };
@@ -369,12 +373,24 @@ rec {
     
     # Build a binary Vector artifact
     binary = args@{
+      # The features to enable in this build.
       features,
-      rustChannel ? null, # Defaulted below
+      # The target triple for rust
       rustTarget,
+      # The host platform's pkgs set
+      #
+      # For example:
+      #    hostPkgs = pkgs;
       hostPkgs,
+      # The target platform's pkgs set
+      #
+      # targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.armv7l-hf-multiplatform.stdenv.targetPlatform.config then
+      #     pkgs
+      #   else
+      #     pkgs.pkgsCross.armv7l-hf-multiplatform;
       targetPkgs,
-      buildType ? "debug",
+      # The build type, defaulting to `release`
+      buildType ? "release",
       logLevel ? "debug",
       runCheckPhase ? true,
     }:
