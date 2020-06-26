@@ -19,6 +19,8 @@ rec {
         };
         binary = tasks.binary configuration;
         binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-x86-64.so.2"; };
+        tarball = tasks.tarball binary;
+        tarball-portable = tasks.tarball binary-portable;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary-portable; };
         # rpm = {
         #   centos7 = tasks.rpm { diskImage = (pkgs.vmTools.diskImages.centos7x86_64); binaryDrv = binary; };
@@ -39,6 +41,7 @@ rec {
           buildType = "debug";
         };
         binary = tasks.binary configuration;
+        tarball = tasks.tarball binary;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
       };
       aarch64-unknown-linux-gnu = rec {
@@ -57,6 +60,8 @@ rec {
         };
         binary = tasks.binary configuration;
         binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-aarch64.so.2"; };
+        tarball = tasks.tarball binary;
+        tarball-portable = tasks.tarball binary-portable;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary-portable; };
       };
       aarch64-unknown-linux-musl = rec {
@@ -74,6 +79,7 @@ rec {
           buildType = "debug";
         };
         binary = tasks.binary configuration;
+        tarball = tasks.tarball binary;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
       };
       armv7-unknown-linux-gnueabihf = rec {
@@ -92,6 +98,8 @@ rec {
         };
         binary = tasks.binary configuration;
         binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-armv7.so.2"; };
+        tarball = tasks.tarball binary;
+        tarball-portable = tasks.tarball binary-portable;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary-portable; };
       };
       armv7-unknown-linux-musleabihf = rec {
@@ -110,6 +118,7 @@ rec {
           buildType = "debug";
         };
         binary = tasks.binary configuration;
+        tarball = tasks.tarball binary;
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary; };
       };
     };
@@ -376,7 +385,7 @@ rec {
         src = binary;
         phases = [ "postFixup" ];
         postFixup = ''
-          install -D -C ${binary}/bin/vector $out/bin/vector
+          install --verbose -D -C ${binary}/bin/vector $out/bin/vector
           ${pkgs.patchelf}/bin/patchelf --set-interpreter ${path} $out/bin/vector
         '';
       };
@@ -425,7 +434,7 @@ rec {
           buildType = buildType;
           logLevel = logLevel;
           # cargoVendorDir = ./vendor;
-          cargoSha256 = "0kiss6d8dsngyqzfxrmspanm2qqnkshw65w7rsn3ysyywc1230yd";
+          cargoSha256 = "009f2c0bsparph4f0fzw00nm6ac3fjlwap0acc49rcclwc8l8nzw";
           # TODO: There seems to be a cargoVendorDir option: https://github.com/NixOS/nixpkgs/blob/a7fa6f60c4df3fde0ab46cfe79294c1d65042fa4/pkgs/build-support/rust/default.nix#L30
 
           target = args.rustTarget;
@@ -482,6 +491,16 @@ rec {
         inherit diskImage;
         src = binaryDrv.src;
         inherit (binaryDrv) name version;
+      };
+
+    tarball = binary:
+      pkgs.stdenv.mkDerivation {
+        name = binary.name + "-tarball";
+        src = binary.src;
+        installPhase = ''
+          mkdir -p $out
+          tar cvfj $out/${binary.name}.tar.bz2 ${binary.out}
+        '';
       };
   };
 

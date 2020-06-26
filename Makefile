@@ -445,15 +445,26 @@ artifacts: artifacts-x86_64-unknown-linux artifacts-aarch64-unknown-linux artifa
 
 ### X86
 ## Linux
-.PHONY: artifacts-x86_64-unknown-linux-gnu artifacts-x86_64-unknown-linux-musl
-artifacts-x86_64-unknown-linux: artifacts-x86_64-unknown-linux-gnu artifacts-x86_64-unknown-linux-musl
+.PHONY: artifacts-x86_64-unknown-linux-gnu
+artifacts-x86_64-unknown-linux: \
+	artifacts-x86_64-unknown-linux-gnu \
+	artifacts-x86_64-unknown-linux-musl
 # GLIBC
 .PHONY: artifacts-x86_64-unknown-linux-gnu
-artifacts-x86_64-unknown-linux-gnu: target/artifacts/x86_64-unknown-linux-gnu/binary target/artifacts/x86_64-unknown-linux-gnu/binary-portable target/artifacts/x86_64-unknown-linux-gnu/docker
+artifacts-x86_64-unknown-linux-gnu: \
+	target/artifacts/x86_64-unknown-linux-gnu/binary \
+	target/artifacts/x86_64-unknown-linux-gnu/binary-portable \
+	target/artifacts/x86_64-unknown-linux-gnu/tarball \
+	target/artifacts/x86_64-unknown-linux-gnu/tarball-portable \
+	target/artifacts/x86_64-unknown-linux-gnu/docker
 .PHONY: artifacts-x86_64-unknown-linux-gnu-binary
 artifacts-x86_64-unknown-linux-gnu-binary: target/artifacts/x86_64-unknown-linux-gnu/binary
 .PHONY: artifacts-x86_64-unknown-linux-gnu-binary-portable
 artifacts-x86_64-unknown-linux-gnu-binary-portable: target/artifacts/x86_64-unknown-linux-gnu/binary-portable
+.PHONY: artifacts-x86_64-unknown-linux-gnu-tarball
+artifacts-x86_64-unknown-linux-gnu-tarball: target/artifacts/x86_64-unknown-linux-gnu/tarball
+.PHONY: artifacts-x86_64-unknown-linux-gnu-tarball-portable
+artifacts-x86_64-unknown-linux-gnu-tarball-portable: target/artifacts/x86_64-unknown-linux-gnu/tarball-portable
 .PHONY: artifacts-x86_64-unknown-linux-gnu-docker
 artifacts-x86_64-unknown-linux-gnu-docker: target/artifacts/x86_64-unknown-linux-gnu/docker
 .PHONY: artifacts-x86_64-unknown-linux-gnu-rpm-centos7
@@ -463,6 +474,8 @@ artifacts-x86_64-unknown-linux-gnu-rpm-centos7: target/artifacts/x86_64-unknown-
 artifacts-x86_64-unknown-linux-musl: target/artifacts/x86_64-unknown-linux-musl/binary target/artifacts/x86_64-unknown-linux-musl/docker
 .PHONY: artifacts-x86_64-unknown-linux-musl-binary
 artifacts-x86_64-unknown-linux-musl-binary: target/artifacts/x86_64-unknown-linux-musl/binary
+.PHONY: artifacts-x86_64-unknown-linux-musl-tarball
+artifacts-x86_64-unknown-linux-musl-tarball: target/artifacts/x86_64-unknown-linux-musl/tarball
 .PHONY: artifacts-x86_64-unknown-linux-musl-binary-portable
 artifacts-x86_64-unknown-linux-musl-docker: target/artifacts/x86_64-unknown-linux-musl/docker
 ### AARCH64
@@ -584,6 +597,12 @@ sign-blog: ## Sign newly added blog articles using GPG
 	$(RUN) sign-blog
 
 ##@ Utility
+
+install: ## Install Vector to the local host.
+	install -D bin/vector /usr/bin/vector
+
+uninstall:
+	rm /usr/bin/vector
 
 build-ci-docker-images: ## Rebuilds all Docker images used in CI
 	@scripts/build-ci-docker-images.sh
