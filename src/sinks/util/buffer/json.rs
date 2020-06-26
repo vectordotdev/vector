@@ -90,7 +90,7 @@ mod tests {
         assert!(matches!(buffer.push(json!({})), PushResult::Overflow(_)));
 
         assert_eq!(buffer.num_items(), 2);
-        assert_eq!(buffer.total_bytes, 34);
+        assert_eq!(buffer.total_bytes, 36);
 
         let json = buffer.finish();
 
