@@ -2,7 +2,7 @@ use crate::dns::Resolver;
 use crate::event::Value;
 use crate::sinks::influxdb::{
     encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
-    Field, InfluxDB1Settings, InfluxDB2Settings,
+    Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
 };
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
@@ -13,7 +13,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::Sink;
-use http02::{Method, Request, Uri};
+use http::{Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -44,6 +44,7 @@ pub struct InfluxDBLogsConfig {
 struct InfluxDBLogsSink {
     uri: Uri,
     token: String,
+    protocol_version: ProtocolVersion,
     namespace: String,
     tags: HashSet<String>,
 }
@@ -87,14 +88,16 @@ impl SinkConfig for InfluxDBLogsConfig {
         .unwrap();
 
         let endpoint = self.endpoint.clone();
-        let uri = settings.write_uri2(endpoint).unwrap();
+        let uri = settings.write_uri(endpoint).unwrap();
 
         let token = settings.token();
+        let protocol_version = settings.protocol_version();
         let namespace = self.namespace.clone();
 
         let sink = InfluxDBLogsSink {
             uri,
             token,
+            protocol_version,
             namespace,
             tags,
         };
@@ -121,6 +124,7 @@ impl SinkConfig for InfluxDBLogsConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for InfluxDBLogsSink {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
@@ -150,6 +154,7 @@ impl HttpSink for InfluxDBLogsSink {
         });
 
         influx_line_protocol(
+            self.protocol_version,
             measurement,
             "logs",
             Some(tags),
@@ -161,14 +166,12 @@ impl HttpSink for InfluxDBLogsSink {
         Some(output.into_bytes())
     }
 
-    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
-        Request::builder()
-            .method(Method::POST)
-            .uri(&self.uri)
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+        Request::post(&self.uri)
             .header("Content-Type", "text/plain")
             .header("Authorization", format!("Token {}", &self.token))
             .body(events)
-            .unwrap()
+            .map_err(Into::into)
     }
 }
 
@@ -224,12 +227,12 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_event() {
+    fn test_encode_event_v1() {
         let mut event = Event::from("hello");
         event.as_mut_log().insert("host", "aws.cloud.eur");
         event.as_mut_log().insert("source_type", "file");
 
-        event.as_mut_log().insert("int", 4);
+        event.as_mut_log().insert("int", 4i32);
         event.as_mut_log().insert("float", 5.5);
         event.as_mut_log().insert("bool", true);
         event.as_mut_log().insert("string", "thisisastring");
@@ -238,6 +241,51 @@ mod tests {
         let sink = create_sink(
             "http://localhost:9999",
             "my-token",
+            ProtocolVersion::V1,
+            "ns",
+            ["source_type", "host"].to_vec(),
+        );
+
+        let bytes = sink.encode_event(event).unwrap();
+        let string = std::str::from_utf8(&bytes).unwrap();
+
+        let line_protocol = split_line_protocol(&string);
+        assert_eq!("ns.vector", line_protocol.0);
+        assert_eq!(
+            "host=aws.cloud.eur,metric_type=logs,source_type=file",
+            line_protocol.1
+        );
+        assert_fields(
+            line_protocol.2.to_string(),
+            [
+                "int=4i",
+                "float=5.5",
+                "bool=true",
+                "string=\"thisisastring\"",
+                "message=\"hello\"",
+            ]
+            .to_vec(),
+        );
+
+        assert_eq!("1542182950000000011\n", line_protocol.3);
+    }
+
+    #[test]
+    fn test_encode_event() {
+        let mut event = Event::from("hello");
+        event.as_mut_log().insert("host", "aws.cloud.eur");
+        event.as_mut_log().insert("source_type", "file");
+
+        event.as_mut_log().insert("int", 4i32);
+        event.as_mut_log().insert("float", 5.5);
+        event.as_mut_log().insert("bool", true);
+        event.as_mut_log().insert("string", "thisisastring");
+        event.as_mut_log().insert("timestamp", ts());
+
+        let sink = create_sink(
+            "http://localhost:9999",
+            "my-token",
+            ProtocolVersion::V2,
             "ns",
             ["source_type", "host"].to_vec(),
         );
@@ -273,7 +321,13 @@ mod tests {
         event.as_mut_log().insert("value", 100);
         event.as_mut_log().insert("timestamp", ts());
 
-        let sink = create_sink("http://localhost:9999", "my-token", "ns", [].to_vec());
+        let sink = create_sink(
+            "http://localhost:9999",
+            "my-token",
+            ProtocolVersion::V2,
+            "ns",
+            [].to_vec(),
+        );
 
         let bytes = sink.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -304,7 +358,13 @@ mod tests {
             .insert("nested.array[2]", "another-value");
         event.as_mut_log().insert("nested.array[3]", 15);
 
-        let sink = create_sink("http://localhost:9999", "my-token", "ns", [].to_vec());
+        let sink = create_sink(
+            "http://localhost:9999",
+            "my-token",
+            ProtocolVersion::V2,
+            "ns",
+            [].to_vec(),
+        );
 
         let bytes = sink.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -338,6 +398,7 @@ mod tests {
         let sink = create_sink(
             "http://localhost:9999",
             "my-token",
+            ProtocolVersion::V2,
             "ns",
             ["as_a_tag", "not_exists_field", "source_type"].to_vec(),
         );
@@ -500,7 +561,13 @@ mod tests {
         assert_eq!(format!("{}", (i + 1) * 1000000000), line_protocol.3);
     }
 
-    fn create_sink(uri: &str, token: &str, namespace: &str, tags: Vec<&str>) -> InfluxDBLogsSink {
+    fn create_sink(
+        uri: &str,
+        token: &str,
+        protocol_version: ProtocolVersion,
+        namespace: &str,
+        tags: Vec<&str>,
+    ) -> InfluxDBLogsSink {
         let uri = uri.parse::<Uri>().unwrap();
         let token = token.to_string();
         let namespace = namespace.to_string();
@@ -508,6 +575,7 @@ mod tests {
         let sink = InfluxDBLogsSink {
             uri,
             token,
+            protocol_version,
             namespace,
             tags,
         };

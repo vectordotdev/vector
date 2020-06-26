@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink, Response},
+        http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink},
         retries2::{RetryAction, RetryLogic},
         service2::TowerRequestConfig,
         BatchBytesConfig, Buffer, Compression,
@@ -13,7 +13,7 @@ use crate::{
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
-use http02::{Method, Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -89,6 +89,7 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for ClickhouseConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
@@ -103,7 +104,7 @@ impl HttpSink for ClickhouseConfig {
         Some(body)
     }
 
-    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let database = if let Some(database) = &self.database {
             database.as_str()
         } else {
@@ -112,10 +113,7 @@ impl HttpSink for ClickhouseConfig {
 
         let uri = encode_uri(&self.host, database, &self.table).expect("Unable to encode uri");
 
-        let mut builder = Request::builder()
-            .method(Method::POST)
-            .uri(uri.clone())
-            .header("Content-Type", "application/x-ndjson");
+        let mut builder = Request::post(&uri).header("Content-Type", "application/x-ndjson");
 
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);
@@ -127,7 +125,7 @@ impl HttpSink for ClickhouseConfig {
             auth.apply(&mut request);
         }
 
-        request
+        Ok(request)
     }
 }
 
@@ -147,7 +145,7 @@ async fn healthcheck(resolver: Resolver, config: ClickhouseConfig) -> crate::Res
 
     match response.status() {
         StatusCode::OK => Ok(()),
-        status => Err(super::HealthcheckError::UnexpectedStatus2 { status }.into()),
+        status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
     }
 }
 
@@ -170,7 +168,7 @@ fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
         format!("{}/?{}", host, query)
     };
 
-    Ok(url.parse::<Uri>().context(super::UriParseError2)?)
+    Ok(url.parse::<Uri>().context(super::UriParseError)?)
 }
 
 #[derive(Clone)]
@@ -179,7 +177,7 @@ struct ClickhouseRetryLogic {
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
-    type Response = Response;
+    type Response = http::Response<bytes05::Bytes>;
     type Error = hyper::Error;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

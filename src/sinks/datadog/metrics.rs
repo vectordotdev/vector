@@ -14,7 +14,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
-use http02::{uri::InvalidUri, Request, StatusCode, Uri};
+use http::{uri::InvalidUri, Request, StatusCode, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -136,6 +136,7 @@ impl SinkConfig for DatadogConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for DatadogSink {
     type Input = Event;
     type Output = Vec<Metric>;
@@ -144,7 +145,7 @@ impl HttpSink for DatadogSink {
         Some(event)
     }
 
-    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let now = Utc::now().timestamp();
         let interval = now - self.last_sent_timestamp.load(SeqCst);
         self.last_sent_timestamp.store(now, SeqCst);
@@ -156,14 +157,14 @@ impl HttpSink for DatadogSink {
             .header("Content-Type", "application/json")
             .header("DD-API-KEY", self.config.api_key.clone())
             .body(body)
-            .unwrap()
+            .map_err(Into::into)
     }
 }
 
 fn build_uri(host: &str) -> crate::Result<Uri> {
     let uri = format!("{}/api/v1/series", host)
         .parse::<Uri>()
-        .context(super::UriParseError2)?;
+        .context(super::UriParseError)?;
 
     Ok(uri)
 }
@@ -171,7 +172,7 @@ fn build_uri(host: &str) -> crate::Result<Uri> {
 async fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result<()> {
     let uri = format!("{}/api/v1/validate", config.host)
         .parse::<Uri>()
-        .context(super::UriParseError2)?;
+        .context(super::UriParseError)?;
 
     let request = Request::get(uri)
         .header("DD-API-KEY", config.api_key)
@@ -183,7 +184,7 @@ async fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result
 
     match response.status() {
         StatusCode::OK => Ok(()),
-        other => Err(super::HealthcheckError::UnexpectedStatus2 { status: other }.into()),
+        other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }
 
@@ -373,9 +374,10 @@ mod tests {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
     use crate::sinks::util::{http::HttpSink, test::load_sink};
+    use crate::test_util::runtime;
     use chrono::offset::TimeZone;
     use chrono::Utc;
-    use http02::{Method, Uri};
+    use http::{Method, Uri};
     use pretty_assertions::assert_eq;
     use std::sync::atomic::AtomicI64;
 
@@ -434,7 +436,10 @@ mod tests {
             },
         ];
 
-        let req = sink.build_request(events);
+        let mut rt = runtime();
+        let req = rt
+            .block_on_std(async move { sink.build_request(events).await })
+            .unwrap();
 
         assert_eq!(req.method(), Method::POST);
         assert_eq!(

@@ -1,4 +1,4 @@
-use super::{healthcheck_response2, GcpAuthConfig, GcpCredentials, Scope};
+use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::Event,
     sinks::{
@@ -8,14 +8,14 @@ use crate::{
             service2::TowerRequestConfig,
             BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
         },
-        Healthcheck, RouterSink, UriParseError2,
+        Healthcheck, RouterSink, UriParseError,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
-use http02::{Method, Request, Uri};
+use http::{Request, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -138,11 +138,12 @@ impl PubsubSink {
             uri = format!("{}?key={}", uri, key);
         }
         uri.parse::<Uri>()
-            .context(UriParseError2)
+            .context(UriParseError)
             .map_err(Into::into)
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for PubsubSink {
     type Input = Value;
     type Output = Vec<BoxedRawValue>;
@@ -155,21 +156,19 @@ impl HttpSink for PubsubSink {
         Some(json!({ "data": base64::encode(&json) }))
     }
 
-    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let body = json!({ "messages": events });
         let body = serde_json::to_vec(&body).unwrap();
 
-        let builder = Request::builder()
-            .method(Method::POST)
-            .uri(self.uri(":publish").unwrap())
-            .header("Content-Type", "application/json");
+        let uri = self.uri(":publish").unwrap();
+        let builder = Request::post(uri).header("Content-Type", "application/json");
 
         let mut request = builder.body(body).unwrap();
         if let Some(creds) = &self.creds {
-            creds.apply2(&mut request);
+            creds.apply(&mut request);
         }
 
-        request
+        Ok(request)
     }
 }
 
@@ -181,12 +180,12 @@ async fn healthcheck(
 ) -> crate::Result<()> {
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
     if let Some(creds) = creds.as_ref() {
-        creds.apply2(&mut request);
+        creds.apply(&mut request);
     }
 
     let mut client = HttpClient::new(cx.resolver(), tls.clone())?;
     let response = client.send(request).await?;
-    healthcheck_response2(creds, HealthcheckError::TopicNotFound.into())(response)
+    healthcheck_response(creds, HealthcheckError::TopicNotFound.into())(response)
 }
 
 #[cfg(test)]

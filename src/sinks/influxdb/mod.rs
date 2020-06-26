@@ -7,8 +7,7 @@ use crate::{dns::Resolver, sinks::util::http::HttpClient};
 use chrono::{DateTime, Utc};
 use futures::TryFutureExt;
 use futures01::Future;
-use http02::{StatusCode, Uri};
-use hyper;
+use http::{StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use snafu::Snafu;
@@ -26,6 +25,12 @@ pub enum Field {
     Int(i64),
     /// boolean
     Bool(bool),
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ProtocolVersion {
+    V1,
+    V2,
 }
 
 #[derive(Debug, Snafu)]
@@ -61,14 +66,9 @@ pub struct InfluxDB2Settings {
 
 trait InfluxDBSettings {
     fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
-    fn write_uri2(self: &Self, endpoint: String) -> crate::Result<http02::Uri> {
-        let uri = self.write_uri(endpoint)?;
-        Ok(format!("{}", uri)
-            .parse::<http02::Uri>()
-            .context(super::UriParseError2)?)
-    }
     fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
     fn token(self: &Self) -> String;
+    fn protocol_version(self: &Self) -> ProtocolVersion;
 }
 
 impl InfluxDBSettings for InfluxDB1Settings {
@@ -94,6 +94,10 @@ impl InfluxDBSettings for InfluxDB1Settings {
     fn token(self: &Self) -> String {
         "".to_string()
     }
+
+    fn protocol_version(self: &Self) -> ProtocolVersion {
+        ProtocolVersion::V1
+    }
 }
 
 impl InfluxDBSettings for InfluxDB2Settings {
@@ -115,6 +119,10 @@ impl InfluxDBSettings for InfluxDB2Settings {
 
     fn token(self: &Self) -> String {
         self.token.clone()
+    }
+
+    fn protocol_version(self: &Self) -> ProtocolVersion {
+        ProtocolVersion::V2
     }
 }
 
@@ -166,7 +174,7 @@ fn healthcheck(
         .and_then(|response| match response.status() {
             StatusCode::OK => Ok(()),
             StatusCode::NO_CONTENT => Ok(()),
-            other => Err(super::HealthcheckError::UnexpectedStatus2 { status: other }.into()),
+            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
         });
 
     Ok(Box::new(healthcheck))
@@ -174,6 +182,7 @@ fn healthcheck(
 
 // https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
 fn influx_line_protocol(
+    protocol_version: ProtocolVersion,
     measurement: String,
     metric_type: &str,
     tags: Option<BTreeMap<String, String>>,
@@ -198,7 +207,7 @@ fn influx_line_protocol(
     line_protocol.push(' ');
 
     // Fields
-    encode_fields(unwrapped_fields, line_protocol);
+    encode_fields(protocol_version, unwrapped_fields, line_protocol);
     line_protocol.push(' ');
 
     // Timestamp
@@ -226,7 +235,11 @@ fn encode_tags(tags: BTreeMap<String, String>, output: &mut String) {
     output.pop();
 }
 
-fn encode_fields(fields: HashMap<String, Field>, output: &mut String) {
+fn encode_fields(
+    protocol_version: ProtocolVersion,
+    fields: HashMap<String, Field>,
+    output: &mut String,
+) {
     for (key, value) in fields.into_iter() {
         encode_string(key.to_string(), output);
         output.push('=');
@@ -244,7 +257,11 @@ fn encode_fields(fields: HashMap<String, Field>, output: &mut String) {
             Field::Float(f) => output.push_str(&f.to_string()),
             Field::UnsignedInt(i) => {
                 output.push_str(&i.to_string());
-                output.push('u');
+                let c = match protocol_version {
+                    ProtocolVersion::V1 => 'i',
+                    ProtocolVersion::V2 => 'u',
+                };
+                output.push(c);
             }
             Field::Int(i) => {
                 output.push_str(&i.to_string());
@@ -305,7 +322,7 @@ fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> c
         url.pop();
     }
 
-    Ok(url.parse::<Uri>().context(super::UriParseError2)?)
+    Ok(url.parse::<Uri>().context(super::UriParseError)?)
 }
 
 #[cfg(test)]
@@ -387,7 +404,8 @@ pub mod test_util {
         let status = res.status();
 
         assert!(
-            status == http::StatusCode::CREATED || status == http::StatusCode::UNPROCESSABLE_ENTITY,
+            status == http01::StatusCode::CREATED
+                || status == http01::StatusCode::UNPROCESSABLE_ENTITY,
             format!("UnexpectedStatus: {}", status)
         );
     }
@@ -546,6 +564,45 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_fields_v1() {
+        let fields = vec![
+            (
+                "field_string".to_owned(),
+                Field::String("string value".to_owned()),
+            ),
+            (
+                "field_string_escape".to_owned(),
+                Field::String("string\\val\"ue".to_owned()),
+            ),
+            ("field_float".to_owned(), Field::Float(123.45)),
+            ("field_unsigned_int".to_owned(), Field::UnsignedInt(657)),
+            ("field_int".to_owned(), Field::Int(657646)),
+            ("field_bool_true".to_owned(), Field::Bool(true)),
+            ("field_bool_false".to_owned(), Field::Bool(false)),
+            ("escape key".to_owned(), Field::Float(10.0)),
+        ]
+        .into_iter()
+        .collect();
+
+        let mut value = String::new();
+        encode_fields(ProtocolVersion::V1, fields, &mut value);
+        assert_fields(
+            value,
+            [
+                "escape\\ key=10",
+                "field_float=123.45",
+                "field_string=\"string value\"",
+                "field_string_escape=\"string\\\\val\\\"ue\"",
+                "field_unsigned_int=657i",
+                "field_int=657646i",
+                "field_bool_true=true",
+                "field_bool_false=false",
+            ]
+            .to_vec(),
+        )
+    }
+
+    #[test]
     fn test_encode_fields() {
         let fields = vec![
             (
@@ -567,7 +624,7 @@ mod tests {
         .collect();
 
         let mut value = String::new();
-        encode_fields(fields, &mut value);
+        encode_fields(ProtocolVersion::V2, fields, &mut value);
         assert_fields(
             value,
             [

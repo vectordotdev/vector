@@ -1621,7 +1621,7 @@ dns_servers = ["0.0.0.0:53"]
     type = "is_log"
     type = "is_metric"
 
-    # Check whether a fields contents exactly matches the value specified.This may
+    # Check whether a fields contents exactly matches the value specified. This may
     # be a single string or a list of strings, in which case this evaluates to true
     # if any of the list matches.
     #
@@ -1641,7 +1641,7 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "host.exists" = true
 
-    # Check whether a fields contents does not match the value specified.This may
+    # Check whether a fields contents does not match the value specified. This may
     # be a single string or a list of strings, in which case this evaluates to
     # false if any of the list matches.
     #
@@ -1662,9 +1662,9 @@ dns_servers = ["0.0.0.0:53"]
     "unit.not_starts_with" = "sys-"
     "unit.not_ends_with" = ".device"
 
-    # Checks whether a string field contains a string argument.This may be a single
-    # string or a list of strings, in which case this evaluates to true if any of
-    # the list matches.
+    # Checks whether a string field contains a string argument. This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
     #
     # * optional
     # * no default
@@ -1673,7 +1673,7 @@ dns_servers = ["0.0.0.0:53"]
     "message.contains" = "foo"
     "message.contains" = ["foo", "bar"]
 
-    # Checks whether a string field ends with a string argument.This may be a
+    # Checks whether a string field ends with a string argument. This may be a
     # single string or a list of strings, in which case this evaluates to true if
     # any of the list matches.
     #
@@ -1683,6 +1683,18 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "environment.ends_with" = "-staging"
     "environment.ends_with" = ["-staging", "-running"]
+
+    # Checks whether an IP field is contained within a given IP CIDR (works with
+    # IPv4 and IPv6). This may be a single string or a list of strings, in which
+    # case this evaluates to true if the IP field is contained within any of the
+    # CIDRs in the list.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "message.ip_cidr_contains" = "10.0.0.0/8"
+    "message.ip_cidr_contains" = ["2000::/10", "192.168.0.0/16"]
 
     # Checks whether a string field matches a regular expression. Vector uses the
     # documented Rust Regex syntax. Note that this condition is considerably more
@@ -1695,7 +1707,7 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "message.regex" = " (any|of|these|five|words) "
 
-    # Checks whether a string field starts with a string argument.This may be a
+    # Checks whether a string field starts with a string argument. This may be a
     # single string or a list of strings, in which case this evaluates to true if
     # any of the list matches.
     #
@@ -2533,7 +2545,7 @@ require('custom_module')
       type = "is_log"
       type = "is_metric"
 
-      # Check whether a fields contents exactly matches the value specified.This may
+      # Check whether a fields contents exactly matches the value specified. This may
       # be a single string or a list of strings, in which case this evaluates to true
       # if any of the list matches.
       #
@@ -2553,7 +2565,7 @@ require('custom_module')
       # * relevant when type = "check_fields"
       "host.exists" = true
 
-      # Check whether a fields contents does not match the value specified.This may
+      # Check whether a fields contents does not match the value specified. This may
       # be a single string or a list of strings, in which case this evaluates to
       # false if any of the list matches.
       #
@@ -2574,9 +2586,9 @@ require('custom_module')
       "unit.not_starts_with" = "sys-"
       "unit.not_ends_with" = ".device"
 
-      # Checks whether a string field contains a string argument.This may be a single
-      # string or a list of strings, in which case this evaluates to true if any of
-      # the list matches.
+      # Checks whether a string field contains a string argument. This may be a
+      # single string or a list of strings, in which case this evaluates to true if
+      # any of the list matches.
       #
       # * optional
       # * no default
@@ -2585,7 +2597,7 @@ require('custom_module')
       "message.contains" = "foo"
       "message.contains" = ["foo", "bar"]
 
-      # Checks whether a string field ends with a string argument.This may be a
+      # Checks whether a string field ends with a string argument. This may be a
       # single string or a list of strings, in which case this evaluates to true if
       # any of the list matches.
       #
@@ -2595,6 +2607,18 @@ require('custom_module')
       # * relevant when type = "check_fields"
       "environment.ends_with" = "-staging"
       "environment.ends_with" = ["-staging", "-running"]
+
+      # Checks whether an IP field is contained within a given IP CIDR (works with
+      # IPv4 and IPv6). This may be a single string or a list of strings, in which
+      # case this evaluates to true if the IP field is contained within any of the
+      # CIDRs in the list.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      # * relevant when type = "check_fields"
+      "message.ip_cidr_contains" = "10.0.0.0/8"
+      "message.ip_cidr_contains" = ["2000::/10", "192.168.0.0/16"]
 
       # Checks whether a string field matches a regular expression. Vector uses the
       # documented Rust Regex syntax. Note that this condition is considerably more
@@ -2607,7 +2631,7 @@ require('custom_module')
       # * relevant when type = "check_fields"
       "message.regex" = " (any|of|these|five|words) "
 
-      # Checks whether a string field starts with a string argument.This may be a
+      # Checks whether a string field starts with a string argument. This may be a
       # single string or a list of strings, in which case this evaluates to true if
       # any of the list matches.
       #
@@ -4679,6 +4703,14 @@ require('custom_module')
   #
 
   [sinks.elasticsearch.auth]
+    # The ARN of an IAM role to assume at startup.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when strategy = "aws"
+    assume_role = "arn:aws:iam::123456789098:role/my_role"
+
     # The basic authentication password.
     #
     # * required

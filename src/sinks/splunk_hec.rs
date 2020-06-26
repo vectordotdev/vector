@@ -13,7 +13,7 @@ use crate::{
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
-use http02::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -110,6 +110,7 @@ impl SinkConfig for HecSinkConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for HecSinkConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
@@ -177,7 +178,7 @@ impl HttpSink for HecSinkConfig {
         }
     }
 
-    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let uri = build_uri(&self.host, "/services/collector/event").expect("Unable to parse URI");
 
         let mut builder = Request::post(uri)
@@ -188,7 +189,7 @@ impl HttpSink for HecSinkConfig {
             builder = builder.header("Content-Encoding", ce);
         }
 
-        builder.body(events).unwrap()
+        builder.body(events).map_err(Into::into)
     }
 }
 
@@ -202,7 +203,7 @@ enum HealthcheckError {
 
 pub async fn healthcheck(config: HecSinkConfig, resolver: Resolver) -> crate::Result<()> {
     let uri =
-        build_uri(&config.host, "/services/collector/health/1.0").context(super::UriParseError2)?;
+        build_uri(&config.host, "/services/collector/health/1.0").context(super::UriParseError)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", config.token))
@@ -217,12 +218,12 @@ pub async fn healthcheck(config: HecSinkConfig, resolver: Resolver) -> crate::Re
         StatusCode::OK => Ok(()),
         StatusCode::BAD_REQUEST => Err(HealthcheckError::InvalidToken.into()),
         StatusCode::SERVICE_UNAVAILABLE => Err(HealthcheckError::QueuesFull.into()),
-        other => Err(super::HealthcheckError::UnexpectedStatus2 { status: other }.into()),
+        other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }
 
 pub fn validate_host(host: &str) -> crate::Result<()> {
-    let uri = Uri::try_from(host).context(super::UriParseError2)?;
+    let uri = Uri::try_from(host).context(super::UriParseError)?;
 
     match uri.scheme() {
         Some(_) => Ok(()),
@@ -230,7 +231,7 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
     }
 }
 
-fn build_uri(host: &str, path: &str) -> Result<Uri, http02::uri::InvalidUri> {
+fn build_uri(host: &str, path: &str) -> Result<Uri, http::uri::InvalidUri> {
     format!("{}{}", host.trim_end_matches('/'), path).parse::<Uri>()
 }
 

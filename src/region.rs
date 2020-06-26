@@ -1,6 +1,6 @@
 #![cfg(feature = "rusoto_core")]
 
-use http02::{uri::InvalidUri, Uri};
+use http::{uri::InvalidUri, Uri};
 use rusoto_core::{region::ParseRegionError, Region};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};

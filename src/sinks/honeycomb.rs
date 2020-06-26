@@ -11,7 +11,7 @@ use crate::{
 };
 use futures::TryFutureExt;
 use futures01::Sink;
-use http02::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -68,6 +68,7 @@ impl SinkConfig for HoneycombConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for HoneycombConfig {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
@@ -88,13 +89,13 @@ impl HttpSink for HoneycombConfig {
         }))
     }
 
-    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let uri = self.build_uri();
         let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
 
         let buf = serde_json::to_vec(&events).unwrap();
 
-        request.body(buf).unwrap()
+        request.body(buf).map_err(Into::into)
     }
 }
 
@@ -102,7 +103,7 @@ impl HoneycombConfig {
     fn build_uri(&self) -> Uri {
         let uri = format!("{}/{}", HOST.clone(), self.dataset);
 
-        uri.parse::<http02::Uri>()
+        uri.parse::<http::Uri>()
             .expect("This should be a valid uri")
     }
 }
@@ -110,7 +111,10 @@ impl HoneycombConfig {
 async fn healthcheck(config: HoneycombConfig, resolver: Resolver) -> crate::Result<()> {
     let mut client = HttpClient::new(resolver, TlsSettings::from_options(&None)?)?;
 
-    let req = config.build_request(Vec::new()).map(hyper::Body::from);
+    let req = config
+        .build_request(Vec::new())
+        .await?
+        .map(hyper::Body::from);
 
     let res = client.send(req).await?;
 

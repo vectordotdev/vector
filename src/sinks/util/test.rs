@@ -27,7 +27,7 @@ pub fn build_test_server(
     addr: std::net::SocketAddr,
     rt: &mut Runtime,
 ) -> (
-    mpsc::Receiver<(http02::request::Parts, Vec<u8>)>,
+    mpsc::Receiver<(http::request::Parts, Vec<u8>)>,
     stream_cancel::Trigger,
     impl Future<Item = (), Error = ()>,
 ) {
