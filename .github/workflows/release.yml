@@ -104,7 +104,7 @@ jobs:
           name: "vector-aarch64-unknown-linux-musl-docker"
           path: "./target/artifacts/aarch64-unknown-linux-musl/docker"
 
-  artifacts-aarch64-unknown-linux-gnu:
+  artifacts-armv7-unknown-linux-gnu:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
