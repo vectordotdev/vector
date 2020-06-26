@@ -456,6 +456,8 @@ artifacts-x86_64-unknown-linux-gnu-binary: target/artifacts/x86_64-unknown-linux
 artifacts-x86_64-unknown-linux-gnu-binary-portable: target/artifacts/x86_64-unknown-linux-gnu/binary-portable
 .PHONY: artifacts-x86_64-unknown-linux-gnu-docker
 artifacts-x86_64-unknown-linux-gnu-docker: target/artifacts/x86_64-unknown-linux-gnu/docker
+.PHONY: artifacts-x86_64-unknown-linux-gnu-rpm-centos7
+artifacts-x86_64-unknown-linux-gnu-rpm-centos7: target/artifacts/x86_64-unknown-linux-gnu/rpm/centos7
 # MUSL
 .PHONY: artifacts-x86_64-unknown-linux-musl
 artifacts-x86_64-unknown-linux-musl: target/artifacts/x86_64-unknown-linux-musl/binary target/artifacts/x86_64-unknown-linux-musl/docker

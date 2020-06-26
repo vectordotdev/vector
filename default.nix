@@ -20,6 +20,9 @@ rec {
         binary = tasks.binary configuration;
         binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-x86-64.so.2"; };
         docker = tasks.docker { tag = configuration.rustTarget; binary = binary-portable; };
+        # rpm = {
+        #   centos7 = tasks.rpm { diskImage = (pkgs.vmTools.diskImages.centos7x86_64); binaryDrv = binary; };
+        # };
       };
       x86_64-unknown-linux-musl = rec {
         configuration = {
@@ -119,10 +122,10 @@ rec {
         PROTOC = "${hostPkgs.protobuf}/bin/protoc"; # NOTE: `targetPkgs.pkgs` points to the 'host' packages.
         PROTOC_INCLUDE = "${hostPkgs.protobuf}/include"; # NOTE: `targetPkgs.pkgs` points to the 'host' packages.
         # On Linux builds, we need some level of localization.
-        LOCALE_ARCHIVE = if targetPkgs.stdenv.isLinux && targetPkgs.glibcLocales != null then
-          "${targetPkgs.glibcLocales}/lib/locale/locale-archive"
-        else
-          "";
+        # LOCALE_ARCHIVE = if targetPkgs.stdenv.isLinux && targetPkgs.glibcLocales != null then
+        #   "${targetPkgs.glibcLocales}/lib/locale/locale-archive"
+        # else
+        #   "";
         # LC_ALL = "en_US.UTF-8";
         # Without setting a tzdata folder, some tests will fail.
         TZDIR = "${targetPkgs.tzdata}/share/zoneinfo";
@@ -135,7 +138,7 @@ rec {
         # Curl looks to this env var for SSL certificates.
         CURL_CA_BUNDLE = "${targetPkgs.cacert}/etc/ca-bundle.crt";
         # Encourage Cargo to be pretty.
-        CARGO_TERM_COLOR = "always";
+        # CARGO_TERM_COLOR = "always";
         # Enable backtraces in the environment.
         RUST_BACKTRACE = "full";
         # Vector gets very angry if you don't set these and use the AWS components.
@@ -149,7 +152,7 @@ rec {
         #   "";
       };
     developmentTools = targetPkgs:
-      with targetPkgs;
+      with targetPkgs.buildPackages;
       [
         file
         dnsutils
@@ -164,6 +167,12 @@ rec {
         stdenv
         bashInteractive
         rustup
+        leveldb
+        snappy.dev
+        protobuf
+        # $$$ Prodding here
+        libcxx
+        libcxxabi
         # Build Env
         git
         cacert
@@ -182,6 +191,7 @@ rec {
         # Linux
         podman
         podman-compose
+        linuxHeaders
       ]);
     dependencies = {
       # From: https://nixos.org/nixpkgs/manual/
@@ -401,7 +411,7 @@ rec {
           # targets = [ args.rustTarget ];
         };
         packageDefinition = {
-          pname = cargoToml.package.name;
+          name = cargoToml.package.name;
           version = cargoToml.package.version;
 
           depsBuildHost = (environment.dependencies.depsBuildHost targetPkgs);
@@ -414,7 +424,8 @@ rec {
           # Configurables
           buildType = buildType;
           logLevel = logLevel;
-          cargoSha256 = "0xg43s4vdhzqz6gqbakr7c7jbr1jlmwr15ykrsl1clgywpg3rm8r";
+          # cargoVendorDir = ./vendor;
+          cargoSha256 = "0kiss6d8dsngyqzfxrmspanm2qqnkshw65w7rsn3ysyywc1230yd";
           # TODO: There seems to be a cargoVendorDir option: https://github.com/NixOS/nixpkgs/blob/a7fa6f60c4df3fde0ab46cfe79294c1d65042fa4/pkgs/build-support/rust/default.nix#L30
 
           target = args.rustTarget;
@@ -457,6 +468,21 @@ rec {
           stdenv = pkgs.stdenvAdapters.makeStaticBinaries;
           # stdenv = overrideCC stdenv (stdenv.cc.override { bintools = stdenv.cc.bintools.override { libc = stdenv.libc; }; };
         }).buildRustPackage packageDefinition;
+
+    # RHEL/CentOS/Fedora/etc
+    rpm = args@{
+      # The disk image to use as the builder
+      diskImage,
+      # The `tasks.binary` call you'd use.
+      binaryDrv
+    }:
+      builtins.trace binaryDrv.name
+      builtins.trace binaryDrv.version
+      pkgs.releaseTools.rpmBuild {
+        inherit diskImage;
+        src = binaryDrv.src;
+        inherit (binaryDrv) name version;
+      };
   };
 
   tools = {

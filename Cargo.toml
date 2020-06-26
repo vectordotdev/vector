@@ -438,5 +438,3 @@ required-features = ["transforms-wasm", "transforms-lua"]
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
 
-[patch.crates-io]
-leveldb = { git = "https://github.com/timberio/leveldb/", branch = "optional-snappy-build" }
