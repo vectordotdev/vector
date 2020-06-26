@@ -179,8 +179,8 @@ mod test {
             future::ok::<_, std::io::Error>(())
         });
         let batch_size = BatchSize {
-            bytes: 1000,
-            events: 1000,
+            bytes: 100_000,
+            events: 1_000,
         };
         let timeout = Duration::from_secs(0);
 
@@ -215,7 +215,7 @@ mod test {
         let output = output.into_iter().collect::<Vec<Vec<u8>>>();
 
         assert!(output.len() > 1);
-        assert!(dbg!(output.iter().map(|o| o.len()).sum::<usize>()) < 51_000);
+        assert!(dbg!(output.iter().map(|o| o.len()).sum::<usize>()) < 80_000);
 
         let decompressed = output.into_iter().flat_map(|batch| {
             let mut decompressed = vec![];

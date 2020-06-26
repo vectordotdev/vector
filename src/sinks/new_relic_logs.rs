@@ -179,7 +179,7 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(
-            http_config.batch.max_size,
+            http_config.batch.max_bytes,
             Some(bytesize::mib(5u64) as usize)
         );
         assert_eq!(http_config.request.in_flight_limit, Some(100));
@@ -210,7 +210,7 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(
-            http_config.batch.max_size,
+            http_config.batch.max_bytes,
             Some(bytesize::mib(8u64) as usize)
         );
         assert_eq!(http_config.request.in_flight_limit, Some(12));
@@ -247,7 +247,7 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(
-            http_config.batch.max_size,
+            http_config.batch.max_bytes,
             Some(bytesize::mib(8u64) as usize)
         );
         assert_eq!(http_config.request.in_flight_limit, Some(12));
