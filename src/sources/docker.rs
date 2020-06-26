@@ -5,7 +5,7 @@ use crate::{
     stream::StreamExt,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
-use bytes::{Bytes, BytesMut};
+use bytes05::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Utc};
 use futures01::{
     sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
@@ -20,7 +20,6 @@ use shiplift::{
     tty::{Chunk, StreamType},
     Docker, Error,
 };
-use std::borrow::Borrow;
 use std::sync::Arc;
 use std::{collections::HashMap, env};
 use string_cache::DefaultAtom as Atom;
@@ -643,7 +642,7 @@ impl ContainerId {
     }
 
     fn as_str(&self) -> &str {
-        std::str::from_utf8(self.0.borrow()).expect("Bytes should be a still valid String")
+        std::str::from_utf8(&self.0).expect("Bytes should be a still valid String")
     }
 }
 
@@ -746,9 +745,9 @@ impl ContainerLogInfo {
             _ => return None,
         };
 
-        let mut bytes_message = BytesMut::from(message.data);
+        let mut bytes_message = Bytes::from(message.data);
 
-        let message = String::from_utf8_lossy(bytes_message.borrow());
+        let message = String::from_utf8_lossy(&bytes_message);
 
         let mut splitter = message.splitn(2, char::is_whitespace);
         let timestamp_str = splitter.next()?;
@@ -814,10 +813,7 @@ impl ContainerLogInfo {
             log_event.insert(event::log_schema().source_type_key(), "docker");
 
             // The log message.
-            log_event.insert(
-                event::log_schema().message_key().clone(),
-                bytes_message.freeze(),
-            );
+            log_event.insert(event::log_schema().message_key().clone(), bytes_message);
 
             // Stream we got the message from.
             log_event.insert(STREAM.clone(), stream);
