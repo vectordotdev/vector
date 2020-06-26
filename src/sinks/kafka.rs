@@ -331,17 +331,16 @@ mod integration_test {
     };
     use std::{thread, time::Duration};
 
-    #[test]
-    fn kafka_happy_path_plaintext() {
-        kafka_happy_path("localhost:9092", None, None, KafkaCompression::None);
-    }
+    const TEST_CA: &str = "tests/data/Vector_CA.crt";
+    const TEST_CRT: &str = "tests/data/localhost.crt";
+    const TEST_KEY: &str = "tests/data/localhost.key";
 
     #[test]
     fn healthcheck() {
         let topic = format!("test-{}", random_string(10));
 
         let config = KafkaSinkConfig {
-            bootstrap_servers: "localhost:9092".into(),
+            bootstrap_servers: "localhost:9091".into(),
             topic: topic.clone(),
             compression: KafkaCompression::None,
             encoding: EncodingConfigWithDefault::from(Encoding::Text),
@@ -357,14 +356,35 @@ mod integration_test {
         rt.block_on_std(jh).unwrap().unwrap();
     }
 
-    const TEST_CA: &str = "tests/data/Vector_CA.crt";
-    const TEST_CRT: &str = "tests/data/localhost.crt";
-    const TEST_KEY: &str = "tests/data/localhost.key";
+    #[test]
+    fn kafka_happy_path_plaintext() {
+        kafka_happy_path("localhost:9091", None, None, KafkaCompression::None);
+    }
+
+    #[test]
+    fn kafka_happy_path_gzip() {
+        kafka_happy_path("localhost:9091", None, None, KafkaCompression::Gzip);
+    }
+
+    #[test]
+    fn kafka_happy_path_lz4() {
+        kafka_happy_path("localhost:9091", None, None, KafkaCompression::Lz4);
+    }
+
+    #[test]
+    fn kafka_happy_path_snappy() {
+        kafka_happy_path("localhost:9091", None, None, KafkaCompression::Snappy);
+    }
+
+    #[test]
+    fn kafka_happy_path_zstd() {
+        kafka_happy_path("localhost:9091", None, None, KafkaCompression::Zstd);
+    }
 
     #[test]
     fn kafka_happy_path_tls() {
         kafka_happy_path(
-            "localhost:9091",
+            "localhost:9092",
             None,
             Some(KafkaTlsConfig {
                 enabled: Some(true),
@@ -380,7 +400,7 @@ mod integration_test {
     #[test]
     fn kafka_happy_path_tls_with_key() {
         kafka_happy_path(
-            "localhost:9091",
+            "localhost:9092",
             None,
             Some(KafkaTlsConfig {
                 enabled: Some(true),
@@ -397,23 +417,18 @@ mod integration_test {
     }
 
     #[test]
-    fn kafka_happy_path_gzip() {
-        kafka_happy_path("localhost:9092", None, None, KafkaCompression::Gzip);
-    }
-
-    #[test]
-    fn kafka_happy_path_lz4() {
-        kafka_happy_path("localhost:9092", None, None, KafkaCompression::Lz4);
-    }
-
-    #[test]
-    fn kafka_happy_path_snappy() {
-        kafka_happy_path("localhost:9092", None, None, KafkaCompression::Snappy);
-    }
-
-    #[test]
-    fn kafka_happy_path_zstd() {
-        kafka_happy_path("localhost:9092", None, None, KafkaCompression::Zstd);
+    fn kafka_happy_path_sasl() {
+        kafka_happy_path(
+            "localhost:9093",
+            Some(KafkaSaslConfig {
+                enabled: Some(true),
+                username: Some("admin".to_owned()),
+                password: Some("admin".to_owned()),
+                mechanism: Some("PLAIN".to_owned()),
+            }),
+            None,
+            KafkaCompression::None,
+        );
     }
 
     fn kafka_happy_path(
@@ -424,14 +439,14 @@ mod integration_test {
     ) {
         let topic = format!("test-{}", random_string(10));
 
-        let tls_enabled = tls.as_ref().and_then(|tls| tls.enabled).unwrap_or(false);
+        let kafka_auth = KafkaAuthConfig { sasl, tls };
         let config = KafkaSinkConfig {
             bootstrap_servers: server.to_string(),
             topic: format!("{}-%Y%m%d", topic),
             compression,
             encoding: EncodingConfigWithDefault::from(Encoding::Text),
             key_field: None,
-            auth: KafkaAuthConfig { sasl, tls },
+            auth: kafka_auth.clone(),
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
             ..Default::default()
@@ -451,10 +466,7 @@ mod integration_test {
         client_config.set("bootstrap.servers", server);
         client_config.set("group.id", &random_string(10));
         client_config.set("enable.partition.eof", "true");
-        if tls_enabled {
-            client_config.set("security.protocol", "ssl");
-            client_config.set("ssl.ca.location", TEST_CA);
-        }
+        let _ = kafka_auth.apply(&mut client_config).unwrap();
 
         let mut tpl = TopicPartitionList::new();
         tpl.add_partition(&topic, 0).set_offset(Offset::Beginning);
