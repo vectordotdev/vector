@@ -767,9 +767,7 @@ impl<'a> Response for &'a str {}
 mod tests {
     use super::*;
     use crate::buffers::Acker;
-    use crate::sinks::util::{
-        buffer::partition::Partition, BatchSize, Buffer, Compression, VecBuffer,
-    };
+    use crate::sinks::util::{buffer::partition::Partition, BatchSize, VecBuffer};
     use crate::test_util::runtime;
     use bytes::Bytes;
     use futures01::{future, Sink};
@@ -1016,56 +1014,6 @@ mod tests {
 
         let output = sent_requests.lock().unwrap();
         assert_eq!(&*output, &vec![vec![0, 1]]);
-    }
-
-    #[test]
-    fn batch_sink_allows_the_final_item_to_exceed_the_buffer_size() {
-        let rt = runtime();
-        let mut clock = MockClock::new();
-
-        let (acker, _) = Acker::new_for_testing();
-        let sent_requests = Arc::new(Mutex::new(Vec::new()));
-
-        let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
-
-            sent_requests.lock().unwrap().push(req);
-
-            future::ok::<_, std::io::Error>(())
-        });
-        let buffered = BatchSink::with_executor(
-            svc,
-            Buffer::new(BATCH_SIZE, Compression::None),
-            TIMEOUT,
-            acker,
-            rt.executor(),
-        );
-
-        let input = vec![
-            vec![0, 1, 2],
-            vec![3, 4, 5],
-            vec![6, 7, 8],
-            vec![9, 10, 11],
-            vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-            vec![24],
-        ];
-        let _ = clock.enter(|_| {
-            buffered
-                .sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(input))
-                .wait()
-                .unwrap()
-        });
-
-        let output = sent_requests.lock().unwrap();
-        assert_eq!(
-            &*output,
-            &vec![
-                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-                vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-                vec![24],
-            ]
-        );
     }
 
     #[test]
