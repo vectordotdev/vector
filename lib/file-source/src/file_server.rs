@@ -457,8 +457,7 @@ fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> 
             break;
         }
 
-        let tmp = buf;
-        buf = &mut tmp[read..];
+        buf = &mut buf[read..];
     }
     Ok(())
 }
