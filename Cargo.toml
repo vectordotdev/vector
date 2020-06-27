@@ -437,5 +437,8 @@ required-features = ["transforms-wasm", "transforms-lua"]
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
 
-[patch.'https://github.com/timberio/leveldb']
-leveldb = { src = "../leveldb" }
+# [patch.'https://github.com/timberio/leveldb']
+# leveldb = { src = "../leveldb", default-features = false }
+
+# [patch.'https://github.com/timberio/leveldb-sys']
+# leveldb = { src = "../leveldb-sys", default-features = false }

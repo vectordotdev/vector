@@ -104,51 +104,51 @@ jobs:
           name: "vector-aarch64-unknown-linux-musl-docker"
           path: "./target/artifacts/aarch64-unknown-linux-musl/docker"
 
-  artifacts-armv7-unknown-linux-gnu:
+  artifacts-armv7-unknown-linux-gnueabihf:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: make artifacts-aarch64-unknown-linux-gnu
+      - run: make artifacts-armv7-unknown-linux-gnueabihf
         env:
           VERBOSE: true
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-aarch64-unknown-linux-gnu-portable"
-          path: "./target/artifacts/aarch64-unknown-linux-gnu/binary-portable/bin/vector"
+          name: "vector-armv7-unknown-linux-gnueabihf-portable"
+          path: "./target/artifacts/armv7-unknown-linux-gnueabihf/binary-portable/bin/vector"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-aarch64-unknown-linux-gnu-portable.tar.gz"
-          path: "./target/artifacts/aarch64-unknown-linux-gnu/tarball-portable/vector-portable.tar.bz2"
+          name: "vector-armv7-unknown-linux-gnueabihf-portable.tar.gz"
+          path: "./target/artifacts/armv7-unknown-linux-gnueabihf/tarball-portable/vector-portable.tar.bz2"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-aarch64-unknown-linux-gnu-docker"
-          path: "./target/artifacts/aarch64-unknown-linux-gnu/docker"
+          name: "vector-armv7-unknown-linux-gnueabihf-docker"
+          path: "./target/artifacts/armv7-unknown-linux-gnueabihf/docker"
 
-  artifacts-armv7-unknown-linux-musl:
+  artifacts-armv7-unknown-linux-musleabihf:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - uses: cachix/install-nix-action@v10
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: make artifacts-armv7-unknown-linux-musl
+      - run: make artifacts-armv7-unknown-linux-musleabihf
         env:
           VERBOSE: true
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-armv7-unknown-linux-musl"
-          path: "./target/artifacts/armv7-unknown-linux-musl/binary/bin/vector"
+          name: "vector-armv7-unknown-linux-musleabihf"
+          path: "./target/artifacts/armv7-unknown-linux-musleabihf/binary/bin/vector"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-armv7-unknown-linux-musl.tar.gz"
-          path: "./target/artifacts/armv7-unknown-linux-musl/tarball/vector.tar.bz2"
+          name: "vector-armv7-unknown-linux-musleabihf.tar.gz"
+          path: "./target/artifacts/armv7-unknown-linux-musleabihf/tarball/vector.tar.bz2"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-armv7-unknown-linux-musl-docker"
-          path: "./target/artifacts/armv7-unknown-linux-musl/docker"
+          name: "vector-armv7-unknown-linux-musleabihf-docker"
+          path: "./target/artifacts/armv7-unknown-linux-musleabihf/docker"
 
 
   # build-x86_64-apple-darwin-packages:

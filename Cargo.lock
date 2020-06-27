@@ -1977,8 +1977,7 @@ checksum = "3576a87f2ba00f6f106fdfcd16db1d698d648a26ad8e0573cad8537c3c362d2a"
 [[package]]
 name = "leveldb"
 version = "0.8.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5a2fa830c44ac4762564389a7efe22688a469c8d7b71dd11da2e35c33ae96c2"
+source = "git+https://github.com/timberio/leveldb.git?branch=optional-snappy-build#827aee5f23e258b66b53347e113564697773a8cc"
 dependencies = [
  "db-key",
  "leveldb-sys",

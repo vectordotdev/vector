@@ -434,7 +434,7 @@ rec {
           buildType = buildType;
           logLevel = logLevel;
           # cargoVendorDir = ./vendor;
-          cargoSha256 = "009f2c0bsparph4f0fzw00nm6ac3fjlwap0acc49rcclwc8l8nzw";
+          cargoSha256 = "1nmamh1ygrx28k8896ffm01slxsahp55lipd1f9d2w2x0qm6sfwq";
           # TODO: There seems to be a cargoVendorDir option: https://github.com/NixOS/nixpkgs/blob/a7fa6f60c4df3fde0ab46cfe79294c1d65042fa4/pkgs/build-support/rust/default.nix#L30
 
           target = args.rustTarget;
