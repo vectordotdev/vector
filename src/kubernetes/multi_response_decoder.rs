@@ -51,7 +51,9 @@ where
     /// Produces an error if there's unparsed data remaining.
     pub fn finish(self) -> Result<(), Vec<u8>> {
         let Self { pending_data, .. } = self;
-        if pending_data.is_empty() {
+        // Kubernetes sometimes adds `\n` to the response, consider this
+        // a valid termination case.
+        if pending_data.is_empty() || pending_data == b"\n" {
             return Ok(());
         }
         Err(pending_data)
@@ -406,6 +408,18 @@ mod tests {
         }
 
         assert_eq!(dec.finish().unwrap_err(), b"{");
+    }
+
+    #[test]
+    fn test_allows_unparsed_newlines_at_finish() {
+        let mut dec = MultiResponseDecoder::<TO>::new();
+
+        {
+            let mut stream = dec.process_next_chunk(b"\n");
+            assert!(stream.next().is_none());
+        }
+
+        assert!(dec.finish().is_ok());
     }
 
     #[test]
