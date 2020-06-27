@@ -89,6 +89,10 @@ pub mod tests {
     use super::Cri;
     use crate::event::LogEvent;
 
+    fn make_long_string(base: &str, len: usize) -> String {
+        base.chars().cycle().take(len).collect()
+    }
+
     /// Shared test cases.
     pub fn cases() -> Vec<(String, LogEvent)> {
         vec![
@@ -126,6 +130,20 @@ pub mod tests {
                     "2016-10-06T00:17:10.113242941Z",
                     "stderr",
                     false,
+                ),
+            ),
+            // A part of the partial message with a realistic length.
+            (
+                [
+                    r#"2016-10-06T00:17:10.113242941Z stdout P "#,
+                    make_long_string("very long message ", 16 * 1024).as_str(),
+                ]
+                .join(""),
+                test_util::make_log_event(
+                    make_long_string("very long message ", 16 * 1024).as_str(),
+                    "2016-10-06T00:17:10.113242941Z",
+                    "stdout",
+                    true,
                 ),
             ),
         ]
