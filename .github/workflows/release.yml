@@ -94,7 +94,7 @@ jobs:
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-aarch64-unknown-linux-musl"
-          path: "./target/artifacts/aarch64-unknown-linux-musl/binary-portable/bin/vector"
+          path: "./target/artifacts/aarch64-unknown-linux-musl/binary/bin/vector"
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-aarch64-unknown-linux-musl.tar.gz"
