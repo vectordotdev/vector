@@ -117,7 +117,7 @@ jobs:
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-aarch64-unknown-linux-android"
-          path: "./target/artifacts/aarch64-unknown-linux-android/binary-portable/bin/vector"
+          path: "./target/artifacts/aarch64-unknown-linux-android/binary/bin/vector"
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-aarch64-unknown-linux-android.tar.gz"
