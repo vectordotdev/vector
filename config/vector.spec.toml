@@ -654,6 +654,41 @@ dns_servers = ["0.0.0.0:53"]
     "socket.send.buffer.bytes" = "100"
 
   #
+  # SASL
+  #
+
+  [sources.kafka.sasl]
+    # Enable SASL/SCRAM authentication to the remote.
+    #
+    # * optional
+    # * no default
+    # * type: bool
+    enabled = true
+    enabled = false
+
+    # The Kafka SASL/SCRAM mechanisms.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    mechanism = "SCRAM-SHA-256"
+    mechanism = "SCRAM-SHA-512"
+
+    # The Kafka SASL/SCRAM authentication password.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    password = "password"
+
+    # The Kafka SASL/SCRAM authentication username.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    username = "username"
+
+  #
   # TLS
   #
 
@@ -7491,6 +7526,41 @@ require('custom_module')
     "client.id" = "${ENV_VAR}"
     "fetch.error.backoff.ms" = "1000"
     "socket.send.buffer.bytes" = "100"
+
+  #
+  # SASL
+  #
+
+  [sinks.kafka.sasl]
+    # Enable SASL/SCRAM authentication to the remote.
+    #
+    # * optional
+    # * no default
+    # * type: bool
+    enabled = true
+    enabled = false
+
+    # The Kafka SASL/SCRAM mechanisms.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    mechanism = "SCRAM-SHA-256"
+    mechanism = "SCRAM-SHA-512"
+
+    # The Kafka SASL/SCRAM authentication password.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    password = "password"
+
+    # The Kafka SASL/SCRAM authentication username.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    username = "username"
 
   #
   # TLS

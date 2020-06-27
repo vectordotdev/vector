@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-02"
+last_modified_on: "2020-06-24"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -78,6 +78,12 @@ ingests data through [Kafka][urls.kafka] and outputs
   librdkafka_options."client.id" = "${ENV_VAR}" # example
   librdkafka_options."fetch.error.backoff.ms" = "1000" # example
   librdkafka_options."socket.send.buffer.bytes" = "100" # example
+
+  # SASL
+  sasl.enabled = true # optional, no default
+  sasl.mechanism = "SCRAM-SHA-256" # optional, no default
+  sasl.password = "password" # optional, no default
+  sasl.username = "username" # optional, no default
 
   # TLS
   tls.ca_file = "/path/to/certificate_authority.crt" # optional, no default
@@ -278,6 +284,123 @@ details.
 #### `[field-name]`
 
 The options and their values. Accepts `string` values.
+
+
+
+</Field>
+</Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"sasl"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### sasl
+
+Options for SASL/SCRAM authentication support.
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"enabled"}
+  path={"sasl"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### enabled
+
+Enable SASL/SCRAM authentication to the remote.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["SCRAM-SHA-256","SCRAM-SHA-512"]}
+  groups={[]}
+  name={"mechanism"}
+  path={"sasl"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### mechanism
+
+The Kafka SASL/SCRAM mechanisms.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["password"]}
+  groups={[]}
+  name={"password"}
+  path={"sasl"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### password
+
+The Kafka SASL/SCRAM authentication password.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["username"]}
+  groups={[]}
+  name={"username"}
+  path={"sasl"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### username
+
+The Kafka SASL/SCRAM authentication username.
 
 
 

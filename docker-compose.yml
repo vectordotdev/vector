@@ -463,16 +463,21 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: PLAINTEXT://:9092,SSL://:9091
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,SSL://localhost:9091
+      KAFKA_LISTENERS: PLAINTEXT://:9091,SSL://:9092,SASL_PLAINTEXT://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9091,SSL://localhost:9092,SASL_PLAINTEXT://localhost:9093
       KAFKA_SSL_KEYSTORE_LOCATION: /certs/localhost.p12
       KAFKA_SSL_KEYSTORE_PASSWORD: NOPASS
       KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/localhost.p12
       KAFKA_SSL_TRUSTSTORE_PASSWORD: NOPASS
       KAFKA_SSL_KEY_PASSWORD: NOPASS
       KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: none
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
+      KAFKA_INTER_BROKER_LISTENER_NAME: SASL_PLAINTEXT
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
     volumes:
       - ./tests/data/localhost.p12:/certs/localhost.p12:ro
+      - ./tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
   pulsar:
     image: apachepulsar/pulsar
     command: bin/pulsar standalone
