@@ -1,15 +1,12 @@
-use super::transform_utils::pick::{IterPicker, Passthrough, PickOnce};
-use crate::transforms::Transform;
-
 mod cri;
 mod docker;
+mod picker;
 mod test_util;
 
 /// Parser for any log format supported by `kubelet`.
-pub type Parser = PickOnce<IterPicker<Vec<Box<dyn Transform>>>>;
+pub type Parser = picker::Picker;
 
 /// Build a parser for any log format supported by `kubelet`.
 pub fn build() -> Parser {
-    let pickers = vec![docker::build(), cri::build(), Box::new(Passthrough)];
-    PickOnce::new(IterPicker::new(pickers))
+    picker::Picker::new()
 }

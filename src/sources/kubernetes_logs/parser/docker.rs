@@ -10,10 +10,6 @@ use lazy_static::lazy_static;
 use snafu::{OptionExt, ResultExt, Snafu};
 use string_cache::DefaultAtom as Atom;
 
-pub fn build() -> Box<dyn Transform> {
-    Box::new(Docker::new())
-}
-
 lazy_static! {
     pub static ref TIME: Atom = Atom::from("time");
     pub static ref LOG: Atom = Atom::from("log");
@@ -113,70 +109,73 @@ enum NormalizationError {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::super::test_util;
-    use super::*;
+    use super::Docker;
+    use crate::event::LogEvent;
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
     }
 
+    /// Shared test cases.
+    pub fn cases() -> Vec<(String, LogEvent)> {
+        vec![
+            (
+                r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
+                test_util::make_log_event(
+                    "The actual log line",
+                    "2016-10-05T00:00:30.082640485Z",
+                    "stderr",
+                    false,
+                ),
+            ),
+            (
+                r#"{"log": "A line without newline chan at the end", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
+                test_util::make_log_event(
+                    "A line without newline chan at the end",
+                    "2016-10-05T00:00:30.082640485Z",
+                    "stdout",
+                    false,
+                ),
+            ),
+            // Partial message due to message length.
+            (
+                [
+                    r#"{"log": ""#,
+                    make_long_string("partial ", 16 * 1024).as_str(),
+                    r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                ]
+                .join(""),
+                test_util::make_log_event(
+                    make_long_string("partial ",16 * 1024).as_str(),
+                    "2016-10-05T00:00:30.082640485Z",
+                    "stdout",
+                    true,
+                ),
+            ),
+            // Non-partial message, because message length matches but
+            // the message also ends with newline.
+            (
+                [
+                    r#"{"log": ""#,
+                    make_long_string("non-partial ", 16 * 1024 - 1).as_str(),
+                    r"\n",
+                    r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
+                ]
+                .join(""),
+                test_util::make_log_event(
+                    make_long_string("non-partial ", 16 * 1024 - 1).as_str(),
+                    "2016-10-05T00:00:30.082640485Z",
+                    "stdout",
+                    false,
+                ),
+            ),
+        ]
+    }
+
     #[test]
     fn test_parsing() {
-        let cases =
-            vec![
-                (
-                    r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
-                    test_util::make_log_event(
-                        "The actual log line",
-                        "2016-10-05T00:00:30.082640485Z",
-                        "stderr",
-                        false,
-                    ),
-                ),
-                (
-                    r#"{"log": "A line without newline chan at the end", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
-                    test_util::make_log_event(
-                        "A line without newline chan at the end",
-                        "2016-10-05T00:00:30.082640485Z",
-                        "stdout",
-                        false,
-                    ),
-                ),
-                // Partial message due to message length.
-                (
-                    [
-                        r#"{"log": ""#,
-                        make_long_string("partial ", 16 * 1024).as_str(),
-                        r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
-                    ]
-                    .join(""),
-                    test_util::make_log_event(
-                        make_long_string("partial ",16 * 1024).as_str(),
-                        "2016-10-05T00:00:30.082640485Z",
-                        "stdout",
-                        true,
-                    ),
-                ),
-                // Non-partial message, because message length matches but
-                // the message also ends with newline.
-                (
-                    [
-                        r#"{"log": ""#,
-                        make_long_string("non-partial ", 16 * 1024 - 1).as_str(),
-                        r"\n",
-                        r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
-                    ]
-                    .join(""),
-                    test_util::make_log_event(
-                        make_long_string("non-partial ", 16 * 1024 - 1).as_str(),
-                        "2016-10-05T00:00:30.082640485Z",
-                        "stdout",
-                        false,
-                    ),
-                ),
-            ];
-
-        test_util::test_parser(build, cases);
+        test_util::test_parser(|| Docker::new(), cases());
     }
 }

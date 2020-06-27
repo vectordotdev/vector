@@ -31,9 +31,10 @@ pub fn make_log_event(message: &str, timestamp: &str, stream: &str, is_partial: 
 /// Shared logic for testing parsers.
 ///
 /// Takes a parser builder and a list of test cases.
-pub fn test_parser<B>(builder: B, cases: Vec<(String, LogEvent)>)
+pub fn test_parser<B, T>(builder: B, cases: Vec<(String, LogEvent)>)
 where
-    B: Fn() -> Box<dyn Transform>,
+    B: Fn() -> T,
+    T: Transform,
 {
     for (message, expected) in cases {
         let input = Event::from(message);

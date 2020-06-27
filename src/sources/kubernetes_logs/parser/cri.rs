@@ -9,10 +9,6 @@ use lazy_static::lazy_static;
 use snafu::{OptionExt, Snafu};
 use string_cache::DefaultAtom as Atom;
 
-pub fn build() -> Box<dyn Transform> {
-    Box::new(Cri::new())
-}
-
 lazy_static! {
     pub static ref MULTILINE_TAG: Atom = Atom::from("multiline_tag");
 }
@@ -88,13 +84,14 @@ enum NormalizationError {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::super::test_util;
-    use super::*;
+    use super::Cri;
+    use crate::event::LogEvent;
 
-    #[test]
-    fn test_parsing() {
-        let cases = vec![
+    /// Shared test cases.
+    pub fn cases() -> Vec<(String, LogEvent)> {
+        vec![
             (
                 "2016-10-06T00:17:09.669794202Z stdout F The content of the log entry 1".into(),
                 test_util::make_log_event(
@@ -131,8 +128,11 @@ mod tests {
                     false,
                 ),
             ),
-        ];
+        ]
+    }
 
-        test_util::test_parser(build, cases);
+    #[test]
+    fn test_parsing() {
+        test_util::test_parser(|| Cri::new(), cases());
     }
 }
