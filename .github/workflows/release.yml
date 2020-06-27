@@ -47,12 +47,12 @@ jobs:
           VERBOSE: true
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-x86_64-unknown-linux-musl-portable"
-          path: "./target/artifacts/x86_64-unknown-linux-musl/binary-portable/bin/vector"
+          name: "vector-x86_64-unknown-linux-musl"
+          path: "./target/artifacts/x86_64-unknown-linux-musl/binary/bin/vector"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-x86_64-unknown-linux-musl-portable.tar.gz"
-          path: "./target/artifacts/x86_64-unknown-linux-musl/tarball-portable/vector-portable.tar.bz2"
+          name: "vector-x86_64-unknown-linux-musl.tar.gz"
+          path: "./target/artifacts/x86_64-unknown-linux-musl/tarball/vector.tar.bz2"
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-x86_64-unknown-linux-musl-docker"
@@ -93,12 +93,12 @@ jobs:
           VERBOSE: true
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-aarch64-unknown-linux-musl-portable"
+          name: "vector-aarch64-unknown-linux-musl"
           path: "./target/artifacts/aarch64-unknown-linux-musl/binary-portable/bin/vector"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-aarch64-unknown-linux-musl-portable.tar.gz"
-          path: "./target/artifacts/aarch64-unknown-linux-musl/tarball-portable/vector-portable.tar.bz2"
+          name: "vector-aarch64-unknown-linux-musl.tar.gz"
+          path: "./target/artifacts/aarch64-unknown-linux-musl/tarball/vecto.tar.bz2"
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-aarch64-unknown-linux-musl-docker"
@@ -139,12 +139,12 @@ jobs:
           VERBOSE: true
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-armv7-unknown-linux-musl-portable"
-          path: "./target/artifacts/armv7-unknown-linux-musl/binary-portable/bin/vector"
+          name: "vector-armv7-unknown-linux-musl"
+          path: "./target/artifacts/armv7-unknown-linux-musl/binary/bin/vector"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-armv7-unknown-linux-musl-portable.tar.gz"
-          path: "./target/artifacts/armv7-unknown-linux-musl/tarball-portable/vector-portable.tar.bz2"
+          name: "vector-armv7-unknown-linux-musl.tar.gz"
+          path: "./target/artifacts/armv7-unknown-linux-musl/tarball/vector.tar.bz2"
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-armv7-unknown-linux-musl-docker"
