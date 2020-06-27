@@ -477,7 +477,7 @@ artifacts-x86_64-unknown-linux-gnu-rpm-centos7: target/artifacts/x86_64-unknown-
 artifacts-x86_64-unknown-linux-musl: \
 	target/artifacts/x86_64-unknown-linux-musl/binary \
 	target/artifacts/x86_64-unknown-linux-musl/tarball \
-	target/artifacts/x86_64-unknown-linux-musl/docker \
+	target/artifacts/x86_64-unknown-linux-musl/docker
 .PHONY: artifacts-x86_64-unknown-linux-musl-binary
 artifacts-x86_64-unknown-linux-musl-binary: target/artifacts/x86_64-unknown-linux-musl/binary
 .PHONY: artifacts-x86_64-unknown-linux-musl-tarball
