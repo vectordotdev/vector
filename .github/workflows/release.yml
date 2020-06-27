@@ -24,11 +24,11 @@ jobs:
           VERBOSE: true
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-x86_64-unknown-linux-gnu-portable"
+          name: "vector-x86_64-unknown-linux-gnu"
           path: "./target/artifacts/x86_64-unknown-linux-gnu/binary-portable/bin/vector"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-x86_64-unknown-linux-gnu-portable.tar.gz"
+          name: "vector-x86_64-unknown-linux-gnu.tar.gz"
           path: "./target/artifacts/x86_64-unknown-linux-gnu/tarball-portable/vector-portable.tar.bz2"
       - uses: actions/upload-artifact@v1
         with:
@@ -70,11 +70,11 @@ jobs:
           VERBOSE: true
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-aarch64-unknown-linux-gnu-portable"
+          name: "vector-aarch64-unknown-linux-gnu"
           path: "./target/artifacts/aarch64-unknown-linux-gnu/binary-portable/bin/vector"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-aarch64-unknown-linux-gnu-portable.tar.gz"
+          name: "vector-aarch64-unknown-linux-gnu.tar.gz"
           path: "./target/artifacts/aarch64-unknown-linux-gnu/tarball-portable/vector-portable.tar.bz2"
       - uses: actions/upload-artifact@v1
         with:
@@ -98,11 +98,30 @@ jobs:
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-aarch64-unknown-linux-musl.tar.gz"
-          path: "./target/artifacts/aarch64-unknown-linux-musl/tarball/vecto.tar.bz2"
+          path: "./target/artifacts/aarch64-unknown-linux-musl/tarball/vector.tar.bz2"
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-aarch64-unknown-linux-musl-docker"
           path: "./target/artifacts/aarch64-unknown-linux-musl/docker"
+
+  artifacts-aarch64-unknown-linux-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: cachix/install-nix-action@v10
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: make artifacts-aarch64-unknown-linux-android
+        env:
+          VERBOSE: true
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-aarch64-unknown-linux-android"
+          path: "./target/artifacts/aarch64-unknown-linux-android/binary-portable/bin/vector"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-aarch64-unknown-linux-android.tar.gz"
+          path: "./target/artifacts/aarch64-unknown-linux-android/tarball/vector.tar.bz2"
 
   artifacts-armv7-unknown-linux-gnueabihf:
     runs-on: ubuntu-latest

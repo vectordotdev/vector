@@ -1,3 +1,5 @@
+{ buildType ? "release" }:
+
 rec {
   target = {
     # Output Artifacts
@@ -15,7 +17,6 @@ rec {
           features = features.components.all ++
             features.byOs.linux.gnu ++
             features.byLinking.static;
-          buildType = "debug";
         };
         binary = tasks.binary configuration;
         binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-x86-64.so.2"; };
@@ -38,7 +39,6 @@ rec {
           features = features.components.all ++
             features.byOs.linux.musl ++
             features.byLinking.static;
-          buildType = "debug";
         };
         binary = tasks.binary configuration;
         tarball = tasks.tarball binary;
@@ -56,7 +56,6 @@ rec {
           features = features.components.all ++
             features.byOs.linux.gnu ++
             features.byLinking.static;
-          buildType = "debug";
         };
         binary = tasks.binary configuration;
         binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-aarch64.so.2"; };
@@ -76,7 +75,6 @@ rec {
           features = features.components.all ++
             features.byOs.linux.musl ++
             features.byLinking.static;
-          buildType = "debug";
         };
         binary = tasks.binary configuration;
         tarball = tasks.tarball binary;
@@ -94,7 +92,6 @@ rec {
           features = features.components.all ++
             features.byOs.linux.musl ++
             features.byLinking.static;
-          buildType = "debug";
         };
         binary = tasks.binary configuration;
         binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-armv7.so.2"; };
@@ -115,7 +112,6 @@ rec {
           features = features.components.all ++
             features.byOs.linux.musl ++
             features.byLinking.static;
-          buildType = "debug";
         };
         binary = tasks.binary configuration;
         tarball = tasks.tarball binary;
@@ -409,7 +405,6 @@ rec {
       #     pkgs.pkgsCross.armv7l-hf-multiplatform;
       targetPkgs,
       # The build type, defaulting to `release`
-      buildType ? "release",
       logLevel ? "debug",
       runCheckPhase ? true,
     }:
