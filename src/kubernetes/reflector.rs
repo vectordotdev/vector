@@ -142,7 +142,7 @@ where
             label_selector: self.label_selector.as_ref().map(|s| s.as_str()),
             pretty: None,
             resource_version: self.resource_version.get(),
-            timeout_seconds: None,
+            timeout_seconds: Some(290), // https://github.com/kubernetes/kubernetes/issues/6513
             allow_watch_bookmarks: Some(true),
         };
         let stream = self.watcher.watch(watch_optional).await?;
@@ -518,7 +518,7 @@ mod tests {
                         label_selector: Some("labels".to_owned()),
                         pretty: None,
                         resource_version: None,
-                        timeout_seconds: None,
+                        timeout_seconds: Some(290),
                     }
                 );
 
