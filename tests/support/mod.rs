@@ -173,6 +173,7 @@ impl Transform for MockTransform {
                 MetricValue::Distribution {
                     ref mut values,
                     ref mut sample_rates,
+                    statistic: _,
                 } => {
                     values.push(self.increase);
                     sample_rates.push(1);
