@@ -1,4 +1,8 @@
-{ buildType ? "release" }:
+{
+  buildType ? "release",
+  runCheckPhase ? true,
+  verbose ? false,
+}:
 
 rec {
   target = {
@@ -13,10 +17,12 @@ rec {
               pkgs
             else
               pkgs.pkgsCross.gnu64;
-          runCheckPhase = false;
           features = features.components.all ++
             features.byOs.linux.gnu ++
             features.byLinking.static;
+            buildType = buildType;
+            verbose = true;
+            runCheckPhase = runCheckPhase;
         };
         binary = tasks.binary configuration;
         binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-x86-64.so.2"; };
@@ -35,10 +41,12 @@ rec {
               pkgs.pkgsStatic  # Yes, this is musl!
             else
               pkgs.pkgsCross.musl64;
-          runCheckPhase = false;
           features = features.components.all ++
             features.byOs.linux.musl ++
             features.byLinking.static;
+            buildType = buildType;
+            verbose = true;
+            runCheckPhase = runCheckPhase;
         };
         binary = tasks.binary configuration;
         tarball = tasks.tarball binary;
@@ -52,10 +60,12 @@ rec {
               pkgs
             else
               pkgs.pkgsCross.aarch64-multiplatform;
-          runCheckPhase = false;
           features = features.components.all ++
             features.byOs.linux.gnu ++
             features.byLinking.static;
+            buildType = buildType;
+            verbose = true;
+            runCheckPhase = runCheckPhase;
         };
         binary = tasks.binary configuration;
         binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-aarch64.so.2"; };
@@ -71,10 +81,12 @@ rec {
               pkgs
             else
               pkgs.pkgsCross.aarch64-multiplatform-musl;
-          runCheckPhase = false;
           features = features.components.all ++
             features.byOs.linux.musl ++
             features.byLinking.static;
+            buildType = buildType;
+            verbose = true;
+            runCheckPhase = runCheckPhase;
         };
         binary = tasks.binary configuration;
         tarball = tasks.tarball binary;
@@ -88,10 +100,12 @@ rec {
               pkgs
             else
               pkgs.pkgsCross.armv7l-hf-multiplatform;
-          runCheckPhase = false;
           features = features.components.all ++
             features.byOs.linux.musl ++
             features.byLinking.static;
+            buildType = buildType;
+            verbose = true;
+            runCheckPhase = runCheckPhase;
         };
         binary = tasks.binary configuration;
         binary-portable = tasks.binaryWithPortableInterpeterPath { binary = binary; path = "/lib64/ld-linux-armv7.so.2"; };
@@ -108,10 +122,12 @@ rec {
               pkgs.pkgsStatic
             else
               pkgs.pkgsCross.armv7l-hf-multiplatform.pkgsStatic;
-          runCheckPhase = false;
           features = features.components.all ++
             features.byOs.linux.musl ++
             features.byLinking.static;
+          buildType = buildType;
+          verbose = true;
+          runCheckPhase = runCheckPhase;
         };
         binary = tasks.binary configuration;
         tarball = tasks.tarball binary;
@@ -404,8 +420,8 @@ rec {
       #   else
       #     pkgs.pkgsCross.armv7l-hf-multiplatform;
       targetPkgs,
-      # The build type, defaulting to `release`
-      logLevel ? "debug",
+      verbose ? false,
+      buildType ? "release",
       runCheckPhase ? true,
     }:
       let
@@ -426,8 +442,8 @@ rec {
 
           passthru = (environment.variables { inherit (args) targetPkgs hostPkgs; });
           # Configurables
-          buildType = buildType;
-          logLevel = logLevel;
+          buildType = args.buildType;
+          logLevel = if verbose then "debug" else "info";
           # cargoVendorDir = ./vendor;
           cargoSha256 = "1nmamh1ygrx28k8896ffm01slxsahp55lipd1f9d2w2x0qm6sfwq";
           # TODO: There seems to be a cargoVendorDir option: https://github.com/NixOS/nixpkgs/blob/a7fa6f60c4df3fde0ab46cfe79294c1d65042fa4/pkgs/build-support/rust/default.nix#L30
@@ -437,11 +453,12 @@ rec {
           src = hostPkgs.lib.cleanSource (tools.gitignore.gitignoreSource ./.);
 
           cargoBuildFlags = [ "--no-default-features" "--features" "${hostPkgs.lib.concatStringsSep "," features}" ];
+          # The default of `buildRustPackage` doesn't suite us well here, so override it.
           checkPhase = if runCheckPhase then
               ''
-              # Configurables
+              set +v
               export TZDIR=${targetPkgs.tzdata}/share/zoneinfo
-              cargo test --no-default-features --features ${hostPkgs.lib.concatStringsSep "," features} -- --test-threads 1
+              cargo test --frozen ${(if args.buildType == "release" then "--release" else "")} --target ${args.rustTarget} --no-default-features --features ${hostPkgs.lib.concatStringsSep "," features} ${(if verbose == true then "-- --nocapture" else "")}
               ''
             else
               "";

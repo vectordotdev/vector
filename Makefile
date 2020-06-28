@@ -13,7 +13,8 @@ else
     export DEFAULT_FEATURES = default
 endif
 
-export BUILD_TYPE ?= debug
+export BUILD_TYPE ?= release
+export RUN_CHECK_PHASE ?= true
 # Override this with any scopes for testing/benching.
 export SCOPE ?= ""
 # Override to false to disable autospawning services on integration tests.
@@ -62,9 +63,17 @@ help:
 	@printf -- "\n"
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make ${FORMATTING_BEGIN_BLUE}<target>${FORMATTING_END}\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  ${FORMATTING_BEGIN_BLUE}%-46s${FORMATTING_END} %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-##@ Environment
-
 # These are some predefined macros, please use them!
+define NIX_BUILD
+	nix build \
+		$(if $(findstring true,$(VERBOSE)),--verbose --show-trace --print-build-logs,) \
+		$(if $(findstring true,$(DRY_RUN)),--dry-run,) \
+		--argstr buildType $(BUILD_TYPE) \
+		--arg verbose $(VERBOSE) \
+		--arg runCheckPhase $(RUN_CHECK_PHASE) \
+		--file default.nix
+endef
+
 ifeq ($(ENVIRONMENT), true)
 define MAYBE_ENVIRONMENT_EXEC
 ${ENVIRONMENT_EXEC}
@@ -137,6 +146,9 @@ define ENVIRONMENT_PREPARE
 	$(CONTAINER_TOOL) pull $(ENVIRONMENT_UPSTREAM)
 endef
 endif
+
+
+##@ Environment
 
 environment: export ENVIRONMENT_TTY = true ## Enter a full Vector dev shell in $CONTAINER_TOOL, binding this folder to the container.
 environment:
@@ -429,14 +441,6 @@ package-rpm-aarch64: package-archive-aarch64-unknown-linux-musl ## Build the aar
 	$(RUN) package-rpm-aarch64
 
 ##@ Releasing
-define NIX_BUILD
-	nix build \
-		$(if $(findstring true,$(VERBOSE)),--verbose --show-trace --print-build-logs,) \
-		$(if $(findstring true,$(DRY_RUN)),--dry-run,) \
-		--argstr buildType $(BUILD_TYPE) \
-		--file default.nix
-endef
-
 target/artifacts/%:
 	$(NIX_BUILD) --out-link $@ $(subst /,.,$@)
 
