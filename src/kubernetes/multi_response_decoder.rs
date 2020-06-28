@@ -37,6 +37,7 @@ where
                 }
                 Err(ResponseError::NeedMoreData) => break,
                 Err(error) => {
+                    trace!(message = "error while decoding response", pending_data = ?self.pending_data, ?error);
                     self.responses_buffer.push(Err(error));
                     break;
                 }
