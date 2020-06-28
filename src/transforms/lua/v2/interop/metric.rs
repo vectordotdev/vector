@@ -29,6 +29,32 @@ impl<'a> FromLua<'a> for MetricKind {
     }
 }
 
+impl<'a> ToLua<'a> for StatisticKind {
+    fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
+        let kind = match self {
+            StatisticKind::Distribution => "distribution",
+            StatisticKind::Histogram => "histogram",
+        };
+        ctx.create_string(kind).map(LuaValue::String)
+    }
+}
+
+impl<'a> FromLua<'a> for StatisticKind {
+    fn from_lua(value: LuaValue<'a>, _: LuaContext<'a>) -> LuaResult<Self> {
+        match value {
+            LuaValue::String(s) if s == "distribution" => Ok(StatisticKind::Distribution),
+            LuaValue::String(s) if s == "histogram" => Ok(StatisticKind::Histogram),
+            _ => Err(LuaError::FromLuaConversionError {
+                from: value.type_name(),
+                to: "StatisticKind",
+                message: Some(
+                    "Statistic kind should be either \"distribution\" or \"histogram\"".to_string(),
+                ),
+            }),
+        }
+    }
+}
+
 impl<'a> ToLua<'a> for Metric {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
         let tbl = ctx.create_table()?;
@@ -61,10 +87,12 @@ impl<'a> ToLua<'a> for Metric {
             MetricValue::Distribution {
                 values,
                 sample_rates,
+                statistic,
             } => {
                 let distribution = ctx.create_table()?;
                 distribution.set("values", values)?;
                 distribution.set("sample_rates", sample_rates)?;
+                distribution.set("statistic", statistic)?;
                 tbl.set("distribution", distribution)?;
             }
             MetricValue::AggregatedHistogram {
@@ -138,6 +166,7 @@ impl<'a> FromLua<'a> for Metric {
             MetricValue::Distribution {
                 values: distribution.get("values")?,
                 sample_rates: distribution.get("sample_rates")?,
+                statistic: distribution.get("statistic")?,
             }
         } else if let Some(aggregated_histogram) =
             table.get::<_, Option<LuaTable>>("aggregated_histogram")?
