@@ -262,7 +262,7 @@ fn tags_to_dimensions(tags: BTreeMap<String, String>) -> Vec<Dimension> {
 mod tests {
     use super::*;
     use crate::dns::Resolver;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
     use rusoto_cloudwatch::PutMetricDataInput;
@@ -376,6 +376,7 @@ mod tests {
             value: MetricValue::Distribution {
                 values: vec![11.0, 12.0],
                 sample_rates: vec![100, 50],
+                statistic: StatisticKind::Histogram,
             },
         }];
 

@@ -1,5 +1,5 @@
 use super::util::{table_to_set, table_to_timestamp, timestamp_to_table};
-use crate::event::metric::{Metric, MetricKind, MetricValue};
+use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use rlua::prelude::*;
 use std::collections::BTreeMap;
 
@@ -290,6 +290,7 @@ mod test {
             value: MetricValue::Distribution {
                 values: vec![1.0, 1.0],
                 sample_rates: vec![10, 20],
+                statistic: StatisticKind::Histogram,
             },
         };
         let assertions = vec![
@@ -475,6 +476,7 @@ mod test {
             value: MetricValue::Distribution {
                 values: vec![1.0, 1.0],
                 sample_rates: vec![10, 20],
+                statistic: StatisticKind::Histogram,
             },
         };
         Lua::new().context(|ctx| {

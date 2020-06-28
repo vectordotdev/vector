@@ -424,7 +424,7 @@ impl Sink for PrometheusSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
 
     fn tags() -> BTreeMap<String, String> {
@@ -527,6 +527,7 @@ mod tests {
             value: MetricValue::Distribution {
                 values: vec![1.0, 2.0, 3.0],
                 sample_rates: vec![3, 3, 2],
+                statistic: StatisticKind::Histogram,
             },
         };
 

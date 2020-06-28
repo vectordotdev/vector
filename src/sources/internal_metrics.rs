@@ -1,5 +1,5 @@
 use crate::{
-    event::metric::{Metric, MetricKind, MetricValue},
+    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event,
@@ -101,6 +101,7 @@ fn into_event(key: Key, measurement: Measurement) -> Event {
             MetricValue::Distribution {
                 values,
                 sample_rates,
+                statistic: StatisticKind::Histogram,
             }
         }
     };
@@ -128,7 +129,7 @@ fn into_event(key: Key, measurement: Measurement) -> Event {
 #[cfg(test)]
 mod tests {
     use super::{capture_metrics, get_controller};
-    use crate::event::metric::{Metric, MetricValue};
+    use crate::event::metric::{Metric, MetricValue, StatisticKind};
     use metrics::{counter, gauge, timing, value};
     use std::collections::BTreeMap;
 
@@ -165,14 +166,16 @@ mod tests {
         assert_eq!(
             MetricValue::Distribution {
                 values: vec![5.0, 6.0],
-                sample_rates: vec![1, 1]
+                sample_rates: vec![1, 1],
+                statistic: StatisticKind::Histogram
             },
             output["baz"].value
         );
         assert_eq!(
             MetricValue::Distribution {
                 values: vec![7.0, 8.0],
-                sample_rates: vec![1, 1]
+                sample_rates: vec![1, 1],
+                statistic: StatisticKind::Histogram
             },
             output["quux"].value
         );
