@@ -38,44 +38,45 @@ scope@{ pkgs ? import <nixpkgs> {} }:
 
   packages = with pkgs; [
     # Core CLI tools
-    dnsutils
-    curl
     bash
-    nix
-    direnv
-    binutils
-    remarshal
-    libiconv
-    tzdata
-    jq
-    stdenv
     bashInteractive
+    binutils
+    curl
+    direnv
+    dnsutils
+    jq
+    libiconv
+    nix
+    remarshal
+    stdenv
+    tzdata
     # Build Env
-    git
+    autoconf
     cacert
     cmake
-    rustup
-    pkg-config
+    cyrus_sasl
+    git
+    gnumake
+    nodejs
     openssl
+    perl
+    pkg-config
     protobuf
     ruby_2_7
-    nodejs
-    perl
-    yarn
-    snappy
-    gnumake
-    autoconf
+    rustup
     shellcheck
+    snappy
+    yarn
     # Container tools
     docker
     docker-compose
     # Wasm
     llvmPackages.libclang
   ] ++ (if stdenv.isDarwin then [
-    darwin.cf-private
     darwin.apple_sdk.frameworks.CoreServices
     darwin.apple_sdk.frameworks.Security
     darwin.apple_sdk.frameworks.SecurityFoundation
+    darwin.cf-private
   ] else [
     # Build
     gcc
@@ -83,8 +84,8 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     # Testing
     systemd
     # Container tools
+    linuxHeaders
     podman
     podman-compose
-    linuxHeaders
   ]);
 }

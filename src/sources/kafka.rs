@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    kafka::KafkaTlsConfig,
+    kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
     stream::StreamExt,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -46,7 +46,8 @@ pub struct KafkaSourceConfig {
     commit_interval_ms: u64,
     key_field: Option<String>,
     librdkafka_options: Option<HashMap<String, String>>,
-    tls: Option<KafkaTlsConfig>,
+    #[serde(flatten)]
+    auth: KafkaAuthConfig,
 }
 
 fn default_session_timeout_ms() -> u64 {
@@ -175,9 +176,7 @@ fn create_consumer(config: KafkaSourceConfig) -> crate::Result<StreamConsumer> {
         .set("enable.auto.offset.store", "false")
         .set("client.id", "vector");
 
-    if let Some(tls) = &config.tls {
-        tls.apply(&mut client_config)?;
-    }
+    config.auth.apply(&mut client_config)?;
 
     if let Some(librdkafka_options) = config.librdkafka_options {
         for (key, value) in librdkafka_options.into_iter() {
