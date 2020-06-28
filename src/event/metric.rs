@@ -51,7 +51,7 @@ pub enum MetricValue {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize, is_enum_variant)]
 #[serde(rename_all = "snake_case")]
 pub enum StatisticKind {
     Histogram,
