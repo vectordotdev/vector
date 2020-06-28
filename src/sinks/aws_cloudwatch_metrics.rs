@@ -157,6 +157,7 @@ impl CloudWatchMetricsSvc {
                         MetricValue::Distribution {
                             values,
                             sample_rates,
+                            statistic: _,
                         } => Some(MetricDatum {
                             metric_name,
                             values: Some(values.to_vec()),
