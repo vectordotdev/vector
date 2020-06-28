@@ -75,6 +75,11 @@ message Set {
 message Distribution {
   repeated double values = 1;
   repeated uint32 sample_rates = 2;
+  enum StatisticKind {
+    Histogram = 0;
+    Distribution = 1;
+  }
+  StatisticKind statistic = 3;
 }
 
 message AggregatedHistogram {

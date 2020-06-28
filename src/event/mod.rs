@@ -540,6 +540,14 @@ impl From<proto::EventWrapper> for Event {
                     MetricProto::Distribution(dist) => MetricValue::Distribution {
                         values: dist.values,
                         sample_rates: dist.sample_rates,
+                        statistic: match dist.statistic() {
+                            proto::distribution::StatisticKind::Histogram => {
+                                StatisticKind::Histogram
+                            }
+                            proto::distribution::StatisticKind::Distribution => {
+                                StatisticKind::Distribution
+                            }
+                        },
                     },
                     MetricProto::AggregatedHistogram(hist) => MetricValue::AggregatedHistogram {
                         buckets: hist.buckets,
@@ -644,9 +652,19 @@ impl From<Event> for proto::EventWrapper {
                     MetricValue::Distribution {
                         values,
                         sample_rates,
+                        statistic,
                     } => MetricProto::Distribution(proto::Distribution {
                         values,
                         sample_rates,
+                        statistic: match statistic {
+                            StatisticKind::Histogram => {
+                                proto::distribution::StatisticKind::Histogram
+                            }
+                            StatisticKind::Distribution => {
+                                proto::distribution::StatisticKind::Distribution
+                            }
+                        }
+                        .into(),
                     }),
                     MetricValue::AggregatedHistogram {
                         buckets,

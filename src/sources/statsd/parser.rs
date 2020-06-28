@@ -1,4 +1,4 @@
-use crate::event::metric::{Metric, MetricKind, MetricValue};
+use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
@@ -66,7 +66,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 },
             }
         }
-        unit @ "h" | unit @ "ms" => {
+        unit @ "h" | unit @ "ms" | unit @ "d" => {
             let val: f64 = parts[0].parse()?;
             Metric {
                 name,
@@ -76,6 +76,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 value: MetricValue::Distribution {
                     values: vec![convert_to_base_units(unit, val)],
                     sample_rates: vec![sample_rate as u32],
+                    statistic: convert_to_statistic(unit),
                 },
             }
         }
@@ -197,6 +198,13 @@ fn convert_to_base_units(unit: &str, val: f64) -> f64 {
     }
 }
 
+fn convert_to_statistic(unit: &str) -> StatisticKind {
+    match unit {
+        "d" => StatisticKind::Distribution,
+        _ => StatisticKind::Histogram,
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
     Malformed(&'static str),
@@ -228,7 +236,7 @@ impl From<ParseFloatError> for ParseError {
 #[cfg(test)]
 mod test {
     use super::{parse, sanitize_key, sanitize_sampling};
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 
     #[test]
     fn basic_counter() {
@@ -305,6 +313,7 @@ mod test {
                 value: MetricValue::Distribution {
                     values: vec![0.320],
                     sample_rates: vec![10],
+                    statistic: StatisticKind::Histogram
                 },
             }),
         );
@@ -330,6 +339,7 @@ mod test {
                 value: MetricValue::Distribution {
                     values: vec![320.0],
                     sample_rates: vec![10],
+                    statistic: StatisticKind::Histogram
                 },
             }),
         );
