@@ -7,8 +7,8 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto, BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer,
-        PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
+        rusoto, BatchConfig, BatchSettings, Length, PartitionBatchSink, PartitionBuffer,
+        PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer2,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext},
@@ -144,11 +144,12 @@ pub enum CloudwatchError {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let batch = self
-            .batch
-            .disallow_max_bytes()?
-            .use_size_as_events()?
-            .get_settings_or_default(BatchSettings::default().events(1000).timeout(1));
+        let batch = self.batch.use_size_as_events()?.get_settings_or_default(
+            BatchSettings::default()
+                .bytes(1_048_576)
+                .events(10_000)
+                .timeout(1),
+        );
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let log_group = self.group_name.clone();
@@ -163,7 +164,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
         let encoding = self.encoding.clone();
         let sink = {
-            let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
+            let buffer = PartitionBuffer::new(VecBuffer2::new(batch.size));
             let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
                 .sink_map_err(|e| error!("Fatal cloudwatchlogs sink error: {}", e))
                 .with_flat_map(move |event| {
@@ -381,6 +382,12 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
         } else {
             panic!("poll_ready was not called; this is a bug!");
         }
+    }
+}
+
+impl Length for InputLogEvent {
+    fn len(&self) -> usize {
+        self.message.len() + 26
     }
 }
 
