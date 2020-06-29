@@ -3,7 +3,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         service2::TowerRequestConfig,
-        BatchBytesConfig, Compression,
+        BatchConfig, Compression,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -40,7 +40,7 @@ pub struct NewRelicLogsConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
 
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -106,11 +106,13 @@ impl NewRelicLogsConfig {
             NewRelicLogsRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
         };
 
-        let batch = BatchBytesConfig {
+        let batch = self.batch.use_size_as_bytes()?;
+        let batch = BatchConfig {
             // The max request size is 10MiB, so in order to be comfortably
             // within this we batch up to 5MiB.
-            max_size: Some(self.batch.max_size.unwrap_or(bytesize::mib(5u64) as usize)),
-            ..self.batch
+            max_bytes: Some(batch.max_bytes.unwrap_or(bytesize::mib(5u64) as usize)),
+            max_events: None,
+            ..batch
         };
 
         let request = TowerRequestConfig {
@@ -177,7 +179,7 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(
-            http_config.batch.max_size,
+            http_config.batch.max_bytes,
             Some(bytesize::mib(5u64) as usize)
         );
         assert_eq!(http_config.request.in_flight_limit, Some(100));
@@ -208,7 +210,7 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(
-            http_config.batch.max_size,
+            http_config.batch.max_bytes,
             Some(bytesize::mib(8u64) as usize)
         );
         assert_eq!(http_config.request.in_flight_limit, Some(12));
@@ -245,7 +247,7 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(
-            http_config.batch.max_size,
+            http_config.batch.max_bytes,
             Some(bytesize::mib(8u64) as usize)
         );
         assert_eq!(http_config.request.in_flight_limit, Some(12));

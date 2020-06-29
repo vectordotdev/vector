@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
-        BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, UriSerde,
+        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
     },
     tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -28,7 +28,7 @@ pub struct HoneycombConfig {
     dataset: String,
 
     #[serde(default)]
-    batch: BatchBytesConfig,
+    batch: BatchConfig,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -42,13 +42,17 @@ inventory::submit! {
 impl SinkConfig for HoneycombConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch_settings = self.batch.unwrap_or(bytesize::mib(5u64), 1);
+        let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
+            BatchSettings::default()
+                .bytes(bytesize::kib(100u64))
+                .timeout(1),
+        );
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            JsonArrayBuffer::default(),
+            JsonArrayBuffer::new(batch_settings.size),
             request_settings,
-            batch_settings,
+            batch_settings.timeout,
             None,
             &cx,
         )

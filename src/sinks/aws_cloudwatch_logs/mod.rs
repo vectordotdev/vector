@@ -7,8 +7,8 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto, BatchEventsConfig, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-        TowerRequestConfig, TowerRequestSettings,
+        rusoto, BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer,
+        PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext},
@@ -67,7 +67,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
     #[serde(default)]
-    pub batch: BatchEventsConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub assume_role: Option<String>,
@@ -145,7 +145,10 @@ pub enum CloudwatchError {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let batch = self.batch.unwrap_or(1000, 1);
+        let batch = self
+            .batch
+            .use_size_as_events()?
+            .get_settings_or_default(BatchSettings::default().events(1000).timeout(1));
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let log_group = self.group_name.clone();
@@ -159,8 +162,8 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             )?);
 
         let sink = {
-            let buffer = PartitionBuffer::new(Vec::new());
-            let svc_sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+            let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
+            let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
                 .sink_map_err(|e| error!("Fatal cloudwatchlogs sink error: {}", e))
                 .with_flat_map(move |event| iter_ok(partition(event, &log_group, &log_stream)));
             Box::new(svc_sink)
@@ -1129,9 +1132,9 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
-            batch: BatchEventsConfig {
-                timeout_secs: None,
+            batch: BatchConfig {
                 max_events: Some(2),
+                ..Default::default()
             },
             request: Default::default(),
             assume_role: None,

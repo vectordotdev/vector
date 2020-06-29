@@ -23,10 +23,11 @@ use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
-pub use batch::{Batch, BatchBytesConfig, BatchEventsConfig, BatchSettings};
+pub use batch::{Batch, BatchConfig, BatchSettings, BatchSize, PushResult};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
 pub use buffer::metrics::{MetricBuffer, MetricEntry};
 pub use buffer::partition::Partition;
+pub use buffer::vec::VecBuffer;
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use service::{ServiceBuilderExt, TowerRequestConfig, TowerRequestLayer, TowerRequestSettings};
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};

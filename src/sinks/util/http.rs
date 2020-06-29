@@ -1,7 +1,7 @@
 use super::{
     retries2::{RetryAction, RetryLogic},
     service2::{TowerBatchedSink, TowerRequestSettings},
-    sink, Batch, BatchSettings,
+    sink, Batch,
 };
 use crate::{
     dns::Resolver,
@@ -24,6 +24,7 @@ use std::{
     future::Future,
     sync::Arc,
     task::{Context, Poll},
+    time::Duration,
 };
 use tower03::Service;
 use tracing::Span;
@@ -82,7 +83,7 @@ where
         sink: T,
         batch: B,
         request_settings: TowerRequestSettings,
-        batch_settings: BatchSettings,
+        batch_timeout: Duration,
         tls_settings: impl Into<MaybeTlsSettings>,
         cx: &SinkContext,
     ) -> Self {
@@ -91,7 +92,7 @@ where
             batch,
             HttpRetryLogic,
             request_settings,
-            batch_settings,
+            batch_timeout,
             tls_settings,
             cx,
         )
@@ -110,7 +111,7 @@ where
         batch: B,
         logic: L,
         request_settings: TowerRequestSettings,
-        batch_settings: BatchSettings,
+        batch_timeout: Duration,
         tls_settings: impl Into<MaybeTlsSettings>,
         cx: &SinkContext,
     ) -> Self {
@@ -124,7 +125,7 @@ where
             };
 
         let svc = HttpBatchService::new(cx.resolver(), tls_settings, request_builder);
-        let inner = request_settings.batch_sink(logic, svc, batch, batch_settings, cx.acker());
+        let inner = request_settings.batch_sink(logic, svc, batch, batch_timeout, cx.acker());
 
         Self {
             sink,

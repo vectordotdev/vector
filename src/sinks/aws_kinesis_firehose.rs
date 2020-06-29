@@ -8,7 +8,7 @@ use crate::{
         rusoto,
         service2::TowerRequestConfig,
         sink::Response,
-        BatchEventsConfig,
+        BatchConfig, BatchSettings, VecBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -45,7 +45,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
-    pub batch: BatchEventsConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub assume_role: Option<String>,
@@ -97,7 +97,10 @@ impl KinesisFirehoseService {
             cx.resolver(),
         )?;
 
-        let batch = config.batch.unwrap_or(500, 1);
+        let batch = config
+            .batch
+            .use_size_as_events()?
+            .get_settings_or_default(BatchSettings::default().events(500).timeout(1));
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
@@ -107,8 +110,8 @@ impl KinesisFirehoseService {
             .batch_sink(
                 KinesisFirehoseRetryLogic,
                 kinesis,
-                Vec::new(),
-                batch,
+                VecBuffer::new(batch.size),
+                batch.timeout,
                 cx.acker(),
             )
             .sink_map_err(|e| error!("Fatal kinesis firehose sink error: {}", e))
@@ -269,7 +272,7 @@ mod integration_tests {
         region::RegionOrEndpoint,
         sinks::{
             elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
-            util::BatchEventsConfig,
+            util::BatchConfig,
         },
         test_util::{random_events_with_stream, random_string, runtime},
         topology::config::SinkContext,
@@ -299,9 +302,9 @@ mod integration_tests {
             stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4573".into()),
             encoding: EncodingConfig::from(Encoding::Json), // required for ES destination w/ localstack
-            batch: BatchEventsConfig {
+            batch: BatchConfig {
                 max_events: Some(2),
-                timeout_secs: None,
+                ..Default::default()
             },
             request: TowerRequestConfig {
                 timeout_secs: Some(10),

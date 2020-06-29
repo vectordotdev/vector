@@ -1,6 +1,6 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use crate::event::Event;
-use crate::sinks::util::Batch;
+use crate::sinks::util::{Batch, BatchSize, PushResult};
 use std::cmp::Ordering;
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
@@ -59,6 +59,7 @@ impl PartialEq for MetricEntry {
 pub struct MetricBuffer {
     state: HashSet<MetricEntry>,
     metrics: HashSet<MetricEntry>,
+    max_events: usize,
 }
 
 impl MetricBuffer {
@@ -96,10 +97,15 @@ impl MetricBuffer {
     //   Absolute AggregatedHistogram => Absolute AggregatedHistogram
     //   Absolute AggregatedSummary   => Absolute AggregatedSummary
     //
-    pub fn new() -> Self {
+    pub fn new(settings: BatchSize) -> Self {
+        Self::new_with_state(settings.events, HashSet::new())
+    }
+
+    fn new_with_state(max_events: usize, state: HashSet<MetricEntry>) -> Self {
         Self {
-            state: HashSet::new(),
-            metrics: HashSet::new(),
+            state,
+            metrics: HashSet::with_capacity(max_events),
+            max_events,
         }
     }
 }
@@ -108,83 +114,84 @@ impl Batch for MetricBuffer {
     type Input = Event;
     type Output = Vec<Metric>;
 
-    fn len(&self) -> usize {
-        self.num_items()
-    }
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        if self.num_items() >= self.max_events {
+            PushResult::Overflow(item)
+        } else {
+            let item = item.into_metric();
 
-    fn push(&mut self, item: Self::Input) {
-        let item = item.into_metric();
-
-        match &item.value {
-            MetricValue::Counter { value } if item.kind.is_absolute() => {
-                let new = MetricEntry(item.clone());
-                if let Some(MetricEntry(Metric {
-                    value: MetricValue::Counter { value: value0, .. },
-                    ..
-                })) = self.state.get(&new)
-                {
-                    // Counters are disaggregated. We take the previoud value from the state
-                    // and emit the difference between previous and current as a Counter
-                    let delta = MetricEntry(Metric {
-                        name: item.name.to_string(),
-                        timestamp: item.timestamp,
-                        tags: item.tags.clone(),
-                        kind: MetricKind::Incremental,
-                        value: MetricValue::Counter {
-                            value: value - value0,
-                        },
-                    });
-
-                    // The resulting Counters could be added up normally
-                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&delta) {
-                        existing.add(&item);
-                        self.metrics.insert(MetricEntry(existing));
-                    } else {
-                        self.metrics.insert(delta);
-                    }
-                    self.state.replace(new);
-                } else {
-                    self.state.insert(new);
-                }
-            }
-            MetricValue::Gauge { .. } if item.kind.is_incremental() => {
-                let new = MetricEntry(item.clone().into_absolute());
-                if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                    existing.add(&item);
-                    self.metrics.insert(MetricEntry(existing));
-                } else {
-                    // If the metric is not present in active batch,
-                    // then we look it up in permanent state, where we keep track
-                    // of its values throughout the entire application uptime
-                    let mut initial = if let Some(default) = self.state.get(&new) {
-                        default.0.clone()
-                    } else {
-                        // Otherwise we start from zero value
-                        Metric {
+            match &item.value {
+                MetricValue::Counter { value } if item.kind.is_absolute() => {
+                    let new = MetricEntry(item.clone());
+                    if let Some(MetricEntry(Metric {
+                        value: MetricValue::Counter { value: value0, .. },
+                        ..
+                    })) = self.state.get(&new)
+                    {
+                        // Counters are disaggregated. We take the previoud value from the state
+                        // and emit the difference between previous and current as a Counter
+                        let delta = MetricEntry(Metric {
                             name: item.name.to_string(),
                             timestamp: item.timestamp,
                             tags: item.tags.clone(),
-                            kind: MetricKind::Absolute,
-                            value: MetricValue::Gauge { value: 0.0 },
+                            kind: MetricKind::Incremental,
+                            value: MetricValue::Counter {
+                                value: value - value0,
+                            },
+                        });
+
+                        // The resulting Counters could be added up normally
+                        if let Some(MetricEntry(mut existing)) = self.metrics.take(&delta) {
+                            existing.add(&item);
+                            self.metrics.insert(MetricEntry(existing));
+                        } else {
+                            self.metrics.insert(delta);
                         }
-                    };
-                    initial.add(&item);
-                    self.metrics.insert(MetricEntry(initial));
+                        self.state.replace(new);
+                    } else {
+                        self.state.insert(new);
+                    }
+                }
+                MetricValue::Gauge { .. } if item.kind.is_incremental() => {
+                    let new = MetricEntry(item.clone().into_absolute());
+                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
+                        existing.add(&item);
+                        self.metrics.insert(MetricEntry(existing));
+                    } else {
+                        // If the metric is not present in active batch,
+                        // then we look it up in permanent state, where we keep track
+                        // of its values throughout the entire application uptime
+                        let mut initial = if let Some(default) = self.state.get(&new) {
+                            default.0.clone()
+                        } else {
+                            // Otherwise we start from zero value
+                            Metric {
+                                name: item.name.to_string(),
+                                timestamp: item.timestamp,
+                                tags: item.tags.clone(),
+                                kind: MetricKind::Absolute,
+                                value: MetricValue::Gauge { value: 0.0 },
+                            }
+                        };
+                        initial.add(&item);
+                        self.metrics.insert(MetricEntry(initial));
+                    }
+                }
+                _metric if item.kind.is_absolute() => {
+                    let new = MetricEntry(item);
+                    self.metrics.replace(new);
+                }
+                _ => {
+                    let new = MetricEntry(item.clone());
+                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
+                        existing.add(&item);
+                        self.metrics.insert(MetricEntry(existing));
+                    } else {
+                        self.metrics.insert(new);
+                    }
                 }
             }
-            _metric if item.kind.is_absolute() => {
-                let new = MetricEntry(item);
-                self.metrics.replace(new);
-            }
-            _ => {
-                let new = MetricEntry(item.clone());
-                if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                    existing.add(&item);
-                    self.metrics.insert(MetricEntry(existing));
-                } else {
-                    self.metrics.insert(new);
-                }
-            }
+            PushResult::Ok(self.num_items() >= self.max_events)
         }
     }
 
@@ -202,10 +209,7 @@ impl Batch for MetricBuffer {
             }
         }
 
-        Self {
-            state,
-            metrics: HashSet::new(),
-        }
+        Self::new_with_state(self.max_events, state)
     }
 
     fn finish(self) -> Self::Output {
@@ -266,7 +270,7 @@ fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>,
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::sinks::util::{BatchSettings, BatchSink};
+    use crate::sinks::util::{BatchSink, BatchSize};
     use crate::{
         buffers::Acker,
         event::metric::{Metric, MetricValue},
@@ -313,13 +317,14 @@ mod test {
 
             future::ok::<_, std::io::Error>(())
         });
+        let batch_size = BatchSize {
+            bytes: 9999,
+            events: 6,
+        };
         let buffered = BatchSink::with_executor(
             svc,
-            MetricBuffer::new(),
-            BatchSettings {
-                timeout: Duration::from_secs(0),
-                size: 6,
-            },
+            MetricBuffer::new(batch_size),
+            Duration::from_secs(0),
             acker,
             rt.executor(),
         );
@@ -380,7 +385,7 @@ mod test {
         assert_eq!(buffer[1].len(), 2);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "counter-0".into(),
@@ -428,7 +433,7 @@ mod test {
         );
 
         assert_eq!(
-            sorted(&buffer[1].clone().finish()),
+            sorted(&buffer[1].clone()),
             [
                 Metric {
                     name: "counter-2".into(),
@@ -491,7 +496,7 @@ mod test {
         assert_eq!(buffer[0].len(), 4);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "counter-0".into(),
@@ -566,7 +571,7 @@ mod test {
         assert_eq!(buffer[0].len(), 4);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "gauge-1".into(),
@@ -656,7 +661,7 @@ mod test {
         assert_eq!(buffer[0].len(), 5);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "gauge-1".into(),
@@ -741,7 +746,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [Metric {
                 name: "set-0".into(),
                 timestamp: None,
@@ -802,7 +807,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "dist-2".into(),
@@ -909,7 +914,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "buckets-2".into(),
@@ -1001,7 +1006,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "buckets-2".into(),
@@ -1067,7 +1072,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "quantiles-2".into(),

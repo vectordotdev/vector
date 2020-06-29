@@ -9,7 +9,7 @@ use crate::{
         rusoto,
         service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
         sink::Response,
-        BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
+        BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
         PartitionInnerBuffer,
     },
     template::Template,
@@ -61,7 +61,7 @@ pub struct S3SinkConfig {
     #[serde(default = "Compression::default_gzip")]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub assume_role: Option<String>,
@@ -175,7 +175,10 @@ impl S3Sink {
         let compression = config.compression;
         let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
         let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
-        let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
+        let batch = config
+            .batch
+            .use_size_as_bytes()?
+            .get_settings_or_default(BatchSettings::default().bytes(10_000_000).timeout(300));
 
         let key_prefix = config
             .key_prefix
@@ -209,11 +212,12 @@ impl S3Sink {
             .settings(request, S3RetryLogic)
             .service(s3);
 
-        let buffer = PartitionBuffer::new(Buffer::new(config.compression));
+        let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
 
-        let sink = PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch, cx.acker())
-            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
-            .sink_map_err(|error| error!("Sink failed to flush: {}", error));
+        let sink =
+            PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch.timeout, cx.acker())
+                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
+                .sink_map_err(|error| error!("Sink failed to flush: {}", error));
 
         Ok(Box::new(sink))
     }
@@ -599,7 +603,7 @@ mod integration_tests {
                 key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
                 filename_time_format: Some("waitsforfullbatch".into()),
                 filename_append_uuid: Some(false),
-                ..config(1000).await
+                ..config(1010).await
             };
             let prefix = config.key_prefix.clone();
             let sink = S3Sink::new(&config, cx).unwrap();
@@ -651,7 +655,7 @@ mod integration_tests {
                 key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
                 filename_time_format: Some("waitsforfullbatch".into()),
                 filename_append_uuid: Some(false),
-                ..config(1000).await
+                ..config(1010).await
             }
         });
 
@@ -719,7 +723,7 @@ mod integration_tests {
             let config = S3SinkConfig {
                 compression: Compression::Gzip,
                 filename_time_format: Some("%S%f".into()),
-                ..config(1000).await
+                ..config(10000).await
             };
 
             let prefix = config.key_prefix.clone();
@@ -730,7 +734,7 @@ mod integration_tests {
             let _ = sink.send_all(events).compat().await.unwrap();
 
             let keys = get_keys(prefix.unwrap()).await;
-            assert_eq!(keys.len(), 2);
+            assert_eq!(keys.len(), 6);
 
             let response_lines = stream::iter(keys).fold(Vec::new(), |mut acc, key| async {
                 assert!(key.ends_with(".log.gz"));
@@ -797,9 +801,10 @@ mod integration_tests {
             key_prefix: Some(random_string(10) + "/date=%F/"),
             bucket: BUCKET.to_string(),
             compression: Compression::None,
-            batch: BatchBytesConfig {
-                max_size: Some(batch_size),
+            batch: BatchConfig {
+                max_bytes: Some(batch_size),
                 timeout_secs: Some(5),
+                ..Default::default()
             },
             region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
             ..Default::default()

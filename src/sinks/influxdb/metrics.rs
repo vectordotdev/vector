@@ -7,7 +7,7 @@ use crate::{
     sinks::util::{
         http::{HttpBatchService, HttpRetryLogic},
         service2::TowerRequestConfig,
-        BatchEventsConfig, MetricBuffer,
+        BatchConfig, BatchSettings, MetricBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -37,7 +37,7 @@ pub struct InfluxDBConfig {
     #[serde(flatten)]
     pub influxdb2_settings: Option<InfluxDB2Settings>,
     #[serde(default)]
-    pub batch: BatchEventsConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -92,7 +92,10 @@ impl InfluxDBSvc {
         let token = settings.token();
         let protocol_version = settings.protocol_version();
 
-        let batch = config.batch.unwrap_or(20, 1);
+        let batch = config
+            .batch
+            .use_size_as_events()?
+            .get_settings_or_default(BatchSettings::default().events(20).timeout(1));
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = settings.write_uri(endpoint)?;
@@ -110,8 +113,8 @@ impl InfluxDBSvc {
             .batch_sink(
                 HttpRetryLogic,
                 influxdb_http_service,
-                MetricBuffer::new(),
-                batch,
+                MetricBuffer::new(batch.size),
+                batch.timeout,
                 cx.acker(),
             )
             .sink_map_err(|e| error!("Fatal influxdb sink error: {}", e));

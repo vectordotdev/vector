@@ -5,7 +5,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
-        BatchBytesConfig, Buffer, Compression, UriSerde,
+        BatchConfig, BatchSettings, Buffer, Compression, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -48,7 +48,7 @@ pub struct HttpSinkConfig {
     pub compression: Compression,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
@@ -110,14 +110,18 @@ impl SinkConfig for HttpSinkConfig {
         config.uri = build_uri(config.uri.clone()).into();
 
         let compression = config.compression;
-        let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
+        let batch = config.batch.use_size_as_bytes()?.get_settings_or_default(
+            BatchSettings::default()
+                .bytes(bytesize::mib(10u64))
+                .timeout(1),
+        );
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let sink = BatchedHttpSink::new(
             config,
-            Buffer::new(compression),
+            Buffer::new(batch.size, compression),
             request,
-            batch,
+            batch.timeout,
             Some(tls.clone()),
             &cx,
         )

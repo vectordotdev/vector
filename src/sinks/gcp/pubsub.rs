@@ -6,7 +6,7 @@ use crate::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
             service2::TowerRequestConfig,
-            BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
+            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer,
         },
         Healthcheck, RouterSink, UriParseError,
     },
@@ -37,7 +37,7 @@ pub struct PubsubConfig {
     pub auth: GcpAuthConfig,
 
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(
@@ -65,7 +65,12 @@ inventory::submit! {
 impl SinkConfig for PubsubConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self)?;
-        let batch_settings = self.batch.unwrap_or(bytesize::mib(10u64), 1);
+        let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
+            BatchSettings::default()
+                .bytes(bytesize::mib(10u64))
+                .events(1000)
+                .timeout(1),
+        );
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 
@@ -80,9 +85,9 @@ impl SinkConfig for PubsubConfig {
 
         let sink = BatchedHttpSink::new(
             sink,
-            JsonArrayBuffer::default(),
+            JsonArrayBuffer::new(batch_settings.size),
             request_settings,
-            batch_settings,
+            batch_settings.timeout,
             Some(tls_settings),
             &cx,
         )

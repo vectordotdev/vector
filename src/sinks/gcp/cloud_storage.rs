@@ -8,7 +8,7 @@ use crate::{
             http::{HttpClient, HttpClientFuture},
             retries2::{RetryAction, RetryLogic},
             service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
-            BatchBytesConfig, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
+            BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
             PartitionInnerBuffer,
         },
         Healthcheck, RouterSink,
@@ -69,7 +69,7 @@ pub struct GcsSinkConfig {
     #[serde(default)]
     compression: Compression,
     #[serde(default)]
-    batch: BatchBytesConfig,
+    batch: BatchConfig,
     #[serde(default)]
     request: TowerRequestConfig,
     #[serde(flatten)]
@@ -199,7 +199,11 @@ impl GcsSink {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
-        let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
+        let batch = config.batch.use_size_as_bytes()?.get_settings_or_default(
+            BatchSettings::default()
+                .bytes(bytesize::mib(10u64))
+                .timeout(300),
+        );
 
         let key_prefix = config
             .key_prefix
@@ -215,11 +219,12 @@ impl GcsSink {
             .settings(request, GcsRetryLogic)
             .service(self);
 
-        let buffer = PartitionBuffer::new(Buffer::new(config.compression));
+        let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
 
-        let sink = PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch, cx.acker())
-            .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
-            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
+        let sink =
+            PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch.timeout, cx.acker())
+                .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
+                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(Box::new(sink))
     }
