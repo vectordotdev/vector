@@ -69,10 +69,16 @@ where
         .into_iter()
         .flat_map(move |dir| {
             glob_impl(
+                // We seek to match the paths like
+                // `<pod_logs_dir>/<container_name>/<n>.log` - paths managed by
+                // the `kubelet` as part of Kubernetes core logging
+                // architecture.
+                // In some setups, there will also be paths like
+                // `<pod_logs_dir>/<hash>.log` - those we want to skip.
                 &[
                     dir.to_str()
                         .expect("non-utf8 path to pod logs dir is not supported"),
-                    "**/*.log",
+                    "*/*.log",
                 ]
                 .join("/"),
             )
@@ -174,7 +180,7 @@ mod tests {
                 // Calls to the glob mock.
                 vec![(
                     // The pattern to expect at the mock.
-                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/**/*.log",
+                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log",
                     // The paths to return from the mock.
                     vec![
                         "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/container1/qwe.log",
@@ -203,7 +209,7 @@ mod tests {
                     ..Pod::default()
                 },
                 vec![(
-                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/**/*.log",
+                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log",
                     vec![],
                 )],
                 vec![],
