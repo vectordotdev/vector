@@ -189,19 +189,18 @@ impl Source {
         let annotator = PodMetadataAnnotator::new(state_reader, fields_spec);
 
         // TODO: maybe some of the parameters have to be configurable.
+        let max_line_bytes = 32 * 1024; // 32 KiB
         let file_server = FileServer {
             paths_provider,
             max_read_bytes: 2048,
             start_at_beginning: true,
             ignore_before: None,
-            max_line_bytes: 32 * 1024, // 32 KiB
+            max_line_bytes,
             data_dir,
             glob_minimum_cooldown: Duration::from_secs(10),
-            // Use device inodes for fingerprinting.
-            // - Docker recreates files on rotation: https://github.com/moby/moby/blob/75d655320e2a443185f8fa4992dc89bd2da0ea68/daemon/logger/loggerutils/logfile.go#L182-L222
-            // - CRI-O recreates files on rotation: https://github.com/cri-o/cri-o/blob/ad83d2a35a30b8a336b16a0ea5f7afc6aebfb9b7/internal/oci/runtime_oci.go#L988-L1042
-            // The rest should do the same.
-            fingerprinter: Fingerprinter::DevInode,
+            fingerprinter: Fingerprinter::FirstLineChecksum {
+                max_line_length: max_line_bytes,
+            },
             oldest_first: false,
             remove_after: None,
         };
