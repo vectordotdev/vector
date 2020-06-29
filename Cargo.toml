@@ -123,7 +123,7 @@ leveldb = { git = "https://github.com/timberio/leveldb.git", branch = "optional-
 db-key = "0.0.5"
 headers = "0.2.1"
 headers03 = { package = "headers", version = "0.3" }
-rdkafka = { version = "0.23.1", features = ["libz", "ssl", "zstd", "gssapi"], optional = true }
+rdkafka = { version = "0.23.1", features = ["libz", "ssl", "zstd" ], optional = true }
 hostname = "0.1.5"
 seahash = { version = "3.0.6", optional = true }
 jemallocator = { version = "0.3.0", optional = true }
@@ -201,7 +201,7 @@ assert_cmd = "1.0"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb", "rdkafka-plain"]
+default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb", "rdkafka-plain", "sasl"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
 default-cmake = ["sources", "transforms", "sinks", "vendored", "unix", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
@@ -210,9 +210,14 @@ default-msvc = ["sources", "transforms", "sinks", "vendored", "rdkafka-cmake"]
 # Enables features that work only on systems providing `cfg(unix)
 unix = ["jemallocator", "shiplift/unix-socket"]
 # Forces vendoring of OpenSSL and ZLib dependencies
-vendored = ["openssl/vendored", "libz-sys/static"]
+vendored = [
+  "openssl/vendored",
+  "rdkafka/ssl-vendored",
+  "rdkafka/libz-static"
+]
 # This feature is less portable, but doesn't require `cmake` as build dependency
 rdkafka-plain = ["rdkafka"]
+sasl = ["rdkafka/gssapi"]
 # Enables `rdkafka` dependency.
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
 # The `sasl` feature has to be added because of the limitations of `librdkafka` build scripts for `cmake`.
@@ -415,7 +420,7 @@ pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 
 shutdown-tests = ["sources","sinks-console","sinks-prometheus","sinks-blackhole","unix","rdkafka","transforms-log_to_metric","transforms-lua"]
-disable-resolv-conf = []
+disable-in-nix-check-phase = []
 
 [[bench]]
 name = "bench"

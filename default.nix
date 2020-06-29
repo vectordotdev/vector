@@ -19,7 +19,8 @@ rec {
               pkgs.pkgsCross.gnu64;
           features = features.components.all ++
             features.byOs.linux.gnu ++
-            features.byLinking.static;
+            features.byLinking.static ++
+            features.testing;
             buildType = buildType;
             verbose = true;
             runCheckPhase = runCheckPhase;
@@ -37,13 +38,14 @@ rec {
         configuration = {
           rustTarget = "x86_64-unknown-linux-musl";
           hostPkgs = pkgs;
-          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.gnu64.stdenv.targetPlatform.config then
-              pkgs.pkgsStatic  # Yes, this is musl!
+          targetPkgs = if pkgs.targetPlatform.config == pkgs.pkgsCross.musl64.stdenv.targetPlatform.config then
+              pkgs
             else
               pkgs.pkgsCross.musl64;
           features = features.components.all ++
             features.byOs.linux.musl ++
-            features.byLinking.static;
+            features.byLinking.static ++
+            features.testing;
             buildType = buildType;
             verbose = true;
             runCheckPhase = runCheckPhase;
@@ -62,7 +64,8 @@ rec {
               pkgs.pkgsCross.aarch64-multiplatform;
           features = features.components.all ++
             features.byOs.linux.gnu ++
-            features.byLinking.static;
+            features.byLinking.static ++
+            features.testing;
             buildType = buildType;
             verbose = true;
             runCheckPhase = runCheckPhase;
@@ -83,7 +86,8 @@ rec {
               pkgs.pkgsCross.aarch64-multiplatform-musl;
           features = features.components.all ++
             features.byOs.linux.musl ++
-            features.byLinking.static;
+            features.byLinking.static ++
+            features.testing;
             buildType = buildType;
             verbose = true;
             runCheckPhase = runCheckPhase;
@@ -102,7 +106,8 @@ rec {
               pkgs.pkgsCross.armv7l-hf-multiplatform;
           features = features.components.all ++
             features.byOs.linux.musl ++
-            features.byLinking.static;
+            features.byLinking.static ++
+            features.testing;
             buildType = buildType;
             verbose = true;
             runCheckPhase = runCheckPhase;
@@ -124,7 +129,8 @@ rec {
               pkgs.pkgsCross.armv7l-hf-multiplatform.pkgsStatic;
           features = features.components.all ++
             features.byOs.linux.musl ++
-            features.byLinking.static;
+            features.byLinking.static ++
+            features.testing;
           buildType = buildType;
           verbose = true;
           runCheckPhase = runCheckPhase;
@@ -139,9 +145,13 @@ rec {
   environment = {
     variables = { targetPkgs, hostPkgs, }: {
         PKG_CONFIG_ALLOW_CROSS=true;
+        # https://github.com/alexcrichton/cc-rs#external-configuration-via-environment-variables
+        # the default compiler flags may cause conflicts in some cross compiling scenarios. Setting this variable will disable the generation of default compiler flags.
+        # CRATE_CC_NO_DEFAULTS=false;
         # We must set some protoc related env vars for the prost crate.
-        PROTOC = "${hostPkgs.protobuf}/bin/protoc"; # NOTE: `targetPkgs.pkgs` points to the 'host' packages.
-        PROTOC_INCLUDE = "${hostPkgs.protobuf}/include"; # NOTE: `targetPkgs.pkgs` points to the 'host' packages.
+        PROTOC = "${hostPkgs.protobuf}/bin/protoc";
+        PROTOC_INCLUDE = "${hostPkgs.protobuf}/include";
+        CFLAGS = "-L=${hostPkgs.cyrus_sasl.dev}/lib/sasl2";
         # On Linux builds, we need some level of localization.
         # LOCALE_ARCHIVE = if targetPkgs.stdenv.isLinux && targetPkgs.glibcLocales != null then
         #   "${targetPkgs.glibcLocales}/lib/locale/locale-archive"
@@ -233,8 +243,12 @@ rec {
         with passedPkgs.buildPackages;
           [
             pkg-config
-            leveldb
-            snappy
+            musl
+            # leveldb
+            # snappy
+            # gsasl
+            # cyrus_sasl
+            # cyrus_sasl.dev
           ]
           ++ (
             if stdenv.isDarwin then
@@ -280,8 +294,9 @@ rec {
         with passedPkgs.buildPackages;
         [
             # This is required for rdkafka
-            rdkafka
             openssl.dev
+            cyrus_sasl
+            libgssglue
             jemalloc
             perl
             autoconf
@@ -289,7 +304,6 @@ rec {
             gnumake
             zlib
             zstd
-            libgssglue
             cmake
         ] ++ (
           if stdenv.isDarwin then
@@ -352,13 +366,16 @@ rec {
     byOs = {
       linux = {
         # Linux is *special* and has two of differing characteristics.
-        gnu = [ "unix" "leveldb" ];
-        musl = [ ];
+        gnu = [ "unix" "leveldb" "sasl" ];
+        musl = [ "vendored" ];
       };
       mac = ["unix"];
       windows = [];
       freebsd = [];
     };
+    testing = [
+      "disable-in-nix-check-phase"
+    ];
   };
 
   
@@ -445,7 +462,7 @@ rec {
           buildType = args.buildType;
           logLevel = if verbose then "debug" else "info";
           # cargoVendorDir = ./vendor;
-          cargoSha256 = "1nmamh1ygrx28k8896ffm01slxsahp55lipd1f9d2w2x0qm6sfwq";
+          cargoSha256 = "14qfj7rcp2dxh1dn7pd25wdhgcfvii4mf7xwiyzxna53w8jr20z9";
           # TODO: There seems to be a cargoVendorDir option: https://github.com/NixOS/nixpkgs/blob/a7fa6f60c4df3fde0ab46cfe79294c1d65042fa4/pkgs/build-support/rust/default.nix#L30
 
           target = args.rustTarget;

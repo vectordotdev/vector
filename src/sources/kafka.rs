@@ -113,7 +113,7 @@ fn kafka_source(
         };
 
         stream
-            .take_until(shutdown.map(move |_| block_in_place(|| consumer.stop())))
+            .take_until(shutdown.map(move |_| block_in_place(|| drop(consumer))))
             .then(move |message| {
                 match message {
                     Err(e) => Err(error!(message = "Error reading message from Kafka", error = ?e)),

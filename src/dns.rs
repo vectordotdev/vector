@@ -89,6 +89,8 @@ mod tests {
         runtime.block_on_std(fut).is_ok()
     }
 
+    // This specific test cannot run in the NixOS checkphase sandbox.
+    #[cfg(not(feature = "disable-in-nix-check-phase"))]
     #[test]
     fn resolve_vector() {
         assert!(resolve("vector.dev"));

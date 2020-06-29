@@ -441,6 +441,8 @@ package-rpm-aarch64: package-archive-aarch64-unknown-linux-musl ## Build the aar
 	$(RUN) package-rpm-aarch64
 
 ##@ Releasing
+# TODO: Our main test suite has a few flaky tests right now, so we don't run this in release mode.
+target/artifacts/%: override RUN_CHECK_PHASE = false
 target/artifacts/%:
 	$(NIX_BUILD) --out-link $@ $(subst /,.,$@)
 
