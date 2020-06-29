@@ -212,7 +212,7 @@ where
                 trace!(message = "got an object event", event = "modified");
                 self.state_writer.update(object).await;
             }
-            WatchEvent::Bookmark(_object) => {
+            WatchEvent::Bookmark { .. } => {
                 trace!(message = "got an object event", event = "bookmark");
                 // noop
             }
@@ -290,18 +290,6 @@ mod tests {
         Pod {
             metadata: Some(ObjectMeta {
                 uid: Some(uid.to_owned()),
-                resource_version: Some(resource_version.to_owned()),
-                ..ObjectMeta::default()
-            }),
-            ..Pod::default()
-        }
-    }
-
-    // A helper to build a bookmark pod object.
-    // See https://github.com/kubernetes/enhancements/blob/e565a82680bb8e05836530ebd1abac723aab40e2/keps/sig-api-machinery/20190206-watch-bookmark.md
-    fn make_pod_bookmark(resource_version: &str) -> Pod {
-        Pod {
-            metadata: Some(ObjectMeta {
                 resource_version: Some(resource_version.to_owned()),
                 ..ObjectMeta::default()
             }),
@@ -400,7 +388,9 @@ mod tests {
                     make_pod("uid2", "25"),
                 ],
                 Some("25".to_owned()),
-                ExpInvRes::Stream(vec![WatchEvent::Bookmark(make_pod_bookmark("50"))]),
+                ExpInvRes::Stream(vec![WatchEvent::Bookmark {
+                    resource_version: "50".into(),
+                }]),
             ),
             (
                 vec![

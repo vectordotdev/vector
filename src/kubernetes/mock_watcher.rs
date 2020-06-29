@@ -6,7 +6,7 @@ use super::watcher::{self, Watcher};
 use async_stream::try_stream;
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{future::BoxFuture, stream::BoxStream, SinkExt, StreamExt};
-use k8s_openapi::{WatchOptional, WatchResponse};
+use k8s_openapi::{Resource, WatchOptional, WatchResponse};
 use serde::de::DeserializeOwned;
 use std::fmt;
 
@@ -21,7 +21,7 @@ pub enum ScenarioEvent {
 /// invocation result.
 pub enum ScenarioActionInvocation<T>
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + Resource,
 {
     /// Return successfully and prepare the stream with responses from the
     /// passed [`Receiver`].
@@ -36,7 +36,7 @@ where
 /// stream item request result.
 pub enum ScenarioActionStream<T>
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + Resource,
 {
     /// Return a watch response.
     Ok(WatchResponse<T>),
@@ -49,7 +49,7 @@ where
 /// A mock watcher, useful for tests.
 pub struct MockWatcher<T>
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + Resource,
 {
     events_tx: Sender<ScenarioEvent>,
     invocation_rx: Receiver<ScenarioActionInvocation<T>>,
@@ -57,7 +57,7 @@ where
 
 impl<T> MockWatcher<T>
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + Resource,
 {
     /// Create a new [`MockWatcher`].
     pub fn new(
@@ -73,7 +73,7 @@ where
 
 impl<T> Watcher for MockWatcher<T>
 where
-    T: DeserializeOwned + Send + Sync + Unpin + 'static,
+    T: DeserializeOwned + Resource + Send + Sync + Unpin + 'static,
 {
     type Object = T;
 

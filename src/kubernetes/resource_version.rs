@@ -45,8 +45,10 @@ impl Candidate {
         let object = match event {
             WatchEvent::Added(object)
             | WatchEvent::Modified(object)
-            | WatchEvent::Deleted(object)
-            | WatchEvent::Bookmark(object) => object,
+            | WatchEvent::Deleted(object) => object,
+            WatchEvent::Bookmark { resource_version } => {
+                return Some(Self(resource_version.clone()))
+            }
             WatchEvent::ErrorStatus(_) | WatchEvent::ErrorOther(_) => return None,
         };
         Self::from_object(object)

@@ -65,7 +65,7 @@ where
 mod tests {
     use super::*;
     use k8s_openapi::{
-        api::core::v1::{Pod, PodSpec},
+        api::core::v1::Pod,
         apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
         WatchResponse,
     };
@@ -484,18 +484,9 @@ mod tests {
                 .next()
                 .expect("expected an yielded entry, but none found")
                 .expect("parsing failed");
-            let expected_event = WatchEvent::Bookmark(Pod {
-                metadata: Some(ObjectMeta {
-                    resource_version: Some("3845".into()),
-                    creation_timestamp: None,
-                    ..ObjectMeta::default()
-                }),
-                spec: Some(PodSpec {
-                    containers: vec![],
-                    ..PodSpec::default()
-                }),
-                ..Pod::default()
-            });
+            let expected_event = WatchEvent::Bookmark {
+                resource_version: "3845".into(),
+            };
             match actual_to {
                 WatchResponse::Ok(actual_event) => assert_eq!(actual_event, expected_event),
                 _ => panic!("expected an event, got something else"),

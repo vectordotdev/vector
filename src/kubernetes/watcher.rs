@@ -1,14 +1,14 @@
 //! Watcher abstraction.
 
 use futures::{future::BoxFuture, stream::Stream};
-use k8s_openapi::{WatchOptional, WatchResponse};
+use k8s_openapi::{Resource, WatchOptional, WatchResponse};
 use serde::de::DeserializeOwned;
 use snafu::Snafu;
 
 /// Watch over the changes for a k8s resource.
 pub trait Watcher {
     /// The type of the watched object.
-    type Object: DeserializeOwned;
+    type Object: DeserializeOwned + Resource;
 
     /// The error type watcher invocation implementation uses internally.
     type InvocationError: std::error::Error + Send + 'static;
