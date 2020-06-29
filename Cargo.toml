@@ -122,7 +122,7 @@ leveldb = { git = "https://github.com/timberio/leveldb", optional = true, defaul
 db-key = "0.0.5"
 headers = "0.2.1"
 headers03 = { package = "headers", version = "0.3" }
-rdkafka = { version = "0.23.1", features = ["libz", "ssl", "zstd", "gssapi"], optional = true }
+rdkafka = { version = "0.23.1", features = ["libz", "ssl", "zstd"], optional = true }
 hostname = "0.1.5"
 seahash = { version = "3.0.6", optional = true }
 jemallocator = { version = "0.3.0", optional = true }
@@ -200,9 +200,11 @@ assert_cmd = "1.0"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain", "rdkafka-plain"]
+default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain", "rdkafka-plain", "sasl"]
+# Default features for *-unknown-linux-musl
+default-musl = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake"]
+default-cmake = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake", "sasl"]
 # Default features for *-pc-windows-msvc
 default-msvc = ["sources", "transforms", "sinks", "vendored", "leveldb-cmake", "rdkafka-cmake"]
 
@@ -210,6 +212,11 @@ default-msvc = ["sources", "transforms", "sinks", "vendored", "leveldb-cmake", "
 unix = ["jemallocator", "shiplift/unix-socket"]
 # Forces vendoring of OpenSSL and ZLib dependencies
 vendored = ["openssl/vendored", "libz-sys/static"]
+# Waiting for 1.1.25 to try this on musl again...
+# https://github.com/NixOS/nixpkgs/blob/master/pkgs/os-specific/linux/musl/default.nix
+# https://git.musl-libc.org/cgit/musl/commit/?id=7844ecb590893f8344324837956718001402d297
+# https://git.musl-libc.org/cgit/musl/commit/?id=ea9525c8bcf6170df59364c4bcd616de1acf8703
+sasl = ["rdkafka/gssapi"]
 # This feature is less portable, but doesn't require `cmake` as build dependency
 rdkafka-plain = ["rdkafka"]
 # Enables `rdkafka` dependency.
