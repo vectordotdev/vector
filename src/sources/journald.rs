@@ -25,6 +25,7 @@ use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::process::{Child, ChildStdout, Command, Stdio};
+use std::str::FromStr;
 use std::time;
 use string_cache::DefaultAtom as Atom;
 use tokio::{task::spawn_blocking, time::delay_for};
@@ -65,6 +66,8 @@ pub struct JournaldConfig {
     pub data_dir: Option<PathBuf>,
     pub batch_size: Option<usize>,
     pub journalctl_path: Option<PathBuf>,
+    #[serde(default)]
+    pub remap_priority: bool,
 }
 
 inventory::submit! {
@@ -115,6 +118,7 @@ impl SourceConfig for JournaldConfig {
             include_units,
             exclude_units,
             batch_size,
+            self.remap_priority,
         )
     }
 
@@ -136,6 +140,7 @@ impl JournaldConfig {
         include_units: HashSet<String>,
         exclude_units: HashSet<String>,
         batch_size: usize,
+        remap_priority: bool,
     ) -> crate::Result<super::Source>
     where
         J: JournalSource + Send + 'static,
@@ -169,6 +174,7 @@ impl JournaldConfig {
                 shutdown: shutdown.clone(),
                 checkpointer,
                 batch_size,
+                remap_priority,
             };
             let span = info_span!("journald-server");
             let dispatcher = dispatcher::get_default(|d| d.clone());
@@ -307,6 +313,7 @@ struct JournaldServer<J, T> {
     shutdown: ShutdownSignal,
     checkpointer: Checkpointer,
     batch_size: usize,
+    remap_priority: bool,
 }
 
 impl<J, T> JournaldServer<J, T>
@@ -340,7 +347,7 @@ where
                     }
                 };
 
-                let mut record = match decode_record(&text) {
+                let mut record = match decode_record(&text, self.remap_priority) {
                     Ok(record) => record,
                     Err(error) => {
                         error!(message = "Invalid record from journald, discarding", %error, %text);
@@ -390,7 +397,7 @@ where
     }
 }
 
-fn decode_record(text: &str) -> Result<Record, JsonError> {
+fn decode_record(text: &str, remap: bool) -> Result<Record, JsonError> {
     let mut record = serde_json::from_str::<JsonValue>(&text)?;
     // journalctl will output non-ASCII messages using an array
     // of integers. Look for those messages and re-parse them.
@@ -400,6 +407,9 @@ fn decode_record(text: &str) -> Result<Record, JsonError> {
             .and_then(decode_array)
             .map(|decoded| *message = decoded)
     });
+    if remap {
+        record.get_mut("PRIORITY").map(remap_priority);
+    }
     serde_json::from_value(record)
 }
 
@@ -417,6 +427,24 @@ fn decode_array(array: &Vec<JsonValue>) -> Option<JsonValue> {
         })
         .collect::<Option<Vec<u8>>>()
         .map(|array| String::from_utf8_lossy(&array).into())
+}
+
+fn remap_priority(priority: &mut JsonValue) {
+    priority
+        .as_str()
+        .and_then(|s| usize::from_str(s).ok())
+        .map(|num| match num {
+            0 => "EMERG",
+            1 => "ALERT",
+            2 => "CRIT",
+            3 => "ERR",
+            4 => "WARNING",
+            5 => "NOTICE",
+            6 => "INFO",
+            7 => "DEBUG",
+            _ => "UNKNOWN",
+        })
+        .map(|text| *priority = JsonValue::String(text.into()));
 }
 
 /// Should the given unit name be filtered (excluded)?
@@ -528,11 +556,11 @@ mod tests {
     use tempfile::tempdir;
     use tokio01::util::FutureExt;
 
-    const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001"}
-{"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002"}
-{"_SYSTEMD_UNIT":"badunit.service","MESSAGE":[194,191,72,101,108,108,111,63],"__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140003"}
-{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Missing timestamp","__CURSOR":"3","__REALTIME_TIMESTAMP":"1578529839140004"}
-{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Different timestamps","__CURSOR":"4","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004"}
+    const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
+{"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
+{"_SYSTEMD_UNIT":"badunit.service","MESSAGE":[194,191,72,101,108,108,111,63],"__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140003","PRIORITY":"5"}
+{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Missing timestamp","__CURSOR":"3","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"2"}
+{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Different timestamps","__CURSOR":"4","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3"}
 "#;
 
     struct FakeJournal {
@@ -597,6 +625,7 @@ mod tests {
                 include_units,
                 exclude_units,
                 DEFAULT_BATCH_SIZE,
+                true,
             )
             .expect("Creating journald source failed");
         let mut rt = runtime();
@@ -622,8 +651,10 @@ mod tests {
             "journald".into()
         );
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140001000));
+        assert_eq!(priority(&received[0]), Value::Bytes("INFO".into()));
         assert_eq!(message(&received[1]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140002000));
+        assert_eq!(priority(&received[1]), Value::Bytes("DEBUG".into()));
     }
 
     #[test]
@@ -707,5 +738,9 @@ mod tests {
 
     fn value_ts(secs: i64, usecs: u32) -> Value {
         Value::Timestamp(chrono::Utc.timestamp(secs, usecs))
+    }
+
+    fn priority(event: &Event) -> Value {
+        event.as_log()[&"PRIORITY".into()].clone()
     }
 }
