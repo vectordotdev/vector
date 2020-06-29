@@ -494,7 +494,8 @@ mod test {
             name = "example distribution",
             distribution = {
                 values = { 1.0, 1.0 },
-                sample_rates = { 10, 20 }
+                sample_rates = { 10, 20 },
+                statistic = "histogram"
             }
         }"#;
         let expected = Metric {
