@@ -10,7 +10,7 @@ use crate::{
         retries2::{RetryAction, RetryLogic},
         rusoto,
         service2::TowerRequestConfig,
-        BatchBytesConfig, Buffer, Compression,
+        BatchConfig, BatchSettings, Buffer, Compression,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
@@ -52,7 +52,7 @@ pub struct ElasticSearchConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub auth: Option<ElasticSearchAuth>,
@@ -107,16 +107,24 @@ impl SinkConfig for ElasticSearchConfig {
 
         let common = ElasticSearchCommon::parse_config(&self)?;
         let compression = common.compression;
-        let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
+        let batch = self
+            .batch
+            .clone()
+            .use_size_as_bytes()?
+            .get_settings_or_default(
+                BatchSettings::default()
+                    .bytes(bytesize::mib(10u64))
+                    .timeout(1),
+            );
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = common.tls_settings.clone();
 
         let sink = BatchedHttpSink::with_retry_logic(
             common,
-            Buffer::new(compression),
+            Buffer::new(batch.size, compression),
             ElasticSearchRetryLogic,
             request,
-            batch,
+            batch.timeout,
             tls_settings,
             &cx,
         )
@@ -811,9 +819,9 @@ mod integration_tests {
 
     fn config() -> ElasticSearchConfig {
         ElasticSearchConfig {
-            batch: BatchBytesConfig {
-                max_size: Some(1),
-                timeout_secs: None,
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
             },
             ..Default::default()
         }

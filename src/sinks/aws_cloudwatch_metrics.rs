@@ -3,7 +3,8 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries2::RetryLogic, rusoto, service2::TowerRequestConfig, BatchEventsConfig, MetricBuffer,
+        retries2::RetryLogic, rusoto, service2::TowerRequestConfig, BatchConfig, BatchSettings,
+        MetricBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -34,7 +35,7 @@ pub struct CloudWatchMetricsSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     #[serde(default)]
-    pub batch: BatchEventsConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub assume_role: Option<String>,
@@ -82,7 +83,10 @@ impl CloudWatchMetricsSvc {
             cx.resolver(),
         )?;
 
-        let batch = config.batch.unwrap_or(20, 1);
+        let batch = config
+            .batch
+            .use_size_as_events()?
+            .get_settings_or_default(BatchSettings::default().events(20).timeout(1));
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let cloudwatch_metrics = CloudWatchMetricsSvc { client, config };
@@ -91,8 +95,8 @@ impl CloudWatchMetricsSvc {
             .batch_sink(
                 CloudWatchMetricsRetryLogic,
                 cloudwatch_metrics,
-                MetricBuffer::new(),
-                batch,
+                MetricBuffer::new(batch.size),
+                batch.timeout,
                 cx.acker(),
             )
             .sink_map_err(|e| error!("CloudwatchMetrics sink error: {}", e));

@@ -1,6 +1,6 @@
 use super::retries2::{FixedRetryPolicy, RetryLogic};
 use super::sink::Response;
-use super::{Batch, BatchSettings, BatchSink};
+use super::{Batch, BatchSink};
 use crate::buffers::Acker;
 use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
@@ -124,7 +124,7 @@ impl TowerRequestSettings {
         retry_logic: L,
         service: S,
         batch: B,
-        batch_settings: BatchSettings,
+        batch_timeout: Duration,
         acker: Acker,
     ) -> TowerBatchedSink<S, B, L, Request>
     // Would like to return `impl Sink + SinkExt<T>` here, but that
@@ -149,7 +149,7 @@ impl TowerRequestSettings {
             .service(service);
 
         let service = TowerCompat::new(service);
-        BatchSink::new(service, batch, batch_settings, acker)
+        BatchSink::new(service, batch, batch_timeout, acker)
     }
 }
 

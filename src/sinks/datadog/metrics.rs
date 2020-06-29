@@ -7,7 +7,7 @@ use crate::{
     sinks::util::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
-        BatchEventsConfig, MetricBuffer,
+        BatchConfig, BatchSettings, MetricBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -41,7 +41,7 @@ pub struct DatadogConfig {
     pub host: String,
     pub api_key: String,
     #[serde(default)]
-    pub batch: BatchEventsConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -109,7 +109,10 @@ impl SinkConfig for DatadogConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
 
-        let batch = self.batch.unwrap_or(20, 1);
+        let batch = self
+            .batch
+            .use_size_as_events()?
+            .get_settings_or_default(BatchSettings::default().events(20).timeout(1));
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = build_uri(&self.host)?;
@@ -121,8 +124,15 @@ impl SinkConfig for DatadogConfig {
             last_sent_timestamp: AtomicI64::new(timestamp),
         };
 
-        let sink = BatchedHttpSink::new(sink, MetricBuffer::new(), request, batch, None, &cx)
-            .sink_map_err(|e| error!("Fatal datadog error: {}", e));
+        let sink = BatchedHttpSink::new(
+            sink,
+            MetricBuffer::new(batch.size),
+            request,
+            batch.timeout,
+            None,
+            &cx,
+        )
+        .sink_map_err(|e| error!("Fatal datadog error: {}", e));
 
         Ok((Box::new(sink), Box::new(healthcheck)))
     }

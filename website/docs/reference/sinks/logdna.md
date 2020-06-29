@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-06-25"
 delivery_guarantee: "at_least_once"
 component_title: "LogDNA"
 description: "The Vector `logdna` sink batches `log` events to LogDna's HTTP Ingestion API."
@@ -67,7 +67,8 @@ The Vector `logdna` sink
   tags = ["tag1", "tag2"] # optional, no default
 
   # Batch
-  batch.max_size = 10490000 # optional, default, bytes
+  batch.max_bytes = 10490000 # optional, default, bytes
+  batch.max_events = 1000 # optional, no default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
@@ -146,7 +147,7 @@ Configures the sink batching behavior.
   enumValues={null}
   examples={[10490000]}
   groups={[]}
-  name={"max_size"}
+  name={"max_bytes"}
   path={"batch"}
   relevantWhen={null}
   required={false}
@@ -156,9 +157,32 @@ Configures the sink batching behavior.
   warnings={[]}
   >
 
-#### max_size
+#### max_bytes
 
 The maximum size of a batch, in bytes, before it is flushed.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[1000]}
+  groups={[]}
+  name={"max_events"}
+  path={"batch"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={"events"}
+  warnings={[]}
+  >
+
+#### max_events
+
+The maximum size of a batch, in events, before it is flushed.
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -230,7 +254,7 @@ Configures the sink specific buffer behavior.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
+ See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -253,7 +277,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
- See [Buffers & Batches](#buffers--batches) for more info.
+
 
 
 </Field>
@@ -772,7 +796,7 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 *Batches* are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured [`timeout_secs`](#timeout_secs).
-2. The batch size meets or exceeds the configured [`max_size`](#max_size).
+2. The batch size meets or exceeds the configured [`max_events`](#max_events).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 

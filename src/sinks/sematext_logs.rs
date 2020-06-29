@@ -1,8 +1,7 @@
 use crate::{
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
-        encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchBytesConfig,
-        Compression,
+        encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchConfig, Compression,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
@@ -27,7 +26,7 @@ pub struct SematextLogsConfig {
     request: TowerRequestConfig,
 
     #[serde(default)]
-    batch: BatchBytesConfig,
+    batch: BatchConfig,
 }
 
 inventory::submit! {

@@ -5,14 +5,14 @@ use std::convert::Infallible;
 use std::time::Duration;
 use vector::buffers::Acker;
 use vector::sinks::util::{
-    Batch, BatchSettings, BatchSink, Buffer, Compression, Partition, PartitionBatchSink,
+    Batch, BatchSink, BatchSize, Buffer, Compression, Partition, PartitionBatchSink, PushResult,
 };
 use vector::test_util::random_lines;
 
 fn batching(
     bench_name: &'static str,
     compression: Compression,
-    max_size: usize,
+    max_bytes: usize,
     num_events: usize,
     event_len: usize,
 ) -> Benchmark {
@@ -28,13 +28,14 @@ fn batching(
             |input| {
                 let mut rt = vector::test_util::runtime();
                 let (acker, _) = Acker::new_for_testing();
+                let batch = BatchSize {
+                    bytes: max_bytes,
+                    events: num_events,
+                };
                 let batch_sink = BatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                    Buffer::new(compression),
-                    BatchSettings {
-                        size: max_size,
-                        timeout: Duration::from_secs(1),
-                    },
+                    Buffer::new(batch, compression),
+                    Duration::from_secs(1),
                     acker,
                 )
                 .sink_map_err(|e| panic!(e));
@@ -51,7 +52,7 @@ fn batching(
 fn partitioned_batching(
     bench_name: &'static str,
     compression: Compression,
-    max_size: usize,
+    max_bytes: usize,
     num_events: usize,
     event_len: usize,
 ) -> Benchmark {
@@ -72,13 +73,14 @@ fn partitioned_batching(
             |input| {
                 let mut rt = vector::test_util::runtime();
                 let (acker, _) = Acker::new_for_testing();
+                let batch = BatchSize {
+                    bytes: max_bytes,
+                    events: num_events,
+                };
                 let batch_sink = PartitionBatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                    PartitionedBuffer::new(compression),
-                    BatchSettings {
-                        size: max_size,
-                        timeout: Duration::from_secs(1),
-                    },
+                    PartitionedBuffer::new(batch, compression),
+                    Duration::from_secs(1),
                     acker,
                 )
                 .sink_map_err(|e| panic!(e));
@@ -166,9 +168,9 @@ impl Partition<Bytes> for InnerBuffer {
 }
 
 impl PartitionedBuffer {
-    pub fn new(compression: Compression) -> Self {
+    pub fn new(batch: BatchSize, compression: Compression) -> Self {
         Self {
-            inner: Buffer::new(compression),
+            inner: Buffer::new(batch, compression),
             key: None,
         }
     }
@@ -178,14 +180,15 @@ impl Batch for PartitionedBuffer {
     type Input = InnerBuffer;
     type Output = InnerBuffer;
 
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-
-    fn push(&mut self, item: Self::Input) {
-        let partition = item.partition();
-        self.key = Some(partition);
-        self.inner.push(&item.inner[..])
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        let key = item.key;
+        match Batch::push(&mut self.inner, item.inner) {
+            PushResult::Ok(full) => {
+                self.key = Some(key);
+                PushResult::Ok(full)
+            }
+            PushResult::Overflow(inner) => PushResult::Overflow(InnerBuffer { inner, key }),
+        }
     }
 
     fn is_empty(&self) -> bool {

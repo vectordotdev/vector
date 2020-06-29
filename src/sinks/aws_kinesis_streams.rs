@@ -9,7 +9,7 @@ use crate::{
         rusoto,
         service2::TowerRequestConfig,
         sink::Response,
-        BatchEventsConfig,
+        BatchConfig, BatchSettings, VecBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -50,7 +50,7 @@ pub struct KinesisSinkConfig {
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
-    pub batch: BatchEventsConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub assume_role: Option<String>,
@@ -102,7 +102,10 @@ impl KinesisService {
             cx.resolver(),
         )?);
 
-        let batch = config.batch.unwrap_or(500, 1);
+        let batch = config
+            .batch
+            .use_size_as_events()?
+            .get_settings_or_default(BatchSettings::default().events(500).timeout(1));
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();
@@ -110,7 +113,13 @@ impl KinesisService {
         let kinesis = KinesisService { client, config };
 
         let sink = request
-            .batch_sink(KinesisRetryLogic, kinesis, Vec::new(), batch, cx.acker())
+            .batch_sink(
+                KinesisRetryLogic,
+                kinesis,
+                VecBuffer::new(batch.size),
+                batch.timeout,
+                cx.acker(),
+            )
             .sink_map_err(|e| error!("Fatal kinesis streams sink error: {}", e))
             .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 
@@ -362,9 +371,9 @@ mod integration_tests {
             partition_key_field: None,
             region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
             encoding: Encoding::Text.into(),
-            batch: BatchEventsConfig {
+            batch: BatchConfig {
                 max_events: Some(2),
-                timeout_secs: None,
+                ..Default::default()
             },
             request: Default::default(),
             assume_role: None,

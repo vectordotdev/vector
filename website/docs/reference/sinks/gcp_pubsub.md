@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-02"
+last_modified_on: "2020-06-23"
 delivery_guarantee: "at_least_once"
 component_title: "GCP PubSub"
 description: "The Vector `gcp_pubsub` sink batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface."
@@ -64,7 +64,8 @@ Interface][urls.gcp_pubsub_rest].
   topic = "this-is-a-topic" # required
 
   # Batch
-  batch.max_size = 10485760 # optional, default, bytes
+  batch.max_bytes = 10485760 # optional, default, bytes
+  batch.max_events = 1000 # optional, default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
@@ -153,7 +154,7 @@ Configures the sink batching behavior.
   enumValues={null}
   examples={[10485760]}
   groups={[]}
-  name={"max_size"}
+  name={"max_bytes"}
   path={"batch"}
   relevantWhen={null}
   required={false}
@@ -163,9 +164,32 @@ Configures the sink batching behavior.
   warnings={[]}
   >
 
-#### max_size
+#### max_bytes
 
 The maximum size of a batch, in bytes, before it is flushed.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={1000}
+  enumValues={null}
+  examples={[1000]}
+  groups={[]}
+  name={"max_events"}
+  path={"batch"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={"events"}
+  warnings={[]}
+  >
+
+#### max_events
+
+The maximum size of a batch, in events, before it is flushed.
  See [Buffers & Batches](#buffers--batches) for more info.
 
 
@@ -237,7 +261,7 @@ Configures the sink specific buffer behavior.
 #### max_events
 
 The maximum number of [events][docs.data-model] allowed in the buffer.
-
+ See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -260,7 +284,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
- See [Buffers & Batches](#buffers--batches) for more info.
+
 
 
 </Field>
@@ -917,7 +941,7 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 *Batches* are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured [`timeout_secs`](#timeout_secs).
-2. The batch size meets or exceeds the configured [`max_size`](#max_size).
+2. The batch size meets or exceeds the configured [`max_events`](#max_events).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 

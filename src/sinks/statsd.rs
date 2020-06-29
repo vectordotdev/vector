@@ -2,7 +2,9 @@ use crate::{
     buffers::Acker,
     event::metric::{MetricKind, MetricValue},
     event::Event,
-    sinks::util::{service2::TowerCompat, BatchBytesConfig, BatchSink, Buffer, Compression},
+    sinks::util::{
+        service2::TowerCompat, BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, FutureExt, TryFutureExt};
@@ -51,7 +53,7 @@ pub struct StatsdSinkConfig {
     #[serde(default = "default_address")]
     pub address: SocketAddr,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
 }
 
 pub fn default_address() -> SocketAddr {
@@ -86,7 +88,10 @@ impl StatsdSvc {
         // However we need to leave some space for +1 extra trailing event in the buffer.
         // Also one might keep an eye on server side limitations, like
         // mentioned here https://github.com/DataDog/dd-agent/issues/2638
-        let batch = config.batch.unwrap_or(1300, 1);
+        let batch = config
+            .batch
+            .use_size_as_bytes()?
+            .get_settings_or_default(BatchSettings::default().bytes(1300).events(1000).timeout(1));
         let namespace = config.namespace.clone();
 
         let client = Client::new(config.address)?;
@@ -96,8 +101,8 @@ impl StatsdSvc {
 
         let sink = BatchSink::new(
             TowerCompat::new(svc),
-            Buffer::new(Compression::None),
-            batch,
+            Buffer::new(batch.size, Compression::None),
+            batch.timeout,
             acker,
         )
         .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
@@ -330,9 +335,10 @@ mod test {
         let config = StatsdSinkConfig {
             namespace: "vector".into(),
             address: default_address(),
-            batch: BatchBytesConfig {
-                max_size: Some(512),
+            batch: BatchConfig {
+                max_bytes: Some(512),
                 timeout_secs: Some(1),
+                ..Default::default()
             },
         };
 

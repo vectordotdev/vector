@@ -1,4 +1,4 @@
-use super::batch::Batch;
+use super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
 use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -6,6 +6,7 @@ use std::io::Write;
 pub mod json;
 pub mod metrics;
 pub mod partition;
+pub mod vec;
 
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
@@ -42,6 +43,10 @@ impl Compression {
 pub struct Buffer {
     inner: InnerBuffer,
     num_items: usize,
+    num_bytes: usize,
+    max_bytes: usize,
+    max_events: usize,
+    compression: Compression,
 }
 
 #[derive(Debug)]
@@ -51,16 +56,25 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
-    pub fn new(compression: Compression) -> Self {
+    pub fn new(settings: BatchSize, compression: Compression) -> Self {
+        Self::new_with_settings(settings.bytes, settings.events, compression)
+    }
+
+    fn new_with_settings(max_bytes: usize, max_events: usize, compression: Compression) -> Self {
+        let buffer = Vec::with_capacity(max_bytes);
         let inner = match compression {
-            Compression::None => InnerBuffer::Plain(Vec::new()),
+            Compression::None => InnerBuffer::Plain(buffer),
             Compression::Gzip => {
-                InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::fast()))
+                InnerBuffer::Gzip(GzEncoder::new(buffer, flate2::Compression::fast()))
             }
         };
         Self {
             inner,
             num_items: 0,
+            num_bytes: 0,
+            max_bytes,
+            max_events,
+            compression,
         }
     }
 
@@ -97,12 +111,20 @@ impl Batch for Buffer {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn len(&self) -> usize {
-        self.size()
-    }
-
-    fn push(&mut self, item: Self::Input) {
-        self.push(&item)
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        // The compressed encoders don't flush bytes immediately, so we
+        // can't track compressed sizes. Keep a running count of the
+        // number of bytes written instead.
+        let new_bytes = self.num_bytes + item.len();
+        if self.is_empty() && item.len() > self.max_bytes {
+            err_event_too_large(item.len())
+        } else if self.num_items >= self.max_events || new_bytes > self.max_bytes {
+            PushResult::Overflow(item)
+        } else {
+            self.push(&item);
+            self.num_bytes = new_bytes;
+            PushResult::Ok(self.num_items >= self.max_events || new_bytes >= self.max_bytes)
+        }
     }
 
     fn is_empty(&self) -> bool {
@@ -110,16 +132,7 @@ impl Batch for Buffer {
     }
 
     fn fresh(&self) -> Self {
-        let inner = match &self.inner {
-            InnerBuffer::Plain(_) => InnerBuffer::Plain(Vec::new()),
-            InnerBuffer::Gzip(_) => {
-                InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::default()))
-            }
-        };
-        Self {
-            inner,
-            num_items: 0,
-        }
+        Self::new_with_settings(self.max_bytes, self.max_events, self.compression)
     }
 
     fn finish(self) -> Self::Output {
@@ -140,7 +153,7 @@ impl Batch for Buffer {
 mod test {
     use super::{Buffer, Compression};
     use crate::buffers::Acker;
-    use crate::sinks::util::{BatchSettings, BatchSink};
+    use crate::sinks::util::{BatchSink, BatchSize};
     use crate::test_util::runtime;
     use futures01::{future, Future, Sink};
     use std::io::Read;
@@ -165,13 +178,16 @@ mod test {
 
             future::ok::<_, std::io::Error>(())
         });
+        let batch_size = BatchSize {
+            bytes: 100_000,
+            events: 1_000,
+        };
+        let timeout = Duration::from_secs(0);
+
         let buffered = BatchSink::with_executor(
             svc,
-            Buffer::new(Compression::Gzip),
-            BatchSettings {
-                timeout: Duration::from_secs(0),
-                size: 1000,
-            },
+            Buffer::new(batch_size, Compression::Gzip),
+            timeout,
             acker,
             rt.executor(),
         );
@@ -199,7 +215,7 @@ mod test {
         let output = output.into_iter().collect::<Vec<Vec<u8>>>();
 
         assert!(output.len() > 1);
-        assert!(dbg!(output.iter().map(|o| o.len()).sum::<usize>()) < 51_000);
+        assert!(dbg!(output.iter().map(|o| o.len()).sum::<usize>()) < 80_000);
 
         let decompressed = output.into_iter().flat_map(|batch| {
             let mut decompressed = vec![];

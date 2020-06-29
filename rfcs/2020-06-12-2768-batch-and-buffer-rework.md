@@ -88,7 +88,7 @@ the buffer over its size limits.
 #[must_use]
 enum PushResult<E> {
     Ok,
-    Full(E),
+    Overflow(E),
 }
 
 trait Batch {

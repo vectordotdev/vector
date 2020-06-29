@@ -1,4 +1,4 @@
-use crate::sinks::util::Batch;
+use crate::sinks::util::{Batch, PushResult};
 
 pub trait Partition<K> {
     fn partition(&self) -> K;
@@ -29,14 +29,15 @@ where
     type Input = PartitionInnerBuffer<T::Input, K>;
     type Output = PartitionInnerBuffer<T::Output, K>;
 
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-
-    fn push(&mut self, item: Self::Input) {
-        let partition = item.partition();
-        self.key = Some(partition);
-        self.inner.push(item.inner)
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        let key = item.key;
+        match self.inner.push(item.inner) {
+            PushResult::Ok(full) => {
+                self.key = Some(key);
+                PushResult::Ok(full)
+            }
+            PushResult::Overflow(inner) => PushResult::Overflow(Self::Input { inner, key }),
+        }
     }
 
     fn is_empty(&self) -> bool {
@@ -44,10 +45,7 @@ where
     }
 
     fn fresh(&self) -> Self {
-        Self {
-            inner: self.inner.fresh(),
-            key: None,
-        }
+        Self::new(self.inner.fresh())
     }
 
     fn finish(mut self) -> Self::Output {
