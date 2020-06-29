@@ -425,7 +425,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::event::Event;
+    use crate::event::{metric::StatisticKind, Event};
     use crate::region::RegionOrEndpoint;
     use crate::test_util::{random_string, runtime};
     use crate::topology::config::SinkContext;
@@ -499,6 +499,7 @@ mod integration_tests {
                 value: MetricValue::Distribution {
                     values: vec![i as f64],
                     sample_rates: vec![100],
+                    statistic: StatisticKind::Histogram,
                 },
             });
             events.push(event);

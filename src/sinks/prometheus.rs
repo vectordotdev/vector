@@ -144,7 +144,14 @@ fn encode_metric_header(namespace: &str, metric: &Metric) -> String {
     let r#type = match &metric.value {
         MetricValue::Counter { .. } => "counter",
         MetricValue::Gauge { .. } => "gauge",
-        MetricValue::Distribution { .. } => "histogram",
+        MetricValue::Distribution {
+            statistic: StatisticKind::Histogram,
+            ..
+        } => "histogram",
+        MetricValue::Distribution {
+            statistic: StatisticKind::Distribution,
+            ..
+        } => "distribution",
         MetricValue::Set { .. } => "gauge",
         MetricValue::AggregatedHistogram { .. } => "histogram",
         MetricValue::AggregatedSummary { .. } => "summary",
