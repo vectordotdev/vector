@@ -5691,7 +5691,6 @@ dependencies = [
  "metrics",
  "metrics-core",
  "metrics-runtime",
- "native-tls",
  "nix 0.16.1",
  "nom 5.1.0",
  "notify",
