@@ -1,5 +1,6 @@
 use super::{err_event_too_large, Batch, BatchSize, PushResult};
 
+#[allow(clippy::len_without_is_empty)]
 pub trait Length {
     fn len(&self) -> usize;
 }
