@@ -38,6 +38,15 @@ impl BatchConfig {
         })
     }
 
+    pub fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
+        // Sinks that used `max_size` for an event count cannot count
+        // bytes, so err if `max_bytes` is set.
+        match self.max_bytes {
+            Some(_) => Err(BatchError::BytesNotAllowed),
+            None => Ok(*self),
+        }
+    }
+
     pub fn use_size_as_events(&self) -> Result<Self, BatchError> {
         let max_events = match (self.max_events, self.max_size) {
             (Some(_), Some(_)) => return Err(BatchError::EventsAndSize),
@@ -45,11 +54,6 @@ impl BatchConfig {
             (None, Some(size)) => Some(size),
             (None, None) => None,
         };
-        // Sinks that used `max_size` for an event count cannot count
-        // bytes, so err if `max_bytes` is set.
-        if self.max_bytes.is_some() {
-            return Err(BatchError::BytesNotAllowed);
-        }
         Ok(Self {
             max_events: max_events,
             max_size: None,
