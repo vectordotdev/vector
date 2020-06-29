@@ -65,7 +65,7 @@ where
 mod tests {
     use super::*;
     use k8s_openapi::{
-        api::core::v1::Pod,
+        api::core::v1::{Pod, PodSpec},
         apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
         WatchResponse,
     };
@@ -462,5 +462,47 @@ mod tests {
         // Capacity limit is set based on heuristics about `Vec` internals, and
         // is adjusted to be as low as possible.
         assert!(dec.responses_buffer.capacity() <= (max_chunks_per_iter + 2).next_power_of_two());
+    }
+
+    #[test]
+    fn test_practical_error_case_1() {
+        let mut dec = MultiResponseDecoder::<TO>::new();
+
+        {
+            let mut stream = dec.process_next_chunk(&[
+                10, 123, 34, 116, 121, 112, 101, 34, 58, 34, 66, 79, 79, 75, 77, 65, 82, 75, 34,
+                44, 34, 111, 98, 106, 101, 99, 116, 34, 58, 123, 34, 107, 105, 110, 100, 34, 58,
+                34, 80, 111, 100, 34, 44, 34, 97, 112, 105, 86, 101, 114, 115, 105, 111, 110, 34,
+                58, 34, 118, 49, 34, 44, 34, 109, 101, 116, 97, 100, 97, 116, 97, 34, 58, 123, 34,
+                114, 101, 115, 111, 117, 114, 99, 101, 86, 101, 114, 115, 105, 111, 110, 34, 58,
+                34, 51, 56, 52, 53, 34, 44, 34, 99, 114, 101, 97, 116, 105, 111, 110, 84, 105, 109,
+                101, 115, 116, 97, 109, 112, 34, 58, 110, 117, 108, 108, 125, 44, 34, 115, 112,
+                101, 99, 34, 58, 123, 34, 99, 111, 110, 116, 97, 105, 110, 101, 114, 115, 34, 58,
+                110, 117, 108, 108, 125, 44, 34, 115, 116, 97, 116, 117, 115, 34, 58, 123, 125,
+                125, 125, 10,
+            ]);
+            let actual_to = stream
+                .next()
+                .expect("expected an yielded entry, but none found")
+                .expect("parsing failed");
+            let expected_event = WatchEvent::Bookmark(Pod {
+                metadata: Some(ObjectMeta {
+                    resource_version: Some("3845".into()),
+                    creation_timestamp: None,
+                    ..ObjectMeta::default()
+                }),
+                spec: Some(PodSpec {
+                    containers: vec![],
+                    ..PodSpec::default()
+                }),
+                ..Pod::default()
+            });
+            match actual_to {
+                WatchResponse::Ok(actual_event) => assert_eq!(actual_event, expected_event),
+                _ => panic!("expected an event, got something else"),
+            }
+        }
+
+        assert!(dec.finish().is_ok());
     }
 }
