@@ -25,11 +25,11 @@
             "required": false
         },
         "AWS_CLOUDWATCH_STREAM_NAME": {
-            "description": "An AWS CloudWatch stream name (if needed, for sinking to CloudWatch)",
+            "description": "An AWS CloudWatch stream name (if needed, for sinking to CloudWatch. Vector can create this for you.)",
             "required": false
         },
         "AWS_CLOUDWATCH_GROUP_NAME": {
-            "description": "An AWS CloudWatch stream group name (if needed, for sinking to CloudWatch)",
+            "description": "An AWS CloudWatch stream group name (if needed, for sinking to CloudWatch. You need to create this yourself.)",
             "required": false
         },
         "LOGPLEX_SOURCE_HTTPS_USERNAME": {
