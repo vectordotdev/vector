@@ -536,8 +536,8 @@ mod test {
         let incomlete_line = prepare_test("incomlete_line.log", b"missing newline char");
         let one_line = prepare_test("one_line.log", b"hello world\n");
         let one_line_duplicate = prepare_test("one_line_duplicate.log", b"hello world\n");
-        let one_line_continuied =
-            prepare_test("one_line_continuied.log", b"hello world\nthe next line\n");
+        let one_line_continued =
+            prepare_test("one_line_continued.log", b"hello world\nthe next line\n");
         let different_two_lines = prepare_test("different_two_lines.log", b"line one\nline two\n");
 
         let exactly_max_line_length =
@@ -558,13 +558,13 @@ mod test {
 
         assert!(run(&one_line).is_ok());
         assert!(run(&one_line_duplicate).is_ok());
-        assert!(run(&one_line_continuied).is_ok());
+        assert!(run(&one_line_continued).is_ok());
         assert!(run(&different_two_lines).is_ok());
         assert!(run(&exactly_max_line_length).is_ok());
         assert!(run(&exceeding_max_line_length).is_ok());
 
         assert_eq!(run(&one_line).unwrap(), run(&one_line_duplicate).unwrap());
-        assert_eq!(run(&one_line).unwrap(), run(&one_line_continuied).unwrap());
+        assert_eq!(run(&one_line).unwrap(), run(&one_line_continued).unwrap());
 
         assert_ne!(run(&one_line).unwrap(), run(&different_two_lines).unwrap());
 
