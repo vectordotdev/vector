@@ -21,7 +21,7 @@
             "required": false
         },
         "AWS_REGION": {
-            "description": "An AWS region (if needed, for sinking to CloudWatch)",
+            "description": "An AWS region (if needed, for sinking to CloudWatch). Examples: `ca-central-1`, `us-east-1`",
             "required": false
         },
         "AWS_CLOUDWATCH_STREAM_NAME": {
@@ -31,6 +31,14 @@
         "AWS_CLOUDWATCH_GROUP_NAME": {
             "description": "An AWS CloudWatch stream group name (if needed, for sinking to CloudWatch)",
             "required": false
+        },
+        "LOGPLEX_SOURCE_HTTPS_USERNAME": {
+            "description": "An autogenerating username. (Use this to add your drain later!)",
+            "generator": "secret"
+        },
+        "LOGPLEX_SOURCE_HTTPS_PASSWORD": {
+            "description": "An autogenerating password. (Use this to add your drain later!)",
+            "generator": "secret"
         }
     },
     "formation": {
