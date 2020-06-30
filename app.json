@@ -11,6 +11,14 @@
         "VECTOR_TOML_URL": {
             "description": "The URL of the `vector.toml` you use to use.",
             "required": true
+        },
+        "AWS_ACCESS_KEY_ID": {
+            "description": "An AWS key ID, if needed. (eg. For sinking to CloudWatch)",
+            "required": false
+        },
+        "AWS_SECRET_ACCESS_KEY": {
+            "description": "An AWS access key, if needed. (eg. For sinking to CloudWatch)",
+            "required": false
         }
     },
     "formation": {
