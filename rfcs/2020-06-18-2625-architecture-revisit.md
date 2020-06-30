@@ -265,7 +265,7 @@ together with channels. While simple, this leads to the whole pipeline being
 limited by the single-threaded throughput of the slowest component.
 
 In the new design, we take advantage of the fact that all of the transform work
-for this config is embarrassingly parallel. Where the source would normally
+for this config is perfectly parallelizable. Where the source would normally
 clone a channel `Sender` for each incoming connection, it will now clone
 a `Push` implementation called `Pipeline` (naming TBD) that does the
 transformation work inline before forwarding the results directly to the sink.
