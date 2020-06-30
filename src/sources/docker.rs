@@ -930,16 +930,15 @@ impl ContainerMetadata {
 }
 
 fn docker() -> Result<bollard::Docker, bollard::errors::Error> {
-    match env::var("DOCKER_HOST").ok() {
-        Some(host) => {
-            let uri = host.parse::<hyper::Uri>().expect("invalid url");
-            if uri.scheme().map(|s| s == "http").unwrap_or(false) {
-                bollard::Docker::connect_with_http_defaults()
-            } else {
-                bollard::Docker::connect_with_tls_defaults()
-            }
-        }
-        None => bollard::Docker::connect_with_local_defaults(),
+    let scheme = env::var("DOCKER_HOST").ok().and_then(|host| {
+        let uri = host.parse::<hyper::Uri>().expect("invalid url");
+        uri.into_parts().scheme
+    });
+
+    match scheme.as_ref().map(|s| s.as_str()) {
+        Some("http") => bollard::Docker::connect_with_http_defaults(),
+        Some("https") => bollard::Docker::connect_with_tls_defaults(),
+        _ => bollard::Docker::connect_with_local_defaults(),
     }
 }
 
