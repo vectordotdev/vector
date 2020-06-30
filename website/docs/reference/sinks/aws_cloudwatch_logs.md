@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-06-29"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Logs"
 description: "The Vector `aws_cloudwatch_logs` sink batches `log` events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint."
@@ -76,7 +76,8 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
   stream_name = "{{ host }}" # required
 
   # Batch
-  batch.max_events = 1000 # optional, default, events
+  batch.max_bytes = 1048576 # optional, default, bytes
+  batch.max_events = 10000 # optional, default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
@@ -152,9 +153,32 @@ Configures the sink batching behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={1000}
+  defaultValue={1048576}
   enumValues={null}
-  examples={[1000]}
+  examples={[1048576]}
+  groups={[]}
+  name={"max_bytes"}
+  path={"batch"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+#### max_bytes
+
+The maximum size of a batch, in bytes, before it is flushed.
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={10000}
+  enumValues={null}
+  examples={[10000]}
   groups={[]}
   name={"max_events"}
   path={"batch"}

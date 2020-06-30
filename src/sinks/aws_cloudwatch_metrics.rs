@@ -85,6 +85,7 @@ impl CloudWatchMetricsSvc {
 
         let batch = config
             .batch
+            .disallow_max_bytes()?
             .use_size_as_events()?
             .get_settings_or_default(BatchSettings::default().events(20).timeout(1));
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
