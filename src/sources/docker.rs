@@ -5,6 +5,7 @@ use crate::{
     stream::StreamExt,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
+use bollard::{errors::Error as DockerError, Docker};
 use bytes05::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Utc};
 use futures01::{sync::mpsc, Async, Future, Sink, Stream};
@@ -15,7 +16,7 @@ use shiplift::{
     builder::{ContainerFilter, EventFilter, LogsOptions},
     rep::ContainerDetails,
     tty::{Chunk, StreamType},
-    Docker, Error,
+    Error,
 };
 use std::sync::Arc;
 use std::{collections::HashMap, env};
@@ -125,7 +126,7 @@ impl SourceConfig for DockerConfig {
 
 struct DockerSourceCore {
     config: DockerConfig,
-    docker: Docker,
+    docker: shiplift::Docker,
     /// Only logs created at, or after this moment are logged.
     now_timestamp: DateTime<Utc>,
 }
@@ -134,7 +135,7 @@ impl DockerSourceCore {
     fn new(config: DockerConfig) -> crate::Result<Self> {
         // ?NOTE: Constructs a new Docker instance for a docker host listening at url specified by an env var DOCKER_HOST.
         // ?      Otherwise connects to unix socket which requires sudo privileges, or docker group membership.
-        let docker = Docker::new();
+        let docker = shiplift::Docker::new();
 
         // Only log events created at-or-after this moment are logged.
         let now = chrono::Local::now();
@@ -929,16 +930,16 @@ impl ContainerMetadata {
     }
 }
 
-fn docker() -> Result<bollard::Docker, bollard::errors::Error> {
+fn docker() -> Result<Docker, DockerError> {
     let scheme = env::var("DOCKER_HOST").ok().and_then(|host| {
         let uri = host.parse::<hyper::Uri>().expect("invalid url");
         uri.into_parts().scheme
     });
 
     match scheme.as_ref().map(|s| s.as_str()) {
-        Some("http") => bollard::Docker::connect_with_http_defaults(),
-        Some("https") => bollard::Docker::connect_with_tls_defaults(),
-        _ => bollard::Docker::connect_with_local_defaults(),
+        Some("http") => Docker::connect_with_http_defaults(),
+        Some("https") => Docker::connect_with_tls_defaults(),
+        _ => Docker::connect_with_local_defaults(),
     }
 }
 
