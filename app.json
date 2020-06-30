@@ -1,6 +1,6 @@
 {
     "name": "Vector",
-    "description": "Vector is a lightweight tool for building observability pipelines.",
+    "description": "Vector is a lightweight tool for building observability pipelines. (With easy setup for CloudWatch!)",
     "repository": "https://github.com/timberio/vector",
     "logo": "https://vector.dev/press/vector-icon.png",
     "keywords": ["observability"],
@@ -23,7 +23,15 @@
         "AWS_REGION": {
             "description": "An AWS region, if needed.",
             "required": false
-        }
+        },
+        "AWS_CLOUDWATCH_STREAM_NAME": {
+            "description": "An AWS CloudWatch stream name, if needed.",
+            "required": false
+        },
+        "AWS_CLOUDWATCH_GROUP_NAME": {
+            "description": "An AWS CloudWatch stream group name, if needed.",
+            "required": false
+        },
     },
     "formation": {
         "web": {
