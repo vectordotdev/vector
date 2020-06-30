@@ -1,0 +1,22 @@
+{
+    "name": "Vector",
+    "description": "Vector is a lightweight tool for building observability pipelines.",
+    "repository": "https://github.com/timberio/vector",
+    "logo": "https://vector.dev/press/vector-icon.png",
+    "keywords": ["observability"],
+    "buildpacks": [
+        { "url": "https://github.com/timberio/vector-heroku-buildpack" }
+    ],
+    "env": {
+        "VECTOR_TOML_URL": {
+            "description": "The URL of the `vector.toml` you use to use.",
+            "required": true
+        }
+    },
+    "formation": {
+        "web": {
+            "quantity": 1,
+            "size": "standard-1x"
+        }
+    }
+}

@@ -182,6 +182,9 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 
 Or use your own [preferred method][docs.installation].
 
+## Deploy
+
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/timberio/vector/tree/heroku-button&env[VECTOR_TOML_URL]=https://github.com/timberio/vector-heroku-buildpack/blob/master/vector.toml)
 
 ## Latest Highlights
 
