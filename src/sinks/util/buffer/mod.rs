@@ -7,6 +7,7 @@ pub mod json;
 pub mod metrics;
 pub mod partition;
 pub mod vec;
+pub mod vec2;
 
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
