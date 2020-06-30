@@ -7,10 +7,7 @@ use crate::{
 };
 use bytes05::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Utc};
-use futures01::{
-    sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
-    Async, Future, Sink, Stream,
-};
+use futures01::{sync::mpsc, Async, Future, Sink, Stream};
 use http01::StatusCode;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -106,7 +103,7 @@ impl SourceConfig for DockerConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: Sender<Event>,
+        out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         DockerSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
@@ -218,7 +215,7 @@ struct DockerSource {
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
     ///receives ContainerLogInfo comming from event stream futures
-    main_recv: UnboundedReceiver<ContainerLogInfo>,
+    main_recv: mpsc::UnboundedReceiver<ContainerLogInfo>,
     /// It may contain shortened container id.
     hostname: Option<String>,
     /// True if self needs to be excluded
@@ -228,7 +225,7 @@ struct DockerSource {
 impl DockerSource {
     fn new(
         config: DockerConfig,
-        out: Sender<Event>,
+        out: mpsc::Sender<Event>,
         shutdown: ShutdownSignal,
     ) -> crate::Result<impl Future<Item = (), Error = ()>> {
         // Find out it's own container id, if it's inside a docker container.
@@ -491,9 +488,9 @@ impl Future for DockerSource {
 struct EventStreamBuilder {
     core: Arc<DockerSourceCore>,
     /// Event stream futures send events through this
-    out: Sender<Event>,
+    out: mpsc::Sender<Event>,
     /// End through which event stream futures send ContainerLogInfo to main future
-    main_send: UnboundedSender<ContainerLogInfo>,
+    main_send: mpsc::UnboundedSender<ContainerLogInfo>,
     /// Self and event streams will end on this.
     shutdown: ShutdownSignal,
 }
@@ -501,8 +498,8 @@ struct EventStreamBuilder {
 impl EventStreamBuilder {
     fn new(
         core: DockerSourceCore,
-        out: Sender<Event>,
-        main_send: UnboundedSender<ContainerLogInfo>,
+        out: mpsc::Sender<Event>,
+        main_send: mpsc::UnboundedSender<ContainerLogInfo>,
         shutdown: ShutdownSignal,
     ) -> Self {
         EventStreamBuilder {
@@ -932,44 +929,37 @@ impl ContainerMetadata {
     }
 }
 
+fn docker() -> Result<bollard::Docker, bollard::errors::Error> {
+    match env::var("DOCKER_HOST").ok() {
+        Some(host) => {
+            let uri = host.parse::<hyper::Uri>().expect("invalid url");
+            if uri.scheme().map(|s| s == "http").unwrap_or(false) {
+                bollard::Docker::connect_with_http_defaults()
+            } else {
+                bollard::Docker::connect_with_tls_defaults()
+            }
+        }
+        None => bollard::Docker::connect_with_local_defaults(),
+    }
+}
+
 #[cfg(all(test, feature = "docker-integration-tests"))]
 mod tests {
     use super::*;
     use crate::runtime::Runtime;
     use crate::test_util::{collect_n, runtime, trace_init};
-    use futures::compat::Future01CompatExt;
-
-    static BUXYBOX_IMAGE_TAG: &'static str = "latest";
-
-    async fn pull(image: &str, docker: &Docker) {
-        let list_option = shiplift::ImageListOptions::builder()
-            .filter_name(image)
-            .build();
-
-        if let Ok(images) = docker
-            .images()
-            .list(&list_option)
-            .compat()
-            .await
-            .map_err(|e| error!(%e))
-        {
-            if images.is_empty() {
-                trace!("Pulling image");
-                let options = shiplift::PullOptions::builder()
-                    .image(image)
-                    .tag(BUXYBOX_IMAGE_TAG)
-                    .build();
-                let _ = docker
-                    .images()
-                    .pull(&options)
-                    .collect()
-                    .compat()
-                    .await
-                    .map_err(|e| error!(%e));
-            }
-        }
-        // Try running the tests in any case.
-    }
+    use bollard::{
+        container::{
+            Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
+            RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
+        },
+        image::{CreateImageOptions, CreateImageResults, ListImagesOptions},
+        Docker,
+    };
+    use futures::{
+        compat::Future01CompatExt,
+        stream::{StreamExt, TryStreamExt},
+    };
 
     /// None if docker is not present on the system
     fn source_with<'a, L: Into<Option<&'a str>>>(
@@ -1005,20 +995,15 @@ mod tests {
     }
 
     /// Users should ensure to remove container before exiting.
-    async fn log_container<'a, L: Into<Option<&'a str>>>(
-        name: &str,
-        label: L,
-        log: &str,
-        docker: &Docker,
-    ) -> String {
-        cmd_container(name, label, vec!["echo".to_owned(), log.to_owned()], docker).await
+    async fn log_container(name: &str, label: Option<&str>, log: &str, docker: &Docker) -> String {
+        cmd_container(name, label, vec!["echo", log], docker).await
     }
 
     /// Users should ensure to remove container before exiting.
     /// Will resend message every so often.
-    async fn eternal_container<'a, L: Into<Option<&'a str>>>(
+    async fn eternal_container(
         name: &str,
-        label: L,
+        label: Option<&str>,
         log: &str,
         docker: &Docker,
     ) -> String {
@@ -1026,19 +1011,19 @@ mod tests {
             name,
             label,
             vec![
-                "sh".to_owned(),
-                "-c".to_owned(),
-                format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {}; i=$((i+1)); done", log),
+                "sh",
+                "-c",
+                format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {}; i=$((i+1)); done", log).as_str(),
             ],
             docker,
         ).await
     }
 
     /// Users should ensure to remove container before exiting.
-    async fn cmd_container<'a, L: Into<Option<&'a str>>>(
+    async fn cmd_container(
         name: &str,
-        label: L,
-        cmd: Vec<String>,
+        label: Option<&str>,
+        cmd: Vec<&str>,
         docker: &Docker,
     ) -> String {
         if let Some(id) = cmd_container_for_real(name, label, cmd, docker).await {
@@ -1054,69 +1039,91 @@ mod tests {
     }
 
     /// Users should ensure to remove container before exiting.
-    async fn cmd_container_for_real<'a, L: Into<Option<&'a str>>>(
+    async fn cmd_container_for_real(
         name: &str,
-        label: L,
-        cmd: Vec<String>,
+        label: Option<&str>,
+        cmd: Vec<&str>,
         docker: &Docker,
     ) -> Option<String> {
-        pull("busybox", docker).await;
+        pull_busybox(docker).await;
 
         trace!("Creating container");
 
-        let mut options = shiplift::builder::ContainerOptions::builder("busybox");
-        options
-            .name(name)
-            .cmd(cmd.iter().map(|s| s.as_str()).collect());
-        label.into().map(|label| {
-            let mut map = HashMap::new();
-            map.insert(label, "");
-            options.labels(&map);
+        let options = Some(CreateContainerOptions { name });
+        let config = ContainerConfig {
+            image: Some("busybox"),
+            cmd: Some(cmd),
+            labels: label.map(|label| vec![(label, "")].into_iter().collect()),
+            ..Default::default()
+        };
+
+        let container = docker.create_container(options, config).await;
+        container.ok().map(|c| c.id)
+    }
+
+    /// Polling busybox image
+    async fn pull_busybox(docker: &Docker) {
+        let mut filters = HashMap::new();
+        filters.insert("reference", vec!["busybox:latest"]);
+
+        let options = Some(ListImagesOptions {
+            filters,
+            ..Default::default()
         });
 
-        docker
-            .containers()
-            .create(&options.build())
-            .compat()
-            .await
-            .map_err(|e| error!(%e))
-            .ok()
-            .map(|c| c.id)
+        let images = docker.list_images(options).await.unwrap();
+        if images.is_empty() {
+            // If `busybox:latest` not found, pull it
+            let options = Some(CreateImageOptions {
+                from_image: "busybox",
+                tag: "latest",
+                ..Default::default()
+            });
+
+            docker
+                .create_image(options, None, None)
+                .for_each(|item| async move {
+                    match item.unwrap() {
+                        err @ CreateImageResults::CreateImageError { .. } => panic!("{:?}", err),
+                        _ => {}
+                    }
+                })
+                .await
+        }
     }
 
     /// Returns once container has started
-    #[must_use]
-    async fn container_start(id: &str, docker: &Docker) -> Result<(), shiplift::errors::Error> {
+    async fn container_start(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
         trace!("Starting container");
 
-        docker.containers().get(id).start().compat().await
+        let options = None::<StartContainerOptions<&str>>;
+        docker.start_container(id, options).await
     }
 
     /// Returns once container is done running
-    #[must_use]
-    async fn container_wait(id: &str, docker: &Docker) -> Result<(), shiplift::errors::Error> {
+    async fn container_wait(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
         trace!("Waiting container");
 
         docker
-            .containers()
-            .get(id)
-            .wait()
-            .compat()
+            .wait_container(id, None::<WaitContainerOptions<&str>>)
+            .try_for_each(|exit| async move {
+                info!("Container exited with status code: {}", exit.status_code);
+                Ok(())
+            })
             .await
-            .map(|exit| info!("Container exited with status code: {}", exit.status_code))
     }
 
     /// Returns once container is killed
-    #[must_use]
-    async fn container_kill(id: &str, docker: &Docker) -> Result<(), shiplift::errors::Error> {
+    async fn container_kill(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
         trace!("Waiting container");
 
-        docker.containers().get(id).kill(None).compat().await
+        docker
+            .kill_container(id, None::<KillContainerOptions<&str>>)
+            .await
     }
 
     /// Returns once container is done running
-    #[must_use]
-    async fn container_run(id: &str, docker: &Docker) -> Result<(), shiplift::errors::Error> {
+    async fn container_run(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
         container_start(id, docker).await?;
         container_wait(id, docker).await
     }
@@ -1126,20 +1133,17 @@ mod tests {
 
         // Don't panick, as this is unreleated to test, and there possibly other containers that need to be removed
         let _ = docker
-            .containers()
-            .get(id)
-            .remove(shiplift::builder::RmContainerOptions::builder().build())
-            .compat()
+            .remove_container(id, None::<RemoveContainerOptions>)
             .await
             .map_err(|e| error!(%e));
     }
 
     /// Returns once it's certain that log has been made
     /// Expects that this is the only one with a container
-    async fn container_log_n<'a, L: Into<Option<&'a str>>>(
+    async fn container_log_n(
         n: usize,
         name: &str,
-        label: L,
+        label: Option<&str>,
         log: &str,
         docker: &Docker,
     ) -> String {
@@ -1155,9 +1159,9 @@ mod tests {
 
     /// Once function returns, the container has entered into running state.
     /// Container must be killed before removed.
-    fn running_container<'a, L: Into<Option<&'a str>> + Send + 'static>(
+    fn running_container(
         name: &'static str,
-        label: L,
+        label: Option<&'static str>,
         log: &'static str,
         docker: &Docker,
         rt: &mut Runtime,
@@ -1201,9 +1205,9 @@ mod tests {
         let out = source_with(&[name], None, &mut rt);
 
         rt.block_on_std(async move {
-            let docker = Docker::new();
+            let docker = docker().unwrap();
 
-            let id = container_log_n(1, name, label, message, &docker).await;
+            let id = container_log_n(1, name, Some(label), message, &docker).await;
             let events = collect_n(out, 1).compat().await.ok().unwrap();
             container_remove(&id, &docker).await;
 
@@ -1232,7 +1236,7 @@ mod tests {
         let out = source_with(&[name], None, &mut rt);
 
         rt.block_on_std(async move {
-            let docker = Docker::new();
+            let docker = docker().unwrap();
 
             let id = container_log_n(2, name, None, message, &docker).await;
             let events = collect_n(out, 2).compat().await.ok().unwrap();
@@ -1261,7 +1265,7 @@ mod tests {
         let out = source_with(&[name1], None, &mut rt);
 
         rt.block_on_std(async move {
-            let docker = Docker::new();
+            let docker = docker().unwrap();
 
             let id0 = container_log_n(1, name0, None, "13", &docker).await;
             let id1 = container_log_n(1, name1, None, message, &docker).await;
@@ -1289,10 +1293,10 @@ mod tests {
         let out = source_with(&[name0, name1], label, &mut rt);
 
         rt.block_on_std(async move {
-            let docker = Docker::new();
+            let docker = docker().unwrap();
 
             let id0 = container_log_n(1, name0, None, "13", &docker).await;
-            let id1 = container_log_n(1, name1, label, message, &docker).await;
+            let id1 = container_log_n(1, name1, Some(label), message, &docker).await;
             let events = collect_n(out, 1).compat().await.ok().unwrap();
             container_remove(&id0, &docker).await;
             container_remove(&id1, &docker).await;
@@ -1313,8 +1317,8 @@ mod tests {
         let label = "vector_test_label_currently_running";
 
         let mut rt = runtime();
-        let docker = Docker::new();
-        let id = running_container(name, label, message, &docker, &mut rt);
+        let docker = docker().unwrap();
+        let id = running_container(name, Some(label), message, &docker, &mut rt);
         let out = source_with(&[name], None, &mut rt);
 
         rt.block_on_std(async move {
@@ -1352,7 +1356,7 @@ mod tests {
         let out = source_with_config(config, &mut rt);
 
         rt.block_on_std(async move {
-            let docker = Docker::new();
+            let docker = docker().unwrap();
 
             let id = container_log_n(1, name, None, message, &docker).await;
             let events = collect_n(out, 1).compat().await.ok().unwrap();
@@ -1380,7 +1384,7 @@ mod tests {
         let exclude_out = source_with_config(config_ex, &mut rt);
 
         rt.block_on_std(async move {
-            let docker = Docker::new();
+            let docker = docker().unwrap();
 
             let id = container_log_n(1, name, None, message, &docker).await;
             container_remove(&id, &docker).await;
@@ -1406,7 +1410,7 @@ mod tests {
         };
 
         let mut rt = runtime();
-        let docker = Docker::new();
+        let docker = docker().unwrap();
 
         let id = running_container(name, None, message, &docker, &mut rt);
         let exclude_out = source_with_config(config_ex, &mut rt);
