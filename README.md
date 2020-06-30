@@ -184,7 +184,17 @@ Or use your own [preferred method][docs.installation].
 
 ## Deploy
 
+We taught [Vic](https://vector.dev/vic/) how to deploy Vector on Heroku (and to sink Logplex to CloudWatch)! What a good flying squirrel!
+
+Want to spin one up? Hit the button and fill in the boxes.
+
 [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/timberio/vector/tree/heroku-button&env[VECTOR_TOML_URL]=https://raw.githubusercontent.com/timberio/vector-heroku-buildpack/master/vector.toml)
+
+Then:
+
+```bash
+heroku drains:add https://${VECTOR_INSTANCE_NAME}.herokuapp.com/logs -a ${YOUR_APP}
+```
 
 ## Latest Highlights
 

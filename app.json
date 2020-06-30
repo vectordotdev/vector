@@ -31,7 +31,7 @@
         "AWS_CLOUDWATCH_GROUP_NAME": {
             "description": "An AWS CloudWatch stream group name, if needed.",
             "required": false
-        },
+        }
     },
     "formation": {
         "web": {
