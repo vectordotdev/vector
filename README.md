@@ -184,7 +184,7 @@ Or use your own [preferred method][docs.installation].
 
 ## Deploy
 
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/timberio/vector/tree/add-retries-to-the-verification-of-the-release-artifacts&env[VECTOR_TOML_URL]=https://raw.githubusercontent.com/timberio/vector-heroku-buildpack/master/vector.toml)
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/timberio/vector/tree/heroku-button&env[VECTOR_TOML_URL]=https://raw.githubusercontent.com/timberio/vector-heroku-buildpack/master/vector.toml)
 
 ## Latest Highlights
 
