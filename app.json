@@ -19,6 +19,10 @@
         "AWS_SECRET_ACCESS_KEY": {
             "description": "An AWS access key, if needed. (eg. For sinking to CloudWatch)",
             "required": false
+        },
+        "AWS_REGION": {
+            "description": "An AWS region, if needed.",
+            "required": false
         }
     },
     "formation": {
