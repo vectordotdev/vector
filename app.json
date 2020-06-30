@@ -13,23 +13,23 @@
             "required": false
         },
         "AWS_ACCESS_KEY_ID": {
-            "description": "An AWS key ID, if needed. (eg. For sinking to CloudWatch)",
+            "description": "An AWS key ID (if needed, for sinking to CloudWatch)",
             "required": false
         },
         "AWS_SECRET_ACCESS_KEY": {
-            "description": "An AWS access key, if needed. (eg. For sinking to CloudWatch)",
+            "description": "An AWS access key (if needed, for sinking to CloudWatch)",
             "required": false
         },
         "AWS_REGION": {
-            "description": "An AWS region, if needed.",
+            "description": "An AWS region (if needed, for sinking to CloudWatch)",
             "required": false
         },
         "AWS_CLOUDWATCH_STREAM_NAME": {
-            "description": "An AWS CloudWatch stream name, if needed.",
+            "description": "An AWS CloudWatch stream name (if needed, for sinking to CloudWatch)",
             "required": false
         },
         "AWS_CLOUDWATCH_GROUP_NAME": {
-            "description": "An AWS CloudWatch stream group name, if needed.",
+            "description": "An AWS CloudWatch stream group name (if needed, for sinking to CloudWatch)",
             "required": false
         }
     },
