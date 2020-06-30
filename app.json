@@ -9,8 +9,8 @@
     ],
     "env": {
         "VECTOR_TOML_URL": {
-            "description": "The URL of the `vector.toml` you use to use.",
-            "required": true
+            "description": "The URL of the `vector.toml` you use to use. (Refreshed on restart! For static, provision a `vector.toml` with your app.)",
+            "required": false
         },
         "AWS_ACCESS_KEY_ID": {
             "description": "An AWS key ID, if needed. (eg. For sinking to CloudWatch)",
