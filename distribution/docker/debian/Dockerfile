@@ -1,5 +1,7 @@
 FROM debian:buster-slim AS builder
 
+RUN apt-get update && apt-get install -y libsasl2-2 && rm -rf /var/lib/apt/lists/*
+
 COPY vector-*.deb ./
 RUN dpkg -i vector-$(dpkg --print-architecture).deb
 
