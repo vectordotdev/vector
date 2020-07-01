@@ -216,7 +216,7 @@ vendored = ["openssl/vendored", "libz-sys/static"]
 # https://github.com/NixOS/nixpkgs/blob/master/pkgs/os-specific/linux/musl/default.nix
 # https://git.musl-libc.org/cgit/musl/commit/?id=7844ecb590893f8344324837956718001402d297
 # https://git.musl-libc.org/cgit/musl/commit/?id=ea9525c8bcf6170df59364c4bcd616de1acf8703
-sasl = ["rdkafka/gssapi"]
+sasl = ["rdkafka/gssapi-vendored"]
 # This feature is less portable, but doesn't require `cmake` as build dependency
 rdkafka-plain = ["rdkafka"]
 # Enables `rdkafka` dependency.
@@ -446,3 +446,6 @@ required-features = ["transforms-wasm", "transforms-lua"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
+
+[patch.crates-io]
+rdkafka = { git = "https://github.com/timberio/rust-rdkafka", rev = "244c9922e4a763eef72ba6c52ec87ee3ef088219" }
