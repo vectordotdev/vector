@@ -30,16 +30,6 @@ where
             let responses = decoder.process_next_chunk(chunk.as_ref());
             emit!(internal_events::ChunkProcessed{ byte_size: chunk.len() });
             for response in responses {
-                // Sometimes Kubernetes API starts returning `null`s in
-                // the object field while streaming the response.
-                // Handle it as if the stream has ended.
-                // See https://github.com/kubernetes/client-go/issues/334
-                if let Err(ResponseError::Json(error)) = &response {
-                    if error.is_data() {
-                        warn!(message = "handling response json parsing data error as steram end", ?error);
-                        return;
-                    }
-                }
                 let response = response.context(Parsing)?;
                 yield response;
             }
@@ -172,20 +162,6 @@ mod tests {
                     Error::UnparsedDataUponCompletion { data } if data == vec![b'{']
                 ));
             }
-
-            assert!(out_stream.next().await.is_none());
-        })
-    }
-
-    #[test]
-    fn test_sudden_null() {
-        test_util::trace_init();
-        test_util::block_on_std(async move {
-            let chunks: Vec<Result<_, std::io::Error>> = vec![Ok("null")];
-            let sample_body = hyper_body_from_chunks(chunks);
-
-            let out_stream = body::<_, WatchResponse<Pod>>(sample_body);
-            pin_mut!(out_stream);
 
             assert!(out_stream.next().await.is_none());
         })
