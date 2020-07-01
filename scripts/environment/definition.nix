@@ -54,7 +54,6 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     autoconf
     cacert
     cmake
-    cyrus_sasl
     git
     gnumake
     nodejs
