@@ -11,4 +11,7 @@ COPY --from=builder /usr/bin/vector /usr/bin/vector
 COPY --from=builder /usr/share/doc/vector /usr/share/doc/vector
 COPY --from=builder /etc/vector /etc/vector
 
+# Smoke test.
+RUN ["/usr/bin/vector", "--version"]
+
 ENTRYPOINT ["/usr/bin/vector"]
