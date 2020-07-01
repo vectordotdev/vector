@@ -9,7 +9,7 @@ use bollard::{
     errors::Error as DockerError, service::SystemEventsResponse, system::EventsOptions, Docker,
 };
 use bytes05::{Buf, Bytes};
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, FixedOffset, Local, NaiveTime, Utc, MAX_DATE};
 use futures::{compat::Future01CompatExt, FutureExt, Stream, TryFutureExt};
 use futures01::{
     sync::mpsc,
@@ -23,7 +23,7 @@ use http01::StatusCode;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use shiplift::{
-    builder::{ContainerFilter, EventFilter, LogsOptions},
+    builder::LogsOptions,
     rep::ContainerDetails,
     tty::{Chunk, StreamType},
     Error,
@@ -121,7 +121,7 @@ impl SourceConfig for DockerConfig {
             out,
             shutdown,
         );
-        //
+        // Add log about error
         let source = source.map_err(|_| ());
         //
         Ok(Box::new(source.boxed().compat()))
@@ -138,7 +138,7 @@ impl SourceConfig for DockerConfig {
 
 struct DockerSourceCore {
     config: DockerConfig,
-    docker: shiplift::Docker,
+    docker: Docker,
     /// Only logs created at, or after this moment are logged.
     now_timestamp: DateTime<Utc>,
 }
@@ -147,10 +147,10 @@ impl DockerSourceCore {
     fn new(config: DockerConfig) -> crate::Result<Self> {
         // ?NOTE: Constructs a new Docker instance for a docker host listening at url specified by an env var DOCKER_HOST.
         // ?      Otherwise connects to unix socket which requires sudo privileges, or docker group membership.
-        let docker = shiplift::Docker::new();
+        let docker = docker()?;
 
         // Only log events created at-or-after this moment are logged.
-        let now = chrono::Local::now();
+        let now = Local::now();
         info!(
             message = "Capturing logs from now on",
             now = %now.to_rfc3339()
@@ -198,13 +198,9 @@ impl DockerSourceCore {
             filters.insert("image".to_owned(), include_images.clone());
         }
 
-        // let docker = self.docker;
-        let docker = docker().unwrap();
-        docker.events(Some(EventsOptions {
+        self.docker.events(Some(EventsOptions {
             since: self.now_timestamp.clone(),
-            until: chrono::MAX_DATE
-                .and_time(chrono::NaiveTime::from_hms(0, 0, 0))
-                .unwrap(),
+            until: MAX_DATE.and_time(NaiveTime::from_hms(0, 0, 0)).unwrap(),
             filters,
         }))
     }
@@ -224,7 +220,6 @@ impl DockerSourceCore {
 struct DockerSource {
     esb: EventStreamBuilder,
     /// event stream from docker
-    // events: Box<dyn Stream<Item = DockerEvent, Error = shiplift::Error> + Send>,
     events: Box<dyn Stream<Item = Result<SystemEventsResponse, DockerError>> + Send>,
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
@@ -288,6 +283,7 @@ impl DockerSource {
             // if let Err(error) = source.handle_running_containers().await {
             //     error!(message="Listing currently running containers, failed", %error);
             // }
+            let source = source.handle_running_containers().await;
             source.compat().await
         };
 
@@ -299,8 +295,8 @@ impl DockerSource {
     }
 
     /// Future that captures currently running containers, and starts event streams for them.
-    async fn handle_running_containers(&self) -> crate::Result<()> {
-        Ok(())
+    async fn handle_running_containers(self) -> Self {
+        self
         // let mut options = shiplift::ContainerListOptions::builder();
 
         // // by docker API, using both type of include results in AND between them
@@ -537,9 +533,10 @@ impl EventStreamBuilder {
 
     /// Constructs and runs event stream until shutdown.
     fn start(&self, id: ContainerId) -> ContainerState {
-        let metadata_fetch = self
-            .core
-            .docker
+        // let metadata_fetch = self
+        //     .core
+        //     .docker
+        let metadata_fetch = shiplift::Docker::new()
             .containers()
             .get(id.as_str())
             .inspect()
@@ -576,9 +573,10 @@ impl EventStreamBuilder {
             .since(info.log_since())
             .timestamps(true);
 
-        let mut stream = self
-            .core
-            .docker
+        // let mut stream = self
+        //     .core
+        //     .docker
+        let mut stream = shiplift::Docker::new()
             .containers()
             .get(info.id.as_str())
             .logs(&options.build());
