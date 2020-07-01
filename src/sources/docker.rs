@@ -6,7 +6,8 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bollard::{
-    errors::Error as DockerError, service::SystemEventsResponse, system::EventsOptions, Docker,
+    container::ListContainersOptions, errors::Error as DockerError, service::SystemEventsResponse,
+    system::EventsOptions, Docker,
 };
 use bytes05::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, NaiveTime, Utc, MAX_DATE};
@@ -119,12 +120,30 @@ impl SourceConfig for DockerConfig {
         let source = DockerSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
             out,
-            shutdown,
-        );
-        // Add log about error
-        let source = source.map_err(|_| ());
-        //
-        Ok(Box::new(source.boxed().compat()))
+            shutdown.clone(),
+        )?;
+
+        // Capture currently running containers, and do main future(self / run)
+        let fut = async move {
+            match source.handle_running_containers().await {
+                Ok(source) => source.run().await,
+                Err(error) => {
+                    error!(message="Listing currently running containers, failed", %error);
+                }
+            }
+        };
+
+        // Once this ShutdownSignal resolves it will drop DockerSource and by extension it's ShutdownSignal.
+        Ok(Box::new(
+            async move {
+                Ok(tokio::select! {
+                    _ = fut => {}
+                    _ = shutdown.compat() => {}
+                })
+            }
+            .boxed()
+            .compat(),
+        ))
     }
 
     fn output_type(&self) -> DataType {
@@ -232,11 +251,11 @@ struct DockerSource {
 }
 
 impl DockerSource {
-    async fn new(
+    fn new(
         config: DockerConfig,
         out: mpsc::Sender<Event>,
         shutdown: ShutdownSignal,
-    ) -> crate::Result<()> {
+    ) -> crate::Result<DockerSource> {
         // Find out it's own container id, if it's inside a docker container.
         // Since docker doesn't readily provide such information,
         // various approches need to be made. As such the solution is not
@@ -268,109 +287,89 @@ impl DockerSource {
         // t2 -- outside: container stoped
         // t3 -- list_containers
         // In that case, logs between [t1,t2] will be pulled to vector only on next start/unpause of that container.
-        let esb = EventStreamBuilder::new(core, out, main_send, shutdown.clone());
+        let esb = EventStreamBuilder {
+            core: Arc::new(core),
+            out,
+            main_send,
+            shutdown: shutdown,
+        };
 
-        // Construct, capture currently running containers, and do main future(self)
-        let source = DockerSource {
+        Ok(DockerSource {
             esb,
             events: Box::new(events),
             containers: HashMap::new(),
             main_recv,
             hostname: env::var("HOSTNAME").ok(),
             exclude_self,
-        };
-        let fut = async move {
-            // if let Err(error) = source.handle_running_containers().await {
-            //     error!(message="Listing currently running containers, failed", %error);
-            // }
-            let source = source.handle_running_containers().await;
-            source.compat().await
-        };
-
-        // Once this ShutdownSignal resolves it will drop DockerSource and by extension it's ShutdownSignal.
-        Ok(tokio::select! {
-            _ = fut => {}
-            _ = shutdown.compat() => {}
         })
     }
 
     /// Future that captures currently running containers, and starts event streams for them.
-    async fn handle_running_containers(self) -> Self {
-        self
-        // let mut options = shiplift::ContainerListOptions::builder();
+    async fn handle_running_containers(mut self) -> crate::Result<Self> {
+        let mut filters = HashMap::new();
 
-        // // by docker API, using both type of include results in AND between them
-        // // TODO: missing feature in shiplift to include ContainerFilter::Name
+        if let Some(include_labels) = &self.esb.core.config.include_labels {
+            filters.insert("label".to_owned(), include_labels.clone());
+        }
 
-        // // Include-label
-        // options.filter(
-        //     self.esb
-        //         .core
-        //         .config
-        //         .include_labels
-        //         .clone()
-        //         .unwrap_or_default()
-        //         .iter()
-        //         .map(|s| ContainerFilter::LabelName(s.clone()))
-        //         .collect(),
-        // );
+        self.esb
+            .core
+            .docker
+            .list_containers(Some(ListContainersOptions {
+                all: false, // only running containers
+                filters,
+                ..Default::default()
+            }))
+            .await?
+            .into_iter()
+            .for_each(|container| {
+                let id = container.id.unwrap();
+                let names = container.names.unwrap();
+                let image = container.image.unwrap();
 
-        // // Future
-        // self.esb
-        //     .core
-        //     .docker
-        //     .containers()
-        //     .list(&options.build())
-        //     .map(move |list| {
-        //         for container in list {
-        //             trace!(
-        //                 message = "Found already running container",
-        //                 id = field::display(&container.id),
-        //                 names = field::debug(&container.names)
-        //             );
+                trace!(
+                    message = "Found already running container",
+                    id = field::display(&id),
+                    names = field::debug(&names)
+                );
 
-        //             if !self.exclude_vector(container.id.as_str(), container.image.as_str()) {
-        //                 continue;
-        //             }
+                if !self.exclude_vector(id.as_str(), image.as_str()) {
+                    return;
+                }
 
-        //             // This check is necessary since shiplift doesn't have way to include
-        //             // names into request to docker.
-        //             if !self.esb.core.config.container_name_included(
-        //                 container.id.as_str(),
-        //                 container.names.iter().map(|s| {
-        //                     // In this case shiplift gives names with starting '/' so it needs to be removed.
-        //                     let s = s.as_str();
-        //                     if s.starts_with('/') {
-        //                         s.split_at('/'.len_utf8()).1
-        //                     } else {
-        //                         s
-        //                     }
-        //                 }),
-        //             ) {
-        //                 trace!(
-        //                     message = "Container excluded",
-        //                     id = field::display(&container.id)
-        //                 );
-        //                 continue;
-        //             }
+                // This check is necessary since shiplift doesn't have way to include
+                // names into request to docker.
+                if !self.esb.core.config.container_name_included(
+                    id.as_str(),
+                    names.iter().map(|s| {
+                        // In this case bollard / shiplift gives names with starting '/' so it needs to be removed.
+                        let s = s.as_str();
+                        if s.starts_with('/') {
+                            s.split_at('/'.len_utf8()).1
+                        } else {
+                            s
+                        }
+                    }),
+                ) {
+                    trace!(message = "Container excluded", id = field::display(&id));
+                    return;
+                }
 
-        //             // Include image check
-        //             if let Some(images) = &self.esb.core.config.include_images {
-        //                 let image_check = images.iter().any(|image| &container.image == image);
-        //                 if !images.is_empty() && !image_check {
-        //                     continue;
-        //                 }
-        //             }
+                // Include image check
+                if let Some(images) = &self.esb.core.config.include_images {
+                    if !images.iter().any(|img| img == &image) {
+                        return;
+                    }
+                }
 
-        //             let id = ContainerId::new(container.id);
+                let id = ContainerId::new(id);
+                self.containers.insert(id.clone(), self.esb.start(id));
+            });
 
-        //             self.containers.insert(id.clone(), self.esb.start(id));
-        //         }
-
-        //         self
-        //     })
-        //     .map_err(|error| error!(message="Listing currently running containers, failed",%error))
+        Ok(self)
     }
+
+    async fn run(self) {}
 
     /// True if container with the given id and image must be excluded from logging,
     /// because it's a vector instance, probably this one.
@@ -517,20 +516,6 @@ struct EventStreamBuilder {
 }
 
 impl EventStreamBuilder {
-    fn new(
-        core: DockerSourceCore,
-        out: mpsc::Sender<Event>,
-        main_send: mpsc::UnboundedSender<ContainerLogInfo>,
-        shutdown: ShutdownSignal,
-    ) -> Self {
-        EventStreamBuilder {
-            core: Arc::new(core),
-            out,
-            main_send,
-            shutdown,
-        }
-    }
-
     /// Constructs and runs event stream until shutdown.
     fn start(&self, id: ContainerId) -> ContainerState {
         // let metadata_fetch = self
