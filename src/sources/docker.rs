@@ -2,12 +2,15 @@ use crate::{
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     shutdown::ShutdownSignal,
-    stream::StreamExt,
+    // stream::StreamExt as _,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bollard::{
-    container::ListContainersOptions, errors::Error as DockerError, service::SystemEventsResponse,
-    system::EventsOptions, Docker,
+    container::{InspectContainerOptions, ListContainersOptions, LogsOptions},
+    errors::Error as DockerError,
+    service::{ContainerInspectResponse, SystemEventsResponse},
+    system::EventsOptions,
+    Docker,
 };
 use bytes05::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, NaiveTime, Utc, MAX_DATE};
@@ -24,8 +27,8 @@ use http01::StatusCode;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use shiplift::{
-    builder::LogsOptions,
-    rep::ContainerDetails,
+    // builder::LogsOptions,
+    // rep::ContainerDetails,
     tty::{Chunk, StreamType},
     Error,
 };
@@ -518,39 +521,81 @@ struct EventStreamBuilder {
 impl EventStreamBuilder {
     /// Constructs and runs event stream until shutdown.
     fn start(&self, id: ContainerId) -> ContainerState {
-        // let metadata_fetch = self
-        //     .core
-        //     .docker
-        let metadata_fetch = shiplift::Docker::new()
-            .containers()
-            .get(id.as_str())
-            .inspect()
-            .map_err(|error| error!(message="Fetching container details failed",%error))
-            .and_then(|details| {
-                ContainerMetadata::from_details(&details)
-                    .map_err(|error| error!(message="Metadata extraction failed",%error))
-            });
-
         let this = self.clone();
-        let task = metadata_fetch.and_then(move |metadata| {
-            this.start_event_stream(ContainerLogInfo::new(id, metadata, this.core.now_timestamp))
+        tokio::spawn(async move {
+            Arc::clone(&this.core)
+                .docker
+                .inspect_container(id.clone().as_str(), None::<InspectContainerOptions>)
+                .map_err(|error| error!(message = "Fetching container details failed", %error))
+                .and_then(|details| async move {
+                    ContainerMetadata::from_details(details)
+                        .map_err(|error| error!(message = "Metadata extraction failed", %error))
+                })
+                .and_then(|metadata| async move {
+                    let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
+                    this.start_event_stream(info).await;
+                    Ok::<(), ()>(())
+                })
+                .await
         });
-
-        tokio01::spawn(task);
 
         ContainerState::new()
     }
 
     /// If info is present, restarts event stream which will run until shutdown.
     fn restart(&self, container: &mut ContainerState) {
-        if let Some(info) = container.take_info() {
-            tokio01::spawn(self.start_event_stream(info));
+        // if let Some(info) = container.take_info() {
+        //     tokio01::spawn(self.start_event_stream(info));
+        // }
+    }
+
+    async fn start_event_stream(&self, info: ContainerLogInfo) {
+        // Establish connection
+        let options = Some(LogsOptions {
+            follow: true,
+            stdout: true,
+            stderr: true,
+            since: info.log_since(),
+            timestamps: true,
+            ..Default::default()
+        });
+
+        let stream = self.core.docker.logs(info.id.as_str(), options);
+        info!(
+            message = "Started listening logs on docker container",
+            id = field::display(info.id.as_str())
+        );
+
+        // use futures::stream::StreamExt;
+        // let stream = futures::stream::iter(1..=10);
+        // stream.take_until(futures::future::poll_fn(|_cx| {
+        //     //
+        //     futures::task::Poll::Pending
+        // }));
+        {
+            use futures::future;
+            use futures::stream::{self, StreamExt};
+            use futures::task::Poll;
+
+            let stream = stream::iter(1..=10);
+
+            let mut i = 0;
+            let stop_fut = future::poll_fn(|_cx| {
+                i += 1;
+                if i <= 5 {
+                    Poll::Pending
+                } else {
+                    Poll::Ready(())
+                }
+            });
+
+            let stream = stream.take_until(stop_fut);
         }
     }
 
-    fn start_event_stream(&self, info: ContainerLogInfo) -> impl Future<Item = (), Error = ()> {
+    fn start_event_stream2(&self, info: ContainerLogInfo) -> impl Future<Item = (), Error = ()> {
         // Establish connection
-        let mut options = LogsOptions::builder();
+        let mut options = shiplift::builder::LogsOptions::builder();
         options
             .follow(true)
             .stdout(true)
@@ -558,9 +603,6 @@ impl EventStreamBuilder {
             .since(info.log_since())
             .timestamps(true);
 
-        // let mut stream = self
-        //     .core
-        //     .docker
         let mut stream = shiplift::Docker::new()
             .containers()
             .get(info.id.as_str())
@@ -575,6 +617,7 @@ impl EventStreamBuilder {
         let partial_event_marker_field = self.core.config.partial_event_marker_field.clone();
         let auto_partial_merge = self.core.config.auto_partial_merge;
         let mut partial_event_merge_state = None;
+        use crate::stream::StreamExt;
         tokio01::prelude::stream::poll_fn(move || {
             // !Hot code: from here
             if let Some(&mut (_, ref mut info)) = state.as_mut() {
@@ -914,9 +957,12 @@ struct ContainerMetadata {
 }
 
 impl ContainerMetadata {
-    fn from_details(details: &ContainerDetails) -> Result<Self, chrono::format::ParseError> {
-        let labels = details
-            .config
+    fn from_details(details: ContainerInspectResponse) -> crate::Result<Self> {
+        let config = details.config.unwrap();
+        let name = details.name.unwrap();
+        let created = details.created.unwrap();
+
+        let labels = config
             .labels
             .as_ref()
             .map(|map| {
@@ -928,9 +974,9 @@ impl ContainerMetadata {
 
         Ok(ContainerMetadata {
             labels,
-            name: details.name.as_str().trim_start_matches("/").into(),
-            image: details.config.image.as_str().into(),
-            created_at: DateTime::parse_from_rfc3339(details.created.as_str())?
+            name: name.as_str().trim_start_matches("/").into(),
+            image: config.image.unwrap().as_str().into(),
+            created_at: DateTime::parse_from_rfc3339(created.as_str())?
                 .with_timezone(&Utc)
                 .into(),
         })
