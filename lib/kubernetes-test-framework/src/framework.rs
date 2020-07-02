@@ -1,8 +1,8 @@
 //! The test framework main entry point.
 
 use super::{
-    log_lookup, namespace, test_pod, up_down, vector, wait_for_resource, wait_for_rollout,
-    Interface, Result,
+    exec_tail, log_lookup, namespace, test_pod, up_down, vector, wait_for_resource,
+    wait_for_rollout, Interface, Reader, Result,
 };
 
 /// Framework wraps the interface to the system with an easy-to-use rust API
@@ -53,10 +53,17 @@ impl Framework {
         Ok(manager)
     }
 
-    /// Initialize log lookup for a particular `resouurce` in a particular
+    /// Initialize log lookup for a particular `resource` in a particular
     /// `namespace`.
-    pub fn logs(&self, namespace: &str, resource: &str) -> Result<log_lookup::Reader> {
-        log_lookup::logs(&self.interface.kubectl_command, namespace, resource)
+    pub fn logs(&self, namespace: &str, resource: &str) -> Result<Reader> {
+        log_lookup(&self.interface.kubectl_command, namespace, resource)
+    }
+
+    /// Exec a `tail -f` command reading the specified `file` within
+    /// a `Container` in a `Pod` of a specified `resource` at the specified
+    /// `namespace`.
+    pub fn exec_tail(&self, namespace: &str, resource: &str, file: &str) -> Result<Reader> {
+        exec_tail(&self.interface.kubectl_command, namespace, resource, file)
     }
 
     /// Wait for a set of `resources` in a specified `namespace` to acheive

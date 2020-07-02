@@ -8,7 +8,7 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use kubernetes_test_framework::{
-    lock, log_lookup, test_pod, wait_for_resource::WaitFor, Framework, Interface,
+    lock, test_pod, wait_for_resource::WaitFor, Framework, Interface, Reader,
 };
 use std::collections::HashSet;
 
@@ -87,7 +87,7 @@ fn generate_long_string(a: usize, b: usize) -> String {
 /// Read the first line from vector logs and assert that it matches the expected
 /// one.
 /// This allows detecting the situations where things have gone very wrong.
-async fn smoke_check_first_line(log_reader: &mut log_lookup::Reader) {
+async fn smoke_check_first_line(log_reader: &mut Reader) {
     // Wait for first line as a smoke check.
     let first_line = log_reader
         .read_line()
@@ -108,7 +108,7 @@ enum FlowControlCommand {
 }
 
 async fn look_for_log_line<P>(
-    log_reader: &mut log_lookup::Reader,
+    log_reader: &mut Reader,
     mut predicate: P,
 ) -> Result<(), Box<dyn std::error::Error>>
 where

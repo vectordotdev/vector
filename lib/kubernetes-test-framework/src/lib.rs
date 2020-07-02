@@ -15,11 +15,13 @@
     missing_docs
 )]
 
+mod exec_tail;
 pub mod framework;
 pub mod interface;
 mod lock;
-pub mod log_lookup;
+mod log_lookup;
 pub mod namespace;
+mod reader;
 mod resource_file;
 pub mod test_pod;
 mod up_down;
@@ -30,8 +32,11 @@ pub mod wait_for_rollout;
 
 // Re-export some unit for trivial accessability.
 
+use exec_tail::exec_tail;
 pub use framework::Framework;
 pub use interface::Interface;
 pub use lock::lock;
+use log_lookup::log_lookup;
+pub use reader::Reader;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
