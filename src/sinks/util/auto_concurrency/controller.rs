@@ -58,7 +58,12 @@ impl<L> Controller<L> {
 
         let rtt = inner.current_rtt.update(rtt);
         let avg = inner.past_rtt.average();
-        if avg > 0.0 && now >= inner.next_update {
+
+        if avg == 0.0 {
+            // No past measurements, set up initial values.
+            inner.past_rtt.update(rtt);
+            inner.next_update = now + Duration::from_secs_f64(rtt);
+        } else if avg > 0.0 && now >= inner.next_update {
             let threshold = avg * THRESHOLD_RATIO;
 
             // Back pressure responses, either explicit or implicit due
