@@ -749,7 +749,7 @@ mod integration_tests {
         let mut rt = runtime();
         onboarding_v2();
 
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let endpoint = "http://localhost:9999".to_string();
         let influxdb1_settings = None;
         let influxdb2_settings = Some(InfluxDB2Settings {
@@ -773,7 +773,7 @@ mod integration_tests {
         let mut rt = runtime();
         onboarding_v2();
 
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:9999".to_string();
         let influxdb1_settings = None;
         let influxdb2_settings = Some(InfluxDB2Settings {
@@ -794,7 +794,7 @@ mod integration_tests {
     #[test]
     fn influxdb1_healthchecks_ok() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let endpoint = "http://localhost:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
             database: DATABASE.to_string(),
@@ -818,7 +818,7 @@ mod integration_tests {
     #[test]
     fn influxdb1_healthchecks_fail() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
             database: DATABASE.to_string(),

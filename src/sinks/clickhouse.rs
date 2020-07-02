@@ -279,7 +279,7 @@ mod integration_tests {
                 .create_table(&table, "host String, timestamp String, message String")
                 .await;
 
-            let (sink, _hc) = config.build(SinkContext::new_test(executor)).unwrap();
+            let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
 
             let mut input_event = Event::from("raw log line");
             input_event.as_mut_log().insert("host", "example.com");
@@ -299,7 +299,6 @@ mod integration_tests {
         crate::test_util::trace_init();
 
         let mut rt = runtime();
-        let executor = rt.executor();
 
         rt.block_on_std(async move {
             let table = gen_table();
@@ -331,7 +330,7 @@ mod integration_tests {
                 )
                 .await;
 
-            let (sink, _hc) = config.build(SinkContext::new_test(executor)).unwrap();
+            let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
 
             let mut input_event = Event::from("raw log line");
             input_event.as_mut_log().insert("host", "example.com");
@@ -365,7 +364,6 @@ mod integration_tests {
         crate::test_util::trace_init();
 
         let mut rt = runtime();
-        let executor = rt.executor();
 
         rt.block_on_std(async move {
             let table = gen_table();
@@ -394,7 +392,7 @@ timestamp_format = "unix""#,
                 )
                 .await;
 
-            let (sink, _hc) = config.build(SinkContext::new_test(executor)).unwrap();
+            let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
 
             let mut input_event = Event::from("raw log line");
             input_event.as_mut_log().insert("host", "example.com");
@@ -428,7 +426,6 @@ timestamp_format = "unix""#,
         crate::test_util::trace_init();
 
         let mut rt = runtime();
-        let executor = rt.executor();
 
         rt.block_on_std(async move {
             let table = gen_table();
@@ -452,7 +449,7 @@ timestamp_format = "unix""#,
                 .create_table(&table, "host String, timestamp String")
                 .await;
 
-            let (sink, _hc) = config.build(SinkContext::new_test(executor)).unwrap();
+            let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
 
             let mut input_event = Event::from("raw log line");
             input_event.as_mut_log().insert("host", "example.com");

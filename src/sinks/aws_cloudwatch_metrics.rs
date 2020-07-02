@@ -451,7 +451,7 @@ mod integration_tests {
     #[test]
     fn cloudwatch_metrics_put_data() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let sink = CloudWatchMetricsSvc::new(config(), cx).unwrap();
 
         let mut events = Vec::new();

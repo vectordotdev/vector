@@ -131,7 +131,7 @@ mod tests {
             extra
         ))
         .unwrap()
-        .build(TransformContext::new_test(rt.executor()))
+        .build(TransformContext::new_test())
         .unwrap();
         coercer.transform(event).unwrap().into_log()
     }

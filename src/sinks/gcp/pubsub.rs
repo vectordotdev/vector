@@ -207,10 +207,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config
-            .build(SinkContext::new_test(runtime().executor()))
-            .is_ok()
-        {
+        if config.build(SinkContext::new_test()).is_ok() {
             panic!("config.build failed to error");
         }
     }
@@ -245,7 +242,7 @@ mod integration_tests {
         rt: &Runtime,
         topic: &str,
     ) -> (crate::sinks::RouterSink, crate::sinks::Healthcheck) {
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         config(topic).build(cx).expect("Building sink failed")
     }
 

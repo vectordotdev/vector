@@ -294,7 +294,7 @@ mod tests {
             patterns, config
         ))
         .unwrap()
-        .build(TransformContext::new_test(rt.executor()))
+        .build(TransformContext::new_test())
         .unwrap();
 
         parser.transform(event).map(|event| event.into_log())

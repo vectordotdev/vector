@@ -792,7 +792,7 @@ mod tests {
             compression,
             ..HecSinkConfig::default()
         }
-        .build(SinkContext::new_test(exec))
+        .build(SinkContext::new_test())
         .unwrap()
     }
 

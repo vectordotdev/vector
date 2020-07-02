@@ -415,7 +415,7 @@ fn benchmark_regex(c: &mut Criterion) {
                         field: None,
                         drop_failed: true,
                         ..Default::default()
-                    }.build(TransformContext::new_test(rt.executor())).unwrap();
+                    }.build(TransformContext::new_test()).unwrap();
 
                     let src_lines = http_access_log_lines()
                         .take(num_lines)

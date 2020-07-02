@@ -95,7 +95,7 @@ fn field_filter(c: &mut Criterion) {
                         field: "the_field".to_string(),
                         value: "0".to_string(),
                     }
-                    .build(TransformContext::new_test(rt.executor()))
+                    .build(TransformContext::new_test())
                     .unwrap()
                 },
                 |mut transform| {

@@ -763,7 +763,7 @@ mod integration_tests {
         let mut rt = runtime();
         onboarding_v2();
 
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
