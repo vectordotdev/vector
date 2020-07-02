@@ -84,10 +84,9 @@ impl<L> Controller<L> {
 
             let new_avg = inner.past_rtt.update(rtt);
             inner.next_update = now + Duration::from_secs_f64(new_avg);
+            inner.had_back_pressure = false;
+            inner.current_rtt.reset();
         }
-
-        inner.had_back_pressure = false;
-        inner.current_rtt.reset();
     }
 }
 
