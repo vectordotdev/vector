@@ -539,18 +539,6 @@ impl EventStreamBuilder {
                             _ => error!(message = "docker API container logging error", %error),
                         };
 
-                        // End of stream
-                        let info = info.take().expect("Should be present here");
-
-                        info!(
-                            message = "Stoped listening logs on docker container",
-                            id = field::display(info.id.as_str())
-                        );
-
-                        if let Err(error) = main_send.send(info) {
-                            error!(message = "Unable to return ContainerLogInfo to main", %error);
-                        }
-
                         Err(())
                     }
                 }
@@ -559,8 +547,20 @@ impl EventStreamBuilder {
             .filter_map(|v| future::ready(v.transpose()))
             .take_until(self.shutdown.clone().compat())
             .forward(self.out.clone().sink_compat().sink_map_err(|_| ()))
-            .map(|_| ())
+            .map(|_| {})
             .await;
+
+        // End of stream
+        let info = info.take().expect("Should be present here");
+
+        info!(
+            message = "Stoped listening logs on docker container",
+            id = field::display(info.id.as_str())
+        );
+
+        if let Err(error) = main_send.send(info) {
+            error!(message = "Unable to return ContainerLogInfo to main", %error);
+        }
     }
 }
 
