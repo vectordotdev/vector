@@ -228,7 +228,7 @@ where
                                     }
                                     Err(error) => {
                                         // We will try again after some time.
-                                        warn!(message = "Failed deleting log file.",path = ?watcher.path, ?error);
+                                        warn!(message = "Failed deleting log file.",path = ?watcher.path, ?error, rate_limit_secs = 1);
                                     }
                                 }
                             }
