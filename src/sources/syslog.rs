@@ -9,18 +9,18 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 #[cfg(unix)]
-use std::path::PathBuf;
+use std::{io, path::PathBuf};
 use syslog_loose::{self, IncompleteDate, Message, ProcId, Protocol};
 use tokio01::{
     self,
-    codec::{BytesCodec, LinesCodec},
+    codec::{BytesCodec, Decoder, LinesCodec},
     net::{UdpFramed, UdpSocket},
 };
 use tracing::field;
@@ -99,7 +99,7 @@ impl SourceConfig for SyslogConfig {
             #[cfg(unix)]
             Mode::Unix { path } => Ok(build_unix_source(
                 path,
-                self.max_length,
+                SyslogDecoder::new(self.max_length),
                 host_key,
                 shutdown,
                 out,
@@ -124,10 +124,10 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
-    type Decoder = LinesCodec;
+    type Decoder = SyslogDecoder;
 
     fn decoder(&self) -> Self::Decoder {
-        LinesCodec::new_with_max_length(self.max_length)
+        SyslogDecoder::new(self.max_length)
     }
 
     fn build_event(&self, frame: String, host: Bytes) -> Option<Event> {
@@ -139,6 +139,75 @@ impl TcpSource for SyslogTcpSource {
 
             event
         })
+    }
+}
+
+/// Decodes according to `Octet Counting` in https://tools.ietf.org/html/rfc6587
+#[derive(Clone, Debug)]
+struct SyslogDecoder {
+    other: LinesCodec,
+}
+
+impl SyslogDecoder {
+    fn new(max_length: usize) -> Self {
+        Self {
+            other: LinesCodec::new_with_max_length(max_length),
+        }
+    }
+}
+
+impl Decoder for SyslogDecoder {
+    type Item = String;
+
+    type Error = io::Error;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        if let Some(&first_byte) = src.get(0) {
+            if 49 <= first_byte && first_byte <= 57 {
+                // First character is non zero number so we can assume that
+                // octet count framing is used.
+                if let Some((i, _)) = src.iter().enumerate().find(|&(_, &b)| b == ' ' as u8) {
+                    let len: usize = std::str::from_utf8(&src[..i])
+                        .map_err(|_| ())
+                        .and_then(|num| num.parse().map_err(|_| ()))
+                        .map_err(|_| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                "Unable to decode message len as number",
+                            )
+                        })?;
+                    let from = i + 1;
+                    let to = from + len;
+                    if let Some(msg) = src.get(from..to) {
+                        let s = std::str::from_utf8(msg)
+                            .map_err(|_| {
+                                io::Error::new(
+                                    io::ErrorKind::InvalidData,
+                                    "Unable to decode message as UTF8",
+                                )
+                            })?
+                            .to_string();
+                        src.advance(to);
+                        Ok(Some(s))
+                    } else {
+                        Ok(None)
+                    }
+                } else if src.len() < self.other.max_length() {
+                    Ok(None)
+                } else {
+                    // This is certainly mallformed, and there is no recovering from this.
+                    Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        "frame length limit exceeded",
+                    ))
+                }
+            } else {
+                // Octet counting isn't used so fallback to newline delimitation.
+                self.other.decode(src)
+            }
+        } else {
+            Ok(None)
+        }
     }
 }
 
