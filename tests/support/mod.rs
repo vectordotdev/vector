@@ -283,9 +283,10 @@ where
             error!(message = "Ingesting an event failed at mock sink", ?error)
         });
         let sink = StreamSink::new(sink, cx.acker());
-        let healthcheck = match self.healthy {
-            true => future::ok(()),
-            false => future::err(HealthcheckError::Unhealthy.into()),
+        let healthcheck = if self.healthy {
+            future::ok(())
+        } else {
+            future::err(HealthcheckError::Unhealthy.into())
         };
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
