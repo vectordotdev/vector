@@ -4,6 +4,7 @@ use crate::{
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
@@ -37,9 +38,14 @@ impl TransformConfig for SplitConfig {
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| f == field);
 
+        let escaped_separator = match self.separator {
+            Some(ref separator) => Some(regex::escape(separator)),
+            None => None,
+        };
+
         Ok(Box::new(Split::new(
             self.field_names.clone(),
-            self.separator.clone(),
+            escaped_separator,
             field.clone(),
             drop_field,
             types,
@@ -61,7 +67,7 @@ impl TransformConfig for SplitConfig {
 
 pub struct Split {
     field_names: Vec<(Atom, Conversion)>,
-    separator: Option<String>,
+    separator: Option<Regex>,
     field: Atom,
     drop_field: bool,
 }
@@ -81,6 +87,17 @@ impl Split {
                 (name, conversion)
             })
             .collect();
+
+        let separator = match separator {
+            Some(s) => match Regex::new(&s) {
+                Ok(expression) => Some(expression),
+                Err(err) => {
+                    error!(message = "Invalid regex expression for separator", %err);
+                    None
+                }
+            },
+            None => None
+        };
 
         Self {
             field_names,
@@ -130,9 +147,9 @@ impl Transform for Split {
 
 // Splits the given input by a separator.
 // If the separator is `None`, then it will split on whitespace.
-pub fn split(input: &str, separator: Option<String>) -> Vec<&str> {
+pub fn split(input: &str, separator: Option<Regex>) -> Vec<&str> {
     match separator {
-        Some(separator) => input.split(&separator).collect(),
+        Some(separator) => separator.split(input).collect(),
         None => input.split_whitespace().collect(),
     }
 }
@@ -147,6 +164,7 @@ mod tests {
         topology::config::{TransformConfig, TransformContext},
         Event,
     };
+    use regex::Regex;
     use string_cache::DefaultAtom as Atom;
 
     #[test]
@@ -158,14 +176,14 @@ mod tests {
 
     #[test]
     fn split_comma() {
-        assert_eq!(split("foo", Some(",".to_string())), &["foo"]);
-        assert_eq!(split("foo,bar", Some(",".to_string())), &["foo", "bar"]);
+        assert_eq!(split("foo", Some(Regex::new(",").unwrap())), &["foo"]);
+        assert_eq!(split("foo,bar", Some(Regex::new(",").unwrap())), &["foo", "bar"]);
     }
 
     #[test]
     fn split_semicolon() {
         assert_eq!(
-            split("foo,bar;baz", Some(";".to_string())),
+            split("foo,bar;baz", Some(Regex::new(";").unwrap())),
             &["foo,bar", "baz"]
         );
     }
