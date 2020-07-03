@@ -101,14 +101,6 @@ dns_servers = ["0.0.0.0:53"]
 
 # Ingests data through the Docker engine daemon and outputs `log` events.
 [sources.docker]
-  # Setting this to `false` will disable the automatic merging of partial events.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  auto_partial_merge = true
-  auto_partial_merge = false
-
   # A list of container IDs _or_ names to match against. Prefix matches are
   # supported, meaning you can supply just the first few characters of the
   # container ID or name. If not provided, all containers will be included.
@@ -134,15 +126,6 @@ dns_servers = ["0.0.0.0:53"]
   # * no default
   # * type: [string]
   include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"]
-
-  # The field name to be added to events that are detected to contain an
-  # incomplete message (i.e. partial events). If set to `""`, no field will be
-  # added to partial event. This allows to opt-out of partial event detection.
-  #
-  # * optional
-  # * default: "_partial"
-  # * type: string
-  partial_event_marker_field = "_partial"
 
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
