@@ -296,7 +296,7 @@ dependencies = [
  "failure",
  "futures-core",
  "futures-util",
- "hex 0.4.2",
+ "hex",
  "http 0.2.1",
  "hyper 0.13.6",
  "hyper-tls 0.4.1",
@@ -1600,12 +1600,6 @@ dependencies = [
 
 [[package]]
 name = "hex"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
-
-[[package]]
-name = "hex"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "644f9158b2f133fd50f5fb3242878846d9eb792e445c893805ff0e3824006e35"
@@ -1751,24 +1745,6 @@ dependencies = [
 
 [[package]]
 name = "hyper-openssl"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f52657b5cdb2a8067efd29a02e011b7cf656b473ec8a5c34e86645e85d763006"
-dependencies = [
- "antidote",
- "bytes 0.4.12",
- "futures 0.1.29",
- "hyper 0.12.35",
- "lazy_static 1.4.0",
- "linked_hash_set",
- "openssl",
- "openssl-sys",
- "tokio-io",
- "tokio-openssl 0.3.0",
-]
-
-[[package]]
-name = "hyper-openssl"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed123fc8c1833f305468df3c3a6a837c34a7ae616567d40a5e3c2bf3cac2e31d"
@@ -1819,24 +1795,10 @@ checksum = "9e10742152c5ca53f3339c5dc5756a3704ac58758ca9b73c801c8d652f4c987d"
 dependencies = [
  "failure",
  "futures-util",
- "hex 0.4.2",
+ "hex",
  "hyper 0.13.6",
  "pin-project",
  "tokio 0.2.21",
-]
-
-[[package]]
-name = "hyperlocal"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d063d6d5658623c6ef16f452e11437c0e7e23a6d327470573fe78892dafbc4fb"
-dependencies = [
- "futures 0.1.29",
- "hex 0.3.2",
- "hyper 0.12.35",
- "tokio 0.1.22",
- "tokio-io",
- "tokio-uds",
 ]
 
 [[package]]
@@ -3938,7 +3900,7 @@ dependencies = [
  "base64 0.12.0",
  "bytes 0.5.4",
  "futures 0.3.5",
- "hex 0.4.2",
+ "hex",
  "hmac",
  "http 0.2.1",
  "hyper 0.13.6",
@@ -4252,33 +4214,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae75d0445b5d3778c9da3d1f840faa16d0627c8607f78a74daf69e5b988c39a1"
 dependencies = [
  "lazy_static 1.4.0",
-]
-
-[[package]]
-name = "shiplift"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b78521d24224ac77e489f92efa0f02884e7fc2973f97b2e72c9bb3e4771e6f6b"
-dependencies = [
- "base64 0.11.0",
- "byteorder",
- "bytes 0.4.12",
- "flate2",
- "futures 0.1.29",
- "http 0.1.21",
- "hyper 0.12.35",
- "hyper-openssl 0.7.1",
- "hyperlocal",
- "log 0.4.8",
- "mime",
- "openssl",
- "serde",
- "serde_json",
- "tar",
- "tokio 0.1.22",
- "tokio-codec",
- "tokio-io",
- "url 2.1.1",
 ]
 
 [[package]]
@@ -4656,18 +4591,6 @@ checksum = "603c90a2b5a7b6ea3a2c38ae9c66f5cc7e1cfba65376961d500815e8570ed269"
 dependencies = [
  "chrono",
  "nom 5.1.0",
-]
-
-[[package]]
-name = "tar"
-version = "0.4.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3196bfbffbba3e57481b6ea32249fbaf590396a52505a2615adbb79d9d826d3"
-dependencies = [
- "filetime",
- "libc",
- "redox_syscall",
- "xattr",
 ]
 
 [[package]]
@@ -5751,7 +5674,7 @@ dependencies = [
  "http 0.1.21",
  "http 0.2.1",
  "hyper 0.13.6",
- "hyper-openssl 0.8.0",
+ "hyper-openssl",
  "indexmap",
  "inventory",
  "jemallocator",
@@ -5804,7 +5727,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "shiplift",
  "smpl_jwt",
  "snafu",
  "stream-cancel",
@@ -6285,15 +6207,6 @@ checksum = "d59cefebd0c892fa2dd6de581e937301d8552cb44489cdff035c6187cb63fa5e"
 dependencies = [
  "winapi 0.2.8",
  "winapi-build",
-]
-
-[[package]]
-name = "xattr"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "244c3741f4240ef46274860397c7c74e50eb23624996930e484c16679633a54c"
-dependencies = [
- "libc",
 ]
 
 [[package]]
