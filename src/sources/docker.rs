@@ -916,12 +916,9 @@ mod tests {
             RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
         },
         image::{CreateImageOptions, CreateImageResults, ListImagesOptions},
-        Docker,
     };
-    use futures::{
-        compat::Future01CompatExt,
-        stream::{StreamExt, TryStreamExt},
-    };
+    use futures::{compat::Future01CompatExt, stream::TryStreamExt};
+    use futures01::{Async, Stream as Stream01};
 
     /// None if docker is not present on the system
     fn source_with<'a, L: Into<Option<&'a str>>>(
