@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-25"
+last_modified_on: "2020-07-03"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
@@ -568,7 +568,7 @@ draining the oldest files before moving on to read data from younger files.
   templateable={false}
   type={"uint"}
   unit={"seconds"}
-  warnings={[]}
+  warnings={[{"visibility_level":"option","text":"Vector's process must have permission to delete files.","option_name":"remove_after"}]}
   >
 
 ### remove_after
