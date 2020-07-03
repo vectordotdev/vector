@@ -27,6 +27,8 @@ use vector::topology::config::{
 };
 use vector::transforms::Transform;
 
+pub mod stats;
+
 pub fn sink(channel_size: usize) -> (Receiver<Event>, MockSinkConfig<Sender<Event>>) {
     let (tx, rx) = futures01::sync::mpsc::channel(channel_size);
     let sink = MockSinkConfig::new(tx, true);
