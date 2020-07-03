@@ -2,7 +2,6 @@ use crate::{
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     shutdown::ShutdownSignal,
-    // stream::StreamExt as _,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bollard::{
@@ -18,20 +17,12 @@ use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     future,
     sink::SinkExt,
-    FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt,
+    FutureExt, Stream, StreamExt, TryFutureExt,
 };
-use futures01::{
-    sync::mpsc as mpsc01,
-    Async,
-    Future,
-    Sink,
-    //
-    Stream as Stream01,
-};
-use http01::StatusCode;
+use futures01::sync::mpsc as mpsc01;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use shiplift::Error;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::{collections::HashMap, env};
 use string_cache::DefaultAtom as Atom;
@@ -50,8 +41,6 @@ lazy_static! {
     static ref STREAM: Atom = Atom::from("stream");
     static ref CONTAINER: Atom = Atom::from("container_id");
 }
-
-// type DockerEvent = shiplift::rep::Event;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -127,12 +116,12 @@ impl SourceConfig for DockerConfig {
             shutdown.clone(),
         )?;
 
-        // Capture currently running containers, and do main future(self / run)
+        // Capture currently running containers, and do main future(run)
         let fut = async move {
             match source.handle_running_containers().await {
                 Ok(source) => source.run().await,
                 Err(error) => {
-                    error!(message="Listing currently running containers, failed", %error);
+                    error!(message = "Listing currently running containers, failed", %error);
                 }
             }
         };
@@ -207,6 +196,7 @@ impl DockerSourceCore {
                 "pause".to_owned(),
             ],
         );
+        filters.insert("type".to_owned(), vec!["container".to_owned()]);
 
         // Apply include filters
         if let Some(include_containers) = &self.config.include_containers {
@@ -223,6 +213,8 @@ impl DockerSourceCore {
 
         self.docker.events(Some(EventsOptions {
             since: self.now_timestamp.clone(),
+            // Try zero, should be good to go, see code:
+            // https://github.com/moby/moby/blob/c833222d54c00d64a0fc44c561a5973ecd414053/api/server/router/system/system_routes.go#L155
             until: MAX_DATE.and_time(NaiveTime::from_hms(0, 0, 0)).unwrap(),
             filters,
         }))
@@ -243,7 +235,7 @@ impl DockerSourceCore {
 struct DockerSource {
     esb: EventStreamBuilder,
     /// event stream from docker
-    events: Box<dyn Stream<Item = Result<SystemEventsResponse, DockerError>> + Send>,
+    events: Pin<Box<dyn Stream<Item = Result<SystemEventsResponse, DockerError>> + Send>>,
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
     ///receives ContainerLogInfo comming from event stream futures
@@ -300,7 +292,7 @@ impl DockerSource {
 
         Ok(DockerSource {
             esb,
-            events: Box::new(events),
+            events: Box::pin(events),
             containers: HashMap::new(),
             main_recv,
             hostname: env::var("HOSTNAME").ok(),
@@ -341,8 +333,8 @@ impl DockerSource {
                     return;
                 }
 
-                // This check is necessary since shiplift doesn't have way to include
-                // names into request to docker.
+                // This check is necessary since docker api doesn't have way to include
+                // names into request.
                 if !self.esb.core.config.container_name_included(
                     id.as_str(),
                     names.iter().map(|s| {
@@ -373,7 +365,89 @@ impl DockerSource {
         Ok(self)
     }
 
-    async fn run(self) {}
+    async fn run(mut self) {
+        loop {
+            tokio::select! {
+                value = self.main_recv.next() => {
+                    match value {
+                        Some(info) => {
+                            let state = self
+                                .containers
+                                .get_mut(&info.id)
+                                .expect("Every ContainerLogInfo has it's ContainerState");
+                            if state.return_info(info) {
+                                self.esb.restart(state);
+                            }
+                        }
+                        None => {
+                            error!(message = "docker source main stream has ended unexpectedly");
+                            info!(message = "Shuting down docker source");
+                            return;
+                        }
+                    };
+                }
+                value = self.events.next() => {
+                    match value {
+                        Some(Ok(mut event)) => {
+                            let action = event.action.unwrap();
+                            let actor = event.actor.take().unwrap();
+                            let id = actor.id.unwrap();
+                            let attributes = actor.attributes.unwrap();
+
+                            trace!(
+                                message = "docker event",
+                                id = field::display(&id),
+                                action = field::display(&action),
+                                timestamp = field::display(event.time.unwrap()),
+                                attributes = field::debug(&attributes),
+                            );
+                            let id = ContainerId::new(id);
+
+                            // Update container status
+                            match action.as_str() {
+                                "die" | "pause" => {
+                                    if let Some(state) = self.containers.get_mut(&id) {
+                                        state.stoped();
+                                    }
+                                }
+                                "start" | "upause" => {
+                                    if let Some(state) = self.containers.get_mut(&id) {
+                                        state.running();
+                                        self.esb.restart(state);
+                                    } else {
+                                        // This check is necessary since docker api doesn't have way to include
+                                        // names into request.
+                                        let include_name =
+                                            self.esb.core.config.container_name_included(
+                                                id.as_str(),
+                                                attributes.get("name").map(|s| s.as_str()),
+                                            );
+
+                                        let self_check = self.exclude_vector(
+                                            id.as_str(),
+                                            attributes.get("image").map(|s| s.as_str()),
+                                        );
+
+                                        if include_name && self_check {
+                                            self.containers.insert(id.clone(), self.esb.start(id));
+                                        }
+                                    }
+                                }
+                                _ => {},
+                            };
+                        }
+                        Some(Err(error)) => error!(source = "docker events", %error),
+                        None => {
+                            // TODO: this could be fixed, but should be tryed with some timeoff and exponential backoff
+                            error!(message = "docker event stream has ended unexpectedly");
+                            info!(message = "Shuting down docker source");
+                            return;
+                        }
+                    };
+                }
+            };
+        }
+    }
 
     /// True if container with the given id and image must be excluded from logging,
     /// because it's a vector instance, probably this one.
@@ -395,115 +469,6 @@ impl DockerSource {
             }
         }
         true
-    }
-}
-
-impl Future for DockerSource {
-    type Item = ();
-    type Error = ();
-
-    /// Main future which listens for events from docker and messages from event streams futures.
-    /// Depending on recieved events and messages, may start/restart an event stream future.
-    fn poll(&mut self) -> Result<Async<()>, ()> {
-        loop {
-            return Ok(Async::NotReady);
-            // match self.main_recv.poll() {
-            //     // Process message from event_stream
-            //     Ok(Async::Ready(Some(info))) => {
-            //         let state = self
-            //             .containers
-            //             .get_mut(&info.id)
-            //             .expect("Every ContainerLogInfo has it's ContainerState");
-            //         if state.return_info(info) {
-            //             self.esb.restart(state);
-            //         }
-            //     }
-            //     // Check events from docker
-            //     Ok(Async::NotReady) => {
-            //         match self.events.poll() {
-            //             Ok(Async::NotReady) => return Ok(Async::NotReady),
-            //             // Process event from docker
-            //             Ok(Async::Ready(Some(mut event))) => {
-            //                 if let (Some(id), Some(status)) = (event.id.take(), event.status.take())
-            //                 {
-            //                     trace!(
-            //                         message = "docker event",
-            //                         id = field::display(&id),
-            //                         status = field::display(&status),
-            //                         timestamp = field::display(event.time),
-            //                         attributes = field::debug(&event.actor.attributes),
-            //                     );
-            //                     let id = ContainerId::new(id);
-
-            //                     // Update container status
-            //                     match status.as_str() {
-            //                         "die" | "pause" => {
-            //                             if let Some(state) = self.containers.get_mut(&id) {
-            //                                 state.stoped();
-            //                             }
-            //                         }
-            //                         "start" | "upause" => {
-            //                             if let Some(state) = self.containers.get_mut(&id) {
-            //                                 state.running();
-            //                                 self.esb.restart(state);
-            //                             } else {
-            //                                 // This check is necessary since shiplift doesn't have way to include
-            //                                 // names into request to docker.
-            //                                 let include_name =
-            //                                     self.esb.core.config.container_name_included(
-            //                                         id.as_str(),
-            //                                         event
-            //                                             .actor
-            //                                             .attributes
-            //                                             .get("name")
-            //                                             .map(|s| s.as_str()),
-            //                                     );
-
-            //                                 let self_check = self.exclude_vector(
-            //                                     id.as_str(),
-            //                                     event
-            //                                         .actor
-            //                                         .attributes
-            //                                         .get("image")
-            //                                         .map(|s| s.as_str()),
-            //                                 );
-
-            //                                 if include_name && self_check {
-            //                                     // Included
-            //                                     self.containers
-            //                                         .insert(id.clone(), self.esb.start(id));
-            //                                 } else {
-            //                                     // Ignore
-            //                                 }
-            //                             }
-            //                         }
-            //                         // Ignore
-            //                         _ => (),
-            //                     }
-            //                 }
-            //             }
-            //             Err(error) => error!(source="docker events",%error),
-            //             // Stream has ended
-            //             Ok(Async::Ready(None)) => {
-            //                 // TODO: this could be fixed, but should be tryed with some timeoff and exponential backoff
-            //                 error!(message = "docker event stream has ended unexpectedly");
-            //                 info!(message = "Shuting down docker source");
-            //                 return Err(());
-            //             }
-            //         }
-            //     }
-            //     Err(()) => error!(message = "Error in docker source main stream"),
-            //     // For some strange reason stream has ended.
-            //     // It should never reach this point. But if it does,
-            //     // something has gone terrible wrong, and this system is probably
-            //     // in invalid state.
-            //     Ok(Async::Ready(None)) => {
-            //         error!(message = "docker source main stream has ended unexpectedly");
-            //         info!(message = "Shuting down docker source");
-            //         return Err(());
-            //     }
-            // }
-        }
     }
 }
 
