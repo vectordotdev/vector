@@ -161,7 +161,7 @@ impl Decoder for SyslogDecoder {
 
     type Error = io::Error;
 
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<String>, io::Error> {
         if let Some(&first_byte) = src.get(0) {
             if 49 <= first_byte && first_byte <= 57 {
                 // First character is non zero number so we can assume that
@@ -207,6 +207,13 @@ impl Decoder for SyslogDecoder {
             }
         } else {
             Ok(None)
+        }
+    }
+
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<String>, io::Error> {
+        match self.decode(buf)? {
+            Some(frame) => Ok(Some(frame)),
+            None => self.other.decode_eof(buf),
         }
     }
 }
