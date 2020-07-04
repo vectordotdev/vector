@@ -1,4 +1,5 @@
 use crate::{
+    event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -47,6 +48,8 @@ pub struct DockerConfig {
     include_containers: Option<Vec<String>>,
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
+    partial_event_marker_field: Option<Atom>,
+    auto_partial_merge: bool,
 }
 
 impl Default for DockerConfig {
@@ -55,6 +58,8 @@ impl Default for DockerConfig {
             include_containers: None,
             include_labels: None,
             include_images: None,
+            partial_event_marker_field: Some(event::PARTIAL.clone()),
+            auto_partial_merge: true,
         }
     }
 }
@@ -81,6 +86,15 @@ impl DockerConfig {
             true
         }
     }
+
+    fn with_empty_partial_event_marker_field_as_none(mut self) -> Self {
+        if let Some(val) = &self.partial_event_marker_field {
+            if val.is_empty() {
+                self.partial_event_marker_field = None;
+            }
+        }
+        self
+    }
 }
 
 inventory::submit! {
@@ -96,7 +110,11 @@ impl SourceConfig for DockerConfig {
         shutdown: ShutdownSignal,
         out: mpsc01::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        let source = DockerSource::new(self.clone(), out, shutdown.clone())?;
+        let source = DockerSource::new(
+            self.clone().with_empty_partial_event_marker_field_as_none(),
+            out,
+            shutdown.clone(),
+        )?;
 
         // Capture currently running containers, and do main future(run)
         let fut = async move {
@@ -518,11 +536,19 @@ impl EventStreamBuilder {
         // Create event streamer
         let mut info = Some(info);
         let main_send = self.main_send.clone();
+        let partial_event_marker_field = self.core.config.partial_event_marker_field.clone();
+        let auto_partial_merge = self.core.config.auto_partial_merge;
+        let mut partial_event_merge_state = None;
 
         stream
             .map(|value| {
                 match value {
-                    Ok(message) => Ok(info.as_mut().unwrap().new_event(message)),
+                    Ok(message) => Ok(info.as_mut().unwrap().new_event(
+                        message,
+                        partial_event_marker_field.clone(),
+                        auto_partial_merge,
+                        &mut partial_event_merge_state,
+                    )),
                     Err(error) => {
                         // On any error, restart connection
                         match error.kind() {
@@ -566,7 +592,7 @@ impl EventStreamBuilder {
 
 /// Container ID as assigned by Docker.
 /// Is actually a string.
-#[derive(Debug, Hash, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Hash, Clone, Eq, PartialEq, Ord, PartialOrd)]
 struct ContainerId(Bytes);
 
 impl ContainerId {
@@ -580,7 +606,6 @@ impl ContainerId {
 }
 
 /// Kept by main to keep track of container state
-#[derive(Debug)]
 struct ContainerState {
     /// None if there is a event_stream of this container.
     info: Option<ContainerLogInfo>,
@@ -630,7 +655,6 @@ impl ContainerState {
 }
 
 /// Exchanged between main future and event_stream futures
-#[derive(Debug)]
 struct ContainerLogInfo {
     /// Container docker ID
     id: ContainerId,
@@ -667,7 +691,13 @@ impl ContainerLogInfo {
 
     /// Expects timestamp at the begining of message.
     /// Expects messages to be ordered by timestamps.
-    fn new_event(&mut self, log_output: LogOutput) -> Option<Event> {
+    fn new_event(
+        &mut self,
+        log_output: LogOutput,
+        partial_event_marker_field: Option<Atom>,
+        auto_partial_merge: bool,
+        partial_event_merge_state: &mut Option<LogEventMergeState>,
+    ) -> Option<Event> {
         let (stream, message) = match log_output {
             LogOutput::StdErr { message } => (STDERR.clone(), message),
             LogOutput::StdOut { message } => (STDOUT.clone(), message),
@@ -716,8 +746,24 @@ impl ContainerLogInfo {
             }
         };
 
+        // Message is actually one line from stderr or stdout, and they are
+        // delimited with newline, so that newline needs to be removed.
+        // If there's no newline, the event is considered partial, and will
+        // either be merged within the docker source, or marked accordingly
+        // before sending out, depending on the configuration.
+        let is_partial = if bytes_message
+            .last()
+            .map(|&b| b as char == '\n')
+            .unwrap_or(false)
+        {
+            bytes_message.truncate(bytes_message.len() - 1);
+            false
+        } else {
+            true
+        };
+
         // Prepare the log event.
-        let log_event = {
+        let mut log_event = {
             let mut log_event = LogEvent::new();
 
             // Source type
@@ -755,6 +801,51 @@ impl ContainerLogInfo {
             log_event
         };
 
+        // If automatic partial event merging is requested - perform the
+        // merging.
+        // Otherwise mark partial events and return all the events with no
+        // merging.
+        let log_event = if auto_partial_merge {
+            // Partial event events merging logic.
+
+            // If event is partial, stash it and return `None`.
+            if is_partial {
+                // If we already have a partial event merge state, the current
+                // message has to be merged into that existing state.
+                // Otherwise, create a new partial event merge state with the
+                // current message being the initial one.
+                if let Some(partial_event_merge_state) = partial_event_merge_state {
+                    partial_event_merge_state.merge_in_next_event(
+                        log_event,
+                        &[event::log_schema().message_key().clone()],
+                    );
+                } else {
+                    *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
+                };
+                return None;
+            };
+
+            // This is not a parial event. If we have a partial event merge
+            // state from before, the current event must be a final event, that
+            // would give us a merged event we can return.
+            // Otherwise it's just a regular event that we return as-is.
+            match partial_event_merge_state.take() {
+                Some(partial_event_merge_state) => partial_event_merge_state
+                    .merge_in_final_event(log_event, &[event::log_schema().message_key().clone()]),
+                None => log_event,
+            }
+        } else {
+            // If the event is partial, just set the partial event marker field.
+            if is_partial {
+                // Only add partial event marker field if it's requested.
+                if let Some(partial_event_marker_field) = partial_event_marker_field {
+                    log_event.insert(partial_event_marker_field, true);
+                }
+            }
+            // Return the log event as is, partial or not. No merging here.
+            log_event
+        };
+
         // Partial or not partial - we return the event we got here, because all
         // other cases were handeled earlier.
         let event = Event::Log(log_event);
@@ -763,7 +854,6 @@ impl ContainerLogInfo {
     }
 }
 
-#[derive(Debug)]
 struct ContainerMetadata {
     /// label.key -> String
     labels: Vec<(Atom, Value)>,
