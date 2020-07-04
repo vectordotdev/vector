@@ -1383,4 +1383,29 @@ mod tests {
             assert!(is_empty(exclude_out).await.unwrap());
         });
     }
+
+    #[test]
+    fn log_longer_than_16kb() {
+        trace_init();
+
+        let mut message = String::with_capacity(20 * 1024);
+        for _ in 0..message.capacity() {
+            message.push('0');
+        }
+        let name = "vector_test_log_longer_than_16kb";
+
+        let mut rt = runtime();
+        let out = source_with(&[name], None, &mut rt);
+
+        rt.block_on_std(async move {
+            let docker = docker().unwrap();
+
+            let id = container_log_n(1, name, None, message.as_str(), &docker).await;
+            let events = collect_n(out, 1).compat().await.ok().unwrap();
+            container_remove(&id, &docker).await;
+
+            let log = events[0].as_log();
+            assert_eq!(log[&event::log_schema().message_key()], message.into());
+        });
+    }
 }

@@ -446,3 +446,6 @@ required-features = ["transforms-wasm", "transforms-lua"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
+
+[patch.crates-io]
+bollard = { git = "https://github.com/fanatid/bollard/", rev = "fe0fe1ed25c84f54f0dc222f5dba0270f529a019" }
