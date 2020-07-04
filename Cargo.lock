@@ -5560,7 +5560,6 @@ dependencies = [
  "headers 0.2.3",
  "headers 0.3.2",
  "hostname",
- "http 0.1.21",
  "http 0.2.1",
  "hyper 0.13.4",
  "hyper-openssl 0.8.0",
