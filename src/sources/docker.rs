@@ -698,14 +698,13 @@ impl ContainerLogInfo {
         auto_partial_merge: bool,
         partial_event_merge_state: &mut Option<LogEventMergeState>,
     ) -> Option<Event> {
-        let (stream, message) = match log_output {
+        let (stream, mut bytes_message) = match log_output {
             LogOutput::StdErr { message } => (STDERR.clone(), message),
             LogOutput::StdOut { message } => (STDOUT.clone(), message),
             _ => return None,
         };
 
-        let mut bytes_message = Bytes::from(message.clone());
-
+        let message = String::from_utf8_lossy(&bytes_message);
         let mut splitter = message.splitn(2, char::is_whitespace);
         let timestamp_str = splitter.next()?;
         let timestamp = match DateTime::parse_from_rfc3339(timestamp_str) {

@@ -282,8 +282,9 @@ dependencies = [
 
 [[package]]
 name = "bollard"
-version = "0.6.1"
-source = "git+https://github.com/fanatid/bollard/?rev=fe0fe1ed25c84f54f0dc222f5dba0270f529a019#fe0fe1ed25c84f54f0dc222f5dba0270f529a019"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3008a3b2bc89543b1a5b207575fcb298ae4ef9901125ac1b81f6304280be8e69"
 dependencies = [
  "arrayvec 0.5.1",
  "base64 0.12.0",

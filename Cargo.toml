@@ -138,7 +138,7 @@ exitcode = "1.1.2"
 snafu = { version = "0.6", features = ["futures-01", "futures"] }
 url = "1.7"
 base64 = { version = "0.10.1", optional = true }
-bollard = { version = "0.6", default-features = false, features = ["tls"], optional = true }
+bollard = { version = "0.7", default-features = false, features = ["tls"], optional = true }
 owning_ref = { version = "0.4.0", optional = true }
 listenfd = { version = "0.3.3", optional = true }
 inventory = "0.1"
@@ -446,6 +446,3 @@ required-features = ["transforms-wasm", "transforms-lua"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
-
-[patch.crates-io]
-bollard = { git = "https://github.com/fanatid/bollard/", rev = "fe0fe1ed25c84f54f0dc222f5dba0270f529a019" }
