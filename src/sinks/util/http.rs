@@ -386,14 +386,14 @@ pub enum Auth {
 
 impl Auth {
     pub fn apply<B>(&self, req: &mut Request<B>) {
-        use headers03::HeaderMapExt;
+        use headers::{Authorization, HeaderMapExt};
 
         match &self {
             Auth::Basic { user, password } => {
-                let auth = headers03::Authorization::basic(&user, &password);
+                let auth = Authorization::basic(&user, &password);
                 req.headers_mut().typed_insert(auth);
             }
-            Auth::Bearer { token } => match headers03::Authorization::bearer(&token) {
+            Auth::Bearer { token } => match Authorization::bearer(&token) {
                 Ok(auth) => req.headers_mut().typed_insert(auth),
                 Err(error) => error!(message = "invalid bearer token", %token, %error),
             },

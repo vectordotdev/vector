@@ -1454,22 +1454,6 @@ dependencies = [
 
 [[package]]
 name = "headers"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "882ca7d8722f33ce2c2db44f95425d6267ed59ca96ce02acbe58320054ceb642"
-dependencies = [
- "base64 0.10.1",
- "bitflags",
- "bytes 0.4.12",
- "headers-core 0.1.1",
- "http 0.1.21",
- "mime",
- "sha-1",
- "time 0.1.42",
-]
-
-[[package]]
-name = "headers"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed18eb2459bf1a09ad2d6b1547840c3e5e62882fa09b9a6a20b1de8e3228848f"
@@ -1477,21 +1461,11 @@ dependencies = [
  "base64 0.12.0",
  "bitflags",
  "bytes 0.5.4",
- "headers-core 0.2.0",
+ "headers-core",
  "http 0.2.1",
  "mime",
  "sha-1",
  "time 0.1.42",
-]
-
-[[package]]
-name = "headers-core"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "967131279aaa9f7c20c7205b45a391638a83ab118e6509b2d0ccbe08de044237"
-dependencies = [
- "bytes 0.4.12",
- "http 0.1.21",
 ]
 
 [[package]]
@@ -5557,8 +5531,7 @@ dependencies = [
  "glob 0.2.11",
  "goauth",
  "grok",
- "headers 0.2.3",
- "headers 0.3.2",
+ "headers",
  "hostname",
  "http 0.2.1",
  "hyper 0.13.4",
@@ -5765,7 +5738,7 @@ checksum = "0e95175b7a927258ecbb816bdada3cc469cb68593e7940b96a60f4af366a9970"
 dependencies = [
  "bytes 0.5.4",
  "futures 0.3.4",
- "headers 0.3.2",
+ "headers",
  "http 0.2.1",
  "hyper 0.13.4",
  "log",

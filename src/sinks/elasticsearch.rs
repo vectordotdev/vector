@@ -88,8 +88,8 @@ pub enum ElasticSearchAuth {
 impl ElasticSearchAuth {
     pub fn apply<B>(&self, req: &mut Request<B>) {
         if let Self::Basic { user, password } = &self {
-            use headers03::HeaderMapExt;
-            let auth = headers03::Authorization::basic(&user, &password);
+            use headers::{Authorization, HeaderMapExt};
+            let auth = Authorization::basic(&user, &password);
             req.headers_mut().typed_insert(auth);
         }
     }
