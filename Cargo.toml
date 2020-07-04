@@ -392,8 +392,11 @@ docker = [
   "docker-integration-tests",
   "es-integration-tests",
   "gcp-integration-tests",
+  "gcp-pubsub-integration-tests",
+  "gcp-cloud-storage-integration-tests",
   "influxdb-integration-tests",
   "kafka-integration-tests",
+  "loki-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
 ]
