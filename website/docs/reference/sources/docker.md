@@ -478,6 +478,16 @@ will be replaced before being evaluated.
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
 
+### Message Splitting & Merging
+
+Docker, by default, will split log messages that exceed 16kb. This can be a
+rather frustrating problem because it produces malformed log messages that are
+difficult to work with. Vector's `docker` source solves this by default,
+automatically merging these messages into a single message. You can turn this
+off via the `auto_partial_merge` option. Furthermore, you can adjust the marker
+that we use to determine if an event is partial via the
+`partial_event_marker_field` option.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
