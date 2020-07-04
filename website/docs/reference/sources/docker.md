@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-03"
+last_modified_on: "2020-05-01"
 delivery_guarantee: "best_effort"
 component_title: "Docker"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
@@ -63,15 +63,40 @@ daemon][urls.docker_daemon] and outputs [`log`][docs.data-model.log] events.
 ```toml title="vector.toml"
 [sources.my_source_id]
   type = "docker" # required
+  auto_partial_merge = true # optional, default
   include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # optional, no default
   include_images = ["httpd", "redis"] # optional, no default
   include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"] # optional, no default
+  partial_event_marker_field = "_partial" # optional, default
 ```
 
 </TabItem>
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"auto_partial_merge"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### auto_partial_merge
+
+Setting this to `false` will disable the automatic merging of partial events.
+ See [Message Splitting & Merging](#message-splitting--merging) for more info.
+
+
+</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -143,6 +168,31 @@ A list of container object labels to match against when filtering running
 containers. This should follow the described label's synatx in [docker object
 labels docs][urls.docker_object_labels].
 
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"_partial"}
+  enumValues={null}
+  examples={["_partial"]}
+  groups={[]}
+  name={"partial_event_marker_field"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### partial_event_marker_field
+
+The field name to be added to events that are detected to contain an incomplete
+message (i.e. partial events). If set to `""`, no field will be added to
+partial event. This allows to opt-out of partial event detection.
+ See [Message Splitting & Merging](#message-splitting--merging) for more info.
 
 
 </Field>
@@ -484,7 +534,7 @@ Docker, by default, will split log messages that exceed 16kb. This can be a
 rather frustrating problem because it produces malformed log messages that are
 difficult to work with. Vector's `docker` source solves this by default,
 automatically merging these messages into a single message. You can turn this
-off via the `auto_partial_merge` option. Furthermore, you can adjust the marker
+off via the [`auto_partial_merge`](#auto_partial_merge) option. Furthermore, you can adjust the marker
 that we use to determine if an event is partial via the
 `partial_event_marker_field` option.
 
