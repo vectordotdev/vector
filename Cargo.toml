@@ -92,7 +92,6 @@ prost-types = "0.5"
 # GCP
 goauth = { version = "0.7.1", optional = true }
 smpl_jwt = { version = "0.5.0", optional = true }
-reqwest = "0.9.5"
 
 # External libs
 derivative = "1.0"
@@ -197,6 +196,7 @@ dirs = "2.0.2"
 tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
 assert_cmd = "1.0"
+reqwest = "0.9.5"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
