@@ -381,7 +381,7 @@ pub mod test_util {
         return (measurement, split[0], split[1].to_string(), split[2]);
     }
 
-    pub(crate) fn onboarding_v2() {
+    pub(crate) async fn onboarding_v2() {
         let mut body = std::collections::HashMap::new();
         body.insert("username", "my-user");
         body.insert("password", "my-password");
@@ -399,13 +399,13 @@ pub mod test_util {
             .json(&body)
             .header("accept", "application/json")
             .send()
+            .await
             .unwrap();
 
         let status = res.status();
 
         assert!(
-            status == http01::StatusCode::CREATED
-                || status == http01::StatusCode::UNPROCESSABLE_ENTITY,
+            status == StatusCode::CREATED || status == StatusCode::UNPROCESSABLE_ENTITY,
             format!("UnexpectedStatus: {}", status)
         );
     }
@@ -744,9 +744,9 @@ mod integration_tests {
 
     #[test]
     fn influxdb2_healthchecks_ok() {
-        onboarding_v2();
-
         let mut rt = runtime();
+        rt.block_on_std(onboarding_v2());
+
         let cx = SinkContext::new_test(rt.executor());
         let endpoint = "http://localhost:9999".to_string();
         let influxdb1_settings = None;
@@ -768,9 +768,9 @@ mod integration_tests {
 
     #[test]
     fn influxdb2_healthchecks_fail() {
-        onboarding_v2();
-
         let mut rt = runtime();
+        rt.block_on_std(onboarding_v2());
+
         let cx = SinkContext::new_test(rt.executor());
         let endpoint = "http://not_exist:9999".to_string();
         let influxdb1_settings = None;

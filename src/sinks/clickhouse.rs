@@ -242,8 +242,10 @@ mod integration_tests {
         test_util::{random_string, runtime},
         topology::config::{SinkConfig, SinkContext},
     };
+    use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use serde_json::Value;
+    use std::sync::Arc;
     use std::time::Duration;
     use tokio01::util::FutureExt;
 
@@ -270,22 +272,28 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let client = ClickhouseClient::new(host);
-        client.create_table(&table, "host String, timestamp String, message String");
+        let client = Arc::new((ClickhouseClient::new(host), table));
+        let client2 = Arc::clone(&client);
+        rt.block_on_std(async move {
+            client2
+                .0
+                .create_table(&client2.1, "host String, timestamp String, message String");
+        });
 
         let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        let pump = sink.send(input_event.clone());
-        rt.block_on(pump).unwrap();
+        rt.block_on_std(async move {
+            sink.send(input_event.clone()).compat().await.unwrap();
 
-        let output = client.select_all(&table);
-        assert_eq!(1, output.rows);
+            let output = client.0.select_all(&client.1).await;
+            assert_eq!(1, output.rows);
 
-        let expected = serde_json::to_value(input_event.into_log().all_fields()).unwrap();
-        assert_eq!(expected, output.data[0]);
+            let expected = serde_json::to_value(input_event.into_log().all_fields()).unwrap();
+            assert_eq!(expected, output.data[0]);
+        });
     }
 
     #[test]
@@ -325,28 +333,29 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        let pump = sink.send(input_event.clone());
-        rt.block_on(pump).unwrap();
+        rt.block_on_std(async move {
+            sink.send(input_event.clone()).compat().await.unwrap();
 
-        let output = client.select_all(&table);
-        assert_eq!(1, output.rows);
+            let output = client.select_all(&table).await;
+            assert_eq!(1, output.rows);
 
-        let exp_event = input_event.as_mut_log();
-        exp_event.insert(
-            event::log_schema().timestamp_key().clone(),
-            format!(
-                "{}",
-                exp_event
-                    .get(&event::log_schema().timestamp_key())
-                    .unwrap()
-                    .as_timestamp()
-                    .unwrap()
-                    .format("%Y-%m-%d %H:%M:%S")
-            ),
-        );
+            let exp_event = input_event.as_mut_log();
+            exp_event.insert(
+                event::log_schema().timestamp_key().clone(),
+                format!(
+                    "{}",
+                    exp_event
+                        .get(&event::log_schema().timestamp_key())
+                        .unwrap()
+                        .as_timestamp()
+                        .unwrap()
+                        .format("%Y-%m-%d %H:%M:%S")
+                ),
+            );
 
-        let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
-        assert_eq!(expected, output.data[0]);
+            let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
+            assert_eq!(expected, output.data[0]);
+        });
     }
 
     #[test]
@@ -383,28 +392,29 @@ compression = "none"
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        let pump = sink.send(input_event.clone());
-        rt.block_on(pump).unwrap();
+        rt.block_on_std(async move {
+            sink.send(input_event.clone()).compat().await.unwrap();
 
-        let output = client.select_all(&table);
-        assert_eq!(1, output.rows);
+            let output = client.select_all(&table).await;
+            assert_eq!(1, output.rows);
 
-        let exp_event = input_event.as_mut_log();
-        exp_event.insert(
-            event::log_schema().timestamp_key().clone(),
-            format!(
-                "{}",
-                exp_event
-                    .get(&event::log_schema().timestamp_key())
-                    .unwrap()
-                    .as_timestamp()
-                    .unwrap()
-                    .format("%Y-%m-%d %H:%M:%S")
-            ),
-        );
+            let exp_event = input_event.as_mut_log();
+            exp_event.insert(
+                event::log_schema().timestamp_key().clone(),
+                format!(
+                    "{}",
+                    exp_event
+                        .get(&event::log_schema().timestamp_key())
+                        .unwrap()
+                        .as_timestamp()
+                        .unwrap()
+                        .format("%Y-%m-%d %H:%M:%S")
+                ),
+            );
 
-        let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
-        assert_eq!(expected, output.data[0]);
+            let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
+            assert_eq!(expected, output.data[0]);
+        });
     }
 
     #[test]
@@ -456,8 +466,8 @@ compression = "none"
             }
         }
 
-        fn create_table(&self, table: &str, schema: &str) {
-            let mut response = self
+        async fn create_table(&self, table: &str, schema: &str) {
+            let response = self
                 .client
                 .post(&self.host)
                 //
@@ -469,26 +479,30 @@ compression = "none"
                     table, schema
                 ))
                 .send()
+                .await
                 .unwrap();
+
             if !response.status().is_success() {
-                panic!("create table failed: {}", response.text().unwrap())
+                panic!("create table failed: {}", response.text().await.unwrap())
             }
         }
 
-        fn select_all(&self, table: &str) -> QueryResponse {
-            let mut response = self
+        async fn select_all(&self, table: &str) -> QueryResponse {
+            let response = self
                 .client
                 .post(&self.host)
                 .body(format!("SELECT * FROM {} FORMAT JSON", table))
                 .send()
+                .await
                 .unwrap();
+
             if !response.status().is_success() {
-                panic!("select all failed: {}", response.text().unwrap())
+                panic!("select all failed: {}", response.text().await.unwrap())
             } else {
-                if let Ok(value) = response.json() {
-                    value
-                } else {
-                    panic!("json failed: {:?}", response.text().unwrap());
+                let text = response.text().await.unwrap();
+                match serde_json::from_str(&text) {
+                    Ok(value) => value,
+                    Err(_) => panic!("json failed: {:?}", text),
                 }
             }
         }
