@@ -9,7 +9,7 @@ use crate::{
         rusoto,
         service2::TowerRequestConfig,
         sink::Response,
-        BatchConfig, BatchSettings, VecBuffer,
+        BatchConfig, BatchSettings, Compression, VecBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -18,7 +18,7 @@ use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rand::random;
-use rusoto_core::{Region, RusotoError};
+use rusoto_core::RusotoError;
 use rusoto_kinesis::{
     DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError, PutRecordsInput,
     PutRecordsOutput, PutRecordsRequestEntry,
@@ -49,6 +49,8 @@ pub struct KinesisSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
+    #[serde(default)]
+    pub compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
@@ -96,11 +98,7 @@ impl KinesisService {
         config: KinesisSinkConfig,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = Arc::new(create_client(
-            (&config.region).try_into()?,
-            config.assume_role.clone(),
-            cx.resolver(),
-        )?);
+        let client = Arc::new(create_client(&config, cx.resolver())?);
 
         let batch = config
             .batch
@@ -196,11 +194,7 @@ enum HealthcheckError {
 }
 
 async fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Result<()> {
-    let client = create_client(
-        config.region.try_into()?,
-        config.assume_role.clone(),
-        resolver,
-    )?;
+    let client = create_client(&config, resolver)?;
     let stream_name = config.stream_name;
 
     let req = client.describe_stream(DescribeStreamInput {
@@ -222,15 +216,15 @@ async fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Re
     }
 }
 
-fn create_client(
-    region: Region,
-    assume_role: Option<String>,
-    resolver: Resolver,
-) -> crate::Result<KinesisClient> {
-    let client = rusoto::client(resolver)?;
-    let creds = rusoto::AwsCredentialsProvider::new(&region, assume_role)?;
+fn create_client(config: &KinesisSinkConfig, resolver: Resolver) -> crate::Result<KinesisClient> {
+    let region = (&config.region).try_into()?;
 
-    Ok(KinesisClient::new_with(client, creds, region))
+    let client = rusoto::client(resolver)?;
+    let creds = rusoto::AwsCredentialsProvider::new(&region, config.assume_role.clone())?;
+
+    let client =
+        rusoto_core::Client::new_with_encoding(creds, client, config.compression.to_rusoto());
+    Ok(KinesisClient::new_with_client(client, region))
 }
 
 fn encode_event(
@@ -372,6 +366,7 @@ mod integration_tests {
             partition_key_field: None,
             region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
             encoding: Encoding::Text.into(),
+            compression: Compression::None,
             batch: BatchConfig {
                 max_events: Some(2),
                 ..Default::default()
