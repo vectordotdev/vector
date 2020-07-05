@@ -11,11 +11,11 @@ use sinks::util::{encoding::EncodingConfig, Encoding};
 use std::fmt;
 use std::{collections::HashMap, str::FromStr, thread, time::Duration};
 #[cfg(unix)]
-use tokio01::codec::{FramedWrite, LinesCodec};
+use tokio01::codec::{BytesCodec, FramedWrite, LinesCodec};
 #[cfg(unix)]
 use tokio_uds::UnixStream;
 use vector::test_util::{
-    block_on, next_addr, random_maps, random_string, receive, runtime, send_lines,
+    block_on, next_addr, random_maps, random_string, receive, runtime, send_encodable, send_lines,
     shutdown_on_idle, trace_init, wait_for_tcp,
 };
 use vector::topology::{self, config};
@@ -216,7 +216,7 @@ fn test_unix_stream_syslog() {
 #[test]
 fn test_octet_counting_syslog() {
     trace_init();
-    let num_messages: usize = 1;
+    let num_messages: usize = 10000;
 
     let in_addr = next_addr();
     let out_addr = next_addr();
@@ -256,7 +256,12 @@ fn test_octet_counting_syslog() {
         })
         .collect();
 
-    block_on(send_lines(in_addr, input_lines.clone().into_iter())).unwrap();
+    block_on(send_encodable(
+        in_addr,
+        BytesCodec::new(),
+        input_lines.clone().into_iter().map(Into::into),
+    ))
+    .unwrap();
 
     // Shut down server
     block_on(topology.stop()).unwrap();

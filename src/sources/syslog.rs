@@ -154,6 +154,68 @@ impl SyslogDecoder {
             other: LinesCodec::new_with_max_length(max_length),
         }
     }
+
+    fn octet_decode(&self, src: &mut BytesMut) -> Result<Option<String>, io::Error> {
+        // Encoding scheme:
+        //
+        // len ' ' data
+        // |    |  | len number of bytes that contain syslog message
+        // |    |
+        // |    | Separating whitespace
+        // |
+        // | ASCII decimal number of unknown length
+
+        if let Some((i, _)) = src.iter().enumerate().find(|&(_, &b)| b == ' ' as u8) {
+            let len: usize = std::str::from_utf8(&src[..i])
+                .map_err(|_| ())
+                .and_then(|num| num.parse().map_err(|_| ()))
+                .map_err(|_| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Unable to decode message len as number",
+                    )
+                })?;
+
+            let from = i + 1;
+            let to = from + len;
+
+            if let Some(msg) = src.get(from..to) {
+                let s = std::str::from_utf8(msg)
+                    .map_err(|_| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Unable to decode message as UTF8",
+                        )
+                    })?
+                    .to_string();
+                src.advance(to);
+                Ok(Some(s))
+            } else {
+                Ok(None)
+            }
+        } else if src.len() < self.other.max_length() {
+            Ok(None)
+        } else {
+            // This is certainly mallformed, and there is no recovering from this.
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "frame length limit exceeded",
+            ))
+        }
+    }
+
+    /// None if this is not octet counting encoded
+    fn checked_decode(&self, src: &mut BytesMut) -> Option<Result<Option<String>, io::Error>> {
+        if let Some(&first_byte) = src.get(0) {
+            if 49 <= first_byte && first_byte <= 57 {
+                // First character is non zero number so we can assume that
+                // octet count framing is used.
+                trace!("Octet counting encoded event detected.");
+                return Some(self.octet_decode(src));
+            }
+        }
+        None
+    }
 }
 
 impl Decoder for SyslogDecoder {
@@ -162,58 +224,20 @@ impl Decoder for SyslogDecoder {
     type Error = io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<String>, io::Error> {
-        if let Some(&first_byte) = src.get(0) {
-            if 49 <= first_byte && first_byte <= 57 {
-                // First character is non zero number so we can assume that
-                // octet count framing is used.
-                if let Some((i, _)) = src.iter().enumerate().find(|&(_, &b)| b == ' ' as u8) {
-                    let len: usize = std::str::from_utf8(&src[..i])
-                        .map_err(|_| ())
-                        .and_then(|num| num.parse().map_err(|_| ()))
-                        .map_err(|_| {
-                            io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "Unable to decode message len as number",
-                            )
-                        })?;
-                    let from = i + 1;
-                    let to = from + len;
-                    if let Some(msg) = src.get(from..to) {
-                        let s = std::str::from_utf8(msg)
-                            .map_err(|_| {
-                                io::Error::new(
-                                    io::ErrorKind::InvalidData,
-                                    "Unable to decode message as UTF8",
-                                )
-                            })?
-                            .to_string();
-                        src.advance(to);
-                        Ok(Some(s))
-                    } else {
-                        Ok(None)
-                    }
-                } else if src.len() < self.other.max_length() {
-                    Ok(None)
-                } else {
-                    // This is certainly mallformed, and there is no recovering from this.
-                    Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        "frame length limit exceeded",
-                    ))
-                }
-            } else {
-                // Octet counting isn't used so fallback to newline delimitation.
-                self.other.decode(src)
-            }
+        if let Some(ret) = self.checked_decode(src) {
+            ret
         } else {
-            Ok(None)
+            // Octet counting isn't used so fallback to newline codec.
+            self.other.decode(src)
         }
     }
 
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<String>, io::Error> {
-        match self.decode(buf)? {
-            Some(frame) => Ok(Some(frame)),
-            None => self.other.decode_eof(buf),
+        if let Some(ret) = self.checked_decode(buf) {
+            ret
+        } else {
+            // Octet counting isn't used so fallback to newline codec.
+            self.other.decode_eof(buf)
         }
     }
 }
