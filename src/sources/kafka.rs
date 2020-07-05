@@ -263,6 +263,7 @@ mod integration_test {
         shutdown::ShutdownSignal,
         test_util::{collect_n, random_string, runtime},
     };
+    use chrono::{TimeZone, Utc};
     use futures::compat::Compat;
     use futures01::{sync::mpsc, Future};
     use rdkafka::{
@@ -273,7 +274,12 @@ mod integration_test {
 
     const BOOTSTRAP_SERVER: &str = "localhost:9092";
 
-    fn send_event(topic: &str, key: &str, text: &str) -> impl Future<Item = (), Error = ()> {
+    fn send_event(
+        topic: &str,
+        key: &str,
+        text: &str,
+        timestamp: i64,
+    ) -> impl Future<Item = (), Error = ()> {
         let producer: FutureProducer = ClientConfig::new()
             .set("bootstrap.servers", BOOTSTRAP_SERVER)
             .set("produce.offset.report", "true")
@@ -281,7 +287,10 @@ mod integration_test {
             .create()
             .expect("Producer creation error");
 
-        let record = FutureRecord::to(topic).payload(text).key(key);
+        let record = FutureRecord::to(topic)
+            .payload(text)
+            .key(key)
+            .timestamp(timestamp);
 
         Compat::new(producer.send(record, 0))
             .map(|_| ())
@@ -294,6 +303,7 @@ mod integration_test {
         let topic = format!("test-topic-{}", random_string(10));
         println!("Test topic name: {}", topic);
         let group_id = format!("test-group-{}", random_string(10));
+        let now = Utc::now();
 
         let config = KafkaSourceConfig {
             bootstrap_servers: BOOTSTRAP_SERVER.into(),
@@ -310,8 +320,13 @@ mod integration_test {
 
         let mut rt = runtime();
         println!("Sending event...");
-        rt.block_on(send_event(&topic, "my key", "my message"))
-            .unwrap();
+        rt.block_on(send_event(
+            &topic,
+            "my key",
+            "my message",
+            now.timestamp_millis(),
+        ))
+        .unwrap();
         println!("Receiving event...");
         let (tx, rx) = mpsc::channel(1);
         rt.spawn(kafka_source(config, ShutdownSignal::noop(), tx).unwrap());
@@ -327,6 +342,10 @@ mod integration_test {
         assert_eq!(
             events[0].as_log()[event::log_schema().source_type_key()],
             "kafka".into()
+        );
+        assert_eq!(
+            events[0].as_log()[event::log_schema().timestamp_key()],
+            now.into()
         );
     }
 }
