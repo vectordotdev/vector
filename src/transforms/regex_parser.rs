@@ -195,7 +195,7 @@ impl Transform for RegexParser {
         emit!(RegexEventProcessed);
 
         if let Some(value) = &value {
-            let regex_id = self.regexset.matches(&value).into_iter().nth(0);
+            let regex_id = self.regexset.matches(&value).into_iter().next();
             let id = match regex_id {
                 Some(id) => id,
                 None => {

@@ -119,7 +119,7 @@ pub fn build_pieces(
     let mut tasks = HashMap::new();
     let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
-    let mut shutdown_coordinator = SourceShutdownCoordinator::new();
+    let mut shutdown_coordinator = SourceShutdownCoordinator::default();
 
     let mut errors = vec![];
 
@@ -177,7 +177,7 @@ pub fn build_pieces(
         let typetag = &transform.inner.transform_type();
 
         let cx = TransformContext {
-            resolver: resolver.clone(),
+            resolver,
             exec: exec.clone(),
         };
 
@@ -228,7 +228,7 @@ pub fn build_pieces(
         };
 
         let cx = SinkContext {
-            resolver: resolver.clone(),
+            resolver,
             acker,
             exec: exec.clone(),
         };

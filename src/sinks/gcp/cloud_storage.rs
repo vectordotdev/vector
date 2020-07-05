@@ -205,11 +205,7 @@ impl GcsSink {
                 .timeout(300),
         );
 
-        let key_prefix = config
-            .key_prefix
-            .as_ref()
-            .map(String::as_str)
-            .unwrap_or("date=%F/");
+        let key_prefix = config.key_prefix.as_deref().unwrap_or("date=%F/");
         let key_prefix = Template::try_from(key_prefix).context(KeyPrefixTemplate)?;
 
         let settings = self.settings.clone();
@@ -354,7 +350,7 @@ impl RequestSettings {
             .compression
             .content_encoding()
             .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
-        let storage_class = config.storage_class.unwrap_or(GcsStorageClass::default());
+        let storage_class = config.storage_class.unwrap_or_default();
         let storage_class = HeaderValue::from_str(&to_string(storage_class)).unwrap();
         let metadata = config
             .metadata
@@ -365,12 +361,15 @@ impl RequestSettings {
                     .map(make_header)
                     .collect::<Result<Vec<_>, _>>()
             })
-            .unwrap_or(Ok(vec![]))?;
+            .unwrap_or_else(|| Ok(vec![]))?;
         let extension = config
             .filename_extension
             .clone()
             .unwrap_or_else(|| config.compression.extension().into());
-        let time_format = config.filename_time_format.clone().unwrap_or("%s".into());
+        let time_format = config
+            .filename_time_format
+            .clone()
+            .unwrap_or_else(|| "%s".into());
         let append_uuid = config.filename_append_uuid.unwrap_or(true);
         Ok(Self {
             acl,
@@ -521,7 +520,7 @@ mod tests {
 
         let req = RequestWrapper::new(
             buf.clone(),
-            request_settings(Some("ext".into()), false, Compression::None),
+            request_settings(Some("ext"), false, Compression::None),
         );
         assert_eq!(req.key, "key/date.ext".to_string());
 
@@ -537,7 +536,7 @@ mod tests {
         );
         assert_eq!(req.key, "key/date.log.gz".to_string());
 
-        let req = RequestWrapper::new(buf.clone(), request_settings(None, true, Compression::Gzip));
+        let req = RequestWrapper::new(buf, request_settings(None, true, Compression::Gzip));
         assert_ne!(req.key, "key/date.log.gz".to_string());
     }
 }

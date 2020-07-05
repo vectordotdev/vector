@@ -91,7 +91,7 @@ impl FileWatcher {
             devno,
             inode: ino,
             is_dead: false,
-            last_read_attempt: ts.clone(),
+            last_read_attempt: ts,
             last_read_success: ts,
         })
     }

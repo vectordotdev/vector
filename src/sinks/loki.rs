@@ -77,7 +77,7 @@ inventory::submit! {
 impl SinkConfig for LokiConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         if self.labels.is_empty() {
-            return Err(format!("`labels` must include at least one label.").into());
+            return Err("`labels` must include at least one label.".into());
         }
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());

@@ -43,7 +43,7 @@ impl SinkConfig for PapertrailConfig {
             cx.resolver(),
             MaybeTlsSettings::Tls(TlsSettings::default()),
         );
-        let healthcheck = tcp_healthcheck(host.clone(), port, cx.resolver());
+        let healthcheck = tcp_healthcheck(host, port, cx.resolver());
 
         let pid = std::process::id();
 

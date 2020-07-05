@@ -90,7 +90,7 @@ fn raise_sighup() {
 
 #[cfg(unix)]
 fn create_watcher(
-    config_paths: &Vec<PathBuf>,
+    config_paths: &[PathBuf],
 ) -> Result<(RecommendedWatcher, Receiver<RawEvent>), Error> {
     info!("Creating configuration file watcher.");
     let (sender, receiver) = channel();
@@ -100,7 +100,7 @@ fn create_watcher(
 }
 
 #[cfg(unix)]
-fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &Vec<PathBuf>) -> Result<(), Error> {
+fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &[PathBuf]) -> Result<(), Error> {
     for path in config_paths {
         watcher.watch(path, RecursiveMode::NonRecursive)?;
     }

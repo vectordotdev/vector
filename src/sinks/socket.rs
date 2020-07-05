@@ -113,7 +113,7 @@ mod test {
         let (sink, _healthcheck) = config.build(context).unwrap();
 
         let event = Event::from("raw log line");
-        let pump = sink.send(event.clone());
+        let pump = sink.send(event);
         rt.block_on(pump).unwrap();
 
         let mut buf = [0; 256];

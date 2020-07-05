@@ -67,7 +67,7 @@ pub fn start_validated(
         inputs: HashMap::new(),
         outputs: HashMap::new(),
         config: Config::empty(),
-        shutdown_coordinator: SourceShutdownCoordinator::new(),
+        shutdown_coordinator: SourceShutdownCoordinator::default(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
@@ -126,7 +126,6 @@ impl RunningTopology {
     /// into the returned future and is used to poll for when the tasks have completed. One the
     /// returned future is dropped then everything from this RunningTopology instance is fully
     /// dropped.
-    #[must_use]
     pub fn stop(self) -> impl Future<Item = (), Error = ()> {
         // Create handy handles collections of all tasks for the subsequent operations.
         let mut wait_handles = Vec::new();
@@ -883,7 +882,7 @@ mod source_finished_tests {
             },
         );
 
-        let (topology, _crash) = topology::start(old_config.clone(), &mut rt, false).unwrap();
+        let (topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
 
         rt.block_on(topology.sources_finished().timeout(Duration::from_secs(2)))
             .unwrap();

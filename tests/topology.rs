@@ -1,6 +1,4 @@
-#![allow(clippy::bool_comparison)]
 #![allow(clippy::match_bool)]
-#![allow(clippy::redundant_clone)]
 
 mod support;
 
@@ -201,7 +199,7 @@ fn topology_transform_chain() {
 
     let event = Event::from("this");
 
-    in1.send(event.clone()).wait().unwrap();
+    in1.send(event).wait().unwrap();
 
     rt.block_on(topology.stop()).unwrap();
 
@@ -239,7 +237,7 @@ fn topology_remove_one_source() {
     let event2 = Event::from("that");
     let h_out1 = oneshot::spawn(out1.collect(), &rt.executor());
     let h_in1 = oneshot::spawn(in1.send(event1.clone()), &rt.executor());
-    let h_in2 = oneshot::spawn(in2.send(event2.clone()), &rt.executor());
+    let h_in2 = oneshot::spawn(in2.send(event2), &rt.executor());
     rt.block_on(h_in1).unwrap();
     rt.block_on(h_in2).unwrap_err();
     rt.block_on(topology.stop()).unwrap();
@@ -313,7 +311,7 @@ fn topology_remove_one_transform() {
 
     let event = Event::from("this");
     let h_out1 = oneshot::spawn(out1.map(into_message).collect(), &rt.executor());
-    let h_in1 = oneshot::spawn(in1.send(event.clone()), &rt.executor());
+    let h_in1 = oneshot::spawn(in1.send(event), &rt.executor());
     rt.block_on(h_in1).unwrap();
     rt.block_on(topology.stop()).unwrap();
     let res = rt.block_on(h_out1).unwrap();
@@ -349,7 +347,7 @@ fn topology_swap_source() {
 
     let h_out1v1 = oneshot::spawn(out1v1.collect(), &rt.executor());
     let h_out1v2 = oneshot::spawn(out1v2.collect(), &rt.executor());
-    let h_in1 = oneshot::spawn(in1.send(event1.clone()), &rt.executor());
+    let h_in1 = oneshot::spawn(in1.send(event1), &rt.executor());
     let h_in2 = oneshot::spawn(in2.send(event2.clone()), &rt.executor());
     rt.block_on(h_in1).unwrap_err();
     rt.block_on(h_in2).unwrap();
@@ -426,7 +424,7 @@ fn topology_swap_transform() {
     let event = Event::from("this");
     let h_out1v1 = oneshot::spawn(out1v1.map(into_message).collect(), &rt.executor());
     let h_out1v2 = oneshot::spawn(out1v2.map(into_message).collect(), &rt.executor());
-    let h_in1 = oneshot::spawn(in1.send(event.clone()), &rt.executor());
+    let h_in1 = oneshot::spawn(in1.send(event), &rt.executor());
     rt.block_on(h_in1).unwrap();
     rt.block_on(topology.stop()).unwrap();
     let res1v1 = rt.block_on(h_out1v1).unwrap();
@@ -552,10 +550,7 @@ fn topology_healthcheck_run_for_changes_on_reload() {
     config.add_source("in1", src);
     config.add_sink("out2", &["in1"], sink_failing_healthcheck(10).1);
 
-    assert!(
-        topology
-            .reload_config_and_respawn(config, &mut rt, true)
-            .unwrap()
-            == false
-    );
+    assert!(!topology
+        .reload_config_and_respawn(config, &mut rt, true)
+        .unwrap());
 }

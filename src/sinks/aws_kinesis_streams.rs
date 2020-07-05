@@ -321,7 +321,7 @@ mod tests {
         event.as_mut_log().insert("key", "some_key");
         let event = encode_event(event, &Some("key".into()), &Encoding::Text.into()).unwrap();
 
-        assert_eq!(&event.data[..], "hello world".as_bytes());
+        assert_eq!(&event.data[..], b"hello world");
         assert_eq!(&event.partition_key, &"some_key".to_string());
     }
 
@@ -331,7 +331,7 @@ mod tests {
         event.as_mut_log().insert("key", random_string(300));
         let event = encode_event(event, &Some("key".into()), &Encoding::Text.into()).unwrap();
 
-        assert_eq!(&event.data[..], "hello world".as_bytes());
+        assert_eq!(&event.data[..], b"hello world");
         assert_eq!(event.partition_key.len(), 256);
     }
 }

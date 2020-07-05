@@ -1,12 +1,3 @@
-#![allow(clippy::cognitive_complexity)]
-#![allow(clippy::option_map_unit_fn)]
-#![allow(clippy::or_fun_call)]
-#![allow(clippy::ptr_arg)]
-#![allow(clippy::redundant_clone)]
-#![allow(clippy::single_match)]
-#![allow(clippy::unnecessary_unwrap)]
-#![allow(clippy::useless_format)]
-
 #[macro_use]
 extern crate tracing;
 
@@ -175,15 +166,14 @@ fn main() {
                 format!("vector={}", level),
                 format!("codec={}", level),
                 format!("file_source={}", level),
-                format!("tower_limit=trace"),
+                "tower_limit=trace".to_owned(),
                 format!("rdkafka={}", level),
             ]
-            .join(",")
-            .to_string(),
+            .join(","),
         },
     };
 
-    let color = match opts.color.clone() {
+    let color = match opts.color {
         #[cfg(unix)]
         Color::Auto => atty::is(atty::Stream::Stdout),
         #[cfg(windows)]
@@ -201,14 +191,14 @@ fn main() {
 
     metrics::init().expect("metrics initialization failed");
 
-    sub_command.map(|s| {
+    if let Some(s) = sub_command {
         std::process::exit(match s {
             SubCommand::Validate(v) => validate::validate(&v, color),
             SubCommand::List(l) => list::cmd(&l),
             SubCommand::Test(t) => unit_test::cmd(&t),
             SubCommand::Generate(g) => generate::cmd(&g),
-        })
-    });
+        });
+    }
 
     info!("Log level {:?} is enabled.", level);
 
@@ -250,7 +240,7 @@ fn main() {
         .expect("Couldn't set schema");
 
     let mut rt = {
-        let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
+        let threads = opts.threads.unwrap_or_else(|| max(1, num_cpus::get()));
         runtime::Runtime::with_thread_count(threads).expect("Unable to create async runtime")
     };
 
@@ -393,7 +383,7 @@ fn handle_config_errors(config: Result<Config, Vec<String>>) -> Option<Config> {
     }
 }
 
-fn read_configs(config_paths: &Vec<PathBuf>) -> Result<Config, Vec<String>> {
+fn read_configs(config_paths: &[PathBuf]) -> Result<Config, Vec<String>> {
     let mut config = vector::topology::Config::empty();
     let mut errors = Vec::new();
 
@@ -410,10 +400,9 @@ fn read_configs(config_paths: &Vec<PathBuf>) -> Result<Config, Vec<String>> {
             path = ?p
         );
 
-        match Config::load(file).and_then(|n| config.append(n)) {
-            Err(errs) => errors.extend(errs.iter().map(|e| format!("{:?}: {}", p, e))),
-            _ => (),
-        };
+        if let Err(errs) = Config::load(file).and_then(|n| config.append(n)) {
+            errors.extend(errs.iter().map(|e| format!("{:?}: {}", p, e)));
+        }
     });
 
     if let Err(mut errs) = config.expand_macros() {

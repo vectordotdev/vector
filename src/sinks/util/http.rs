@@ -146,10 +146,8 @@ where
     type SinkError = crate::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        if self.slot.is_some() {
-            if self.poll_complete()?.is_not_ready() {
-                return Ok(AsyncSink::NotReady(item));
-            }
+        if self.slot.is_some() && self.poll_complete()?.is_not_ready() {
+            return Ok(AsyncSink::NotReady(item));
         }
         assert!(self.slot.is_none(), "poll_complete did not clear slot");
 
@@ -189,7 +187,7 @@ where
         resolver: Resolver,
         tls_settings: impl Into<MaybeTlsSettings>,
     ) -> crate::Result<HttpClient<B>> {
-        let mut http = HttpConnector::new_with_resolver(resolver.clone());
+        let mut http = HttpConnector::new_with_resolver(resolver);
         http.enforce_http(false);
 
         let settings = tls_settings.into();
@@ -368,9 +366,11 @@ impl RetryLogic for HttpRetryLogic {
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ if status.is_server_error() => RetryAction::Retry(
-                format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
-            ),
+            _ if status.is_server_error() => RetryAction::Retry(format!(
+                "{}: {}",
+                status,
+                String::from_utf8_lossy(response.body())
+            )),
             _ if status.is_success() => RetryAction::Successful,
             _ => RetryAction::DontRetry(format!("response status: {}", status)),
         }
@@ -442,9 +442,7 @@ mod test {
 
         let request = b"hello".to_vec();
         let mut service = HttpBatchService::new(resolver, None, move |body: Vec<u8>| {
-            Box::pin(ready(
-                Request::post(&uri).body(body.into()).map_err(Into::into),
-            ))
+            Box::pin(ready(Request::post(&uri).body(body).map_err(Into::into)))
         });
 
         let (tx, rx) = futures01::sync::mpsc::channel(10);

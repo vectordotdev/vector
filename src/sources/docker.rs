@@ -726,7 +726,7 @@ impl ContainerLogInfo {
         self.last_log
             .as_ref()
             .map(|&(ref d, _)| d.timestamp())
-            .unwrap_or(self.created.timestamp())
+            .unwrap_or_else(|| self.created.timestamp())
             - 1
     }
 
@@ -807,7 +807,7 @@ impl ContainerLogInfo {
 
         // Prepare the log event.
         let mut log_event = {
-            let mut log_event = LogEvent::new();
+            let mut log_event = LogEvent::default();
 
             // Source type
             log_event.insert(event::log_schema().source_type_key(), "docker");
@@ -841,7 +841,7 @@ impl ContainerLogInfo {
             log_event.insert(IMAGE.clone(), self.metadata.image.clone());
 
             // Timestamp of the container creation.
-            log_event.insert(CREATED_AT.clone(), self.metadata.created_at.clone());
+            log_event.insert(CREATED_AT.clone(), self.metadata.created_at);
 
             // Return the resulting log event.
             log_event
@@ -928,16 +928,14 @@ impl ContainerMetadata {
             labels,
             name: remove_slash(details.name.as_str()).into(),
             image: details.config.image.as_str().into(),
-            created_at: DateTime::parse_from_rfc3339(details.created.as_str())?
-                .with_timezone(&Utc)
-                .into(),
+            created_at: DateTime::parse_from_rfc3339(details.created.as_str())?.with_timezone(&Utc),
         })
     }
 }
 
 /// Removes / at the start of str
 fn remove_slash(s: &str) -> &str {
-    s.trim_start_matches("/")
+    s.trim_start_matches('/')
 }
 
 #[cfg(all(test, feature = "docker-integration-tests"))]
