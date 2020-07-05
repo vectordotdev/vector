@@ -6,6 +6,7 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
+use chrono::{TimeZone, Utc};
 use futures::compat::Compat;
 use futures01::{future, sync::mpsc, Future, Poll, Sink, Stream};
 use owning_ref::OwningHandle;
@@ -125,12 +126,21 @@ fn kafka_source(
                             }
                             Some(Ok(payload)) => Bytes::from(payload),
                         };
-                        let mut event = Event::from(payload);
+                        let mut event = Event::new_empty_log();
+                        let log = event.as_mut_log();
+
+                        log.insert(event::log_schema().message_key().clone(), payload);
+
+                        // Extract timestamp from kafka message
+                        let timestamp = msg
+                            .timestamp()
+                            .to_millis()
+                            .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
+                            .unwrap_or_else(Utc::now);
+                        log.insert(event::log_schema().timestamp_key().clone(), timestamp);
 
                         // Add source type
-                        event
-                            .as_mut_log()
-                            .insert(event::log_schema().source_type_key(), "kafka");
+                        log.insert(event::log_schema().source_type_key(), "kafka");
 
                         if let Some(key_field) = &config.key_field {
                             match msg.key_view::<[u8]>() {
@@ -139,7 +149,7 @@ fn kafka_source(
                                     return Err(error!(message = "Cannot extract key", error = ?e))
                                 }
                                 Some(Ok(key)) => {
-                                    event.as_mut_log().insert(key_field.clone(), key);
+                                    log.insert(key_field.clone(), key);
                                 }
                             }
                         }
