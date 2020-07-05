@@ -47,10 +47,10 @@ impl SinkConfig for VectorSinkConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let sink = TcpSink::new(host.clone(), port, cx.resolver(), tls);
+        let sink = TcpSink::new(host, port, cx.resolver(), tls);
+        let healthcheck = sink.healthcheck();
         let sink = StreamSink::new(sink, cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event)));
-        let healthcheck = super::util::tcp::tcp_healthcheck(host, port, cx.resolver());
 
         Ok((Box::new(sink), healthcheck))
     }
