@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-05"
+last_modified_on: "2020-07-06"
 delivery_guarantee: "best_effort"
 component_title: "Syslog"
 description: "The Vector `syslog` source ingests data through the Syslog protocol and outputs `log` events."
@@ -742,7 +742,7 @@ Each line is read until a new line delimiter (the `0xA` byte) is found.
 Vector makes a _best effort_ to parse the various Syslog formats out in the
 wild. This includes [RFC 6587][urls.syslog_6587], [RFC 5424][urls.syslog_5424],
 [RFC 3164][urls.syslog_3164], and other common variations (such as the Nginx
-Syslog style). It's unfortunate that the Syslog specification is not more 
+Syslog style). It's unfortunate that the Syslog specification is not more
 accurately followed, but we hope Vector insulates you from these diviations.
 
 If parsing fails, Vector will include the entire Syslog line in the [`message`](#message)
