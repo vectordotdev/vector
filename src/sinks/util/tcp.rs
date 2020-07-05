@@ -274,7 +274,7 @@ enum HealthcheckError {
     NoAddresses,
 }
 
-fn tcp_healthcheck(
+pub fn tcp_healthcheck(
     host: String,
     port: u16,
     resolver: Resolver,
