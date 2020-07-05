@@ -77,11 +77,7 @@ impl CloudWatchMetricsSvc {
         config: CloudWatchMetricsSinkConfig,
         cx: SinkContext,
     ) -> crate::Result<super::RouterSink> {
-        let client = Self::create_client(
-            (&config.region).try_into()?,
-            config.assume_role.clone(),
-            cx.resolver(),
-        )?;
+        let client = Self::create_client(&config, cx.resolver())?;
 
         let batch = config
             .batch
@@ -109,11 +105,7 @@ impl CloudWatchMetricsSvc {
         config: CloudWatchMetricsSinkConfig,
         resolver: Resolver,
     ) -> crate::Result<()> {
-        let client = Self::create_client(
-            (&config.region).try_into()?,
-            config.assume_role.clone(),
-            resolver,
-        )?;
+        let client = Self::create_client(&config, resolver)?;
 
         let datum = MetricDatum {
             metric_name: "healthcheck".into(),
@@ -129,10 +121,10 @@ impl CloudWatchMetricsSvc {
     }
 
     fn create_client(
-        region: Region,
-        assume_role: Option<String>,
+        config: &CloudWatchMetricsSinkConfig,
         resolver: Resolver,
     ) -> crate::Result<CloudWatchClient> {
+        let region = (&config.region).try_into()?;
         let region = if cfg!(test) {
             // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
             match region {
@@ -145,10 +137,11 @@ impl CloudWatchMetricsSvc {
         } else {
             region
         };
-        let d = rusoto::client(resolver)?;
-        let p = rusoto::AwsCredentialsProvider::new(&region, assume_role)?;
 
-        Ok(CloudWatchClient::new_with(d, p, region))
+        let client = rusoto::client(resolver)?;
+        let creds = rusoto::AwsCredentialsProvider::new(&region, config.assume_role.clone())?;
+
+        Ok(CloudWatchClient::new_with(client, creds, region))
     }
 
     fn encode_events(&mut self, events: Vec<Metric>) -> PutMetricDataInput {
@@ -291,9 +284,7 @@ mod tests {
     fn svc() -> CloudWatchMetricsSvc {
         let resolver = Resolver;
         let config = config();
-        let region = (&config.region).try_into().unwrap();
-        let client = CloudWatchMetricsSvc::create_client(region, None, resolver).unwrap();
-
+        let client = CloudWatchMetricsSvc::create_client(&config, resolver).unwrap();
         CloudWatchMetricsSvc { client, config }
     }
 

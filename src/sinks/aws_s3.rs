@@ -21,7 +21,7 @@ use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
 use http::StatusCode;
 use lazy_static::lazy_static;
-use rusoto_core::{Region, RusotoError};
+use rusoto_core::RusotoError;
 use rusoto_s3::{
     HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3,
 };
@@ -187,10 +187,8 @@ impl S3Sink {
             .unwrap_or("date=%F/");
         let key_prefix = Template::try_from(key_prefix)?;
 
-        let region = (&config.region).try_into()?;
-
         let s3 = S3Sink {
-            client: Self::create_client(region, config.assume_role.clone(), cx.resolver())?,
+            client: Self::create_client(&config, cx.resolver())?,
         };
 
         let filename_extension = config.filename_extension.clone();
@@ -223,11 +221,7 @@ impl S3Sink {
     }
 
     pub async fn healthcheck(config: S3SinkConfig, resolver: Resolver) -> crate::Result<()> {
-        let client = Self::create_client(
-            (&config.region).try_into()?,
-            config.assume_role.clone(),
-            resolver,
-        )?;
+        let client = Self::create_client(&config, resolver)?;
 
         let bucket = config.bucket.clone();
         let req = client.head_bucket(HeadBucketRequest {
@@ -247,15 +241,12 @@ impl S3Sink {
         }
     }
 
-    pub fn create_client(
-        region: Region,
-        _assume_role: Option<String>,
-        resolver: Resolver,
-    ) -> crate::Result<S3Client> {
+    pub fn create_client(config: &S3SinkConfig, resolver: Resolver) -> crate::Result<S3Client> {
+        let region = (&config.region).try_into()?;
         let client = rusoto::client(resolver)?;
 
         #[cfg(not(test))]
-        let creds = rusoto::AwsCredentialsProvider::new(&region, _assume_role)?;
+        let creds = rusoto::AwsCredentialsProvider::new(&region, config.assume_role.clone())?;
 
         // Hack around the fact that rusoto will not pick up runtime
         // env vars. This is designed to only for test purposes use

@@ -18,7 +18,7 @@ use chrono::{Duration, Utc};
 use futures::future::{FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
 use lazy_static::lazy_static;
-use rusoto_core::{request::BufferedHttpResponse, Region, RusotoError};
+use rusoto_core::{request::BufferedHttpResponse, RusotoError};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError,
     DescribeLogGroupsRequest, DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
@@ -260,8 +260,7 @@ impl CloudwatchLogsSvc {
         key: &CloudwatchKey,
         resolver: Resolver,
     ) -> crate::Result<Self> {
-        let region = config.region.clone().try_into()?;
-        let client = create_client(region, config.assume_role.clone(), resolver)?;
+        let client = create_client(config, resolver)?;
 
         let group_name = String::from_utf8_lossy(&key.group[..]).into_owned();
         let stream_name = String::from_utf8_lossy(&key.stream[..]).into_owned();
@@ -483,7 +482,7 @@ async fn healthcheck(config: CloudwatchLogsSinkConfig, resolver: Resolver) -> cr
     let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
     let expected_group_name = group_name.clone();
 
-    let client = create_client((&config.region).try_into()?, config.assume_role, resolver)?;
+    let client = create_client(&config, resolver)?;
 
     let request = DescribeLogGroupsRequest {
         limit: Some(1),
@@ -517,13 +516,13 @@ async fn healthcheck(config: CloudwatchLogsSinkConfig, resolver: Resolver) -> cr
 }
 
 fn create_client(
-    region: Region,
-    assume_role: Option<String>,
+    config: &CloudwatchLogsSinkConfig,
     resolver: Resolver,
 ) -> crate::Result<CloudWatchLogsClient> {
-    let http = rusoto::client(resolver)?;
-    let creds = rusoto::AwsCredentialsProvider::new(&region, assume_role)?;
-    Ok(CloudWatchLogsClient::new_with(http, creds, region))
+    let region = (&config.region).try_into()?;
+    let client = rusoto::client(resolver)?;
+    let creds = rusoto::AwsCredentialsProvider::new(&region, config.assume_role.clone())?;
+    Ok(CloudWatchLogsClient::new_with(client, creds, region))
 }
 
 #[derive(Debug, Clone)]
@@ -863,15 +862,10 @@ mod integration_tests {
     #[test]
     fn cloudwatch_insert_log_event() {
         let mut rt = runtime();
-        let resolver = Resolver;
 
         let stream_name = gen_name();
 
-        let region = Region::Custom {
-            name: "localstack".into(),
-            endpoint: "http://localhost:6000".into(),
-        };
-        ensure_group(region.clone());
+        ensure_group();
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
@@ -901,10 +895,8 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let client = create_client(region, None, resolver).unwrap();
-
         let response = rt
-            .block_on_std(async move { client.get_log_events(request).await })
+            .block_on_std(async move { create_client_test().get_log_events(request).await })
             .unwrap();
 
         let events = response.events.unwrap();
@@ -920,15 +912,10 @@ mod integration_tests {
     #[test]
     fn cloudwatch_insert_log_events_sorted() {
         let mut rt = runtime();
-        let resolver = Resolver;
 
         let stream_name = gen_name();
 
-        let region = Region::Custom {
-            name: "localstack".into(),
-            endpoint: "http://localhost:6000".into(),
-        };
-        ensure_group(region.clone());
+        ensure_group();
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
@@ -973,10 +960,8 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let client = create_client(region, None, resolver).unwrap();
-
         let response = rt
-            .block_on_std(async move { client.get_log_events(request).await })
+            .block_on_std(async move { create_client_test().get_log_events(request).await })
             .unwrap();
 
         let events = response.events.unwrap();
@@ -995,15 +980,9 @@ mod integration_tests {
     #[test]
     fn cloudwatch_insert_out_of_range_timestamp() {
         let mut rt = runtime();
-        let resolver = Resolver;
 
         let stream_name = gen_name();
-
-        let region = Region::Custom {
-            name: "localstack".into(),
-            endpoint: "http://localhost:6000".into(),
-        };
-        ensure_group(region.clone());
+        ensure_group();
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
@@ -1057,10 +1036,8 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some((now - Duration::days(30)).timestamp_millis());
 
-        let client = create_client(region, None, resolver).unwrap();
-
         let response = rt
-            .block_on_std(async move { client.get_log_events(request).await })
+            .block_on_std(async move { create_client_test().get_log_events(request).await })
             .unwrap();
 
         let events = response.events.unwrap();
@@ -1076,15 +1053,9 @@ mod integration_tests {
     #[test]
     fn cloudwatch_dynamic_group_and_stream_creation() {
         let mut rt = runtime();
-        let resolver = Resolver;
 
         let group_name = gen_name();
         let stream_name = gen_name();
-
-        let region = Region::Custom {
-            name: "localstack".into(),
-            endpoint: "http://localhost:6000".into(),
-        };
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
@@ -1114,10 +1085,8 @@ mod integration_tests {
         request.log_group_name = group_name;
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let client = create_client(region, None, resolver).unwrap();
-
         let response = rt
-            .block_on_std(async move { client.get_log_events(request).await })
+            .block_on_std(async move { create_client_test().get_log_events(request).await })
             .unwrap();
 
         let events = response.events.unwrap();
@@ -1133,16 +1102,11 @@ mod integration_tests {
     #[test]
     fn cloudwatch_insert_log_event_batched() {
         let mut rt = runtime();
-        let resolver = Resolver;
 
         let group_name = gen_name();
         let stream_name = gen_name();
 
-        let region = Region::Custom {
-            name: "localstack".into(),
-            endpoint: "http://localhost:6000".into(),
-        };
-        ensure_group(region.clone());
+        ensure_group();
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
@@ -1175,10 +1139,8 @@ mod integration_tests {
         request.log_group_name = group_name.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let client = create_client(region, None, resolver).unwrap();
-
         let response = rt
-            .block_on_std(async move { client.get_log_events(request).await })
+            .block_on_std(async move { create_client_test().get_log_events(request).await })
             .unwrap();
 
         let events = response.events.unwrap();
@@ -1195,17 +1157,10 @@ mod integration_tests {
     fn cloudwatch_insert_log_event_partitioned() {
         crate::test_util::trace_init();
         let mut rt = runtime();
-        let resolver = Resolver;
 
         let stream_name = gen_name();
 
-        let region = Region::Custom {
-            name: "localstack".into(),
-            endpoint: "http://localhost:6000".into(),
-        };
-
-        let client = create_client(region.clone(), None, resolver).unwrap();
-        ensure_group(region);
+        ensure_group();
 
         let config = CloudwatchLogsSinkConfig {
             group_name: Template::try_from(GROUP_NAME).unwrap(),
@@ -1248,9 +1203,8 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let client2 = client.clone();
         let response = rt
-            .block_on_std(async move { client2.get_log_events(request).await })
+            .block_on_std(async move { create_client_test().get_log_events(request).await })
             .unwrap();
         let events = response.events.unwrap();
         let output_lines = events
@@ -1273,7 +1227,7 @@ mod integration_tests {
         request.start_time = Some(timestamp.timestamp_millis());
 
         let response = rt
-            .block_on_std(async move { client.get_log_events(request).await })
+            .block_on_std(async move { create_client_test().get_log_events(request).await })
             .unwrap();
         let events = response.events.unwrap();
         let output_lines = events
@@ -1293,11 +1247,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_healthcheck() {
-        let region = Region::Custom {
-            name: "localstack".into(),
-            endpoint: "http://localhost:6000".into(),
-        };
-        ensure_group(region);
+        ensure_group();
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from("test-stream").unwrap(),
@@ -1317,18 +1267,28 @@ mod integration_tests {
         rt.block_on_std(healthcheck(config, resolver)).unwrap();
     }
 
-    fn ensure_group(region: Region) {
-        let mut rt = runtime();
-        let resolver = Resolver;
-
-        let client = create_client(region, None, resolver).unwrap();
-
-        let req = CreateLogGroupRequest {
-            log_group_name: GROUP_NAME.into(),
-            ..Default::default()
+    fn create_client_test() -> CloudWatchLogsClient {
+        let region = Region::Custom {
+            name: "localstack".into(),
+            endpoint: "http://localhost:6000".into(),
         };
 
-        let _ = rt.block_on_std(async move { client.create_log_group(req).await });
+        let client = rusoto::client(Resolver).unwrap();
+        let creds = rusoto::AwsCredentialsProvider::new(&region, None).unwrap();
+        CloudWatchLogsClient::new_with(client, creds, region)
+    }
+
+    fn ensure_group() {
+        let mut rt = runtime();
+
+        let _ = rt.block_on_std(async move {
+            let client = create_client_test();
+            let req = CreateLogGroupRequest {
+                log_group_name: GROUP_NAME.into(),
+                ..Default::default()
+            };
+            client.create_log_group(req).await
+        });
     }
 
     fn gen_name() -> String {
