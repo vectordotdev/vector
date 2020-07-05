@@ -38,6 +38,15 @@ impl Compression {
             Self::Gzip => "log.gz",
         }
     }
+
+    #[cfg(feature = "rusoto_core")]
+    pub fn to_rusoto(&self) -> rusoto_core::encoding::ContentEncoding {
+        match self {
+            Self::None => rusoto_core::encoding::ContentEncoding::Identity,
+            // 6 is default, add Gzip level support to vector in future
+            Self::Gzip => rusoto_core::encoding::ContentEncoding::Gzip(None, 6),
+        }
+    }
 }
 
 #[derive(Debug)]
