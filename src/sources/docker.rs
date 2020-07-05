@@ -45,7 +45,7 @@ lazy_static! {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerConfig {
-    include_containers: Option<Vec<String>>,
+    include_containers: Option<Vec<String>>, // Starts with actually, not include
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
     partial_event_marker_field: Option<Atom>,
@@ -199,10 +199,6 @@ impl DockerSourceCore {
         filters.insert("type".to_owned(), vec!["container".to_owned()]);
 
         // Apply include filters
-        if let Some(include_containers) = &self.config.include_containers {
-            filters.insert("container".to_owned(), include_containers.clone());
-        }
-
         if let Some(include_labels) = &self.config.include_labels {
             filters.insert("label".to_owned(), include_labels.clone());
         }
@@ -213,7 +209,7 @@ impl DockerSourceCore {
 
         self.docker.events(Some(EventsOptions {
             since: self.now_timestamp.clone(),
-            // Try zero, should be good to go, see code:
+            // Handler in Docker API:
             // https://github.com/moby/moby/blob/c833222d54c00d64a0fc44c561a5973ecd414053/api/server/router/system/system_routes.go#L155
             until: MAX_DATE.and_time(NaiveTime::from_hms(0, 0, 0)).unwrap(),
             filters,
@@ -304,8 +300,13 @@ impl DockerSource {
     async fn handle_running_containers(mut self) -> crate::Result<Self> {
         let mut filters = HashMap::new();
 
+        // Apply include filters
         if let Some(include_labels) = &self.esb.core.config.include_labels {
             filters.insert("label".to_owned(), include_labels.clone());
+        }
+
+        if let Some(include_images) = &self.esb.core.config.include_images {
+            filters.insert("ancestor".to_owned(), include_images.clone());
         }
 
         self.esb
@@ -333,8 +334,6 @@ impl DockerSource {
                     return;
                 }
 
-                // This check is necessary since docker api doesn't have way to include
-                // names into request.
                 if !self.esb.core.config.container_name_included(
                     id.as_str(),
                     names.iter().map(|s| {
@@ -349,13 +348,6 @@ impl DockerSource {
                 ) {
                     trace!(message = "Container excluded", id = field::display(&id));
                     return;
-                }
-
-                // Include image check
-                if let Some(images) = &self.esb.core.config.include_images {
-                    if !images.iter().any(|img| img == &image) {
-                        return;
-                    }
                 }
 
                 let id = ContainerId::new(id);
@@ -415,8 +407,6 @@ impl DockerSource {
                                         state.running();
                                         self.esb.restart(state);
                                     } else {
-                                        // This check is necessary since docker api doesn't have way to include
-                                        // names into request.
                                         let include_name =
                                             self.esb.core.config.container_name_included(
                                                 id.as_str(),
