@@ -14,9 +14,10 @@ use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
+use std::io;
 use std::net::SocketAddr;
 #[cfg(unix)]
-use std::{io, path::PathBuf};
+use std::path::PathBuf;
 use syslog_loose::{self, IncompleteDate, Message, ProcId, Protocol};
 use tokio01::{
     self,
@@ -165,7 +166,7 @@ impl SyslogDecoder {
         // |
         // | ASCII decimal number of unknown length
 
-        if let Some((i, _)) = src.iter().enumerate().find(|&(_, &b)| b == ' ' as u8) {
+        if let Some((i, _)) = src.iter().enumerate().find(|&(_, &b)| b == b' ') {
             let len: usize = std::str::from_utf8(&src[..i])
                 .map_err(|_| ())
                 .and_then(|num| num.parse().map_err(|_| ()))
