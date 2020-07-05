@@ -92,6 +92,7 @@ pub struct FileConfig {
     pub multiline: Option<MultilineConfig>,
     pub max_read_bytes: usize,
     pub oldest_first: bool,
+    pub remove_after: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -181,6 +182,7 @@ impl Default for FileConfig {
             multiline: None,
             max_read_bytes: 2048,
             oldest_first: false,
+            remove_after: None,
         }
     }
 }
@@ -248,6 +250,7 @@ pub fn file_source(
         glob_minimum_cooldown,
         fingerprinter: config.fingerprinting.clone().into(),
         oldest_first: config.oldest_first,
+        remove_after: config.remove_after.map(Duration::from_secs),
     };
 
     let file_key = config.file_key.clone();
@@ -352,7 +355,7 @@ mod tests {
         event,
         shutdown::ShutdownSignal,
         sources::file,
-        test_util::{block_on, runtime, shutdown_on_idle},
+        test_util::{block_on, runtime, shutdown_on_idle, trace_init},
         topology::Config,
     };
     use futures01::{Future, Stream};
@@ -1482,5 +1485,50 @@ mod tests {
                 "hooray".into(),
             ]
         );
+    }
+
+    #[test]
+    fn remove_file() {
+        trace_init();
+        let n = 5;
+        let remove_after = 2;
+
+        let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            remove_after: Some(remove_after),
+            ..test_default_file_config(&dir)
+        };
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let mut rt = runtime();
+        rt.spawn(source);
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        sleep(); // The files must be observed at their original lengths before writing to them
+
+        for i in 0..n {
+            writeln!(&mut file, "{}", i).unwrap();
+        }
+        std::mem::drop(file);
+
+        // Wait for remove grace period to end.
+        std::thread::sleep(Duration::from_secs(remove_after + 1));
+
+        drop(trigger_shutdown);
+        shutdown_on_idle(rt);
+
+        let received = wait_with_timeout(rx.collect());
+        assert_eq!(received.len(), n);
+
+        match File::open(&path) {
+            Ok(_) => panic!("File wasn't removed"),
+            Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::NotFound),
+        }
     }
 }
