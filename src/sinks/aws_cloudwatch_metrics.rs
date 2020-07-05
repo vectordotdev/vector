@@ -4,7 +4,7 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries2::RetryLogic, rusoto, service2::TowerRequestConfig, BatchConfig, BatchSettings,
-        MetricBuffer,
+        Compression, MetricBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -34,6 +34,8 @@ pub struct CloudWatchMetricsSinkConfig {
     pub namespace: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+    #[serde(default)]
+    pub compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
@@ -141,7 +143,9 @@ impl CloudWatchMetricsSvc {
         let client = rusoto::client(resolver)?;
         let creds = rusoto::AwsCredentialsProvider::new(&region, config.assume_role.clone())?;
 
-        Ok(CloudWatchClient::new_with(client, creds, region))
+        let client =
+            rusoto_core::Client::new_with_encoding(creds, client, config.compression.to_rusoto());
+        Ok(CloudWatchClient::new_with_client(client, region))
     }
 
     fn encode_events(&mut self, events: Vec<Metric>) -> PutMetricDataInput {
