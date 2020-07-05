@@ -53,6 +53,13 @@ write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_
   encodings: ["json", "text"]
 ) %>
 
+<%= render("_partials/fields/_compression_options.toml",
+  namespace: "sinks.aws_cloudwatch_logs.options",
+  options: {
+    "default" => "none"
+  }
+) %>
+
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"
 common = true
