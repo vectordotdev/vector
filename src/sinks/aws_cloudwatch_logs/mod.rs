@@ -7,8 +7,9 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto, BatchConfig, BatchSettings, Length, PartitionBatchSink, PartitionBuffer,
-        PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer2,
+        rusoto, BatchConfig, BatchSettings, Compression, Length, PartitionBatchSink,
+        PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings,
+        VecBuffer2,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext},
@@ -67,6 +68,8 @@ pub struct CloudwatchLogsSinkConfig {
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
     #[serde(default)]
+    pub compression: Compression,
+    #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -82,6 +85,7 @@ fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
         encoding: e.into(),
         create_missing_group: Default::default(),
         create_missing_stream: Default::default(),
+        compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
         assume_role: Default::default(),
@@ -520,9 +524,13 @@ fn create_client(
     resolver: Resolver,
 ) -> crate::Result<CloudWatchLogsClient> {
     let region = (&config.region).try_into()?;
+
     let client = rusoto::client(resolver)?;
     let creds = rusoto::AwsCredentialsProvider::new(&region, config.assume_role.clone())?;
-    Ok(CloudWatchLogsClient::new_with(client, creds, region))
+
+    let client =
+        rusoto_core::Client::new_with_encoding(creds, client, config.compression.to_rusoto());
+    Ok(CloudWatchLogsClient::new_with_client(client, region))
 }
 
 #[derive(Debug, Clone)]
@@ -874,6 +882,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
@@ -924,6 +933,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
@@ -991,6 +1001,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
@@ -1064,6 +1075,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
@@ -1115,6 +1127,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            compression: Default::default(),
             batch: BatchConfig {
                 max_events: Some(2),
                 ..Default::default()
@@ -1169,6 +1182,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
@@ -1256,6 +1270,7 @@ mod integration_tests {
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
+            compression: Default::default(),
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
