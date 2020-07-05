@@ -207,6 +207,18 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: bytes
   max_line_bytes = 102400
 
+  # Timeout from reaching `eof` after which file will be removed from filesystem,
+  # unless new data is written in the meantime. If not specified, files will not
+  # be removed.
+  #
+  # * optional
+  # * no default
+  # * type: uint
+  # * unit: seconds
+  remove_after = 0
+  remove_after = 5
+  remove_after = 60
+
   # For files with a stored checkpoint at startup, setting this option to `true`
   # will tell Vector to read from the beginning of the file instead of the stored
   # checkpoint.

@@ -8,10 +8,10 @@ use futures::{
 use glob::glob;
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
-use std::fs::{self, File};
+use std::fs::{self, remove_file, File};
 use std::io::{self, Read, Seek, Write};
 use std::path::{Path, PathBuf};
-use std::time;
+use std::time::{self, Duration};
 use tokio::time::delay_for;
 use tracing::field;
 
@@ -37,9 +37,10 @@ where
     pub ignore_before: Option<time::SystemTime>,
     pub max_line_bytes: usize,
     pub data_dir: PathBuf,
-    pub glob_minimum_cooldown: time::Duration,
+    pub glob_minimum_cooldown: Duration,
     pub fingerprinter: Fingerprinter,
     pub oldest_first: bool,
+    pub remove_after: Option<Duration>,
 }
 
 /// `FileServer` as Source
@@ -216,6 +217,23 @@ where
                             line_buffer.clear();
                         }
                     } else {
+                        // Should the file be removed
+                        if let Some(grace_period) = self.remove_after {
+                            if watcher.last_read_success().elapsed() >= grace_period {
+                                // Try to remove
+                                match remove_file(&watcher.path) {
+                                    Ok(()) => {
+                                        info!(message = "Log file deleted.", path = ?watcher.path);
+                                        watcher.set_dead();
+                                    }
+                                    Err(error) => {
+                                        // We will try again after some time.
+                                        warn!(message = "Failed deleting log file.",path = ?watcher.path, ?error, rate_limit_secs = 1);
+                                    }
+                                }
+                            }
+                        }
+
                         break;
                     }
                     if bytes_read > self.max_read_bytes {
@@ -270,7 +288,7 @@ where
             // all of these requirements.
             match block_on(select(
                 shutdown,
-                delay_for(time::Duration::from_millis(backoff as u64)),
+                delay_for(Duration::from_millis(backoff as u64)),
             )) {
                 Either::Left((_, _)) => return Ok(Shutdown),
                 Either::Right((_, future)) => shutdown = future,

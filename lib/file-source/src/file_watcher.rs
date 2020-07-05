@@ -180,6 +180,10 @@ impl FileWatcher {
         self.last_read_success = Instant::now();
     }
 
+    pub fn last_read_success(&self) -> Instant {
+        self.last_read_success
+    }
+
     pub fn should_read(&self) -> bool {
         self.last_read_success.elapsed() < Duration::from_secs(10)
             || self.last_read_attempt.elapsed() > Duration::from_secs(10)
