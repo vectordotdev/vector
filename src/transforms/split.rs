@@ -96,7 +96,7 @@ impl Split {
                     None
                 }
             },
-            None => None
+            None => None,
         };
 
         Self {
@@ -177,7 +177,10 @@ mod tests {
     #[test]
     fn split_comma() {
         assert_eq!(split("foo", Some(Regex::new(",").unwrap())), &["foo"]);
-        assert_eq!(split("foo,bar", Some(Regex::new(",").unwrap())), &["foo", "bar"]);
+        assert_eq!(
+            split("foo,bar", Some(Regex::new(",").unwrap())),
+            &["foo", "bar"]
+        );
     }
 
     #[test]
