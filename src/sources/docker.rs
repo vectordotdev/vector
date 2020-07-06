@@ -184,14 +184,14 @@ impl DockerSourceCore {
         // event  | emmited on commands
         // -------+-------------------
         // start  | docker start, docker run, restart policy, docker restart
-        // upause | docker unpause
+        // unpause | docker unpause
         // die    | docker restart, docker stop, docker kill, process exited, oom
         // pause  | docker pause
         filters.insert(
             "event".to_owned(),
             vec![
                 "start".to_owned(),
-                "upause".to_owned(),
+                "unpause".to_owned(),
                 "die".to_owned(),
                 "pause".to_owned(),
             ],
@@ -402,7 +402,7 @@ impl DockerSource {
                                         state.stoped();
                                     }
                                 }
-                                "start" | "upause" => {
+                                "start" | "unpause" => {
                                     if let Some(state) = self.containers.get_mut(&id) {
                                         state.running();
                                         self.esb.restart(state);
