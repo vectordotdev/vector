@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-25"
+last_modified_on: "2020-07-06"
 delivery_guarantee: "at_least_once"
 component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."
@@ -60,7 +60,7 @@ The Vector `clickhouse` sink
   table = "mytable" # required
 
   # Requests
-  compression = "gzip" # optional, default
+  compression = "none" # optional, default
 ```
 
 </TabItem>
@@ -108,7 +108,7 @@ The Vector `clickhouse` sink
   request.timeout_secs = 30 # optional, default, seconds
 
   # Requests
-  compression = "gzip" # optional, default
+  compression = "none" # optional, default
 
   # TLS
   tls.ca_file = "/path/to/certificate_authority.crt" # optional, no default
@@ -453,7 +453,7 @@ The behavior when the buffer becomes full.
 </Field>
 <Field
   common={true}
-  defaultValue={"gzip"}
+  defaultValue={"none"}
   enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
   examples={["none","gzip"]}
   groups={[]}

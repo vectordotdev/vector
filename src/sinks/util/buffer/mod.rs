@@ -21,10 +21,6 @@ pub enum Compression {
 }
 
 impl Compression {
-    pub fn default_gzip() -> Compression {
-        Compression::Gzip
-    }
-
     pub fn content_encoding(&self) -> Option<&'static str> {
         match self {
             Self::None => None,

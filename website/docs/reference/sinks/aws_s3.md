@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-25"
+last_modified_on: "2020-07-06"
 delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
@@ -47,7 +47,7 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   type = "aws_s3" # required
   inputs = ["my-source-or-transform-id"] # required
   bucket = "my-bucket" # required
-  compression = "gzip" # optional, default
+  compression = "none" # optional, default
   healthcheck = true # optional, default
   region = "us-east-1" # required, required when endpoint = ""
 
@@ -77,7 +77,7 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   bucket = "my-bucket" # required
-  compression = "gzip" # optional, default
+  compression = "none" # optional, default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
   region = "us-east-1" # required, required when endpoint = ""
@@ -423,7 +423,7 @@ The behavior when the buffer becomes full.
 </Field>
 <Field
   common={true}
-  defaultValue={"gzip"}
+  defaultValue={"none"}
   enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
   examples={["none","gzip"]}
   groups={[]}
