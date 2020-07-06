@@ -141,10 +141,8 @@ inventory::submit! {
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = S3Sink::healthcheck(self.clone(), cx.resolver())
-            .boxed()
-            .compat();
-        let sink = S3Sink::new(self, cx)?;
+        let healthcheck = self.clone().healthcheck(cx.resolver()).boxed().compat();
+        let sink = self.new(cx)?;
         Ok((sink, Box::new(healthcheck)))
     }
 
@@ -167,20 +165,20 @@ enum HealthcheckError {
     UnknownStatus { status: StatusCode },
 }
 
-impl S3Sink {
-    pub fn new(config: &S3SinkConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
-        let encoding = config.encoding.clone();
+impl S3SinkConfig {
+    pub fn new(&self, cx: SinkContext) -> crate::Result<super::RouterSink> {
+        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let encoding = self.encoding.clone();
 
-        let compression = config.compression;
-        let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
-        let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
-        let batch = config
+        let compression = self.compression;
+        let filename_time_format = self.filename_time_format.clone().unwrap_or("%s".into());
+        let filename_append_uuid = self.filename_append_uuid.unwrap_or(true);
+        let batch = self
             .batch
             .use_size_as_bytes()?
             .get_settings_or_default(BatchSettings::default().bytes(10_000_000).timeout(300));
 
-        let key_prefix = config
+        let key_prefix = self
             .key_prefix
             .as_ref()
             .map(String::as_str)
@@ -188,12 +186,12 @@ impl S3Sink {
         let key_prefix = Template::try_from(key_prefix)?;
 
         let s3 = S3Sink {
-            client: Self::create_client(&config, cx.resolver())?,
+            client: self.create_client(cx.resolver())?,
         };
 
-        let filename_extension = config.filename_extension.clone();
-        let bucket = config.bucket.clone();
-        let options = config.options.clone();
+        let filename_extension = self.filename_extension.clone();
+        let bucket = self.bucket.clone();
+        let options = self.options.clone();
 
         let svc = ServiceBuilder::new()
             .map(move |req| {
@@ -210,7 +208,7 @@ impl S3Sink {
             .settings(request, S3RetryLogic)
             .service(s3);
 
-        let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
+        let buffer = PartitionBuffer::new(Buffer::new(batch.size, self.compression));
 
         let sink =
             PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch.timeout, cx.acker())
@@ -220,12 +218,11 @@ impl S3Sink {
         Ok(Box::new(sink))
     }
 
-    pub async fn healthcheck(config: S3SinkConfig, resolver: Resolver) -> crate::Result<()> {
-        let client = Self::create_client(&config, resolver)?;
+    pub async fn healthcheck(self, resolver: Resolver) -> crate::Result<()> {
+        let client = self.create_client(resolver)?;
 
-        let bucket = config.bucket.clone();
         let req = client.head_bucket(HeadBucketRequest {
-            bucket: bucket.clone(),
+            bucket: self.bucket.clone(),
         });
 
         match req.await {
@@ -233,7 +230,10 @@ impl S3Sink {
             Err(error) => Err(match error {
                 RusotoError::Unknown(resp) => match resp.status {
                     StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
-                    StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
+                    StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket {
+                        bucket: self.bucket,
+                    }
+                    .into(),
                     status => HealthcheckError::UnknownStatus { status }.into(),
                 },
                 error => error.into(),
@@ -241,12 +241,12 @@ impl S3Sink {
         }
     }
 
-    pub fn create_client(config: &S3SinkConfig, resolver: Resolver) -> crate::Result<S3Client> {
-        let region = (&config.region).try_into()?;
+    pub fn create_client(&self, resolver: Resolver) -> crate::Result<S3Client> {
+        let region = (&self.region).try_into()?;
         let client = rusoto::client(resolver)?;
 
         #[cfg(not(test))]
-        let creds = rusoto::AwsCredentialsProvider::new(&region, config.assume_role.clone())?;
+        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
 
         // Hack around the fact that rusoto will not pick up runtime
         // env vars. This is designed to only for test purposes use
@@ -540,7 +540,6 @@ mod integration_tests {
         dns::Resolver,
         event::Event,
         region::RegionOrEndpoint,
-        sinks::aws_s3::{S3Sink, S3SinkConfig},
         test_util::{random_lines_with_stream, random_string, runtime},
         topology::config::SinkContext,
     };
@@ -564,7 +563,7 @@ mod integration_tests {
         rt.block_on_std(async move {
             let config = config(1000000).await;
             let prefix = config.key_prefix.clone();
-            let sink = S3Sink::new(&config, cx).unwrap();
+            let sink = config.new(cx).unwrap();
 
             let (lines, events) = random_lines_with_stream(100, 10);
 
@@ -597,7 +596,7 @@ mod integration_tests {
                 ..config(1010).await
             };
             let prefix = config.key_prefix.clone();
-            let sink = S3Sink::new(&config, cx).unwrap();
+            let sink = config.new(cx).unwrap();
 
             let (lines, _events) = random_lines_with_stream(100, 30);
 
@@ -651,7 +650,7 @@ mod integration_tests {
         });
 
         let prefix = config.key_prefix.clone();
-        let sink = S3Sink::new(&config, cx).unwrap();
+        let sink = config.new(cx).unwrap();
 
         let (lines, _) = random_lines_with_stream(100, 30);
 
@@ -718,7 +717,7 @@ mod integration_tests {
             };
 
             let prefix = config.key_prefix.clone();
-            let sink = S3Sink::new(&config, cx).unwrap();
+            let sink = config.new(cx).unwrap();
 
             let (lines, events) = random_lines_with_stream(100, 500);
 
@@ -748,7 +747,7 @@ mod integration_tests {
 
         rt.block_on_std(async move {
             let config = config(1).await;
-            S3Sink::healthcheck(config, resolver).await.unwrap();
+            config.healthcheck(resolver).await.unwrap();
         });
     }
 
@@ -763,7 +762,7 @@ mod integration_tests {
                 ..config(1).await
             };
             assert_downcast_matches!(
-                S3Sink::healthcheck(config, resolver).await.unwrap_err(),
+                config.healthcheck(resolver).await.unwrap_err(),
                 HealthcheckError,
                 HealthcheckError::UnknownBucket{ .. }
             );

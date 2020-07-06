@@ -58,9 +58,7 @@ inventory::submit! {
 #[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = CloudWatchMetricsSvc::healthcheck(self.clone(), cx.resolver())
-            .boxed()
-            .compat();
+        let healthcheck = self.clone().healthcheck(cx.resolver()).boxed().compat();
         let sink = CloudWatchMetricsSvc::new(self.clone(), cx)?;
         Ok((sink, Box::new(healthcheck)))
     }
@@ -74,12 +72,52 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
     }
 }
 
+impl CloudWatchMetricsSinkConfig {
+    async fn healthcheck(self, resolver: Resolver) -> crate::Result<()> {
+        let client = self.create_client(resolver)?;
+
+        let datum = MetricDatum {
+            metric_name: "healthcheck".into(),
+            value: Some(1.0),
+            ..Default::default()
+        };
+        let request = PutMetricDataInput {
+            namespace: self.namespace.clone(),
+            metric_data: vec![datum],
+        };
+
+        client.put_metric_data(request).await.map_err(Into::into)
+    }
+
+    fn create_client(&self, resolver: Resolver) -> crate::Result<CloudWatchClient> {
+        let region = (&self.region).try_into()?;
+        let region = if cfg!(test) {
+            // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
+            match region {
+                Region::Custom { endpoint, .. } => Region::Custom {
+                    name: "us-east-1".into(),
+                    endpoint,
+                },
+                _ => panic!("Only Custom regions are supported for CloudWatchClient testing"),
+            }
+        } else {
+            region
+        };
+
+        let client = rusoto::client(resolver)?;
+        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+
+        let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
+        Ok(CloudWatchClient::new_with_client(client, region))
+    }
+}
+
 impl CloudWatchMetricsSvc {
     pub fn new(
         config: CloudWatchMetricsSinkConfig,
         cx: SinkContext,
     ) -> crate::Result<super::RouterSink> {
-        let client = Self::create_client(&config, cx.resolver())?;
+        let client = config.create_client(cx.resolver())?;
 
         let batch = config
             .batch
@@ -101,51 +139,6 @@ impl CloudWatchMetricsSvc {
             .sink_map_err(|e| error!("CloudwatchMetrics sink error: {}", e));
 
         Ok(Box::new(sink))
-    }
-
-    async fn healthcheck(
-        config: CloudWatchMetricsSinkConfig,
-        resolver: Resolver,
-    ) -> crate::Result<()> {
-        let client = Self::create_client(&config, resolver)?;
-
-        let datum = MetricDatum {
-            metric_name: "healthcheck".into(),
-            value: Some(1.0),
-            ..Default::default()
-        };
-        let request = PutMetricDataInput {
-            namespace: config.namespace.clone(),
-            metric_data: vec![datum],
-        };
-
-        client.put_metric_data(request).await.map_err(Into::into)
-    }
-
-    fn create_client(
-        config: &CloudWatchMetricsSinkConfig,
-        resolver: Resolver,
-    ) -> crate::Result<CloudWatchClient> {
-        let region = (&config.region).try_into()?;
-        let region = if cfg!(test) {
-            // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
-            match region {
-                Region::Custom { endpoint, .. } => Region::Custom {
-                    name: "us-east-1".into(),
-                    endpoint,
-                },
-                _ => panic!("Only Custom regions are supported for CloudWatchClient testing"),
-            }
-        } else {
-            region
-        };
-
-        let client = rusoto::client(resolver)?;
-        let creds = rusoto::AwsCredentialsProvider::new(&region, config.assume_role.clone())?;
-
-        let client =
-            rusoto_core::Client::new_with_encoding(creds, client, config.compression.into());
-        Ok(CloudWatchClient::new_with_client(client, region))
     }
 
     fn encode_events(&mut self, events: Vec<Metric>) -> PutMetricDataInput {
@@ -288,7 +281,7 @@ mod tests {
     fn svc() -> CloudWatchMetricsSvc {
         let resolver = Resolver;
         let config = config();
-        let client = CloudWatchMetricsSvc::create_client(&config, resolver).unwrap();
+        let client = config.create_client(resolver).unwrap();
         CloudWatchMetricsSvc { client, config }
     }
 
@@ -452,7 +445,7 @@ mod integration_tests {
     fn cloudwatch_metrics_healthchecks() {
         let mut rt = runtime();
         let resolver = Resolver;
-        let _ = rt.block_on_std(CloudWatchMetricsSvc::healthcheck(config(), resolver));
+        let _ = rt.block_on_std(config().healthcheck(resolver));
     }
 
     #[test]

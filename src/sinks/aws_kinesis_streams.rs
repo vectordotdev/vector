@@ -79,7 +79,7 @@ inventory::submit! {
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
+        let healthcheck = self.clone().healthcheck(cx.resolver()).boxed().compat();
         let sink = KinesisService::new(self.clone(), cx)?;
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
@@ -93,12 +93,47 @@ impl SinkConfig for KinesisSinkConfig {
     }
 }
 
+impl KinesisSinkConfig {
+    async fn healthcheck(self, resolver: Resolver) -> crate::Result<()> {
+        let client = self.create_client(resolver)?;
+        let stream_name = self.stream_name;
+
+        let req = client.describe_stream(DescribeStreamInput {
+            stream_name: stream_name.clone(),
+            exclusive_start_shard_id: None,
+            limit: Some(1),
+        });
+
+        match req.await {
+            Ok(resp) => {
+                let name = resp.stream_description.stream_name;
+                if name == stream_name {
+                    Ok(())
+                } else {
+                    Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
+                }
+            }
+            Err(source) => Err(HealthcheckError::DescribeStreamFailed { source }.into()),
+        }
+    }
+
+    fn create_client(&self, resolver: Resolver) -> crate::Result<KinesisClient> {
+        let region = (&self.region).try_into()?;
+
+        let client = rusoto::client(resolver)?;
+        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+
+        let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
+        Ok(KinesisClient::new_with_client(client, region))
+    }
+}
+
 impl KinesisService {
     pub fn new(
         config: KinesisSinkConfig,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = Arc::new(create_client(&config, cx.resolver())?);
+        let client = Arc::new(config.create_client(cx.resolver())?);
 
         let batch = config
             .batch
@@ -191,39 +226,6 @@ enum HealthcheckError {
         stream_name
     ))]
     NoMatchingStreamName { stream_name: String },
-}
-
-async fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Result<()> {
-    let client = create_client(&config, resolver)?;
-    let stream_name = config.stream_name;
-
-    let req = client.describe_stream(DescribeStreamInput {
-        stream_name: stream_name.clone(),
-        exclusive_start_shard_id: None,
-        limit: Some(1),
-    });
-
-    match req.await {
-        Ok(resp) => {
-            let name = resp.stream_description.stream_name;
-            if name == stream_name {
-                Ok(())
-            } else {
-                Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
-            }
-        }
-        Err(source) => Err(HealthcheckError::DescribeStreamFailed { source }.into()),
-    }
-}
-
-fn create_client(config: &KinesisSinkConfig, resolver: Resolver) -> crate::Result<KinesisClient> {
-    let region = (&config.region).try_into()?;
-
-    let client = rusoto::client(resolver)?;
-    let creds = rusoto::AwsCredentialsProvider::new(&region, config.assume_role.clone())?;
-
-    let client = rusoto_core::Client::new_with_encoding(creds, client, config.compression.into());
-    Ok(KinesisClient::new_with_client(client, region))
 }
 
 fn encode_event(

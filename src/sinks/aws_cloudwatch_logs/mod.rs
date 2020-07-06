@@ -145,6 +145,18 @@ pub enum CloudwatchError {
     MakeService,
 }
 
+impl CloudwatchLogsSinkConfig {
+    fn create_client(&self, resolver: Resolver) -> crate::Result<CloudWatchLogsClient> {
+        let region = (&self.region).try_into()?;
+
+        let client = rusoto::client(resolver)?;
+        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+
+        let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
+        Ok(CloudWatchLogsClient::new_with_client(client, region))
+    }
+}
+
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
@@ -264,7 +276,7 @@ impl CloudwatchLogsSvc {
         key: &CloudwatchKey,
         resolver: Resolver,
     ) -> crate::Result<Self> {
-        let client = create_client(config, resolver)?;
+        let client = config.create_client(resolver)?;
 
         let group_name = String::from_utf8_lossy(&key.group[..]).into_owned();
         let stream_name = String::from_utf8_lossy(&key.stream[..]).into_owned();
@@ -486,7 +498,7 @@ async fn healthcheck(config: CloudwatchLogsSinkConfig, resolver: Resolver) -> cr
     let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
     let expected_group_name = group_name.clone();
 
-    let client = create_client(&config, resolver)?;
+    let client = config.create_client(resolver)?;
 
     let request = DescribeLogGroupsRequest {
         limit: Some(1),
@@ -517,19 +529,6 @@ async fn healthcheck(config: CloudwatchLogsSinkConfig, resolver: Resolver) -> cr
         },
         Err(source) => Err(HealthcheckError::DescribeLogStreamsFailed { source }.into()),
     }
-}
-
-fn create_client(
-    config: &CloudwatchLogsSinkConfig,
-    resolver: Resolver,
-) -> crate::Result<CloudWatchLogsClient> {
-    let region = (&config.region).try_into()?;
-
-    let client = rusoto::client(resolver)?;
-    let creds = rusoto::AwsCredentialsProvider::new(&region, config.assume_role.clone())?;
-
-    let client = rusoto_core::Client::new_with_encoding(creds, client, config.compression.into());
-    Ok(CloudWatchLogsClient::new_with_client(client, region))
 }
 
 #[derive(Debug, Clone)]
