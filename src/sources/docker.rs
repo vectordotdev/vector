@@ -506,7 +506,7 @@ impl EventStreamBuilder {
         }
     }
 
-    async fn start_event_stream(&self, info: ContainerLogInfo) {
+    async fn start_event_stream(&self, mut info: ContainerLogInfo) {
         // Establish connection
         let options = Some(LogsOptions {
             follow: true,
@@ -524,7 +524,6 @@ impl EventStreamBuilder {
         );
 
         // Create event streamer
-        let mut info = Some(info);
         let main_send = self.main_send.clone();
         let partial_event_marker_field = self.core.config.partial_event_marker_field.clone();
         let auto_partial_merge = self.core.config.auto_partial_merge;
@@ -533,7 +532,7 @@ impl EventStreamBuilder {
         stream
             .map(|value| {
                 match value {
-                    Ok(message) => Ok(info.as_mut().unwrap().new_event(
+                    Ok(message) => Ok(info.new_event(
                         message,
                         partial_event_marker_field.clone(),
                         auto_partial_merge,
@@ -566,8 +565,6 @@ impl EventStreamBuilder {
             .await;
 
         // End of stream
-        let info = info.take().expect("Should be present here");
-
         info!(
             message = "Stoped listening logs on docker container",
             id = field::display(info.id.as_str())
