@@ -542,9 +542,8 @@ impl EventStreamBuilder {
                     Err(error) => {
                         // On any error, restart connection
                         match error.kind() {
-                            // http::StatusCode::NOT_IMPLEMENTED
                             DockerErrorKind::DockerResponseServerError { status_code, .. }
-                                if *status_code == 501 =>
+                                if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
                             {
                                 error!(
                                     r#"docker engine is not using either `jsonfile` or `journald`
