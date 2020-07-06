@@ -228,7 +228,7 @@ mod integration_tests {
             auth: None,
         };
         let (acker, ack_counter) = Acker::new_for_testing();
-        let rt = runtime();
+        let mut rt = runtime();
 
         let sink = rt.block_on_std(async move { PulsarSink::new(cnf, acker).unwrap() });
 

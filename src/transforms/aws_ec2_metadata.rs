@@ -507,7 +507,7 @@ mod integration_tests {
     #[test]
     fn enrich() {
         crate::test_util::trace_init();
-        let rt = runtime();
+        let mut rt = runtime();
 
         let config = Ec2Metadata {
             host: Some(HOST.clone()),
@@ -555,7 +555,7 @@ mod integration_tests {
 
     #[test]
     fn fields() {
-        let rt = runtime();
+        let mut rt = runtime();
 
         let config = Ec2Metadata {
             host: Some(HOST.clone()),
@@ -586,7 +586,7 @@ mod integration_tests {
 
     #[test]
     fn namespace() {
-        let rt = runtime();
+        let mut rt = runtime();
 
         let config = Ec2Metadata {
             host: Some(HOST.clone()),
