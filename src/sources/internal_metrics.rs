@@ -1,5 +1,5 @@
 use crate::{
-    event::metric::Metric,
+    metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event,
@@ -44,13 +44,6 @@ impl SourceConfig for InternalMetricsConfig {
     }
 }
 
-fn get_controller() -> crate::Result<Controller> {
-    crate::metrics::CONTROLLER
-        .get()
-        .cloned()
-        .ok_or_else(|| "metrics system not initialized".into())
-}
-
 async fn run(
     controller: Controller,
     mut out: mpsc::Sender<Event>,
@@ -77,18 +70,10 @@ async fn run(
     Ok(())
 }
 
-fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
-    controller
-        .snapshot()
-        .into_measurements()
-        .into_iter()
-        .map(|(k, m)| Metric::from_measurement(k, m).into())
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{capture_metrics, get_controller};
     use crate::event::metric::{Metric, MetricValue};
+    use crate::metrics::{capture_metrics, get_controller};
     use metrics::{counter, gauge, timing, value};
     use std::collections::BTreeMap;
 
