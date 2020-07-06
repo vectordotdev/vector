@@ -278,6 +278,7 @@ mod integration_tests {
         test_util::{random_events_with_stream, random_string, runtime},
         topology::config::SinkContext,
     };
+    use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use rusoto_core::Region;
     use rusoto_firehose::{
@@ -321,42 +322,45 @@ mod integration_tests {
 
         let (input, events) = random_events_with_stream(100, 100);
 
-        let pump = sink.send_all(events);
-        let _ = rt.block_on(pump).unwrap();
+        rt.block_on_std(async move {
+            let _ = sink.send_all(events).compat().await.unwrap();
 
-        thread::sleep(Duration::from_secs(1));
+            thread::sleep(Duration::from_secs(1));
 
-        let config = ElasticSearchConfig {
-            auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
-            host: "http://localhost:4571".into(),
-            index: Some(stream.clone()),
-            ..Default::default()
-        };
-        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+            let config = ElasticSearchConfig {
+                auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+                host: "http://localhost:4571".into(),
+                index: Some(stream.clone()),
+                ..Default::default()
+            };
+            let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-        let client = reqwest::Client::builder()
-            .build()
-            .expect("Could not build HTTP client");
+            let client = reqwest::Client::builder()
+                .build()
+                .expect("Could not build HTTP client");
 
-        let response = client
-            .get(&format!("{}/{}/_search", common.base_url, stream))
-            .json(&json!({
-                "query": { "query_string": { "query": "*" } }
-            }))
-            .send()
-            .unwrap()
-            .json::<elastic_responses::search::SearchResponse<Value>>()
-            .unwrap();
+            let response = client
+                .get(&format!("{}/{}/_search", common.base_url, stream))
+                .json(&json!({
+                    "query": { "query_string": { "query": "*" } }
+                }))
+                .send()
+                .await
+                .unwrap()
+                .json::<elastic_responses::search::SearchResponse<Value>>()
+                .await
+                .unwrap();
 
-        assert_eq!(input.len() as u64, response.total());
-        let input = input
-            .into_iter()
-            .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
-            .collect::<Vec<_>>();
-        for hit in response.into_hits() {
-            let event = hit.into_document().unwrap();
-            assert!(input.contains(&event));
-        }
+            assert_eq!(input.len() as u64, response.total());
+            let input = input
+                .into_iter()
+                .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
+                .collect::<Vec<_>>();
+            for hit in response.into_hits() {
+                let event = hit.into_document().unwrap();
+                assert!(input.contains(&event));
+            }
+        });
     }
 
     async fn ensure_stream(region: Region, delivery_stream_name: String) {

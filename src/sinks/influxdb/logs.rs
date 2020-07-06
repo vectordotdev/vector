@@ -599,150 +599,152 @@ mod integration_tests {
     use crate::test_util::runtime;
     use crate::topology::SinkContext;
     use chrono::Utc;
+    use futures::compat::Future01CompatExt;
     use futures01::Sink;
 
     #[test]
     fn influxdb2_logs_put_data() {
+        let mut rt = runtime();
         onboarding_v2();
 
         let ns = format!("ns-{}", Utc::now().timestamp_nanos());
 
-        let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let config = InfluxDBLogsConfig {
-            namespace: ns.clone(),
-            endpoint: "http://localhost:9999".to_string(),
-            tags: Default::default(),
-            influxdb1_settings: None,
-            influxdb2_settings: Some(InfluxDB2Settings {
-                org: ORG.to_string(),
-                bucket: BUCKET.to_string(),
-                token: TOKEN.to_string(),
-            }),
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
-        };
+        rt.block_on_std(async move {
+            let config = InfluxDBLogsConfig {
+                namespace: ns.clone(),
+                endpoint: "http://localhost:9999".to_string(),
+                tags: Default::default(),
+                influxdb1_settings: None,
+                influxdb2_settings: Some(InfluxDB2Settings {
+                    org: ORG.to_string(),
+                    bucket: BUCKET.to_string(),
+                    token: TOKEN.to_string(),
+                }),
+                encoding: Default::default(),
+                batch: Default::default(),
+                request: Default::default(),
+            };
 
-        let (sink, _) = config.build(cx).unwrap();
+            let (sink, _) = config.build(cx).unwrap();
 
-        let mut events = Vec::new();
+            let mut events = Vec::new();
 
-        let mut event1 = Event::from("message_1");
-        event1.as_mut_log().insert("host", "aws.cloud.eur");
-        event1.as_mut_log().insert("source_type", "file");
+            let mut event1 = Event::from("message_1");
+            event1.as_mut_log().insert("host", "aws.cloud.eur");
+            event1.as_mut_log().insert("source_type", "file");
 
-        let mut event2 = Event::from("message_2");
-        event2.as_mut_log().insert("host", "aws.cloud.eur");
-        event2.as_mut_log().insert("source_type", "file");
+            let mut event2 = Event::from("message_2");
+            event2.as_mut_log().insert("host", "aws.cloud.eur");
+            event2.as_mut_log().insert("source_type", "file");
 
-        events.push(event1);
-        events.push(event2);
+            events.push(event1);
+            events.push(event2);
 
-        let pump = sink.send_all(futures01::stream::iter_ok(events));
-        let _ = rt.block_on(pump).unwrap();
+            let _ = sink.send_all(futures01::stream::iter_ok(events)).compat().await.unwrap();
 
-        let mut body = std::collections::HashMap::new();
-        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{}.vector\")", ns.clone()));
-        body.insert("type", "flux".to_owned());
+            let mut body = std::collections::HashMap::new();
+            body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{}.vector\")", ns.clone()));
+            body.insert("type", "flux".to_owned());
 
-        let client = reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+            let client = reqwest::Client::builder()
+                .danger_accept_invalid_certs(true)
+                .build()
+                .unwrap();
 
-        let mut res = client
-            .post("http://localhost:9999/api/v2/query?org=my-org")
-            .json(&body)
-            .header("accept", "application/json")
-            .header("Authorization", "Token my-token")
-            .send()
-            .unwrap();
-        let result = res.text();
-        let string = result.unwrap();
+            let res = client
+                .post("http://localhost:9999/api/v2/query?org=my-org")
+                .json(&body)
+                .header("accept", "application/json")
+                .header("Authorization", "Token my-token")
+                .send()
+                .await
+                .unwrap();
+            let string = res.text().await.unwrap();
 
-        let lines = string.split("\n").collect::<Vec<&str>>();
-        let header = lines[0].split(",").collect::<Vec<&str>>();
-        let record1 = lines[1].split(",").collect::<Vec<&str>>();
-        let record2 = lines[2].split(",").collect::<Vec<&str>>();
+            let lines = string.split("\n").collect::<Vec<&str>>();
+            let header = lines[0].split(",").collect::<Vec<&str>>();
+            let record1 = lines[1].split(",").collect::<Vec<&str>>();
+            let record2 = lines[2].split(",").collect::<Vec<&str>>();
 
-        // measurement
-        assert_eq!(
-            record1[header
-                .iter()
-                .position(|&r| r.trim() == "_measurement")
-                .unwrap()]
-            .trim(),
-            format!("{}.vector", ns.clone())
-        );
-        assert_eq!(
-            record2[header
-                .iter()
-                .position(|&r| r.trim() == "_measurement")
-                .unwrap()]
-            .trim(),
-            format!("{}.vector", ns.clone())
-        );
+            // measurement
+            assert_eq!(
+                record1[header
+                    .iter()
+                    .position(|&r| r.trim() == "_measurement")
+                    .unwrap()]
+                .trim(),
+                format!("{}.vector", ns.clone())
+            );
+            assert_eq!(
+                record2[header
+                    .iter()
+                    .position(|&r| r.trim() == "_measurement")
+                    .unwrap()]
+                .trim(),
+                format!("{}.vector", ns.clone())
+            );
 
-        // tags
-        assert_eq!(
-            record1[header
-                .iter()
-                .position(|&r| r.trim() == "metric_type")
-                .unwrap()]
-            .trim(),
-            "logs"
-        );
-        assert_eq!(
-            record2[header
-                .iter()
-                .position(|&r| r.trim() == "metric_type")
-                .unwrap()]
-            .trim(),
-            "logs"
-        );
-        assert_eq!(
-            record1[header.iter().position(|&r| r.trim() == "host").unwrap()].trim(),
-            "aws.cloud.eur"
-        );
-        assert_eq!(
-            record2[header.iter().position(|&r| r.trim() == "host").unwrap()].trim(),
-            "aws.cloud.eur"
-        );
-        assert_eq!(
-            record1[header
-                .iter()
-                .position(|&r| r.trim() == "source_type")
-                .unwrap()]
-            .trim(),
-            "file"
-        );
-        assert_eq!(
-            record2[header
-                .iter()
-                .position(|&r| r.trim() == "source_type")
-                .unwrap()]
-            .trim(),
-            "file"
-        );
+            // tags
+            assert_eq!(
+                record1[header
+                    .iter()
+                    .position(|&r| r.trim() == "metric_type")
+                    .unwrap()]
+                .trim(),
+                "logs"
+            );
+            assert_eq!(
+                record2[header
+                    .iter()
+                    .position(|&r| r.trim() == "metric_type")
+                    .unwrap()]
+                .trim(),
+                "logs"
+            );
+            assert_eq!(
+                record1[header.iter().position(|&r| r.trim() == "host").unwrap()].trim(),
+                "aws.cloud.eur"
+            );
+            assert_eq!(
+                record2[header.iter().position(|&r| r.trim() == "host").unwrap()].trim(),
+                "aws.cloud.eur"
+            );
+            assert_eq!(
+                record1[header
+                    .iter()
+                    .position(|&r| r.trim() == "source_type")
+                    .unwrap()]
+                .trim(),
+                "file"
+            );
+            assert_eq!(
+                record2[header
+                    .iter()
+                    .position(|&r| r.trim() == "source_type")
+                    .unwrap()]
+                .trim(),
+                "file"
+            );
 
-        // field
-        assert_eq!(
-            record1[header.iter().position(|&r| r.trim() == "_field").unwrap()].trim(),
-            "message"
-        );
-        assert_eq!(
-            record2[header.iter().position(|&r| r.trim() == "_field").unwrap()].trim(),
-            "message"
-        );
-        assert_eq!(
-            record1[header.iter().position(|&r| r.trim() == "_value").unwrap()].trim(),
-            "message_1"
-        );
-        assert_eq!(
-            record2[header.iter().position(|&r| r.trim() == "_value").unwrap()].trim(),
-            "message_2"
-        );
+            // field
+            assert_eq!(
+                record1[header.iter().position(|&r| r.trim() == "_field").unwrap()].trim(),
+                "message"
+            );
+            assert_eq!(
+                record2[header.iter().position(|&r| r.trim() == "_field").unwrap()].trim(),
+                "message"
+            );
+            assert_eq!(
+                record1[header.iter().position(|&r| r.trim() == "_value").unwrap()].trim(),
+                "message_1"
+            );
+            assert_eq!(
+                record2[header.iter().position(|&r| r.trim() == "_value").unwrap()].trim(),
+                "message_2"
+            );
+        });
     }
 }

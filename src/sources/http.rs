@@ -207,8 +207,9 @@ mod tests {
         test_util::{self, collect_n, runtime},
         topology::config::{GlobalOptions, SourceConfig},
     };
+    use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
-    use http01::{HeaderMap, Method};
+    use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
     use string_cache::DefaultAtom as Atom;
@@ -239,22 +240,24 @@ mod tests {
         (recv, address)
     }
 
-    fn send(address: SocketAddr, body: &str) -> u16 {
+    async fn send(address: SocketAddr, body: &str) -> u16 {
         reqwest::Client::new()
             .post(&format!("http://{}/", address))
             .body(body.to_owned())
             .send()
+            .await
             .unwrap()
             .status()
             .as_u16()
     }
 
-    fn send_with_headers(address: SocketAddr, body: &str, headers: HeaderMap) -> u16 {
+    async fn send_with_headers(address: SocketAddr, body: &str, headers: HeaderMap) -> u16 {
         reqwest::Client::new()
-            .request(Method::POST, &format!("http://{}/", address))
+            .post(&format!("http://{}/", address))
             .headers(headers)
             .body(body.to_owned())
             .send()
+            .await
             .unwrap()
             .status()
             .as_u16()
@@ -267,26 +270,28 @@ mod tests {
         let mut rt = runtime();
         let (rx, addr) = source(&mut rt, Encoding::default(), vec![]);
 
-        assert_eq!(200, send(addr, body));
+        rt.block_on_std(async move {
+            assert_eq!(200, send(addr, body).await);
 
-        let mut events = rt.block_on(collect_n(rx, 2)).unwrap();
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(log[&event::log_schema().message_key()], "test body".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
-        }
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(
-                log[&event::log_schema().message_key()],
-                "test body 2".into()
-            );
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
-        }
+            let mut events = collect_n(rx, 2).compat().await.unwrap();
+            {
+                let event = events.remove(0);
+                let log = event.as_log();
+                assert_eq!(log[&event::log_schema().message_key()], "test body".into());
+                assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+                assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            }
+            {
+                let event = events.remove(0);
+                let log = event.as_log();
+                assert_eq!(
+                    log[&event::log_schema().message_key()],
+                    "test body 2".into()
+                );
+                assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+                assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            }
+        });
     }
 
     #[test]
@@ -297,26 +302,28 @@ mod tests {
         let mut rt = runtime();
         let (rx, addr) = source(&mut rt, Encoding::default(), vec![]);
 
-        assert_eq!(200, send(addr, body));
+        rt.block_on_std(async move {
+            assert_eq!(200, send(addr, body).await);
 
-        let mut events = rt.block_on(collect_n(rx, 2)).unwrap();
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(log[&event::log_schema().message_key()], "test body".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
-        }
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(
-                log[&event::log_schema().message_key()],
-                "test body 2".into()
-            );
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
-        }
+            let mut events = collect_n(rx, 2).compat().await.unwrap();
+            {
+                let event = events.remove(0);
+                let log = event.as_log();
+                assert_eq!(log[&event::log_schema().message_key()], "test body".into());
+                assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+                assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            }
+            {
+                let event = events.remove(0);
+                let log = event.as_log();
+                assert_eq!(
+                    log[&event::log_schema().message_key()],
+                    "test body 2".into()
+                );
+                assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+                assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            }
+        });
     }
 
     #[test]
@@ -324,23 +331,25 @@ mod tests {
         let mut rt = runtime();
         let (rx, addr) = source(&mut rt, Encoding::Json, vec![]);
 
-        assert_eq!(400, send(addr, "{")); //malformed
-        assert_eq!(400, send(addr, r#"{"key"}"#)); //key without value
+        rt.block_on_std(async move {
+            assert_eq!(400, send(addr, "{").await); //malformed
+            assert_eq!(400, send(addr, r#"{"key"}"#).await); //key without value
 
-        assert_eq!(200, send(addr, "{}")); //can be one object or array of objects
-        assert_eq!(200, send(addr, "[{},{},{}]"));
+            assert_eq!(200, send(addr, "{}").await); //can be one object or array of objects
+            assert_eq!(200, send(addr, "[{},{},{}]").await);
 
-        let mut events = rt.block_on(collect_n(rx, 2)).unwrap();
-        assert!(events
-            .remove(1)
-            .as_log()
-            .get(&event::log_schema().timestamp_key())
-            .is_some());
-        assert!(events
-            .remove(0)
-            .as_log()
-            .get(&event::log_schema().timestamp_key())
-            .is_some());
+            let mut events = collect_n(rx, 2).compat().await.unwrap();
+            assert!(events
+                .remove(1)
+                .as_log()
+                .get(&event::log_schema().timestamp_key())
+                .is_some());
+            assert!(events
+                .remove(0)
+                .as_log()
+                .get(&event::log_schema().timestamp_key())
+                .is_some());
+        });
     }
 
     #[test]
@@ -348,24 +357,26 @@ mod tests {
         let mut rt = runtime();
         let (rx, addr) = source(&mut rt, Encoding::Json, vec![]);
 
-        assert_eq!(200, send(addr, r#"[{"key":"value"}]"#));
-        assert_eq!(200, send(addr, r#"{"key2":"value2"}"#));
+        rt.block_on_std(async move {
+            assert_eq!(200, send(addr, r#"[{"key":"value"}]"#).await);
+            assert_eq!(200, send(addr, r#"{"key2":"value2"}"#).await);
 
-        let mut events = rt.block_on(collect_n(rx, 2)).unwrap();
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(log[&Atom::from("key")], "value".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
-        }
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(log[&Atom::from("key2")], "value2".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
-        }
+            let mut events = collect_n(rx, 2).compat().await.unwrap();
+            {
+                let event = events.remove(0);
+                let log = event.as_log();
+                assert_eq!(log[&Atom::from("key")], "value".into());
+                assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+                assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            }
+            {
+                let event = events.remove(0);
+                let log = event.as_log();
+                assert_eq!(log[&Atom::from("key2")], "value2".into());
+                assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+                assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            }
+        });
     }
 
     #[test]
@@ -373,28 +384,30 @@ mod tests {
         let mut rt = runtime();
         let (rx, addr) = source(&mut rt, Encoding::Ndjson, vec![]);
 
-        assert_eq!(400, send(addr, r#"[{"key":"value"}]"#)); //one object per line
+        rt.block_on_std(async move {
+            assert_eq!(400, send(addr, r#"[{"key":"value"}]"#).await); //one object per line
 
-        assert_eq!(
-            200,
-            send(addr, "{\"key1\":\"value1\"}\n\n{\"key2\":\"value2\"}")
-        );
+            assert_eq!(
+                200,
+                send(addr, "{\"key1\":\"value1\"}\n\n{\"key2\":\"value2\"}").await
+            );
 
-        let mut events = rt.block_on(collect_n(rx, 2)).unwrap();
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(log[&Atom::from("key1")], "value1".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
-        }
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(log[&Atom::from("key2")], "value2".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
-        }
+            let mut events = collect_n(rx, 2).compat().await.unwrap();
+            {
+                let event = events.remove(0);
+                let log = event.as_log();
+                assert_eq!(log[&Atom::from("key1")], "value1".into());
+                assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+                assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            }
+            {
+                let event = events.remove(0);
+                let log = event.as_log();
+                assert_eq!(log[&Atom::from("key2")], "value2".into());
+                assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+                assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            }
+        });
     }
 
     #[test]
@@ -414,24 +427,26 @@ mod tests {
             ],
         );
 
-        assert_eq!(
-            200,
-            send_with_headers(addr, "{\"key1\":\"value1\"}", headers)
-        );
-
-        let mut events = rt.block_on(collect_n(rx, 1)).unwrap();
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(log[&Atom::from("key1")], "value1".into());
-            assert_eq!(log[&Atom::from("User-Agent")], "test_client".into());
+        rt.block_on_std(async move {
             assert_eq!(
-                log[&Atom::from("Upgrade-Insecure-Requests")],
-                "false".into()
+                200,
+                send_with_headers(addr, "{\"key1\":\"value1\"}", headers).await
             );
-            assert_eq!(log[&Atom::from("AbsentHeader")], "".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
-        }
+
+            let mut events = collect_n(rx, 1).compat().await.unwrap();
+            {
+                let event = events.remove(0);
+                let log = event.as_log();
+                assert_eq!(log[&Atom::from("key1")], "value1".into());
+                assert_eq!(log[&Atom::from("User-Agent")], "test_client".into());
+                assert_eq!(
+                    log[&Atom::from("Upgrade-Insecure-Requests")],
+                    "false".into()
+                );
+                assert_eq!(log[&Atom::from("AbsentHeader")], "".into());
+                assert!(log.get(&event::log_schema().timestamp_key()).is_some());
+                assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            }
+        });
     }
 }
