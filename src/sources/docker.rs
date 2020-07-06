@@ -590,7 +590,7 @@ impl ContainerId {
     }
 
     fn as_str(&self) -> &str {
-        std::str::from_utf8(&self.0).expect("Bytes should be a still valid String")
+        std::str::from_utf8(&self.0).expect("Container Id Bytes aren't String")
     }
 }
 
