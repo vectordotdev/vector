@@ -385,7 +385,6 @@ mod tests {
         "#;
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let rt = runtime();
         let cx = SinkContext::new_test();
 
         let _ = config.build(cx).unwrap();

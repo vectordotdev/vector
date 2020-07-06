@@ -196,7 +196,6 @@ async fn healthcheck(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::runtime;
 
     #[test]
     fn fails_missing_creds() {

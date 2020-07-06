@@ -739,18 +739,21 @@ mod tests {
         old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
         let mut new_config = old_config.clone();
 
-        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
 
-        new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
+            new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
-        let _ = topology
-            .reload_config_and_respawn(new_config, &mut rt, false)
-            .unwrap();
+            topology
+                .reload_config_and_respawn(new_config, false)
+                .await
+                .unwrap();
 
-        assert_eq!(
-            topology.config.global.data_dir,
-            Some(Path::new("/asdf").to_path_buf())
-        );
+            assert_eq!(
+                topology.config.global.data_dir,
+                Some(Path::new("/asdf").to_path_buf())
+            );
+        });
     }
 }
 
@@ -790,11 +793,14 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
 
-        assert!(topology
-            .reload_config_and_respawn(new_config, &mut rt, false)
-            .unwrap());
+            assert!(topology
+                .reload_config_and_respawn(new_config, false)
+                .await
+                .unwrap());
+        });
     }
 
     #[test]
@@ -826,11 +832,14 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
 
-        assert!(!topology
-            .reload_config_and_respawn(new_config, &mut rt, false)
-            .unwrap());
+            assert!(!topology
+                .reload_config_and_respawn(new_config, false)
+                .await
+                .unwrap());
+        });
     }
 
     #[test]
@@ -850,11 +859,14 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, _crash) = topology::start(old_config.clone(), &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config.clone(), false).await.unwrap();
 
-        assert!(topology
-            .reload_config_and_respawn(old_config, &mut rt, false)
-            .unwrap());
+            assert!(topology
+                .reload_config_and_respawn(old_config, false)
+                .await
+                .unwrap());
+        })
     }
 }
 
@@ -883,7 +895,9 @@ mod source_finished_tests {
             },
         );
 
-        let (topology, _crash) = topology::start(old_config.clone(), &mut rt, false).unwrap();
+        let (topology, _crash) = rt
+            .block_on_std(topology::start(old_config.clone(), false))
+            .unwrap();
 
         rt.block_on(topology.sources_finished().timeout(Duration::from_secs(2)))
             .unwrap();
@@ -906,6 +920,7 @@ mod transient_state_tests {
     use crate::topology::config::{Config, DataType, GlobalOptions, SourceConfig};
     use crate::transforms::json_parser::JsonParserConfig;
     use crate::{topology, Error};
+    use futures::compat::Future01CompatExt;
     use futures01::{sync::mpsc::Sender, Future};
     use serde::{Deserialize, Serialize};
     use stream_cancel::{Trigger, Tripwire};
@@ -985,15 +1000,19 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
-        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
 
-        trigger_old.cancel();
+            trigger_old.cancel();
 
-        rt.block_on(topology.sources_finished()).unwrap();
+            let finished = topology.sources_finished();
+            finished.compat().await.unwrap();
 
-        assert!(topology
-            .reload_config_and_respawn(new_config, &mut rt, false)
-            .unwrap());
+            assert!(topology
+                .reload_config_and_respawn(new_config, false)
+                .await
+                .unwrap());
+        });
     }
 
     #[test]
@@ -1026,11 +1045,14 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
-        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
 
-        assert!(topology
-            .reload_config_and_respawn(new_config, &mut rt, false)
-            .unwrap());
+            assert!(topology
+                .reload_config_and_respawn(new_config, false)
+                .await
+                .unwrap());
+        });
     }
 
     #[test]
@@ -1071,10 +1093,13 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
 
-        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
 
-        assert!(topology
-            .reload_config_and_respawn(new_config, &mut rt, false)
-            .unwrap());
+            assert!(topology
+                .reload_config_and_respawn(new_config, false)
+                .await
+                .unwrap());
+        });
     }
 }

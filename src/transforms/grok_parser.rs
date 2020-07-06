@@ -134,7 +134,6 @@ mod tests {
     use crate::event::LogEvent;
     use crate::{
         event,
-        test_util::runtime,
         topology::config::{TransformConfig, TransformContext},
         Event,
     };
@@ -148,7 +147,6 @@ mod tests {
         drop_field: bool,
         types: &[(&str, &str)],
     ) -> LogEvent {
-        let rt = runtime();
         let event = Event::from(event);
         let mut parser = GrokParserConfig {
             pattern: pattern.into(),
