@@ -376,6 +376,7 @@ mod integration_tests {
         topology::config::{SinkConfig, SinkContext},
         Event,
     };
+    use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use serde_json::Value as JsonValue;
     use std::net::SocketAddr;
@@ -384,37 +385,41 @@ mod integration_tests {
     const USERNAME: &str = "admin";
     const PASSWORD: &str = "password";
 
+    // It usually takes ~1 second for the event to show up in search, so poll until
+    // we see it.
+    async fn find_entry(message: &str) -> serde_json::value::Value {
+        let value = Some(message);
+        for _ in 0..20usize {
+            match recent_entries(None)
+                .await
+                .into_iter()
+                .find(|entry| entry["message"].as_str() == value)
+            {
+                Some(value) => return value,
+                None => std::thread::sleep(std::time::Duration::from_millis(100)),
+            }
+        }
+        panic!("Didn't find event in Splunk");
+    }
+
     #[test]
     fn splunk_insert_message() {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let config = config(Encoding::Text, vec![]);
-        let (sink, _) = config.build(cx).unwrap();
+        rt.block_on_std(async move {
+            let config = config(Encoding::Text, vec![]).await;
+            let (sink, _) = config.build(cx).unwrap();
 
-        let message = random_string(100);
-        let event = Event::from(message.clone());
+            let message = random_string(100);
+            let event = Event::from(message.clone());
+            sink.send(event).compat().await.unwrap();
 
-        let pump = sink.send(event);
+            let entry = find_entry(message.as_str()).await;
 
-        rt.block_on(pump).unwrap();
-
-        // It usually takes ~1 second for the event to show up in search, so poll until
-        // we see it.
-        let entry = (0..20)
-            .find_map(|_| {
-                recent_entries(None)
-                    .into_iter()
-                    .find(|entry| entry["_raw"].as_str().unwrap() == message)
-                    .or_else(|| {
-                        std::thread::sleep(std::time::Duration::from_millis(100));
-                        None
-                    })
-            })
-            .expect("Didn't find event in Splunk");
-
-        assert_eq!(message, entry["_raw"].as_str().unwrap());
-        assert!(entry.get("message").is_none());
+            assert_eq!(message, entry["_raw"].as_str().unwrap());
+            assert!(entry.get("message").is_none());
+        });
     }
 
     #[test]
@@ -422,32 +427,19 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let mut config = config(Encoding::Text, vec![]);
-        config.index = Some("custom_index".to_string());
-        let (sink, _) = config.build(cx).unwrap();
+        rt.block_on_std(async move {
+            let mut config = config(Encoding::Text, vec![]).await;
+            config.index = Some("custom_index".to_string());
+            let (sink, _) = config.build(cx).unwrap();
 
-        let message = random_string(100);
-        let event = Event::from(message.clone());
+            let message = random_string(100);
+            let event = Event::from(message.clone());
+            sink.send(event).compat().await.unwrap();
 
-        let pump = sink.send(event);
+            let entry = find_entry(message.as_str()).await;
 
-        rt.block_on(pump).unwrap();
-
-        // It usually takes ~1 second for the event to show up in search, so poll until
-        // we see it.
-        let entry = (0..20)
-            .find_map(|_| {
-                recent_entries(Some("custom_index"))
-                    .into_iter()
-                    .find(|entry| entry["index"].as_str().unwrap() == "custom_index")
-                    .or_else(|| {
-                        std::thread::sleep(std::time::Duration::from_millis(100));
-                        None
-                    })
-            })
-            .expect("Didn't find event in Splunk");
-
-        assert_eq!(entry["index"].as_str().unwrap(), "custom_index");
+            assert_eq!(entry["index"].as_str().unwrap(), "custom_index");
+        });
     }
 
     #[test]
@@ -455,33 +447,32 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let config = config(Encoding::Text, vec![]);
-        let (sink, _) = config.build(cx).unwrap();
+        rt.block_on_std(async move {
+            let config = config(Encoding::Text, vec![]).await;
+            let (sink, _) = config.build(cx).unwrap();
 
-        let (messages, events) = random_lines_with_stream(100, 10);
+            let (messages, events) = random_lines_with_stream(100, 10);
+            let _ = sink.send_all(events).compat().await.unwrap();
 
-        let pump = sink.send_all(events);
+            let mut found_all = false;
+            for _ in 0..20 {
+                let entries = recent_entries(None).await;
 
-        let _ = rt.block_on(pump).unwrap();
+                found_all = messages.iter().all(|message| {
+                    entries
+                        .iter()
+                        .any(|entry| entry["_raw"].as_str().unwrap() == message)
+                });
 
-        let mut found_all = false;
-        for _ in 0..20 {
-            let entries = recent_entries(None);
+                if found_all {
+                    break;
+                }
 
-            found_all = messages.iter().all(|message| {
-                entries
-                    .iter()
-                    .any(|entry| entry["_raw"].as_str().unwrap() == message)
-            });
-
-            if found_all {
-                break;
+                std::thread::sleep(std::time::Duration::from_millis(100));
             }
 
-            std::thread::sleep(std::time::Duration::from_millis(100));
-        }
-
-        assert!(found_all);
+            assert!(found_all);
+        });
     }
 
     #[test]
@@ -489,33 +480,22 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let indexed_fields = vec![Atom::from("asdf")];
-        let config = config(Encoding::Json, indexed_fields);
-        let (sink, _) = config.build(cx).unwrap();
+        rt.block_on_std(async move {
+            let indexed_fields = vec![Atom::from("asdf")];
+            let config = config(Encoding::Json, indexed_fields).await;
+            let (sink, _) = config.build(cx).unwrap();
 
-        let message = random_string(100);
-        let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("asdf", "hello");
+            let message = random_string(100);
+            let mut event = Event::from(message.clone());
+            event.as_mut_log().insert("asdf", "hello");
+            sink.send(event).compat().await.unwrap();
 
-        let pump = sink.send(event);
+            let entry = find_entry(message.as_str()).await;
 
-        rt.block_on(pump).unwrap();
-
-        let entry = (0..20)
-            .find_map(|_| {
-                recent_entries(None)
-                    .into_iter()
-                    .find(|entry| entry["message"].as_str() == Some(message.as_str()))
-                    .or_else(|| {
-                        std::thread::sleep(std::time::Duration::from_millis(100));
-                        None
-                    })
-            })
-            .expect("Didn't find event in Splunk");
-
-        assert_eq!(message, entry["message"].as_str().unwrap());
-        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
-        assert_eq!("hello", asdf);
+            assert_eq!(message, entry["message"].as_str().unwrap());
+            let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+            assert_eq!("hello", asdf);
+        });
     }
 
     #[test]
@@ -523,36 +503,25 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let indexed_fields = vec![Atom::from("asdf")];
-        let config = config(Encoding::Json, indexed_fields);
-        let (sink, _) = config.build(cx).unwrap();
+        rt.block_on_std(async move {
+            let indexed_fields = vec![Atom::from("asdf")];
+            let config = config(Encoding::Json, indexed_fields).await;
+            let (sink, _) = config.build(cx).unwrap();
 
-        let message = random_string(100);
-        let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("asdf", "hello");
-        event.as_mut_log().insert("host", "example.com:1234");
+            let message = random_string(100);
+            let mut event = Event::from(message.clone());
+            event.as_mut_log().insert("asdf", "hello");
+            event.as_mut_log().insert("host", "example.com:1234");
+            sink.send(event).compat().await.unwrap();
 
-        let pump = sink.send(event);
+            let entry = find_entry(message.as_str()).await;
 
-        rt.block_on(pump).unwrap();
-
-        let entry = (0..20)
-            .find_map(|_| {
-                recent_entries(None)
-                    .into_iter()
-                    .find(|entry| entry["message"].as_str() == Some(message.as_str()))
-                    .or_else(|| {
-                        std::thread::sleep(std::time::Duration::from_millis(100));
-                        None
-                    })
-            })
-            .expect("Didn't find event in Splunk");
-
-        assert_eq!(message, entry["message"].as_str().unwrap());
-        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
-        assert_eq!("hello", asdf);
-        let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
-        assert_eq!("example.com:1234", host);
+            assert_eq!(message, entry["message"].as_str().unwrap());
+            let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+            assert_eq!("hello", asdf);
+            let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
+            assert_eq!("example.com:1234", host);
+        });
     }
 
     #[test]
@@ -560,38 +529,27 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let indexed_fields = vec![Atom::from("asdf")];
-        let config = config(Encoding::Json, indexed_fields);
-        let (sink, _) = config.build(cx).unwrap();
+        rt.block_on_std(async move {
+            let indexed_fields = vec![Atom::from("asdf")];
+            let config = config(Encoding::Json, indexed_fields).await;
+            let (sink, _) = config.build(cx).unwrap();
 
-        let message = random_string(100);
-        let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("asdf", "hello");
-        event
-            .as_mut_log()
-            .insert(event::log_schema().source_type_key(), "file");
+            let message = random_string(100);
+            let mut event = Event::from(message.clone());
+            event.as_mut_log().insert("asdf", "hello");
+            event
+                .as_mut_log()
+                .insert(event::log_schema().source_type_key(), "file");
+            sink.send(event).compat().await.unwrap();
 
-        let pump = sink.send(event);
+            let entry = find_entry(message.as_str()).await;
 
-        rt.block_on(pump).unwrap();
-
-        let entry = (0..20)
-            .find_map(|_| {
-                recent_entries(None)
-                    .into_iter()
-                    .find(|entry| entry["message"].as_str() == Some(message.as_str()))
-                    .or_else(|| {
-                        std::thread::sleep(std::time::Duration::from_millis(100));
-                        None
-                    })
-            })
-            .expect("Didn't find event in Splunk");
-
-        assert_eq!(message, entry["message"].as_str().unwrap());
-        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
-        assert_eq!("hello", asdf);
-        let sourcetype = entry["sourcetype"].as_str().unwrap();
-        assert_eq!("file", sourcetype);
+            assert_eq!(message, entry["message"].as_str().unwrap());
+            let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+            assert_eq!("hello", asdf);
+            let sourcetype = entry["sourcetype"].as_str().unwrap();
+            assert_eq!("file", sourcetype);
+        });
     }
 
     #[test]
@@ -599,40 +557,29 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let config = super::HecSinkConfig {
-            host_key: "roast".into(),
-            ..config(Encoding::Json, vec![Atom::from("asdf")])
-        };
+        rt.block_on_std(async move {
+            let config = super::HecSinkConfig {
+                host_key: "roast".into(),
+                ..config(Encoding::Json, vec![Atom::from("asdf")]).await
+            };
 
-        let (sink, _) = config.build(cx).unwrap();
+            let (sink, _) = config.build(cx).unwrap();
 
-        let message = random_string(100);
-        let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("asdf", "hello");
-        event.as_mut_log().insert("host", "example.com:1234");
-        event.as_mut_log().insert("roast", "beef.example.com:1234");
+            let message = random_string(100);
+            let mut event = Event::from(message.clone());
+            event.as_mut_log().insert("asdf", "hello");
+            event.as_mut_log().insert("host", "example.com:1234");
+            event.as_mut_log().insert("roast", "beef.example.com:1234");
+            sink.send(event).compat().await.unwrap();
 
-        let pump = sink.send(event);
+            let entry = find_entry(message.as_str()).await;
 
-        rt.block_on(pump).unwrap();
-
-        let entry = (0..20)
-            .find_map(|_| {
-                recent_entries(None)
-                    .into_iter()
-                    .find(|entry| entry["message"].as_str() == Some(message.as_str()))
-                    .or_else(|| {
-                        std::thread::sleep(std::time::Duration::from_millis(100));
-                        None
-                    })
-            })
-            .expect("Didn't find event in Splunk");
-
-        assert_eq!(message, entry["message"].as_str().unwrap());
-        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
-        assert_eq!("hello", asdf);
-        let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
-        assert_eq!("beef.example.com:1234", host);
+            assert_eq!(message, entry["message"].as_str().unwrap());
+            let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+            assert_eq!("hello", asdf);
+            let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
+            assert_eq!("beef.example.com:1234", host);
+        });
     }
 
     #[test]
@@ -640,59 +587,61 @@ mod integration_tests {
         let mut rt = runtime();
         let resolver = crate::dns::Resolver;
 
-        // OK
-        {
-            let config = config(Encoding::Text, vec![]);
-            let healthcheck = sinks::splunk_hec::healthcheck(config, resolver.clone());
-            rt.block_on_std(healthcheck).unwrap();
-        }
+        rt.block_on_std(async move {
+            // OK
+            {
+                let config = config(Encoding::Text, vec![]).await;
+                let healthcheck = sinks::splunk_hec::healthcheck(config, resolver.clone());
+                healthcheck.await.unwrap();
+            }
 
-        // Server not listening at address
-        {
-            let config = HecSinkConfig {
-                host: "http://localhost:1111".to_string(),
-                ..config(Encoding::Text, vec![])
-            };
-            let healthcheck = sinks::splunk_hec::healthcheck(config, resolver.clone());
+            // Server not listening at address
+            {
+                let config = HecSinkConfig {
+                    host: "http://localhost:1111".to_string(),
+                    ..config(Encoding::Text, vec![]).await
+                };
+                let healthcheck = sinks::splunk_hec::healthcheck(config, resolver.clone());
+                healthcheck.await.unwrap_err();
+            }
 
-            rt.block_on_std(healthcheck).unwrap_err();
-        }
+            // Invalid token
+            // The HEC REST docs claim that the healthcheck endpoint will validate the auth token,
+            // but my local testing server returns 200 even with a bad token.
+            // {
+            //     let healthcheck = sinks::splunk::healthcheck(
+            //         "wrong".to_string(),
+            //         "http://localhost:8088".to_string(),
+            //     )
+            //     .unwrap();
 
-        // Invalid token
-        // The HEC REST docs claim that the healthcheck endpoint will validate the auth token,
-        // but my local testing server returns 200 even with a bad token.
-        // {
-        //     let healthcheck = sinks::splunk::healthcheck(
-        //         "wrong".to_string(),
-        //         "http://localhost:8088".to_string(),
-        //     )
-        //     .unwrap();
+            //     assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Invalid HEC token");
+            // }
 
-        //     assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Invalid HEC token");
-        // }
+            // Unhealthy server
+            {
+                let config = HecSinkConfig {
+                    host: "http://localhost:5503".to_string(),
+                    ..config(Encoding::Text, vec![]).await
+                };
 
-        // Unhealthy server
-        {
-            let config = HecSinkConfig {
-                host: "http://localhost:5503".to_string(),
-                ..config(Encoding::Text, vec![])
-            };
+                let unhealthy = warp::any()
+                    .map(|| warp::reply::with_status("i'm sad", StatusCode::SERVICE_UNAVAILABLE));
+                let server =
+                    warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
+                tokio::spawn(server);
 
-            let unhealthy = warp::any()
-                .map(|| warp::reply::with_status("i'm sad", StatusCode::SERVICE_UNAVAILABLE));
-            let server = warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
-            rt.spawn_std(server);
-
-            let healthcheck = sinks::splunk_hec::healthcheck(config, resolver);
-            assert_downcast_matches!(
-                rt.block_on_std(healthcheck).unwrap_err(),
-                HealthcheckError,
-                HealthcheckError::QueuesFull
-            );
-        }
+                let healthcheck = sinks::splunk_hec::healthcheck(config, resolver);
+                assert_downcast_matches!(
+                    healthcheck.await.unwrap_err(),
+                    HealthcheckError,
+                    HealthcheckError::QueuesFull
+                );
+            }
+        });
     }
 
-    fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
+    async fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()
@@ -703,7 +652,7 @@ mod integration_tests {
             Some(index) => format!("search index={}", index),
             None => "search *".into(),
         };
-        let mut res = client
+        let res = client
             .post("https://localhost:8089/services/search/jobs?output_mode=json")
             .form(&vec![
                 ("search", &search_query[..]),
@@ -712,21 +661,22 @@ mod integration_tests {
             ])
             .basic_auth(USERNAME, Some(PASSWORD))
             .send()
+            .await
             .unwrap();
-        let json: JsonValue = res.json().unwrap();
+        let json: JsonValue = res.json().await.unwrap();
 
         println!("output: {:?}", json);
 
         json["results"].as_array().unwrap().clone()
     }
 
-    fn config(
+    async fn config(
         encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         indexed_fields: Vec<Atom>,
     ) -> super::HecSinkConfig {
         super::HecSinkConfig {
             host: "http://localhost:8088/".into(),
-            token: get_token(),
+            token: get_token().await,
             host_key: "host".into(),
             compression: Compression::None,
             encoding: encoding.into(),
@@ -739,19 +689,20 @@ mod integration_tests {
         }
     }
 
-    fn get_token() -> String {
+    async fn get_token() -> String {
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
 
-        let mut res = client
+        let res = client
             .get("https://localhost:8089/services/data/inputs/http?output_mode=json")
             .basic_auth(USERNAME, Some(PASSWORD))
             .send()
+            .await
             .unwrap();
 
-        let json: JsonValue = res.json().unwrap();
+        let json: JsonValue = res.json().await.unwrap();
         let entries = json["entry"].as_array().unwrap().clone();
 
         if entries.is_empty() {

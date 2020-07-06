@@ -7,7 +7,6 @@ use goauth::{
     GoErr,
 };
 use hyper::{header::AUTHORIZATION, StatusCode};
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
@@ -35,9 +34,9 @@ enum GcpError {
     #[snafu(display("Failed to get OAuth token"))]
     GetToken { source: GoErr },
     #[snafu(display("Failed to get OAuth token text"))]
-    GetTokenText { source: reqwest::Error },
+    GetTokenBytes { source: hyper::Error },
     #[snafu(display("Failed to get implicit GCP token"))]
-    GetImplicitToken { source: reqwest::Error },
+    GetImplicitToken { source: hyper::Error },
     #[snafu(display("Failed to parse OAuth token JSON"))]
     TokenFromJson { source: TokenErr },
     #[snafu(display("Failed to parse OAuth token JSON text"))]
@@ -70,21 +69,30 @@ pub struct GcpCredentials {
 }
 
 fn get_token_implicit() -> Result<Token, GcpError> {
-    let client = Client::new();
-    let mut response = client
-        .get(SERVICE_ACCOUNT_TOKEN_URL)
-        .header("Metadata-Flavor", "Google")
-        .send()
-        .context(GetImplicitToken)?;
-    let text = response.text().context(GetTokenText)?;
-    // Token::from_str is irresponsible and may panic!
-    match serde_json::from_str::<Token>(&text) {
-        Ok(token) => Ok(token),
-        Err(error) => Err(match serde_json::from_str::<TokenErr>(&text) {
-            Ok(error) => GcpError::TokenFromJson { source: error },
-            Err(_) => GcpError::TokenJsonFromStr { source: error },
-        }),
-    }
+    let mut rt = tokio_compat::runtime::current_thread::Runtime::new().unwrap();
+    rt.block_on_std(async {
+        let req = http::Request::get(SERVICE_ACCOUNT_TOKEN_URL)
+            .header("Metadata-Flavor", "Google")
+            .body(hyper::Body::empty())
+            .unwrap();
+
+        let res = hyper::Client::new()
+            .request(req)
+            .await
+            .context(GetImplicitToken)?;
+
+        let body = res.into_body();
+        let bytes = hyper::body::to_bytes(body).await.context(GetTokenBytes)?;
+
+        // Token::from_str is irresponsible and may panic!
+        match serde_json::from_slice::<Token>(&bytes) {
+            Ok(token) => Ok(token),
+            Err(error) => Err(match serde_json::from_slice::<TokenErr>(&bytes) {
+                Ok(error) => GcpError::TokenFromJson { source: error },
+                Err(_) => GcpError::TokenJsonFromStr { source: error },
+            }),
+        }
+    })
 }
 
 fn get_token_with_creds_blocking(

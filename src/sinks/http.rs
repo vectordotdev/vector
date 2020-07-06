@@ -301,7 +301,7 @@ mod tests {
         topology::config::SinkContext,
     };
     use futures01::{Sink, Stream};
-    use headers03::{Authorization, HeaderMapExt};
+    use headers::{Authorization, HeaderMapExt};
     use hyper::Method;
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};

@@ -11,7 +11,6 @@ use futures01::{
     sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     Async, Future, Sink, Stream,
 };
-use http01::StatusCode;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use shiplift::{
@@ -594,7 +593,7 @@ impl EventStreamBuilder {
                         Ok(Async::NotReady) => Ok(Async::NotReady),
                         Err(error) => {
                             match error {
-                                Error::Fault { code, .. } if code == StatusCode::NOT_IMPLEMENTED => {
+                                Error::Fault { code, .. } if code.as_u16() == 501 => {
                                     error!(r#"docker engine is not using either `jsonfile` or `journald`
                                             logging driver. Please enable one of these logging drivers
                                             to get logs from the docker daemon."#);

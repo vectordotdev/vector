@@ -513,34 +513,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
-name = "cookie"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "888604f00b3db336d2af898ec3c1d5d0ddf5e6d462220f2ededc33a87ac4bbd5"
-dependencies = [
- "time 0.1.42",
- "url 1.7.2",
-]
-
-[[package]]
-name = "cookie_store"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46750b3f362965f197996c4448e4a0935e791bf7d6631bfce9ee0af3d24c919c"
-dependencies = [
- "cookie",
- "failure",
- "idna 0.1.5",
- "log",
- "publicsuffix",
- "serde",
- "serde_json",
- "time 0.1.42",
- "try_from",
- "url 1.7.2",
-]
-
-[[package]]
 name = "core-foundation"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1403,7 +1375,7 @@ checksum = "e1567e4f87d311648edd19a8afacd14354b8b1a46ce2e90e84d6e3d931fed61e"
 dependencies = [
  "futures 0.3.4",
  "log",
- "reqwest 0.10.6",
+ "reqwest",
  "serde",
  "serde_derive",
  "serde_json",
@@ -1482,22 +1454,6 @@ dependencies = [
 
 [[package]]
 name = "headers"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "882ca7d8722f33ce2c2db44f95425d6267ed59ca96ce02acbe58320054ceb642"
-dependencies = [
- "base64 0.10.1",
- "bitflags",
- "bytes 0.4.12",
- "headers-core 0.1.1",
- "http 0.1.21",
- "mime",
- "sha-1",
- "time 0.1.42",
-]
-
-[[package]]
-name = "headers"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed18eb2459bf1a09ad2d6b1547840c3e5e62882fa09b9a6a20b1de8e3228848f"
@@ -1505,21 +1461,11 @@ dependencies = [
  "base64 0.12.0",
  "bitflags",
  "bytes 0.5.4",
- "headers-core 0.2.0",
+ "headers-core",
  "http 0.2.1",
  "mime",
  "sha-1",
  "time 0.1.42",
-]
-
-[[package]]
-name = "headers-core"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "967131279aaa9f7c20c7205b45a391638a83ab118e6509b2d0ccbe08de044237"
-dependencies = [
- "bytes 0.4.12",
- "http 0.1.21",
 ]
 
 [[package]]
@@ -1734,19 +1680,6 @@ dependencies = [
  "openssl-sys",
  "tokio 0.2.13",
  "tokio-openssl 0.4.0",
-]
-
-[[package]]
-name = "hyper-tls"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a800d6aa50af4b5850b2b0f659625ce9504df908e9733b635720483be26174f"
-dependencies = [
- "bytes 0.4.12",
- "futures 0.1.29",
- "hyper 0.12.35",
- "native-tls",
- "tokio-io",
 ]
 
 [[package]]
@@ -3220,19 +3153,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "publicsuffix"
-version = "1.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bbaa49075179162b49acac1c6aa45fb4dafb5f13cf6794276d77bc7fd95757b"
-dependencies = [
- "error-chain",
- "idna 0.2.0",
- "lazy_static",
- "regex",
- "url 2.1.1",
-]
-
-[[package]]
 name = "pulsar"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3634,40 +3554,6 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.9.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f88643aea3c1343c804950d7bf983bd2067f5ab59db6d613a08e05572f2714ab"
-dependencies = [
- "base64 0.10.1",
- "bytes 0.4.12",
- "cookie",
- "cookie_store",
- "encoding_rs",
- "flate2",
- "futures 0.1.29",
- "http 0.1.21",
- "hyper 0.12.35",
- "hyper-tls 0.3.2",
- "log",
- "mime",
- "mime_guess",
- "native-tls",
- "serde",
- "serde_json",
- "serde_urlencoded 0.5.5",
- "time 0.1.42",
- "tokio 0.1.22",
- "tokio-executor",
- "tokio-io",
- "tokio-threadpool",
- "tokio-timer",
- "url 1.7.2",
- "uuid 0.7.4",
- "winreg 0.6.2",
-]
-
-[[package]]
-name = "reqwest"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b82c9238b305f26f53443e3a4bc8528d64b8d0bee408ec949eb7bf5635ec680"
@@ -3680,7 +3566,7 @@ dependencies = [
  "http 0.2.1",
  "http-body 0.3.1",
  "hyper 0.13.4",
- "hyper-tls 0.4.1",
+ "hyper-tls",
  "js-sys",
  "lazy_static",
  "log",
@@ -3691,7 +3577,7 @@ dependencies = [
  "pin-project-lite",
  "serde",
  "serde_json",
- "serde_urlencoded 0.6.1",
+ "serde_urlencoded",
  "tokio 0.2.13",
  "tokio-tls",
  "url 2.1.1",
@@ -3743,7 +3629,7 @@ dependencies = [
  "bytes 0.5.4",
  "futures 0.3.4",
  "rusoto_core",
- "serde_urlencoded 0.6.1",
+ "serde_urlencoded",
  "xml-rs",
 ]
 
@@ -3760,7 +3646,7 @@ dependencies = [
  "hmac",
  "http 0.2.1",
  "hyper 0.13.4",
- "hyper-tls 0.4.1",
+ "hyper-tls",
  "lazy_static",
  "log",
  "md5",
@@ -3887,7 +3773,7 @@ dependencies = [
  "chrono",
  "futures 0.3.4",
  "rusoto_core",
- "serde_urlencoded 0.6.1",
+ "serde_urlencoded",
  "tempfile",
  "xml-rs",
 ]
@@ -4099,18 +3985,6 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
-]
-
-[[package]]
-name = "serde_urlencoded"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "642dd69105886af2efd227f75a520ec9b44a820d65bc133a9131f7d229fd165a"
-dependencies = [
- "dtoa",
- "itoa",
- "serde",
- "url 1.7.2",
 ]
 
 [[package]]
@@ -5441,15 +5315,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
 
 [[package]]
-name = "try_from"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "283d3b89e1368717881a9d51dad843cc435380d8109c9e47d38780a324698d8b"
-dependencies = [
- "cfg-if",
-]
-
-[[package]]
 name = "typenum"
 version = "1.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5666,10 +5531,8 @@ dependencies = [
  "glob 0.2.11",
  "goauth",
  "grok",
- "headers 0.2.3",
- "headers 0.3.2",
+ "headers",
  "hostname",
- "http 0.1.21",
  "http 0.2.1",
  "hyper 0.13.4",
  "hyper-openssl 0.8.0",
@@ -5708,7 +5571,7 @@ dependencies = [
  "rand 0.5.6",
  "rdkafka",
  "regex",
- "reqwest 0.9.24",
+ "reqwest",
  "rlua",
  "rusoto_cloudwatch",
  "rusoto_core",
@@ -5875,7 +5738,7 @@ checksum = "0e95175b7a927258ecbb816bdada3cc469cb68593e7940b96a60f4af366a9970"
 dependencies = [
  "bytes 0.5.4",
  "futures 0.3.4",
- "headers 0.3.2",
+ "headers",
  "http 0.2.1",
  "hyper 0.13.4",
  "log",
@@ -5885,7 +5748,7 @@ dependencies = [
  "scoped-tls",
  "serde",
  "serde_json",
- "serde_urlencoded 0.6.1",
+ "serde_urlencoded",
  "tokio 0.2.13",
  "tower-service 0.3.0",
  "urlencoding",

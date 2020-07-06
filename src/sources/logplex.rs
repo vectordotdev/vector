@@ -163,6 +163,7 @@ mod tests {
         topology::config::{GlobalOptions, SourceConfig},
     };
     use chrono::{DateTime, Utc};
+    use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
@@ -184,7 +185,7 @@ mod tests {
         (recv, address)
     }
 
-    fn send(address: SocketAddr, body: &str) -> u16 {
+    async fn send(address: SocketAddr, body: &str) -> u16 {
         let len = body.lines().count();
         reqwest::Client::new()
             .post(&format!("http://{}/events", address))
@@ -193,6 +194,7 @@ mod tests {
             .header("Logplex-Drain-Token", "drain-bar")
             .body(body.to_owned())
             .send()
+            .await
             .unwrap()
             .status()
             .as_u16()
@@ -205,25 +207,27 @@ mod tests {
         let mut rt = runtime();
         let (rx, addr) = source(&mut rt);
 
-        assert_eq!(200, send(addr, body));
+        rt.block_on_std(async move {
+            assert_eq!(200, send(addr, body).await);
 
-        let mut events = rt.block_on(collect_n(rx, body.lines().count())).unwrap();
-        let event = events.remove(0);
-        let log = event.as_log();
+            let mut events = collect_n(rx, body.lines().count()).compat().await.unwrap();
+            let event = events.remove(0);
+            let log = event.as_log();
 
-        assert_eq!(
-            log[&event::log_schema().message_key()],
-            r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
-        );
-        assert_eq!(
-            log[&event::log_schema().timestamp_key()],
-            "2020-01-08T22:33:57.353034+00:00"
-                .parse::<DateTime<Utc>>()
-                .unwrap()
-                .into()
-        );
-        assert_eq!(log[&event::log_schema().host_key()], "host".into());
-        assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
+            assert_eq!(
+                log[&event::log_schema().message_key()],
+                r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
+            );
+            assert_eq!(
+                log[&event::log_schema().timestamp_key()],
+                "2020-01-08T22:33:57.353034+00:00"
+                    .parse::<DateTime<Utc>>()
+                    .unwrap()
+                    .into()
+            );
+            assert_eq!(log[&event::log_schema().host_key()], "host".into());
+            assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
+        });
     }
 
     #[test]

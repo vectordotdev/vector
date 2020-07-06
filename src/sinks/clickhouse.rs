@@ -242,6 +242,7 @@ mod integration_tests {
         test_util::{random_string, runtime},
         topology::config::{SinkConfig, SinkContext},
     };
+    use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use serde_json::Value;
     use std::time::Duration;
@@ -250,197 +251,220 @@ mod integration_tests {
     #[test]
     fn insert_events() {
         crate::test_util::trace_init();
+
         let mut rt = runtime();
+        let executor = rt.executor();
 
-        let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        rt.block_on_std(async move {
+            let table = gen_table();
+            let host = String::from("http://localhost:8123");
 
-        let config = ClickhouseConfig {
-            host: host.clone(),
-            table: table.clone(),
-            compression: Compression::None,
-            batch: BatchConfig {
-                max_events: Some(1),
+            let config = ClickhouseConfig {
+                host: host.clone(),
+                table: table.clone(),
+                compression: Compression::None,
+                batch: BatchConfig {
+                    max_events: Some(1),
+                    ..Default::default()
+                },
+                request: TowerRequestConfig {
+                    retry_attempts: Some(1),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            request: TowerRequestConfig {
-                retry_attempts: Some(1),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
+            };
 
-        let client = ClickhouseClient::new(host);
-        client.create_table(&table, "host String, timestamp String, message String");
+            let client = ClickhouseClient::new(host);
+            client
+                .create_table(&table, "host String, timestamp String, message String")
+                .await;
 
-        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+            let (sink, _hc) = config.build(SinkContext::new_test(executor)).unwrap();
 
-        let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+            let mut input_event = Event::from("raw log line");
+            input_event.as_mut_log().insert("host", "example.com");
 
-        let pump = sink.send(input_event.clone());
-        rt.block_on(pump).unwrap();
+            sink.send(input_event.clone()).compat().await.unwrap();
 
-        let output = client.select_all(&table);
-        assert_eq!(1, output.rows);
+            let output = client.select_all(&table).await;
+            assert_eq!(1, output.rows);
 
-        let expected = serde_json::to_value(input_event.into_log().all_fields()).unwrap();
-        assert_eq!(expected, output.data[0]);
+            let expected = serde_json::to_value(input_event.into_log().all_fields()).unwrap();
+            assert_eq!(expected, output.data[0]);
+        });
     }
 
     #[test]
     fn insert_events_unix_timestamps() {
         crate::test_util::trace_init();
+
         let mut rt = runtime();
+        let executor = rt.executor();
 
-        let table = gen_table();
-        let host = String::from("http://localhost:8123");
-        let mut encoding = EncodingConfigWithDefault::default();
-        encoding.timestamp_format = Some(TimestampFormat::Unix);
+        rt.block_on_std(async move {
+            let table = gen_table();
+            let host = String::from("http://localhost:8123");
+            let mut encoding = EncodingConfigWithDefault::default();
+            encoding.timestamp_format = Some(TimestampFormat::Unix);
 
-        let config = ClickhouseConfig {
-            host: host.clone(),
-            table: table.clone(),
-            compression: Compression::None,
-            encoding,
-            batch: BatchConfig {
-                max_events: Some(1),
+            let config = ClickhouseConfig {
+                host: host.clone(),
+                table: table.clone(),
+                compression: Compression::None,
+                encoding,
+                batch: BatchConfig {
+                    max_events: Some(1),
+                    ..Default::default()
+                },
+                request: TowerRequestConfig {
+                    retry_attempts: Some(1),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            request: TowerRequestConfig {
-                retry_attempts: Some(1),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
+            };
 
-        let client = ClickhouseClient::new(host);
-        client.create_table(
-            &table,
-            "host String, timestamp DateTime('UTC'), message String",
-        );
+            let client = ClickhouseClient::new(host);
+            client
+                .create_table(
+                    &table,
+                    "host String, timestamp DateTime('UTC'), message String",
+                )
+                .await;
 
-        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+            let (sink, _hc) = config.build(SinkContext::new_test(executor)).unwrap();
 
-        let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+            let mut input_event = Event::from("raw log line");
+            input_event.as_mut_log().insert("host", "example.com");
 
-        let pump = sink.send(input_event.clone());
-        rt.block_on(pump).unwrap();
+            sink.send(input_event.clone()).compat().await.unwrap();
 
-        let output = client.select_all(&table);
-        assert_eq!(1, output.rows);
+            let output = client.select_all(&table).await;
+            assert_eq!(1, output.rows);
 
-        let exp_event = input_event.as_mut_log();
-        exp_event.insert(
-            event::log_schema().timestamp_key().clone(),
-            format!(
-                "{}",
-                exp_event
-                    .get(&event::log_schema().timestamp_key())
-                    .unwrap()
-                    .as_timestamp()
-                    .unwrap()
-                    .format("%Y-%m-%d %H:%M:%S")
-            ),
-        );
+            let exp_event = input_event.as_mut_log();
+            exp_event.insert(
+                event::log_schema().timestamp_key().clone(),
+                format!(
+                    "{}",
+                    exp_event
+                        .get(&event::log_schema().timestamp_key())
+                        .unwrap()
+                        .as_timestamp()
+                        .unwrap()
+                        .format("%Y-%m-%d %H:%M:%S")
+                ),
+            );
 
-        let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
-        assert_eq!(expected, output.data[0]);
+            let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
+            assert_eq!(expected, output.data[0]);
+        });
     }
 
     #[test]
     fn insert_events_unix_timestamps_toml_config() {
         crate::test_util::trace_init();
+
         let mut rt = runtime();
+        let executor = rt.executor();
 
-        let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        rt.block_on_std(async move {
+            let table = gen_table();
+            let host = String::from("http://localhost:8123");
 
-        let config: ClickhouseConfig = toml::from_str(&format!(
-            r#"
+            let config: ClickhouseConfig = toml::from_str(&format!(
+                r#"
 host = "{}"
 table = "{}"
 compression = "none"
 [request]
-  retry_attempts = 1
+retry_attempts = 1
 [batch]
-  max_events = 1
+max_events = 1
 [encoding]
-  timestamp_format = "unix""#,
-            host, table
-        ))
-        .unwrap();
+timestamp_format = "unix""#,
+                host, table
+            ))
+            .unwrap();
 
-        let client = ClickhouseClient::new(host);
-        client.create_table(
-            &table,
-            "host String, timestamp DateTime('UTC'), message String",
-        );
+            let client = ClickhouseClient::new(host);
+            client
+                .create_table(
+                    &table,
+                    "host String, timestamp DateTime('UTC'), message String",
+                )
+                .await;
 
-        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+            let (sink, _hc) = config.build(SinkContext::new_test(executor)).unwrap();
 
-        let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+            let mut input_event = Event::from("raw log line");
+            input_event.as_mut_log().insert("host", "example.com");
 
-        let pump = sink.send(input_event.clone());
-        rt.block_on(pump).unwrap();
+            sink.send(input_event.clone()).compat().await.unwrap();
 
-        let output = client.select_all(&table);
-        assert_eq!(1, output.rows);
+            let output = client.select_all(&table).await;
+            assert_eq!(1, output.rows);
 
-        let exp_event = input_event.as_mut_log();
-        exp_event.insert(
-            event::log_schema().timestamp_key().clone(),
-            format!(
-                "{}",
-                exp_event
-                    .get(&event::log_schema().timestamp_key())
-                    .unwrap()
-                    .as_timestamp()
-                    .unwrap()
-                    .format("%Y-%m-%d %H:%M:%S")
-            ),
-        );
+            let exp_event = input_event.as_mut_log();
+            exp_event.insert(
+                event::log_schema().timestamp_key().clone(),
+                format!(
+                    "{}",
+                    exp_event
+                        .get(&event::log_schema().timestamp_key())
+                        .unwrap()
+                        .as_timestamp()
+                        .unwrap()
+                        .format("%Y-%m-%d %H:%M:%S")
+                ),
+            );
 
-        let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
-        assert_eq!(expected, output.data[0]);
+            let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
+            assert_eq!(expected, output.data[0]);
+        });
     }
 
     #[test]
     fn no_retry_on_incorrect_data() {
         crate::test_util::trace_init();
+
         let mut rt = runtime();
+        let executor = rt.executor();
 
-        let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        rt.block_on_std(async move {
+            let table = gen_table();
+            let host = String::from("http://localhost:8123");
 
-        let config = ClickhouseConfig {
-            host: host.clone(),
-            table: table.clone(),
-            compression: Compression::None,
-            batch: BatchConfig {
-                max_events: Some(1),
+            let config = ClickhouseConfig {
+                host: host.clone(),
+                table: table.clone(),
+                compression: Compression::None,
+                batch: BatchConfig {
+                    max_events: Some(1),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
-        };
+            };
 
-        let client = ClickhouseClient::new(host);
-        // the event contains a message field, but its being omited to
-        // fail the request.
-        client.create_table(&table, "host String, timestamp String");
+            let client = ClickhouseClient::new(host);
+            // the event contains a message field, but its being omited to
+            // fail the request.
+            client
+                .create_table(&table, "host String, timestamp String")
+                .await;
 
-        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+            let (sink, _hc) = config.build(SinkContext::new_test(executor)).unwrap();
 
-        let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+            let mut input_event = Event::from("raw log line");
+            input_event.as_mut_log().insert("host", "example.com");
 
-        let pump = sink.send(input_event.clone());
-
-        // Retries should go on forever, so if we are retrying incorrectly
-        // this timeout should trigger.
-        rt.block_on(pump.timeout(Duration::from_secs(5))).unwrap();
+            // Retries should go on forever, so if we are retrying incorrectly
+            // this timeout should trigger.
+            sink.send(input_event.clone())
+                .timeout(Duration::from_secs(5))
+                .compat()
+                .await
+                .unwrap();
+        });
     }
 
     struct ClickhouseClient {
@@ -456,8 +480,8 @@ compression = "none"
             }
         }
 
-        fn create_table(&self, table: &str, schema: &str) {
-            let mut response = self
+        async fn create_table(&self, table: &str, schema: &str) {
+            let response = self
                 .client
                 .post(&self.host)
                 //
@@ -469,26 +493,30 @@ compression = "none"
                     table, schema
                 ))
                 .send()
+                .await
                 .unwrap();
+
             if !response.status().is_success() {
-                panic!("create table failed: {}", response.text().unwrap())
+                panic!("create table failed: {}", response.text().await.unwrap())
             }
         }
 
-        fn select_all(&self, table: &str) -> QueryResponse {
-            let mut response = self
+        async fn select_all(&self, table: &str) -> QueryResponse {
+            let response = self
                 .client
                 .post(&self.host)
                 .body(format!("SELECT * FROM {} FORMAT JSON", table))
                 .send()
+                .await
                 .unwrap();
+
             if !response.status().is_success() {
-                panic!("select all failed: {}", response.text().unwrap())
+                panic!("select all failed: {}", response.text().await.unwrap())
             } else {
-                if let Ok(value) = response.json() {
-                    value
-                } else {
-                    panic!("json failed: {:?}", response.text().unwrap());
+                let text = response.text().await.unwrap();
+                match serde_json::from_str(&text) {
+                    Ok(value) => value,
+                    Err(_) => panic!("json failed: {:?}", text),
                 }
             }
         }
