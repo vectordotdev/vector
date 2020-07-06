@@ -75,6 +75,8 @@ where
             _ => panic!("max requests in-flight; poll_ready must be called first"),
         };
 
+        self.controller.start_request();
+
         // Call the inner service
         let future = self.inner.call(request);
 

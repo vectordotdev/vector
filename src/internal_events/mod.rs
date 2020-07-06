@@ -1,4 +1,5 @@
 mod add_fields;
+mod auto_concurrency;
 mod aws_kinesis_streams;
 mod blackhole;
 mod elasticsearch;
@@ -19,6 +20,7 @@ mod vector;
 mod wasm;
 
 pub use self::add_fields::*;
+pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
 pub use self::elasticsearch::*;
