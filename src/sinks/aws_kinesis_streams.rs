@@ -222,8 +222,7 @@ fn create_client(config: &KinesisSinkConfig, resolver: Resolver) -> crate::Resul
     let client = rusoto::client(resolver)?;
     let creds = rusoto::AwsCredentialsProvider::new(&region, config.assume_role.clone())?;
 
-    let client =
-        rusoto_core::Client::new_with_encoding(creds, client, config.compression.to_rusoto());
+    let client = rusoto_core::Client::new_with_encoding(creds, client, config.compression.into());
     Ok(KinesisClient::new_with_client(client, region))
 }
 
