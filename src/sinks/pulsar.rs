@@ -230,7 +230,7 @@ mod integration_tests {
         let (acker, ack_counter) = Acker::new_for_testing();
         let rt = runtime();
 
-        let sink = PulsarSink::new(cnf, acker).unwrap();
+        let sink = rt.block_on_std(async move { PulsarSink::new(cnf, acker).unwrap() });
 
         let num_events = 1_000;
         let (_input, events) = random_lines_with_stream(100, num_events);
