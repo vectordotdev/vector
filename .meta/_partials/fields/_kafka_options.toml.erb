@@ -30,29 +30,24 @@ The options and their values. Accepts `string` values.
 [<%= namespace %>.sasl]
 type = "table"
 category = "SASL"
-common = false
-description = "Options for SASL/SCRAM authentication support."
+description = "Options for SASL/SCRAM authentication support. Not supported in provided Vector binaries, you need build Vector with feature `sasl`."
 
 [<%= namespace %>.sasl.children.enabled]
 type = "bool"
-common = true
 description = "Enable SASL/SCRAM authentication to the remote."
 
 [<%= namespace %>.sasl.children.username]
 type = "string"
-common = true
 examples = ["username"]
 description = "The Kafka SASL/SCRAM authentication username."
 
 [<%= namespace %>.sasl.children.password]
 type = "string"
-common = true
 examples = ["password"]
 description = "The Kafka SASL/SCRAM authentication password."
 
 [<%= namespace %>.sasl.children.mechanism]
 type = "string"
-common = true
 examples = ["SCRAM-SHA-256", "SCRAM-SHA-512"]
 description = "The Kafka SASL/SCRAM mechanisms."
 
