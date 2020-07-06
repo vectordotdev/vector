@@ -226,7 +226,6 @@ mod integration_tests {
     };
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
-    // use http::{Method, Response};
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
 

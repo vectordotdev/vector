@@ -761,7 +761,7 @@ mod integration_tests {
     #[test]
     fn influxdb2_metrics_put_data() {
         let mut rt = runtime();
-        rt.block_on_std(onboarding_v2());
+        onboarding_v2();
 
         let cx = SinkContext::new_test(rt.executor());
 
@@ -803,7 +803,7 @@ mod integration_tests {
         let stream = stream01::iter_ok(events.clone().into_iter());
 
         rt.block_on_std(async move {
-            sink.send_all(stream).compat().await.unwrap();
+            let _ = sink.send_all(stream).compat().await.unwrap();
 
             let mut body = std::collections::HashMap::new();
             body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));

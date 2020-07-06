@@ -323,7 +323,7 @@ mod integration_tests {
         let (input, events) = random_events_with_stream(100, 100);
 
         rt.block_on_std(async move {
-            sink.send_all(events).compat().await.unwrap();
+            let _ = sink.send_all(events).compat().await.unwrap();
 
             thread::sleep(Duration::from_secs(1));
 

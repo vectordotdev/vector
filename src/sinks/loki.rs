@@ -328,7 +328,8 @@ mod integration_tests {
                 .collect::<Vec<_>>();
 
             let events = lines.clone().into_iter().map(Event::from);
-            sink.send_all(futures01::stream::iter_ok(events))
+            let _ = sink
+                .send_all(futures01::stream::iter_ok(events))
                 .compat()
                 .await
                 .unwrap();
@@ -366,7 +367,8 @@ mod integration_tests {
                 .take(10)
                 .map(Event::from)
                 .collect::<Vec<_>>();
-            sink.send_all(futures01::stream::iter_ok(events.clone()))
+            let _ = sink
+                .send_all(futures01::stream::iter_ok(events.clone()))
                 .compat()
                 .await
                 .unwrap();
@@ -417,7 +419,8 @@ mod integration_tests {
                 }
             }
 
-            sink.send_all(futures01::stream::iter_ok(events))
+            let _ = sink
+                .send_all(futures01::stream::iter_ok(events))
                 .compat()
                 .await
                 .unwrap();

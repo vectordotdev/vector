@@ -605,7 +605,7 @@ mod integration_tests {
     #[test]
     fn influxdb2_logs_put_data() {
         let mut rt = runtime();
-        rt.block_on_std(onboarding_v2());
+        onboarding_v2();
 
         let ns = format!("ns-{}", Utc::now().timestamp_nanos());
 
@@ -642,7 +642,7 @@ mod integration_tests {
             events.push(event1);
             events.push(event2);
 
-            sink.send_all(futures01::stream::iter_ok(events)).compat().await.unwrap();
+            let _ = sink.send_all(futures01::stream::iter_ok(events)).compat().await.unwrap();
 
             let mut body = std::collections::HashMap::new();
             body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{}.vector\")", ns.clone()));
@@ -653,7 +653,7 @@ mod integration_tests {
                 .build()
                 .unwrap();
 
-            let mut res = client
+            let res = client
                 .post("http://localhost:9999/api/v2/query?org=my-org")
                 .json(&body)
                 .header("accept", "application/json")
