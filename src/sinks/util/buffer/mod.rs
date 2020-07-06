@@ -40,6 +40,17 @@ impl Compression {
     }
 }
 
+#[cfg(feature = "rusoto_core")]
+impl From<Compression> for rusoto_core::encoding::ContentEncoding {
+    fn from(compression: Compression) -> Self {
+        match compression {
+            Compression::None => rusoto_core::encoding::ContentEncoding::Identity,
+            // 6 is default, add Gzip level support to vector in future
+            Compression::Gzip => rusoto_core::encoding::ContentEncoding::Gzip(None, 6),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Buffer {
     inner: InnerBuffer,

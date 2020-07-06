@@ -56,6 +56,13 @@ write_to_description = "[Amazon Web Service's Kinesis Data Firehose][urls.aws_ki
   encodings: ["json", "text"]
 ) %>
 
+<%= render("_partials/fields/_compression_options.toml",
+  namespace: "sinks.aws_kinesis_firehose.options",
+  options: {
+    "default" => "none"
+  }
+) %>
+
 [sinks.aws_kinesis_firehose.options.stream_name]
 type = "string"
 common = true

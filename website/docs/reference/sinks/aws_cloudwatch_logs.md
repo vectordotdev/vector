@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-29"
+last_modified_on: "2020-07-05"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Logs"
 description: "The Vector `aws_cloudwatch_logs` sink batches `log` events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint."
@@ -47,6 +47,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
   # General
   type = "aws_cloudwatch_logs" # required
   inputs = ["my-source-or-transform-id"] # required
+  compression = "none" # optional, default
   create_missing_group = true # optional, default
   create_missing_stream = true # optional, default
   group_name = "group-name" # required
@@ -67,6 +68,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
   type = "aws_cloudwatch_logs" # required
   inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  compression = "none" # optional, default
   create_missing_group = true # optional, default
   create_missing_stream = true # optional, default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
@@ -338,6 +340,30 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
+  examples={["none","gzip"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+The compression strategy used to compress the encoded event data before
+transmission.
+
+
 
 </Field>
 <Field
@@ -1043,6 +1069,7 @@ You can learn more about the complete syntax in the
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
+[urls.gzip]: https://www.gzip.org/
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_cloudwatch_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_logs
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers

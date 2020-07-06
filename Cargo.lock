@@ -3642,6 +3642,7 @@ dependencies = [
  "async-trait",
  "base64 0.12.0",
  "bytes 0.5.4",
+ "flate2",
  "futures 0.3.4",
  "hmac",
  "http 0.2.1",

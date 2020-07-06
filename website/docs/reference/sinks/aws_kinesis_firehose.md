@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-07-05"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Kinesis Firehose"
 description: "The Vector `aws_kinesis_firehose` sink batches `log` events to Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint."
@@ -47,6 +47,7 @@ endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecord
   # General
   type = "aws_kinesis_firehose" # required
   inputs = ["my-source-or-transform-id"] # required
+  compression = "none" # optional, default
   healthcheck = true # optional, default
   region = "us-east-1" # required, required when endpoint = ""
   stream_name = "my-stream" # required
@@ -64,6 +65,7 @@ endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecord
   type = "aws_kinesis_firehose" # required
   inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  compression = "none" # optional, default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
   region = "us-east-1" # required, required when endpoint = ""
@@ -308,6 +310,30 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
+  examples={["none","gzip"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+The compression strategy used to compress the encoded event data before
+transmission.
+
+
 
 </Field>
 <Field
@@ -905,5 +931,6 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 [urls.aws_kinesis_firehose]: https://aws.amazon.com/kinesis/data-firehose/
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
+[urls.gzip]: https://www.gzip.org/
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_kinesis_firehose_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_kinesis_firehose
