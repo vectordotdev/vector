@@ -5,6 +5,7 @@ use futures::{compat::Future01CompatExt, future::BoxFuture};
 use futures01::{future, Sink};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::task::Poll;
 use std::time::{Duration, Instant};
@@ -12,7 +13,8 @@ use tokio01::timer::Delay;
 use tower03::Service;
 use vector::{
     assert_between,
-    event::Event,
+    event::{metric::MetricValue, Event, Metric},
+    metrics::{capture_metrics, get_controller, init as metrics_init},
     sinks::{
         util::{retries2::RetryLogic, service2::TowerRequestConfig, BatchSettings, VecBuffer},
         Healthcheck, RouterSink,
@@ -26,7 +28,7 @@ use vector::{
 };
 
 mod support;
-use support::stats::LevelTimeHistogram;
+use support::stats::{LevelTimeHistogram, WeightedSum};
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 struct TestConfig {
@@ -159,7 +161,11 @@ impl Statistics {
     }
 }
 
-fn run_test(lines: usize, delay_ms: u64, concurrency_scale: f64) -> (Statistics, f64) {
+type MetricSet = HashMap<String, Metric>;
+
+fn run_test(lines: usize, delay_ms: u64, concurrency_scale: f64) -> (f64, Statistics, MetricSet) {
+    metrics_init().ok();
+
     let test_config = TestConfig {
         request: TowerRequestConfig {
             in_flight_limit: Some(10),
@@ -184,6 +190,8 @@ fn run_test(lines: usize, delay_ms: u64, concurrency_scale: f64) -> (Statistics,
         .block_on_std(topology::start(config, false))
         .expect("Failed to start topology");
 
+    let controller = get_controller().unwrap();
+
     // Give time for the generator to start and queue all its data.
     std::thread::sleep(Duration::from_secs(1));
     block_on(topology.stop()).unwrap();
@@ -195,12 +203,18 @@ fn run_test(lines: usize, delay_ms: u64, concurrency_scale: f64) -> (Statistics,
         .into_inner()
         .expect("Failed to unwrap stats Mutex");
     stats.report();
-    (stats, duration)
+
+    let metrics = capture_metrics(&controller)
+        .map(Event::into_metric)
+        .map(|event| (event.name.clone(), event))
+        .collect::<MetricSet>();
+
+    (duration, stats, metrics)
 }
 
 #[test]
 fn constant_link() {
-    let (stats, duration) = run_test(200, 100, 0.0);
+    let (duration, stats, metrics) = run_test(200, 100, 0.0);
 
     // With a constant response time link and enough responses, the
     // limiter will ramp up to or near the maximum concurrency (timing
@@ -212,11 +226,20 @@ fn constant_link() {
     assert_between!(stats.in_flight.mean().unwrap(), 5.0, 10.0);
     // Normal times for 200 requests range from 3-4 seconds.
     assert_between!(duration, 2.9, 4.0);
+
+    let observed_rtt = metric_mean(&metrics, "auto_concurrency_observed_rtt");
+    assert_between!(observed_rtt, 100_000_000.0, 110_000_000.0);
+    let averaged_rtt = metric_mean(&metrics, "auto_concurrency_averaged_rtt");
+    assert_between!(averaged_rtt, 100_000_000.0, 110_000_000.0);
+    let concurrency_limit = metric_mean(&metrics, "auto_concurrency_limit");
+    assert_between!(concurrency_limit, 5.0, 10.0);
+    let in_flight = metric_mean(&metrics, "auto_concurrency_in_flight");
+    assert_between!(in_flight, 5.0, 10.0);
 }
 
 #[test]
 fn slow_link() {
-    let (stats, duration) = run_test(100, 100, 1.0);
+    let (duration, stats, metrics) = run_test(100, 100, 1.0);
 
     // With a link that slows down heavily as concurrency increases, the
     // limiter will keep the concurrency low (timing skews occasionally
@@ -227,4 +250,32 @@ fn slow_link() {
     assert_between!(in_flight_mean, 1.0, 2.0);
     // Normal times range widely depending if it hits 3 in flight.
     assert_between!(duration, 15.0, 20.0);
+
+    let observed_rtt = metric_mean(&metrics, "auto_concurrency_observed_rtt");
+    assert_between!(observed_rtt, 100_000_000.0, 310_000_000.0);
+    let averaged_rtt = metric_mean(&metrics, "auto_concurrency_averaged_rtt");
+    assert_between!(averaged_rtt, 100_000_000.0, 310_000_000.0);
+    let concurrency_limit = metric_mean(&metrics, "auto_concurrency_limit");
+    assert_between!(concurrency_limit, 1.0, 2.0);
+    let in_flight = metric_mean(&metrics, "auto_concurrency_in_flight");
+    assert_between!(in_flight, 0.5, 2.0);
+}
+
+fn metric_mean(metrics: &MetricSet, name: &str) -> f64 {
+    let metric = metrics.get(name).unwrap();
+    match &metric.value {
+        MetricValue::Distribution {
+            values,
+            sample_rates,
+        } => values
+            .iter()
+            .zip(sample_rates.iter())
+            .fold(WeightedSum::default(), |mut ws, (&value, &rate)| {
+                ws.add(value, rate as f64);
+                ws
+            })
+            .mean()
+            .unwrap_or_else(|| panic!("No data for metric {}", name)),
+        _ => panic!("Expected distribution metric for {}", name),
+    }
 }

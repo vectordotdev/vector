@@ -1,4 +1,9 @@
 use super::semaphore::ShrinkableSemaphore;
+use crate::emit;
+use crate::internal_events::{
+    AutoConcurrencyAveragedRtt, AutoConcurrencyInFlight, AutoConcurrencyLimit,
+    AutoConcurrencyObservedRtt,
+};
 use crate::sinks::util::retries2::RetryLogic;
 use std::cmp::max;
 use std::future::Future;
@@ -22,6 +27,7 @@ pub(super) struct Controller<L> {
 #[derive(Debug)]
 struct Inner {
     current_limit: usize,
+    in_flight: usize,
     past_rtt: EWMA,
     next_update: Instant,
     current_rtt: Mean,
@@ -36,6 +42,7 @@ impl<L> Controller<L> {
             logic,
             inner: Arc::new(Mutex::new(Inner {
                 current_limit,
+                in_flight: 0,
                 past_rtt: Default::default(),
                 next_update: Instant::now(),
                 current_rtt: Default::default(),
@@ -48,15 +55,32 @@ impl<L> Controller<L> {
         self.semaphore.clone().acquire()
     }
 
+    pub(super) fn start_request(&self) {
+        let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
+        inner.in_flight += 1;
+        emit!(AutoConcurrencyInFlight {
+            in_flight: inner.in_flight as u64
+        });
+    }
+
     fn adjust_to_back_pressure(&self, start: Instant, is_back_pressure: bool) {
         let now = Instant::now();
-        let rtt = now.saturating_duration_since(start).as_secs_f64();
+        let rtt = now.saturating_duration_since(start);
+        emit!(AutoConcurrencyObservedRtt { rtt });
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
         if is_back_pressure {
             inner.had_back_pressure = true;
         }
 
-        let rtt = inner.current_rtt.update(rtt);
+        inner.in_flight -= 1;
+        emit!(AutoConcurrencyInFlight {
+            in_flight: inner.in_flight as u64
+        });
+
+        let rtt = inner.current_rtt.update(rtt.as_secs_f64());
+        emit!(AutoConcurrencyAveragedRtt {
+            rtt: Duration::from_secs_f64(rtt)
+        });
         let avg = inner.past_rtt.average();
 
         if avg == 0.0 {
@@ -81,6 +105,9 @@ impl<L> Controller<L> {
                 self.semaphore.add_permits(1);
                 inner.current_limit += 1;
             }
+            emit!(AutoConcurrencyLimit {
+                concurrency: inner.current_limit as u64,
+            });
 
             let new_avg = inner.past_rtt.update(rtt);
             inner.next_update = now + Duration::from_secs_f64(new_avg);

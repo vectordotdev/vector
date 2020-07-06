@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn captures_internal_metrics() {
-        crate::metrics::init().unwrap();
+        crate::metrics::init().ok();
 
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
