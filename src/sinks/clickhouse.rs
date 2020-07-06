@@ -253,7 +253,6 @@ mod integration_tests {
         crate::test_util::trace_init();
 
         let mut rt = runtime();
-        let executor = rt.executor();
 
         rt.block_on_std(async move {
             let table = gen_table();
