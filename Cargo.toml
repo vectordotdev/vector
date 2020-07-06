@@ -198,11 +198,9 @@ reqwest = { version = "0.10.6", features = ["json"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain", "rdkafka-plain", "sasl"]
-# Default features for *-unknown-linux-musl
-default-musl = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake"]
+default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain", "rdkafka-plain"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake", "sasl"]
+default-cmake = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 default-msvc = ["sources", "transforms", "sinks", "vendored", "leveldb-cmake", "rdkafka-cmake"]
 

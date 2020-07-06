@@ -4,7 +4,7 @@ FROM rust:jessie
 # support editions, which makes it impossible to install `cargo-deb`.
 RUN rustup update stable
 RUN rustup run stable cargo install cargo-deb --version '^1.24.0'
-RUN apt-get update && apt-get install -y cmake libsasl2-dev
+RUN apt-get update && apt-get install -y cmake
 RUN cd /tmp && \
   git clone https://github.com/github/cmark-gfm && \
   cd cmark-gfm && \
