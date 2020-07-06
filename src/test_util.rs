@@ -30,6 +30,37 @@ macro_rules! assert_downcast_matches {
     }};
 }
 
+#[macro_export]
+macro_rules! assert_between {
+    // Adapted from std::assert_eq
+    ($expr:expr, $low:expr, $high:expr) => {{
+        match (&$expr, &$low, &$high) {
+            (expr, low, high) => {
+                if *expr < *low {
+                    panic!(
+                        r#"assertion failed: `(expr < low)`
+expr: {} = `{:?}`,
+ low: `{:?}`"#,
+                        stringify!($expr),
+                        &*expr,
+                        &*low
+                    );
+                }
+                if *expr > *high {
+                    panic!(
+                        r#"assertion failed: `(expr > high)`
+expr: {} = `{:?}`,
+high: `{:?}`"#,
+                        stringify!($expr),
+                        &*expr,
+                        &*high
+                    );
+                }
+            }
+        }
+    }};
+}
+
 static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
 
 pub fn next_addr() -> SocketAddr {

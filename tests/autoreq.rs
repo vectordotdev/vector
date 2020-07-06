@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use tokio01::timer::Delay;
 use tower03::Service;
 use vector::{
+    assert_between,
     event::Event,
     sinks::{
         util::{retries2::RetryLogic, service2::TowerRequestConfig, BatchSettings, VecBuffer},
@@ -187,8 +188,7 @@ fn run_test(lines: usize, delay_ms: u64, concurrency_scale: f64) -> (Statistics,
     std::thread::sleep(Duration::from_secs(1));
     block_on(topology.stop()).unwrap();
     shutdown_on_idle(rt);
-    let duration = Instant::now() - start;
-    let duration = dbg!(duration).as_secs_f64();
+    let duration = (Instant::now() - start).as_secs_f64();
 
     let stats = Arc::try_unwrap(stats)
         .expect("Failed to unwrap stats Arc")
@@ -206,13 +206,12 @@ fn constant_link() {
     // limiter will ramp up to or near the maximum concurrency (timing
     // issues may prevent it from hitting exactly the maximum without
     // running the test for an infinite amount of time),
-    assert!(stats.in_flight.max().unwrap() >= 9);
+    assert_between!(stats.in_flight.max().unwrap(), 9, 10);
     // and will spend most of its time in the top half of the
     // concurrency range.
-    assert!(stats.in_flight.mean().unwrap() >= 5.0);
+    assert_between!(stats.in_flight.mean().unwrap(), 5.0, 10.0);
     // Normal times for 200 requests range from 3-4 seconds.
-    assert!(duration >= 3.0);
-    assert!(duration <= 4.0);
+    assert_between!(duration, 2.9, 4.0);
 }
 
 #[test]
@@ -222,12 +221,10 @@ fn slow_link() {
     // With a link that slows down heavily as concurrency increases, the
     // limiter will keep the concurrency low (timing skews occasionally
     // has it reaching 3, but usually just 2),
-    assert!(stats.in_flight.max().unwrap() <= 3);
+    assert_between!(stats.in_flight.max().unwrap(), 1, 3);
     // and it will spend most of its time between 1 and 2.
     let in_flight_mean = stats.in_flight.mean().unwrap();
-    assert!(in_flight_mean > 1.0);
-    assert!(in_flight_mean < 2.0);
+    assert_between!(in_flight_mean, 1.0, 2.0);
     // Normal times range widely depending if it hits 3 in flight.
-    assert!(duration >= 15.0);
-    assert!(duration < 20.0);
+    assert_between!(duration, 15.0, 20.0);
 }
