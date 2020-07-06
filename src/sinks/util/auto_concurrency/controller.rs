@@ -21,7 +21,7 @@ pub(super) struct Controller<L> {
 
 #[derive(Debug)]
 struct Inner {
-    current: usize,
+    current_limit: usize,
     past_rtt: EWMA,
     next_update: Instant,
     current_rtt: Mean,
@@ -29,13 +29,13 @@ struct Inner {
 }
 
 impl<L> Controller<L> {
-    pub(super) fn new(max: usize, logic: L, current: usize) -> Self {
+    pub(super) fn new(max: usize, logic: L, current_limit: usize) -> Self {
         Self {
-            semaphore: Arc::new(ShrinkableSemaphore::new(current)),
+            semaphore: Arc::new(ShrinkableSemaphore::new(current_limit)),
             max,
             logic,
             inner: Arc::new(Mutex::new(Inner {
-                current,
+                current_limit,
                 past_rtt: Default::default(),
                 next_update: Instant::now(),
                 current_rtt: Default::default(),
@@ -67,19 +67,19 @@ impl<L> Controller<L> {
             let threshold = avg * THRESHOLD_RATIO;
 
             // Back pressure responses, either explicit or implicit due
-            // to increasing response times, trigger a decrease in
-            // concurrency.
-            if inner.current > 1 && (inner.had_back_pressure || rtt >= avg + threshold) {
-                // Decrease (multiplicative) the current concurrency
-                let to_forget = inner.current / 2;
+            // to increasing response times, trigger a decrease in the
+            // concurrency limit.
+            if inner.current_limit > 1 && (inner.had_back_pressure || rtt >= avg + threshold) {
+                // Decrease (multiplicative) the current concurrency limit
+                let to_forget = inner.current_limit / 2;
                 self.semaphore.forget_permits(to_forget);
-                inner.current -= to_forget;
+                inner.current_limit -= to_forget;
             }
-            // Normal quick responses trigger an increase in concurrency.
-            else if inner.current < self.max && !inner.had_back_pressure && rtt <= avg {
-                // Increase (additive) the current concurrency
+            // Normal quick responses trigger an increase in the concurrency limit.
+            else if inner.current_limit < self.max && !inner.had_back_pressure && rtt <= avg {
+                // Increase (additive) the current concurrency limit
                 self.semaphore.add_permits(1);
-                inner.current += 1;
+                inner.current_limit += 1;
             }
 
             let new_avg = inner.past_rtt.update(rtt);
