@@ -227,6 +227,7 @@ fn main() {
 
             let interruption = ctrl_c
                 .select2(to_shutdown)
+                .compat()
                 .await
                 .map_err(|_| ())
                 .expect("Neither stream errors");
