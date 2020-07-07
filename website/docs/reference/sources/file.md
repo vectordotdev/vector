@@ -563,7 +563,7 @@ draining the oldest files before moving on to read data from younger files.
   groups={[]}
   name={"remove_after"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"start_at_beginning":true}}
   required={false}
   templateable={false}
   type={"uint"}
