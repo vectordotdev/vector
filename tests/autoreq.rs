@@ -3,7 +3,7 @@
 use core::task::Context;
 use futures::{compat::Future01CompatExt, future::BoxFuture};
 use futures01::{future, Sink};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use snafu::Snafu;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -30,18 +30,22 @@ use vector::{
 mod support;
 use support::stats::{LevelTimeHistogram, WeightedSum};
 
-#[derive(Debug, Default, Deserialize, Serialize)]
-struct TestConfig {
-    request: TowerRequestConfig,
-
+#[derive(Copy, Clone, Debug, Default, Serialize)]
+struct TestParams {
     // The delay is the base time every request takes return.
     #[serde(default)]
-    delay_ms: u64,
+    delay: Duration,
 
     // The concurrency scale is the rate at which requests' delay
     // increases at higher concurrency levels.
     #[serde(default)]
     concurrency_scale: f64,
+}
+
+#[derive(Debug, Default, Serialize)]
+struct TestConfig {
+    request: TowerRequestConfig,
+    params: TestParams,
 
     // The statistics collected by running a test must be local to that
     // test and retained past the completion of the topology. So, they
@@ -84,16 +88,14 @@ impl SinkConfig for TestConfig {
 #[derive(Clone, Debug)]
 struct TestSink {
     stats: Arc<Mutex<Statistics>>,
-    delay: Duration,
-    concurrency_scale: f64,
+    params: TestParams,
 }
 
 impl TestSink {
     fn new(config: &TestConfig) -> Self {
         Self {
             stats: config.stats.clone(),
-            delay: Duration::from_millis(config.delay_ms),
-            concurrency_scale: config.concurrency_scale,
+            params: config.params,
         }
     }
 }
@@ -122,8 +124,9 @@ impl Service<Vec<Event>> for TestSink {
         stats.in_flight.adjust(1);
 
         let delay = self
+            .params
             .delay
-            .mul_f64(1.0 + stats.in_flight.level() as f64 * self.concurrency_scale);
+            .mul_f64(1.0 + stats.in_flight.level() as f64 * self.params.concurrency_scale);
         let delay = Delay::new(Instant::now() + delay).compat();
 
         let stats = self.stats.clone();
@@ -163,7 +166,7 @@ impl Statistics {
 
 type MetricSet = HashMap<String, Metric>;
 
-fn run_test(lines: usize, delay_ms: u64, concurrency_scale: f64) -> (f64, Statistics, MetricSet) {
+fn run_test(lines: usize, params: TestParams) -> (f64, Statistics, MetricSet) {
     metrics_init().ok();
 
     let test_config = TestConfig {
@@ -172,8 +175,7 @@ fn run_test(lines: usize, delay_ms: u64, concurrency_scale: f64) -> (f64, Statis
             rate_limit_num: Some(9999),
             ..Default::default()
         },
-        delay_ms,
-        concurrency_scale,
+        params,
         ..Default::default()
     };
 
@@ -214,7 +216,13 @@ fn run_test(lines: usize, delay_ms: u64, concurrency_scale: f64) -> (f64, Statis
 
 #[test]
 fn constant_link() {
-    let (duration, stats, metrics) = run_test(200, 100, 0.0);
+    let (duration, stats, metrics) = run_test(
+        200,
+        TestParams {
+            delay: Duration::from_millis(100),
+            ..Default::default()
+        },
+    );
 
     // With a constant response time link and enough responses, the
     // limiter will ramp up to or near the maximum concurrency (timing
@@ -239,7 +247,13 @@ fn constant_link() {
 
 #[test]
 fn slow_link() {
-    let (duration, stats, metrics) = run_test(100, 100, 1.0);
+    let (duration, stats, metrics) = run_test(
+        100,
+        TestParams {
+            delay: Duration::from_millis(100),
+            concurrency_scale: 1.0,
+        },
+    );
 
     // With a link that slows down heavily as concurrency increases, the
     // limiter will keep the concurrency low (timing skews occasionally
