@@ -154,7 +154,7 @@ impl CloudWatchMetricsSvc {
                             dimensions,
                             ..Default::default()
                         }),
-                        MetricValue::Distribution {
+                        MetricValue::Samples {
                             values,
                             sample_rates,
                             statistic: _,
@@ -374,7 +374,7 @@ mod tests {
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
-            value: MetricValue::Distribution {
+            value: MetricValue::Samples {
                 values: vec![11.0, 12.0],
                 sample_rates: vec![100, 50],
                 statistic: StatisticKind::Histogram,
@@ -496,7 +496,7 @@ mod integration_tests {
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
                 kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
+                value: MetricValue::Samples {
                     values: vec![i as f64],
                     sample_rates: vec![100],
                     statistic: StatisticKind::Histogram,

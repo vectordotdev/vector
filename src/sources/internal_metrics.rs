@@ -98,7 +98,7 @@ fn into_event(key: Key, measurement: Measurement) -> Event {
                 .map(|i| i as f64)
                 .collect::<Vec<_>>();
             let sample_rates = vec![1; values.len()];
-            MetricValue::Distribution {
+            MetricValue::Samples {
                 values,
                 sample_rates,
                 statistic: StatisticKind::Histogram,
@@ -164,7 +164,7 @@ mod tests {
         assert_eq!(MetricValue::Gauge { value: 2.0 }, output["foo"].value);
         assert_eq!(MetricValue::Counter { value: 7.0 }, output["bar"].value);
         assert_eq!(
-            MetricValue::Distribution {
+            MetricValue::Samples {
                 values: vec![5.0, 6.0],
                 sample_rates: vec![1, 1],
                 statistic: StatisticKind::Histogram
@@ -172,7 +172,7 @@ mod tests {
             output["baz"].value
         );
         assert_eq!(
-            MetricValue::Distribution {
+            MetricValue::Samples {
                 values: vec![7.0, 8.0],
                 sample_rates: vec![1, 1],
                 statistic: StatisticKind::Histogram

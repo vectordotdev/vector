@@ -202,7 +202,7 @@ mod test {
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
-            value: MetricValue::Distribution {
+            value: MetricValue::Samples {
                 values: vec![10.0],
                 sample_rates: vec![1],
                 statistic: StatisticKind::Histogram,

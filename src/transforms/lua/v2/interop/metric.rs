@@ -84,7 +84,7 @@ impl<'a> ToLua<'a> for Metric {
                 set.set("values", ctx.create_sequence_from(values.into_iter())?)?;
                 tbl.set("set", set)?;
             }
-            MetricValue::Distribution {
+            MetricValue::Samples {
                 values,
                 sample_rates,
                 statistic,
@@ -163,7 +163,7 @@ impl<'a> FromLua<'a> for Metric {
                 values: set.get::<_, LuaTable>("values").and_then(table_to_set)?,
             }
         } else if let Some(distribution) = table.get::<_, Option<LuaTable>>("distribution")? {
-            MetricValue::Distribution {
+            MetricValue::Samples {
                 values: distribution.get("values")?,
                 sample_rates: distribution.get("sample_rates")?,
                 statistic: distribution.get("statistic")?,
@@ -316,7 +316,7 @@ mod test {
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
-            value: MetricValue::Distribution {
+            value: MetricValue::Samples {
                 values: vec![1.0, 1.0],
                 sample_rates: vec![10, 20],
                 statistic: StatisticKind::Histogram,
@@ -503,7 +503,7 @@ mod test {
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
-            value: MetricValue::Distribution {
+            value: MetricValue::Samples {
                 values: vec![1.0, 1.0],
                 sample_rates: vec![10, 20],
                 statistic: StatisticKind::Histogram,

@@ -170,7 +170,7 @@ impl Transform for MockTransform {
                 MetricValue::Counter { ref mut value } => {
                     *value += self.increase;
                 }
-                MetricValue::Distribution {
+                MetricValue::Samples {
                     ref mut values,
                     ref mut sample_rates,
                     statistic: _,

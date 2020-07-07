@@ -152,7 +152,7 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
                     buf.push(format!("#{}", encode_tags(t)));
                 };
             }
-            MetricValue::Distribution {
+            MetricValue::Samples {
                 values,
                 sample_rates,
             } => {
@@ -295,7 +295,7 @@ mod test {
             timestamp: None,
             tags: Some(tags()),
             kind: MetricKind::Incremental,
-            value: MetricValue::Distribution {
+            value: MetricValue::Samples {
                 values: vec![1.5],
                 sample_rates: vec![1],
                 statistic: StatisticKind::Histogram,

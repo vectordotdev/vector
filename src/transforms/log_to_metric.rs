@@ -190,7 +190,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
+                value: MetricValue::Samples {
                     values: vec![value],
                     sample_rates: vec![1],
                     statistic: StatisticKind::Histogram,
@@ -648,7 +648,7 @@ mod tests {
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
+                value: MetricValue::Samples {
                     values: vec![2.5],
                     sample_rates: vec![1],
                     statistic: StatisticKind::Histogram
