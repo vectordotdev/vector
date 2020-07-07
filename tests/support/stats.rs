@@ -2,6 +2,15 @@ use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
 use std::time::Instant;
 
+#[derive(Copy, Clone, Debug, Default)]
+pub struct HistogramStats {
+    pub min: usize,  // The first bucket with a value
+    pub max: usize,  // The last bucket with a value
+    pub mode: usize, // The bucket with the highest value
+    pub total: f64,  // The total over all the weights
+    pub mean: f64,   // The mean of all indices weighted by their value
+}
+
 /// A Histogram is a set of accumulator buckets numbered linearly
 /// starting at zero. This storage will enlarge automatically as items
 /// are added.
@@ -19,59 +28,48 @@ impl Histogram {
         self.totals[index] += amount;
     }
 
-    /// The first bucket with a recorded value.
-    pub fn min(&self) -> Option<usize> {
-        self.totals
-            .iter()
-            .enumerate()
-            .filter(|(_, total)| **total > 0.0)
-            .map(|(i, _)| i)
-            .next()
-    }
-
-    /// The last bucket with a recorded value.
-    pub fn max(&self) -> Option<usize> {
-        self.totals
-            .iter()
-            .enumerate()
-            .rev()
-            .filter(|(_, total)| **total > 0.0)
-            .map(|(i, _)| i)
-            .next()
-    }
-
-    /// The total over all the weights
-    pub fn total(&self) -> f64 {
-        self.totals.iter().fold(0.0, |sum, &item| sum + item)
-    }
-
-    pub fn weighted_sum(&self) -> WeightedSum {
-        self.totals
-            .iter()
-            .enumerate()
-            .fold(WeightedSum::default(), |mut ws, (i, &total)| {
-                ws.add(i as f64, total);
-                ws
-            })
-    }
-
-    /// The mean of the histogram is the mean of all the indices
-    /// weighted by their accumulated value.
-    pub fn mean(&self) -> Option<f64> {
-        self.weighted_sum().mean()
+    pub fn stats(&self) -> Option<HistogramStats> {
+        let (min, max, mode, sum) = self.totals.iter().enumerate().fold(
+            (None, None, None, WeightedSum::default()),
+            |(mut min, mut max, mut mode, mut sum), (i, &total)| {
+                if total > 0.0 {
+                    min = min.or(Some(i));
+                    max = Some(i);
+                    mode = Some(match mode {
+                        None => (i, total),
+                        Some((index, value)) => {
+                            if value > total {
+                                (index, value)
+                            } else {
+                                (i, total)
+                            }
+                        }
+                    });
+                }
+                sum.add(i as f64, total);
+                (min, max, mode, sum)
+            },
+        );
+        min.map(|_| HistogramStats {
+            min: min.unwrap(),
+            max: max.unwrap(),
+            mode: mode.unwrap().0,
+            mean: sum.mean().unwrap(),
+            total: sum.weights,
+        })
     }
 }
 
 impl Display for Histogram {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(
-            fmt,
-            "[min={}, max={}, mean={}, total={}]",
-            self.min().unwrap_or(0),
-            self.max().unwrap_or(0),
-            self.mean().unwrap_or(0.0),
-            self.total()
-        )
+        match self.stats() {
+            None => write!(fmt, "[No stats]"),
+            Some(stats) => write!(
+                fmt,
+                "[min={}, max={}, mode={}, mean={}, total={}]",
+                stats.min, stats.max, stats.mode, stats.mean, stats.total
+            ),
+        }
     }
 }
 
