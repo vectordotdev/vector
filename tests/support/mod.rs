@@ -272,7 +272,7 @@ enum HealthcheckError {
 #[typetag::serialize(name = "mock")]
 impl<T> SinkConfig for MockSinkConfig<T>
 where
-    T: Sink<SinkItem = Event> + std::fmt::Debug + Clone + Send + 'static,
+    T: Sink<SinkItem = Event> + std::fmt::Debug + Clone + Send + Sync + 'static,
     <T as Sink>::SinkError: std::fmt::Debug,
 {
     fn build(&self, cx: SinkContext) -> Result<(RouterSink, Healthcheck), vector::Error> {

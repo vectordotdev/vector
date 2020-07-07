@@ -156,7 +156,6 @@ mod tests {
     use super::SplitConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
-        test_util::runtime,
         topology::config::{TransformConfig, TransformContext},
         Event,
     };
@@ -195,7 +194,6 @@ mod tests {
         drop_field: bool,
         types: &[(&str, &str)],
     ) -> LogEvent {
-        let rt = runtime();
         let event = Event::from(text);
         let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<Atom>>();
         let field = field.map(|f| f.into());
@@ -207,7 +205,7 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
             ..Default::default()
         }
-        .build(TransformContext::new_test(rt.executor()))
+        .build(TransformContext::new_test())
         .unwrap();
 
         parser.transform(event).unwrap().into_log()

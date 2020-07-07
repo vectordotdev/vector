@@ -123,7 +123,7 @@ mod test {
         rt.spawn(server);
         wait_for_tcp(addr);
 
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let (sink, _) = sink.build(cx).unwrap();
 
         let events = vec![

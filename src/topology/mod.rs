@@ -18,14 +18,9 @@ pub use self::config::SinkContext;
 use crate::topology::{builder::Pieces, task::Task};
 
 use crate::buffers;
-use crate::runtime;
 use crate::shutdown::SourceShutdownCoordinator;
 use futures::compat::Future01CompatExt;
-use futures01::{
-    future,
-    sync::{mpsc, oneshot},
-    Future, Stream,
-};
+use futures01::{future, sync::mpsc, Future, Stream};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 use std::panic::AssertUnwindSafe;
@@ -33,32 +28,36 @@ use std::time::{Duration, Instant};
 use tokio01::timer;
 use tracing_futures::Instrument;
 
+// TODO: Result is only for compat, remove when not needed
+type TaskHandle = tokio::task::JoinHandle<Result<(), ()>>;
+
 #[allow(dead_code)]
 pub struct RunningTopology {
     inputs: HashMap<String, buffers::BufferInputCloner>,
     outputs: HashMap<String, fanout::ControlChannel>,
-    source_tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
-    tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
+    source_tasks: HashMap<String, TaskHandle>,
+    tasks: HashMap<String, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
 }
 
-pub fn start(
+pub async fn start(
     config: Config,
-    rt: &mut runtime::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let diff = ConfigDiff::initial(&config);
-    validate(&config, &diff, rt.executor())
-        .and_then(|pieces| start_validated(config, diff, pieces, rt, require_healthy))
+    if let Some(pieces) = validate(&config, &diff) {
+        start_validated(config, diff, pieces, require_healthy).await
+    } else {
+        None
+    }
 }
 
-pub fn start_validated(
+pub async fn start_validated(
     config: Config,
     diff: ConfigDiff,
     mut pieces: Pieces,
-    rt: &mut runtime::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let (abort_tx, abort_rx) = mpsc::unbounded();
@@ -73,18 +72,21 @@ pub fn start_validated(
         abort_tx,
     };
 
-    if !running_topology.run_healthchecks(&diff, &mut pieces, rt, require_healthy) {
+    if !running_topology
+        .run_healthchecks(&diff, &mut pieces, require_healthy)
+        .await
+    {
         return None;
     }
     running_topology.connect_diff(&diff, &mut pieces);
-    running_topology.spawn_diff(&diff, pieces, rt);
+    running_topology.spawn_diff(&diff, pieces);
     running_topology.config = config;
 
     Some((running_topology, abort_rx))
 }
 
-pub fn validate(config: &Config, diff: &ConfigDiff, exec: runtime::TaskExecutor) -> Option<Pieces> {
-    match builder::check_build(config, diff, exec) {
+pub fn validate(config: &Config, diff: &ConfigDiff) -> Option<Pieces> {
+    match builder::check_build(config, diff) {
         Err(errors) => {
             for error in errors {
                 error!("Configuration error: {}", error);
@@ -137,7 +139,8 @@ impl RunningTopology {
         // We need to give some time to the sources to gracefully shutdown, so we will merge
         // them with other tasks.
         for (name, task) in self.tasks.into_iter().chain(self.source_tasks.into_iter()) {
-            let task = task
+            let task = futures::compat::Compat::new(task)
+                .map(|_result| ())
                 .or_else(|_| future::ok(())) // Consider an errored task to be shutdown
                 .shared();
 
@@ -223,10 +226,9 @@ impl RunningTopology {
     }
 
     /// On Error, topology is in invalid state.
-    pub fn reload_config_and_respawn(
+    pub async fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
-        rt: &mut runtime::Runtime,
         require_healthy: bool,
     ) -> Result<bool, ()> {
         if self.config.global.data_dir != new_config.global.data_dir {
@@ -244,13 +246,16 @@ impl RunningTopology {
         let diff = ConfigDiff::new(&self.config, &new_config);
 
         // Checks passed so let's shutdown the difference.
-        self.shutdown_diff(&diff, rt);
+        self.shutdown_diff(&diff).await;
 
         // Now let's actually build the new pieces.
-        if let Some(mut new_pieces) = validate(&new_config, &diff, rt.executor()) {
-            if self.run_healthchecks(&diff, &mut new_pieces, rt, require_healthy) {
+        if let Some(mut new_pieces) = validate(&new_config, &diff) {
+            if self
+                .run_healthchecks(&diff, &mut new_pieces, require_healthy)
+                .await
+            {
                 self.connect_diff(&diff, &mut new_pieces);
-                self.spawn_diff(&diff, new_pieces, rt);
+                self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
                 // We have succesfully changed to new config.
                 return Ok(true);
@@ -260,10 +265,13 @@ impl RunningTopology {
         // We need to rebuild the removed.
         info!("Rebuilding old configuration.");
         let diff = diff.flip();
-        if let Some(mut new_pieces) = validate(&self.config, &diff, rt.executor()) {
-            if self.run_healthchecks(&diff, &mut new_pieces, rt, require_healthy) {
+        if let Some(mut new_pieces) = validate(&self.config, &diff) {
+            if self
+                .run_healthchecks(&diff, &mut new_pieces, require_healthy)
+                .await
+            {
                 self.connect_diff(&diff, &mut new_pieces);
-                self.spawn_diff(&diff, new_pieces, rt);
+                self.spawn_diff(&diff, new_pieces);
                 // We have succesfully returned to old config.
                 return Ok(false);
             }
@@ -275,11 +283,10 @@ impl RunningTopology {
         Err(())
     }
 
-    fn run_healthchecks(
+    async fn run_healthchecks(
         &mut self,
         diff: &ConfigDiff,
         pieces: &mut Pieces,
-        rt: &mut runtime::Runtime,
         require_healthy: bool,
     ) -> bool {
         let healthchecks = take_healthchecks(diff, pieces)
@@ -289,9 +296,8 @@ impl RunningTopology {
 
         info!("Running healthchecks.");
         if require_healthy {
-            let jh = rt.spawn_handle_std(healthchecks.compat());
-            let success = rt
-                .block_on_std(jh)
+            let success = tokio::spawn(healthchecks.compat())
+                .await
                 .expect("Task panicked or runtime shutdown unexpectedly");
 
             if success.is_ok() {
@@ -302,13 +308,13 @@ impl RunningTopology {
                 false
             }
         } else {
-            rt.spawn(healthchecks);
+            tokio::spawn(healthchecks.compat());
             true
         }
     }
 
     /// Shutdowns removed and replaced pieces of topology.
-    fn shutdown_diff(&mut self, diff: &ConfigDiff, rt: &mut runtime::Runtime) {
+    async fn shutdown_diff(&mut self, diff: &ConfigDiff) {
         // Sources
         let timeout = Duration::from_secs(30); //sec
 
@@ -328,7 +334,8 @@ impl RunningTopology {
         for name in &diff.sources.to_remove {
             info!("Removing source {:?}", name);
 
-            self.tasks.remove(name).unwrap().forget();
+            let previous = self.tasks.remove(name).unwrap();
+            drop(previous); // detach and forget
 
             self.remove_outputs(name);
             source_shutdown_complete_futures
@@ -350,22 +357,29 @@ impl RunningTopology {
             );
         }
 
-        rt.block_on(future::join_all(source_shutdown_complete_futures))
+        future::join_all(source_shutdown_complete_futures)
+            .compat()
+            .await
             .unwrap();
 
         // Second pass now that all sources have shut down for final cleanup.
         for name in &diff.sources.to_remove {
-            self.source_tasks.remove(name).wait().unwrap();
+            if let Some(task) = self.source_tasks.remove(name) {
+                task.await.unwrap().unwrap();
+            }
         }
         for name in &diff.sources.to_change {
-            self.source_tasks.remove(name).wait().unwrap();
+            if let Some(task) = self.source_tasks.remove(name) {
+                task.await.unwrap().unwrap();
+            }
         }
 
         // Transforms
         for name in &diff.transforms.to_remove {
             info!("Removing transform {:?}", name);
 
-            self.tasks.remove(name).unwrap().forget();
+            let previous = self.tasks.remove(name).unwrap();
+            drop(previous); // detach and forget
 
             self.remove_inputs(&name);
             self.remove_outputs(&name);
@@ -375,7 +389,8 @@ impl RunningTopology {
         for name in &diff.sinks.to_remove {
             info!("Removing sink {:?}", name);
 
-            self.tasks.remove(name).unwrap().forget();
+            let previous = self.tasks.remove(name).unwrap();
+            drop(previous); // detach and forget
 
             self.remove_inputs(&name);
         }
@@ -414,83 +429,68 @@ impl RunningTopology {
     }
 
     /// Starts new and changed pieces of topology.
-    fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces, rt: &mut runtime::Runtime) {
+    fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces) {
         // Sources
         for name in &diff.sources.to_change {
             info!("Rebuilding source {:?}", name);
-            self.spawn_source(name, &mut new_pieces, rt);
+            self.spawn_source(name, &mut new_pieces);
         }
 
         for name in &diff.sources.to_add {
             info!("Starting source {:?}", name);
-            self.spawn_source(&name, &mut new_pieces, rt);
+            self.spawn_source(&name, &mut new_pieces);
         }
 
         // Transforms
         for name in &diff.transforms.to_change {
             info!("Rebuilding transform {:?}", name);
-            self.spawn_transform(&name, &mut new_pieces, rt);
+            self.spawn_transform(&name, &mut new_pieces);
         }
 
         for name in &diff.transforms.to_add {
             info!("Starting transform {:?}", name);
-            self.spawn_transform(&name, &mut new_pieces, rt);
+            self.spawn_transform(&name, &mut new_pieces);
         }
 
         // Sinks
         for name in &diff.sinks.to_change {
             info!("Rebuilding sink {:?}", name);
-            self.spawn_sink(&name, &mut new_pieces, rt);
+            self.spawn_sink(&name, &mut new_pieces);
         }
 
         for name in &diff.sinks.to_add {
             info!("Starting sink {:?}", name);
-            self.spawn_sink(&name, &mut new_pieces, rt);
+            self.spawn_sink(&name, &mut new_pieces);
         }
     }
 
-    fn spawn_sink(
-        &mut self,
-        name: &str,
-        new_pieces: &mut builder::Pieces,
-        rt: &mut runtime::Runtime,
-    ) {
+    fn spawn_sink(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = info_span!("sink", name = %task.name(), r#type = %task.typetag());
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
-        let spawned = oneshot::spawn(task, &rt.executor());
+        let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
-            previous.forget();
+            drop(previous); // detach and forget
         }
     }
 
-    fn spawn_transform(
-        &mut self,
-        name: &str,
-        new_pieces: &mut builder::Pieces,
-        rt: &mut runtime::Runtime,
-    ) {
+    fn spawn_transform(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = info_span!("transform", name = %task.name(), r#type = %task.typetag());
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
-        let spawned = oneshot::spawn(task, &rt.executor());
+        let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
-            previous.forget();
+            drop(previous); // detach and forget
         }
     }
 
-    fn spawn_source(
-        &mut self,
-        name: &str,
-        new_pieces: &mut builder::Pieces,
-        rt: &mut runtime::Runtime,
-    ) {
+    fn spawn_source(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = info_span!("source", name = %task.name(), r#type = %task.typetag());
         let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
-        let spawned = oneshot::spawn(task, &rt.executor());
+        let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
-            previous.forget();
+            drop(previous); // detach and forget
         }
 
         self.shutdown_coordinator
@@ -498,10 +498,8 @@ impl RunningTopology {
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
         let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(span);
-        self.source_tasks.insert(
-            name.to_string(),
-            oneshot::spawn(source_task, &rt.executor()),
-        );
+        self.source_tasks
+            .insert(name.to_string(), tokio::spawn(source_task.compat()));
     }
 
     fn remove_outputs(&mut self, name: &str) {
@@ -741,16 +739,21 @@ mod tests {
         old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
         let mut new_config = old_config.clone();
 
-        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
 
-        new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
+            new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
-        let _ = topology.reload_config_and_respawn(new_config, &mut rt, false);
+            topology
+                .reload_config_and_respawn(new_config, false)
+                .await
+                .unwrap();
 
-        assert_eq!(
-            topology.config.global.data_dir,
-            Some(Path::new("/asdf").to_path_buf())
-        );
+            assert_eq!(
+                topology.config.global.data_dir,
+                Some(Path::new("/asdf").to_path_buf())
+            );
+        });
     }
 }
 
@@ -790,11 +793,14 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
 
-        assert!(topology
-            .reload_config_and_respawn(new_config, &mut rt, false)
-            .unwrap());
+            assert!(topology
+                .reload_config_and_respawn(new_config, false)
+                .await
+                .unwrap());
+        });
     }
 
     #[test]
@@ -826,11 +832,14 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
 
-        assert!(!topology
-            .reload_config_and_respawn(new_config, &mut rt, false)
-            .unwrap());
+            assert!(!topology
+                .reload_config_and_respawn(new_config, false)
+                .await
+                .unwrap());
+        });
     }
 
     #[test]
@@ -850,11 +859,14 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, _crash) = topology::start(old_config.clone(), &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config.clone(), false).await.unwrap();
 
-        assert!(topology
-            .reload_config_and_respawn(old_config, &mut rt, false)
-            .unwrap());
+            assert!(topology
+                .reload_config_and_respawn(old_config, false)
+                .await
+                .unwrap());
+        })
     }
 }
 
@@ -883,7 +895,9 @@ mod source_finished_tests {
             },
         );
 
-        let (topology, _crash) = topology::start(old_config.clone(), &mut rt, false).unwrap();
+        let (topology, _crash) = rt
+            .block_on_std(topology::start(old_config.clone(), false))
+            .unwrap();
 
         rt.block_on(topology.sources_finished().timeout(Duration::from_secs(2)))
             .unwrap();
@@ -906,6 +920,7 @@ mod transient_state_tests {
     use crate::topology::config::{Config, DataType, GlobalOptions, SourceConfig};
     use crate::transforms::json_parser::JsonParserConfig;
     use crate::{topology, Error};
+    use futures::compat::Future01CompatExt;
     use futures01::{sync::mpsc::Sender, Future};
     use serde::{Deserialize, Serialize};
     use stream_cancel::{Trigger, Tripwire};
@@ -985,15 +1000,19 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
-        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
 
-        trigger_old.cancel();
+            trigger_old.cancel();
 
-        rt.block_on(topology.sources_finished()).unwrap();
+            let finished = topology.sources_finished();
+            finished.compat().await.unwrap();
 
-        assert!(topology
-            .reload_config_and_respawn(new_config, &mut rt, false)
-            .unwrap());
+            assert!(topology
+                .reload_config_and_respawn(new_config, false)
+                .await
+                .unwrap());
+        });
     }
 
     #[test]
@@ -1026,11 +1045,14 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
-        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
 
-        assert!(topology
-            .reload_config_and_respawn(new_config, &mut rt, false)
-            .unwrap());
+            assert!(topology
+                .reload_config_and_respawn(new_config, false)
+                .await
+                .unwrap());
+        });
     }
 
     #[test]
@@ -1071,10 +1093,13 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
 
-        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
 
-        assert!(topology
-            .reload_config_and_respawn(new_config, &mut rt, false)
-            .unwrap());
+            assert!(topology
+                .reload_config_and_respawn(new_config, false)
+                .await
+                .unwrap());
+        });
     }
 }

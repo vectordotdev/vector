@@ -382,32 +382,34 @@ pub mod test_util {
     }
 
     pub(crate) fn onboarding_v2() {
-        let mut body = std::collections::HashMap::new();
-        body.insert("username", "my-user");
-        body.insert("password", "my-password");
-        body.insert("org", ORG);
-        body.insert("bucket", BUCKET);
-        body.insert("token", TOKEN);
+        crate::test_util::runtime().block_on_std(async {
+            let mut body = std::collections::HashMap::new();
+            body.insert("username", "my-user");
+            body.insert("password", "my-password");
+            body.insert("org", ORG);
+            body.insert("bucket", BUCKET);
+            body.insert("token", TOKEN);
 
-        let client = reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+            let client = reqwest::Client::builder()
+                .danger_accept_invalid_certs(true)
+                .build()
+                .unwrap();
 
-        let res = client
-            .post("http://localhost:9999/api/v2/setup")
-            .json(&body)
-            .header("accept", "application/json")
-            .send()
-            .unwrap();
+            let res = client
+                .post("http://localhost:9999/api/v2/setup")
+                .json(&body)
+                .header("accept", "application/json")
+                .send()
+                .await
+                .unwrap();
 
-        let status = res.status();
+            let status = res.status();
 
-        assert!(
-            status == http01::StatusCode::CREATED
-                || status == http01::StatusCode::UNPROCESSABLE_ENTITY,
-            format!("UnexpectedStatus: {}", status)
-        );
+            assert!(
+                status == StatusCode::CREATED || status == StatusCode::UNPROCESSABLE_ENTITY,
+                format!("UnexpectedStatus: {}", status)
+            );
+        });
     }
 }
 
@@ -744,10 +746,10 @@ mod integration_tests {
 
     #[test]
     fn influxdb2_healthchecks_ok() {
+        let mut rt = runtime();
         onboarding_v2();
 
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let endpoint = "http://localhost:9999".to_string();
         let influxdb1_settings = None;
         let influxdb2_settings = Some(InfluxDB2Settings {
@@ -768,10 +770,10 @@ mod integration_tests {
 
     #[test]
     fn influxdb2_healthchecks_fail() {
+        let mut rt = runtime();
         onboarding_v2();
 
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:9999".to_string();
         let influxdb1_settings = None;
         let influxdb2_settings = Some(InfluxDB2Settings {
@@ -792,7 +794,7 @@ mod integration_tests {
     #[test]
     fn influxdb1_healthchecks_ok() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let endpoint = "http://localhost:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
             database: DATABASE.to_string(),
@@ -816,7 +818,7 @@ mod integration_tests {
     #[test]
     fn influxdb1_healthchecks_fail() {
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
             database: DATABASE.to_string(),

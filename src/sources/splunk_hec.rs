@@ -732,7 +732,7 @@ fn event_error(text: &str, code: u16, event: usize) -> Response {
 #[cfg(test)]
 mod tests {
     use super::{parse_timestamp, SplunkConfig};
-    use crate::runtime::{Runtime, TaskExecutor};
+    use crate::runtime::Runtime;
     use crate::test_util::{self, collect_n, runtime};
     use crate::{
         event::{self, Event},
@@ -745,8 +745,8 @@ mod tests {
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
     };
     use chrono::{TimeZone, Utc};
+    use futures::compat::Future01CompatExt;
     use futures01::{stream, sync::mpsc, Sink};
-    use http01::Method;
     use std::net::SocketAddr;
 
     /// Splunk token
@@ -783,7 +783,6 @@ mod tests {
         address: SocketAddr,
         encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         compression: Compression,
-        exec: TaskExecutor,
     ) -> (RouterSink, Healthcheck) {
         HecSinkConfig {
             host: format!("http://{}", address),
@@ -792,7 +791,7 @@ mod tests {
             compression,
             ..HecSinkConfig::default()
         }
-        .build(SinkContext::new_test(exec))
+        .build(SinkContext::new_test())
         .unwrap()
     }
 
@@ -802,7 +801,7 @@ mod tests {
     ) -> (Runtime, RouterSink, mpsc::Receiver<Event>) {
         let mut rt = runtime();
         let (source, address) = source(&mut rt);
-        let (sink, health) = sink(address, encoding, compression, rt.executor());
+        let (sink, health) = sink(address, encoding, compression);
         assert!(rt.block_on(health).is_ok());
         (rt, sink, source)
     }
@@ -827,23 +826,18 @@ mod tests {
         events
     }
 
-    fn post(address: SocketAddr, api: &str, message: &str) -> u16 {
-        send_with(address, api, Method::POST, message, TOKEN)
+    async fn post(address: SocketAddr, api: &str, message: &str) -> u16 {
+        send_with(address, api, message, TOKEN).await
     }
 
-    fn send_with(
-        address: SocketAddr,
-        api: &str,
-        method: Method,
-        message: &str,
-        token: &str,
-    ) -> u16 {
+    async fn send_with(address: SocketAddr, api: &str, message: &str, token: &str) -> u16 {
         reqwest::Client::new()
-            .request(method, &format!("http://{}/{}", address, api))
+            .post(&format!("http://{}/{}", address, api))
             .header("Authorization", format!("Splunk {}", token))
             .header("x-splunk-request-channel", "guid")
             .body(message.to_owned())
             .send()
+            .await
             .unwrap()
             .status()
             .as_u16()
@@ -1013,22 +1007,24 @@ mod tests {
         let mut rt = runtime();
         let (source, address) = source(&mut rt);
 
-        assert_eq!(200, post(address, "services/collector/raw", message));
+        rt.block_on_std(async move {
+            assert_eq!(200, post(address, "services/collector/raw", message).await);
 
-        let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
-        assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
-            message.into()
-        );
-        assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
-        assert!(event
-            .as_log()
-            .get(&event::log_schema().timestamp_key())
-            .is_some());
-        assert_eq!(
-            event.as_log()[event::log_schema().source_type_key()],
-            "splunk_hec".into()
-        );
+            let event = collect_n(source, 1).compat().await.unwrap().remove(0);
+            assert_eq!(
+                event.as_log()[&event::log_schema().message_key()],
+                message.into()
+            );
+            assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+            assert!(event
+                .as_log()
+                .get(&event::log_schema().timestamp_key())
+                .is_some());
+            assert_eq!(
+                event.as_log()[event::log_schema().source_type_key()],
+                "splunk_hec".into()
+            );
+        });
     }
 
     #[test]
@@ -1036,7 +1032,9 @@ mod tests {
         let mut rt = runtime();
         let (_source, address) = source(&mut rt);
 
-        assert_eq!(400, post(address, "services/collector/event", ""));
+        rt.block_on_std(async move {
+            assert_eq!(400, post(address, "services/collector/event", "").await);
+        });
     }
 
     #[test]
@@ -1044,16 +1042,12 @@ mod tests {
         let mut rt = runtime();
         let (_source, address) = source(&mut rt);
 
-        assert_eq!(
-            401,
-            send_with(
-                address,
-                "services/collector/event",
-                Method::POST,
-                "",
-                "nope"
-            )
-        );
+        rt.block_on_std(async move {
+            assert_eq!(
+                401,
+                send_with(address, "services/collector/event", "", "nope").await
+            );
+        });
     }
 
     #[test]
@@ -1061,7 +1055,7 @@ mod tests {
         let message = "no_autorization";
         let mut rt = runtime();
         let (source, address) = source_with(&mut rt, None);
-        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip, rt.executor());
+        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip);
         assert!(rt.block_on(health).is_ok());
 
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
@@ -1078,21 +1072,26 @@ mod tests {
         let mut rt = runtime();
         let (source, address) = source(&mut rt);
 
-        assert_eq!(400, post(address, "services/collector/event", message));
+        rt.block_on_std(async move {
+            assert_eq!(
+                400,
+                post(address, "services/collector/event", message).await
+            );
 
-        let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
-        assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
-            "first".into()
-        );
-        assert!(event
-            .as_log()
-            .get(&event::log_schema().timestamp_key())
-            .is_some());
-        assert_eq!(
-            event.as_log()[event::log_schema().source_type_key()],
-            "splunk_hec".into()
-        );
+            let event = collect_n(source, 1).compat().await.unwrap().remove(0);
+            assert_eq!(
+                event.as_log()[&event::log_schema().message_key()],
+                "first".into()
+            );
+            assert!(event
+                .as_log()
+                .get(&event::log_schema().timestamp_key())
+                .is_some());
+            assert_eq!(
+                event.as_log()[event::log_schema().source_type_key()],
+                "splunk_hec".into()
+            );
+        });
     }
 
     #[test]
@@ -1101,27 +1100,32 @@ mod tests {
         let mut rt = runtime();
         let (source, address) = source(&mut rt);
 
-        assert_eq!(200, post(address, "services/collector/event", message));
+        rt.block_on_std(async move {
+            assert_eq!(
+                200,
+                post(address, "services/collector/event", message).await
+            );
 
-        let events = rt.block_on(collect_n(source, 3)).unwrap();
+            let events = collect_n(source, 3).compat().await.unwrap();
 
-        assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
-            "first".into()
-        );
-        assert_eq!(events[0].as_log()[&super::SOURCE], "main".into());
+            assert_eq!(
+                events[0].as_log()[&event::log_schema().message_key()],
+                "first".into()
+            );
+            assert_eq!(events[0].as_log()[&super::SOURCE], "main".into());
 
-        assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
-            "second".into()
-        );
-        assert_eq!(events[1].as_log()[&super::SOURCE], "main".into());
+            assert_eq!(
+                events[1].as_log()[&event::log_schema().message_key()],
+                "second".into()
+            );
+            assert_eq!(events[1].as_log()[&super::SOURCE], "main".into());
 
-        assert_eq!(
-            events[2].as_log()[&event::log_schema().message_key()],
-            "third".into()
-        );
-        assert_eq!(events[2].as_log()[&super::SOURCE], "secondary".into());
+            assert_eq!(
+                events[2].as_log()[&event::log_schema().message_key()],
+                "third".into()
+            );
+            assert_eq!(events[2].as_log()[&super::SOURCE], "secondary".into());
+        });
     }
 
     #[test]

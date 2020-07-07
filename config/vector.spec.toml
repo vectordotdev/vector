@@ -2874,6 +2874,16 @@ require('custom_module')
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
 
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
+
   # Dynamically create a log group if it does not already exist. This will ignore
   # `create_missing_stream` directly after creating the group and will create the
   # first stream.
@@ -3130,6 +3140,16 @@ require('custom_module')
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
 
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
+
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
   #
@@ -3208,6 +3228,16 @@ require('custom_module')
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
@@ -3429,6 +3459,16 @@ require('custom_module')
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.

@@ -3,7 +3,7 @@ use crate::{
     sinks::util::{
         self,
         encoding::{EncodingConfig, EncodingConfiguration},
-        tcp::{tcp_healthcheck, TcpSink},
+        tcp::TcpSink,
         Encoding, UriSerde,
     },
     tls::{MaybeTlsSettings, TlsConfig},
@@ -50,8 +50,8 @@ impl SinkConfig for DatadogLogsConfig {
 
         let tls_settings = MaybeTlsSettings::from_config(&tls, false)?;
 
-        let sink = TcpSink::new(host.clone(), port, cx.resolver(), tls_settings);
-        let healthcheck = tcp_healthcheck(host.clone(), port, cx.resolver());
+        let sink = TcpSink::new(host, port, cx.resolver(), tls_settings);
+        let healthcheck = sink.healthcheck();
 
         let encoding = self.encoding.clone();
         let api_key = Bytes::from(format!("{} ", self.api_key));
