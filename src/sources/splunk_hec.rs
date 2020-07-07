@@ -732,7 +732,7 @@ fn event_error(text: &str, code: u16, event: usize) -> Response {
 #[cfg(test)]
 mod tests {
     use super::{parse_timestamp, SplunkConfig};
-    use crate::runtime::{Runtime, TaskExecutor};
+    use crate::runtime::Runtime;
     use crate::test_util::{self, collect_n, runtime};
     use crate::{
         event::{self, Event},
@@ -783,7 +783,6 @@ mod tests {
         address: SocketAddr,
         encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         compression: Compression,
-        exec: TaskExecutor,
     ) -> (RouterSink, Healthcheck) {
         HecSinkConfig {
             host: format!("http://{}", address),
@@ -792,7 +791,7 @@ mod tests {
             compression,
             ..HecSinkConfig::default()
         }
-        .build(SinkContext::new_test(exec))
+        .build(SinkContext::new_test())
         .unwrap()
     }
 
@@ -802,7 +801,7 @@ mod tests {
     ) -> (Runtime, RouterSink, mpsc::Receiver<Event>) {
         let mut rt = runtime();
         let (source, address) = source(&mut rt);
-        let (sink, health) = sink(address, encoding, compression, rt.executor());
+        let (sink, health) = sink(address, encoding, compression);
         assert!(rt.block_on(health).is_ok());
         (rt, sink, source)
     }
@@ -1056,7 +1055,7 @@ mod tests {
         let message = "no_autorization";
         let mut rt = runtime();
         let (source, address) = source_with(&mut rt, None);
-        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip, rt.executor());
+        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip);
         assert!(rt.block_on(health).is_ok());
 
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);

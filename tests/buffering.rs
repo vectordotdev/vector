@@ -60,7 +60,7 @@ fn test_buffering() {
 
     let mut rt = test_util::runtime();
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
     let (input_events, input_events_stream) =
         test_util::random_events_with_stream(line_length, num_events);
@@ -103,7 +103,7 @@ fn test_buffering() {
 
     let mut rt = test_util::runtime();
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
     let (input_events2, input_events_stream) =
         test_util::random_events_with_stream(line_length, num_events);
@@ -162,7 +162,7 @@ fn test_max_size() {
 
     let mut rt = test_util::runtime();
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
     let send = in_tx
         .sink_map_err(|err| panic!(err))
@@ -204,7 +204,7 @@ fn test_max_size() {
 
     let mut rt = test_util::runtime();
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
     let output_events = test_util::receive_events(out_rx);
 
@@ -249,7 +249,7 @@ fn test_max_size_resume() {
     // Use a multi-thread runtime here.
     let mut rt = runtime::Runtime::new().unwrap();
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
     // Send all of the input events _before_ the output sink is ready.
     // This causes the writers to stop writing to the on-disk buffer, and once
@@ -305,7 +305,7 @@ fn test_reclaim_disk_space() {
 
     let mut rt = test_util::runtime();
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
     let (input_events, input_events_stream) =
         test_util::random_events_with_stream(line_length, num_events);
@@ -350,7 +350,7 @@ fn test_reclaim_disk_space() {
 
     let mut rt = test_util::runtime();
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
     let (input_events2, input_events_stream) =
         test_util::random_events_with_stream(line_length, num_events);

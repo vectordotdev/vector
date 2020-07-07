@@ -46,7 +46,8 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -88,7 +89,8 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -129,7 +131,8 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
