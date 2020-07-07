@@ -38,10 +38,7 @@ impl TransformConfig for SplitConfig {
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| f == field);
 
-        let escaped_separator = match self.separator {
-            Some(ref separator) => Some(regex::escape(separator)),
-            None => None,
-        };
+        let escaped_separator = self.separator.as_ref().map(|s| regex::escape(s));
 
         Ok(Box::new(Split::new(
             self.field_names.clone(),
@@ -49,7 +46,7 @@ impl TransformConfig for SplitConfig {
             field.clone(),
             drop_field,
             types,
-        )))
+        )?))
     }
 
     fn input_type(&self) -> DataType {
@@ -79,7 +76,7 @@ impl Split {
         field: Atom,
         drop_field: bool,
         types: HashMap<Atom, Conversion>,
-    ) -> Self {
+    ) -> crate::Result<Self> {
         let field_names = field_names
             .into_iter()
             .map(|name| {
@@ -92,19 +89,18 @@ impl Split {
             Some(s) => match Regex::new(&s) {
                 Ok(expression) => Some(expression),
                 Err(err) => {
-                    error!(message = "Invalid regex expression for separator", %err);
-                    None
+                    return Err(Box::new(err));
                 }
             },
             None => None,
         };
 
-        Self {
+        Ok(Self {
             field_names,
             separator,
             field,
             drop_field,
-        }
+        })
     }
 }
 
