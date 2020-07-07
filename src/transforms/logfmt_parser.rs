@@ -111,7 +111,6 @@ mod tests {
     use super::LogfmtConfig;
     use crate::{
         event::{LogEvent, Value},
-        test_util,
         topology::config::{TransformConfig, TransformContext},
         Event,
     };
@@ -119,13 +118,12 @@ mod tests {
     fn parse_log(text: &str, drop_field: bool, types: &[(&str, &str)]) -> LogEvent {
         let event = Event::from(text);
 
-        let rt = test_util::runtime();
         let mut parser = LogfmtConfig {
             field: None,
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(TransformContext::new_test(rt.executor()))
+        .build(TransformContext::new_test())
         .unwrap();
 
         parser.transform(event).unwrap().into_log()

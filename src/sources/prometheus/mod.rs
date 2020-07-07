@@ -188,7 +188,7 @@ mod test {
             },
         );
 
-        let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+        let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
         thread::sleep(Duration::from_secs(1));
 
         let client = Client::new();

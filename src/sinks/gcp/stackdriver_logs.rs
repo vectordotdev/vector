@@ -422,10 +422,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config
-            .build(SinkContext::new_test(runtime().executor()))
-            .is_ok()
-        {
+        if config.build(SinkContext::new_test()).is_ok() {
             panic!("config.build failed to error");
         }
     }

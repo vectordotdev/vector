@@ -55,9 +55,9 @@ impl Default for Encoding {
 
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
-    fn build(&self, mut cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = FileSink::new(&self);
-        let sink = streaming_sink::compat::adapt_to_topology(&mut cx, sink);
+        let sink = streaming_sink::compat::adapt_to_topology(sink);
         let sink = StreamSink::new(sink, cx.acker());
         Ok((Box::new(sink), Box::new(futures01::future::ok(()))))
     }

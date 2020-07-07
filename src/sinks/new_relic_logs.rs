@@ -274,9 +274,7 @@ mod tests {
 
         let mut rt = runtime();
 
-        let (sink, _healthcheck) = http_config
-            .build(SinkContext::new_test(rt.executor()))
-            .unwrap();
+        let (sink, _healthcheck) = http_config.build(SinkContext::new_test()).unwrap();
         let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();

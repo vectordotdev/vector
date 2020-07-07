@@ -227,7 +227,7 @@ mod tests {
         // Set up Sink
         let config = UnixSinkConfig::new(out_path.clone(), Encoding::Text.into());
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(cx).unwrap();
 
         // Set up server to receive events from the Sink.

@@ -147,7 +147,7 @@ impl TransformConfig for Ec2Metadata {
 
         let http_client = HttpClient::new(cx.resolver(), None)?;
 
-        cx.executor().spawn_std(
+        tokio::spawn(
             async move {
                 let mut client =
                     MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
@@ -507,15 +507,14 @@ mod integration_tests {
     #[test]
     fn enrich() {
         crate::test_util::trace_init();
-        let rt = runtime();
+        let mut rt = runtime();
 
         let config = Ec2Metadata {
             host: Some(HOST.clone()),
             ..Default::default()
         };
-        let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
-            .unwrap();
+        let mut transform =
+            rt.block_on_std(async move { config.build(TransformContext::new_test()).unwrap() });
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -556,16 +555,15 @@ mod integration_tests {
 
     #[test]
     fn fields() {
-        let rt = runtime();
+        let mut rt = runtime();
 
         let config = Ec2Metadata {
             host: Some(HOST.clone()),
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
-        let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
-            .unwrap();
+        let mut transform =
+            rt.block_on_std(async move { config.build(TransformContext::new_test()).unwrap() });
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -588,16 +586,15 @@ mod integration_tests {
 
     #[test]
     fn namespace() {
-        let rt = runtime();
+        let mut rt = runtime();
 
         let config = Ec2Metadata {
             host: Some(HOST.clone()),
             namespace: Some("ec2.metadata".into()),
             ..Default::default()
         };
-        let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
-            .unwrap();
+        let mut transform =
+            rt.block_on_std(async move { config.build(TransformContext::new_test()).unwrap() });
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -622,9 +619,8 @@ mod integration_tests {
             namespace: Some("".into()),
             ..Default::default()
         };
-        let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
-            .unwrap();
+        let mut transform =
+            rt.block_on_std(async move { config.build(TransformContext::new_test()).unwrap() });
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));

@@ -38,7 +38,7 @@ fn pipe() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -86,7 +86,7 @@ fn sample() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -142,7 +142,7 @@ fn merge() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -208,7 +208,7 @@ fn fork() {
     let output_lines1 = receive(&out_addr1);
     let output_lines2 = receive(&out_addr2);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -264,7 +264,7 @@ fn merge_and_fork() {
     let output_lines1 = receive(&out_addr1);
     let output_lines2 = receive(&out_addr2);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -336,7 +336,7 @@ fn reconnect() {
         .collect();
     let output_lines = futures01::sync::oneshot::spawn(output_lines, &output_rt.executor());
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 

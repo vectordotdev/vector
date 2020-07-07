@@ -609,7 +609,7 @@ mod integration_tests {
 
         let ns = format!("ns-{}", Utc::now().timestamp_nanos());
 
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         rt.block_on_std(async move {
             let config = InfluxDBLogsConfig {

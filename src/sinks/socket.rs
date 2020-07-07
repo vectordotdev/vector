@@ -109,7 +109,7 @@ mod test {
             }),
         };
         let mut rt = runtime();
-        let context = SinkContext::new_test(rt.executor());
+        let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).unwrap();
 
         let event = Event::from("raw log line");
@@ -141,7 +141,7 @@ mod test {
             }),
         };
         let mut rt = runtime();
-        let context = SinkContext::new_test(rt.executor());
+        let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).unwrap();
 
         let receiver = receive(&addr);
@@ -202,7 +202,7 @@ mod test {
             }),
         };
         let mut rt = runtime();
-        let context = SinkContext::new_test(rt.executor());
+        let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).unwrap();
 
         let msg_counter = Arc::new(AtomicUsize::new(0));

@@ -1,7 +1,6 @@
 use crate::{
     conditions::{Condition, ConditionConfig},
     event::{Event, Value},
-    runtime::Runtime,
     topology::config::{
         TestCondition, TestDefinition, TestInput, TestInputValue, TransformContext,
     },
@@ -315,7 +314,6 @@ fn build_unit_test(
     expansions: &IndexMap<String, Vec<String>>,
     config: &super::Config,
 ) -> Result<UnitTest, Vec<String>> {
-    let rt = Runtime::single_threaded().unwrap();
     let mut errors = vec![];
 
     let inputs = match build_inputs(&definition, &expansions) {
@@ -381,10 +379,7 @@ fn build_unit_test(
     let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
     for (name, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(name) {
-            match transform_config
-                .inner
-                .build(TransformContext::new_test(rt.executor()))
-            {
+            match transform_config.inner.build(TransformContext::new_test()) {
                 Ok(transform) => {
                     transforms.insert(
                         name.clone(),

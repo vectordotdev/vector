@@ -3,7 +3,6 @@ use crate::{
     conditions,
     dns::Resolver,
     event::{self, Event, Metric},
-    runtime::TaskExecutor,
     shutdown::ShutdownSignal,
     sinks, sources, transforms,
 };
@@ -124,7 +123,7 @@ pub enum DataType {
 }
 
 #[typetag::serde(tag = "type")]
-pub trait SourceConfig: core::fmt::Debug {
+pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     fn build(
         &self,
         name: &str,
@@ -154,7 +153,7 @@ pub struct SinkOuter {
 }
 
 #[typetag::serde(tag = "type")]
-pub trait SinkConfig: core::fmt::Debug {
+pub trait SinkConfig: core::fmt::Debug + Send + Sync {
     fn build(&self, cx: SinkContext) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)>;
 
     fn input_type(&self) -> DataType;
@@ -166,16 +165,14 @@ pub trait SinkConfig: core::fmt::Debug {
 pub struct SinkContext {
     pub(super) acker: Acker,
     pub(super) resolver: Resolver,
-    pub(super) exec: TaskExecutor,
 }
 
 impl SinkContext {
     #[cfg(test)]
-    pub fn new_test(exec: TaskExecutor) -> Self {
+    pub fn new_test() -> Self {
         Self {
             acker: Acker::Null,
             resolver: Resolver,
-            exec,
         }
     }
 
@@ -183,16 +180,8 @@ impl SinkContext {
         self.acker.clone()
     }
 
-    pub fn exec(&self) -> TaskExecutor {
-        self.exec.clone()
-    }
-
     pub fn resolver(&self) -> Resolver {
         self.resolver.clone()
-    }
-
-    pub fn executor(&self) -> &TaskExecutor {
-        &self.exec
     }
 }
 
@@ -208,7 +197,7 @@ pub struct TransformOuter {
 }
 
 #[typetag::serde(tag = "type")]
-pub trait TransformConfig: core::fmt::Debug {
+pub trait TransformConfig: core::fmt::Debug + Send + Sync {
     fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn transforms::Transform>>;
 
     fn input_type(&self) -> DataType;
@@ -227,20 +216,12 @@ pub trait TransformConfig: core::fmt::Debug {
 
 #[derive(Debug, Clone)]
 pub struct TransformContext {
-    pub(super) exec: TaskExecutor,
     pub(super) resolver: Resolver,
 }
 
 impl TransformContext {
-    pub fn new_test(exec: TaskExecutor) -> Self {
-        Self {
-            resolver: Resolver,
-            exec,
-        }
-    }
-
-    pub fn executor(&self) -> &TaskExecutor {
-        &self.exec
+    pub fn new_test() -> Self {
+        Self { resolver: Resolver }
     }
 
     pub fn resolver(&self) -> Resolver {

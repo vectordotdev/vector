@@ -46,7 +46,7 @@ fn test_tcp_syslog() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -92,7 +92,7 @@ fn test_udp_syslog() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
     let input_messages: Vec<SyslogMessageRFC5424> = (0..num_messages)
         .map(|i| SyslogMessageRFC5424::random(i, 30, 4, 3, 3))
@@ -161,7 +161,7 @@ fn test_unix_stream_syslog() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     while std::os::unix::net::UnixStream::connect(&in_path).is_err() {}
 

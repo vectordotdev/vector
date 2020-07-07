@@ -196,7 +196,6 @@ async fn healthcheck(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::runtime;
 
     #[test]
     fn fails_missing_creds() {
@@ -207,10 +206,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config
-            .build(SinkContext::new_test(runtime().executor()))
-            .is_ok()
-        {
+        if config.build(SinkContext::new_test()).is_ok() {
             panic!("config.build failed to error");
         }
     }
@@ -220,10 +216,7 @@ mod tests {
 #[cfg(feature = "gcp-pubsub-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::{
-        runtime::Runtime,
-        test_util::{random_events_with_stream, random_string, runtime},
-    };
+    use crate::test_util::{random_events_with_stream, random_string, runtime};
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use reqwest::{Client, Method, Response};
@@ -241,11 +234,8 @@ mod integration_tests {
         }
     }
 
-    fn config_build(
-        rt: &Runtime,
-        topic: &str,
-    ) -> (crate::sinks::RouterSink, crate::sinks::Healthcheck) {
-        let cx = SinkContext::new_test(rt.executor());
+    fn config_build(topic: &str) -> (crate::sinks::RouterSink, crate::sinks::Healthcheck) {
+        let cx = SinkContext::new_test();
         config(topic).build(cx).expect("Building sink failed")
     }
 
@@ -255,7 +245,7 @@ mod integration_tests {
 
         let mut rt = runtime();
         let (topic, subscription) = rt.block_on_std(create_topic_subscription());
-        let (sink, healthcheck) = config_build(&rt, &topic);
+        let (sink, healthcheck) = config_build(&topic);
 
         rt.block_on_std(async move {
             healthcheck.compat().await.expect("Health check failed");
@@ -287,7 +277,7 @@ mod integration_tests {
         let mut rt = runtime();
         let (topic, _subscription) = rt.block_on_std(create_topic_subscription());
         let topic = format!("BAD{}", topic);
-        let (_sink, healthcheck) = config_build(&rt, &topic);
+        let (_sink, healthcheck) = config_build(&topic);
         rt.block_on_std(async move {
             healthcheck
                 .compat()
