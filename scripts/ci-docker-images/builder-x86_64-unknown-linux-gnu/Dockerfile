@@ -22,7 +22,7 @@ RUN cd /tmp && \
 RUN echo "%sudo         ALL = (ALL) NOPASSWD: ALL" >> /etc/sudoers.d/sudo
 RUN useradd -m -G wheel \
     -u $(echo "${USER}" | cut -d: -f1) \
-    -g $(echo "${USER}" | cut -d: -f2) \
+    # -g $(echo "${USER}" | cut -d: -f2) \
     runner
 
 USER ${USER}
