@@ -75,7 +75,7 @@ fn test_sink_panic() {
 
     let output_lines = receive(&out_addr);
     std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
     std::thread::sleep(std::time::Duration::from_millis(100));
@@ -157,7 +157,7 @@ fn test_sink_error() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
     std::thread::sleep(std::time::Duration::from_millis(100));
@@ -225,7 +225,7 @@ fn test_source_error() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
     std::thread::sleep(std::time::Duration::from_millis(100));
@@ -296,7 +296,7 @@ fn test_source_panic() {
     let output_lines = receive(&out_addr);
 
     std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
     std::thread::sleep(std::time::Duration::from_millis(100));

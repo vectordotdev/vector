@@ -117,7 +117,7 @@ mod test {
 
         let mut rt = runtime();
 
-        let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+        let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
         let bind_addr = next_addr();
         let socket = std::net::UdpSocket::bind(&bind_addr).unwrap();

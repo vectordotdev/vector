@@ -56,7 +56,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                 );
 
                 let mut rt = runtime::Runtime::new().unwrap();
-                let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
                 let mut options = OpenOptions::new();
                 options.create(true).write(true);

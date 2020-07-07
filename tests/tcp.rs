@@ -37,7 +37,7 @@ fn pipe() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -85,7 +85,7 @@ fn sample() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -138,7 +138,7 @@ fn merge() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -204,7 +204,7 @@ fn fork() {
     let output_lines1 = receive(&out_addr1);
     let output_lines2 = receive(&out_addr2);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -260,7 +260,7 @@ fn merge_and_fork() {
     let output_lines1 = receive(&out_addr1);
     let output_lines2 = receive(&out_addr2);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -332,7 +332,7 @@ fn reconnect() {
         .collect();
     let output_lines = futures01::sync::oneshot::spawn(output_lines, &output_rt.executor());
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -360,8 +360,12 @@ fn healthcheck() {
 
     let _listener = TcpListener::bind(&addr).unwrap();
 
-    let healthcheck =
-        vector::sinks::util::tcp::tcp_healthcheck(addr.ip().to_string(), addr.port(), resolver);
+    let healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
+        addr.ip().to_string(),
+        addr.port(),
+        resolver,
+        None.into(),
+    );
 
     assert!(rt.block_on(healthcheck).is_ok());
 
@@ -370,6 +374,7 @@ fn healthcheck() {
         bad_addr.ip().to_string(),
         bad_addr.port(),
         resolver,
+        None.into(),
     );
 
     assert!(rt.block_on(bad_healthcheck).is_err());

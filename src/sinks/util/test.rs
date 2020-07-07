@@ -18,7 +18,7 @@ where
 {
     let sink_config: T = toml::from_str(config)?;
     let rt = runtime();
-    let cx = SinkContext::new_test(rt.executor());
+    let cx = SinkContext::new_test();
 
     Ok((sink_config, cx, rt))
 }

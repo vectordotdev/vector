@@ -51,8 +51,14 @@ impl TcpSinkConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let sink = raw_tcp(host.clone(), port, cx.clone(), self.encoding.clone(), tls);
-        let healthcheck = tcp_healthcheck(host, port, cx.resolver());
+        let tcp = TcpSink::new(host, port, cx.resolver(), tls);
+        let healthcheck = tcp.healthcheck();
+
+        let encoding = self.encoding.clone();
+        let sink = Box::new(
+            StreamSink::new(tcp, cx.acker())
+                .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
+        );
 
         Ok((sink, healthcheck))
     }
@@ -90,6 +96,15 @@ impl TcpSink {
             backoff: Self::fresh_backoff(),
             span,
         }
+    }
+
+    pub fn healthcheck(&self) -> Healthcheck {
+        tcp_healthcheck(
+            self.host.clone(),
+            self.port,
+            self.resolver.clone(),
+            self.tls.clone(),
+        )
     }
 
     fn fresh_backoff() -> ExponentialBackoff {
@@ -249,33 +264,26 @@ impl Sink for TcpSink {
     }
 }
 
-pub fn raw_tcp(
-    host: String,
-    port: u16,
-    cx: SinkContext,
-    encoding: EncodingConfig<Encoding>,
-    tls: MaybeTlsSettings,
-) -> RouterSink {
-    let tcp = TcpSink::new(host, port, cx.resolver(), tls);
-    let sink = StreamSink::new(tcp, cx.acker());
-    Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))))
-}
-
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
     #[snafu(display("Connect error: {}", source))]
-    ConnectError { source: std::io::Error },
+    ConnectError { source: crate::tls::TlsError },
     #[snafu(display("Unable to resolve DNS: {}", source))]
     DnsError { source: crate::dns::DnsError },
     #[snafu(display("No addresses returned."))]
     NoAddresses,
 }
 
-pub fn tcp_healthcheck(host: String, port: u16, resolver: Resolver) -> Healthcheck {
+pub fn tcp_healthcheck(
+    host: String,
+    port: u16,
+    resolver: Resolver,
+    tls: MaybeTlsSettings,
+) -> Healthcheck {
     // Lazy to avoid immediately connecting
     let check = future::lazy(move || {
         resolver
-            .lookup_ip_01(host)
+            .lookup_ip_01(host.clone())
             .map_err(|source| HealthcheckError::DnsError { source }.into())
             .and_then(|mut ip| {
                 ip.next()
@@ -283,7 +291,13 @@ pub fn tcp_healthcheck(host: String, port: u16, resolver: Resolver) -> Healthche
             })
             .and_then(move |ip| {
                 let addr = SocketAddr::new(ip, port);
-                TcpStream::connect(&addr)
+                future::result(
+                    tls.connect(host, addr)
+                        .map_err(|source| HealthcheckError::ConnectError { source }.into()),
+                )
+            })
+            .and_then(|maybe| {
+                maybe
                     .map(|_| ())
                     .map_err(|source| HealthcheckError::ConnectError { source }.into())
             })
