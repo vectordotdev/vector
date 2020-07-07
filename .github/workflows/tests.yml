@@ -273,9 +273,9 @@ jobs:
         minikube_version:
           - 'v1.11.0'
         kubernetes_version:
-          - 'v1.18.4'
-          - 'v1.17.7'
-          - 'v1.16.11'
+          - 'v1.18.5'
+          - 'v1.17.8'
+          - 'v1.16.12'
           - 'v1.15.12'
           - 'v1.14.10'
         container_runtime:
