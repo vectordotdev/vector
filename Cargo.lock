@@ -348,14 +348,11 @@ checksum = "39092a32794787acd8525ee150305ff051b0aa6cc2abaf193924f5ab05425f39"
 
 [[package]]
 name = "built"
-version = "0.3.2"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d2315cfb416f86e05360edc950b1d7d25ecfb00f7f8eba60dbd7882a0f2e944"
+checksum = "161483ae87631dd826cb40fc696d9e5a9fa94e19c2e69a372dcedd7dc68e7c0a"
 dependencies = [
- "chrono",
- "git2",
- "semver",
- "toml 0.5.6",
+ "cargo-lock",
 ]
 
 [[package]]
@@ -409,6 +406,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "214238caa1bf3a496ec3392968969cab8549f96ff30652c9e56885329315f6bb"
 dependencies = [
  "ppv-lite86",
+]
+
+[[package]]
+name = "cargo-lock"
+version = "4.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8504b63dd1249fd1745b7b4ef9b6f7b107ddeb3c95370043c7dbcc38653a2679"
+dependencies = [
+ "semver",
+ "serde",
+ "toml 0.5.6",
+ "url 2.1.1",
 ]
 
 [[package]]
@@ -1381,19 +1390,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "git2"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c1af51ea8a906616af45a4ce78eacf25860f7a13ae7bf8a814693f0f4037a26"
-dependencies = [
- "bitflags",
- "libc",
- "libgit2-sys",
- "log 0.4.8",
- "url 2.1.1",
-]
-
-[[package]]
 name = "glob"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1914,18 +1910,6 @@ name = "libc"
 version = "0.2.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99e85c08494b21a9054e7fe1374a732aeadaff3980b6990b94bfd3a70f690005"
-
-[[package]]
-name = "libgit2-sys"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4870c781f6063efb83150cd22c1ddf6ecf58531419e7570cdcced46970f64a16"
-dependencies = [
- "cc",
- "libc",
- "libz-sys",
- "pkg-config",
-]
 
 [[package]]
 name = "libloading"
@@ -3887,6 +3871,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"
 dependencies = [
  "semver-parser",
+ "serde",
 ]
 
 [[package]]

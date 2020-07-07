@@ -176,7 +176,7 @@ nix = "0.16.1"
 
 [build-dependencies]
 prost-build = "0.5.0"
-built = "0.3"
+built = "0.4"
 
 [dev-dependencies]
 approx = "0.3.0"
