@@ -240,6 +240,18 @@ Instead of balancing read capacity fairly across all watched files, prioritize \
 draining the oldest files before moving on to read data from younger files.\
 """
 
+[sources.file.options.remove_after]
+type = "uint"
+unit = "seconds"
+common = false
+examples = [0, 5, 60]
+description = """\
+Timeout from reaching `eof` after which file will be removed from filesystem, \
+unless new data is written in the meantime. \
+If not specified, files will not be removed.\
+"""
+warnings = [{visibility_level = "option", text = "Vector's process must have permission to delete files."}]
+
 [sources.file.fields.log.fields.file]
 type = "string"
 examples = ["/var/log/nginx.log"]
