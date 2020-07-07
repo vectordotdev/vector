@@ -2,7 +2,7 @@ use crate::{
     event::log_schema,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        tcp::{tcp_healthcheck, TcpSink},
+        tcp::TcpSink,
         Encoding, UriSerde,
     },
     tls::{MaybeTlsSettings, TlsSettings},
@@ -38,12 +38,12 @@ impl SinkConfig for PapertrailConfig {
             .ok_or_else(|| "A port is required for endpoints".to_string())?;
 
         let sink = TcpSink::new(
-            host.clone(),
+            host,
             port,
             cx.resolver(),
             MaybeTlsSettings::Tls(TlsSettings::default()),
         );
-        let healthcheck = tcp_healthcheck(host.clone(), port, cx.resolver());
+        let healthcheck = sink.healthcheck();
 
         let pid = std::process::id();
 

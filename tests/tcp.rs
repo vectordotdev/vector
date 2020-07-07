@@ -364,8 +364,12 @@ fn healthcheck() {
 
     let _listener = TcpListener::bind(&addr).unwrap();
 
-    let healthcheck =
-        vector::sinks::util::tcp::tcp_healthcheck(addr.ip().to_string(), addr.port(), resolver);
+    let healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
+        addr.ip().to_string(),
+        addr.port(),
+        resolver,
+        None.into(),
+    );
 
     assert!(rt.block_on(healthcheck).is_ok());
 
@@ -374,6 +378,7 @@ fn healthcheck() {
         bad_addr.ip().to_string(),
         bad_addr.port(),
         resolver,
+        None.into(),
     );
 
     assert!(rt.block_on(bad_healthcheck).is_err());
