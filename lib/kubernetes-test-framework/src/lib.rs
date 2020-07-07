@@ -30,7 +30,7 @@ pub mod vector;
 pub mod wait_for_resource;
 pub mod wait_for_rollout;
 
-// Re-export some unit for trivial accessability.
+// Re-export some unit for trivial accessibility.
 
 use exec_tail::exec_tail;
 pub use framework::Framework;
