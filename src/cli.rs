@@ -1,6 +1,6 @@
-use crate::{generate, list, unit_test, validate};
 use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
+use vector::{generate, list, unit_test, validate};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -14,7 +14,7 @@ pub struct Opts {
 
 impl Opts {
     pub fn get_matches() -> Self {
-        let version = crate::get_version();
+        let version = vector::get_version();
         let app = Opts::clap().version(version.as_str()).global_settings(&[
             AppSettings::ColoredHelp,
             AppSettings::InferSubcommands,

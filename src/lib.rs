@@ -80,7 +80,6 @@ pub mod wasm;
 #[macro_use]
 pub mod internal_events;
 pub mod async_read;
-pub mod cli;
 pub mod hyper;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;

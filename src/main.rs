@@ -10,6 +10,9 @@
 #[macro_use]
 extern crate tracing;
 
+mod cli;
+
+use cli::{Color, LogFormat, Opts, SubCommand};
 use futures::compat::Future01CompatExt;
 use futures01::{future, Future, Stream};
 use std::{
@@ -21,7 +24,6 @@ use std::{
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use vector::{
-    cli::{Color, LogFormat, Opts, SubCommand},
     config_paths, event, generate, list, metrics, runtime, topology, trace, unit_test, validate,
 };
 
