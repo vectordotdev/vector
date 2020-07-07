@@ -31,7 +31,7 @@ macro_rules! assert_downcast_matches {
 }
 
 #[macro_export]
-macro_rules! assert_between {
+macro_rules! assert_within {
     // Adapted from std::assert_eq
     ($expr:expr, $low:expr, $high:expr) => {{
         match (&$expr, &$low, &$high) {
