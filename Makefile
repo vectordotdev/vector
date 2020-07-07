@@ -97,9 +97,9 @@ define ENVIRONMENT_EXEC
 			--interactive \
 			--env INSIDE_ENVIRONMENT=true \
 			--network host \
-			--mount type=bind,source=${PWD},target=/vector \
+			--mount type=bind,source=${PWD},target=/git/timberio/vector \
 			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
-			--mount type=volume,source=vector-target,target=/vector/target \
+			--mount type=volume,source=vector-target,target=/git/timberio/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			$(ENVIRONMENT_UPSTREAM)
 endef
