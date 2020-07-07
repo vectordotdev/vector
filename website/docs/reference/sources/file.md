@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-03"
+last_modified_on: "2020-07-07"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
@@ -74,6 +74,7 @@ ingests data through one or more local files and outputs
   include = ["/var/log/nginx/*.log"] # required
   max_line_bytes = 102400 # optional, default, bytes
   remove_after = 0 # optional, no default, seconds
+  skip_first_lines = 0 # optional, default, relevant when start_at_beginning = true
   start_at_beginning = false # optional, default
 
   # Context
@@ -563,7 +564,7 @@ draining the oldest files before moving on to read data from younger files.
   groups={[]}
   name={"remove_after"}
   path={null}
-  relevantWhen={{"start_at_beginning":true}}
+  relevantWhen={null}
   required={false}
   templateable={false}
   type={"uint"}
@@ -576,6 +577,29 @@ draining the oldest files before moving on to read data from younger files.
 Timeout from reaching `eof` after which file will be removed from filesystem,
 unless new data is written in the meantime. If not specified, files will not be
 removed.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={0}
+  enumValues={null}
+  examples={[0]}
+  groups={[]}
+  name={"skip_first_lines"}
+  path={null}
+  relevantWhen={{"start_at_beginning":true}}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={null}
+  warnings={[]}
+  >
+
+### skip_first_lines
+
+Number of first lines per file that should be skipped.
 
 
 
