@@ -212,6 +212,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::test_util::{block_on, random_lines_with_stream, random_string, runtime};
+    use futures::compat::Future01CompatExt;
     use pulsar::Message;
     use std::{
         sync::atomic::AtomicUsize,
@@ -234,16 +235,15 @@ mod integration_tests {
 
         let num_events = 1_000;
         let (_input, events) = random_lines_with_stream(100, num_events);
-        let consumer = sink
+        let consumer_fut = sink
             .pulsar()
             .consumer()
             .with_topic(&topic)
             .with_consumer_name("VectorTestConsumer")
             .with_subscription_type(SubType::Shared)
             .with_subscription("VectorTestSub")
-            .build::<String>()
-            .wait()
-            .unwrap();
+            .build::<String>();
+        let consumer = rt.block_on_std(async move { consumer_fut.compat().await.unwrap() });
 
         let pump = sink.send_all(events);
         let _ = block_on(pump).unwrap();

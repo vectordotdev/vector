@@ -619,7 +619,8 @@ mod integration_tests {
             namespace: Some("".into()),
             ..Default::default()
         };
-        let mut transform = config.build(TransformContext::new_test()).unwrap();
+        let mut transform =
+            rt.block_on_std(async move { config.build(TransformContext::new_test()).unwrap() });
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
