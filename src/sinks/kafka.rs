@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::{self, Event},
+    event::{self, Event, Value},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
@@ -150,7 +150,13 @@ impl Sink for KafkaSink {
 
         let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);
 
-        let record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
+        let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
+
+        if let Some(Value::Timestamp(timestamp)) =
+            item.as_log().get(&event::log_schema().timestamp_key())
+        {
+            record = record.timestamp(timestamp.timestamp_millis());
+        }
 
         debug!(message = "sending event.", count = 1);
         let future = match self.producer.send_result(record) {
