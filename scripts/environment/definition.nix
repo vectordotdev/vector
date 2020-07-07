@@ -19,8 +19,6 @@ scope@{ pkgs ? import <nixpkgs> {} }:
     SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
     # Git looks to this env var for SSL certificates.
     GIT_SSL_CAINFO = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-    # Curl looks to this env var for SSL certificates.
-    CURL_CA_BUNDLE = "${pkgs.cacert}/etc/ca-bundle.crt";
     # Encourage Cargo to be pretty.
     CARGO_TERM_COLOR = "always";
     # Enable backtraces in the environment.

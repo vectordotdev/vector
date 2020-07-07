@@ -1,10 +1,16 @@
-# The official Rust image based on Debian 8 Jessie.
-FROM rust:jessie
-# This image was not updated since 2018, so Cargo version inside it does not
-# support editions, which makes it impossible to install `cargo-deb`.
-RUN rustup update stable
-RUN rustup run stable cargo install cargo-deb --version '^1.24.0'
-RUN apt-get update && apt-get install -y cmake
+FROM centos:7 as builder
+# This is formatted "$UID:$GID" by the docker-compose/scripts.
+ARG USER
+
+RUN yum install -y epel-release && \
+    yum clean all && \
+    yum makecache
+RUN yum install -y \
+        make openssl-devel cmake3 git \
+        gcc gcc-c++ libstdc++-static sudo && \
+    yum clean all
+RUN ln -s /usr/bin/cmake3 /usr/bin/cmake
+
 RUN cd /tmp && \
   git clone https://github.com/github/cmark-gfm && \
   cd cmark-gfm && \
@@ -12,3 +18,21 @@ RUN cd /tmp && \
   make install INSTALL_PREFIX=/usr && \
   cd .. && \
   rm -rf cmark-gfm
+
+RUN echo "%sudo         ALL = (ALL) NOPASSWD: ALL" >> /etc/sudoers.d/sudo
+RUN useradd -m -G wheel \
+    -u $(echo "${USER}" | cut -d: -f1) \
+    # -g $(echo "${USER}" | cut -d: -f2) \
+    runner
+
+USER ${USER}
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --no-modify-path --default-toolchain none -y
+ENV PATH=/home/runner/.cargo/bin:$PATH
+RUN echo "export PATH=/home/runner/.cargo/bin:$PATH" >> ~/bashrc
+ENV LIBRARY_PATH /usr/local/lib:$LIBRARY_PATH
+ENV LD_LIBRARY_PATH /usr/local/lib:$LD_LIBRARY_PATH
+
+RUN rustup update stable
+RUN rustup run stable cargo install cargo-deb --version '^1.24.0'
+
+ENTRYPOINT ["/bin/bash"]
