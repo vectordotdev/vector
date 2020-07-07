@@ -25,7 +25,7 @@ cargo check --tests --no-default-features
 
 echo "Checking that all components have corresponding features in Cargo.toml..."
 COMPONENTS="$(cargo run --no-default-features -- list)"
-if (echo "$COMPONENTS" | grep -E -v "^(Sources:|Transforms:|Sinks:|)$" >/dev/null); then
+if (echo "$COMPONENTS" | grep -E -v "(Log level|^(Sources:|Transforms:|Sinks:|)$)" >/dev/null); then
   echo "Some of the components do not have a corresponding feature flag in Cargo.toml:"
   # shellcheck disable=SC2001
   echo "$COMPONENTS" | sed "s/^/    /"
