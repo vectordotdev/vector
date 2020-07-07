@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use tokio01::timer::Delay;
 use tower03::Service;
 use vector::{
-    assert_between,
+    assert_within,
     event::{metric::MetricValue, Event, Metric},
     metrics::{capture_metrics, get_controller, init as metrics_init},
     sinks::{
@@ -229,22 +229,22 @@ fn constant_link() {
     // limiter will ramp up to or near the maximum concurrency (timing
     // issues may prevent it from hitting exactly the maximum without
     // running the test for an infinite amount of time),
-    assert_between!(in_flight.max, 9, 10);
+    assert_within!(in_flight.max, 9, 10);
     // and will spend most of its time in the top half of the
     // concurrency range.
-    assert_between!(in_flight.mode, 9, 10);
-    assert_between!(in_flight.mean, 4.9, 10.0);
+    assert_within!(in_flight.mode, 9, 10);
+    assert_within!(in_flight.mean, 4.9, 10.0);
     // Normal times for 200 requests range from 3-4 seconds.
-    assert_between!(duration, 2.5, 4.0);
+    assert_within!(duration, 2.5, 4.0);
 
     let observed_rtt = metric_mean(&metrics, "auto_concurrency_observed_rtt");
-    assert_between!(observed_rtt, 100_000_000.0, 110_000_000.0);
+    assert_within!(observed_rtt, 100_000_000.0, 110_000_000.0);
     let averaged_rtt = metric_mean(&metrics, "auto_concurrency_averaged_rtt");
-    assert_between!(averaged_rtt, 100_000_000.0, 110_000_000.0);
+    assert_within!(averaged_rtt, 100_000_000.0, 110_000_000.0);
     let concurrency_limit = metric_mean(&metrics, "auto_concurrency_limit");
-    assert_between!(concurrency_limit, 5.0, 10.0);
+    assert_within!(concurrency_limit, 5.0, 10.0);
     let in_flight = metric_mean(&metrics, "auto_concurrency_in_flight");
-    assert_between!(in_flight, 5.0, 10.0);
+    assert_within!(in_flight, 5.0, 10.0);
 }
 
 #[test]
@@ -261,21 +261,21 @@ fn slow_link() {
     // With a link that slows down heavily as concurrency increases, the
     // limiter will keep the concurrency low (timing skews occasionally
     // has it reaching 3, but usually just 2),
-    assert_between!(in_flight.max, 1, 3);
+    assert_within!(in_flight.max, 1, 3);
     // and it will spend most of its time between 1 and 2.
-    assert_between!(in_flight.mode, 1, 2);
-    assert_between!(in_flight.mean, 1.0, 2.0);
+    assert_within!(in_flight.mode, 1, 2);
+    assert_within!(in_flight.mean, 1.0, 2.0);
     // Normal times range widely depending if it hits 3 in flight.
-    assert_between!(duration, 15.0, 20.0);
+    assert_within!(duration, 15.0, 20.0);
 
     let observed_rtt = metric_mean(&metrics, "auto_concurrency_observed_rtt");
-    assert_between!(observed_rtt, 100_000_000.0, 310_000_000.0);
+    assert_within!(observed_rtt, 100_000_000.0, 310_000_000.0);
     let averaged_rtt = metric_mean(&metrics, "auto_concurrency_averaged_rtt");
-    assert_between!(averaged_rtt, 100_000_000.0, 310_000_000.0);
+    assert_within!(averaged_rtt, 100_000_000.0, 310_000_000.0);
     let concurrency_limit = metric_mean(&metrics, "auto_concurrency_limit");
-    assert_between!(concurrency_limit, 1.0, 2.0);
+    assert_within!(concurrency_limit, 1.0, 2.0);
     let in_flight = metric_mean(&metrics, "auto_concurrency_in_flight");
-    assert_between!(in_flight, 0.5, 2.0);
+    assert_within!(in_flight, 0.5, 2.0);
 }
 
 fn metric_mean(metrics: &MetricSet, name: &str) -> f64 {
