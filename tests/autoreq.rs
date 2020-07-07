@@ -224,16 +224,18 @@ fn constant_link() {
         },
     );
 
+    let in_flight = stats.in_flight.stats().unwrap();
     // With a constant response time link and enough responses, the
     // limiter will ramp up to or near the maximum concurrency (timing
     // issues may prevent it from hitting exactly the maximum without
     // running the test for an infinite amount of time),
-    assert_between!(stats.in_flight.max().unwrap(), 9, 10);
+    assert_between!(in_flight.max, 9, 10);
     // and will spend most of its time in the top half of the
     // concurrency range.
-    assert_between!(stats.in_flight.mean().unwrap(), 5.0, 10.0);
+    assert_between!(in_flight.mode, 9, 10);
+    assert_between!(in_flight.mean, 4.9, 10.0);
     // Normal times for 200 requests range from 3-4 seconds.
-    assert_between!(duration, 2.9, 4.0);
+    assert_between!(duration, 2.5, 4.0);
 
     let observed_rtt = metric_mean(&metrics, "auto_concurrency_observed_rtt");
     assert_between!(observed_rtt, 100_000_000.0, 110_000_000.0);
@@ -255,13 +257,14 @@ fn slow_link() {
         },
     );
 
+    let in_flight = stats.in_flight.stats().unwrap();
     // With a link that slows down heavily as concurrency increases, the
     // limiter will keep the concurrency low (timing skews occasionally
     // has it reaching 3, but usually just 2),
-    assert_between!(stats.in_flight.max().unwrap(), 1, 3);
+    assert_between!(in_flight.max, 1, 3);
     // and it will spend most of its time between 1 and 2.
-    let in_flight_mean = stats.in_flight.mean().unwrap();
-    assert_between!(in_flight_mean, 1.0, 2.0);
+    assert_between!(in_flight.mode, 1, 2);
+    assert_between!(in_flight.mean, 1.0, 2.0);
     // Normal times range widely depending if it hits 3 in flight.
     assert_between!(duration, 15.0, 20.0);
 
