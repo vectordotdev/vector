@@ -269,6 +269,7 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
     let skip_first_lines = config.skip_first_lines;
+    let start_at_beginning = config.start_at_beginning;
     Box::new(future::lazy(move || {
         info!(message = "Starting file server.", ?include, ?exclude);
 
@@ -277,7 +278,7 @@ pub fn file_source(
 
         // Skips first lines per file
         let skipped: Box<dyn Stream<Item = (Bytes, String, u64), Error = ()> + Send> =
-            if skip_first_lines > 0 {
+            if skip_first_lines > 0 && start_at_beginning {
                 let mut map = HashMap::new();
                 Box::new(rx.filter(move |&(_, _, file_id)| {
                     let entry = map.entry(file_id).or_insert(skip_first_lines);
