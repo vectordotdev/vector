@@ -76,10 +76,10 @@ mod tests {
     // A helper function to make a test object.
     fn make_to(uid: &str) -> TO {
         WatchResponse::Ok(WatchEvent::Added(Pod {
-            metadata: Some(ObjectMeta {
+            metadata: ObjectMeta {
                 uid: Some(uid.to_owned()),
                 ..ObjectMeta::default()
-            }),
+            },
             ..Pod::default()
         }))
     }

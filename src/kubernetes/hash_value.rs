@@ -21,7 +21,7 @@ where
 
     /// Get the `uid` from the `T`'s [`Metadata`] (if any).
     pub fn uid(&self) -> Option<&str> {
-        let ObjectMeta { ref uid, .. } = self.0.metadata()?;
+        let ObjectMeta { ref uid, .. } = self.0.metadata();
         let uid = uid.as_ref()?;
         Some(uid.as_str())
     }

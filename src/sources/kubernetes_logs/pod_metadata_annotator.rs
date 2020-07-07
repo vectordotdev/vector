@@ -57,8 +57,7 @@ impl PodMetadataAnnotator {
         let guard = self.pods_state_reader.get(uid)?;
         let entry = guard.get_one()?;
         let pod: &Pod = entry.as_ref();
-        let metadata = pod.metadata.as_ref()?;
-        annotate_from_metadata(log, &self.fields_spec, &metadata);
+        annotate_from_metadata(log, &self.fields_spec, &pod.metadata);
         Some(())
     }
 }

@@ -460,4 +460,4 @@ tower-layer = "0.3"
 
 [patch.crates-io]
 # TODO: switch to crates.io after fix for https://github.com/Arnavion/k8s-openapi/issues/70 is released
-k8s-openapi = { git = "https://github.com/timberio/k8s-openapi.git", branch = "fix-70" }
+k8s-openapi = { git = "https://github.com/Arnavion/k8s-openapi.git", rev = "f506c01134b5280faaa1d003c7445178df7fa36e" }

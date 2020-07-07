@@ -59,13 +59,7 @@ impl Candidate {
     where
         T: Metadata<Ty = ObjectMeta>,
     {
-        let metadata = match object.metadata() {
-            Some(val) => val,
-            None => {
-                warn!(message = "Got k8s object without metadata");
-                return None;
-            }
-        };
+        let metadata = object.metadata();
 
         let new_resource_version = match metadata.resource_version {
             Some(ref val) => val,

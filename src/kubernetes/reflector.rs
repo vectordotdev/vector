@@ -288,11 +288,11 @@ mod tests {
     // A helper to build a pod object for test purposes.
     fn make_pod(uid: &str, resource_version: &str) -> Pod {
         Pod {
-            metadata: Some(ObjectMeta {
+            metadata: ObjectMeta {
                 uid: Some(uid.to_owned()),
                 resource_version: Some(resource_version.to_owned()),
                 ..ObjectMeta::default()
-            }),
+            },
             ..Pod::default()
         }
     }

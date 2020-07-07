@@ -133,10 +133,10 @@ mod tests {
 
     fn make_pod(uid: &str) -> Pod {
         Pod {
-            metadata: Some(ObjectMeta {
+            metadata: ObjectMeta {
                 uid: Some(uid.to_owned()),
                 ..ObjectMeta::default()
-            }),
+            },
             ..Pod::default()
         }
     }

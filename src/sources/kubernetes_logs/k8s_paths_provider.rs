@@ -53,7 +53,7 @@ impl PathsProvider for K8sPathsProvider {
 }
 
 fn extract_pod_logs_directory(pod: &Pod) -> Option<PathBuf> {
-    let metadata = pod.metadata.as_ref()?;
+    let metadata = &pod.metadata;
     let namespace = metadata.namespace.as_ref()?;
     let name = metadata.name.as_ref()?;
     let uid = metadata.uid.as_ref()?;
@@ -103,52 +103,45 @@ mod tests {
             (Pod::default(), None),
             (
                 Pod {
-                    metadata: Some(ObjectMeta::default()),
-                    ..Pod::default()
-                },
-                None,
-            ),
-            (
-                Pod {
-                    metadata: Some(ObjectMeta {
+                    metadata: ObjectMeta {
                         namespace: Some("sandbox0-ns".to_owned()),
                         name: Some("sandbox0-name".to_owned()),
                         uid: Some("sandbox0-uid".to_owned()),
                         ..ObjectMeta::default()
-                    }),
+                    },
                     ..Pod::default()
                 },
                 Some("/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid"),
             ),
             (
                 Pod {
-                    metadata: Some(ObjectMeta {
+                    metadata: ObjectMeta {
                         namespace: Some("sandbox0-ns".to_owned()),
                         name: Some("sandbox0-name".to_owned()),
                         ..ObjectMeta::default()
-                    }),
+                    },
                     ..Pod::default()
                 },
                 None,
             ),
             (
                 Pod {
-                    metadata: Some(ObjectMeta {
+                    metadata: ObjectMeta {
                         namespace: Some("sandbox0-ns".to_owned()),
                         uid: Some("sandbox0-uid".to_owned()),
                         ..ObjectMeta::default()
-                    }),
+                    },
                     ..Pod::default()
                 },
                 None,
             ),
             (
                 Pod {
-                    metadata: Some(ObjectMeta {
+                    metadata: ObjectMeta {
                         name: Some("sandbox0-name".to_owned()),
                         uid: Some("sandbox0-uid".to_owned()),
                         ..ObjectMeta::default()
-                    }),
+                    },
                     ..Pod::default()
                 },
                 None,
@@ -169,12 +162,12 @@ mod tests {
             // Pod exists and has some containers that write logs.
             (
                 Pod {
-                    metadata: Some(ObjectMeta {
+                    metadata: ObjectMeta {
                         namespace: Some("sandbox0-ns".to_owned()),
                         name: Some("sandbox0-name".to_owned()),
                         uid: Some("sandbox0-uid".to_owned()),
                         ..ObjectMeta::default()
-                    }),
+                    },
                     ..Pod::default()
                 },
                 // Calls to the glob mock.
@@ -200,12 +193,12 @@ mod tests {
             // Pod has proper metadata, but doesn't have log files.
             (
                 Pod {
-                    metadata: Some(ObjectMeta {
+                    metadata: ObjectMeta {
                         namespace: Some("sandbox0-ns".to_owned()),
                         name: Some("sandbox0-name".to_owned()),
                         uid: Some("sandbox0-uid".to_owned()),
                         ..ObjectMeta::default()
-                    }),
+                    },
                     ..Pod::default()
                 },
                 vec![(

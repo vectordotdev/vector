@@ -87,11 +87,11 @@ mod tests {
 
     fn make_pod() -> Pod {
         Pod {
-            metadata: Some(ObjectMeta {
+            metadata: ObjectMeta {
                 name: Some("pod_name".to_owned()),
                 uid: Some("pod_uid".to_owned()),
                 ..ObjectMeta::default()
-            }),
+            },
             ..Pod::default()
         }
     }
