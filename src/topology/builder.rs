@@ -114,7 +114,7 @@ pub fn build_pieces(config: &super::Config, diff: &ConfigDiff) -> Result<Pieces,
     let mut tasks = HashMap::new();
     let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
-    let mut shutdown_coordinator = SourceShutdownCoordinator::new();
+    let mut shutdown_coordinator = SourceShutdownCoordinator::default();
 
     let mut errors = vec![];
 
@@ -171,9 +171,7 @@ pub fn build_pieces(config: &super::Config, diff: &ConfigDiff) -> Result<Pieces,
 
         let typetag = &transform.inner.transform_type();
 
-        let cx = TransformContext {
-            resolver: resolver.clone(),
-        };
+        let cx = TransformContext { resolver };
 
         let input_type = transform.inner.input_type();
         let transform = match transform.inner.build(cx) {
@@ -221,10 +219,7 @@ pub fn build_pieces(config: &super::Config, diff: &ConfigDiff) -> Result<Pieces,
             Ok(buffer) => buffer,
         };
 
-        let cx = SinkContext {
-            resolver: resolver.clone(),
-            acker,
-        };
+        let cx = SinkContext { resolver, acker };
 
         let (sink, healthcheck) = match sink.inner.build(cx) {
             Err(error) => {

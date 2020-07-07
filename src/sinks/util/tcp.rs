@@ -102,7 +102,7 @@ impl TcpSink {
         tcp_healthcheck(
             self.host.clone(),
             self.port,
-            self.resolver.clone(),
+            self.resolver,
             self.tls.clone(),
         )
     }
