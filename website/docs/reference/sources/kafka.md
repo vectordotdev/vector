@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-01"
+last_modified_on: "2020-07-05"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -680,7 +680,8 @@ The raw event message, unaltered.
 
 ### timestamp
 
-The exact time the event was ingested.
+Timestamp extracted from the event, or, if not present, the exact time the
+event was ingested.
 
 
 
