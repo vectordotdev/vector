@@ -37,7 +37,7 @@ GEM
     unindent (1.0)
     uri_template (0.7.0)
     word_wrap (1.0.0)
-    yard (0.9.24)
+    yard (0.9.25)
     zeitwerk (2.3.0)
 
 PLATFORMS
