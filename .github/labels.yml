@@ -11,8 +11,8 @@
 - name: "domain: config"
   description: Anything config related
   color: 212f3e
-- name: "domain: deps"
-  description: Anything deps related
+- name: "domain: dependencies"
+  description: Anything dependency related
   color: 212f3e
 - name: "domain: networking"
   description: Anything networking related
