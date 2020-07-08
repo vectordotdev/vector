@@ -267,7 +267,7 @@ get_architecture() {
             ;;
 
         Linux)
-            case `ldd --version 2>&1 | grep -Fq 'musl' >/dev/null; echo $?` in
+            case $(ldd --version 2>&1 | grep -Fq 'musl' >/dev/null; echo $?) in
               0)
                 _ostype=unknown-linux-musl
                 ;;
