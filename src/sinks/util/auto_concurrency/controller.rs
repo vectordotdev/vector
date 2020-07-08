@@ -10,6 +10,7 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::OwnedSemaphorePermit;
+use tower03::timeout::error::Elapsed;
 
 const EWMA_ALPHA: f64 = 0.5;
 const THRESHOLD_RATIO: f64 = 0.01;
@@ -126,7 +127,18 @@ where
         start: Instant,
         response: &Result<L::Response, crate::Error>,
     ) {
-        let is_back_pressure = matches!(response, Err(r) if self.logic.is_retriable_error(r.downcast_ref::<L::Error>().expect("REMOVE THIS: We got an unexpected error type")));
+        let is_back_pressure = match response {
+            Ok(_) => false,
+            Err(err) => {
+                if let Some(err) = err.downcast_ref::<L::Error>() {
+                    self.logic.is_retriable_error(err)
+                } else if err.downcast_ref::<Elapsed>().is_some() {
+                    true
+                } else {
+                    panic!("Unhandled error response! {:?}", err)
+                }
+            }
+        };
         self.adjust_to_back_pressure(start, is_back_pressure)
     }
 }
