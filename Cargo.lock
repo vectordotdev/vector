@@ -3794,9 +3794,9 @@ dependencies = [
 
 [[package]]
 name = "scan_fmt"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "faf737f37ca340201889b5f48ecde47f233e9da3cbf3d04be27883adac39b4da"
+checksum = "248286eec0f55678879ef1caec3d76276643ebcb5460d8cb6e732ef40f50aabe"
 dependencies = [
  "regex",
 ]
