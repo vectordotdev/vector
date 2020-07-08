@@ -1,7 +1,7 @@
 FROM docker.io/ubuntu:20.04 AS ENVIRONMENT
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ='America/New York' \
-    PATH=/root/.cargo/bin:$PATH \
+    PATH=/root/.cargo/bin:/root/.local/bin/:$PATH \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8

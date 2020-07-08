@@ -9,6 +9,10 @@ apt upgrade --yes
 # Deps
 apt install --yes \
     build-essential \
+    pkg-config \
+    libssl-dev \
+    python3-pip \
+    jq \
     software-properties-common \
     locales \
     apt-transport-https \
@@ -24,7 +28,7 @@ locale-gen en_US.UTF-8
 dpkg-reconfigure locales
 
 # Rust
-curl https://sh.rustup.rs -sSf | sh -s -- -y
+curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 
 # Yarn
 curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
@@ -40,3 +44,6 @@ add-apt-repository \
 # Install those new things
 apt update --yes
 apt install --yes yarn docker-ce docker-ce-cli containerd.io
+
+# Remarshal is particular
+pip3 install --global remarshal==0.11.2
