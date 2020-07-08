@@ -11,6 +11,8 @@ env:
   RUST_TEST_THREADS: 1
   TEST_LOG: vector=debug
   RUST_BACKTRACE: full
+  AWS_ACCESS_KEY_ID: "dummy"
+  AWS_SECRET_ACCESS_KEY: "dummy"
 
 jobs:
   cancel-previous:

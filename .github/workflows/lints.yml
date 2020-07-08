@@ -11,6 +11,8 @@ env:
   ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
   TEST_LOG: vector=debug
   RUST_BACKTRACE: full
+  AWS_ACCESS_KEY_ID: "dummy"
+  AWS_SECRET_ACCESS_KEY: "dummy"
 
 jobs:
   cancel-previous:
