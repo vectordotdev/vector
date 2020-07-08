@@ -9,9 +9,12 @@ apt upgrade --yes
 # Deps
 apt install --yes \
     build-essential \
+    software-properties-common \
     locales \
-    docker.io \
+    apt-transport-https \
+    ca-certificates \
     curl \
+    gnupg-agent \
     ruby-bundler \
     nodejs \
     gnupg2
