@@ -679,7 +679,6 @@ mod test {
 
     #[test]
     fn transaction_from_condition() {
-        let rt = crate::runtime::Runtime::single_threaded().unwrap();
         let mut transaction = toml::from_str::<TransactionConfig>(
             r#"
 identifier_fields = [ "request_id" ]
@@ -688,7 +687,7 @@ identifier_fields = [ "request_id" ]
 "#,
         )
         .unwrap()
-        .build(TransformContext::new_test(rt.executor()))
+        .build(TransformContext::new_test())
         .unwrap();
 
         let mut outputs = Vec::new();
@@ -750,7 +749,6 @@ identifier_fields = [ "request_id" ]
 
     #[test]
     fn transaction_merge_strategies() {
-        let rt = crate::runtime::Runtime::single_threaded().unwrap();
         let mut transaction = toml::from_str::<TransactionConfig>(
             r#"
 identifier_fields = [ "request_id" ]
@@ -764,7 +762,7 @@ merge_strategies.baz = "max"
 "#,
         )
         .unwrap()
-        .build(TransformContext::new_test(rt.executor()))
+        .build(TransformContext::new_test())
         .unwrap();
 
         let mut outputs = Vec::new();
