@@ -453,6 +453,7 @@ fn get_value_merger(
 
 //------------------------------------------------------------------------------
 
+#[derive(Debug)]
 struct TransactionState {
     fields: HashMap<String, Box<dyn TransactionValueMerger>>,
     stale_since: Instant,
