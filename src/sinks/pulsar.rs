@@ -69,8 +69,8 @@ inventory::submit! {
 #[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = PulsarSink::new(self.clone(), cx.acker())?;
-        let hc = healthcheck(self.clone(), sink.pulsar.clone());
+        let sink = PulsarSink::new(self, cx.acker())?;
+        let hc = PulsarSink::healthcheck(self, sink.pulsar.clone());
         Ok((Box::new(sink), hc))
     }
 
@@ -84,9 +84,9 @@ impl SinkConfig for PulsarSinkConfig {
 }
 
 impl PulsarSink {
-    pub(crate) fn new(config: PulsarSinkConfig, acker: Acker) -> crate::Result<Self> {
-        let auth = config.auth.map(|auth| Authentication {
-            name: auth.name,
+    fn new(config: &PulsarSinkConfig, acker: Acker) -> crate::Result<Self> {
+        let auth = config.auth.as_ref().map(|auth| Authentication {
+            name: auth.name.clone(),
             data: auth.token.as_bytes().to_vec(),
         });
         let pulsar = Pulsar::new(config.address.parse()?, auth, DefaultExecutor::current())
@@ -95,8 +95,8 @@ impl PulsarSink {
         let producer = pulsar.producer(Some(ProducerOptions::default()));
 
         Ok(Self {
-            topic: config.topic,
-            encoding: config.encoding.into(),
+            topic: config.topic.clone(),
+            encoding: config.encoding.clone().into(),
             pulsar,
             producer,
             in_flight: FuturesUnordered::new(),
@@ -107,9 +107,20 @@ impl PulsarSink {
         })
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn pulsar(&self) -> &'_ Pulsar {
-        &self.pulsar
+    fn healthcheck(config: &PulsarSinkConfig, pulsar: Pulsar) -> super::Healthcheck {
+        let topic = config.topic.clone();
+        Box::new(future::lazy(move || {
+            pulsar
+                .consumer()
+                .with_topic(topic)
+                .with_consumer_name("Healthcheck")
+                .with_subscription_type(SubType::Shared)
+                .with_subscription("HealthSubscription")
+                .build::<String>()
+                .and_then(|consumer| consumer.take(1).collect())
+                .map(|_| ())
+                .map_err(|err| err.into())
+        }))
     }
 }
 
@@ -166,21 +177,6 @@ fn encode_event(item: Event, encoding: &EncodingConfig<Encoding>) -> crate::Resu
     })
 }
 
-fn healthcheck(config: PulsarSinkConfig, pulsar: Pulsar) -> super::Healthcheck {
-    Box::new(future::lazy(move || {
-        pulsar
-            .consumer()
-            .with_topic(&config.topic)
-            .with_consumer_name("Healthcheck")
-            .with_subscription_type(SubType::Shared)
-            .with_subscription("HealthSubscription")
-            .build::<String>()
-            .and_then(|consumer| consumer.take(1).collect())
-            .map(|_| ())
-            .map_err(|err| err.into())
-    }))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231,12 +227,12 @@ mod integration_tests {
         let (acker, ack_counter) = Acker::new_for_testing();
         let mut rt = runtime();
 
-        let sink = rt.block_on_std(async move { PulsarSink::new(cnf, acker).unwrap() });
+        let sink = rt.block_on_std(async move { PulsarSink::new(&cnf, acker).unwrap() });
 
         let num_events = 1_000;
         let (_input, events) = random_lines_with_stream(100, num_events);
         let consumer_fut = sink
-            .pulsar()
+            .pulsar
             .consumer()
             .with_topic(&topic)
             .with_consumer_name("VectorTestConsumer")
