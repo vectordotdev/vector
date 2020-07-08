@@ -13,6 +13,7 @@ apt install --yes \
     libssl-dev \
     python3-pip \
     jq \
+    shellcheck \
     software-properties-common \
     locales \
     apt-transport-https \
