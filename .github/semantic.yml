@@ -20,7 +20,7 @@ scopes:
   - buffers
   - cli
   - config
-  - dependencies
+  - deps
   - networking
   - observability
   - operations
