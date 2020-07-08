@@ -90,17 +90,17 @@ impl<'a> Iterator for PathIter<'a> {
                 },
                 Key(mut s) => match c {
                     Some('.') => {
-                        res = Some(Some(PathComponent::Key(s.into())));
+                        res = Some(Some(PathComponent::Key(s)));
                         Dot
                     }
                     Some('[') => {
-                        res = Some(Some(PathComponent::Key(s.into())));
+                        res = Some(Some(PathComponent::Key(s)));
                         OpeningBracket
                     }
                     Some(']') => Invalid,
                     Some('\\') => KeyEscape(s),
                     None => {
-                        res = Some(Some(PathComponent::Key(s.into())));
+                        res = Some(Some(PathComponent::Key(s)));
                         End
                     }
                     Some(c) => {

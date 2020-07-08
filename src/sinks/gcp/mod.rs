@@ -52,7 +52,7 @@ pub struct GcpAuthConfig {
 impl GcpAuthConfig {
     pub fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpCredentials>> {
         let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
-        let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
+        let creds_path = self.credentials_path.as_ref().or_else(|| gap.as_ref());
         Ok(match (&creds_path, &self.api_key) {
             (Some(path), _) => Some(GcpCredentials::from_file(path, scope)?),
             (None, Some(_)) => None,
@@ -181,7 +181,9 @@ pub fn healthcheck_response(
             // regenerated. Since the health check runs at
             // startup, after a successful health check is a
             // good place to create the regeneration task.
-            creds.map(|creds| creds.spawn_regenerate_token());
+            if let Some(creds) = creds {
+                creds.spawn_regenerate_token();
+            }
             Ok(())
         }
         StatusCode::FORBIDDEN => Err(GcpError::InvalidCredentials0.into()),

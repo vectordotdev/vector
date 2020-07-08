@@ -86,7 +86,7 @@ impl Transform for GrokParser {
 
         if let Some(value) = value {
             if let Some(matches) = self.pattern.match_against(&value) {
-                let drop_field = self.drop_field && !matches.get(&self.field).is_some();
+                let drop_field = self.drop_field && matches.get(&self.field).is_none();
                 for (name, value) in matches.iter() {
                     let conv = self.types.get(name).unwrap_or(&Conversion::Bytes);
                     match conv.convert(value.into()) {
@@ -200,12 +200,9 @@ mod tests {
             event::Value::from("help i'm stuck in an http server"),
             event[&event::log_schema().message_key()]
         );
-        assert!(
-            event[&event::log_schema().timestamp_key()]
-                .to_string_lossy()
-                .len()
-                > 0
-        );
+        assert!(!event[&event::log_schema().timestamp_key()]
+            .to_string_lossy()
+            .is_empty());
     }
 
     #[test]
@@ -250,12 +247,9 @@ mod tests {
             event::Value::from("i am the only field"),
             event[&event::log_schema().message_key()]
         );
-        assert!(
-            event[&event::log_schema().timestamp_key()]
-                .to_string_lossy()
-                .len()
-                > 0
-        );
+        assert!(!event[&event::log_schema().timestamp_key()]
+            .to_string_lossy()
+            .is_empty());
     }
 
     #[test]

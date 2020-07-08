@@ -157,12 +157,8 @@ impl Transform for Geoip {
         ];
         for field in geoip_fields.iter() {
             let e = event.as_mut_log();
-            let d = e.get(&Atom::from(field.to_string()));
-            match d {
-                None => {
-                    e.insert(Atom::from(field.to_string()), Value::from(""));
-                }
-                _ => (),
+            if e.get(&Atom::from(field.to_string())).is_none() {
+                e.insert(Atom::from(field.to_string()), Value::from(""));
             }
         }
 
@@ -204,11 +200,7 @@ mod tests {
         for field in exp_geoip_attr.keys() {
             let k = Atom::from(format!("geo.{}", field).to_string());
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
-
-            match exp_geoip_attr.get(field) {
-                Some(&v) => assert_eq!(geodata, v),
-                _ => assert!(false),
-            }
+            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
     }
 
@@ -234,10 +226,7 @@ mod tests {
         for field in exp_geoip_attr.keys() {
             let k = Atom::from(format!("geo.{}", field).to_string());
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
-            match exp_geoip_attr.get(field) {
-                Some(&v) => assert_eq!(geodata, v),
-                _ => assert!(false),
-            }
+            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
     }
 
@@ -264,10 +253,7 @@ mod tests {
             let k = Atom::from(format!("geo.{}", field).to_string());
             println!("Looking for {:?}", k);
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
-            match exp_geoip_attr.get(field) {
-                Some(&v) => assert_eq!(geodata, v),
-                _ => assert!(false),
-            }
+            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }
     }
 }

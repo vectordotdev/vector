@@ -145,7 +145,6 @@ impl Sink for KafkaSink {
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.render_string(&item).map_err(|missing_keys| {
             error!(message = "Missing keys for topic", ?missing_keys);
-            ()
         })?;
 
         let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);
@@ -312,7 +311,7 @@ mod tests {
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
-        assert_eq!(&key[..], "value".as_bytes());
+        assert_eq!(&key[..], b"value");
         assert_eq!(map[&event::log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
         assert_eq!(map["foo"], "bar".to_string());

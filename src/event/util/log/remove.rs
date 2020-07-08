@@ -27,12 +27,12 @@ fn remove_array(
 ) -> Option<(Value, bool)> {
     match path.next()? {
         PathComponent::Index(index) => match path.peek() {
-            None => return array_remove(array, index).map(|v| (v, false)),
+            None => array_remove(array, index).map(|v| (v, false)),
             Some(_) => array
                 .get_mut(index)
                 .and_then(|value| Some((remove_rec(value, path, prune)?.0, false))),
         },
-        _ => return None,
+        _ => None,
     }
 }
 
@@ -43,7 +43,7 @@ fn remove_map(
 ) -> Option<(Value, bool)> {
     match path.next()? {
         PathComponent::Key(key) => match path.peek() {
-            None => fields.remove(&key).map(|v| (v, fields.len() == 0)),
+            None => fields.remove(&key).map(|v| (v, fields.is_empty())),
             Some(_) => {
                 let (result, empty) = fields
                     .get_mut(&key)
@@ -51,10 +51,10 @@ fn remove_map(
                 if prune && empty {
                     fields.remove(&key);
                 }
-                Some((result, fields.len() == 0))
+                Some((result, fields.is_empty()))
             }
         },
-        _ => return None,
+        _ => None,
     }
 }
 

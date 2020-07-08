@@ -752,9 +752,7 @@ mod tests {
 
         let n = 10;
 
-        let events = (0..n)
-            .into_iter()
-            .map(|i| Event::from(format!("program me {}", i)));
+        let events = (0..n).map(|i| Event::from(format!("program me {}", i)));
 
         let stream =
             Transform::transform_stream(Box::new(transform), Box::new(stream::iter_ok(events)));

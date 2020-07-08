@@ -74,8 +74,8 @@ impl HumioLogsConfig {
             host,
             encoding: self.encoding.clone().transmute(),
             compression: self.compression,
-            batch: self.batch.clone(),
-            request: self.request.clone(),
+            batch: self.batch,
+            request: self.request,
             ..Default::default()
         }
     }

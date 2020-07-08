@@ -14,7 +14,7 @@ pub fn get_mut<'a>(fields: &'a mut BTreeMap<String, Value>, path: &str) -> Optio
     }
 }
 
-fn get_mut_value<'a, I>(mut value: &'a mut Value, mut path_iter: I) -> Option<&'a mut Value>
+fn get_mut_value<I>(mut value: &mut Value, mut path_iter: I) -> Option<&mut Value>
 where
     I: Iterator<Item = PathComponent>,
 {

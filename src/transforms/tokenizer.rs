@@ -273,7 +273,6 @@ mod tests {
             field,
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
-            ..Default::default()
         }
         .build(TransformContext::new_test())
         .unwrap();

@@ -172,7 +172,7 @@ impl HttpSink for StackdriverSink {
             .as_ref()
             .and_then(|key| log.remove(key))
             .map(remap_severity)
-            .unwrap_or(0.into());
+            .unwrap_or_else(|| 0.into());
 
         let entry = serde_json::json!({
             "jsonPayload": log,
@@ -302,7 +302,7 @@ mod tests {
         let log = LogEvent::from_iter(
             [("message", "hello world"), ("anumber", "100")]
                 .iter()
-                .map(|&s| s),
+                .copied(),
         );
         let json = sink.encode_event(Event::from(log)).unwrap();
         let body = serde_json::to_string(&json).unwrap();
@@ -358,8 +358,8 @@ mod tests {
             severity_key: None,
         };
 
-        let log1 = LogEvent::from_iter([("message", "hello")].iter().map(|&s| s));
-        let log2 = LogEvent::from_iter([("message", "world")].iter().map(|&s| s));
+        let log1 = LogEvent::from_iter([("message", "hello")].iter().copied());
+        let log2 = LogEvent::from_iter([("message", "world")].iter().copied());
         let event1 = sink.encode_event(Event::from(log1)).unwrap();
         let event2 = sink.encode_event(Event::from(log2)).unwrap();
 

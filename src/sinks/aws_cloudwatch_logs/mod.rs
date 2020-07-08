@@ -239,8 +239,7 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
             let svc = {
                 let policy = self.request_settings.retry_policy(CloudwatchRetryLogic);
 
-                let cloudwatch =
-                    CloudwatchLogsSvc::new(&self.config, &key, self.resolver.clone()).unwrap();
+                let cloudwatch = CloudwatchLogsSvc::new(&self.config, &key, self.resolver).unwrap();
                 let timeout = Timeout::new(cloudwatch, self.request_settings.timeout);
 
                 let buffer = Buffer::new(timeout, 1);
@@ -806,7 +805,7 @@ mod tests {
     fn cloudwatch_encode_log_as_json() {
         let mut event = Event::from("hello world").into_log();
         event.insert("key", "value");
-        let encoded = encode_log(event.clone(), &Encoding::Json.into()).unwrap();
+        let encoded = encode_log(event, &Encoding::Json.into()).unwrap();
         let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
         assert!(map.get(&event::log_schema().timestamp_key()).is_none());
     }
@@ -815,7 +814,7 @@ mod tests {
     fn cloudwatch_encode_log_as_text() {
         let mut event = Event::from("hello world").into_log();
         event.insert("key", "value");
-        let encoded = encode_log(event.clone(), &Encoding::Text.into()).unwrap();
+        let encoded = encode_log(event, &Encoding::Text.into()).unwrap();
         assert_eq!(encoded.message, "hello world");
     }
 
@@ -823,7 +822,6 @@ mod tests {
     fn cloudwatch_24h_split() {
         let now = Utc::now();
         let events = (0..100)
-            .into_iter()
             .map(|i| now - Duration::hours(i))
             .map(|timestamp| {
                 let mut event = Event::new_empty_log();

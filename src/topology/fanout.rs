@@ -172,7 +172,7 @@ mod tests {
         );
         assert_eq!(
             CollectCurrent::new(rx_b).wait().unwrap().1,
-            vec![rec1.clone(), rec2.clone()]
+            vec![rec1, rec2]
         );
     }
 
@@ -197,7 +197,7 @@ mod tests {
 
         let mut rt = runtime();
 
-        let recs = vec![rec1.clone(), rec2.clone(), rec3.clone()];
+        let recs = vec![rec1, rec2, rec3];
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         rt.spawn(send.map(|_| ()));
 
@@ -208,9 +208,9 @@ mod tests {
         let collect_b = futures01::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
         let collect_c = futures01::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
 
-        assert_eq!(collect_a.wait().unwrap(), recs.clone());
-        assert_eq!(collect_b.wait().unwrap(), recs.clone());
-        assert_eq!(collect_c.wait().unwrap(), recs.clone());
+        assert_eq!(collect_a.wait().unwrap(), recs);
+        assert_eq!(collect_b.wait().unwrap(), recs);
+        assert_eq!(collect_c.wait().unwrap(), recs);
     }
 
     #[test]
@@ -244,12 +244,9 @@ mod tests {
         );
         assert_eq!(
             CollectCurrent::new(rx_b).wait().unwrap().1,
-            vec![rec1.clone(), rec2.clone(), rec3.clone()]
+            vec![rec1, rec2, rec3.clone()]
         );
-        assert_eq!(
-            CollectCurrent::new(rx_c).wait().unwrap().1,
-            vec![rec3.clone()]
-        );
+        assert_eq!(CollectCurrent::new(rx_c).wait().unwrap().1, vec![rec3]);
     }
 
     #[test]
@@ -279,11 +276,11 @@ mod tests {
 
         assert_eq!(
             CollectCurrent::new(rx_a).wait().unwrap().1,
-            vec![rec1.clone(), rec2.clone(), rec3.clone()]
+            vec![rec1.clone(), rec2.clone(), rec3]
         );
         assert_eq!(
             CollectCurrent::new(rx_b).wait().unwrap().1,
-            vec![rec1.clone(), rec2.clone()]
+            vec![rec1, rec2]
         );
     }
 
@@ -308,7 +305,7 @@ mod tests {
 
         let mut rt = runtime();
 
-        let recs = vec![rec1.clone(), rec2.clone(), rec3.clone()];
+        let recs = vec![rec1.clone(), rec2, rec3];
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         rt.spawn(send.map(|_| ()));
 
@@ -322,9 +319,9 @@ mod tests {
         let collect_b = futures01::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
         let collect_c = futures01::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
 
-        assert_eq!(collect_a.wait().unwrap(), recs.clone());
-        assert_eq!(collect_b.wait().unwrap(), recs.clone());
-        assert_eq!(collect_c.wait().unwrap(), vec![rec1.clone()]);
+        assert_eq!(collect_b.wait().unwrap(), recs);
+        assert_eq!(collect_a.wait().unwrap(), recs);
+        assert_eq!(collect_c.wait().unwrap(), vec![rec1]);
     }
 
     #[test]
@@ -348,7 +345,7 @@ mod tests {
 
         let mut rt = runtime();
 
-        let recs = vec![rec1.clone(), rec2.clone(), rec3.clone()];
+        let recs = vec![rec1.clone(), rec2, rec3];
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         rt.spawn(send.map(|_| ()));
 
@@ -362,9 +359,9 @@ mod tests {
         let collect_b = futures01::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
         let collect_c = futures01::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
 
-        assert_eq!(collect_a.wait().unwrap(), recs.clone());
-        assert_eq!(collect_b.wait().unwrap(), vec![rec1.clone()]);
-        assert_eq!(collect_c.wait().unwrap(), recs.clone());
+        assert_eq!(collect_a.wait().unwrap(), recs);
+        assert_eq!(collect_b.wait().unwrap(), vec![rec1]);
+        assert_eq!(collect_c.wait().unwrap(), recs);
     }
 
     #[test]
@@ -388,7 +385,7 @@ mod tests {
 
         let mut rt = runtime();
 
-        let recs = vec![rec1.clone(), rec2.clone(), rec3.clone()];
+        let recs = vec![rec1.clone(), rec2.clone(), rec3];
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         rt.spawn(send.map(|_| ()));
 
@@ -403,9 +400,9 @@ mod tests {
         let collect_b = futures01::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
         let collect_c = futures01::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
 
-        assert_eq!(collect_a.wait().unwrap(), [rec1.clone(), rec2.clone()]);
-        assert_eq!(collect_b.wait().unwrap(), recs.clone());
-        assert_eq!(collect_c.wait().unwrap(), recs.clone());
+        assert_eq!(collect_a.wait().unwrap(), [rec1, rec2]);
+        assert_eq!(collect_b.wait().unwrap(), recs);
+        assert_eq!(collect_c.wait().unwrap(), recs);
     }
 
     #[test]
@@ -415,8 +412,8 @@ mod tests {
         let rec1 = Event::from("line 1".to_string());
         let rec2 = Event::from("line 2".to_string());
 
-        let fanout = fanout.send(rec1.clone()).wait().unwrap();
-        let _fanout = fanout.send(rec2.clone()).wait().unwrap();
+        let fanout = fanout.send(rec1).wait().unwrap();
+        let _fanout = fanout.send(rec2).wait().unwrap();
     }
 
     #[test]
@@ -450,11 +447,8 @@ mod tests {
         );
         assert_eq!(
             CollectCurrent::new(rx_b).wait().unwrap().1,
-            vec![rec1.clone(), rec2.clone(), rec3.clone()]
+            vec![rec1, rec2, rec3.clone()]
         );
-        assert_eq!(
-            CollectCurrent::new(rx_a2).wait().unwrap().1,
-            vec![rec3.clone()]
-        );
+        assert_eq!(CollectCurrent::new(rx_a2).wait().unwrap().1, vec![rec3]);
     }
 }

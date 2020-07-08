@@ -85,7 +85,7 @@ impl FileSink {
             path: config.path.clone(),
             encoding: config.encoding.clone(),
             idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
-            files: ExpiringHashMap::new(),
+            files: ExpiringHashMap::default(),
         }
     }
 
@@ -291,7 +291,7 @@ mod tests {
         trace!(message = "Template", %template);
 
         let config = FileSinkConfig {
-            path: template.clone().try_into().unwrap(),
+            path: template.try_into().unwrap(),
             idle_timeout_secs: None,
             encoding: Encoding::Text.into(),
         };

@@ -350,7 +350,7 @@ impl IpCidrPredicate {
                 )
             }
         };
-        let cidrs = match cidr_strings.iter().map(|s| IpCidr::from_str(s)).collect() {
+        let cidrs = match cidr_strings.iter().map(IpCidr::from_str).collect() {
             Ok(v) => v,
             Err(e) => return Err(format!("Invalid IP CIDR: {}", e)),
         };
