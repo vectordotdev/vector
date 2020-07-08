@@ -180,7 +180,6 @@ fn encode_event(item: Event, encoding: &EncodingConfig<Encoding>) -> crate::Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{self, Event};
     use std::collections::HashMap;
 
     #[test]
@@ -207,70 +206,65 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::test_util::{block_on, random_lines_with_stream, random_string, runtime};
+    use crate::test_util::{random_lines_with_stream, random_string, runtime};
     use futures::compat::Future01CompatExt;
     use pulsar::Message;
-    use std::{
-        sync::atomic::AtomicUsize,
-        sync::{Arc, Mutex},
-    };
+    use std::{sync::atomic::AtomicUsize, sync::Arc};
 
     #[test]
     fn pulsar_happy() {
-        let topic = format!("test-{}", random_string(10));
-        let cnf = PulsarSinkConfig {
-            address: "127.0.0.1:6650".to_owned(),
-            topic: topic.clone(),
-            encoding: Encoding::Text.into(),
-            auth: None,
-        };
-        let (acker, ack_counter) = Acker::new_for_testing();
         let mut rt = runtime();
+        rt.block_on_std(async {
+            let topic = format!("test-{}", random_string(10));
+            let cnf = PulsarSinkConfig {
+                address: "127.0.0.1:6650".to_owned(),
+                topic: topic.clone(),
+                encoding: Encoding::Text.into(),
+                auth: None,
+            };
+            let (acker, ack_counter) = Acker::new_for_testing();
 
-        let sink = rt.block_on_std(async move { PulsarSink::new(&cnf, acker).unwrap() });
+            let sink = PulsarSink::new(&cnf, acker).unwrap();
 
-        let num_events = 1_000;
-        let (_input, events) = random_lines_with_stream(100, num_events);
-        let consumer_fut = sink
-            .pulsar
-            .consumer()
-            .with_topic(&topic)
-            .with_consumer_name("VectorTestConsumer")
-            .with_subscription_type(SubType::Shared)
-            .with_subscription("VectorTestSub")
-            .build::<String>();
-        let consumer = rt.block_on_std(async move { consumer_fut.compat().await.unwrap() });
-
-        let pump = sink.send_all(events);
-        let _ = block_on(pump).unwrap();
-
-        assert_eq!(
-            ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-            num_events
-        );
-
-        let error: Arc<Mutex<Option<pulsar::Error>>> = Arc::new(Mutex::new(None));
-        let successes = Arc::new(AtomicUsize::new(0));
-
-        {
-            let successes = successes.clone();
-            consumer
-                .take(1000)
-                .for_each(move |Message { payload, ack, .. }| {
-                    ack.ack();
-                    let _msg = payload.unwrap();
-                    successes.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    Ok(())
-                })
-                .map_err({
-                    move |e| {
-                        let mut error = error.lock().unwrap();
-                        *error = Some(e);
-                    }
-                })
-                .wait()
+            let num_events = 1_000;
+            let (_input, events) = random_lines_with_stream(100, num_events);
+            let consumer = sink
+                .pulsar
+                .consumer()
+                .with_topic(&topic)
+                .with_consumer_name("VectorTestConsumer")
+                .with_subscription_type(SubType::Shared)
+                .with_subscription("VectorTestSub")
+                .build::<String>()
+                .compat()
+                .await
                 .unwrap();
-        }
-        assert_eq!(successes.load(std::sync::atomic::Ordering::Relaxed), 1000);
+
+            let _ = sink.send_all(events).compat().await.unwrap();
+
+            assert_eq!(
+                ack_counter.load(std::sync::atomic::Ordering::Relaxed),
+                num_events
+            );
+
+            let successes = Arc::new(AtomicUsize::new(0));
+            {
+                let successes = successes.clone();
+                consumer
+                    .take(1000)
+                    .for_each(move |Message { payload, ack, .. }| {
+                        ack.ack();
+                        let _msg = payload.unwrap();
+                        successes.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        Ok(())
+                    })
+                    .map_err(move |e| {
+                        panic!("{:?}", e);
+                    })
+                    .wait()
+                    .unwrap();
+            }
+            assert_eq!(successes.load(std::sync::atomic::Ordering::Relaxed), 1000);
+        });
     }
 }
