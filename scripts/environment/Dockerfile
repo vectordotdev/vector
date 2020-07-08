@@ -7,37 +7,18 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LC_ALL=en_US.UTF-8
 
 # Normal updates
-RUN echo $TZ > /etc/timezone && \
-    apt update --yes && \
-    apt upgrade --yes
+RUN echo $TZ > /etc/timezone
 
 # Dependencies
-RUN apt install --yes \
-    build-essential \
-    locales \
-    docker.io \
-    curl \
-    ruby-bundler \
-    nodejs \
-    gnupg2
-
-# Additional setup
-RUN locale-gen en_US.UTF-8 && \
-    dpkg-reconfigure locales
-
-# Install Rust
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-
-# Yarn
-RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - && \
-    echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list && \
-    apt update --yes && \
-    apt install --yes yarn
+ADD scripts/environment/bootstrap-ubuntu-20.04.sh /bootstrap-ubuntu-20.04.sh
+RUN /bootstrap-ubuntu-20.04.sh
 
 # Setup the env
 RUN mkdir -p /git/timberio/vector/{scripts,website,scripts/environment}
-ADD . /git/timberio/vector/
-ADD website/package.json website/yarn.lock /git/timberio/vector/website/
+ADD scripts/environment scripts/Gemfile scripts/Gemfile.lock \
+    /git/timberio/vector/scripts/
+ADD website/package.json website/yarn.lock \
+    /git/timberio/vector/website/
 
 # Setup the toolchain
 WORKDIR /git/timberio/vector
