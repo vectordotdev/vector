@@ -1,21 +1,30 @@
-# Bootstrap
-FROM docker.io/nixos/nix:2.3.4
-RUN nix-channel --add https://nixos.org/channels/nixpkgs-unstable nixpkgs
+FROM docker.io/ubuntu:20.04 AS ENVIRONMENT
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ='America/New York' \
+    PATH=/root/.cargo/bin:/root/.local/bin/:$PATH \
+    LANG=en_US.UTF-8 \
+    LANGUAGE=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8
+
+# Container junk
+RUN echo $TZ > /etc/timezone
 
 # Setup the env
-RUN mkdir -p vector/{scripts,website,scripts/environment}
-ADD default.nix shell.nix rust-toolchain .envrc /vector/
-ADD scripts/environment/definition.nix /vector/scripts/environment/
-ADD scripts/Gemfile scripts/Gemfile.lock /vector/scripts/
-ADD website/package.json website/yarn.lock /vector/website/
-WORKDIR /vector
-SHELL [ "/usr/bin/env", "nix-shell", "/vector/shell.nix", "--run" ]
-RUN echo "Installing env..."
+RUN mkdir -p /git/timberio/vector/{scripts,website,scripts/environment}
+ADD scripts/environment/bootstrap-ubuntu-20.04.sh scripts/environment/prepare.sh \
+    /git/timberio/vector/scripts/environment/
 
 # Setup the toolchain
-WORKDIR /vector
-ADD ./scripts/environment/prepare.sh /
-RUN ../prepare.sh
+WORKDIR /git/timberio/vector
+RUN ./scripts/environment/bootstrap-ubuntu-20.04.sh
+
+ADD scripts/Gemfile scripts/Gemfile.lock \
+    /git/timberio/vector/scripts/
+ADD website/package.json website/yarn.lock \
+    /git/timberio/vector/website/
+ADD rust-toolchain \
+    /git/timberio/vector/
+RUN ./scripts/environment/prepare.sh
 
 # Declare volumes
 VOLUME /vector
