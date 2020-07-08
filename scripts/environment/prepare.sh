@@ -1,5 +1,5 @@
 #! /usr/bin/env bash
-set -e
+set -e -o verbose
 
 rustup default "$(cat rust-toolchain)"
 rustup component add rustfmt
@@ -12,5 +12,5 @@ bundle install
 cd ..
 
 cd website
-yarn
+yarn install
 cd ..

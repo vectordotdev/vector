@@ -22,7 +22,6 @@ expanding into more specifics.
 1. [Development](#development)
    1. [Setup](#setup)
       1. [Using a Docker or Podman environment](#using-a-docker-or-podman-environment)
-      1. [Using Nix](#using-nix)
       1. [Bring your own toolbox](#bring-your-own-toolbox)
    1. [The Basics](#the-basics)
       1. [Directory Structure](#directory-structure)
@@ -241,43 +240,6 @@ make fmt ENVIRONMENT=true
 ```
 
 We use explicit environment opt-in as many contributors choose to keep their Rust toolchain local, and use `make generate ENVIRONMENT=true` etc.
-
-#### Using Nix
-
-> **Targets:** This method is preferred and ideal for Linux and Mac builds which are not cross compiles.
->
-> **Note:** We're still new at this Nix stuff, so if you're a Nix expert please, teach us more!
-
-If you're a Nix user, or you're open to trying out a new tool, you can use our Nix expressions!
-
-If you don't have Nix yet, [install it](https://nixos.org/download.html):
-
-```bash
-curl -L https://nixos.org/nix/install | sh
-# Hesitating? Uninstalling is just `rm -rf /nix && rm -rf ~/.nix-*`,
-# then remove the import from `.bash_profile`
-```
-
-Next, run `nix-shell` from the Vector directory.
-
-**_Wow, you did it!_** Now you can run the commands described in "Bring your own toolbox" now. This has pulled in all the required packages and set required environment variables.
-
-Your other programs are there too, so you can run `code .` or `clion .` or whatever and get going like normal.
-
-We've only partially adopted Nix to ensure contributors can still use familiar tools. You may still need to run `bundle install`, `yarn` or other commands to initialize things. (PRs welcome if you have ideas to integrate with `carnix`, `bundix`, etc!)
-
-If you're interested in having Nix **automatically enter your environment**, you can consider a tool like [`direnv`](https://direnv.net/docs/installation.html), often available from your package manager.
-
-```bash
-❯ cd /git/timberio/vector
-❯ direnv allow .
-❯ cd ../vector
-direnv: loading /git/timberio/vector/.envrc
-direnv: using nix
-direnv: export +AR +AS +CC +CONFIG_SHELL +CXX +HOST_PATH +IN_NIX_SHELL +LC_ALL +LD +NIX_BINTOOLS +NIX_BINTOOLS_WRAPPER_x86_64_unknown_linux_gnu_TARGET_HOST +NIX_BUILD_CORES +NIX_BUILD_TOP +NIX_CC +NIX_CC_WRAPPER_x86_64_unknown_linux_gnu_TARGET_HOST +NIX_CFLAGS_COMPILE +NIX_ENFORCE_NO_NATIVE +NIX_HARDENING_ENABLE +NIX_INDENT_MAKE +NIX_LDFLAGS +NIX_STORE +NM +OBJCOPY +OBJDUMP +PROTOC +PROTOC_INCLUDE +RANLIB +READELF +SIZE +SOURCE_DATE_EPOCH +STRINGS +STRIP +TEMP +TEMPDIR +TMP +TMPDIR +buildInputs +builder +configureFlags +depsBuildBuild +depsBuildBuildPropagated +depsBuildTarget +depsBuildTargetPropagated +depsHostHost +depsHostHostPropagated +depsTargetTarget +depsTargetTargetPropagated +doCheck +doInstallCheck +name +nativeBuildInputs +nobuildPhase +out +outputs +patches +phases +propagatedBuildInputs +propagatedNativeBuildInputs +shell +shellHook +stdenv +strictDeps +system ~LOCALE_ARCHIVE ~PATH
-```
-
-Now you can use the jobs detailed in **"Bring your own toolbox"** below.
 
 #### Bring your own toolbox
 

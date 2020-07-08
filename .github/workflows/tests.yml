@@ -8,10 +8,11 @@ on:
 
 env:
   VERBOSE: true
-  ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
   RUST_TEST_THREADS: 1
   TEST_LOG: vector=debug
   RUST_BACKTRACE: full
+  AWS_ACCESS_KEY_ID: "dummy"
+  AWS_SECRET_ACCESS_KEY: "dummy"
 
 jobs:
   cancel-previous:
@@ -26,22 +27,19 @@ jobs:
 
   test-linux:
     name: Unit - Linux, flaky
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test"
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test
 
   test-mac:
     name: Unit - Mac, flaky
@@ -51,19 +49,15 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test"
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test
 
   test-windows:
     name: Unit - Windows, flaky
@@ -80,232 +74,196 @@ jobs:
 
   test-behavior:
     name: Behavior - Linux
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test-behavior"
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-behavior
 
   test-shutdown:
     name: Shutdown - Linux
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test-shutdown"
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-shutdown
 
 
   test-integration-aws:
     name: Integration - Linux, AWS
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test-integration-aws"
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-integration-aws
 
   test-integration-clickhouse:
     name: Integration - Linux, Clickhouse
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test-integration-clickhouse"
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-integration-clickhouse
 
   test-integration-docker:
     name: Integration - Linux, Docker
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test-integration-docker"
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-integration-docker
 
   test-integration-elasticsearch:
     name: Integration - Linux, ES
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test-integration-elasticsearch"
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-integration-elasticsearch
 
   test-integration-gcp:
     name: Integration - Linux, GCP
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test-integration-gcp"
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-integration-gcp
 
   test-integration-influxdb:
     name: Integration - Linux, Influx
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test-integration-influxdb"
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-integration-influxdb
 
   test-integration-kafka:
     name: Integration - Linux, Kafka
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test-integration-kafka"
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-integration-kafka
 
   test-integration-loki:
     name: Integration - Linux, Loki
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test-integration-loki"
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-integration-loki
 
   test-integration-pulsar:
     name: Integration - Linux, Pulsar
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test-integration-pulsar"
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-integration-pulsar
 
   test-integration-splunk:
     name: Integration - Linux, Splunk
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v10
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: nix-shell --run "echo 'Env installing...'"
-      - run: nix-shell --run "bash scripts/environment/prepare.sh"
-      - run: nix-shell --run "make slim-builds"
-      - run: nix-shell --run "make test-integration-splunk"
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-integration-splunk
 
   test-integration-kubernetes:
     name: Integration - Linux, Kubernetes, flaky
