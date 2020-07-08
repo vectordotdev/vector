@@ -176,7 +176,7 @@ nix = "0.16.1"
 
 [build-dependencies]
 prost-build = "0.5.0"
-built = "0.3"
+built = { version = "0.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
 approx = "0.3.0"

@@ -5,5 +5,5 @@ fn main() {
     prost_build
         .compile_protos(&["proto/event.proto"], &["proto/"])
         .unwrap();
-    built::write_built_file().unwrap();
+    built::write_built_file().expect("Failed to acquire build-time information");
 }
