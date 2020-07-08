@@ -87,7 +87,7 @@ mod test {
     use futures01::Stream;
     use std::{thread, time::Duration};
 
-    fn parse_count(lines: &Vec<&str>, prefix: &str) -> usize {
+    fn parse_count(lines: &[&str], prefix: &str) -> usize {
         lines
             .iter()
             .find(|s| s.starts_with(prefix))
@@ -117,7 +117,7 @@ mod test {
 
         let mut rt = runtime();
 
-        let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+        let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
         let bind_addr = next_addr();
         let socket = std::net::UdpSocket::bind(&bind_addr).unwrap();
@@ -159,14 +159,14 @@ mod test {
             .collect::<Vec<_>>();
 
         // note that prometheus client reorders the labels
-        let foo1 = parse_count(&lines, "vector_foo{a=\"true\",b=\"b\"");
-        let foo2 = parse_count(&lines, "vector_foo{a=\"true\",b=\"c\"");
+        let vector_foo1 = parse_count(&lines, "vector_foo{a=\"true\",b=\"b\"");
+        let vector_foo2 = parse_count(&lines, "vector_foo{a=\"true\",b=\"c\"");
         // packets get lost :(
-        assert!(foo1 > 90);
-        assert!(foo2 > 90);
+        assert!(vector_foo1 > 90);
+        assert!(vector_foo2 > 90);
 
-        let bar = parse_count(&lines, "vector_bar");
-        assert_eq!(42, bar);
+        let vector_bar = parse_count(&lines, "vector_bar");
+        assert_eq!(42, vector_bar);
 
         assert_eq!(parse_count(&lines, "vector_glork_bucket{le=\"1\"}"), 0);
         assert_eq!(parse_count(&lines, "vector_glork_bucket{le=\"2\"}"), 0);

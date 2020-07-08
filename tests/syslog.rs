@@ -1,5 +1,3 @@
-#![allow(clippy::inherent_to_string)]
-#![allow(clippy::redundant_clone)]
 #![cfg(all(feature = "sources-syslog", feature = "sinks-socket"))]
 
 use approx::assert_relative_eq;
@@ -10,6 +8,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use sinks::socket::SocketSinkConfig;
 use sinks::util::{encoding::EncodingConfig, Encoding};
+use std::fmt;
 use std::{collections::HashMap, str::FromStr, thread, time::Duration};
 #[cfg(unix)]
 use tokio01::codec::{FramedWrite, LinesCodec};
@@ -46,7 +45,7 @@ fn test_tcp_syslog() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -56,7 +55,7 @@ fn test_tcp_syslog() {
 
     let input_lines: Vec<String> = input_messages.iter().map(|msg| msg.to_string()).collect();
 
-    block_on(send_lines(in_addr, input_lines.clone().into_iter())).unwrap();
+    block_on(send_lines(in_addr, input_lines.into_iter())).unwrap();
 
     // Shut down server
     block_on(topology.stop()).unwrap();
@@ -92,7 +91,7 @@ fn test_udp_syslog() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
     let input_messages: Vec<SyslogMessageRFC5424> = (0..num_messages)
         .map(|i| SyslogMessageRFC5424::random(i, 30, 4, 3, 3))
@@ -161,7 +160,7 @@ fn test_unix_stream_syslog() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     while std::os::unix::net::UnixStream::connect(&in_path).is_err() {}
 
@@ -170,7 +169,7 @@ fn test_unix_stream_syslog() {
         .collect();
 
     let input_lines: Vec<String> = input_messages.iter().map(|msg| msg.to_string()).collect();
-    let input_stream = futures01::stream::iter_ok::<_, ()>(input_lines.clone().into_iter());
+    let input_stream = futures01::stream::iter_ok::<_, ()>(input_lines.into_iter());
 
     UnixStream::connect(&in_path)
         .map_err(|e| panic!("{:}", e))
@@ -258,9 +257,12 @@ impl SyslogMessageRFC5424 {
             message: msg,
         }
     }
+}
 
-    fn to_string(&self) -> String {
-        format!(
+impl fmt::Display for SyslogMessageRFC5424 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
             "<{}>{} {} {} {} {} {} {} {}",
             encode_priority(self.severity, self.facility),
             self.version,

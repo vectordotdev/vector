@@ -295,7 +295,7 @@ mod tests {
 
         let new_event1 = transform.transform(event1.clone()).unwrap();
         let new_event2 = transform.transform(event2.clone()).unwrap();
-        let new_event3 = transform.transform(event3.clone());
+        let new_event3 = transform.transform(event3);
 
         assert_eq!(new_event1, event1);
         assert_eq!(new_event2, event2);

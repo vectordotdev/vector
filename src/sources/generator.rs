@@ -93,11 +93,12 @@ impl GeneratorConfig {
             let events = self
                 .lines
                 .iter()
-                .map(|line| match self.sequence {
-                    false => Event::from(&line[..]),
-                    true => {
+                .map(|line| {
+                    if self.sequence {
                         number += 1;
                         Event::from(&format!("{} {}", number, line)[..])
+                    } else {
+                        Event::from(&line[..])
                     }
                 })
                 .collect::<Vec<Event>>();

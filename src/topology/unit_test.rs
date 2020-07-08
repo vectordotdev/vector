@@ -1,7 +1,6 @@
 use crate::{
     conditions::{Condition, ConditionConfig},
     event::{Event, Value},
-    runtime::Runtime,
     topology::config::{
         TestCondition, TestDefinition, TestInput, TestInputValue, TransformContext,
     },
@@ -39,7 +38,7 @@ fn event_to_string(event: &Event) -> String {
     }
 }
 
-fn events_to_string(name: &str, events: &Vec<Event>) -> String {
+fn events_to_string(name: &str, events: &[Event]) -> String {
     if events.len() > 1 {
         format!(
             "  {}s:\n    {}",
@@ -208,7 +207,7 @@ fn links_to_a_leaf(
 /// Reduces a collection of transforms into a set that only contains those that
 /// link between our root (test input) and a set of leaves (test outputs).
 fn reduce_transforms(
-    roots: &Vec<String>,
+    roots: Vec<String>,
     leaves: &IndexMap<String, ()>,
     transform_outputs: &mut IndexMap<String, IndexMap<String, ()>>,
 ) {
@@ -315,7 +314,6 @@ fn build_unit_test(
     expansions: &IndexMap<String, Vec<String>>,
     config: &super::Config,
 ) -> Result<UnitTest, Vec<String>> {
-    let rt = Runtime::single_threaded().unwrap();
     let mut errors = vec![];
 
     let inputs = match build_inputs(&definition, &expansions) {
@@ -367,7 +365,7 @@ fn build_unit_test(
     // Reduce the configured transforms into just the ones connecting our test
     // target with output targets.
     reduce_transforms(
-        &inputs
+        inputs
             .iter()
             .map(|(names, _)| names)
             .flatten()
@@ -381,10 +379,7 @@ fn build_unit_test(
     let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
     for (name, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(name) {
-            match transform_config
-                .inner
-                .build(TransformContext::new_test(rt.executor()))
-            {
+            match transform_config.inner.build(TransformContext::new_test()) {
                 Ok(transform) => {
                     transforms.insert(
                         name.clone(),

@@ -1,5 +1,3 @@
-#![allow(clippy::identity_conversion)]
-
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
 use tempfile::tempdir;
@@ -46,7 +44,8 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -80,15 +79,15 @@ fn benchmark_buffers(c: &mut Criterion) {
                     config.sinks["out"].buffer = BufferConfig::Disk {
                         max_size: 1_000_000,
                         when_full: Default::default(),
-                    }
-                    .into();
+                    };
                     config.global.data_dir = Some(data_dir.clone());
 
                     let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -129,7 +128,8 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)

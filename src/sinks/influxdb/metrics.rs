@@ -94,6 +94,7 @@ impl InfluxDBSvc {
 
         let batch = config
             .batch
+            .disallow_max_bytes()?
             .use_size_as_events()?
             .get_settings_or_default(BatchSettings::default().events(20).timeout(1));
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -276,8 +277,7 @@ fn encode_events(
 
     // remove last '\n'
     output.pop();
-
-    return output;
+    output
 }
 
 fn encode_distribution(values: &[f64], counts: &[u32]) -> Option<HashMap<String, Field>> {
@@ -592,7 +592,7 @@ mod tests {
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: (0..20).into_iter().map(f64::from).collect::<Vec<_>>(),
+                    values: (0..20).map(f64::from).collect::<Vec<_>>(),
                     sample_rates: vec![1; 20],
                 },
             },
@@ -602,8 +602,8 @@ mod tests {
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: (1..5).into_iter().map(f64::from).collect::<Vec<_>>(),
-                    sample_rates: (1..5).into_iter().collect::<Vec<_>>(),
+                    values: (1..5).map(f64::from).collect::<Vec<_>>(),
+                    sample_rates: (1..5).collect::<Vec<_>>(),
                 },
             },
         ];
@@ -734,7 +734,8 @@ mod integration_tests {
     use crate::topology::SinkContext;
     use crate::Event;
     use chrono::Utc;
-    use futures01::{stream, Sink};
+    use futures::compat::Future01CompatExt;
+    use futures01::{stream as stream01, Sink};
 
     //    fn onboarding_v1() {
     //        let client = reqwest::Client::builder()
@@ -758,10 +759,10 @@ mod integration_tests {
 
     #[test]
     fn influxdb2_metrics_put_data() {
+        let mut rt = runtime();
         onboarding_v2();
 
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
@@ -798,69 +799,70 @@ mod integration_tests {
 
         let sink = InfluxDBSvc::new(config, cx).unwrap();
 
-        let stream = stream::iter_ok(events.clone().into_iter());
+        let stream = stream01::iter_ok(events.clone().into_iter());
 
-        let pump = sink.send_all(stream);
-        let _ = rt.block_on(pump).unwrap();
+        rt.block_on_std(async move {
+            let _ = sink.send_all(stream).compat().await.unwrap();
 
-        let mut body = std::collections::HashMap::new();
-        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));
-        body.insert("type", "flux".to_owned());
+            let mut body = std::collections::HashMap::new();
+            body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));
+            body.insert("type", "flux".to_owned());
 
-        let client = reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+            let client = reqwest::Client::builder()
+                .danger_accept_invalid_certs(true)
+                .build()
+                .unwrap();
 
-        let mut res = client
-            .post("http://localhost:9999/api/v2/query?org=my-org")
-            .json(&body)
-            .header("accept", "application/json")
-            .header("Authorization", "Token my-token")
-            .send()
-            .unwrap();
-        let result = res.text();
-        let string = result.unwrap();
+            let res = client
+                .post("http://localhost:9999/api/v2/query?org=my-org")
+                .json(&body)
+                .header("accept", "application/json")
+                .header("Authorization", "Token my-token")
+                .send()
+                .await
+                .unwrap();
+            let string = res.text().await.unwrap();
 
-        let lines = string.split("\n").collect::<Vec<&str>>();
-        let header = lines[0].split(",").collect::<Vec<&str>>();
-        let record = lines[1].split(",").collect::<Vec<&str>>();
+            let lines = string.split("\n").collect::<Vec<&str>>();
+            let header = lines[0].split(",").collect::<Vec<&str>>();
+            let record = lines[1].split(",").collect::<Vec<&str>>();
 
-        assert_eq!(
-            record[header
-                .iter()
-                .position(|&r| r.trim() == "metric_type")
-                .unwrap()]
-            .trim(),
-            "counter"
-        );
-        assert_eq!(
-            record[header
-                .iter()
-                .position(|&r| r.trim() == "production")
-                .unwrap()]
-            .trim(),
-            "true"
-        );
-        assert_eq!(
-            record[header.iter().position(|&r| r.trim() == "region").unwrap()].trim(),
-            "us-west-1"
-        );
-        assert_eq!(
-            record[header
-                .iter()
-                .position(|&r| r.trim() == "_measurement")
-                .unwrap()]
-            .trim(),
-            format!("ns.{}", metric)
-        );
-        assert_eq!(
-            record[header.iter().position(|&r| r.trim() == "_field").unwrap()].trim(),
-            "value"
-        );
-        assert_eq!(
-            record[header.iter().position(|&r| r.trim() == "_value").unwrap()].trim(),
-            "45"
-        );
+            assert_eq!(
+                record[header
+                    .iter()
+                    .position(|&r| r.trim() == "metric_type")
+                    .unwrap()]
+                .trim(),
+                "counter"
+            );
+            assert_eq!(
+                record[header
+                    .iter()
+                    .position(|&r| r.trim() == "production")
+                    .unwrap()]
+                .trim(),
+                "true"
+            );
+            assert_eq!(
+                record[header.iter().position(|&r| r.trim() == "region").unwrap()].trim(),
+                "us-west-1"
+            );
+            assert_eq!(
+                record[header
+                    .iter()
+                    .position(|&r| r.trim() == "_measurement")
+                    .unwrap()]
+                .trim(),
+                format!("ns.{}", metric)
+            );
+            assert_eq!(
+                record[header.iter().position(|&r| r.trim() == "_field").unwrap()].trim(),
+                "value"
+            );
+            assert_eq!(
+                record[header.iter().position(|&r| r.trim() == "_value").unwrap()].trim(),
+                "45"
+            );
+        });
     }
 }

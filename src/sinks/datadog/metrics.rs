@@ -111,6 +111,7 @@ impl SinkConfig for DatadogConfig {
 
         let batch = self
             .batch
+            .disallow_max_bytes()?
             .use_size_as_events()?
             .get_settings_or_default(BatchSettings::default().events(20).timeout(1));
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -558,7 +559,7 @@ mod tests {
     #[test]
     fn test_dense_stats() {
         // https://github.com/DataDog/dd-agent/blob/master/tests/core/test_histogram.py
-        let values = (0..20).into_iter().map(f64::from).collect::<Vec<_>>();
+        let values = (0..20).map(f64::from).collect::<Vec<_>>();
         let counts = vec![1; 20];
 
         assert_eq!(
@@ -577,8 +578,8 @@ mod tests {
 
     #[test]
     fn test_sparse_stats() {
-        let values = (1..5).into_iter().map(f64::from).collect::<Vec<_>>();
-        let counts = (1..5).into_iter().collect::<Vec<_>>();
+        let values = (1..5).map(f64::from).collect::<Vec<_>>();
+        let counts = (1..5).collect::<Vec<_>>();
 
         assert_eq!(
             stats(&values, &counts),

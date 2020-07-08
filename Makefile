@@ -97,9 +97,9 @@ define ENVIRONMENT_EXEC
 			--interactive \
 			--env INSIDE_ENVIRONMENT=true \
 			--network host \
-			--mount type=bind,source=${PWD},target=/vector \
+			--mount type=bind,source=${PWD},target=/git/timberio/vector \
 			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
-			--mount type=volume,source=vector-target,target=/vector/target \
+			--mount type=volume,source=vector-target,target=/git/timberio/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			$(ENVIRONMENT_UPSTREAM)
 endef
@@ -413,7 +413,7 @@ package-deb-aarch64: package-archive-aarch64-unknown-linux-musl  ## Build the aa
 # rpms
 
 package-rpm: ## Build the rpm package
-	$(RUN) package-rpm
+	@scripts/package-rpm.sh
 
 package-rpm-all: package-rpm-x86_64 package-rpm-armv7 package-rpm-aarch64 ## Build all rpm packages
 

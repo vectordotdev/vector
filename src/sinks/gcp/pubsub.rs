@@ -196,7 +196,6 @@ async fn healthcheck(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::runtime;
 
     #[test]
     fn fails_missing_creds() {
@@ -207,10 +206,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config
-            .build(SinkContext::new_test(runtime().executor()))
-            .is_ok()
-        {
+        if config.build(SinkContext::new_test()).is_ok() {
             panic!("config.build failed to error");
         }
     }
@@ -220,10 +216,8 @@ mod tests {
 #[cfg(feature = "gcp-pubsub-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::{
-        runtime::Runtime,
-        test_util::{block_on, random_events_with_stream, random_string, runtime},
-    };
+    use crate::test_util::{random_events_with_stream, random_string, runtime};
+    use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
@@ -240,11 +234,8 @@ mod integration_tests {
         }
     }
 
-    fn config_build(
-        rt: &Runtime,
-        topic: &str,
-    ) -> (crate::sinks::RouterSink, crate::sinks::Healthcheck) {
-        let cx = SinkContext::new_test(rt.executor());
+    fn config_build(topic: &str) -> (crate::sinks::RouterSink, crate::sinks::Healthcheck) {
+        let cx = SinkContext::new_test();
         config(topic).build(cx).expect("Building sink failed")
     }
 
@@ -252,66 +243,80 @@ mod integration_tests {
     fn publish_events() {
         crate::test_util::trace_init();
 
-        let rt = runtime();
-        let (topic, subscription) = create_topic_subscription();
-        let (sink, healthcheck) = config_build(&rt, &topic);
+        let mut rt = runtime();
+        let (topic, subscription) = rt.block_on_std(create_topic_subscription());
+        let (sink, healthcheck) = config_build(&topic);
 
-        block_on(healthcheck).expect("Health check failed");
+        rt.block_on_std(async move {
+            healthcheck.compat().await.expect("Health check failed");
 
-        let (input, events) = random_events_with_stream(100, 100);
+            let (input, events) = random_events_with_stream(100, 100);
+            let _ = sink
+                .send_all(events)
+                .compat()
+                .await
+                .expect("Sending events failed");
 
-        let pump = sink.send_all(events);
-        let _ = block_on(pump).expect("Sending events failed");
-
-        let response = pull_messages(&subscription, 1000);
-        let messages = response
-            .receivedMessages
-            .as_ref()
-            .expect("Response is missing messages");
-        assert_eq!(input.len(), messages.len());
-        for i in 0..input.len() {
-            let data = messages[i].message.decode_data();
-            let data = serde_json::to_value(data).unwrap();
-            let expected = serde_json::to_value(input[i].as_log().all_fields()).unwrap();
-            assert_eq!(data, expected);
-        }
+            let response = pull_messages(&subscription, 1000).await;
+            let messages = response
+                .receivedMessages
+                .as_ref()
+                .expect("Response is missing messages");
+            assert_eq!(input.len(), messages.len());
+            for i in 0..input.len() {
+                let data = messages[i].message.decode_data();
+                let data = serde_json::to_value(data).unwrap();
+                let expected = serde_json::to_value(input[i].as_log().all_fields()).unwrap();
+                assert_eq!(data, expected);
+            }
+        });
     }
 
     #[test]
     fn checks_for_valid_topic() {
-        let rt = runtime();
-        let (topic, _subscription) = create_topic_subscription();
+        let mut rt = runtime();
+        let (topic, _subscription) = rt.block_on_std(create_topic_subscription());
         let topic = format!("BAD{}", topic);
-        let (_sink, healthcheck) = config_build(&rt, &topic);
-        block_on(healthcheck).expect_err("Health check did not fail");
+        let (_sink, healthcheck) = config_build(&topic);
+        rt.block_on_std(async move {
+            healthcheck
+                .compat()
+                .await
+                .expect_err("Health check did not fail");
+        });
     }
 
-    fn create_topic_subscription() -> (String, String) {
+    async fn create_topic_subscription() -> (String, String) {
         let topic = format!("topic-{}", random_string(10));
         let subscription = format!("subscription-{}", random_string(10));
         request(Method::PUT, &format!("topics/{}", topic), json!({}))
+            .await
             .json::<Value>()
+            .await
             .expect("Creating new topic failed");
         request(
             Method::PUT,
             &format!("subscriptions/{}", subscription),
             json!({ "topic": format!("projects/{}/topics/{}", PROJECT, topic) }),
         )
+        .await
         .json::<Value>()
+        .await
         .expect("Creating new subscription failed");
         (topic, subscription)
     }
 
-    fn request(method: Method, path: &str, json: Value) -> Response {
+    async fn request(method: Method, path: &str, json: Value) -> Response {
         let url = format!("http://{}/v1/projects/{}/{}", EMULATOR_HOST, PROJECT, path);
         Client::new()
             .request(method.clone(), &url)
             .json(&json)
             .send()
+            .await
             .expect(&format!("Sending {} request to {} failed", method, url))
     }
 
-    fn pull_messages(subscription: &str, count: usize) -> PullResponse {
+    async fn pull_messages(subscription: &str, count: usize) -> PullResponse {
         request(
             Method::POST,
             &format!("subscriptions/{}:pull", subscription),
@@ -320,7 +325,9 @@ mod integration_tests {
                 "maxMessages": count
             }),
         )
+        .await
         .json::<PullResponse>()
+        .await
         .expect("Extracting pull data failed")
     }
 

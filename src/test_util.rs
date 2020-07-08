@@ -151,7 +151,7 @@ pub fn random_nested_events_with_stream(
     count: usize,
 ) -> (Vec<Event>, impl Stream<Item = Event, Error = ()>) {
     random_events_with_stream_generic(count, move || {
-        let mut log = LogEvent::new();
+        let mut log = LogEvent::default();
 
         let tree = random_pseudonested_map(len, breadth, depth);
         for (k, v) in tree.into_iter() {

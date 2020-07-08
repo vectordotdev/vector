@@ -47,7 +47,7 @@ impl RemoveTags {
 
 impl Transform for RemoveTags {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
-        let ref mut tags = event.as_mut_metric().tags;
+        let tags = &mut event.as_mut_metric().tags;
 
         if let Some(map) = tags {
             for tag in &self.tags {

@@ -1,6 +1,5 @@
 use crate::topology::config::component::ComponentDescription;
 use crate::Event;
-use inventory;
 use serde::{Deserialize, Serialize};
 
 pub mod check_fields;
@@ -24,7 +23,7 @@ pub trait Condition: Send + Sync {
 }
 
 #[typetag::serde(tag = "type")]
-pub trait ConditionConfig: std::fmt::Debug {
+pub trait ConditionConfig: std::fmt::Debug + Send + Sync {
     fn build(&self) -> crate::Result<Box<dyn Condition>>;
 }
 

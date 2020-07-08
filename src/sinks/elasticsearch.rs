@@ -88,8 +88,8 @@ pub enum ElasticSearchAuth {
 impl ElasticSearchAuth {
     pub fn apply<B>(&self, req: &mut Request<B>) {
         if let Self::Basic { user, password } = &self {
-            use headers03::HeaderMapExt;
-            let auth = headers03::Authorization::basic(&user, &password);
+            use headers::{Authorization, HeaderMapExt};
+            let auth = Authorization::basic(&user, &password);
             req.headers_mut().typed_insert(auth);
         }
     }
@@ -301,9 +301,11 @@ impl RetryLogic for ElasticSearchRetryLogic {
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ if status.is_server_error() => RetryAction::Retry(
-                format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
-            ),
+            _ if status.is_server_error() => RetryAction::Retry(format!(
+                "{}: {}",
+                status,
+                String::from_utf8_lossy(response.body())
+            )),
             _ if status.is_client_error() => {
                 let body = String::from_utf8_lossy(response.body());
                 warn!(
@@ -394,14 +396,10 @@ impl ElasticSearchCommon {
             return Err(ParseError::AWSCompressionNotAllowed.into());
         }
 
-        let index = config
-            .index
-            .as_ref()
-            .map(String::as_str)
-            .unwrap_or("vector-%Y.%m.%d");
+        let index = config.index.as_deref().unwrap_or("vector-%Y.%m.%d");
         let index = Template::try_from(index).context(IndexTemplate)?;
 
-        let doc_type = config.doc_type.clone().unwrap_or("_doc".into());
+        let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
 
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
@@ -620,44 +618,47 @@ mod integration_tests {
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
         let base_url = common.base_url.clone();
 
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let (sink, _hc) = config.build(cx.clone()).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("my_id", "42");
         input_event.as_mut_log().insert("foo", "bar");
 
-        let pump = sink.send(input_event.clone());
-        rt.block_on(pump).unwrap();
+        rt.block_on_std(async move {
+            sink.send(input_event.clone()).compat().await.unwrap();
 
-        // make sure writes all all visible
-        rt.block_on_std(flush(cx.resolver(), common)).unwrap();
+            // make sure writes all all visible
+            flush(cx.resolver(), common).await.unwrap();
 
-        let response = reqwest::Client::new()
-            .get(&format!("{}/{}/_search", base_url, index))
-            .json(&json!({
-                "query": { "query_string": { "query": "*" } }
-            }))
-            .send()
-            .unwrap()
-            .json::<elastic_responses::search::SearchResponse<Value>>()
-            .unwrap();
+            let response = reqwest::Client::new()
+                .get(&format!("{}/{}/_search", base_url, index))
+                .json(&json!({
+                    "query": { "query_string": { "query": "*" } }
+                }))
+                .send()
+                .await
+                .unwrap()
+                .json::<elastic_responses::search::SearchResponse<Value>>()
+                .await
+                .unwrap();
 
-        assert_eq!(1, response.total());
+            assert_eq!(1, response.total());
 
-        let hit = response.into_hits().next().unwrap();
-        assert_eq!("42", hit.id());
+            let hit = response.into_hits().next().unwrap();
+            assert_eq!("42", hit.id());
 
-        let doc = hit.document().unwrap();
-        assert_eq!(None, doc["my_id"].as_str());
+            let doc = hit.document().unwrap();
+            assert_eq!(None, doc["my_id"].as_str());
 
-        let value = hit.into_document().unwrap();
-        let expected = json!({
-            "message": "raw log line",
-            "foo": "bar",
-            "timestamp": input_event.as_log()[&event::log_schema().timestamp_key()],
+            let value = hit.into_document().unwrap();
+            let expected = json!({
+                "message": "raw log line",
+                "foo": "bar",
+                "timestamp": input_event.as_log()[&event::log_schema().timestamp_key()],
+            });
+            assert_eq!(expected, value);
         });
-        assert_eq!(expected, value);
     }
 
     #[test]
@@ -724,7 +725,7 @@ mod integration_tests {
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
         let base_url = common.base_url.clone();
 
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let (sink, healthcheck) = config.build(cx.clone()).expect("Building config failed");
 
         rt.block_on_std(async move {
@@ -779,8 +780,10 @@ mod integration_tests {
                     "query": { "query_string": { "query": "*" } }
                 }))
                 .send()
+                .await
                 .unwrap()
                 .json::<elastic_responses::search::SearchResponse<Value>>()
+                .await
                 .unwrap();
 
             if break_events {

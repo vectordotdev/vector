@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-07-03"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
@@ -73,6 +73,7 @@ ingests data through one or more local files and outputs
   ignore_older = 86400 # optional, no default, seconds
   include = ["/var/log/nginx/*.log"] # required
   max_line_bytes = 102400 # optional, default, bytes
+  remove_after = 0 # optional, no default, seconds
   start_at_beginning = false # optional, default
 
   # Context
@@ -551,6 +552,31 @@ the buffered message is guaraneed to be flushed, even if incomplete.
 Instead of balancing read capacity fairly across all watched files, prioritize
 draining the oldest files before moving on to read data from younger files.
  See [File Read Order](#file-read-order) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[0,5,60]}
+  groups={[]}
+  name={"remove_after"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={"seconds"}
+  warnings={[{"visibility_level":"option","text":"Vector's process must have permission to delete files.","option_name":"remove_after"}]}
+  >
+
+### remove_after
+
+Timeout from reaching `eof` after which file will be removed from filesystem,
+unless new data is written in the meantime. If not specified, files will not be
+removed.
+
 
 
 </Field>

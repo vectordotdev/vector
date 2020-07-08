@@ -301,7 +301,7 @@ mod tests {
         topology::config::SinkContext,
     };
     use futures01::{Sink, Stream};
-    use headers03::{Authorization, HeaderMapExt};
+    use headers::{Authorization, HeaderMapExt};
     use hyper::Method;
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
@@ -312,7 +312,7 @@ mod tests {
         let event = Event::from("hello world");
 
         let mut config = default_config(Encoding::Text);
-        config.encoding = encoding.clone();
+        config.encoding = encoding;
         let bytes = config.encode_event(event).unwrap();
 
         assert_eq!(bytes, Vec::from(&"hello world\n"[..]));
@@ -324,7 +324,7 @@ mod tests {
         let event = Event::from("hello world");
 
         let mut config = default_config(Encoding::Json);
-        config.encoding = encoding.clone();
+        config.encoding = encoding;
         let bytes = config.encode_event(event).unwrap();
 
         #[derive(Deserialize, Debug)]
@@ -385,8 +385,7 @@ mod tests {
         "#;
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let _ = config.build(cx).unwrap();
     }
@@ -411,7 +410,7 @@ mod tests {
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
         let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
@@ -474,7 +473,7 @@ mod tests {
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
         let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
@@ -534,7 +533,7 @@ mod tests {
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
         let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
         let (rx, trigger, server) = build_test_server(in_addr, &mut rt);

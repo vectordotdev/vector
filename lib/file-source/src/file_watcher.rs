@@ -91,7 +91,7 @@ impl FileWatcher {
             devno,
             inode: ino,
             is_dead: false,
-            last_read_attempt: ts.clone(),
+            last_read_attempt: ts,
             last_read_success: ts,
         })
     }
@@ -178,6 +178,10 @@ impl FileWatcher {
 
     fn track_read_success(&mut self) {
         self.last_read_success = Instant::now();
+    }
+
+    pub fn last_read_success(&self) -> Instant {
+        self.last_read_success
     }
 
     pub fn should_read(&self) -> bool {

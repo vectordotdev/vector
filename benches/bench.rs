@@ -71,7 +71,8 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -122,7 +123,8 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -173,7 +175,8 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -225,7 +228,8 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -300,7 +304,8 @@ fn benchmark_interconnected(c: &mut Criterion) {
                     let output_lines1 = count_receive(&out_addr1);
                     let output_lines2 = count_receive(&out_addr2);
 
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
                     wait_for_tcp(in_addr1);
                     wait_for_tcp(in_addr2);
 
@@ -371,7 +376,8 @@ fn benchmark_transforms(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -408,14 +414,13 @@ fn benchmark_regex(c: &mut Criterion) {
         Benchmark::new("regex", move |b| {
             b.iter_with_setup(
                 || {
-                    let rt = vector::runtime::Runtime::single_threaded().unwrap();
                     let parser =transforms::regex_parser::RegexParserConfig {
                         // Many captures to stress the regex parser
                         patterns: vec![r#"^(?P<addr>\d+\.\d+\.\d+\.\d+) (?P<user>\S+) (?P<auth>\S+) \[(?P<date>\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ [+-]\d{4})\] "(?P<method>[A-Z]+) (?P<uri>[^"]+) HTTP/\d\.\d" (?P<code>\d+) (?P<size>\d+) "(?P<referrer>[^"]+)" "(?P<browser>[^"]+)""#.into()],
                         field: None,
                         drop_failed: true,
                         ..Default::default()
-                    }.build(TransformContext::new_test(rt.executor())).unwrap();
+                    }.build(TransformContext::new_test()).unwrap();
 
                     let src_lines = http_access_log_lines()
                         .take(num_lines)
@@ -546,7 +551,8 @@ fn benchmark_complex(c: &mut Criterion) {
                     let output_lines_200 = count_receive(&out_addr_200);
                     let output_lines_404 = count_receive(&out_addr_404);
 
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
                     wait_for_tcp(in_addr1);
                     wait_for_tcp(in_addr2);
 
