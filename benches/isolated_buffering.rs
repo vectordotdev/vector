@@ -1,5 +1,3 @@
-#![allow(clippy::redundant_pattern_matching)]
-
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
@@ -73,9 +71,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let (writer, mut reader) = tokio::sync::mpsc::channel(100);
 
                     let read_handle =
-                        rt.spawn_handle_std(
-                            async move { while let Some(_) = reader.next().await {} },
-                        );
+                        rt.spawn_handle_std(async move { while reader.next().await.is_some() {} });
 
                     (rt, writer, read_handle)
                 },
@@ -100,7 +96,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let path = data_dir.join("basic_sink");
 
                     // Clear out any existing data
-                    if let Ok(_) = std::fs::metadata(&path) {
+                    if std::fs::metadata(&path).is_ok() {
                         std::fs::remove_dir_all(&path).unwrap();
                     }
 
@@ -125,7 +121,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let path = data_dir2.join("basic_sink");
 
                     // Clear out any existing data
-                    if let Ok(_) = std::fs::metadata(&path) {
+                    if std::fs::metadata(&path).is_ok() {
                         std::fs::remove_dir_all(&path).unwrap();
                     }
 
@@ -156,7 +152,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let path = data_dir3.join("basic_sink");
 
                     // Clear out any existing data
-                    if let Ok(_) = std::fs::metadata(&path) {
+                    if std::fs::metadata(&path).is_ok() {
                         std::fs::remove_dir_all(&path).unwrap();
                     }
 

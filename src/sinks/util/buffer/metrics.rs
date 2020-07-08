@@ -153,7 +153,7 @@ impl Batch for MetricBuffer {
                     }
                 }
                 MetricValue::Gauge { .. } if item.kind.is_incremental() => {
-                    let new = MetricEntry(item.clone().into_absolute());
+                    let new = MetricEntry(item.clone().to_absolute());
                     if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                         existing.add(&item);
                         self.metrics.insert(MetricEntry(existing));
@@ -291,8 +291,8 @@ mod test {
             .collect()
     }
 
-    fn sorted(buffer: &Vec<Metric>) -> Vec<Metric> {
-        let mut buffer = buffer.clone();
+    fn sorted(buffer: &[Metric]) -> Vec<Metric> {
+        let mut buffer = buffer.to_owned();
         buffer.sort_by_key(|k| format!("{:?}", k));
         buffer
     }
@@ -893,7 +893,7 @@ mod test {
                 kind: MetricKind::Absolute,
                 value: MetricValue::AggregatedHistogram {
                     buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![1 * i, 2 * i, 4 * i],
+                    counts: vec![i, 2 * i, 4 * i],
                     count: 6 * i,
                     sum: 10.0,
                 },
@@ -985,7 +985,7 @@ mod test {
                 kind: MetricKind::Incremental,
                 value: MetricValue::AggregatedHistogram {
                     buckets: vec![1.0, 4.0, 16.0],
-                    counts: vec![1 * i, 2 * i, 4 * i],
+                    counts: vec![i, 2 * i, 4 * i],
                     count: 6 * i,
                     sum: 10.0,
                 },
@@ -1050,7 +1050,7 @@ mod test {
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
                         quantiles: vec![0.0, 0.5, 1.0],
-                        values: vec![(1 * i) as f64, (2 * i) as f64, (4 * i) as f64],
+                        values: vec![i as f64, (2 * i) as f64, (4 * i) as f64],
                         count: 6 * i,
                         sum: 10.0,
                     },

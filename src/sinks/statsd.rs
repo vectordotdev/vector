@@ -178,15 +178,12 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
             _ => {}
         },
         MetricKind::Absolute => {
-            match &metric.value {
-                MetricValue::Gauge { value } => {
-                    buf.push(format!("{}:{}", metric.name, value));
-                    buf.push("g".to_string());
-                    if let Some(t) = &metric.tags {
-                        buf.push(format!("#{}", encode_tags(t)));
-                    };
-                }
-                _ => {}
+            if let MetricValue::Gauge { value } = &metric.value {
+                buf.push(format!("{}:{}", metric.name, value));
+                buf.push("g".to_string());
+                if let Some(t) = &metric.tags {
+                    buf.push(format!("#{}", encode_tags(t)));
+                };
             };
         }
     }
@@ -367,7 +364,7 @@ mod test {
         });
         events.push(event);
 
-        let stream = iter_ok(events.clone().into_iter());
+        let stream = iter_ok(events.into_iter());
         let sender = sink.send_all(stream);
         let deadline = Instant::now() + Duration::from_millis(100);
 

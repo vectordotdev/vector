@@ -277,8 +277,7 @@ fn encode_events(
 
     // remove last '\n'
     output.pop();
-
-    return output;
+    output
 }
 
 fn encode_distribution(values: &[f64], counts: &[u32]) -> Option<HashMap<String, Field>> {
@@ -593,7 +592,7 @@ mod tests {
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: (0..20).into_iter().map(f64::from).collect::<Vec<_>>(),
+                    values: (0..20).map(f64::from).collect::<Vec<_>>(),
                     sample_rates: vec![1; 20],
                 },
             },
@@ -603,8 +602,8 @@ mod tests {
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: (1..5).into_iter().map(f64::from).collect::<Vec<_>>(),
-                    sample_rates: (1..5).into_iter().collect::<Vec<_>>(),
+                    values: (1..5).map(f64::from).collect::<Vec<_>>(),
+                    sample_rates: (1..5).collect::<Vec<_>>(),
                 },
             },
         ];

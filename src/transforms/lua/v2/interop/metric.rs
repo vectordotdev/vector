@@ -115,7 +115,7 @@ impl<'a> FromLua<'a> for Metric {
         let name: String = table.get("name")?;
         let timestamp = table
             .get::<_, Option<LuaTable>>("timestamp")?
-            .map(|t| table_to_timestamp(t))
+            .map(table_to_timestamp)
             .transpose()?;
         let tags: Option<BTreeMap<String, String>> = table.get("tags")?;
         let kind = table

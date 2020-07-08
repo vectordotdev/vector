@@ -14,7 +14,7 @@ impl<'a> ToLua<'a> for Value {
             Value::Boolean(b) => Ok(LuaValue::Boolean(b)),
             Value::Timestamp(t) => timestamp_to_table(ctx, t).map(LuaValue::Table),
             Value::Map(m) => ctx
-                .create_table_from(m.into_iter().map(|(k, v)| (k.to_string(), v)))
+                .create_table_from(m.into_iter().map(|(k, v)| (k, v)))
                 .map(LuaValue::Table),
             Value::Array(a) => ctx.create_sequence_from(a.into_iter()).map(LuaValue::Table),
             Value::Null => ctx.create_string("").map(LuaValue::String),
@@ -193,15 +193,16 @@ mod test {
 
         Lua::new().context(move |ctx| {
             for (value, test_src) in pairs.into_iter() {
-                let test_fn: LuaFunction = ctx.load(test_src).eval().expect(&format!(
-                    "failed to load {} for value {:?}",
-                    test_src, value
-                ));
+                let test_fn: LuaFunction = ctx.load(test_src).eval().unwrap_or_else(|_| {
+                    panic!("failed to load {} for value {:?}", test_src, value)
+                });
                 assert!(
-                    test_fn.call::<_, bool>(value.clone()).expect(&format!(
-                        "failed to call {} for value {:?}",
-                        test_src, value
-                    )),
+                    test_fn
+                        .call::<_, bool>(value.clone())
+                        .unwrap_or_else(|_| panic!(
+                            "failed to call {} for value {:?}",
+                            test_src, value
+                        )),
                     "test function: {}, value: {:?}",
                     test_src,
                     value

@@ -184,10 +184,10 @@ where
                         if condition_matched {
                             let buffered = entry.get_mut();
                             add_next_line(buffered, line);
-                            return None;
+                            None
                         } else {
                             let buffered = entry.insert(line.as_ref().into());
-                            return Some((buffered.freeze(), entry.key().clone()));
+                            Some((buffered.freeze(), entry.key().clone()))
                         }
                     }
                     // All consecutive lines matching this pattern, plus one
@@ -196,11 +196,11 @@ where
                         if condition_matched {
                             let buffered = entry.get_mut();
                             add_next_line(buffered, line);
-                            return None;
+                            None
                         } else {
                             let (src, mut buffered) = entry.remove_entry();
                             add_next_line(&mut buffered, line);
-                            return Some((buffered.freeze(), src));
+                            Some((buffered.freeze(), src))
                         }
                     }
                     // All consecutive lines not matching this pattern are included
@@ -208,11 +208,11 @@ where
                     Mode::HaltBefore => {
                         if condition_matched {
                             let buffered = entry.insert(line.as_ref().into());
-                            return Some((buffered.freeze(), entry.key().clone()));
+                            Some((buffered.freeze(), entry.key().clone()))
                         } else {
                             let buffered = entry.get_mut();
                             add_next_line(buffered, line);
-                            return None;
+                            None
                         }
                     }
                     // All consecutive lines, up to and including the first line
@@ -221,11 +221,11 @@ where
                         if condition_matched {
                             let (src, mut buffered) = entry.remove_entry();
                             add_next_line(&mut buffered, line);
-                            return Some((buffered.freeze(), src));
+                            Some((buffered.freeze(), src))
                         } else {
                             let buffered = entry.get_mut();
                             add_next_line(buffered, line);
-                            return None;
+                            None
                         }
                     }
                 }
@@ -236,12 +236,12 @@ where
                     // It was indeed a new line we need to filter.
                     // Set the timeout and buffer this line.
                     self.timeouts
-                        .insert(entry.key().clone(), self.config.timeout.clone());
+                        .insert(entry.key().clone(), self.config.timeout);
                     entry.insert(line.as_ref().into());
-                    return None;
+                    None
                 } else {
                     // It's just a regular line we don't really care about.
-                    return Some((line, entry.into_key()));
+                    Some((line, entry.into_key()))
                 }
             }
         }

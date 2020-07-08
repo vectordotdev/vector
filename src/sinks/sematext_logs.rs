@@ -45,13 +45,13 @@ impl SinkConfig for SematextLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let host = match (&self.host, &self.region) {
             (Some(host), None) => host.clone(),
-            (None, Some(Region::Na)) => "https://logsene-receiver.sematext.com".to_string(),
-            (None, Some(Region::Eu)) => "https://logsene-receiver.eu.sematext.com".to_string(),
+            (None, Some(Region::Na)) => "https://logsene-receiver.sematext.com".to_owned(),
+            (None, Some(Region::Eu)) => "https://logsene-receiver.eu.sematext.com".to_owned(),
             (None, None) => {
-                return Err(format!("Either `region` or `host` must be set.").into());
+                return Err("Either `region` or `host` must be set.".into());
             }
             (Some(_), Some(_)) => {
-                return Err(format!("Only one of `region` and `host` can be set.").into());
+                return Err("Only one of `region` and `host` can be set.".into());
             }
         };
 
@@ -60,8 +60,8 @@ impl SinkConfig for SematextLogsConfig {
             compression: Compression::None,
             doc_type: Some("logs".to_string()),
             index: Some(self.token.clone()),
-            batch: self.batch.clone(),
-            request: self.request.clone(),
+            batch: self.batch,
+            request: self.request,
             encoding: self.encoding.clone(),
             ..Default::default()
         }

@@ -42,14 +42,14 @@ pub enum Event {
     Metric(Metric),
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Default)]
 pub struct LogEvent {
     fields: BTreeMap<String, Value>,
 }
 
 impl Event {
     pub fn new_empty_log() -> Self {
-        Event::Log(LogEvent::new())
+        Event::Log(LogEvent::default())
     }
 
     pub fn as_log(&self) -> &LogEvent {
@@ -96,12 +96,6 @@ impl Event {
 }
 
 impl LogEvent {
-    pub fn new() -> Self {
-        Self {
-            fields: BTreeMap::new(),
-        }
-    }
-
     pub fn get(&self, key: &Atom) -> Option<&Value> {
         util::log::get(&self.fields, key)
     }
@@ -162,7 +156,7 @@ impl LogEvent {
         util::log::keys(&self.fields)
     }
 
-    pub fn all_fields<'a>(&'a self) -> impl Iterator<Item = (String, &'a Value)> + Serialize {
+    pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
         util::log::all_fields(&self.fields)
     }
 
@@ -190,7 +184,7 @@ impl<K: Into<Atom>, V: Into<Value>> Extend<(K, V)> for LogEvent {
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
 impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut log_event = LogEvent::new();
+        let mut log_event = LogEvent::default();
         log_event.extend(iter);
         log_event
     }
@@ -403,12 +397,10 @@ impl From<JsonValue> for Value {
             JsonValue::String(s) => Value::Bytes(Bytes::from(s)),
             JsonValue::Object(obj) => Value::Map(
                 obj.into_iter()
-                    .map(|(key, value)| (key.into(), Value::from(value)))
+                    .map(|(key, value)| (key, Value::from(value)))
                     .collect(),
             ),
-            JsonValue::Array(arr) => {
-                Value::Array(arr.into_iter().map(|value| Value::from(value)).collect())
-            }
+            JsonValue::Array(arr) => Value::Array(arr.into_iter().map(Value::from).collect()),
             JsonValue::Null => Value::Null,
         }
     }
@@ -602,7 +594,7 @@ fn encode_map(fields: BTreeMap<String, Value>) -> proto::ValueMap {
 
 fn encode_array(items: Vec<Value>) -> proto::ValueArray {
     proto::ValueArray {
-        items: items.into_iter().map(|value| encode_value(value)).collect(),
+        items: items.into_iter().map(encode_value).collect(),
     }
 }
 
@@ -612,7 +604,7 @@ impl From<Event> for proto::EventWrapper {
             Event::Log(LogEvent { fields }) => {
                 let fields = fields
                     .into_iter()
-                    .map(|(k, v)| (k.to_string(), encode_value(v)))
+                    .map(|(k, v)| (k, encode_value(v)))
                     .collect::<BTreeMap<_, _>>();
 
                 let event = EventProto::Log(Log { fields });

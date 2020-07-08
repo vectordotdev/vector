@@ -26,7 +26,7 @@ impl TransformConfig for ConcatConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let joiner: String = match self.joiner.clone() {
             None => " ".into(),
-            Some(var) => var.into(),
+            Some(var) => var,
         };
         let items = self
             .items

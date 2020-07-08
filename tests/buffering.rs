@@ -1,5 +1,4 @@
 #![allow(clippy::match_bool)]
-#![allow(clippy::redundant_clone)]
 #![cfg(feature = "leveldb")]
 
 use futures01::{Future, Sink};
@@ -97,7 +96,7 @@ fn test_buffering() {
             max_size,
             when_full: Default::default(),
         };
-        config.global.data_dir = Some(data_dir.clone());
+        config.global.data_dir = Some(data_dir);
         config
     };
 
@@ -198,7 +197,7 @@ fn test_max_size() {
             max_size,
             when_full: Default::default(),
         };
-        config.global.data_dir = Some(data_dir.clone());
+        config.global.data_dir = Some(data_dir);
         config
     };
 
@@ -244,7 +243,7 @@ fn test_max_size_resume() {
         max_size,
         when_full: Default::default(),
     };
-    config.global.data_dir = Some(data_dir.clone());
+    config.global.data_dir = Some(data_dir);
 
     // Use a multi-thread runtime here.
     let mut rt = runtime::Runtime::new().unwrap();

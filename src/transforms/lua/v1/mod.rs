@@ -188,9 +188,7 @@ impl rlua::UserData for LuaEvent {
         methods.add_meta_function(rlua::MetaMethod::Pairs, |ctx, event: LuaEvent| {
             let state = ctx.create_table()?;
             {
-                let keys = ctx.create_table_from(
-                    event.inner.as_log().keys().map(|k| (k.to_string(), true)),
-                )?;
+                let keys = ctx.create_table_from(event.inner.as_log().keys().map(|k| (k, true)))?;
                 state.set("event", event)?;
                 state.set("keys", keys)?;
             }

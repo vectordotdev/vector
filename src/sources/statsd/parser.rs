@@ -207,9 +207,7 @@ pub enum ParseError {
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            anything => write!(f, "Statsd parse error: {:?}", anything),
-        }
+        write!(f, "Statsd parse error: {:?}", self)
     }
 }
 

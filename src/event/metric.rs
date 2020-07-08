@@ -51,7 +51,7 @@ pub enum MetricValue {
 }
 
 impl Metric {
-    pub fn into_absolute(&self) -> Self {
+    pub fn to_absolute(&self) -> Self {
         Self {
             name: self.name.clone(),
             timestamp: self.timestamp,

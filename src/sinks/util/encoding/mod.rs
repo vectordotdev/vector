@@ -62,11 +62,7 @@ pub trait EncodingConfiguration<E> {
                             let field_path = PathIter::new(field).collect::<Vec<_>>();
                             !only_fields.iter().any(|only| {
                                 // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-                                if field_path.starts_with(&only[..]) {
-                                    true
-                                } else {
-                                    false
-                                }
+                                field_path.starts_with(&only[..])
                             })
                         })
                         .collect::<VecDeque<_>>();
@@ -131,7 +127,9 @@ pub trait EncodingConfiguration<E> {
                 let path_iter = PathIter::new(f).collect::<Vec<_>>();
                 only_fields.iter().any(|v| v == &path_iter)
             }) {
-                Err("`except_fields` and `only_fields` should be mutually exclusive.")?;
+                return Err(
+                    "`except_fields` and `only_fields` should be mutually exclusive.".into(),
+                );
             }
         }
         Ok(())
@@ -290,7 +288,7 @@ mod tests {
         let timestamp = timestamp.as_timestamp().unwrap();
         event
             .as_mut_log()
-            .insert("another", Value::Timestamp(timestamp.clone()));
+            .insert("another", Value::Timestamp(*timestamp));
 
         config.encoding.apply_rules(&mut event);
 

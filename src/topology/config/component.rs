@@ -1,4 +1,3 @@
-use inventory;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::marker::PhantomData;

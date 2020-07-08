@@ -291,7 +291,7 @@ mod tests {
     fn convert(fmt: &str, value: &str) -> Result<Value, Error> {
         std::env::set_var("TZ", TIMEZONE);
         fmt.parse::<Conversion>()
-            .expect(&format!("Invalid conversion {:?}", fmt))
+            .unwrap_or_else(|_| panic!("Invalid conversion {:?}", fmt))
             .convert(value.into())
     }
 

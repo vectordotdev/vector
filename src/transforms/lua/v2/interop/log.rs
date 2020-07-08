@@ -3,7 +3,7 @@ use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for LogEvent {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
-        ctx.create_table_from(self.into_iter().map(|(k, v)| (k.to_string(), v)))
+        ctx.create_table_from(self.into_iter().map(|(k, v)| (k, v)))
             .map(LuaValue::Table)
     }
 }
@@ -12,7 +12,7 @@ impl<'a> FromLua<'a> for LogEvent {
     fn from_lua(value: LuaValue<'a>, _: LuaContext<'a>) -> LuaResult<Self> {
         match value {
             LuaValue::Table(t) => {
-                let mut log = LogEvent::new();
+                let mut log = LogEvent::default();
                 for pair in t.pairs() {
                     let (key, value): (String, Value) = pair?;
                     log.insert_flat(key, value);
@@ -59,7 +59,7 @@ mod test {
                 let result: bool = ctx
                     .load(assertion)
                     .eval()
-                    .expect(&format!("Failed to verify assertion {:?}", assertion));
+                    .unwrap_or_else(|_| panic!("Failed to verify assertion {:?}", assertion));
                 assert!(result, assertion);
             }
         });

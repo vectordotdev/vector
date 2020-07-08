@@ -64,7 +64,7 @@ pub struct InfluxDB2Settings {
     token: String,
 }
 
-trait InfluxDBSettings {
+trait InfluxDBSettings: std::fmt::Debug {
     fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
     fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
     fn token(self: &Self) -> String;
@@ -130,22 +130,15 @@ fn influxdb_settings(
     influxdb1_settings: Option<InfluxDB1Settings>,
     influxdb2_settings: Option<InfluxDB2Settings>,
 ) -> Result<Box<dyn InfluxDBSettings>, crate::Error> {
-    if influxdb1_settings.is_some() & influxdb2_settings.is_some() {
-        return Err(ConfigError::BothConfiguration {
-            v1_settings: influxdb1_settings.unwrap(),
-            v2_settings: influxdb2_settings.unwrap(),
+    match (influxdb1_settings, influxdb2_settings) {
+        (Some(v1_settings), Some(v2_settings)) => Err(ConfigError::BothConfiguration {
+            v1_settings,
+            v2_settings,
         }
-        .into());
-    }
-
-    if influxdb1_settings.is_none() & influxdb2_settings.is_none() {
-        return Err(ConfigError::MissingConfiguration.into());
-    }
-
-    if let Some(settings) = influxdb1_settings {
-        Ok(Box::new(settings))
-    } else {
-        Ok(Box::new(influxdb2_settings.unwrap()))
+        .into()),
+        (None, None) => Err(ConfigError::MissingConfiguration.into()),
+        (Some(settings), _) => Ok(Box::new(settings)),
+        (_, Some(settings)) => Ok(Box::new(settings)),
     }
 }
 
@@ -157,9 +150,7 @@ fn healthcheck(
     influxdb2_settings: Option<InfluxDB2Settings>,
     resolver: Resolver,
 ) -> crate::Result<super::Healthcheck> {
-    let settings = influxdb_settings(influxdb1_settings.clone(), influxdb2_settings.clone())?;
-
-    let endpoint = endpoint.clone();
+    let settings = influxdb_settings(influxdb1_settings, influxdb2_settings)?;
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
@@ -191,7 +182,7 @@ fn influx_line_protocol(
     line_protocol: &mut String,
 ) {
     // Fields
-    let unwrapped_fields = fields.unwrap_or_else(|| HashMap::new());
+    let unwrapped_fields = fields.unwrap_or_else(HashMap::new);
     // LineProtocol should have a field
     if unwrapped_fields.is_empty() {
         return;
@@ -201,7 +192,7 @@ fn influx_line_protocol(
     line_protocol.push(',');
 
     // Tags
-    let mut unwrapped_tags = tags.unwrap_or_else(|| BTreeMap::new());
+    let mut unwrapped_tags = tags.unwrap_or_else(BTreeMap::new);
     unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
     encode_tags(unwrapped_tags, line_protocol);
     line_protocol.push(' ');
@@ -318,7 +309,7 @@ fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> c
         format!("{}/{}?{}", endpoint, path, serializer.finish())
     };
 
-    if url.ends_with("?") {
+    if url.ends_with('?') {
         url.pop();
     }
 
@@ -378,7 +369,7 @@ pub mod test_util {
 
         split = split[1].splitn(3, ' ').collect::<Vec<&str>>();
 
-        return (measurement, split[0], split[1].to_string(), split[2]);
+        (measurement, split[0], split[1].to_string(), split[2])
     }
 
     pub(crate) fn onboarding_v2() {
@@ -437,10 +428,10 @@ mod tests {
     "#;
         let config: InfluxDBTestConfig = toml::from_str(&config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
-        match settings {
-            Ok(_) => assert!(false, "Expected error"),
-            Err(e) => assert_eq!(format!("{}",e), "Unclear settings. Both version configured v1: InfluxDB1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDB2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"my-token\" }.".to_owned())
-        }
+        assert_eq!(
+            format!("{}", settings.expect_err("expected error")),
+            "Unclear settings. Both version configured v1: InfluxDB1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDB2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"my-token\" }.".to_owned()
+        );
     }
 
     #[test]
@@ -449,13 +440,10 @@ mod tests {
     "#;
         let config: InfluxDBTestConfig = toml::from_str(&config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
-        match settings {
-            Ok(_) => assert!(false, "Expected error"),
-            Err(e) => assert_eq!(
-                format!("{}", e),
-                "InfluxDB v1 or v2 should be configured as endpoint.".to_owned()
-            ),
-        }
+        assert_eq!(
+            format!("{}", settings.expect_err("expected error")),
+            "InfluxDB v1 or v2 should be configured as endpoint.".to_owned()
+        );
     }
 
     #[test]

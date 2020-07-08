@@ -55,7 +55,7 @@ impl BatchConfig {
             (None, None) => None,
         };
         Ok(Self {
-            max_events: max_events,
+            max_events,
             max_size: None,
             ..*self
         })

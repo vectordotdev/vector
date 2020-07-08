@@ -53,14 +53,15 @@ impl TryFrom<&str> for Template {
         let (has_error, is_dynamic) = StrftimeItems::new(src).fold((false, false), |pair, item| {
             (pair.0 || is_error(&item), pair.1 || is_dynamic(&item))
         });
-        match has_error {
-            true => Err(TemplateError::StrftimeError),
-            false => Ok(Template {
+        if has_error {
+            Err(TemplateError::StrftimeError)
+        } else {
+            Ok(Template {
                 src: src.into(),
                 src_bytes: src.into(),
                 has_ts: is_dynamic,
                 has_fields: RE.is_match(src),
-            }),
+            })
         }
     }
 }

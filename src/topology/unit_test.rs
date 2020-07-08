@@ -38,7 +38,7 @@ fn event_to_string(event: &Event) -> String {
     }
 }
 
-fn events_to_string(name: &str, events: &Vec<Event>) -> String {
+fn events_to_string(name: &str, events: &[Event]) -> String {
     if events.len() > 1 {
         format!(
             "  {}s:\n    {}",
@@ -207,7 +207,7 @@ fn links_to_a_leaf(
 /// Reduces a collection of transforms into a set that only contains those that
 /// link between our root (test input) and a set of leaves (test outputs).
 fn reduce_transforms(
-    roots: &Vec<String>,
+    roots: Vec<String>,
     leaves: &IndexMap<String, ()>,
     transform_outputs: &mut IndexMap<String, IndexMap<String, ()>>,
 ) {
@@ -365,7 +365,7 @@ fn build_unit_test(
     // Reduce the configured transforms into just the ones connecting our test
     // target with output targets.
     reduce_transforms(
-        &inputs
+        inputs
             .iter()
             .map(|(names, _)| names)
             .flatten()

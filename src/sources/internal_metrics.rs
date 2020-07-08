@@ -50,7 +50,7 @@ fn get_controller() -> crate::Result<Controller> {
     crate::metrics::CONTROLLER
         .get()
         .cloned()
-        .ok_or("metrics system not initialized".into())
+        .ok_or_else(|| "metrics system not initialized".into())
 }
 
 async fn run(
@@ -113,7 +113,7 @@ fn into_event(key: Key, measurement: Measurement) -> Event {
     let metric = Metric {
         name: key.name().to_string(),
         timestamp: Some(Utc::now()),
-        tags: if labels.len() == 0 {
+        tags: if labels.is_empty() {
             None
         } else {
             Some(labels)

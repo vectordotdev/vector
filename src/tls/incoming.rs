@@ -57,7 +57,7 @@ impl<I: Stream + Debug> Debug for MaybeTlsIncoming<I> {
 impl TlsSettings {
     pub(crate) fn acceptor(&self) -> Result<SslAcceptor> {
         match self.identity {
-            None => Err(TlsError::MissingRequiredIdentity.into()),
+            None => Err(TlsError::MissingRequiredIdentity),
             Some(_) => {
                 let mut acceptor =
                     SslAcceptor::mozilla_intermediate(SslMethod::tls()).context(CreateAcceptor)?;
@@ -73,7 +73,7 @@ impl MaybeTlsSettings {
         let listener = TcpListener::bind(addr).context(TcpBind)?;
 
         let acceptor = match self {
-            Self::Tls(tls) => Some(tls.acceptor()?.into()),
+            Self::Tls(tls) => Some(tls.acceptor()?),
             Self::Raw(()) => None,
         };
 

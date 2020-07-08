@@ -31,7 +31,7 @@ impl TransformConfig for RenameFieldsConfig {
             self.fields
                 .clone()
                 .all_fields()
-                .map(|(k, v)| (k.into(), v.into()))
+                .map(|(k, v)| (k, v.into()))
                 .collect(),
             self.drop_empty.unwrap_or(false),
         )?))
@@ -62,7 +62,7 @@ impl Transform for RenameFields {
             let log = event.as_mut_log();
             match log.remove_prune(&old_key, self.drop_empty) {
                 Some(v) => {
-                    if let Some(_) = event.as_mut_log().insert(&new_key.clone(), v) {
+                    if event.as_mut_log().insert(&new_key.clone(), v).is_some() {
                         debug!(
                             message = "Field overwritten",
                             field = old_key.as_ref(),

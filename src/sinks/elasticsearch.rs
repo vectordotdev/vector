@@ -301,9 +301,11 @@ impl RetryLogic for ElasticSearchRetryLogic {
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ if status.is_server_error() => RetryAction::Retry(
-                format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
-            ),
+            _ if status.is_server_error() => RetryAction::Retry(format!(
+                "{}: {}",
+                status,
+                String::from_utf8_lossy(response.body())
+            )),
             _ if status.is_client_error() => {
                 let body = String::from_utf8_lossy(response.body());
                 warn!(
@@ -394,14 +396,10 @@ impl ElasticSearchCommon {
             return Err(ParseError::AWSCompressionNotAllowed.into());
         }
 
-        let index = config
-            .index
-            .as_ref()
-            .map(String::as_str)
-            .unwrap_or("vector-%Y.%m.%d");
+        let index = config.index.as_deref().unwrap_or("vector-%Y.%m.%d");
         let index = Template::try_from(index).context(IndexTemplate)?;
 
-        let doc_type = config.doc_type.clone().unwrap_or("_doc".into());
+        let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
 
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 

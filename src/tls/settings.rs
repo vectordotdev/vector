@@ -119,7 +119,7 @@ impl TlsSettings {
                 }
             }
         }
-        if self.authorities.len() > 0 {
+        if !self.authorities.is_empty() {
             let mut store = X509StoreBuilder::new().context(NewStoreBuilder)?;
             for authority in &self.authorities {
                 store.add_cert(authority.clone()).context(AddCertToStore)?;
@@ -167,7 +167,7 @@ impl TlsOptions {
 
     fn load_identity(&self) -> Result<Option<IdentityStore>> {
         match (&self.crt_file, &self.key_file) {
-            (None, Some(_)) => Err(TlsError::MissingCrtKeyFile.into()),
+            (None, Some(_)) => Err(TlsError::MissingCrtKeyFile),
             (None, None) => Ok(None),
             (Some(filename), _) => {
                 let (data, filename) = open_read(filename, "certificate")?;
@@ -208,7 +208,7 @@ impl TlsOptions {
     fn parse_pkcs12_identity(&self, der: Vec<u8>) -> Result<Option<IdentityStore>> {
         let pkcs12 = Pkcs12::from_der(&der).context(ParsePkcs12)?;
         // Verify password
-        let key_pass = self.key_pass.as_ref().map(|s| s.as_str()).unwrap_or("");
+        let key_pass = self.key_pass.as_deref().unwrap_or("");
         pkcs12.parse(&key_pass).context(ParsePkcs12)?;
         Ok(Some(IdentityStore(der, key_pass.to_string())))
     }
@@ -324,18 +324,19 @@ impl MaybeTlsSettings {
     pub fn from_config(config: &Option<TlsConfig>, for_server: bool) -> Result<Self> {
         match config {
             None => Ok(Self::Raw(())), // No config, no TLS settings
-            Some(config) => match config.enabled.unwrap_or(false) {
-                false => Ok(Self::Raw(())), // Explicitly disabled, still no TLS settings
-                true => {
+            Some(config) => {
+                if config.enabled.unwrap_or(false) {
                     let tls =
                         TlsSettings::from_options_base(&Some(config.options.clone()), for_server)?;
                     match (for_server, &tls.identity) {
                         // Servers require an identity certificate
-                        (true, None) => Err(TlsError::MissingRequiredIdentity.into()),
+                        (true, None) => Err(TlsError::MissingRequiredIdentity),
                         _ => Ok(Self::Tls(tls)),
                     }
+                } else {
+                    Ok(Self::Raw(())) // Explicitly disabled, still no TLS settings
                 }
-            },
+            }
         }
     }
 }
@@ -385,7 +386,7 @@ fn der_or_pem<T>(data: Vec<u8>, der_fn: impl Fn(Vec<u8>) -> T, pem_fn: impl Fn(S
 /// inline data and is used directly instead of opening a file.
 fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> {
     if let Some(filename) = filename.to_str() {
-        if let Some(_) = filename.find(PEM_START_MARKER) {
+        if filename.find(PEM_START_MARKER).is_some() {
             return Ok((Vec::from(filename), "inline text".into()));
         }
     }
@@ -570,9 +571,10 @@ mod test {
     // This can be eliminated once the `bool_to_option` feature migrates
     // out of nightly.
     fn and_some<T>(src: bool, value: T) -> Option<T> {
-        match src {
-            true => Some(value),
-            false => None,
+        if src {
+            Some(value)
+        } else {
+            None
         }
     }
 }

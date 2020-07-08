@@ -83,7 +83,7 @@ impl Transform for JsonParser {
                     .map_err(|error| {
                         emit!(JsonFailedParse {
                             field: &self.field,
-                            error: error
+                            error
                         })
                     })
                     .ok()

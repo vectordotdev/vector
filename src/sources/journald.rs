@@ -101,8 +101,7 @@ impl SourceConfig for JournaldConfig {
         let exclude_units: HashSet<String> = self.exclude_units.iter().map(fixup_unit).collect();
         if let Some(unit) = include_units
             .iter()
-            .filter(|unit| exclude_units.contains(&unit[..]))
-            .next()
+            .find(|unit| exclude_units.contains(&unit[..]))
         {
             let unit = unit.into();
             return Err(BuildError::DuplicatedUnit { unit }.into());
@@ -227,9 +226,10 @@ fn create_event(record: Record) -> Event {
 /// Map the given unit name into a valid systemd unit
 /// by appending ".service" if no extension is present.
 fn fixup_unit(unit: &String) -> String {
-    match unit.contains('.') {
-        true => unit.into(),
-        false => format!("{}.service", unit),
+    if unit.contains('.') {
+        unit.into()
+    } else {
+        format!("{}.service", unit)
     }
 }
 
@@ -418,7 +418,7 @@ fn decode_array(array: &Vec<JsonValue>) -> Option<JsonValue> {
     // then the bytes into a string, but return None if any value in the
     // array was not a valid byte.
     array
-        .into_iter()
+        .iter()
         .map(|item| {
             item.as_u64().and_then(|num| match num {
                 num if num <= u8::max_value() as u64 => Some(num as u8),
@@ -430,10 +430,8 @@ fn decode_array(array: &Vec<JsonValue>) -> Option<JsonValue> {
 }
 
 fn remap_priority(priority: &mut JsonValue) {
-    priority
-        .as_str()
-        .and_then(|s| usize::from_str(s).ok())
-        .map(|num| match num {
+    if let Some(num) = priority.as_str().and_then(|s| usize::from_str(s).ok()) {
+        let text = match num {
             0 => "EMERG",
             1 => "ALERT",
             2 => "CRIT",
@@ -443,8 +441,9 @@ fn remap_priority(priority: &mut JsonValue) {
             6 => "INFO",
             7 => "DEBUG",
             _ => "UNKNOWN",
-        })
-        .map(|text| *priority = JsonValue::String(text.into()));
+        };
+        *priority = JsonValue::String(text.into());
+    }
 }
 
 /// Should the given unit name be filtered (excluded)?
@@ -512,10 +511,10 @@ mod checkpointer_tests {
     use tempfile::tempdir;
 
     fn open_read_close<F: AsRef<Path> + Debug>(path: F) -> Vec<u8> {
-        let mut file = File::open(&path).expect(&format!("Could not open {:?}", path));
+        let mut file = File::open(&path).unwrap_or_else(|_| panic!("Could not open {:?}", path));
         let mut buf = Vec::<u8>::new();
         file.read_to_end(&mut buf)
-            .expect(&format!("Could not read {:?}", path));
+            .unwrap_or_else(|_| panic!("Could not read {:?}", path));
         buf
     }
 
@@ -609,8 +608,8 @@ mod tests {
         let tempdir = tempdir().unwrap();
         let mut checkpointer =
             Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
-        let include_units = HashSet::<String>::from_iter(iunits.into_iter().map(|&s| s.into()));
-        let exclude_units = HashSet::<String>::from_iter(xunits.into_iter().map(|&s| s.into()));
+        let include_units = HashSet::<String>::from_iter(iunits.iter().map(|&s| s.into()));
+        let exclude_units = HashSet::<String>::from_iter(xunits.iter().map(|&s| s.into()));
 
         if let Some(cursor) = cursor {
             checkpointer.set(cursor).expect("Could not set checkpoint");
@@ -721,11 +720,11 @@ mod tests {
         assert_eq!(filter_unit(Some(&one), &includes, &empty), false);
         assert_eq!(filter_unit(Some(&one), &empty, &excludes), false);
         assert_eq!(filter_unit(Some(&one), &includes, &excludes), false);
-        let bar = String::from("bar");
-        assert_eq!(filter_unit(Some(&bar), &empty, &empty), false);
-        assert_eq!(filter_unit(Some(&bar), &includes, &empty), true);
-        assert_eq!(filter_unit(Some(&bar), &empty, &excludes), true);
-        assert_eq!(filter_unit(Some(&bar), &includes, &excludes), true);
+        let two = String::from("two");
+        assert_eq!(filter_unit(Some(&two), &empty, &empty), false);
+        assert_eq!(filter_unit(Some(&two), &includes, &empty), true);
+        assert_eq!(filter_unit(Some(&two), &empty, &excludes), true);
+        assert_eq!(filter_unit(Some(&two), &includes, &excludes), true);
     }
 
     fn message(event: &Event) -> Value {

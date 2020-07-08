@@ -47,9 +47,10 @@ impl Filter {
 
 impl Transform for Filter {
     fn transform(&mut self, event: Event) -> Option<Event> {
-        match self.condition.check(&event) {
-            true => Some(event),
-            false => None,
+        if self.condition.check(&event) {
+            Some(event)
+        } else {
+            None
         }
     }
 }

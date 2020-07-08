@@ -23,7 +23,7 @@ mod test {
         }));
         let expected: Vec<_> = vec!["field1", "field2", "field3"]
             .into_iter()
-            .map(|s| String::from(s))
+            .map(String::from)
             .collect();
 
         let collected: Vec<_> = keys(&fields).collect();
@@ -52,7 +52,7 @@ mod test {
             "a.b.c",
         ]
         .into_iter()
-        .map(|s| String::from(s))
+        .map(String::from)
         .collect();
 
         let collected: Vec<_> = keys(&fields).collect();

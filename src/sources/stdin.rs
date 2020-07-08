@@ -106,8 +106,7 @@ where
 
     let host_key = config
         .host_key
-        .clone()
-        .unwrap_or(event::log_schema().host_key().to_string());
+        .unwrap_or_else(|| event::log_schema().host_key().to_string());
     let hostname = hostname::get_hostname();
 
     let mut guard = CRITICAL_SECTION

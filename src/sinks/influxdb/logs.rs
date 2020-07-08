@@ -379,7 +379,7 @@ mod tests {
         assert_eq!("ns.vector", line_protocol.0);
         assert_eq!("metric_type=logs", line_protocol.1);
         assert_fields(
-            line_protocol.2.to_string(),
+            line_protocol.2,
             [
                 "a=1i",
                 "nested.array[0]=\"example-value\"",
@@ -461,7 +461,7 @@ mod tests {
                 .as_mut_log()
                 .insert(format!("key{}", i), format!("value{}", i));
 
-            let timestamp = Utc.ymd(1970, 01, 01).and_hms_nano(0, 0, (i as u32) + 1, 0);
+            let timestamp = Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0);
             event.as_mut_log().insert("timestamp", timestamp);
             event.as_mut_log().insert("source_type", "file");
 
@@ -525,7 +525,7 @@ mod tests {
                 .as_mut_log()
                 .insert(format!("key{}", i), format!("value{}", i));
 
-            let timestamp = Utc.ymd(1970, 01, 01).and_hms_nano(0, 0, (i as u32) + 1, 0);
+            let timestamp = Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0);
             event.as_mut_log().insert("timestamp", timestamp);
             event.as_mut_log().insert("source_type", "file");
 
@@ -578,14 +578,13 @@ mod tests {
         let token = token.to_string();
         let namespace = namespace.to_string();
         let tags: HashSet<String> = tags.into_iter().map(|tag| tag.to_string()).collect();
-        let sink = InfluxDBLogsSink {
+        InfluxDBLogsSink {
             uri,
             token,
             protocol_version,
             namespace,
             tags,
-        };
-        sink
+        }
     }
 }
 

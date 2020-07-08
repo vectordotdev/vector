@@ -45,7 +45,7 @@ fn is_header(input: &str) -> bool {
 }
 
 fn is_comment(input: &str) -> bool {
-    input.starts_with("#")
+    input.starts_with('#')
 }
 
 fn parse_header(input: &str) -> Result<ParserHeader, ParserError> {

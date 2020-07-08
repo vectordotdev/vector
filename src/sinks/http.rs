@@ -312,7 +312,7 @@ mod tests {
         let event = Event::from("hello world");
 
         let mut config = default_config(Encoding::Text);
-        config.encoding = encoding.clone();
+        config.encoding = encoding;
         let bytes = config.encode_event(event).unwrap();
 
         assert_eq!(bytes, Vec::from(&"hello world\n"[..]));
@@ -324,7 +324,7 @@ mod tests {
         let event = Event::from("hello world");
 
         let mut config = default_config(Encoding::Json);
-        config.encoding = encoding.clone();
+        config.encoding = encoding;
         let bytes = config.encode_event(event).unwrap();
 
         #[derive(Deserialize, Debug)]

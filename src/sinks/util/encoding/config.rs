@@ -138,9 +138,7 @@ where
             timestamp_format: inner.timestamp_format,
         };
 
-        concrete
-            .validate()
-            .map_err(|e| serde::de::Error::custom(e))?;
+        concrete.validate().map_err(serde::de::Error::custom)?;
         Ok(concrete)
     }
 }

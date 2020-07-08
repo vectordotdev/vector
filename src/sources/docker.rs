@@ -208,7 +208,7 @@ impl DockerSourceCore {
         }
 
         self.docker.events(Some(EventsOptions {
-            since: self.now_timestamp.clone(),
+            since: self.now_timestamp,
             // Handler in Docker API:
             // https://github.com/moby/moby/blob/c833222d54c00d64a0fc44c561a5973ecd414053/api/server/router/system/system_routes.go#L155
             until: MAX_DATE.and_time(NaiveTime::from_hms(0, 0, 0)).unwrap(),
@@ -283,7 +283,7 @@ impl DockerSource {
             core: Arc::new(core),
             out,
             main_send,
-            shutdown: shutdown,
+            shutdown,
         };
 
         Ok(DockerSource {
@@ -671,7 +671,7 @@ impl ContainerLogInfo {
         self.last_log
             .as_ref()
             .map(|&(ref d, _)| d.timestamp())
-            .unwrap_or(self.created.timestamp())
+            .unwrap_or_else(|| self.created.timestamp())
             - 1
     }
 
@@ -749,7 +749,7 @@ impl ContainerLogInfo {
 
         // Prepare the log event.
         let mut log_event = {
-            let mut log_event = LogEvent::new();
+            let mut log_event = LogEvent::default();
 
             // Source type
             log_event.insert(event::log_schema().source_type_key(), "docker");
@@ -780,7 +780,7 @@ impl ContainerLogInfo {
             log_event.insert(IMAGE.clone(), self.metadata.image.clone());
 
             // Timestamp of the container creation.
-            log_event.insert(CREATED_AT.clone(), self.metadata.created_at.clone());
+            log_event.insert(CREATED_AT.clone(), self.metadata.created_at);
 
             // Return the resulting log event.
             log_event
@@ -868,11 +868,9 @@ impl ContainerMetadata {
 
         Ok(ContainerMetadata {
             labels,
-            name: name.as_str().trim_start_matches("/").into(),
+            name: name.as_str().trim_start_matches('/').into(),
             image: config.image.unwrap().as_str().into(),
-            created_at: DateTime::parse_from_rfc3339(created.as_str())?
-                .with_timezone(&Utc)
-                .into(),
+            created_at: DateTime::parse_from_rfc3339(created.as_str())?.with_timezone(&Utc),
         })
     }
 }

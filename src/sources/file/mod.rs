@@ -257,7 +257,7 @@ pub fn file_source(
     let host_key = config
         .host_key
         .clone()
-        .unwrap_or(event::log_schema().host_key().to_string());
+        .unwrap_or_else(|| event::log_schema().host_key().to_string());
     let hostname = hostname::get_hostname();
 
     let include = config.include.clone();
@@ -730,7 +730,7 @@ mod tests {
 
         for event in received {
             let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
-            let mut split = line.split(" ");
+            let mut split = line.split(' ');
             let file = split.next().unwrap().parse::<usize>().unwrap();
             assert_ne!(file, 4);
             let i = split.next().unwrap().parse::<usize>().unwrap();

@@ -82,7 +82,7 @@ impl SourceConfig for SplunkConfig {
 
         let event_service = source.event_service(out.clone());
         let raw_service = source.raw_service(out.clone());
-        let health_service = source.health_service(out.clone());
+        let health_service = source.health_service(out);
         let options = SplunkSource::options();
 
         let services = path!("services" / "collector" / ..)
@@ -346,9 +346,7 @@ impl<R: Read> EventStream<R> {
         let mut reader = IoRead::new(&mut self.data);
         match reader.peek()? {
             None => Ok(None),
-            Some(_) => {
-                Deserialize::deserialize(&mut Deserializer::new(reader)).map(|data| Some(data))
-            }
+            Some(_) => Deserialize::deserialize(&mut Deserializer::new(reader)).map(Some),
         }
     }
 }
@@ -750,7 +748,7 @@ mod tests {
     use std::net::SocketAddr;
 
     /// Splunk token
-    const TOKEN: &'static str = "token";
+    const TOKEN: &str = "token";
 
     const CHANNEL_CAPACITY: usize = 1000;
 
@@ -891,7 +889,6 @@ mod tests {
         let (mut rt, sink, source) = start(Encoding::Text, Compression::None);
 
         let messages = (0..n)
-            .into_iter()
             .map(|i| format!("multiple_simple_text_event_{}", i))
             .collect::<Vec<_>>();
         let events = channel_n(messages.clone(), sink, source, &mut rt);
@@ -939,7 +936,6 @@ mod tests {
         let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
 
         let messages = (0..n)
-            .into_iter()
             .map(|i| format!("multiple_simple_json_event{}", i))
             .collect::<Vec<_>>();
         let events = channel_n(messages.clone(), sink, source, &mut rt);
@@ -1133,7 +1129,7 @@ mod tests {
         let cases = vec![
             Utc::now(),
             Utc.ymd(1971, 11, 7).and_hms(1, 1, 1),
-            Utc.ymd(2011, 08, 5).and_hms(1, 1, 1),
+            Utc.ymd(2011, 8, 5).and_hms(1, 1, 1),
             Utc.ymd(2189, 11, 4).and_hms(2, 2, 2),
         ];
 

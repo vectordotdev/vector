@@ -52,11 +52,7 @@ inventory::submit! {
 impl TransformConfig for AddFieldsConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AddFields::new(
-            self.fields
-                .clone()
-                .all_fields()
-                .map(|(k, v)| (k.into(), v.into()))
-                .collect(),
+            self.fields.clone().all_fields().collect(),
             self.overwrite,
         )))
     }
@@ -79,7 +75,7 @@ impl AddFields {
         let mut new_fields = IndexMap::new();
 
         for (k, v) in fields {
-            flatten_field(k.into(), v, &mut new_fields);
+            flatten_field(k, v, &mut new_fields);
         }
 
         AddFields {
@@ -109,23 +105,21 @@ impl Transform for AddFields {
                 TemplateOrValue::Value(v) => v,
             };
             if self.overwrite {
-                if let Some(_) = event.as_mut_log().insert(&key, value) {
+                if event.as_mut_log().insert(&key, value).is_some() {
                     debug!(
                         message = "Field overwritten",
                         field = key.as_ref(),
                         rate_limit_secs = 30,
                     )
                 }
+            } else if event.as_mut_log().contains(&key) {
+                debug!(
+                    message = "Field not overwritten",
+                    field = key.as_ref(),
+                    rate_limit_secs = 30,
+                )
             } else {
-                if event.as_mut_log().contains(&key) {
-                    debug!(
-                        message = "Field not overwritten",
-                        field = key.as_ref(),
-                        rate_limit_secs = 30,
-                    )
-                } else {
-                    event.as_mut_log().insert(key, value);
-                }
+                event.as_mut_log().insert(key, value);
             }
         }
 

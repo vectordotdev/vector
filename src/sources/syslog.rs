@@ -83,7 +83,7 @@ impl SourceConfig for SyslogConfig {
         let host_key = self
             .host_key
             .clone()
-            .unwrap_or(event::log_schema().host_key().to_string());
+            .unwrap_or_else(|| event::log_schema().host_key().to_string());
 
         match self.mode.clone() {
             Mode::Tcp { address, tls } => {
@@ -274,7 +274,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
     for element in parsed.structured_data.iter() {
         for (name, value) in element.params.iter() {
             let key = format!("{}.{}", element.id, name);
-            log.insert(key, value.clone());
+            log.insert(key, *value);
         }
     }
 }

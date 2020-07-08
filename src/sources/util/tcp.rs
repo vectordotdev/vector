@@ -90,7 +90,7 @@ pub trait TcpSource: Clone + Send + 'static {
                 addr = field::display(
                     listener
                         .local_addr()
-                        .map(|addr| SocketListenAddr::SocketAddr(addr))
+                        .map(SocketListenAddr::SocketAddr)
                         .unwrap_or(addr)
                 )
             );

@@ -209,11 +209,11 @@ async fn healthcheck(config: LogdnaConfig, resolver: Resolver) -> crate::Result<
     let res = client.send(req).await?;
 
     if res.status().is_server_error() {
-        return Err(format!("Server returned a server error").into());
+        return Err("Server returned a server error".into());
     }
 
     if res.status() == StatusCode::FORBIDDEN {
-        return Err(format!("Token is not valid, 403 returned.").into());
+        return Err("Token is not valid, 403 returned.".into());
     }
 
     Ok(())

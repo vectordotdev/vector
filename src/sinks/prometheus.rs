@@ -185,7 +185,7 @@ fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: 
                 }
                 let mut sum = 0.0;
                 let mut count = 0;
-                for (v, c) in values.into_iter().zip(sample_rates.into_iter()) {
+                for (v, c) in values.iter().zip(sample_rates.iter()) {
                     buckets
                         .iter()
                         .enumerate()
@@ -332,14 +332,14 @@ impl PrometheusSink {
         let namespace = self.config.namespace.clone();
         let buckets = self.config.buckets.clone();
         let last_flush_timestamp = Arc::clone(&self.last_flush_timestamp);
-        let flush_period_secs = self.config.flush_period_secs.clone();
+        let flush_period_secs = self.config.flush_period_secs;
 
         let new_service = make_service_fn(move |_| {
             let metrics = Arc::clone(&metrics);
             let namespace = namespace.clone();
             let buckets = buckets.clone();
             let last_flush_timestamp = Arc::clone(&last_flush_timestamp);
-            let flush_period_secs = flush_period_secs.clone();
+            let flush_period_secs = flush_period_secs;
 
             async move {
                 Ok::<_, crate::Error>(service_fn(move |req| {
@@ -362,7 +362,7 @@ impl PrometheusSink {
 
         let server = Server::bind(&self.config.address)
             .serve(new_service)
-            .with_graceful_shutdown(tripwire.clone().compat().map(|_| ()))
+            .with_graceful_shutdown(tripwire.compat().map(|_| ()))
             .map_err(|e| eprintln!("server error: {}", e));
 
         tokio::spawn(server);
@@ -385,7 +385,7 @@ impl Sink for PrometheusSink {
 
         match item.kind {
             MetricKind::Incremental => {
-                let new = MetricEntry(item.clone().into_absolute());
+                let new = MetricEntry(item.to_absolute());
                 if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
                     if item.value.is_set() {
                         // sets need to be expired from time to time

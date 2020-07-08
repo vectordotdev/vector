@@ -53,7 +53,7 @@ impl AddTags {
 impl Transform for AddTags {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         if !self.tags.is_empty() {
-            let ref mut tags = event.as_mut_metric().tags;
+            let tags = &mut event.as_mut_metric().tags;
 
             if tags.is_none() {
                 *tags = Some(BTreeMap::new());
@@ -64,7 +64,8 @@ impl Transform for AddTags {
                 if self.overwrite {
                     map.insert(name.to_string(), value.to_string());
                 } else {
-                    map.entry(name.to_string()).or_insert(value.to_string());
+                    map.entry(name.to_string())
+                        .or_insert_with(|| value.to_string());
                 }
             }
         }

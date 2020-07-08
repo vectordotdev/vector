@@ -99,7 +99,7 @@ mod test {
     #[test]
     fn test_insert_nested() {
         let mut fields = BTreeMap::new();
-        insert(&mut fields, "a.b.c".into(), Value::Integer(3));
+        insert(&mut fields, "a.b.c", Value::Integer(3));
 
         let expected = fields_from_json(json!({
             "a": {
@@ -114,8 +114,8 @@ mod test {
     #[test]
     fn test_insert_array() {
         let mut fields = BTreeMap::new();
-        insert(&mut fields, "a.b[0].c[2]".into(), Value::Integer(10));
-        insert(&mut fields, "a.b[0].c[0]".into(), Value::Integer(5));
+        insert(&mut fields, "a.b[0].c[2]", Value::Integer(10));
+        insert(&mut fields, "a.b[0].c[0]", Value::Integer(5));
 
         let expected = fields_from_json(json!({
             "a": {

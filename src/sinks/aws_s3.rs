@@ -171,18 +171,17 @@ impl S3SinkConfig {
         let encoding = self.encoding.clone();
 
         let compression = self.compression;
-        let filename_time_format = self.filename_time_format.clone().unwrap_or("%s".into());
+        let filename_time_format = self
+            .filename_time_format
+            .clone()
+            .unwrap_or_else(|| "%s".into());
         let filename_append_uuid = self.filename_append_uuid.unwrap_or(true);
         let batch = self
             .batch
             .use_size_as_bytes()?
             .get_settings_or_default(BatchSettings::default().bytes(10_000_000).timeout(300));
 
-        let key_prefix = self
-            .key_prefix
-            .as_ref()
-            .map(String::as_str)
-            .unwrap_or("date=%F/");
+        let key_prefix = self.key_prefix.as_deref().unwrap_or("date=%F/");
         let key_prefix = Template::try_from(key_prefix)?;
 
         let s3 = S3Sink {
@@ -519,7 +518,7 @@ mod tests {
         assert_eq!(req.key, "key/date.log.gz".to_string());
 
         let req = build_request(
-            buf.clone(),
+            buf,
             "date".into(),
             None,
             true,

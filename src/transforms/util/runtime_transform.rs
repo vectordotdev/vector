@@ -79,7 +79,7 @@ where
         let timers = self.timers();
         let input_rx: MessageStream = Box::new(
             input_rx
-                .map(|event| Message::Process(event))
+                .map(Message::Process)
                 .into_future()
                 .map(move |(first, rest)| {
                     // The first message is always `Message::Init`.
@@ -132,7 +132,7 @@ where
                     }
                     acc
                 })
-                .map(|v| stream::iter_ok(v))
+                .map(stream::iter_ok)
                 .flatten(),
         )
     }

@@ -68,7 +68,7 @@ impl<'a> FieldsIter<'a> {
         let mut path_iter = self.path.iter().chain(iter::once(&component)).peekable();
         loop {
             match path_iter.next() {
-                None => return String::from(res),
+                None => return res,
                 Some(PathComponent::Key(key)) => res.push_str(&key),
                 Some(PathComponent::Index(index)) => res.push_str(&format!("[{}]", index)),
             }
