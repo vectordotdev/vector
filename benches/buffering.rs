@@ -1,5 +1,3 @@
-#![allow(clippy::identity_conversion)]
-
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
 use tempfile::tempdir;
@@ -81,8 +79,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     config.sinks["out"].buffer = BufferConfig::Disk {
                         max_size: 1_000_000,
                         when_full: Default::default(),
-                    }
-                    .into();
+                    };
                     config.global.data_dir = Some(data_dir.clone());
 
                     let mut rt = runtime::Runtime::new().unwrap();

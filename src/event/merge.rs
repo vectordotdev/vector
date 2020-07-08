@@ -67,7 +67,7 @@ mod test {
         ];
 
         let current = {
-            let mut log = LogEvent::new();
+            let mut log = LogEvent::default();
 
             log.insert("merge", "hello "); // will be concatenated with the `merged` from `incoming`.
             log.insert("do_not_merge", "my_first_value"); // will remain as is, since it's not selected for merging.
@@ -85,7 +85,7 @@ mod test {
         };
 
         let incoming = {
-            let mut log = LogEvent::new();
+            let mut log = LogEvent::default();
 
             log.insert("merge", "world"); // will be concatenated to the `merge` from `current`.
             log.insert("do_not_merge", "my_second_value"); // will be ignored, since it's not selected for merge.
@@ -101,11 +101,11 @@ mod test {
             log
         };
 
-        let mut merged = current.clone();
+        let mut merged = current;
         merge_log_event(&mut merged, incoming, &fields_to_merge);
 
         let expected = {
-            let mut log = LogEvent::new();
+            let mut log = LogEvent::default();
             log.insert("merge", "hello world");
             log.insert("do_not_merge", "my_first_value");
             log.insert("a", true);

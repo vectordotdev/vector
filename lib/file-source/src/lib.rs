@@ -1,10 +1,3 @@
-#![allow(clippy::clone_on_copy)]
-#![allow(clippy::cognitive_complexity)]
-#![allow(clippy::needless_return)]
-#![allow(clippy::redundant_field_names)]
-#![allow(clippy::string_lit_as_bytes)]
-#![allow(clippy::unreadable_literal)]
-
 #[macro_use]
 extern crate scan_fmt;
 #[macro_use]
@@ -160,9 +153,9 @@ mod test {
             // cause trimmed reads and the only remaining character in the
             // line is the newline. Womp womp
             if !ret.is_empty() {
-                return Some(ret.to_string());
+                Some(ret.to_string())
             } else {
-                return None;
+                None
             }
         }
     }
@@ -247,7 +240,7 @@ mod test {
                 FWAction::WriteLine(ref s) => {
                     fwfiles[0].write_line(s);
                     assert!(fp.write(s.as_bytes()).is_ok());
-                    assert!(fp.write("\n".as_bytes()).is_ok());
+                    assert!(fp.write(b"\n").is_ok());
                     assert!(fp.flush().is_ok());
                     writes += 1;
                 }
@@ -319,7 +312,7 @@ mod test {
                 FWAction::WriteLine(ref s) => {
                     fwfiles[0].write_line(s);
                     assert!(fp.write(s.as_bytes()).is_ok());
-                    assert!(fp.write("\n".as_bytes()).is_ok());
+                    assert!(fp.write(b"\n").is_ok());
                     assert!(fp.flush().is_ok());
                 }
                 FWAction::RotateFile => {

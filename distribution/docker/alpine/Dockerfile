@@ -11,4 +11,7 @@ RUN apk update && apk add ca-certificates tzdata && rm -rf /var/cache/apk/*
 COPY --from=builder /vector/bin/* /usr/local/bin/
 COPY --from=builder /vector/config/vector.toml /etc/vector/vector.toml
 
+# Smoke test
+RUN ["vector", "--version"]
+
 ENTRYPOINT ["/usr/local/bin/vector"]

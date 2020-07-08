@@ -1,4 +1,3 @@
-#![allow(clippy::skip_while_next)]
 #![cfg(all(
     feature = "sources-socket",
     feature = "transforms-sampler",
@@ -107,10 +106,7 @@ fn sample() {
     let mut input_lines = input_lines.into_iter();
     // Assert that all of the output lines were present in the input and in the same order
     for output_line in output_lines {
-        let next_line = input_lines
-            .by_ref()
-            .skip_while(|l| l != &output_line)
-            .next();
+        let next_line = input_lines.by_ref().find(|l| l == &output_line);
         assert_eq!(Some(output_line), next_line);
     }
 }

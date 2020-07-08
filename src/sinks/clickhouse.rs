@@ -204,7 +204,7 @@ impl RetryLogic for ClickhouseRetryLogic {
                 } else if body.starts_with(b"Code: 53") {
                     RetryAction::DontRetry("type mismatch".into())
                 } else {
-                    RetryAction::Retry(String::from_utf8_lossy(body).to_string().into())
+                    RetryAction::Retry(String::from_utf8_lossy(body).to_string())
                 }
             }
             _ => self.inner.should_retry_response(response),

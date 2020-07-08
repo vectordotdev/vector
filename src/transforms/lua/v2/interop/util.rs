@@ -18,7 +18,7 @@ pub fn timestamp_to_table<'a>(ctx: LuaContext<'a>, ts: DateTime<Utc>) -> LuaResu
     Ok(table)
 }
 
-pub fn table_is_timestamp<'a>(t: &LuaTable<'a>) -> LuaResult<bool> {
+pub fn table_is_timestamp(t: &LuaTable<'_>) -> LuaResult<bool> {
     for &key in &["year", "month", "day", "hour", "min", "sec"] {
         if !t.contains_key(key)? {
             return Ok(false);
@@ -27,7 +27,7 @@ pub fn table_is_timestamp<'a>(t: &LuaTable<'a>) -> LuaResult<bool> {
     Ok(true)
 }
 
-pub fn table_to_timestamp<'a>(t: LuaTable<'a>) -> LuaResult<DateTime<Utc>> {
+pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
     let year = t.get("year")?;
     let month = t.get("month")?;
     let day = t.get("day")?;

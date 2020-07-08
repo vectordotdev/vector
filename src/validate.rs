@@ -149,12 +149,10 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Result<Config, Option<Co
 
     if to_valdiate == validated {
         Ok(full_config)
+    } else if validated > 0 {
+        Err(Some(full_config))
     } else {
-        if validated > 0 {
-            Err(Some(full_config))
-        } else {
-            Err(None)
-        }
+        Err(None)
     }
 }
 
@@ -164,17 +162,15 @@ fn validate_topology(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool 
             if warnings.is_empty() {
                 fmt.success("Configuration topology");
                 true
+            } else if opts.deny_warnings {
+                fmt.title("Topology errors");
+                fmt.sub_error(warnings);
+                false
             } else {
-                if opts.deny_warnings {
-                    fmt.title("Topology errors");
-                    fmt.sub_error(warnings);
-                    false
-                } else {
-                    fmt.title("Topology warnings");
-                    fmt.sub_warning(warnings);
-                    fmt.success("Configuration topology");
-                    true
-                }
+                fmt.title("Topology warnings");
+                fmt.sub_warning(warnings);
+                fmt.success("Configuration topology");
+                true
             }
         }
         Err(errors) => {

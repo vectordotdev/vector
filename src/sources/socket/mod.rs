@@ -93,7 +93,7 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .clone()
-                    .unwrap_or(event::log_schema().host_key().clone());
+                    .unwrap_or_else(|| event::log_schema().host_key().clone());
                 Ok(udp::udp(config.address, host_key, shutdown, out))
             }
             #[cfg(unix)]
@@ -101,7 +101,7 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .clone()
-                    .unwrap_or(event::log_schema().host_key().to_string());
+                    .unwrap_or_else(|| event::log_schema().host_key().to_string());
                 Ok(unix::unix(
                     config.path,
                     config.max_length,
@@ -314,7 +314,7 @@ mod test {
         let (tx, rx) = mpsc::channel(2);
         let addr = next_addr();
 
-        let mut shutdown = SourceShutdownCoordinator::new();
+        let mut shutdown = SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(source_name);
 
         // Start TCP Source
@@ -355,7 +355,7 @@ mod test {
 
         let addr = next_addr();
 
-        let mut shutdown = SourceShutdownCoordinator::new();
+        let mut shutdown = SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(source_name);
 
         // Start TCP Source
@@ -415,7 +415,7 @@ mod test {
 
         let addr = next_addr();
 
-        let mut shutdown = SourceShutdownCoordinator::new();
+        let mut shutdown = SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(source_name);
 
         // Start TCP Source
@@ -555,7 +555,7 @@ mod test {
     fn init_udp(sender: mpsc::Sender<event::Event>) -> (SocketAddr, Runtime) {
         let (addr, rt, handle) = init_udp_inner(sender, "default", ShutdownSignal::noop());
         handle.forget();
-        return (addr, rt);
+        (addr, rt)
     }
 
     fn init_udp_inner(
@@ -670,7 +670,7 @@ mod test {
         let (tx, rx) = mpsc::channel(2);
         let source_name = "udp_shutdown_simple";
 
-        let mut shutdown = SourceShutdownCoordinator::new();
+        let mut shutdown = SourceShutdownCoordinator::default();
         let (address, mut rt, source_handle) =
             init_udp_with_shutdown(tx, source_name, &mut shutdown);
 
@@ -697,7 +697,7 @@ mod test {
         let (tx, rx) = mpsc::channel(10);
         let source_name = "udp_shutdown_infinite_stream";
 
-        let mut shutdown = SourceShutdownCoordinator::new();
+        let mut shutdown = SourceShutdownCoordinator::default();
         let (address, mut rt, source_handle) =
             init_udp_with_shutdown(tx, source_name, &mut shutdown);
 
@@ -753,13 +753,13 @@ mod test {
         rt.spawn(server);
 
         // Wait for server to accept traffic
-        while let Err(_) = std::os::unix::net::UnixStream::connect(&in_path) {}
+        while std::os::unix::net::UnixStream::connect(&in_path).is_err() {}
 
         (in_path, rt)
     }
 
     #[cfg(unix)]
-    fn send_lines_unix<'a>(path: PathBuf, lines: Vec<&'a str>) {
+    fn send_lines_unix(path: PathBuf, lines: Vec<&str>) {
         let input_stream =
             futures01::stream::iter_ok::<_, ()>(lines.clone().into_iter().map(|s| s.to_string()));
 

@@ -1,6 +1,5 @@
 use crate::topology::config::component::ComponentDescription;
 use crate::Event;
-use inventory;
 use serde::{Deserialize, Serialize};
 
 pub mod check_fields;

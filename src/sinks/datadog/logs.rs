@@ -37,7 +37,7 @@ impl SinkConfig for DatadogLogsConfig {
                 .port_u16()
                 .ok_or_else(|| "A port is required for endpoints".to_string())?;
 
-            (format!("{}", host), port, self.tls.clone())
+            (host.to_string(), port, self.tls.clone())
         } else {
             let tls = self.tls.clone().unwrap_or({
                 let mut tls = TlsConfig::default();

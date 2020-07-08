@@ -335,15 +335,8 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Elapsed(pub(super) ());
-
-impl Elapsed {
-    /// Construct a new elapsed error
-    pub fn new() -> Self {
-        Elapsed(())
-    }
-}
 
 impl fmt::Display for Elapsed {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
