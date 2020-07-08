@@ -30874,7 +30874,7 @@ module.exports = {
     "pulsar": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  address = \"127.0.0.1:6650\" # required\n  inputs = [\"in\"] # required\n  topic = \"topic-1234\" # required\n  type = \"pulsar\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # General\n  address = \"pulsar://127.0.0.1:6650\" # required\n  inputs = [\"in\"] # required\n  topic = \"topic-1234\" # required\n  type = \"pulsar\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Pulsar is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data.",
