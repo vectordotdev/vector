@@ -12,7 +12,7 @@ update_configs:
     # https://dependabot.com/docs/config-file/#version_requirement_updates
     version_requirement_updates: "off" # We should consider switching this to "auto"
     commit_message:
-      prefix: "chore(dependencies)"
+      prefix: "chore(deps)"
   - package_manager: "ruby:bundler"
     directory: "/scripts"
     update_schedule: "weekly"
@@ -25,7 +25,7 @@ update_configs:
     # https://dependabot.com/docs/config-file/#version_requirement_updates
     version_requirement_updates: "off" # We should consider switching this to "auto"
     commit_message:
-      prefix: "chore(dependencies)"
+      prefix: "chore(deps)"
   - package_manager: "javascript"
     directory: "/website"
     update_schedule: "weekly"
