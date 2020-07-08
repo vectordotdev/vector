@@ -1,14 +1,19 @@
 FROM debian:buster-slim AS builder
 
-COPY vector-*.deb ./
-RUN dpkg -i vector-$(dpkg --print-architecture).deb
+WORKDIR /vector
+
+COPY vector-*-unknown-linux-gnu*.tar.gz ./
+RUN tar -xvf vector-$(uname -m)-unknown-linux-gnu*.tar.gz --strip-components=2
 
 FROM debian:buster-slim
 
-RUN apt-get update && apt-get install -y ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+  && apt-get install -y \
+    ca-certificates \
+    tzdata \
+  && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/bin/vector /usr/bin/vector
-COPY --from=builder /usr/share/doc/vector /usr/share/doc/vector
-COPY --from=builder /etc/vector /etc/vector
+COPY --from=builder /vector/bin/vector /usr/local/bin/vector
+COPY --from=builder /vector/config/vector.toml /etc/vector/vector.toml
 
-ENTRYPOINT ["/usr/bin/vector"]
+ENTRYPOINT ["/usr/local/bin/vector"]
