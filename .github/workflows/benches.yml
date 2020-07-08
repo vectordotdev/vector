@@ -3,8 +3,7 @@ name: Benchmark Suite
 on:
   push:
     branches:
-      - master
-  pull_request: {}
+      - bench-*
 
 env:
   VERBOSE: true
