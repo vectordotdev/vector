@@ -12,7 +12,7 @@ import SVG from 'react-inlinesvg';
 
 Vector is a lightweight, ultra-fast, [open-source][urls.vector_repo] tool for
 building observability pipelines. Compared to Logstash and friends, Vector
-[improves throughput by ~10X while significanly reducing CPU and memory
+[improves throughput by ~10X while significantly reducing CPU and memory
 usage][urls.vector_performance].
 
 ### Principles
