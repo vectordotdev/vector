@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
 use std::time::Instant;

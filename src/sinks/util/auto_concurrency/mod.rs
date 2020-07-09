@@ -5,6 +5,7 @@ mod future;
 mod layer;
 mod semaphore;
 mod service;
+mod tests;
 
 pub(crate) use layer::AutoConcurrencyLimitLayer;
 pub(crate) use service::AutoConcurrencyLimit;
