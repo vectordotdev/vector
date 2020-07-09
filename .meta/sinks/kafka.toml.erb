@@ -46,7 +46,8 @@ write_to_description = "[Apache Kafka][urls.kafka] via the [Kafka protocol][urls
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.kafka.options",
-  encodings: ["json", "text"]
+  encodings: ["json", "text"],
+  default: "text"
 ) %>
 
 [sinks.kafka.options.key_field]

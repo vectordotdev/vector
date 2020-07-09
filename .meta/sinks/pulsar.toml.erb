@@ -26,7 +26,8 @@ write_to_description = "[Apache Pulsar][urls.pulsar] via the [Pulsar protocol][u
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.pulsar.options",
-  encodings: ["json", "text"]
+  encodings: ["json", "text"],
+  default: "text"
 ) %>
 
 [sinks.pulsar.options.address]
