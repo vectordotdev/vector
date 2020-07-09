@@ -26,6 +26,7 @@ pub struct DnstapConfig {
     pub max_length: usize,
     pub host_key: Option<String>,
     pub socket_path: PathBuf,
+    pub raw_data_only: Option<bool>,
 }
 
 fn default_max_length() -> usize {
@@ -52,6 +53,7 @@ impl Default for DnstapConfig {
             host_key: Some("host".to_string()),
             max_length: default_max_length(),
             socket_path: PathBuf::from("/run/bind/dnstap.sock"),
+            raw_data_only: None,
         }
     }
 }
@@ -79,6 +81,11 @@ impl SourceConfig for DnstapConfig {
             host_key.clone(),
             self.socket_path.clone(),
             self.content_type(),
+            if let Some(v) = self.raw_data_only {
+                v
+            } else {
+                false
+            },
         );
         Ok(build_framestream_unix_source(frame_handler, shutdown, out))
     }
@@ -99,6 +106,7 @@ pub struct DnstapFrameHandler {
     socket_path: PathBuf,
     content_type: String,
     schema: DnstapEventSchema,
+    raw_data_only: bool,
 }
 
 impl DnstapFrameHandler {
@@ -107,6 +115,7 @@ impl DnstapFrameHandler {
         host_key: String,
         socket_path: PathBuf,
         content_type: String,
+        raw_data_only: bool,
     ) -> Self {
         Self {
             max_length,
@@ -114,6 +123,7 @@ impl DnstapFrameHandler {
             socket_path,
             content_type,
             schema: DnstapEventSchema::new(),
+            raw_data_only,
         }
     }
 }
@@ -142,12 +152,17 @@ impl FrameHandler for DnstapFrameHandler {
             log_event.insert(self.host_key(), host);
         }
 
-        match DnstapParser::new(&self.schema, log_event).parse_dnstap_data(frame) {
-            Err(error) => {
-                error!("Dnstap protobuf decode error {:?}", error);
-                None
+        if self.raw_data_only {
+            log_event.insert(&self.schema.dnstap_root_data_schema.raw_data, base64::encode(&frame));
+            Some(event)
+        } else {
+            match DnstapParser::new(&self.schema, log_event).parse_dnstap_data(frame) {
+                Err(error) => {
+                    error!("Dnstap protobuf decode error {:?}", error);
+                    None
+                }
+                Ok(_) => Some(event),
             }
-            Ok(_) => Some(event),
         }
     }
     fn socket_path(&self) -> PathBuf {
