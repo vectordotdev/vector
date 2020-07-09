@@ -47,9 +47,15 @@ pub enum Encoding {
     Json,
 }
 
+enum PulsarProducerState {
+    NotReady(PulsarSinkConfig),
+    Creating(Box<dyn Future<Item = Producer<TokioExecutor>, Error = ()> + Send>),
+    Ready(Arc<Mutex<Producer<TokioExecutor>>>),
+}
+
 struct PulsarSink {
     encoding: EncodingConfig<Encoding>,
-    producer: Arc<Mutex<Producer<TokioExecutor>>>,
+    producer: PulsarProducerState,
     in_flight: FuturesUnordered<MetadataFuture<SendFuture, usize>>,
     // ack
     seq_head: usize,
@@ -67,8 +73,8 @@ inventory::submit! {
 #[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = PulsarSink::new(self, cx.acker())?;
-        let hc = PulsarSink::healthcheck(Arc::clone(&sink.producer));
+        let sink = PulsarSink::new(self.clone(), cx.acker())?;
+        let hc = PulsarSink::healthcheck(self.clone());
         Ok((Box::new(sink), Box::new(hc.boxed().compat())))
     }
 
@@ -82,30 +88,10 @@ impl SinkConfig for PulsarSinkConfig {
 }
 
 impl PulsarSink {
-    fn new(config: &PulsarSinkConfig, acker: Acker) -> crate::Result<Self> {
-        // Clone for moving to async lifetime
-        let address = config.address.clone();
-        let auth = config.auth.as_ref().map(|auth| Authentication {
-            name: auth.name.clone(),
-            data: auth.token.as_bytes().to_vec(),
-        });
-        let topic = config.topic.clone();
-
-        // Temporary async block in sync
-        let producer = std::thread::spawn(move || {
-            let mut rt = crate::runtime::Runtime::single_threaded().unwrap();
-            rt.block_on_std(async move {
-                let pulsar = Pulsar::new(&address, auth, None, None).await?;
-                Ok(pulsar.producer().with_topic(topic).build().await?)
-            })
-        })
-        .join()
-        .expect("Runtime thread error")
-        .context(CreatePulsarSink)?;
-
+    fn new(config: PulsarSinkConfig, acker: Acker) -> crate::Result<Self> {
         Ok(Self {
             encoding: config.encoding.clone().into(),
-            producer: Arc::new(Mutex::new(producer)),
+            producer: PulsarProducerState::NotReady(config),
             in_flight: FuturesUnordered::new(),
             seq_head: 0,
             seq_tail: 0,
@@ -114,9 +100,41 @@ impl PulsarSink {
         })
     }
 
-    async fn healthcheck(producer: Arc<Mutex<Producer<TokioExecutor>>>) -> crate::Result<()> {
-        let producer = producer.lock().await;
+    async fn healthcheck(config: PulsarSinkConfig) -> crate::Result<()> {
+        let producer = create_pulsar_producer(&config)
+            .await
+            .context(CreatePulsarSink)?;
         producer.check_connection().await.map_err(Into::into)
+    }
+
+    fn poll_producer(&mut self) -> Poll<Arc<Mutex<Producer<TokioExecutor>>>, ()> {
+        loop {
+            self.producer = match self.producer {
+                PulsarProducerState::NotReady(ref config) => {
+                    error!("poll_producer, NotReady");
+                    let config = config.clone();
+                    let fut = async move {
+                        let producer = create_pulsar_producer(&config).await;
+                        Ok(producer.expect("fail on creating pulsar producer"))
+                    };
+                    PulsarProducerState::Creating(Box::new(fut.boxed().compat()))
+                }
+                PulsarProducerState::Creating(ref mut fut) => {
+                    error!("poll_producer, creating");
+                    match fut.poll() {
+                        Ok(Async::NotReady) => return Ok(Async::NotReady),
+                        Ok(Async::Ready(producer)) => {
+                            PulsarProducerState::Ready(Arc::new(Mutex::new(producer)))
+                        }
+                        Err(_) => unreachable!(),
+                    }
+                }
+                PulsarProducerState::Ready(ref producer) => {
+                    error!("poll_producer, ready");
+                    return Ok(Async::Ready(Arc::clone(producer)));
+                }
+            }
+        }
     }
 }
 
@@ -125,23 +143,32 @@ impl Sink for PulsarSink {
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let message = encode_event(item, &self.encoding).map_err(|_| ())?;
+        match self.poll_producer() {
+            Ok(Async::NotReady) => Ok(AsyncSink::NotReady(item)),
+            Ok(Async::Ready(producer)) => {
+                let message = encode_event(item, &self.encoding).map_err(|_| ())?;
 
-        let producer = Arc::clone(&self.producer);
-        let fut = async move { producer.lock().await.send(message.clone()).await };
+                let fut = async move { producer.lock().await.send(message.clone()).await };
 
-        let seqno = self.seq_head;
-        self.seq_head += 1;
-        self.in_flight
-            .push((Box::new(fut.boxed().compat()) as SendFuture).join(future::ok(seqno)));
-        Ok(AsyncSink::Ready)
+                let seqno = self.seq_head;
+                self.seq_head += 1;
+                self.in_flight
+                    .push((Box::new(fut.boxed().compat()) as SendFuture).join(future::ok(seqno)));
+                Ok(AsyncSink::Ready)
+            }
+            Err(_) => unreachable!(),
+        }
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
         loop {
             match self.in_flight.poll() {
-                Ok(Async::NotReady) => return Ok(Async::NotReady),
-                Ok(Async::Ready(None)) => return Ok(Async::Ready(())),
+                Ok(Async::NotReady) => {
+                    return Ok(Async::NotReady);
+                }
+                Ok(Async::Ready(None)) => {
+                    return Ok(Async::Ready(()));
+                }
                 Ok(Async::Ready(Some((result, seqno)))) => {
                     trace!(
                         "Pulsar sink produced message {:?} from {} at sequence id {}",
@@ -161,6 +188,18 @@ impl Sink for PulsarSink {
             }
         }
     }
+}
+
+async fn create_pulsar_producer(
+    config: &PulsarSinkConfig,
+) -> Result<Producer<TokioExecutor>, PulsarError> {
+    let auth = config.auth.as_ref().map(|auth| Authentication {
+        name: auth.name.clone(),
+        data: auth.token.as_bytes().to_vec(),
+    });
+
+    let pulsar = Pulsar::new(&config.address, auth, None, None).await?;
+    pulsar.producer().with_topic(&config.topic).build().await
 }
 
 fn encode_event(item: Event, encoding: &EncodingConfig<Encoding>) -> crate::Result<Vec<u8>> {
@@ -214,6 +253,9 @@ mod integration_tests {
 
         let mut rt = runtime();
         rt.block_on_std(async move {
+            let num_events = 1_000;
+            let (_input, events) = random_lines_with_stream(100, num_events);
+
             let topic = format!("test-{}", random_string(10));
             let cnf = PulsarSinkConfig {
                 address: "pulsar://127.0.0.1:6650".to_owned(),
@@ -221,23 +263,11 @@ mod integration_tests {
                 encoding: Encoding::Text.into(),
                 auth: None,
             };
-            let (acker, ack_counter) = Acker::new_for_testing();
-            let sink = PulsarSink::new(&cnf, acker).unwrap();
-
-            let num_events = 1_000;
-            let (_input, events) = random_lines_with_stream(100, num_events);
-            let _ = sink.send_all(events).compat().await.unwrap();
-
-            assert_eq!(
-                ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-                num_events
-            );
 
             let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.address)
                 .build()
                 .await
                 .unwrap();
-
             let mut consumer = pulsar
                 .consumer()
                 .with_topic(&topic)
@@ -248,7 +278,15 @@ mod integration_tests {
                 .await
                 .unwrap();
 
-            for _ in 0..1000usize {
+            let (acker, ack_counter) = Acker::new_for_testing();
+            let sink = PulsarSink::new(cnf.clone(), acker).unwrap();
+            let _ = sink.send_all(events).compat().await.unwrap();
+            assert_eq!(
+                ack_counter.load(std::sync::atomic::Ordering::Relaxed),
+                num_events
+            );
+
+            for _ in 0..num_events {
                 let msg = match consumer.next().await.unwrap() {
                     Ok(msg) => msg,
                     Err(err) => panic!("{:?}", err),
