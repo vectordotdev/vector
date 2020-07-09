@@ -236,7 +236,7 @@ fn test_octet_counting_syslog() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
