@@ -16,6 +16,7 @@ RUN cd /tmp && \
   cd cmark-gfm && \
   git checkout 0.29.0.gfm.0 && \
   make install INSTALL_PREFIX=/usr && \
+  ldconfig && \
   cd .. && \
   rm -rf cmark-gfm && \
   cmark-gfm --version
