@@ -5,8 +5,9 @@
 image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
+  # Overrides the image tag, the default is `{image.version}-{image.base}`.
   tag: ""
+  # Overrides the image version, the default is the Chart appVersion.
   version: ""
   base: "debian"
 
