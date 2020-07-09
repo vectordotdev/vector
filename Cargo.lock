@@ -2665,9 +2665,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.3.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c601810575c99596d4afc46f78a678c80105117c379eb3650cf99b8a21ce5b"
+checksum = "0b631f7e854af39a1739f401cf34a8a013dfe09eac4fa4dba91e9768bd28168d"
 
 [[package]]
 name = "onig"
@@ -2808,12 +2808,12 @@ checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
 
 [[package]]
 name = "pem"
-version = "0.7.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1581760c757a756a41f0ee3ff01256227bdf64cb752839779b95ffb01c59793"
+checksum = "59698ea79df9bf77104aefd39cc3ec990cb9693fb59c3b0a70ddf2646fdffb4b"
 dependencies = [
- "base64 0.11.0",
- "lazy_static 1.4.0",
+ "base64 0.12.0",
+ "once_cell",
  "regex",
 ]
 
@@ -3168,9 +3168,9 @@ dependencies = [
 
 [[package]]
 name = "pulsar"
-version = "1.0.0-alpha"
+version = "1.0.0-alpha-2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b596244f7eabd0e58880cfa8e6b2404753a506d8d153f24e6a6c1ca50fd3bd6"
+checksum = "24444e0ff93787312bc84a12827d017e00252c447739fb38a1d3d27b14c05dc5"
 dependencies = [
  "bit-vec 0.6.1",
  "bytes 0.5.4",

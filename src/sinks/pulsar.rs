@@ -148,7 +148,13 @@ impl Sink for PulsarSink {
             Ok(Async::Ready(producer)) => {
                 let message = encode_event(item, &self.encoding).map_err(|_| ())?;
 
-                let fut = async move { producer.lock().await.send(message.clone()).await };
+                let fut = async move {
+                    let mut locked = producer.lock().await;
+                    match locked.send(message.clone()).await {
+                        Ok(fut) => fut.await,
+                        Err(e) => Err(e),
+                    }
+                };
 
                 let seqno = self.seq_head;
                 self.seq_head += 1;
@@ -193,12 +199,14 @@ impl Sink for PulsarSink {
 async fn create_pulsar_producer(
     config: &PulsarSinkConfig,
 ) -> Result<Producer<TokioExecutor>, PulsarError> {
-    let auth = config.auth.as_ref().map(|auth| Authentication {
-        name: auth.name.clone(),
-        data: auth.token.as_bytes().to_vec(),
-    });
-
-    let pulsar = Pulsar::new(&config.address, auth, None, None).await?;
+    let mut builder = Pulsar::builder(&config.address);
+    if let Some(auth) = &config.auth {
+        builder = builder.with_auth(Authentication {
+            name: auth.name.clone(),
+            data: auth.token.as_bytes().to_vec(),
+        });
+    }
+    let pulsar = builder.build().await?;
     pulsar.producer().with_topic(&config.topic).build().await
 }
 
