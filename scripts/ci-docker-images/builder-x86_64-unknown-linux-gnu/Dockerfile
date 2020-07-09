@@ -17,7 +17,8 @@ RUN cd /tmp && \
   git checkout 0.29.0.gfm.0 && \
   make install INSTALL_PREFIX=/usr && \
   cd .. && \
-  rm -rf cmark-gfm
+  rm -rf cmark-gfm && \
+  cmark-gfm --version
 
 RUN echo "%sudo         ALL = (ALL) NOPASSWD: ALL" >> /etc/sudoers.d/sudo
 RUN useradd -m -G wheel \
