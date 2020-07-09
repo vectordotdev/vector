@@ -166,7 +166,7 @@ impl SyslogDecoder {
         // |
         // | ASCII decimal number of unknown length
 
-        if let Some((i, _)) = src.iter().enumerate().find(|&(_, &b)| b == b' ') {
+        if let Some(i) = src.iter().position(|&b| b == b' ') {
             let len: usize = std::str::from_utf8(&src[..i])
                 .map_err(|_| ())
                 .and_then(|num| num.parse().map_err(|_| ()))
