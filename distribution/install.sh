@@ -127,7 +127,10 @@ install_from_archive() {
         x86_64-apple-darwin)
             _archive_arch=$_arch
             ;;
-        x86_64-*linux*)
+        x86_64-*linux*-gnu)
+            _archive_arch="x86_64-unknown-linux-gnu"
+            ;;
+        x86_64-*linux*-musl)
             _archive_arch="x86_64-unknown-linux-musl"
             ;;
         armv7-*linux*hf)
@@ -264,7 +267,18 @@ get_architecture() {
             ;;
 
         Linux)
-            _ostype=unknown-linux-gnu
+            case $(ldd --version 2>&1 | grep -Fq 'musl' >/dev/null; echo $?) in
+              0)
+                _ostype=unknown-linux-musl
+                ;;
+              1)
+                _ostype=unknown-linux-gnu
+                ;;
+              # Fallback
+              *)
+                _ostype=unknown-linux-gnu
+                ;;
+            esac
             _bitness=$(get_bitness)
             ;;
 
