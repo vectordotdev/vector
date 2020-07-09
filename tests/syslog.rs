@@ -249,18 +249,15 @@ fn test_octet_counting_syslog() {
         })
         .collect();
 
-    let input_lines: Vec<String> = input_messages
-        .iter()
-        .map(|msg| {
-            let s = msg.to_string();
-            format!("{} {}", s.len(), s)
-        })
-        .collect();
+    let input_lines: Vec<String> = input_messages.iter().map(|msg| {
+        let s = msg.to_string();
+        format!("{} {}", s.len(), s)
+    });
 
     block_on(send_encodable(
         in_addr,
         BytesCodec::new(),
-        input_lines.clone().into_iter().map(Into::into),
+        input_lines.map(Into::into),
     ))
     .unwrap();
 
