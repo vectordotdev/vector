@@ -720,11 +720,11 @@ mod tests {
         assert_eq!(filter_unit(Some(&one), &includes, &empty), false);
         assert_eq!(filter_unit(Some(&one), &empty, &excludes), false);
         assert_eq!(filter_unit(Some(&one), &includes, &excludes), false);
-        let two = String::from("two");
-        assert_eq!(filter_unit(Some(&two), &empty, &empty), false);
-        assert_eq!(filter_unit(Some(&two), &includes, &empty), true);
-        assert_eq!(filter_unit(Some(&two), &empty, &excludes), true);
-        assert_eq!(filter_unit(Some(&two), &includes, &excludes), true);
+        let bar = String::from("bar");
+        assert_eq!(filter_unit(Some(&bar), &empty, &empty), false);
+        assert_eq!(filter_unit(Some(&bar), &includes, &empty), true);
+        assert_eq!(filter_unit(Some(&bar), &empty, &excludes), true);
+        assert_eq!(filter_unit(Some(&bar), &includes, &excludes), true);
     }
 
     fn message(event: &Event) -> Value {
