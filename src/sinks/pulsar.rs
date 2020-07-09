@@ -92,13 +92,16 @@ impl PulsarSink {
         let topic = config.topic.clone();
 
         // Temporary async block in sync
-        let mut rt = tokio_compat::runtime::current_thread::Runtime::new()?;
-        let producer = rt
-            .block_on_std(async move {
+        let producer = std::thread::spawn(move || {
+            let mut rt = crate::runtime::Runtime::single_threaded().unwrap();
+            rt.block_on_std(async move {
                 let pulsar = Pulsar::new(&address, auth, None, None).await?;
                 Ok(pulsar.producer().with_topic(topic).build().await?)
             })
-            .context(CreatePulsarSink)?;
+        })
+        .join()
+        .expect("Runtime thread error")
+        .context(CreatePulsarSink)?;
 
         Ok(Self {
             encoding: config.encoding.clone().into(),
@@ -201,26 +204,26 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::test_util::{random_lines_with_stream, random_string, runtime};
+    use crate::test_util::{random_lines_with_stream, random_string, runtime, trace_init};
     use futures::{compat::Future01CompatExt, StreamExt};
     use pulsar::SubType;
 
     #[test]
     fn pulsar_happy() {
-        crate::test_util::trace_init();
+        trace_init();
 
         let mut rt = runtime();
-        let topic = format!("test-{}", random_string(10));
-        let cnf = PulsarSinkConfig {
-            address: "pulsar://127.0.0.1:6650".to_owned(),
-            topic: topic.clone(),
-            encoding: Encoding::Text.into(),
-            auth: None,
-        };
-        let (acker, ack_counter) = Acker::new_for_testing();
-        let sink = PulsarSink::new(&cnf, acker).unwrap();
-
         rt.block_on_std(async move {
+            let topic = format!("test-{}", random_string(10));
+            let cnf = PulsarSinkConfig {
+                address: "pulsar://127.0.0.1:6650".to_owned(),
+                topic: topic.clone(),
+                encoding: Encoding::Text.into(),
+                auth: None,
+            };
+            let (acker, ack_counter) = Acker::new_for_testing();
+            let sink = PulsarSink::new(&cnf, acker).unwrap();
+
             let num_events = 1_000;
             let (_input, events) = random_lines_with_stream(100, num_events);
             let _ = sink.send_all(events).compat().await.unwrap();
