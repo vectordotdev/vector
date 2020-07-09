@@ -1,5 +1,6 @@
 #![cfg(all(test, feature = "sources-generator"))]
 
+use super::controller::ControllerStatistics;
 use crate::{
     assert_within,
     event::{metric::MetricValue, Event, Metric},
@@ -64,6 +65,8 @@ struct TestConfig {
     // are created by `Default` and may be cloned to retain a handle.
     #[serde(skip)]
     stats: Arc<Mutex<Statistics>>,
+    #[serde(skip)]
+    controller_stats: Arc<Mutex<Arc<Mutex<ControllerStatistics>>>>,
 }
 
 #[typetag::serialize(name = "test")]
@@ -81,6 +84,19 @@ impl SinkConfig for TestConfig {
             )
             .sink_map_err(|e| panic!("Fatal test sink error: {}", e));
         let healthcheck = future::ok(());
+
+        // Dig deep to get at the internal controller statistics
+        let stats = sink
+            .get_ref()
+            .get_ref()
+            .get_ref()
+            .get_ref()
+            .get_ref()
+            .controller
+            .stats
+            .clone();
+        *self.controller_stats.lock().unwrap() = stats;
+
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
@@ -132,8 +148,9 @@ impl Service<Vec<Event>> for TestSink {
     }
 
     fn call(&mut self, _request: Vec<Event>) -> Self::Future {
+        let now = Instant::now();
         let mut stats = self.stats.lock().expect("Poisoned stats lock");
-        stats.in_flight.adjust(1);
+        stats.in_flight.adjust(1, now);
         let in_flight = stats.in_flight.level();
 
         let params = self.params;
@@ -143,14 +160,14 @@ impl Service<Vec<Event>> for TestSink {
         let delay = Delay::new(Instant::now() + delay).compat();
 
         if params.concurrency_drop > 0 && in_flight >= params.concurrency_drop {
-            stats.in_flight.adjust(-1);
+            stats.in_flight.adjust(-1, now);
             Box::pin(pending())
         } else {
             let stats2 = self.stats.clone();
             Box::pin(async move {
                 delay.await.expect("Delay failed!");
                 let mut stats = stats2.lock().expect("Poisoned stats lock");
-                stats.in_flight.adjust(-1);
+                stats.in_flight.adjust(-1, now);
 
                 if params.concurrency_defer > 0 && in_flight >= params.concurrency_defer {
                     Err(Error::Deferred)

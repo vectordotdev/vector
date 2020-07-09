@@ -161,6 +161,10 @@ impl<S, B, R, E> BatchSink<S, B, R, E> {
     pub fn get_ref(&self) -> &S {
         &self.service.service
     }
+
+    pub fn get_mut(&mut self) -> &mut S {
+        &mut self.service.service
+    }
 }
 
 impl<S, B, Request, E> BatchSink<S, B, Request, E>

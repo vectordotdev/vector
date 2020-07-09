@@ -266,6 +266,10 @@ mod compat {
         pub fn get_ref(&self) -> &S {
             &self.inner
         }
+
+        pub fn get_mut(&mut self) -> &S {
+            &mut self.inner
+        }
     }
 
     impl<S, Request> Service01<Request> for TowerCompat<S>
