@@ -216,7 +216,7 @@ mod tests {
 #[cfg(feature = "gcp-pubsub-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::test_util::{random_events_with_stream, random_string, runtime};
+    use crate::test_util::{random_events_with_stream, random_string, runtime, trace_init};
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use reqwest::{Client, Method, Response};
@@ -241,13 +241,13 @@ mod integration_tests {
 
     #[test]
     fn publish_events() {
-        crate::test_util::trace_init();
+        trace_init();
 
         let mut rt = runtime();
-        let (topic, subscription) = rt.block_on_std(create_topic_subscription());
-        let (sink, healthcheck) = config_build(&topic);
+        rt.block_on_std(async {
+            let (topic, subscription) = create_topic_subscription().await;
+            let (sink, healthcheck) = config_build(&topic);
 
-        rt.block_on_std(async move {
             healthcheck.compat().await.expect("Health check failed");
 
             let (input, events) = random_events_with_stream(100, 100);
@@ -274,11 +274,13 @@ mod integration_tests {
 
     #[test]
     fn checks_for_valid_topic() {
+        trace_init();
+
         let mut rt = runtime();
-        let (topic, _subscription) = rt.block_on_std(create_topic_subscription());
-        let topic = format!("BAD{}", topic);
-        let (_sink, healthcheck) = config_build(&topic);
-        rt.block_on_std(async move {
+        rt.block_on_std(async {
+            let (topic, _subscription) = create_topic_subscription().await;
+            let topic = format!("BAD{}", topic);
+            let (_sink, healthcheck) = config_build(&topic);
             healthcheck
                 .compat()
                 .await
