@@ -157,6 +157,12 @@ where
     }
 }
 
+impl<S, B, R, E> BatchSink<S, B, R, E> {
+    pub fn get_ref(&self) -> &S {
+        &self.service.service
+    }
+}
+
 impl<S, B, Request, E> BatchSink<S, B, Request, E>
 where
     S: Service<Request>,

@@ -262,6 +262,10 @@ mod compat {
         pub fn new(inner: S) -> Self {
             Self { inner }
         }
+
+        pub fn get_ref(&self) -> &S {
+            &self.inner
+        }
     }
 
     impl<S, Request> Service01<Request> for TowerCompat<S>
