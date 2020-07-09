@@ -226,7 +226,7 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-gcp
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	cargo test --no-default-features --features gcp-integration-tests ::gcp:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features gcp-integration-tests ::gcp:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -246,7 +246,7 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-kafka
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	cargo test --no-default-features --features "kafka-integration-tests rdkafka-plain" ::kafka:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features "kafka-integration-tests rdkafka-plain" ::kafka:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -349,7 +349,6 @@ check-markdown: ## Check that markdown is styled properly
 
 check-generate: ## Check that no files are pending generation
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-generate.sh
-
 
 check-version: ## Check that Vector's version is correct accounting for recent changes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-version.rb
