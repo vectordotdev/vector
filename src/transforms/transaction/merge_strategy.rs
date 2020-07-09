@@ -59,7 +59,7 @@ impl TransactionValueMerger for ConcatMerger {
             Ok(())
         } else {
             Err(format!(
-                "expected numeric value, found: '{}'",
+                "expected string value, found: '{}'",
                 v.to_string_lossy()
             ))
         }
