@@ -69,45 +69,53 @@ pub struct GcpCredentials {
 }
 
 fn get_token_implicit() -> Result<Token, GcpError> {
-    let mut rt = tokio_compat::runtime::current_thread::Runtime::new().unwrap();
-    rt.block_on_std(async {
-        let req = http::Request::get(SERVICE_ACCOUNT_TOKEN_URL)
-            .header("Metadata-Flavor", "Google")
-            .body(hyper::Body::empty())
-            .unwrap();
+    std::thread::spawn(|| {
+        let mut rt = crate::runtime::Runtime::single_threaded().unwrap();
+        rt.block_on_std(async {
+            let req = http::Request::get(SERVICE_ACCOUNT_TOKEN_URL)
+                .header("Metadata-Flavor", "Google")
+                .body(hyper::Body::empty())
+                .unwrap();
 
-        let res = hyper::Client::new()
-            .request(req)
-            .await
-            .context(GetImplicitToken)?;
+            let res = hyper::Client::new()
+                .request(req)
+                .await
+                .context(GetImplicitToken)?;
 
-        let body = res.into_body();
-        let bytes = hyper::body::to_bytes(body).await.context(GetTokenBytes)?;
+            let body = res.into_body();
+            let bytes = hyper::body::to_bytes(body).await.context(GetTokenBytes)?;
 
-        // Token::from_str is irresponsible and may panic!
-        match serde_json::from_slice::<Token>(&bytes) {
-            Ok(token) => Ok(token),
-            Err(error) => Err(match serde_json::from_slice::<TokenErr>(&bytes) {
-                Ok(error) => GcpError::TokenFromJson { source: error },
-                Err(_) => GcpError::TokenJsonFromStr { source: error },
-            }),
-        }
+            // Token::from_str is irresponsible and may panic!
+            match serde_json::from_slice::<Token>(&bytes) {
+                Ok(token) => Ok(token),
+                Err(error) => Err(match serde_json::from_slice::<TokenErr>(&bytes) {
+                    Ok(error) => GcpError::TokenFromJson { source: error },
+                    Err(_) => GcpError::TokenJsonFromStr { source: error },
+                }),
+            }
+        })
     })
+    .join()
+    .expect("Runtime thread error")
 }
 
 fn get_token_with_creds_blocking(
-    jwt: &Jwt<JwtClaims>,
-    credentials: &Credentials,
+    jwt: Jwt<JwtClaims>,
+    credentials: Credentials,
 ) -> Result<Token, GoErr> {
-    let mut rt = tokio_compat::runtime::current_thread::Runtime::new()?;
-    rt.block_on_std(goauth::get_token(jwt, credentials))
+    std::thread::spawn(move || {
+        let mut rt = crate::runtime::Runtime::single_threaded().unwrap();
+        rt.block_on_std(async move { goauth::get_token(&jwt, &credentials).await })
+    })
+    .join()
+    .expect("Runtime thread error")
 }
 
 impl GcpCredentials {
     fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
         let creds = Credentials::from_file(path).context(InvalidCredentials1)?;
         let jwt = make_jwt(&creds, &scope)?;
-        let token = get_token_with_creds_blocking(&jwt, &creds).context(GetToken)?;
+        let token = get_token_with_creds_blocking(jwt, creds.clone()).context(GetToken)?;
         Ok(Self {
             creds: Some(creds),
             scope,
@@ -136,7 +144,7 @@ impl GcpCredentials {
         let token = match &self.creds {
             Some(creds) => {
                 let jwt = make_jwt(creds, &self.scope).unwrap(); // Errors caught above
-                get_token_with_creds_blocking(&jwt, creds)?
+                get_token_with_creds_blocking(jwt, creds.clone())?
             }
             None => get_token_implicit()?,
         };
