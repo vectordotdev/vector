@@ -20,6 +20,8 @@ use tokio01::net::{TcpListener, TcpStream};
 use tokio01::util::FutureExt;
 use tokio_openssl::SslConnectorExt;
 
+pub mod stats;
+
 #[macro_export]
 macro_rules! assert_downcast_matches {
     ($e:expr, $t:ty, $v:pat) => {{

@@ -1,5 +1,23 @@
-#![cfg(all(feature = "sources-generator"))]
+#![cfg(all(test, feature = "sources-generator"))]
 
+use crate::{
+    assert_within,
+    event::{metric::MetricValue, Event, Metric},
+    metrics::{capture_metrics, get_controller, init as metrics_init},
+    sinks::{
+        util::{retries2::RetryLogic, service2::TowerRequestConfig, BatchSettings, VecBuffer},
+        Healthcheck, RouterSink,
+    },
+    sources::generator::GeneratorConfig,
+    test_util::{
+        block_on, runtime, shutdown_on_idle,
+        stats::{LevelTimeHistogram, WeightedSum},
+    },
+    topology::{
+        self,
+        config::{self, DataType, SinkConfig, SinkContext},
+    },
+};
 use core::task::Context;
 use futures::{
     compat::Future01CompatExt,
@@ -14,24 +32,6 @@ use std::task::Poll;
 use std::time::{Duration, Instant};
 use tokio01::timer::Delay;
 use tower03::Service;
-use vector::{
-    assert_within,
-    event::{metric::MetricValue, Event, Metric},
-    metrics::{capture_metrics, get_controller, init as metrics_init},
-    sinks::{
-        util::{retries2::RetryLogic, service2::TowerRequestConfig, BatchSettings, VecBuffer},
-        Healthcheck, RouterSink,
-    },
-    sources::generator::GeneratorConfig,
-    test_util::{block_on, runtime, shutdown_on_idle},
-    topology::{
-        self,
-        config::{self, DataType, SinkConfig, SinkContext},
-    },
-};
-
-mod support;
-use support::stats::{LevelTimeHistogram, WeightedSum};
 
 #[derive(Copy, Clone, Debug, Default, Serialize)]
 struct TestParams {
@@ -68,7 +68,7 @@ struct TestConfig {
 
 #[typetag::serialize(name = "test")]
 impl SinkConfig for TestConfig {
-    fn build(&self, cx: SinkContext) -> Result<(RouterSink, Healthcheck), vector::Error> {
+    fn build(&self, cx: SinkContext) -> Result<(RouterSink, Healthcheck), crate::Error> {
         let batch = BatchSettings::default().events(1).bytes(9999).timeout(9999);
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let sink = request
@@ -117,7 +117,7 @@ enum Response {
     Ok,
 }
 
-impl vector::sinks::util::sink::Response for Response {}
+impl crate::sinks::util::sink::Response for Response {}
 
 // The TestSink service doesn't actually do anything with the data, it
 // just delays a while depending on the configured parameters and then
