@@ -385,3 +385,144 @@ pub fn get_value_merger(
         MergeStrategy::Discard => Ok(Box::new(DiscardMerger::new(v))),
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::Event;
+    use serde_json::json;
+    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn initial_values() {
+        assert!(get_value_merger("foo".into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger("foo".into(), &MergeStrategy::Sum).is_err());
+        assert!(get_value_merger("foo".into(), &MergeStrategy::Max).is_err());
+        assert!(get_value_merger("foo".into(), &MergeStrategy::Min).is_err());
+        assert!(get_value_merger("foo".into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger("foo".into(), &MergeStrategy::Concat).is_ok());
+
+        assert!(get_value_merger(42.into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(42.into(), &MergeStrategy::Sum).is_ok());
+        assert!(get_value_merger(42.into(), &MergeStrategy::Min).is_ok());
+        assert!(get_value_merger(42.into(), &MergeStrategy::Max).is_ok());
+        assert!(get_value_merger(42.into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(42.into(), &MergeStrategy::Concat).is_err());
+
+        assert!(get_value_merger(4.2.into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(4.2.into(), &MergeStrategy::Sum).is_ok());
+        assert!(get_value_merger(4.2.into(), &MergeStrategy::Min).is_ok());
+        assert!(get_value_merger(4.2.into(), &MergeStrategy::Max).is_ok());
+        assert!(get_value_merger(4.2.into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(4.2.into(), &MergeStrategy::Concat).is_err());
+
+        assert!(get_value_merger(true.into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(true.into(), &MergeStrategy::Sum).is_err());
+        assert!(get_value_merger(true.into(), &MergeStrategy::Max).is_err());
+        assert!(get_value_merger(true.into(), &MergeStrategy::Min).is_err());
+        assert!(get_value_merger(true.into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(true.into(), &MergeStrategy::Concat).is_err());
+
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Sum).is_err());
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Max).is_err());
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Min).is_err());
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Concat).is_err());
+
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::Sum).is_err());
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::Max).is_err());
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::Min).is_err());
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::Concat).is_err());
+
+        assert!(get_value_merger(json!({}).into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(json!({}).into(), &MergeStrategy::Sum).is_err());
+        assert!(get_value_merger(json!({}).into(), &MergeStrategy::Max).is_err());
+        assert!(get_value_merger(json!({}).into(), &MergeStrategy::Min).is_err());
+        assert!(get_value_merger(json!({}).into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(json!({}).into(), &MergeStrategy::Concat).is_err());
+
+        assert!(get_value_merger(json!(null).into(), &MergeStrategy::Discard).is_ok());
+        assert!(get_value_merger(json!(null).into(), &MergeStrategy::Sum).is_err());
+        assert!(get_value_merger(json!(null).into(), &MergeStrategy::Max).is_err());
+        assert!(get_value_merger(json!(null).into(), &MergeStrategy::Min).is_err());
+        assert!(get_value_merger(json!(null).into(), &MergeStrategy::Array).is_ok());
+        assert!(get_value_merger(json!(null).into(), &MergeStrategy::Concat).is_err());
+    }
+
+    #[test]
+    fn merging_values() {
+        assert_eq!(
+            merge("foo".into(), "bar".into(), &MergeStrategy::Discard),
+            Ok("foo".into())
+        );
+        assert_eq!(
+            merge("foo".into(), "bar".into(), &MergeStrategy::Array),
+            Ok(json!(["foo", "bar"]).into())
+        );
+        assert_eq!(
+            merge("foo".into(), "bar".into(), &MergeStrategy::Concat),
+            Ok("foo bar".into())
+        );
+        assert!(merge("foo".into(), 42.into(), &MergeStrategy::Concat).is_err());
+        assert!(merge("foo".into(), 4.2.into(), &MergeStrategy::Concat).is_err());
+        assert!(merge("foo".into(), true.into(), &MergeStrategy::Concat).is_err());
+        assert!(merge("foo".into(), Utc::now().into(), &MergeStrategy::Concat).is_err());
+        assert!(merge("foo".into(), json!({}).into(), &MergeStrategy::Concat).is_err());
+        assert!(merge("foo".into(), json!([]).into(), &MergeStrategy::Concat).is_err());
+        assert!(merge("foo".into(), json!(null).into(), &MergeStrategy::Concat).is_err());
+
+        assert_eq!(
+            merge(21.into(), 21.into(), &MergeStrategy::Sum),
+            Ok(42.into())
+        );
+        assert_eq!(
+            merge(41.into(), 42.into(), &MergeStrategy::Max),
+            Ok(42.into())
+        );
+        assert_eq!(
+            merge(42.into(), 41.into(), &MergeStrategy::Max),
+            Ok(42.into())
+        );
+        assert_eq!(
+            merge(42.into(), 43.into(), &MergeStrategy::Min),
+            Ok(42.into())
+        );
+        assert_eq!(
+            merge(43.into(), 42.into(), &MergeStrategy::Min),
+            Ok(42.into())
+        );
+
+        assert_eq!(
+            merge(2.1.into(), 2.1.into(), &MergeStrategy::Sum),
+            Ok(4.2.into())
+        );
+        assert_eq!(
+            merge(4.1.into(), 4.2.into(), &MergeStrategy::Max),
+            Ok(4.2.into())
+        );
+        assert_eq!(
+            merge(4.2.into(), 4.1.into(), &MergeStrategy::Max),
+            Ok(4.2.into())
+        );
+        assert_eq!(
+            merge(4.2.into(), 4.3.into(), &MergeStrategy::Min),
+            Ok(4.2.into())
+        );
+        assert_eq!(
+            merge(4.3.into(), 4.2.into(), &MergeStrategy::Min),
+            Ok(4.2.into())
+        );
+    }
+
+    fn merge(initial: Value, additional: Value, strategy: &MergeStrategy) -> Result<Value, String> {
+        let mut merger = get_value_merger(initial, strategy)?;
+        merger.add(additional)?;
+        let mut output = Event::new_empty_log();
+        let mut output = output.as_mut_log();
+        merger.insert_into("out".into(), &mut output)?;
+        Ok(output.remove(&Atom::from("out")).unwrap())
+    }
+}
