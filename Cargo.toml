@@ -28,7 +28,7 @@ extended-description-file = "target/debian-extended-description.txt"
 [workspace]
 members = [
   ".",
-  "lib/codec",
+  "lib/codec01",
   "lib/file-source",
   "lib/tracing-limit",
   "lib/vector-wasm",
@@ -36,7 +36,7 @@ members = [
 
 [dependencies]
 # Internal libs
-codec = { path = "lib/codec" }
+codec01 = { path = "lib/codec01" }
 file-source = { path = "lib/file-source" }
 tracing-limit = { path = "lib/tracing-limit" }
 
@@ -52,7 +52,7 @@ tokio-signal = "0.2.7"
 tokio-compat = { version = "0.1", features = ["rt-full"] }
 # TODO: remove when pulsar is upgraded
 tokio-executor = "0.1.10"
-tokio-util = { version = "0.3.1", features = ["compat"] }
+tokio-util = { version = "0.3.1", features = ["codec", "compat"] }
 async-trait = "0.1"
 
 # Tracing

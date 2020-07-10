@@ -108,7 +108,7 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<bytes::Bytes, ErrorM
     let mut body = bytes::BytesMut::new();
     body.extend_from_slice(&buf);
 
-    let mut decoder = codec::BytesDelimitedCodec::new(b'\n');
+    let mut decoder = codec01::BytesDelimitedCodec::new(b'\n');
     std::iter::from_fn(move || {
         match decoder.decode_eof(&mut body) {
             Err(e) => Some(Err(ErrorMessage::new(

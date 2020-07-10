@@ -1,5 +1,5 @@
 use bytes::{BufMut, BytesMut};
-use codec::BytesDelimitedCodec;
+use codec01::BytesDelimitedCodec;
 use std::collections::HashMap;
 use tokio_codec::{Decoder, Encoder};
 

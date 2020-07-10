@@ -515,7 +515,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "codec"
+name = "codec01"
 version = "0.1.0"
 dependencies = [
  "bytes 0.4.12",
@@ -5422,7 +5422,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "codec",
+ "codec01",
  "colored",
  "criterion",
  "db-key",
