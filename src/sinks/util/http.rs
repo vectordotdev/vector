@@ -437,7 +437,8 @@ mod test {
             .unwrap();
 
         let request = b"hello".to_vec();
-        let mut service = HttpBatchService::new(resolver, None, move |body: Vec<u8>| {
+        let client = HttpClient::new(resolver, None).unwrap();
+        let mut service = HttpBatchService::new(client, move |body: Vec<u8>| {
             Box::pin(ready(Request::post(&uri).body(body).map_err(Into::into)))
         });
 
