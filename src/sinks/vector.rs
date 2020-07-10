@@ -6,7 +6,8 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::Bytes;
+use bytes05::{BufMut, BytesMut};
 use futures01::{stream::iter_ok, Sink};
 use prost::Message;
 use serde::{Deserialize, Serialize};
@@ -80,7 +81,10 @@ fn encode_event(event: Event) -> Option<Bytes> {
     });
 
     let mut out = BytesMut::with_capacity(full_len);
-    out.put_u32_be(event_len as u32);
+    out.put_u32(event_len as u32);
     event.encode(&mut out).unwrap();
-    Some(out.freeze())
+
+    let mut bytes = Bytes::with_capacity(out.len());
+    bytes.extend_from_slice(&out);
+    Some(bytes)
 }
