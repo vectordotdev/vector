@@ -5,12 +5,14 @@ use crate::{
     tls::TlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
-use bytes05::Bytes;
+use bytes05::{Bytes, BytesMut};
 use chrono::Utc;
+use codec::BytesDelimitedCodec;
 use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::net::SocketAddr;
+use tokio_util::codec::Decoder;
 use warp::http::{HeaderMap, HeaderValue, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -101,14 +103,11 @@ fn add_headers(
     events
 }
 
-fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<bytes::Bytes, ErrorMessage>> {
-    use tokio01::codec::Decoder;
-
-    // TODO: remove on bytes 0.4 => 0.5 update
-    let mut body = bytes::BytesMut::new();
+fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>> {
+    let mut body = BytesMut::new();
     body.extend_from_slice(&buf);
 
-    let mut decoder = codec01::BytesDelimitedCodec::new(b'\n');
+    let mut decoder = BytesDelimitedCodec::new(b'\n');
     std::iter::from_fn(move || {
         match decoder.decode_eof(&mut body) {
             Err(e) => Some(Err(ErrorMessage::new(

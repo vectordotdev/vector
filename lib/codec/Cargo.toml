@@ -1,0 +1,13 @@
+[package]
+name = "codec"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+
+[dependencies]
+bytes = "0.5"
+tokio-util = { version = "0.3.1", features = ["codec"] }
+tracing = "0.1.15"
+
+[dev-dependencies]
+serde_json = "1.0.33"

@@ -36,6 +36,7 @@ members = [
 
 [dependencies]
 # Internal libs
+codec = { path = "lib/codec" }
 codec01 = { path = "lib/codec01" }
 file-source = { path = "lib/file-source" }
 tracing-limit = { path = "lib/tracing-limit" }

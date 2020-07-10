@@ -515,6 +515,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "codec"
+version = "0.1.0"
+dependencies = [
+ "bytes 0.5.4",
+ "serde_json",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "codec01"
 version = "0.1.0"
 dependencies = [
@@ -5422,6 +5432,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
+ "codec",
  "codec01",
  "colored",
  "criterion",
