@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-07-09"
 delivery_guarantee: "at_least_once"
 component_title: "Apache Pulsar"
 description: "The Vector `pulsar` sink streams `log` events to Apache Pulsar via the Pulsar protocol."
@@ -44,12 +44,12 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
   # General
   type = "pulsar" # required
   inputs = ["my-source-or-transform-id"] # required
-  address = "127.0.0.1:6650" # required
+  address = "pulsar://127.0.0.1:6650" # required
   healthcheck = true # optional, default
   topic = "topic-1234" # required
 
   # Encoding
-  encoding.codec = "json" # required
+  encoding.codec = "text" # optional, default
 ```
 
 </TabItem>
@@ -60,7 +60,7 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
   # General
   type = "pulsar" # required
   inputs = ["my-source-or-transform-id"] # required
-  address = "127.0.0.1:6650" # required
+  address = "pulsar://127.0.0.1:6650" # required
   healthcheck = true # optional, default
   topic = "topic-1234" # required
 
@@ -69,7 +69,7 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
   auth.token = "${PULSAR_TOKEN}" # optional, no default
 
   # Encoding
-  encoding.codec = "json" # required
+  encoding.codec = "text" # optional, default
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.timestamp_format = "rfc3339" # optional, default
@@ -83,7 +83,7 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["127.0.0.1:6650"]}
+  examples={["pulsar://127.0.0.1:6650"]}
   groups={[]}
   name={"address"}
   path={null}
@@ -182,7 +182,7 @@ The basic authentication password.
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}
@@ -197,14 +197,14 @@ Configures the encoding specific sink behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={null}
+  defaultValue={"text"}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","text"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

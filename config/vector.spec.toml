@@ -3897,7 +3897,8 @@ require('custom_module')
   [sinks.aws_s3.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "ndjson" or "text"
     codec = "ndjson"
@@ -7634,7 +7635,8 @@ require('custom_module')
   [sinks.kafka.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "json" or "text"
     codec = "json"
@@ -8752,7 +8754,7 @@ require('custom_module')
   #
   # * required
   # * type: string
-  address = "127.0.0.1:6650"
+  address = "pulsar://127.0.0.1:6650"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -8810,7 +8812,8 @@ require('custom_module')
   [sinks.pulsar.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "json" or "text"
     codec = "json"
@@ -9341,7 +9344,8 @@ require('custom_module')
   [sinks.splunk_hec.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "json" or "text"
     codec = "json"

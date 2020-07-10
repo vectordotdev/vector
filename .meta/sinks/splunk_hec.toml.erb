@@ -44,7 +44,8 @@ write_to_description = "a [Splunk's HTTP Event Collector][urls.splunk_hec]"
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.splunk_hec.options",
-  encodings: ["json", "text"]
+  encodings: ["json", "text"],
+  default: "text"
 ) %>
 
 [sinks.splunk_hec.options.host]

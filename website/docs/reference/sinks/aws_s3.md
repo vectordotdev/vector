@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-25"
+last_modified_on: "2020-07-09"
 delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
@@ -61,7 +61,7 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   buffer.type = "memory" # optional, default
 
   # Encoding
-  encoding.codec = "ndjson" # required
+  encoding.codec = "text" # optional, default
 
   # Naming
   key_prefix = "date=%F/" # optional, default
@@ -105,7 +105,7 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   content_type = "text/x-log" # optional, default
 
   # Encoding
-  encoding.codec = "ndjson" # required
+  encoding.codec = "text" # optional, default
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.timestamp_format = "rfc3339" # optional, default
@@ -502,7 +502,7 @@ A standard MIME type describing the format of the contents.
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}
@@ -517,14 +517,14 @@ Configures the encoding specific sink behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={null}
+  defaultValue={"text"}
   enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["ndjson","text"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
