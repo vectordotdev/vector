@@ -584,11 +584,17 @@ mod integration_tests {
         let mut rt = runtime();
         let resolver = crate::dns::Resolver;
 
+        let config_to_healthcheck = |config| {
+            let tls_settings = TlsSettings::from_options(&config.tls)?;
+            let client = HttpClient::new(resolver, tls_settings)?;
+            sinks::splunk_hec::healthcheck(config, client)
+        };
+
         rt.block_on_std(async move {
             // OK
             {
                 let config = config(Encoding::Text, vec![]).await;
-                let healthcheck = sinks::splunk_hec::healthcheck(config, resolver.clone());
+                let healthcheck = config_to_healthcheck(config);
                 healthcheck.await.unwrap();
             }
 
@@ -598,7 +604,7 @@ mod integration_tests {
                     host: "http://localhost:1111".to_string(),
                     ..config(Encoding::Text, vec![]).await
                 };
-                let healthcheck = sinks::splunk_hec::healthcheck(config, resolver.clone());
+                let healthcheck = config_to_healthcheck(config);
                 healthcheck.await.unwrap_err();
             }
 
@@ -628,7 +634,7 @@ mod integration_tests {
                     warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
                 tokio::spawn(server);
 
-                let healthcheck = sinks::splunk_hec::healthcheck(config, resolver);
+                let healthcheck = config_to_healthcheck(config);
                 assert_downcast_matches!(
                     healthcheck.await.unwrap_err(),
                     HealthcheckError,

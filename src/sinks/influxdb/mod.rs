@@ -743,14 +743,10 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
+        let healthcheck =
+            healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
@@ -767,13 +763,10 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
+
+        let healthcheck =
+            healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client).unwrap();
         rt.block_on(healthcheck).unwrap_err();
     }
 
@@ -790,14 +783,10 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
+        let healthcheck =
+            healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
@@ -814,14 +803,10 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
+        let healthcheck =
+            healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client).unwrap();
         rt.block_on(healthcheck).unwrap_err();
     }
 }

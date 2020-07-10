@@ -570,6 +570,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        dns::Resolver,
         event,
         sinks::util::http::HttpClient,
         test_util::{random_events_with_stream, random_string, runtime},

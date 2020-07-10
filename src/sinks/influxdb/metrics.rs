@@ -801,7 +801,8 @@ mod integration_tests {
             events.push(event);
         }
 
-        let sink = InfluxDBSvc::new(config, cx).unwrap();
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
+        let sink = InfluxDBSvc::new(config, cx, client).unwrap();
 
         let stream = stream01::iter_ok(events.clone().into_iter());
 
