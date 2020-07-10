@@ -8052,10 +8052,10 @@ require('custom_module')
     # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional
-    # * no default
+    # * default: 100000
     # * type: uint
     # * unit: events
-    max_events = 1000
+    max_events = 100000
 
     # The maximum age of a batch before it is flushed.
     #

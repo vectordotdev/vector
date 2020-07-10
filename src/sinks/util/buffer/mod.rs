@@ -56,8 +56,7 @@ pub struct Buffer {
     inner: InnerBuffer,
     num_items: usize,
     num_bytes: usize,
-    max_bytes: usize,
-    max_events: usize,
+    settings: BatchSize,
     compression: Compression,
 }
 
@@ -69,11 +68,7 @@ pub enum InnerBuffer {
 
 impl Buffer {
     pub fn new(settings: BatchSize, compression: Compression) -> Self {
-        Self::new_with_settings(settings.bytes, settings.events, compression)
-    }
-
-    fn new_with_settings(max_bytes: usize, max_events: usize, compression: Compression) -> Self {
-        let buffer = Vec::with_capacity(max_bytes);
+        let buffer = Vec::with_capacity(settings.bytes);
         let inner = match compression {
             Compression::None => InnerBuffer::Plain(buffer),
             Compression::Gzip => {
@@ -84,8 +79,7 @@ impl Buffer {
             inner,
             num_items: 0,
             num_bytes: 0,
-            max_bytes,
-            max_events,
+            settings,
             compression,
         }
     }
@@ -128,14 +122,16 @@ impl Batch for Buffer {
         // can't track compressed sizes. Keep a running count of the
         // number of bytes written instead.
         let new_bytes = self.num_bytes + item.len();
-        if self.is_empty() && item.len() > self.max_bytes {
+        if self.is_empty() && item.len() > self.settings.bytes {
             err_event_too_large(item.len())
-        } else if self.num_items >= self.max_events || new_bytes > self.max_bytes {
+        } else if self.num_items >= self.settings.events || new_bytes > self.settings.bytes {
             PushResult::Overflow(item)
         } else {
             self.push(&item);
             self.num_bytes = new_bytes;
-            PushResult::Ok(self.num_items >= self.max_events || new_bytes >= self.max_bytes)
+            PushResult::Ok(
+                self.num_items >= self.settings.events || new_bytes >= self.settings.bytes,
+            )
         }
     }
 
@@ -144,7 +140,7 @@ impl Batch for Buffer {
     }
 
     fn fresh(&self) -> Self {
-        Self::new_with_settings(self.max_bytes, self.max_events, self.compression)
+        Self::new(self.settings, self.compression)
     }
 
     fn finish(self) -> Self::Output {

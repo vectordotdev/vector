@@ -84,6 +84,7 @@ impl SinkConfig for LokiConfig {
         let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
             BatchSettings::default()
                 .bytes(bytesize::mib(10u64))
+                .events(100_000)
                 .timeout(1),
         );
         let tls = TlsSettings::from_options(&self.tls)?;

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-25"
+last_modified_on: "2020-07-10"
 delivery_guarantee: "at_least_once"
 component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
@@ -78,7 +78,7 @@ The Vector `loki` sink
 
   # Batch
   batch.max_bytes = 10490000 # optional, default, bytes
-  batch.max_events = 1000 # optional, no default, events
+  batch.max_events = 100000 # optional, default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
@@ -285,9 +285,9 @@ The maximum size of a batch, in bytes, before it is flushed.
 </Field>
 <Field
   common={true}
-  defaultValue={null}
+  defaultValue={100000}
   enumValues={null}
-  examples={[1000]}
+  examples={[100000]}
   groups={[]}
   name={"max_events"}
   path={"batch"}
