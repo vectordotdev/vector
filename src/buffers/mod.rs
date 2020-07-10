@@ -158,7 +158,6 @@ impl Acker {
         }
     }
 
-    #[cfg(test)]
     pub fn new_for_testing() -> (Self, Arc<AtomicUsize>) {
         let ack_counter = Arc::new(AtomicUsize::new(0));
         let notifier = Arc::new(AtomicTask::new());
