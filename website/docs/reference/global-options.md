@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-02"
+last_modified_on: "2020-07-10"
 title: Global Options
 description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---
@@ -24,7 +24,6 @@ Vector as a whole and set defaults for component options.
 ```toml title="vector.toml"
 # General
 data_dir = "/var/lib/vector/" # optional, default
-dns_servers = ["0.0.0.0:53"] # optional, no default
 
 # Log schema
 log_schema.host_key = "host" # optional, default
@@ -56,32 +55,6 @@ The directory used for persisting Vector state, such as on-disk buffers, file
 checkpoints, and more. Please make sure the Vector project has write
 permissions to this dir.
  See [Data Directory](#data-directory) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["0.0.0.0:53"]]}
-  groups={[]}
-  name={"dns_servers"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-### dns_servers
-
-The list of DNS servers Vector will use to resolve DNS requests. When set
-Vector will ignore the system configuration and use only the list of DNS
-servers provided. If this option is not set then Vector will attempt to use the
-system configuration.
-
 
 
 </Field>

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-01"
+last_modified_on: "2020-07-09"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
@@ -61,7 +61,7 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
   topic = "topic-1234" # required
 
   # Encoding
-  encoding.codec = "json" # required
+  encoding.codec = "text" # optional, default
 ```
 
 </TabItem>
@@ -92,7 +92,7 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
   buffer.when_full = "block" # optional, default
 
   # Encoding
-  encoding.codec = "json" # required
+  encoding.codec = "text" # optional, default
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.timestamp_format = "rfc3339" # optional, default
@@ -290,7 +290,7 @@ transmission.
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}
@@ -305,14 +305,14 @@ Configures the encoding specific sink behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={null}
+  defaultValue={"text"}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the [`message`](#message) key and the payload is new line delimited."}}
   examples={["json","text"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

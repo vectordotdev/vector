@@ -431,25 +431,25 @@ package-rpm-aarch64: package-archive-aarch64-unknown-linux-musl ## Build the aar
 release: release-prepare generate release-commit ## Release a new Vector version
 
 release-commit: ## Commits release changes
-	$(RUN) release-commit
+	@scripts/release-commit.rb
 
 release-docker: ## Release to Docker Hub
-	$(RUN) release-docker
+	@scripts/release-docker.sh
 
 release-github: ## Release to Github
-	$(RUN) release-github
+	@scripts/release-github.rb
 
 release-homebrew: ## Release to timberio Homebrew tap
-	$(RUN) release-homebrew
+	@scripts/release-homebrew.sh
 
 release-prepare: ## Prepares the release with metadata and highlights
-	@scripts/release-prepare.sh
+	@scripts/release-prepare.rb
 
 release-push: ## Push new Vector version
 	@scripts/release-push.sh
 
 release-rollback: ## Rollback pending release changes
-	@scripts/release-rollback.sh
+	@scripts/release-rollback.rb
 
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
