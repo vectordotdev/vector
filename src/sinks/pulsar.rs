@@ -126,7 +126,6 @@ impl PulsarSink {
         loop {
             self.producer = match self.producer {
                 PulsarProducerState::NotReady(ref config) => {
-                    error!("poll_producer, NotReady");
                     let config = config.clone();
                     let fut = async move {
                         let producer = config.create_pulsar_producer().await;
@@ -134,18 +133,14 @@ impl PulsarSink {
                     };
                     PulsarProducerState::Creating(Box::new(fut.boxed().compat()))
                 }
-                PulsarProducerState::Creating(ref mut fut) => {
-                    error!("poll_producer, creating");
-                    match fut.poll() {
-                        Ok(Async::NotReady) => return Ok(Async::NotReady),
-                        Ok(Async::Ready(producer)) => {
-                            PulsarProducerState::Ready(Arc::new(Mutex::new(producer)))
-                        }
-                        Err(_) => unreachable!(),
+                PulsarProducerState::Creating(ref mut fut) => match fut.poll() {
+                    Ok(Async::NotReady) => return Ok(Async::NotReady),
+                    Ok(Async::Ready(producer)) => {
+                        PulsarProducerState::Ready(Arc::new(Mutex::new(producer)))
                     }
-                }
+                    Err(_) => unreachable!(),
+                },
                 PulsarProducerState::Ready(ref producer) => {
-                    error!("poll_producer, ready");
                     return Ok(Async::Ready(Arc::clone(producer)));
                 }
             }
