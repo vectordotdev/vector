@@ -64,7 +64,7 @@ required = true
 common = true
 examples = [
   {method="discard"},
-  {path="discard"}, 
+  {path="discard"},
   {duration_ms="sum"},
   {query="array"}
 ]

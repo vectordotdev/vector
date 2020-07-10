@@ -244,7 +244,7 @@ impl Transform for Reduce {
     {
         let mut me = self;
 
-        let poll_period = me.flush_period.clone();
+        let poll_period = me.flush_period;
 
         let mut flush_stream = tokio::time::interval(poll_period);
         let mut input_stream = Compat01As03::new(input_rx);

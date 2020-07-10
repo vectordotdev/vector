@@ -23,7 +23,7 @@ struct DiscardMerger {
 
 impl DiscardMerger {
     fn new(v: Value) -> Self {
-        return Self { v };
+        Self { v }
     }
 }
 
@@ -106,10 +106,10 @@ struct TimestampWindowMerger {
 
 impl TimestampWindowMerger {
     fn new(v: DateTime<Utc>) -> Self {
-        return Self {
-            started: v.clone(),
+        Self {
+            started: v,
             latest: v,
-        };
+        }
     }
 }
 
@@ -162,7 +162,7 @@ struct AddNumbersMerger {
 
 impl AddNumbersMerger {
     fn new(v: NumberMergerValue) -> Self {
-        return Self { v };
+        Self { v }
     }
 }
 
@@ -207,7 +207,7 @@ struct MaxNumberMerger {
 
 impl MaxNumberMerger {
     fn new(v: NumberMergerValue) -> Self {
-        return Self { v };
+        Self { v }
     }
 }
 
@@ -268,7 +268,7 @@ struct MinNumberMerger {
 
 impl MinNumberMerger {
     fn new(v: NumberMergerValue) -> Self {
-        return Self { v };
+        Self { v }
     }
 }
 
