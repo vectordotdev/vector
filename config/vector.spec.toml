@@ -2278,7 +2278,7 @@ require('custom_module')
   # * must be: "merge"
   type = "merge"
 
-# Accepts and outputs `log` events, allowing you to combines events of a matching transaction into a single event.
+# Accepts and outputs `log` events, allowing you to combine multiple events into a single event based on a set of identifiers.
 [transforms.reduce]
   #
   # Ends when
@@ -2396,26 +2396,25 @@ require('custom_module')
   # General
   #
 
-  # A maximum period of time to wait before a transaction should be considered
-  # complete after not having received another event.
+  # A maximum period of time to wait after the last event is received before a
+  # combined event should be considered complete.
   #
   # * optional
   # * default: 30000
   # * type: int
   expire_after_ms = 30000
 
-  # Controls the frequency that Vector checks for (and flushes) expired
-  # transactions.
+  # Controls the frequency that Vector checks for (and flushes) expired events.
   #
   # * optional
   # * default: 1000
   # * type: int
   flush_period_ms = 1000
 
-  # An ordered list of fields to distinguish transactions by. Each transaction
-  # has a separate event combining state, and these fields should be used to
-  # prevent
-  # events from unrelated transactions from combining.
+  # An ordered list of fields by which to group events. Each group is combined
+  # independently, allowing you to keep independent events separate. When no
+  # fields are specified, all events will be combined in a single group. Events
+  # missing a specified field will be combined in their own group.
   #
   # * optional
   # * default: []
