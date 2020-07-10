@@ -8,7 +8,6 @@ use crate::{
     dns::Resolver,
     event::Event,
     tls::{tls_connector_builder, MaybeTlsSettings},
-    topology::config::SinkContext,
 };
 use bytes05::{Buf, Bytes};
 use futures::future::BoxFuture;

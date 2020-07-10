@@ -3,7 +3,7 @@ pub mod metrics;
 
 pub(self) use super::{Healthcheck, RouterSink};
 
-use crate::{dns::Resolver, sinks::util::http::HttpClient};
+use crate::sinks::util::http::HttpClient;
 use chrono::{DateTime, Utc};
 use futures::TryFutureExt;
 use futures01::Future;
@@ -148,15 +148,13 @@ fn healthcheck(
     endpoint: String,
     influxdb1_settings: Option<InfluxDB1Settings>,
     influxdb2_settings: Option<InfluxDB2Settings>,
-    resolver: Resolver,
+    mut client: HttpClient,
 ) -> crate::Result<super::Healthcheck> {
     let settings = influxdb_settings(influxdb1_settings, influxdb2_settings)?;
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
     let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
-
-    let mut client = HttpClient::new(resolver, None)?;
 
     let healthcheck = client
         .call(request)
