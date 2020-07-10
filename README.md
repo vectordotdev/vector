@@ -150,7 +150,6 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Multi-platform** - [Linux, MacOS, Windows, x86_64, ARM64, and ARMv7][docs.installation].
 * **CI friendly** - [Config validating][docs.administration.validating] and [unit tests][guides.advanced.unit-testing] make Vector CI friendly.
 * **Configurable concurrency** - All CPU cores ([service][docs.strategies#service]) or just one ([daemon][docs.strategies#daemon]) via the [`--threads` flag][docs.process-management#starting].
-* **Custom DNS** - [Custom DNS][docs.global-options#dns_servers] makes service discovery possible.
 * **Optional static binary** - [Optional MUSL static binaries][pages.releases] mean zero required dependencies.
 * **TLS support** - All relevant Vector components offer TLS options for secure communication.
 
@@ -214,7 +213,6 @@ Or use your own [preferred method][docs.installation].
 [docs.deployment]: https://vector.dev/docs/setup/deployment/
 [docs.from-archives]: https://vector.dev/docs/setup/installation/manual/from-archives/
 [docs.from-source]: https://vector.dev/docs/setup/installation/manual/from-source/
-[docs.global-options#dns_servers]: https://vector.dev/docs/reference/global-options/#dns_servers
 [docs.global-options#log_schema]: https://vector.dev/docs/reference/global-options/#log_schema
 [docs.guarantees]: https://vector.dev/docs/about/guarantees/
 [docs.installation]: https://vector.dev/docs/setup/installation/

@@ -38,16 +38,6 @@ data_dir = "/var/lib/vector"
 data_dir = "/var/local/lib/vector/"
 data_dir = "/home/user/vector/"
 
-# The list of DNS servers Vector will use to resolve DNS requests. When set
-# Vector will ignore the system configuration and use only the list of DNS
-# servers provided. If this option is not set then Vector will attempt to use
-# the system configuration.
-#
-# * optional
-# * no default
-# * type: [string]
-dns_servers = ["0.0.0.0:53"]
-
 #
 # Log schema
 #
