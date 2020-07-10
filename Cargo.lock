@@ -5509,7 +5509,6 @@ dependencies = [
  "tempfile",
  "tokio 0.1.22",
  "tokio 0.2.21",
- "tokio-codec",
  "tokio-compat",
  "tokio-executor",
  "tokio-openssl 0.3.0",

@@ -102,7 +102,7 @@ fn add_headers(
 }
 
 fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<bytes::Bytes, ErrorMessage>> {
-    use tokio_codec::Decoder;
+    use tokio01::codec::Decoder;
 
     // TODO: remove on bytes 0.4 => 0.5 update
     let mut body = bytes::BytesMut::new();
