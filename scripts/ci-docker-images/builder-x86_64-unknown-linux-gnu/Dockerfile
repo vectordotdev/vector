@@ -7,17 +7,22 @@ RUN yum install -y epel-release && \
     yum makecache
 RUN yum install -y \
         make openssl-devel cmake3 git \
-        gcc gcc-c++ libstdc++-static sudo && \
+        gcc gcc-c++ libstdc++-static sudo \
+        perl-App-cpanminus && \
     yum clean all
 RUN ln -s /usr/bin/cmake3 /usr/bin/cmake
+RUN cpanm File::Rename \
+ && rename --version
 
 RUN cd /tmp && \
   git clone https://github.com/github/cmark-gfm && \
   cd cmark-gfm && \
   git checkout 0.29.0.gfm.0 && \
   make install INSTALL_PREFIX=/usr && \
+  ldconfig && \
   cd .. && \
-  rm -rf cmark-gfm
+  rm -rf cmark-gfm && \
+  cmark-gfm --version
 
 RUN echo "%sudo         ALL = (ALL) NOPASSWD: ALL" >> /etc/sudoers.d/sudo
 RUN useradd -m -G wheel \
