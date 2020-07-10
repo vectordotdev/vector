@@ -209,7 +209,7 @@ mod test {
             },
         });
         assert_eq!(
-            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
+            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","samples":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }
