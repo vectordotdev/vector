@@ -1,6 +1,8 @@
 [transforms.reduce]
 title = "Reduce"
-allow_you_to_description = "combines events of a matching transaction into a single event"
+allow_you_to_description = """\
+combine multiple events into a single event based on a set of identifiers\
+"""
 beta = true
 common = false
 function_category = "aggregate"
@@ -16,8 +18,8 @@ common = false
 required = false
 default = 30000
 description = """\
-A maximum period of time to wait before a transaction should be considered \
-complete after not having received another event.\
+A maximum period of time to wait after the last event is received before \
+a combined event should be considered complete.\
 """
 
 [transforms.reduce.options.flush_period_ms]
@@ -27,7 +29,7 @@ required = false
 default = 1000
 description = """\
 Controls the frequency that Vector checks for (and flushes) expired \
-transactions.\
+events.\
 """
 
 [transforms.reduce.options.identifier_fields]
@@ -37,9 +39,10 @@ required = false
 default = []
 examples = [["request_id"],["user_id","transaction_id"]]
 description = """\
-An ordered list of fields to distinguish transactions by. Each transaction has \
-a separate event combining state, and these fields should be used to prevent
-events from unrelated transactions from combining.\
+An ordered list of fields by which to group events. Each group is combined \
+independently, allowing you to keep independent events separate. When no fields \
+are specified, all events will be combined in a single group. Events missing \
+a specified field will be combined in their own group.\
 """
 
 [transforms.reduce.options.merge_strategies]
@@ -55,7 +58,7 @@ The default behavior is as follows:
 1. The first value of a string field is kept, subsequent values are discarded.
 2. For timestamp fields the first is kept and a new field `[field-name]_end` is
    added with the last received timestamp value.
-3. Numeric values are added.\
+3. Numeric values are summed.\
 """
 
 [transforms.reduce.options.merge_strategies.children."`[field-name]`"]
@@ -74,9 +77,9 @@ description = "The custom merge strategy to use for a field."
 "array" = "Each value is appended to an array."
 "concat" = "Concatenate each string value (delimited with a space)."
 "discard" = "Discard all but the first value found."
-"sum" = "Sum all number values."
-"max" = "The maximum of all number values."
-"min" = "The minimum of all number values."
+"sum" = "Sum all numeric values."
+"max" = "The maximum of all numeric values."
+"min" = "The minimum of all numeric values."
 
 [transforms.reduce.options.ends_when]
 type = "table"
