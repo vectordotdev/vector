@@ -5480,7 +5480,7 @@ dependencies = [
  "pretty_assertions",
  "prost 0.5.0",
  "prost-build 0.5.0",
- "prost-derive 0.5.0",
+ "prost-derive 0.6.1",
  "prost-types 0.5.0",
  "pulsar",
  "rand 0.5.6",
