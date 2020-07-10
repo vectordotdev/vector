@@ -267,7 +267,7 @@ impl Transform for Reduce {
                       me.transform_into(&mut output, event);
                       false
                     }
-                    Some(Err(())) => unreachable!(),
+                    Some(Err(())) => panic!("unexpected error reading channel"),
                   }
                 }
             };
