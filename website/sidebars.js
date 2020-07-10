@@ -165,6 +165,8 @@ module.exports = {
             
               "reference/transforms/merge",
             
+              "reference/transforms/reduce",
+            
               "reference/transforms/regex_parser",
             
               "reference/transforms/remove_fields",
@@ -182,8 +184,6 @@ module.exports = {
               "reference/transforms/tag_cardinality_limit",
             
               "reference/transforms/tokenizer",
-            
-              "reference/transforms/transaction",
             
               "reference/transforms/wasm",
             

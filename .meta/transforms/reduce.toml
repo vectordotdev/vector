@@ -1,5 +1,5 @@
-[transforms.transaction]
-title = "Transaction"
+[transforms.reduce]
+title = "Reduce"
 allow_you_to_description = "combines events of a matching transaction into a single event"
 beta = true
 common = false
@@ -8,9 +8,9 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/fields/_component_options.toml", type: "transform", name: "transaction") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "reduce") %>
 
-[transforms.transaction.options.expire_after_ms]
+[transforms.reduce.options.expire_after_ms]
 type = "int"
 common = false
 required = false
@@ -20,7 +20,7 @@ A maximum period of time to wait before a transaction should be considered \
 complete after not having received another event.\
 """
 
-[transforms.transaction.options.flush_period_ms]
+[transforms.reduce.options.flush_period_ms]
 type = "int"
 common = false
 required = false
@@ -30,7 +30,7 @@ Controls the frequency that Vector checks for (and flushes) expired \
 transactions.\
 """
 
-[transforms.transaction.options.identifier_fields]
+[transforms.reduce.options.identifier_fields]
 type = "[string]"
 common = true
 required = false
@@ -42,7 +42,7 @@ a separate event combining state, and these fields should be used to prevent
 events from unrelated transactions from combining.\
 """
 
-[transforms.transaction.options.merge_strategies]
+[transforms.reduce.options.merge_strategies]
 type = "table"
 common = false
 required = false
@@ -58,7 +58,7 @@ The default behavior is as follows:
 3. Numeric values are added.\
 """
 
-[transforms.transaction.options.merge_strategies.children."`[field-name]`"]
+[transforms.reduce.options.merge_strategies.children."`[field-name]`"]
 type = "string"
 required = true
 common = true
@@ -70,7 +70,7 @@ examples = [
 ]
 description = "The custom merge strategy to use for a field."
 
-[transforms.transaction.options.merge_strategies.children."`[field-name]`".enum]
+[transforms.reduce.options.merge_strategies.children."`[field-name]`".enum]
 "array" = "Each value is appended to an array."
 "concat" = "Concatenate each string value (delimited with a space)."
 "discard" = "Discard all but the first value found."
@@ -78,7 +78,7 @@ description = "The custom merge strategy to use for a field."
 "max" = "The maximum of all number values."
 "min" = "The minimum of all number values."
 
-[transforms.transaction.options.ends_when]
+[transforms.reduce.options.ends_when]
 type = "table"
 common = true
 required = false
@@ -88,9 +88,9 @@ condition resolves to true for an event the transaction it belongs to is \
 immediately flushed.\
 """
 
-<%= render("_partials/fields/_conditions_options.toml", namespace: "transforms.transaction.options.ends_when.children") %>
+<%= render("_partials/fields/_conditions_options.toml", namespace: "transforms.reduce.options.ends_when.children") %>
 
-[[transforms.transaction.examples]]
+[[transforms.reduce.examples]]
 label = "Default"
 body = """\
 Given the following configuration:
@@ -99,7 +99,7 @@ Given the following configuration:
 
 ```toml
 [transforms.transaction_events]
-  type = "transaction"
+  type = "reduce"
   inputs = [...]
 ```
 
@@ -155,7 +155,7 @@ Notice that string values have not been overridden and integer values have been 
 summed.\
 """
 
-[[transforms.transaction.examples]]
+[[transforms.reduce.examples]]
 label = "With Identifier Fields"
 body = """\
 Given the following configuration:
@@ -164,7 +164,7 @@ Given the following configuration:
 
 ```toml
 [transforms.transaction_events]
-  type = "transaction"
+  type = "reduce"
   inputs = [...]
 
   identifier_fields = ["request_id"]

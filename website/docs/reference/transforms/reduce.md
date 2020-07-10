@@ -1,15 +1,15 @@
 ---
-last_modified_on: "2020-06-23"
-component_title: "Transaction"
-description: "The Vector `transaction` transform accepts and outputs `log` events, allowing you to combines events of a matching transaction into a single event."
+last_modified_on: "2020-07-10"
+component_title: "Reduce"
+description: "The Vector `reduce` transform accepts and outputs `log` events, allowing you to combines events of a matching transaction into a single event."
 event_types: ["log"]
 function_category: "aggregate"
-issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+transaction%22
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+reduce%22
 operating_systems: ["Linux","MacOS","Windows"]
-sidebar_label: "transaction|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/transforms/transaction.rs
+sidebar_label: "reduce|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/reduce
 status: "beta"
-title: "Transaction Transform"
+title: "Reduce Transform"
 unsupported_operating_systems: []
 ---
 
@@ -18,7 +18,7 @@ import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The Vector `transaction` transform
+The Vector `reduce` transform
 accepts and outputs [`log`][docs.data-model.log] events, allowing you to
 combines events of a matching transaction into a single event.
 
@@ -27,7 +27,7 @@ combines events of a matching transaction into a single event.
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/transaction.md.erb
+     website/docs/reference/transforms/reduce.md.erb
 -->
 
 ## Configuration
@@ -41,7 +41,7 @@ combines events of a matching transaction into a single event.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
-  type = "transaction" # required
+  type = "reduce" # required
   inputs = ["my-source-or-transform-id"] # required
   identifier_fields = [] # optional, default
 
@@ -64,7 +64,7 @@ combines events of a matching transaction into a single event.
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
-  type = "transaction" # required
+  type = "reduce" # required
   inputs = ["my-source-or-transform-id"] # required
   expire_after_ms = 30000 # optional, default
   flush_period_ms = 1000 # optional, default
@@ -84,6 +84,8 @@ combines events of a matching transaction into a single event.
   ends_when."message.contains" = ["foo", "bar"] # example
   ends_when."environment.ends_with" = "-staging" # example
   ends_when."environment.ends_with" = ["-staging", "-running"] # example
+  ends_when."message.ip_cidr_contains" = "10.0.0.0/8" # example
+  ends_when."message.ip_cidr_contains" = ["2000::/10", "192.168.0.0/16"] # example
   ends_when."message.regex" = " (any|of|these|five|words) " # example
   ends_when."environment.starts_with" = "staging-" # example
   ends_when."environment.starts_with" = ["staging-", "running-"] # example
@@ -166,9 +168,9 @@ The type of the condition to execute.
 
 #### `[field-name]`.eq
 
-Check whether a fields contents exactly matches the value specified.This may be
-a single string or a list of strings, in which case this evaluates to true if
-any of the list matches.
+Check whether a fields contents exactly matches the value specified. This may
+be a single string or a list of strings, in which case this evaluates to true
+if any of the list matches.
 
 
 
@@ -215,7 +217,7 @@ being `true` or `false` respectively.
 
 #### `[field-name]`.neq
 
-Check whether a fields contents does not match the value specified.This may be
+Check whether a fields contents does not match the value specified. This may be
 a single string or a list of strings, in which case this evaluates to false if
 any of the list matches.
 
@@ -263,7 +265,7 @@ Check if the given `[condition]` does not match.
 
 #### `[field_name]`.contains
 
-Checks whether a string field contains a string argument.This may be a single
+Checks whether a string field contains a string argument. This may be a single
 string or a list of strings, in which case this evaluates to true if any of the
 list matches.
 
@@ -288,9 +290,35 @@ list matches.
 
 #### `[field_name]`.ends_with
 
-Checks whether a string field ends with a string argument.This may be a single
+Checks whether a string field ends with a string argument. This may be a single
 string or a list of strings, in which case this evaluates to true if any of the
 list matches.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.ip_cidr_contains":"10.0.0.0/8"},{"message.ip_cidr_contains":["2000::/10","192.168.0.0/16"]}]}
+  groups={[]}
+  name={"`[field_name]`.ip_cidr_contains"}
+  path={"ends_when"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[field_name]`.ip_cidr_contains
+
+Checks whether an IP field is contained within a given [IP CIDR][urls.cidr]
+(works with IPv4 and IPv6). This may be a single string or a list of strings,
+in which case this evaluates to true if the IP field is contained within any of
+the CIDRs in the list.
 
 
 
@@ -340,7 +368,7 @@ preferred where possible.
 
 #### `[field_name]`.starts_with
 
-Checks whether a string field starts with a string argument.This may be a
+Checks whether a string field starts with a string argument. This may be a
 single string or a list of strings, in which case this evaluates to true if any
 of the list matches.
 
@@ -497,7 +525,7 @@ Given the following configuration:
 
 ```toml
 [transforms.transaction_events]
-  type = "transaction"
+  type = "reduce"
   inputs = [...]
 ```
 
@@ -561,7 +589,7 @@ Given the following configuration:
 
 ```toml
 [transforms.transaction_events]
-  type = "transaction"
+  type = "reduce"
   inputs = [...]
 
   identifier_fields = ["request_id"]
@@ -647,7 +675,7 @@ Notice that the fields from the third event are not present as it has been ident
 
 ### Complex Processing
 
-If you encounter limitations with the `transaction`
+If you encounter limitations with the `reduce`
 transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
 These transforms are designed for complex processing and give you the power of
 full programming runtime.
@@ -661,23 +689,10 @@ will be replaced before being evaluated.
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
 
-### When to use this transform
-
-Where possible, Vector will handle event merging at the source level. For
-example, the [`file`][docs.sources.file] contains a `message_start_indicator`
-option and the [`docker`][docs.sources.file] contains an `auto_partial_merge`
-option. Both of these options should be used instead of this transform.
-Unfortunately, merging logs is not always this straight forward. It is
-precisely these edge cases that this transform hopes to solve.
-
-If you're using this transform for a common use case, please consider
-[opening an issue][urls.new_feature_request] to let us know.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
-[docs.sources.file]: /docs/reference/sources/file/
-[urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
+[urls.cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax
 [urls.vector_programmable_transforms]: https://vector.dev/components/?functions%5B%5D=program

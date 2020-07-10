@@ -27,7 +27,7 @@ impl DiscardMerger {
     }
 }
 
-impl TransactionValueMerger for DiscardMerger {
+impl ReduceValueMerger for DiscardMerger {
     fn add(&mut self, _v: Value) -> Result<(), String> {
         Ok(())
     }
@@ -51,7 +51,7 @@ impl ConcatMerger {
     }
 }
 
-impl TransactionValueMerger for ConcatMerger {
+impl ReduceValueMerger for ConcatMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         if let Value::Bytes(b) = v {
             self.v.extend(&[b' ']);
@@ -84,7 +84,7 @@ impl ArrayMerger {
     }
 }
 
-impl TransactionValueMerger for ArrayMerger {
+impl ReduceValueMerger for ArrayMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         self.v.push(v);
         Ok(())
@@ -113,7 +113,7 @@ impl TimestampWindowMerger {
     }
 }
 
-impl TransactionValueMerger for TimestampWindowMerger {
+impl ReduceValueMerger for TimestampWindowMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         if let Value::Timestamp(ts) = v {
             self.latest = ts
@@ -166,7 +166,7 @@ impl AddNumbersMerger {
     }
 }
 
-impl TransactionValueMerger for AddNumbersMerger {
+impl ReduceValueMerger for AddNumbersMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         // Try and keep max precision with integer values, but once we've
         // received a float downgrade to float precision.
@@ -211,7 +211,7 @@ impl MaxNumberMerger {
     }
 }
 
-impl TransactionValueMerger for MaxNumberMerger {
+impl ReduceValueMerger for MaxNumberMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         // Try and keep max precision with integer values, but once we've
         // received a float downgrade to float precision.
@@ -272,7 +272,7 @@ impl MinNumberMerger {
     }
 }
 
-impl TransactionValueMerger for MinNumberMerger {
+impl ReduceValueMerger for MinNumberMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         // Try and keep max precision with integer values, but once we've
         // received a float downgrade to float precision.
@@ -322,12 +322,12 @@ impl TransactionValueMerger for MinNumberMerger {
 
 //------------------------------------------------------------------------------
 
-pub trait TransactionValueMerger: std::fmt::Debug + Send + Sync {
+pub trait ReduceValueMerger: std::fmt::Debug + Send + Sync {
     fn add(&mut self, v: Value) -> Result<(), String>;
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String>;
 }
 
-impl From<Value> for Box<dyn TransactionValueMerger> {
+impl From<Value> for Box<dyn ReduceValueMerger> {
     fn from(v: Value) -> Self {
         match v {
             Value::Integer(i) => Box::new(AddNumbersMerger::new(i.into())),
@@ -342,10 +342,7 @@ impl From<Value> for Box<dyn TransactionValueMerger> {
     }
 }
 
-pub fn get_value_merger(
-    v: Value,
-    m: &MergeStrategy,
-) -> Result<Box<dyn TransactionValueMerger>, String> {
+pub fn get_value_merger(v: Value, m: &MergeStrategy) -> Result<Box<dyn ReduceValueMerger>, String> {
     match m {
         MergeStrategy::Sum => match v {
             Value::Integer(i) => Ok(Box::new(AddNumbersMerger::new(i.into()))),

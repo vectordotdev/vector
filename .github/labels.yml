@@ -345,6 +345,9 @@
 - name: "transform: merge"
   description: Anything `merge` transform related
   color: 54a0ff
+- name: "transform: reduce"
+  description: Anything `reduce` transform related
+  color: 54a0ff
 - name: "transform: regex_parser"
   description: Anything `regex_parser` transform related
   color: 54a0ff
@@ -371,9 +374,6 @@
   color: 54a0ff
 - name: "transform: tokenizer"
   description: Anything `tokenizer` transform related
-  color: 54a0ff
-- name: "transform: transaction"
-  description: Anything `transaction` transform related
   color: 54a0ff
 - name: "transform: wasm"
   description: Anything `wasm` transform related

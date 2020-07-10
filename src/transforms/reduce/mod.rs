@@ -26,13 +26,13 @@ use merge_strategy::*;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
-pub struct TransactionConfig {
+pub struct ReduceConfig {
     pub expire_after_ms: Option<u64>,
 
     pub flush_period_ms: Option<u64>,
 
-    /// An ordered list of fields to distinguish transactions by. Each
-    /// transaction has a separate event merging state.
+    /// An ordered list of fields to distinguish reduces by. Each
+    /// reduce has a separate event merging state.
     #[serde(default)]
     pub identifier_fields: Vec<String>,
 
@@ -40,18 +40,18 @@ pub struct TransactionConfig {
     pub merge_strategies: IndexMap<String, MergeStrategy>,
 
     /// An optional condition that determines when an event is the end of a
-    /// transaction.
+    /// reduce.
     pub ends_when: Option<AnyCondition>,
 }
 
 inventory::submit! {
-    TransformDescription::new::<TransactionConfig>("transaction")
+    TransformDescription::new::<ReduceConfig>("reduce")
 }
 
-#[typetag::serde(name = "transaction")]
-impl TransformConfig for TransactionConfig {
+#[typetag::serde(name = "reduce")]
+impl TransformConfig for ReduceConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        let t = Transaction::new(self)?;
+        let t = Reduce::new(self)?;
         Ok(Box::new(t))
     }
 
@@ -64,17 +64,17 @@ impl TransformConfig for TransactionConfig {
     }
 
     fn transform_type(&self) -> &'static str {
-        "transaction"
+        "reduce"
     }
 }
 
 #[derive(Debug)]
-struct TransactionState {
-    fields: HashMap<String, Box<dyn TransactionValueMerger>>,
+struct ReduceState {
+    fields: HashMap<String, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
 }
 
-impl TransactionState {
+impl ReduceState {
     fn new(e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) -> Self {
         Self {
             stale_since: Instant::now(),
@@ -139,17 +139,17 @@ impl TransactionState {
 
 //------------------------------------------------------------------------------
 
-pub struct Transaction {
+pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
     identifier_fields: Vec<Atom>,
     merge_strategies: IndexMap<String, MergeStrategy>,
-    transaction_merge_states: HashMap<Discriminant, TransactionState>,
+    reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Box<dyn Condition>>,
 }
 
-impl Transaction {
-    fn new(config: &TransactionConfig) -> crate::Result<Self> {
+impl Reduce {
+    fn new(config: &ReduceConfig) -> crate::Result<Self> {
         let ends_when = if let Some(ends_conf) = &config.ends_when {
             Some(ends_conf.build()?)
         } else {
@@ -163,38 +163,38 @@ impl Transaction {
             .map(Atom::from)
             .collect();
 
-        Ok(Transaction {
+        Ok(Reduce {
             expire_after: Duration::from_millis(config.expire_after_ms.unwrap_or(30000)),
             flush_period: Duration::from_millis(config.flush_period_ms.unwrap_or(1000)),
             identifier_fields,
             merge_strategies: config.merge_strategies.clone(),
-            transaction_merge_states: HashMap::new(),
+            reduce_merge_states: HashMap::new(),
             ends_when,
         })
     }
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
         let mut flush_discriminants = Vec::new();
-        for (k, t) in &self.transaction_merge_states {
+        for (k, t) in &self.reduce_merge_states {
             if t.stale_since.elapsed() >= self.expire_after {
                 flush_discriminants.push(k.clone());
             }
         }
         for k in &flush_discriminants {
-            if let Some(t) = self.transaction_merge_states.remove(k) {
+            if let Some(t) = self.reduce_merge_states.remove(k) {
                 output.push(Event::from(t.flush()));
             }
         }
     }
 
     fn flush_all_into(&mut self, output: &mut Vec<Event>) {
-        self.transaction_merge_states
+        self.reduce_merge_states
             .drain()
             .for_each(|(_, s)| output.push(Event::from(s.flush())));
     }
 }
 
-impl Transform for Transaction {
+impl Transform for Reduce {
     // Only used in tests
     fn transform(&mut self, event: Event) -> Option<Event> {
         let mut output = Vec::new();
@@ -214,17 +214,17 @@ impl Transform for Transaction {
 
         if ends_here {
             output.push(Event::from(
-                if let Some(mut state) = self.transaction_merge_states.remove(&discriminant) {
+                if let Some(mut state) = self.reduce_merge_states.remove(&discriminant) {
                     state.add_event(event, &self.merge_strategies);
                     state.flush()
                 } else {
-                    TransactionState::new(event, &self.merge_strategies).flush()
+                    ReduceState::new(event, &self.merge_strategies).flush()
                 },
             ));
         } else {
-            match self.transaction_merge_states.entry(discriminant) {
+            match self.reduce_merge_states.entry(discriminant) {
                 hash_map::Entry::Vacant(entry) => {
-                    entry.insert(TransactionState::new(event, &self.merge_strategies));
+                    entry.insert(ReduceState::new(event, &self.merge_strategies));
                 }
                 hash_map::Entry::Occupied(mut entry) => {
                     entry.get_mut().add_event(event, &self.merge_strategies);
@@ -286,7 +286,7 @@ impl Transform for Transaction {
 
 #[cfg(test)]
 mod test {
-    use super::TransactionConfig;
+    use super::ReduceConfig;
     use crate::{
         event::Value,
         topology::config::{TransformConfig, TransformContext},
@@ -294,8 +294,8 @@ mod test {
     };
 
     #[test]
-    fn transaction_from_condition() {
-        let mut transaction = toml::from_str::<TransactionConfig>(
+    fn reduce_from_condition() {
+        let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
 [ends_when]
@@ -311,23 +311,23 @@ identifier_fields = [ "request_id" ]
         let mut e = Event::from("test message 1");
         e.as_mut_log().insert("counter", 1);
         e.as_mut_log().insert("request_id", "1");
-        transaction.transform_into(&mut outputs, e);
+        reduce.transform_into(&mut outputs, e);
 
         let mut e = Event::from("test message 2");
         e.as_mut_log().insert("counter", 2);
         e.as_mut_log().insert("request_id", "2");
-        transaction.transform_into(&mut outputs, e);
+        reduce.transform_into(&mut outputs, e);
 
         let mut e = Event::from("test message 3");
         e.as_mut_log().insert("counter", 3);
         e.as_mut_log().insert("request_id", "1");
-        transaction.transform_into(&mut outputs, e);
+        reduce.transform_into(&mut outputs, e);
 
         let mut e = Event::from("test message 4");
         e.as_mut_log().insert("counter", 4);
         e.as_mut_log().insert("request_id", "1");
         e.as_mut_log().insert("test_end", "yep");
-        transaction.transform_into(&mut outputs, e);
+        reduce.transform_into(&mut outputs, e);
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
@@ -346,7 +346,7 @@ identifier_fields = [ "request_id" ]
         e.as_mut_log().insert("request_id", "2");
         e.as_mut_log().insert("extra_field", "value1");
         e.as_mut_log().insert("test_end", "yep");
-        transaction.transform_into(&mut outputs, e);
+        reduce.transform_into(&mut outputs, e);
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
@@ -364,8 +364,8 @@ identifier_fields = [ "request_id" ]
     }
 
     #[test]
-    fn transaction_merge_strategies() {
-        let mut transaction = toml::from_str::<TransactionConfig>(
+    fn reduce_merge_strategies() {
+        let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
 
@@ -389,7 +389,7 @@ merge_strategies.baz = "max"
         e.as_mut_log().insert("baz", 2);
         e.as_mut_log().insert("request_id", "1");
 
-        transaction.transform_into(&mut outputs, e);
+        reduce.transform_into(&mut outputs, e);
 
         let mut e = Event::from("test message 2");
         e.as_mut_log().insert("foo", "second foo");
@@ -397,7 +397,7 @@ merge_strategies.baz = "max"
         e.as_mut_log().insert("baz", "not number");
         e.as_mut_log().insert("request_id", "1");
 
-        transaction.transform_into(&mut outputs, e);
+        reduce.transform_into(&mut outputs, e);
 
         let mut e = Event::from("test message 3");
         e.as_mut_log().insert("foo", 10);
@@ -406,7 +406,7 @@ merge_strategies.baz = "max"
         e.as_mut_log().insert("request_id", "1");
         e.as_mut_log().insert("test_end", "yep");
 
-        transaction.transform_into(&mut outputs, e);
+        reduce.transform_into(&mut outputs, e);
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(

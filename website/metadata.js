@@ -32315,6 +32315,43 @@ module.exports = {
 
       ]
     },
+    "reduce": {
+      "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  type = \"reduce\" # required"
+      },
+      "delivery_guarantee": null,
+      "description": null,
+      "event_types": [
+        "log"
+      ],
+      "features": [
+
+      ],
+      "function_category": "aggregate",
+      "id": "reduce_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
+      "name": "reduce",
+      "operating_systems": [
+
+      ],
+      "output_types": [
+        "log"
+      ],
+      "service_providers": [
+
+      ],
+      "short_description": "Accepts log events and allows you to combines events of a matching transaction into a single event.",
+      "status": "beta",
+      "title": "Reduce",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "regex_parser": {
       "beta": false,
       "config_examples": {
@@ -32643,43 +32680,6 @@ module.exports = {
       "short_description": "Accepts log events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.",
       "status": "prod-ready",
       "title": "Tokenizer",
-      "type": "transform",
-      "unsupported_operating_systems": [
-
-      ]
-    },
-    "transaction": {
-      "beta": true,
-      "config_examples": {
-        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  type = \"transaction\" # required"
-      },
-      "delivery_guarantee": null,
-      "description": null,
-      "event_types": [
-        "log"
-      ],
-      "features": [
-
-      ],
-      "function_category": "aggregate",
-      "id": "transaction_transform",
-      "inpuut_types": [
-        "log"
-      ],
-      "logo_path": null,
-      "name": "transaction",
-      "operating_systems": [
-
-      ],
-      "output_types": [
-        "log"
-      ],
-      "service_providers": [
-
-      ],
-      "short_description": "Accepts log events and allows you to combines events of a matching transaction into a single event.",
-      "status": "beta",
-      "title": "Transaction",
       "type": "transform",
       "unsupported_operating_systems": [
 
