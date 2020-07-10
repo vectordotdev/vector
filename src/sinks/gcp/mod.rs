@@ -1,5 +1,5 @@
 use crate::sinks::HealthcheckError;
-use futures01::{Future, Stream};
+use futures::stream::StreamExt;
 use goauth::scopes::Scope;
 use goauth::{
     auth::{JwtClaims, Token, TokenErr},
@@ -12,7 +12,6 @@ use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use tokio01::timer::Interval;
 
 pub mod cloud_storage;
 pub mod pubsub;
@@ -51,13 +50,23 @@ pub struct GcpAuthConfig {
 
 impl GcpAuthConfig {
     pub fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpCredentials>> {
-        let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
-        let creds_path = self.credentials_path.as_ref().or_else(|| gap.as_ref());
-        Ok(match (&creds_path, &self.api_key) {
-            (Some(path), _) => Some(GcpCredentials::from_file(path, scope)?),
-            (None, Some(_)) => None,
-            (None, None) => Some(GcpCredentials::new_implicit(scope)?),
+        let this = self.clone();
+        // We can not run new Runtime in thread which already used by other Runtime.
+        // Without new thread we get error: `default Tokio timer already set for execution context`
+        std::thread::spawn(|| {
+            let mut rt = crate::runtime::Runtime::single_threaded().unwrap();
+            rt.block_on_std(async move {
+                let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
+                let creds_path = this.credentials_path.as_ref().or_else(|| gap.as_ref());
+                Ok(match (&creds_path, &this.api_key) {
+                    (Some(path), _) => Some(GcpCredentials::from_file(path, scope).await?),
+                    (None, Some(_)) => None,
+                    (None, None) => Some(GcpCredentials::new_implicit(scope).await?),
+                })
+            })
         })
+        .join()
+        .expect("Runtime thread error")
     }
 }
 
@@ -68,46 +77,35 @@ pub struct GcpCredentials {
     token: Arc<RwLock<Token>>,
 }
 
-fn get_token_implicit() -> Result<Token, GcpError> {
-    let mut rt = tokio_compat::runtime::current_thread::Runtime::new().unwrap();
-    rt.block_on_std(async {
-        let req = http::Request::get(SERVICE_ACCOUNT_TOKEN_URL)
-            .header("Metadata-Flavor", "Google")
-            .body(hyper::Body::empty())
-            .unwrap();
+async fn get_token_implicit() -> Result<Token, GcpError> {
+    let req = http::Request::get(SERVICE_ACCOUNT_TOKEN_URL)
+        .header("Metadata-Flavor", "Google")
+        .body(hyper::Body::empty())
+        .unwrap();
 
-        let res = hyper::Client::new()
-            .request(req)
-            .await
-            .context(GetImplicitToken)?;
+    let res = hyper::Client::new()
+        .request(req)
+        .await
+        .context(GetImplicitToken)?;
 
-        let body = res.into_body();
-        let bytes = hyper::body::to_bytes(body).await.context(GetTokenBytes)?;
+    let body = res.into_body();
+    let bytes = hyper::body::to_bytes(body).await.context(GetTokenBytes)?;
 
-        // Token::from_str is irresponsible and may panic!
-        match serde_json::from_slice::<Token>(&bytes) {
-            Ok(token) => Ok(token),
-            Err(error) => Err(match serde_json::from_slice::<TokenErr>(&bytes) {
-                Ok(error) => GcpError::TokenFromJson { source: error },
-                Err(_) => GcpError::TokenJsonFromStr { source: error },
-            }),
-        }
-    })
-}
-
-fn get_token_with_creds_blocking(
-    jwt: &Jwt<JwtClaims>,
-    credentials: &Credentials,
-) -> Result<Token, GoErr> {
-    let mut rt = tokio_compat::runtime::current_thread::Runtime::new()?;
-    rt.block_on_std(goauth::get_token(jwt, credentials))
+    // Token::from_str is irresponsible and may panic!
+    match serde_json::from_slice::<Token>(&bytes) {
+        Ok(token) => Ok(token),
+        Err(error) => Err(match serde_json::from_slice::<TokenErr>(&bytes) {
+            Ok(error) => GcpError::TokenFromJson { source: error },
+            Err(_) => GcpError::TokenJsonFromStr { source: error },
+        }),
+    }
 }
 
 impl GcpCredentials {
-    fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
+    async fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
         let creds = Credentials::from_file(path).context(InvalidCredentials1)?;
         let jwt = make_jwt(&creds, &scope)?;
-        let token = get_token_with_creds_blocking(&jwt, &creds).context(GetToken)?;
+        let token = goauth::get_token(&jwt, &creds).await.context(GetToken)?;
         Ok(Self {
             creds: Some(creds),
             scope,
@@ -115,8 +113,8 @@ impl GcpCredentials {
         })
     }
 
-    fn new_implicit(scope: Scope) -> crate::Result<Self> {
-        let token = get_token_implicit()?;
+    async fn new_implicit(scope: Scope) -> crate::Result<Self> {
+        let token = get_token_implicit().await?;
         Ok(Self {
             creds: None,
             scope,
@@ -132,34 +130,33 @@ impl GcpCredentials {
             .insert(AUTHORIZATION, value.parse().unwrap());
     }
 
-    fn regenerate_token(&self) -> crate::Result<()> {
+    async fn regenerate_token(&self) -> crate::Result<()> {
         let token = match &self.creds {
             Some(creds) => {
                 let jwt = make_jwt(creds, &self.scope).unwrap(); // Errors caught above
-                get_token_with_creds_blocking(&jwt, creds)?
+                goauth::get_token(&jwt, creds).await?
             }
-            None => get_token_implicit()?,
+            None => get_token_implicit().await?,
         };
         *self.token.write().unwrap() = token;
         Ok(())
     }
 
     pub fn spawn_regenerate_token(&self) {
-        let interval = self.token.read().unwrap().expires_in() as u64 / 2;
-        let copy = self.clone();
-        let renew_task = Interval::new_interval(Duration::from_secs(interval))
-            .for_each(move |_instant| {
+        let this = self.clone();
+
+        let period = this.token.read().unwrap().expires_in() as u64 / 2;
+        let interval = tokio::time::interval(Duration::from_secs(period));
+        let task = interval.for_each(move |_| {
+            let this = this.clone();
+            async move {
                 debug!("Renewing GCP authentication token");
-                if let Err(error) = copy.regenerate_token() {
+                if let Err(error) = this.regenerate_token().await {
                     error!(message = "Failed to update GCP authentication token", %error);
                 }
-                Ok(())
-            })
-            .map_err(
-                |error| error!(message = "GCP authentication token regenerate interval failed", %error),
-            );
-
-        tokio01::spawn(renew_task);
+            }
+        });
+        tokio::spawn(task);
     }
 }
 

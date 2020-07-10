@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-25"
+last_modified_on: "2020-07-09"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."
@@ -52,7 +52,7 @@ HTTP Event Collector][urls.splunk_hec].
   token = "${SPLUNK_HEC_TOKEN}" # required
 
   # Encoding
-  encoding.codec = "json" # required
+  encoding.codec = "text" # optional, default
 
   # Requests
   compression = "none" # optional, default
@@ -85,7 +85,7 @@ HTTP Event Collector][urls.splunk_hec].
   buffer.when_full = "block" # optional, default
 
   # Encoding
-  encoding.codec = "json" # required
+  encoding.codec = "text" # optional, default
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.timestamp_format = "rfc3339" # optional, default
@@ -359,7 +359,7 @@ transmission.
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}
@@ -374,14 +374,14 @@ Configures the encoding specific sink behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={null}
+  defaultValue={"text"}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","text"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

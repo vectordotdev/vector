@@ -720,7 +720,7 @@ mod tests {
         assert_eq!(filter_unit(Some(&one), &includes, &empty), false);
         assert_eq!(filter_unit(Some(&one), &empty, &excludes), false);
         assert_eq!(filter_unit(Some(&one), &includes, &excludes), false);
-        let two = String::from("two");
+        let two = String::from("bar");
         assert_eq!(filter_unit(Some(&two), &empty, &empty), false);
         assert_eq!(filter_unit(Some(&two), &includes, &empty), true);
         assert_eq!(filter_unit(Some(&two), &empty, &excludes), true);

@@ -38,16 +38,6 @@ data_dir = "/var/lib/vector"
 data_dir = "/var/local/lib/vector/"
 data_dir = "/home/user/vector/"
 
-# The list of DNS servers Vector will use to resolve DNS requests. When set
-# Vector will ignore the system configuration and use only the list of DNS
-# servers provided. If this option is not set then Vector will attempt to use
-# the system configuration.
-#
-# * optional
-# * no default
-# * type: [string]
-dns_servers = ["0.0.0.0:53"]
-
 #
 # Log schema
 #
@@ -3897,7 +3887,8 @@ require('custom_module')
   [sinks.aws_s3.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "ndjson" or "text"
     codec = "ndjson"
@@ -7634,7 +7625,8 @@ require('custom_module')
   [sinks.kafka.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "json" or "text"
     codec = "json"
@@ -8752,7 +8744,7 @@ require('custom_module')
   #
   # * required
   # * type: string
-  address = "127.0.0.1:6650"
+  address = "pulsar://127.0.0.1:6650"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -8810,7 +8802,8 @@ require('custom_module')
   [sinks.pulsar.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "json" or "text"
     codec = "json"
@@ -9341,7 +9334,8 @@ require('custom_module')
   [sinks.splunk_hec.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "json" or "text"
     codec = "json"

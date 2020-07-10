@@ -29957,7 +29957,7 @@ module.exports = {
     "aws_s3": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  bucket = \"my-bucket\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  type = \"aws_s3\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
+        "toml": "[sinks.out]\n  bucket = \"my-bucket\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  type = \"aws_s3\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Amazon Simple Storage Service (Amazon S3) is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data.",
@@ -30627,7 +30627,7 @@ module.exports = {
     "kafka": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  bootstrap_servers = \"10.14.22.123:9092,10.14.23.332:9092\" # required\n  inputs = [\"in\"] # required\n  key_field = \"user_id\" # required\n  topic = \"topic-1234\" # required\n  type = \"kafka\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  bootstrap_servers = \"10.14.22.123:9092,10.14.23.332:9092\" # required\n  inputs = [\"in\"] # required\n  key_field = \"user_id\" # required\n  topic = \"topic-1234\" # required\n  type = \"kafka\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Apache Kafka is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.",
@@ -30874,7 +30874,7 @@ module.exports = {
     "pulsar": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  address = \"127.0.0.1:6650\" # required\n  inputs = [\"in\"] # required\n  topic = \"topic-1234\" # required\n  type = \"pulsar\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  address = \"pulsar://127.0.0.1:6650\" # required\n  inputs = [\"in\"] # required\n  topic = \"topic-1234\" # required\n  type = \"pulsar\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Pulsar is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data.",
@@ -30994,7 +30994,7 @@ module.exports = {
     "splunk_hec": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"json\" # required\n\n  # General\n  host = \"http://my-splunk-host.com\" # required\n  inputs = [\"in\"] # required\n  token = \"${SPLUNK_HEC_TOKEN}\" # required\n  type = \"splunk_hec\" # required"
+        "toml": "[sinks.out]\n  host = \"http://my-splunk-host.com\" # required\n  inputs = [\"in\"] # required\n  token = \"${SPLUNK_HEC_TOKEN}\" # required\n  type = \"splunk_hec\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "The Splunk HTTP Event Collector (HEC) is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.",

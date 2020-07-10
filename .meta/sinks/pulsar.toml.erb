@@ -26,13 +26,14 @@ write_to_description = "[Apache Pulsar][urls.pulsar] via the [Pulsar protocol][u
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.pulsar.options",
-  encodings: ["json", "text"]
+  encodings: ["json", "text"],
+  default: "text"
 ) %>
 
 [sinks.pulsar.options.address]
 type = "string"
 common = true
-examples = ["127.0.0.1:6650"]
+examples = ["pulsar://127.0.0.1:6650"]
 required = true
 description = "A host and port pair that the pulsar client should connect to."
 
