@@ -7,12 +7,10 @@ use crate::{
 };
 use bytes05::Bytes;
 use chrono::Utc;
-use codec::{self, BytesDelimitedCodec};
 use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::net::SocketAddr;
-use tokio_codec::Decoder;
 use warp::http::{HeaderMap, HeaderValue, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -104,11 +102,13 @@ fn add_headers(
 }
 
 fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<bytes::Bytes, ErrorMessage>> {
+    use tokio_codec::Decoder;
+
     // TODO: remove on bytes 0.4 => 0.5 update
     let mut body = bytes::BytesMut::new();
     body.extend_from_slice(&buf);
 
-    let mut decoder = BytesDelimitedCodec::new(b'\n');
+    let mut decoder = codec::BytesDelimitedCodec::new(b'\n');
     std::iter::from_fn(move || {
         match decoder.decode_eof(&mut body) {
             Err(e) => Some(Err(ErrorMessage::new(
@@ -116,11 +116,11 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<bytes::Bytes, ErrorM
                 format!("Bad request: {}", e),
             ))),
             Ok(Some(b)) => Some(Ok(b)),
-            Ok(None) => None, //actually done
+            Ok(None) => None, // actually done
         }
     })
     .filter(|s| match s {
-        //filter empty lines
+        // filter empty lines
         Ok(b) => !b.is_empty(),
         _ => true,
     })
