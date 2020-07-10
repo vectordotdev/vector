@@ -249,7 +249,7 @@ fn test_octet_counting_syslog() {
         })
         .collect();
 
-    let input_lines: Vec<String> = input_messages.iter().map(|msg| {
+    let input_lines = input_messages.iter().map(|msg| {
         let s = msg.to_string();
         format!("{} {}", s.len(), s)
     });
