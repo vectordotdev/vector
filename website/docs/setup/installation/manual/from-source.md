@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-11"
+last_modified_on: "2020-07-10"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
@@ -425,6 +425,7 @@ features one has to pass a comma-separated list of component features.
 | `transforms-logfmt_parser` | Enables building of [`logfmt_parser` transform][docs.transforms.logfmt_parser].  |
 | `transforms-lua` | Enables building of [`lua` transform][docs.transforms.lua].  |
 | `transforms-merge` | Enables building of [`merge` transform][docs.transforms.merge].  |
+| `transforms-reduce` | Enables building of [`reduce` transform][docs.transforms.reduce].  |
 | `transforms-regex_parser` | Enables building of [`regex_parser` transform][docs.transforms.regex_parser].  |
 | `transforms-remove_fields` | Enables building of [`remove_fields` transform][docs.transforms.remove_fields].  |
 | `transforms-remove_tags` | Enables building of [`remove_tags` transform][docs.transforms.remove_tags].  |
@@ -539,6 +540,7 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.logfmt_parser]: /docs/reference/transforms/logfmt_parser/
 [docs.transforms.lua]: /docs/reference/transforms/lua/
 [docs.transforms.merge]: /docs/reference/transforms/merge/
+[docs.transforms.reduce]: /docs/reference/transforms/reduce/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [docs.transforms.remove_fields]: /docs/reference/transforms/remove_fields/
 [docs.transforms.remove_tags]: /docs/reference/transforms/remove_tags/

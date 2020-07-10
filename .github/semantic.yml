@@ -105,6 +105,7 @@ scopes:
   - logfmt_parser transform
   - lua transform
   - merge transform
+  - reduce transform
   - regex_parser transform
   - remove_fields transform
   - remove_tags transform

@@ -32315,6 +32315,43 @@ module.exports = {
 
       ]
     },
+    "reduce": {
+      "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  type = \"reduce\" # required"
+      },
+      "delivery_guarantee": null,
+      "description": null,
+      "event_types": [
+        "log"
+      ],
+      "features": [
+
+      ],
+      "function_category": "aggregate",
+      "id": "reduce_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
+      "name": "reduce",
+      "operating_systems": [
+
+      ],
+      "output_types": [
+        "log"
+      ],
+      "service_providers": [
+
+      ],
+      "short_description": "Accepts log events and allows you to combine multiple events into a single event based on a set of identifiers.",
+      "status": "beta",
+      "title": "Reduce",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "regex_parser": {
       "beta": false,
       "config_examples": {

@@ -16,7 +16,7 @@ use string_cache::DefaultAtom as Atom;
 /// Intended for disecting streams of events to substreams, for instance to
 /// be able to allocate a buffer per substream.
 /// Implements `PartialEq`, `Eq` and `Hash` to enable use as a `HashMap` key.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Discriminant {
     values: Vec<Option<Value>>,
 }
