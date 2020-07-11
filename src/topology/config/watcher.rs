@@ -157,22 +157,6 @@ mod tests {
     }
 
     #[test]
-    fn multi_file_update() {
-        crate::test_util::trace_init();
-        let delay = Duration::from_secs(3);
-        let file_path = temp_file();
-        let mut file = File::create(&file_path).unwrap();
-
-        let _ = config_watcher(vec![file_path], delay).unwrap();
-
-        for i in 0..3 {
-            if !test(&mut file, delay * 5) {
-                panic!("Test timed out on {}. update", i + 1);
-            }
-        }
-    }
-
-    #[test]
     fn sym_file_update() {
         crate::test_util::trace_init();
         let delay = Duration::from_secs(3);
