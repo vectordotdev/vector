@@ -584,7 +584,7 @@ mod integration_tests {
         let mut rt = runtime();
         let resolver = crate::dns::Resolver;
 
-        let config_to_healthcheck = |config| {
+        let config_to_healthcheck = move |config: super::HecSinkConfig| {
             let tls_settings = TlsSettings::from_options(&config.tls).unwrap();
             let client = HttpClient::new(resolver, tls_settings).unwrap();
             sinks::splunk_hec::healthcheck(config, client)
