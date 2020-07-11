@@ -6,7 +6,6 @@ use tower03::Service;
 
 use futures::ready;
 use std::{
-    error::Error,
     fmt,
     future::Future,
     mem,
