@@ -109,7 +109,7 @@ fn benchmark_batching(c: &mut Criterion) {
         "batch",
         batching(
             "gzip 10mb with 2mb batches",
-            Compression::Gzip,
+            Compression::Gzip(0),
             2_000_000,
             100_000,
             100,
@@ -119,7 +119,7 @@ fn benchmark_batching(c: &mut Criterion) {
         "batch",
         batching(
             "gzip 10mb with 500kb batches",
-            Compression::Gzip,
+            Compression::Gzip(0),
             500_000,
             100_000,
             100,
@@ -140,7 +140,7 @@ fn benchmark_batching(c: &mut Criterion) {
         "partitioned_batch",
         partitioned_batching(
             "gzip 10mb with 2mb batches",
-            Compression::Gzip,
+            Compression::Gzip(0),
             2_000_000,
             100_000,
             100,

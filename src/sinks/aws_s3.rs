@@ -511,7 +511,7 @@ mod tests {
             "date".into(),
             None,
             false,
-            Compression::Gzip,
+            Compression::Gzip(0),
             "bucket".into(),
             S3Options::default(),
         );
@@ -522,7 +522,7 @@ mod tests {
             "date".into(),
             None,
             true,
-            Compression::Gzip,
+            Compression::Gzip(0),
             "bucket".into(),
             S3Options::default(),
         );
@@ -710,7 +710,7 @@ mod integration_tests {
 
         rt.block_on_std(async {
             let config = S3SinkConfig {
-                compression: Compression::Gzip,
+                compression: Compression::Gzip(0),
                 filename_time_format: Some("%S%f".into()),
                 ..config(10000).await
             };

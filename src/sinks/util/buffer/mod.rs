@@ -32,9 +32,10 @@ impl Buffer {
         let buffer = Vec::with_capacity(settings.bytes);
         let inner = match compression {
             Compression::None => InnerBuffer::Plain(buffer),
-            Compression::Gzip => {
-                InnerBuffer::Gzip(GzEncoder::new(buffer, flate2::Compression::fast()))
-            }
+            Compression::Gzip(level) => InnerBuffer::Gzip(GzEncoder::new(
+                buffer,
+                flate2::Compression::new(level as u32),
+            )),
         };
         Self {
             inner,
@@ -155,7 +156,7 @@ mod test {
 
         let buffered = BatchSink::with_executor(
             svc,
-            Buffer::new(batch_size, Compression::Gzip),
+            Buffer::new(batch_size, Compression::Gzip(0)),
             timeout,
             acker,
             rt.executor(),

@@ -865,7 +865,7 @@ mod tests {
     #[test]
     fn one_simple_text_event() {
         let message = "one_simple_text_event";
-        let (mut rt, sink, source) = start(Encoding::Text, Compression::Gzip);
+        let (mut rt, sink, source) = start(Encoding::Text, Compression::Gzip(0));
 
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
 
@@ -912,7 +912,7 @@ mod tests {
     #[test]
     fn one_simple_json_event() {
         let message = "one_simple_json_event";
-        let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
+        let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip(0));
 
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
 
@@ -933,7 +933,7 @@ mod tests {
     #[test]
     fn multiple_simple_json_event() {
         let n = 200;
-        let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
+        let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip(0));
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_json_event{}", i))
@@ -958,7 +958,7 @@ mod tests {
 
     #[test]
     fn json_event() {
-        let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
+        let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip(0));
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("greeting", "hello");
@@ -982,7 +982,7 @@ mod tests {
 
     #[test]
     fn line_to_message() {
-        let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
+        let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip(0));
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");
@@ -1051,7 +1051,7 @@ mod tests {
         let message = "no_autorization";
         let mut rt = runtime();
         let (source, address) = source_with(&mut rt, None);
-        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip);
+        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip(0));
         assert!(rt.block_on(health).is_ok());
 
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
