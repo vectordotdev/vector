@@ -85,9 +85,8 @@ serde = { version = "1.0.80", features = ["derive"] }
 serde_json = { version = "1.0.33", features = ["raw_value"] }
 
 # Prost
-prost = "0.5"
-prost-derive = "0.5"
-prost-types = "0.5"
+prost = "0.6.1"
+prost-types = "0.6.1"
 
 # GCP
 goauth = { version = "0.7.1", optional = true }
@@ -174,7 +173,7 @@ atty = "0.2"
 nix = "0.16.1"
 
 [build-dependencies]
-prost-build = "0.5.0"
+prost-build = "0.6.1"
 built = { version = "0.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]

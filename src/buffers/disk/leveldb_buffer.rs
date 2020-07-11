@@ -1,4 +1,5 @@
 use crate::event::{proto, Event};
+use bytes05::Bytes;
 use futures01::{
     task::{self, AtomicTask, Task},
     Async, AsyncSink, Poll, Sink, Stream,
@@ -95,7 +96,8 @@ impl Sink for Writer {
 
             self.poll_complete()?;
 
-            let event = proto::EventWrapper::decode(value).unwrap().into();
+            let buf = Bytes::from(value);
+            let event = proto::EventWrapper::decode(buf).unwrap().into();
             return Ok(AsyncSink::NotReady(event));
         }
 
@@ -189,7 +191,8 @@ impl Stream for Reader {
             self.unacked_sizes.push_back(value.len());
             self.read_offset += 1;
 
-            match proto::EventWrapper::decode(value) {
+            let buf = Bytes::from(value);
+            match proto::EventWrapper::decode(buf) {
                 Ok(event) => {
                     let event = Event::from(event);
                     Ok(Async::Ready(Some(event)))
