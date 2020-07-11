@@ -15,7 +15,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use stream_cancel::{StreamExt, Trigger, Tripwire};
-use tokio01::codec::{FramedRead, FramedWrite, LinesCodec};
+use tokio01::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 use tokio01::net::{TcpListener, TcpStream};
 use tokio01::util::FutureExt;
 use tokio_openssl::SslConnectorExt;
@@ -54,15 +54,22 @@ pub fn send_lines(
     addr: SocketAddr,
     lines: impl Iterator<Item = String>,
 ) -> impl Future<Item = (), Error = ()> {
-    let lines = futures01::stream::iter_ok::<_, ()>(lines);
+    send_encodable(addr, LinesCodec::new(), lines)
+}
+
+pub fn send_encodable<I>(
+    addr: SocketAddr,
+    encoder: impl Encoder<Item = I, Error = std::io::Error>,
+    items: impl Iterator<Item = I>,
+) -> impl Future<Item = (), Error = ()> {
+    let items = futures01::stream::iter_ok::<_, ()>(items);
 
     TcpStream::connect(&addr)
         .map_err(|e| panic!("{:}", e))
         .and_then(|socket| {
-            let out =
-                FramedWrite::new(socket, LinesCodec::new()).sink_map_err(|e| panic!("{:?}", e));
+            let out = FramedWrite::new(socket, encoder).sink_map_err(|e| panic!("{:?}", e));
 
-            lines
+            items
                 .forward(out)
                 .and_then(|(_source, sink)| {
                     let socket = sink.into_inner().into_inner();

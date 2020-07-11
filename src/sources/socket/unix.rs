@@ -8,6 +8,7 @@ use bytes::Bytes;
 use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use tokio01::codec::LinesCodec;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -56,5 +57,12 @@ pub fn unix(
     shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
 ) -> Source {
-    build_unix_source(path, max_length, host_key, shutdown, out, build_event)
+    build_unix_source(
+        path,
+        LinesCodec::new_with_max_length(max_length),
+        host_key,
+        shutdown,
+        out,
+        build_event,
+    )
 }
