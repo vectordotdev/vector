@@ -7,7 +7,7 @@ use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use std::path::PathBuf;
 use tokio01::{
     self,
-    codec::{FramedRead, LinesCodec},
+    codec::{Decoder, FramedRead},
 };
 use tokio_uds::UnixListener;
 use tracing::field;
@@ -18,9 +18,11 @@ use tracing_futures::Instrument;
 * for build_event can allow for different source-specific logic (such as decoding syslog messages
 * in the syslog source).
 **/
-pub fn build_unix_source(
+pub fn build_unix_source<
+    D: Decoder<Item = String, Error = std::io::Error> + Clone + Send + 'static,
+>(
     path: PathBuf,
-    max_length: usize,
+    decoder: D,
     host_key: String,
     shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
@@ -62,17 +64,17 @@ pub fn build_unix_source(
                 let build_event = build_event.clone();
                 let received_from: Option<Bytes> =
                     path.map(|p| p.to_string_lossy().into_owned().into());
-                let lines_in = FramedRead::new(
-                    socket.allow_read_until(shutdown.clone()),
-                    LinesCodec::new_with_max_length(max_length),
-                )
-                .filter_map(move |line| build_event(&host_key, received_from.clone(), &line))
-                .map_err(move |error| {
-                    emit!(UnixSocketError {
-                        error,
-                        path: &listen_path,
-                    });
-                });
+                let lines_in =
+                    FramedRead::new(socket.allow_read_until(shutdown.clone()), decoder.clone())
+                        .filter_map(move |line| {
+                            build_event(&host_key, received_from.clone(), &line)
+                        })
+                        .map_err(move |error| {
+                            emit!(UnixSocketError {
+                                error,
+                                path: &listen_path,
+                            });
+                        });
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
                 tokio01::spawn(handler.instrument(span))
