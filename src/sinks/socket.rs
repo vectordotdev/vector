@@ -144,7 +144,7 @@ mod test {
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).unwrap();
 
-        let receiver = receive(&addr);
+        let mut receiver = receive(&addr);
 
         let (lines, events) = random_lines_with_stream(10, 100);
         let pump = sink.send_all(events);
@@ -153,6 +153,7 @@ mod test {
         // Some CI machines are very slow, be generous.
         std::thread::sleep(std::time::Duration::from_secs(2));
 
+        receiver.cancel();
         let output = receiver.wait();
         assert_eq!(output.len(), lines.len());
         for (source, received) in lines.iter().zip(output) {

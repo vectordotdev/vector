@@ -368,7 +368,7 @@ where
 pub struct Receiver<T> {
     handle: futures01::sync::oneshot::SpawnHandle<Vec<T>, ()>,
     count: Arc<AtomicUsize>,
-    trigger: Trigger,
+    trigger: Option<Trigger>,
     _runtime: Runtime,
 }
 
@@ -377,8 +377,11 @@ impl<T> Receiver<T> {
         self.count.load(Ordering::Relaxed)
     }
 
+    pub fn cancel(&mut self) {
+        self.trigger.take();
+    }
+
     pub fn wait(self) -> Vec<T> {
-        self.trigger.cancel();
         self.handle.wait().unwrap()
     }
 }
@@ -408,7 +411,7 @@ pub fn receive(addr: &SocketAddr) -> Receiver<String> {
     Receiver {
         handle,
         count,
-        trigger,
+        trigger: Some(trigger),
         _runtime: runtime,
     }
 }
@@ -437,7 +440,7 @@ where
     Receiver {
         handle,
         count,
-        trigger,
+        trigger: Some(trigger),
         _runtime: runtime,
     }
 }
