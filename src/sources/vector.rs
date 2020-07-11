@@ -75,6 +75,8 @@ impl TcpSource for VectorSource {
     }
 
     fn build_event(&self, frame: BytesMut, _host: Bytes) -> Option<Event> {
+        let frame = bytes05::Bytes::copy_from_slice(&frame);
+
         let byte_size = frame.len();
         match proto::EventWrapper::decode(frame).map(Event::from) {
             Ok(event) => {
