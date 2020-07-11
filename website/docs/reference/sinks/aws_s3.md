@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-09"
+last_modified_on: "2020-07-11"
 delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
@@ -47,7 +47,6 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   type = "aws_s3" # required
   inputs = ["my-source-or-transform-id"] # required
   bucket = "my-bucket" # required
-  compression = "gzip" # optional, default
   healthcheck = true # optional, default
   region = "us-east-1" # required, required when endpoint = ""
 
@@ -77,7 +76,6 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   bucket = "my-bucket" # required
-  compression = "gzip" # optional, default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
   region = "us-east-1" # required, required when endpoint = ""
@@ -99,6 +97,10 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
+
+  # Compression
+  compression.codec = "gzip" # optional, default
+  compression.level = 6 # optional, default
 
   # Content Type
   content_encoding = "gzip" # optional, no default
@@ -422,13 +424,35 @@ The behavior when the buffer becomes full.
 
 </Field>
 <Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+Configures the compression specific sink behavior.
+
+
+<Fields filters={false}>
+<Field
   common={true}
   defaultValue={"gzip"}
   enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
   examples={["none","gzip"]}
   groups={[]}
-  name={"compression"}
-  path={null}
+  name={"codec"}
+  path={"compression"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -437,12 +461,39 @@ The behavior when the buffer becomes full.
   warnings={[]}
   >
 
-### compression
+#### codec
 
-The compression strategy used to compress the encoded event data before
+The compression algorithm used to compress the encoded event data before
 transmission.
 
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={6}
+  enumValues={null}
+  examples={[0,1,6,9]}
+  groups={[]}
+  name={"level"}
+  path={"compression"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### level
+
+Compression level. Can be described by string: `none`, `fast`, `default`,
+`best`.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field

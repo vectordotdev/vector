@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-25"
+last_modified_on: "2020-07-11"
 delivery_guarantee: "at_least_once"
 component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."
@@ -51,16 +51,12 @@ The Vector `clickhouse` sink
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
-  # General
   type = "clickhouse" # required
   inputs = ["my-source-or-transform-id"] # required
   database = "mydatabase" # optional, no default
   healthcheck = true # optional, default
   host = "http://localhost:8123" # required
   table = "mytable" # required
-
-  # Requests
-  compression = "gzip" # optional, default
 ```
 
 </TabItem>
@@ -93,6 +89,13 @@ The Vector `clickhouse` sink
   buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
+  # Compression
+  # Requests
+  compression.codec = "gzip" # optional, default
+
+  # General
+  compression.level = 6 # optional, default
+
   # Encoding
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
@@ -106,9 +109,6 @@ The Vector `clickhouse` sink
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 30 # optional, default, seconds
-
-  # Requests
-  compression = "gzip" # optional, default
 
   # TLS
   tls.ca_file = "/path/to/certificate_authority.crt" # optional, no default
@@ -452,13 +452,35 @@ The behavior when the buffer becomes full.
 
 </Field>
 <Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+Configures the compression specific sink behavior.
+
+
+<Fields filters={false}>
+<Field
   common={true}
   defaultValue={"gzip"}
   enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
   examples={["none","gzip"]}
   groups={[]}
-  name={"compression"}
-  path={null}
+  name={"codec"}
+  path={"compression"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -467,12 +489,39 @@ The behavior when the buffer becomes full.
   warnings={[]}
   >
 
-### compression
+#### codec
 
-The compression strategy used to compress the encoded event data before
+The compression algorithm used to compress the encoded event data before
 transmission.
 
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={6}
+  enumValues={null}
+  examples={[0,1,6,9]}
+  groups={[]}
+  name={"level"}
+  path={"compression"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### level
+
+Compression level. Can be described by string: `none`, `fast`, `default`,
+`best`.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field

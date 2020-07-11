@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-09"
+last_modified_on: "2020-07-11"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."
@@ -53,9 +53,6 @@ HTTP Event Collector][urls.splunk_hec].
 
   # Encoding
   encoding.codec = "text" # optional, default
-
-  # Requests
-  compression = "none" # optional, default
 ```
 
 </TabItem>
@@ -84,6 +81,13 @@ HTTP Event Collector][urls.splunk_hec].
   buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
+  # Compression
+  # Requests
+  compression.codec = "none" # optional, default
+
+  # General
+  compression.level = 6 # optional, default
+
   # Encoding
   encoding.codec = "text" # optional, default
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
@@ -98,9 +102,6 @@ HTTP Event Collector][urls.splunk_hec].
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 60 # optional, default, seconds
-
-  # Requests
-  compression = "none" # optional, default
 
   # TLS
   tls.ca_file = "/path/to/certificate_authority.crt" # optional, no default
@@ -327,13 +328,35 @@ The behavior when the buffer becomes full.
 
 </Field>
 <Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+Configures the compression specific sink behavior.
+
+
+<Fields filters={false}>
+<Field
   common={true}
   defaultValue={"none"}
   enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
   examples={["none","gzip"]}
   groups={[]}
-  name={"compression"}
-  path={null}
+  name={"codec"}
+  path={"compression"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -342,12 +365,39 @@ The behavior when the buffer becomes full.
   warnings={[]}
   >
 
-### compression
+#### codec
 
-The compression strategy used to compress the encoded event data before
+The compression algorithm used to compress the encoded event data before
 transmission.
 
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={6}
+  enumValues={null}
+  examples={[0,1,6,9]}
+  groups={[]}
+  name={"level"}
+  path={"compression"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### level
+
+Compression level. Can be described by string: `none`, `fast`, `default`,
+`best`.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field

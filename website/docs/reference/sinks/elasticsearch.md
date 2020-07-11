@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-25"
+last_modified_on: "2020-07-11"
 delivery_guarantee: "at_least_once"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
@@ -38,7 +38,7 @@ endpoint][urls.elasticsearch_bulk].
 
 <Alert icon={false} type="warning" className="list--icons list--icons--warnings">
 
-* [`compression`](#compression) - AWS hosted Elasticsearch is unable to use compression
+* [`codec`](#codec) - AWS hosted Elasticsearch is unable to use compression
 
 </Alert>
 
@@ -54,7 +54,6 @@ endpoint][urls.elasticsearch_bulk].
 [sinks.my_sink_id]
   type = "elasticsearch" # required
   inputs = ["my-source-or-transform-id"] # required
-  compression = "none" # optional, default
   healthcheck = true # optional, default
   host = "http://10.24.32.122:9000" # optional, no default
   index = "vector-%F" # optional, default
@@ -69,7 +68,6 @@ endpoint][urls.elasticsearch_bulk].
   # General
   type = "elasticsearch" # required
   inputs = ["my-source-or-transform-id"] # required
-  compression = "none" # optional, default
   doc_type = "_doc" # optional, default
   healthcheck = true # optional, default
   host = "http://10.24.32.122:9000" # optional, no default
@@ -96,6 +94,10 @@ endpoint][urls.elasticsearch_bulk].
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
+
+  # Compression
+  compression.codec = "none" # optional, default
+  compression.level = 6 # optional, default
 
   # Encoding
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
@@ -511,27 +513,76 @@ The behavior when the buffer becomes full.
 
 </Field>
 <Field
-  common={true}
-  defaultValue={"none"}
-  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
-  examples={["none","gzip"]}
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
   groups={[]}
   name={"compression"}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"string"}
+  type={"table"}
   unit={null}
-  warnings={[{"visibility_level":"component","text":"AWS hosted Elasticsearch is unable to use compression","option_name":"compression"}]}
+  warnings={[]}
   >
 
 ### compression
 
-The compression strategy used to compress the encoded event data before
+Configures the compression specific sink behavior.
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
+  examples={["none","gzip"]}
+  groups={[]}
+  name={"codec"}
+  path={"compression"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[{"visibility_level":"component","text":"AWS hosted Elasticsearch is unable to use compression","option_name":"codec"}]}
+  >
+
+#### codec
+
+The compression algorithm used to compress the encoded event data before
 transmission.
 
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={6}
+  enumValues={null}
+  examples={[0,1,6,9]}
+  groups={[]}
+  name={"level"}
+  path={"compression"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### level
+
+Compression level. Can be described by string: `none`, `fast`, `default`,
+`best`.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field

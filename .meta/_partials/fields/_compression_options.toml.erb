@@ -3,17 +3,32 @@
     "common" => true,
     "default" => "none",
     "description" => """\
-The compression strategy used to compress the encoded event data before \
+The compression algorithm used to compress the encoded event data before \
 transmission.\
 """
 }.merge(options || {}) -%>
+
 <%- enum = {
     "none" => "No compression.",
     "gzip" => "[Gzip][urls.gzip] standard DEFLATE compression."
 }.merge(enum || {}) -%>
 
 [<%= namespace %>.compression]
+type = "table"
+description = """\
+Configures the compression specific sink behavior.\
+"""
+
+[<%= namespace %>.compression.children.codec]
 <%= options.to_toml %>
 
-[<%= namespace %>.compression.enum]
+[<%= namespace %>.compression.children.codec.enum]
 <%= enum.to_toml %>
+
+[<%= namespace %>.compression.children.level]
+type = "uint"
+default = 6
+examples = [0, 1, 6, 9]
+description = """\
+Compression level. Can be described by string: `none`, `fast`, `default`, `best`.\
+"""

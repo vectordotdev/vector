@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-05"
+last_modified_on: "2020-07-11"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Logs"
 description: "The Vector `aws_cloudwatch_logs` sink batches `log` events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint."
@@ -47,7 +47,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
   # General
   type = "aws_cloudwatch_logs" # required
   inputs = ["my-source-or-transform-id"] # required
-  compression = "none" # optional, default
   create_missing_group = true # optional, default
   create_missing_stream = true # optional, default
   group_name = "group-name" # required
@@ -68,7 +67,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
   type = "aws_cloudwatch_logs" # required
   inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
-  compression = "none" # optional, default
   create_missing_group = true # optional, default
   create_missing_stream = true # optional, default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
@@ -87,6 +85,10 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
+
+  # Compression
+  compression.codec = "none" # optional, default
+  compression.level = 6 # optional, default
 
   # Encoding
   encoding.codec = "json" # required
@@ -343,13 +345,35 @@ The behavior when the buffer becomes full.
 
 </Field>
 <Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+Configures the compression specific sink behavior.
+
+
+<Fields filters={false}>
+<Field
   common={true}
   defaultValue={"none"}
   enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
   examples={["none","gzip"]}
   groups={[]}
-  name={"compression"}
-  path={null}
+  name={"codec"}
+  path={"compression"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -358,12 +382,39 @@ The behavior when the buffer becomes full.
   warnings={[]}
   >
 
-### compression
+#### codec
 
-The compression strategy used to compress the encoded event data before
+The compression algorithm used to compress the encoded event data before
 transmission.
 
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={6}
+  enumValues={null}
+  examples={[0,1,6,9]}
+  groups={[]}
+  name={"level"}
+  path={"compression"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### level
+
+Compression level. Can be described by string: `none`, `fast`, `default`,
+`best`.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field

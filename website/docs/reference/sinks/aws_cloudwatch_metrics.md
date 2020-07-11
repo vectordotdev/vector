@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-05"
+last_modified_on: "2020-07-11"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
@@ -45,7 +45,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 [sinks.my_sink_id]
   type = "aws_cloudwatch_metrics" # required
   inputs = ["my-source-or-transform-id"] # required
-  compression = "none" # optional, default
   healthcheck = true # optional, default
   namespace = "service" # required
   region = "us-east-1" # required, required when endpoint = ""
@@ -60,7 +59,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
   type = "aws_cloudwatch_metrics" # required
   inputs = ["my-source-or-transform-id"] # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
-  compression = "none" # optional, default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
   namespace = "service" # required
@@ -69,6 +67,10 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
   # Batch
   batch.max_events = 20 # optional, default, events
   batch.timeout_secs = 1 # optional, default, seconds
+
+  # Compression
+  compression.codec = "none" # optional, default
+  compression.level = 6 # optional, default
 ```
 
 </TabItem>
@@ -170,13 +172,35 @@ The maximum age of a batch before it is flushed.
 
 </Field>
 <Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+Configures the compression specific sink behavior.
+
+
+<Fields filters={false}>
+<Field
   common={true}
   defaultValue={"none"}
   enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
   examples={["none","gzip"]}
   groups={[]}
-  name={"compression"}
-  path={null}
+  name={"codec"}
+  path={"compression"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -185,12 +209,39 @@ The maximum age of a batch before it is flushed.
   warnings={[]}
   >
 
-### compression
+#### codec
 
-The compression strategy used to compress the encoded event data before
+The compression algorithm used to compress the encoded event data before
 transmission.
 
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={6}
+  enumValues={null}
+  examples={[0,1,6,9]}
+  groups={[]}
+  name={"level"}
+  path={"compression"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### level
+
+Compression level. Can be described by string: `none`, `fast`, `default`,
+`best`.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-25"
+last_modified_on: "2020-07-11"
 delivery_guarantee: "at_least_once"
 component_title: "HTTP"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
@@ -45,7 +45,6 @@ The Vector `http` sink
   # General
   type = "http" # required
   inputs = ["my-source-or-transform-id"] # required
-  compression = "none" # optional, default
   healthcheck = true # optional, default
   uri = "https://10.22.212.22:9000/endpoint" # required
 
@@ -76,7 +75,6 @@ The Vector `http` sink
   # General
   type = "http" # required
   inputs = ["my-source-or-transform-id"] # required
-  compression = "none" # optional, default
   healthcheck = true # optional, default
   healthcheck_uri = "https://10.22.212.22:9000/_health" # optional, no default
   uri = "https://10.22.212.22:9000/endpoint" # required
@@ -97,6 +95,10 @@ The Vector `http` sink
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
+
+  # Compression
+  compression.codec = "none" # optional, default
+  compression.level = 6 # optional, default
 
   # Encoding
   encoding.codec = "json" # required
@@ -459,13 +461,35 @@ The behavior when the buffer becomes full.
 
 </Field>
 <Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+Configures the compression specific sink behavior.
+
+
+<Fields filters={false}>
+<Field
   common={true}
   defaultValue={"none"}
   enumValues={{"none":"No compression.","gzip":"[Gzip][urls.gzip] standard DEFLATE compression."}}
   examples={["none","gzip"]}
   groups={[]}
-  name={"compression"}
-  path={null}
+  name={"codec"}
+  path={"compression"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -474,12 +498,39 @@ The behavior when the buffer becomes full.
   warnings={[]}
   >
 
-### compression
+#### codec
 
-The compression strategy used to compress the encoded event data before
+The compression algorithm used to compress the encoded event data before
 transmission.
 
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={6}
+  enumValues={null}
+  examples={[0,1,6,9]}
+  groups={[]}
+  name={"level"}
+  path={"compression"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"uint"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### level
+
+Compression level. Can be described by string: `none`, `fast`, `default`,
+`best`.
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field

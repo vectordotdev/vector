@@ -3037,16 +3037,6 @@ require('custom_module')
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
 
-  # The compression strategy used to compress the encoded event data before
-  # transmission.
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
-
   # Dynamically create a log group if it does not already exist. This will ignore
   # `create_missing_stream` directly after creating the group and will create the
   # first stream.
@@ -3189,6 +3179,32 @@ require('custom_module')
     when_full = "drop_newest"
 
   #
+  # Compression
+  #
+
+  [sinks.aws_cloudwatch_logs.compression]
+    # The compression algorithm used to compress the encoded event data before
+    # transmission.
+    #
+    # * optional
+    # * default: "none"
+    # * type: string
+    # * enum: "none" or "gzip"
+    codec = "none"
+    codec = "gzip"
+
+    # Compression level. Can be described by string: `none`, `fast`, `default`,
+    # `best`.
+    #
+    # * optional
+    # * default: 6
+    # * type: uint
+    level = 0
+    level = 1
+    level = 6
+    level = 9
+
+  #
   # Encoding
   #
 
@@ -3303,16 +3319,6 @@ require('custom_module')
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
 
-  # The compression strategy used to compress the encoded event data before
-  # transmission.
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
-
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
   #
@@ -3379,6 +3385,32 @@ require('custom_module')
     # * unit: seconds
     timeout_secs = 1
 
+  #
+  # Compression
+  #
+
+  [sinks.aws_cloudwatch_metrics.compression]
+    # The compression algorithm used to compress the encoded event data before
+    # transmission.
+    #
+    # * optional
+    # * default: "none"
+    # * type: string
+    # * enum: "none" or "gzip"
+    codec = "none"
+    codec = "gzip"
+
+    # Compression level. Can be described by string: `none`, `fast`, `default`,
+    # `best`.
+    #
+    # * optional
+    # * default: 6
+    # * type: uint
+    level = 0
+    level = 1
+    level = 6
+    level = 9
+
 # Batches `log` events to Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint.
 [sinks.aws_kinesis_firehose]
   #
@@ -3391,16 +3423,6 @@ require('custom_module')
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
-
-  # The compression strategy used to compress the encoded event data before
-  # transmission.
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
@@ -3507,6 +3529,32 @@ require('custom_module')
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Compression
+  #
+
+  [sinks.aws_kinesis_firehose.compression]
+    # The compression algorithm used to compress the encoded event data before
+    # transmission.
+    #
+    # * optional
+    # * default: "none"
+    # * type: string
+    # * enum: "none" or "gzip"
+    codec = "none"
+    codec = "gzip"
+
+    # Compression level. Can be described by string: `none`, `fast`, `default`,
+    # `best`.
+    #
+    # * optional
+    # * default: 6
+    # * type: uint
+    level = 0
+    level = 1
+    level = 6
+    level = 9
 
   #
   # Encoding
@@ -3623,16 +3671,6 @@ require('custom_module')
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
 
-  # The compression strategy used to compress the encoded event data before
-  # transmission.
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
-
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
   #
@@ -3737,6 +3775,32 @@ require('custom_module')
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Compression
+  #
+
+  [sinks.aws_kinesis_streams.compression]
+    # The compression algorithm used to compress the encoded event data before
+    # transmission.
+    #
+    # * optional
+    # * default: "none"
+    # * type: string
+    # * enum: "none" or "gzip"
+    codec = "none"
+    codec = "gzip"
+
+    # Compression level. Can be described by string: `none`, `fast`, `default`,
+    # `best`.
+    #
+    # * optional
+    # * default: 6
+    # * type: uint
+    level = 0
+    level = 1
+    level = 6
+    level = 9
 
   #
   # Encoding
@@ -3914,16 +3978,6 @@ require('custom_module')
   # * type: string
   bucket = "my-bucket"
 
-  # The compression strategy used to compress the encoded event data before
-  # transmission.
-  #
-  # * optional
-  # * default: "gzip"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
-
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
   #
@@ -4031,6 +4085,32 @@ require('custom_module')
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Compression
+  #
+
+  [sinks.aws_s3.compression]
+    # The compression algorithm used to compress the encoded event data before
+    # transmission.
+    #
+    # * optional
+    # * default: "gzip"
+    # * type: string
+    # * enum: "none" or "gzip"
+    codec = "none"
+    codec = "gzip"
+
+    # Compression level. Can be described by string: `none`, `fast`, `default`,
+    # `best`.
+    #
+    # * optional
+    # * default: 6
+    # * type: uint
+    level = 0
+    level = 1
+    level = 6
+    level = 9
 
   #
   # Content Type
@@ -4383,18 +4463,32 @@ require('custom_module')
     when_full = "drop_newest"
 
   #
-  # Requests
+  # Compression
   #
 
-  # The compression strategy used to compress the encoded event data before
-  # transmission.
-  #
-  # * optional
-  # * default: "gzip"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
+  [sinks.clickhouse.compression]
+
+    # The compression algorithm used to compress the encoded event data before
+    # transmission.
+    #
+    # * optional
+    # * default: "gzip"
+    # * type: string
+    # * enum: "none" or "gzip"
+    codec = "none"
+    codec = "gzip"
+
+
+    # Compression level. Can be described by string: `none`, `fast`, `default`,
+    # `best`.
+    #
+    # * optional
+    # * default: 6
+    # * type: uint
+    level = 0
+    level = 1
+    level = 6
+    level = 9
 
   #
   # General
@@ -5106,18 +5200,34 @@ require('custom_module')
     when_full = "drop_newest"
 
   #
-  # General
+  # Compression
   #
 
-  # The compression strategy used to compress the encoded event data before
-  # transmission.
+  [sinks.elasticsearch.compression]
+    # The compression algorithm used to compress the encoded event data before
+    # transmission.
+    #
+    # * optional
+    # * default: "none"
+    # * type: string
+    # * enum: "none" or "gzip"
+    codec = "none"
+    codec = "gzip"
+
+    # Compression level. Can be described by string: `none`, `fast`, `default`,
+    # `best`.
+    #
+    # * optional
+    # * default: 6
+    # * type: uint
+    level = 0
+    level = 1
+    level = 6
+    level = 9
+
   #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
+  # General
+  #
 
   # The `doc_type` for your index data. This is only relevant for Elasticsearch
   # <= 6.X. If you are using >= 7.0 you do not need to set this option since
@@ -5518,16 +5628,6 @@ require('custom_module')
   # * type: string
   bucket = "my-bucket"
 
-  # The compression strategy used to compress the encoded event data before
-  # transmission.
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
-
   # The filename for a Google Cloud service account credentials JSON file used to
   # authenticate access to the Cloud Storage API. If this is unset, Vector checks
   # the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
@@ -5602,6 +5702,32 @@ require('custom_module')
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Compression
+  #
+
+  [sinks.gcp_cloud_storage.compression]
+    # The compression algorithm used to compress the encoded event data before
+    # transmission.
+    #
+    # * optional
+    # * default: "none"
+    # * type: string
+    # * enum: "none" or "gzip"
+    codec = "none"
+    codec = "gzip"
+
+    # Compression level. Can be described by string: `none`, `fast`, `default`,
+    # `best`.
+    #
+    # * optional
+    # * default: 6
+    # * type: uint
+    level = 0
+    level = 1
+    level = 6
+    level = 9
 
   #
   # Encoding
@@ -6733,54 +6859,30 @@ require('custom_module')
     when_full = "drop_newest"
 
   #
-  # General
+  # Compression
   #
 
-  # The compression strategy used to compress the encoded event data before
-  # transmission.
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
+  [sinks.http.compression]
+    # The compression algorithm used to compress the encoded event data before
+    # transmission.
+    #
+    # * optional
+    # * default: "none"
+    # * type: string
+    # * enum: "none" or "gzip"
+    codec = "none"
+    codec = "gzip"
 
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # A URI that Vector can request in order to determine the service health.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  healthcheck_uri = "https://10.22.212.22:9000/_health"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "http"
-  type = "http"
-
-  # The full URI to make HTTP requests to. This should include the protocol and
-  # host, but can also include the port, path, and any other valid part of a URI.
-  #
-  # * required
-  # * type: string
-  uri = "https://10.22.212.22:9000/endpoint"
+    # Compression level. Can be described by string: `none`, `fast`, `default`,
+    # `best`.
+    #
+    # * optional
+    # * default: 6
+    # * type: uint
+    level = 0
+    level = 1
+    level = 6
+    level = 9
 
   #
   # Encoding
@@ -6830,6 +6932,46 @@ require('custom_module')
     # * type: string
     Authorization = "${HTTP_TOKEN}"
     X-Powered-By = "Vector"
+
+  #
+  # General
+  #
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # A URI that Vector can request in order to determine the service health.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  healthcheck_uri = "https://10.22.212.22:9000/_health"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "http"
+  type = "http"
+
+  # The full URI to make HTTP requests to. This should include the protocol and
+  # host, but can also include the port, path, and any other valid part of a URI.
+  #
+  # * required
+  # * type: string
+  uri = "https://10.22.212.22:9000/endpoint"
 
   #
   # Request
@@ -7028,18 +7170,32 @@ require('custom_module')
     when_full = "drop_newest"
 
   #
-  # Requests
+  # Compression
   #
 
-  # The compression strategy used to compress the encoded event data before
-  # transmission.
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
+  [sinks.humio_logs.compression]
+
+    # The compression algorithm used to compress the encoded event data before
+    # transmission.
+    #
+    # * optional
+    # * default: "none"
+    # * type: string
+    # * enum: "none" or "gzip"
+    codec = "none"
+    codec = "gzip"
+
+
+    # Compression level. Can be described by string: `none`, `fast`, `default`,
+    # `best`.
+    #
+    # * optional
+    # * default: 6
+    # * type: uint
+    level = 0
+    level = 1
+    level = 6
+    level = 9
 
   #
   # Encoding
@@ -8586,18 +8742,32 @@ require('custom_module')
     when_full = "drop_newest"
 
   #
-  # Requests
+  # Compression
   #
 
-  # The compression strategy used to compress the encoded event data before
-  # transmission.
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
+  [sinks.new_relic_logs.compression]
+
+    # The compression algorithm used to compress the encoded event data before
+    # transmission.
+    #
+    # * optional
+    # * default: "none"
+    # * type: string
+    # * enum: "none" or "gzip"
+    codec = "none"
+    codec = "gzip"
+
+
+    # Compression level. Can be described by string: `none`, `fast`, `default`,
+    # `best`.
+    #
+    # * optional
+    # * default: 6
+    # * type: uint
+    level = 0
+    level = 1
+    level = 6
+    level = 9
 
   #
   # Encoding
@@ -9487,18 +9657,32 @@ require('custom_module')
     when_full = "drop_newest"
 
   #
-  # Requests
+  # Compression
   #
 
-  # The compression strategy used to compress the encoded event data before
-  # transmission.
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
+  [sinks.splunk_hec.compression]
+
+    # The compression algorithm used to compress the encoded event data before
+    # transmission.
+    #
+    # * optional
+    # * default: "none"
+    # * type: string
+    # * enum: "none" or "gzip"
+    codec = "none"
+    codec = "gzip"
+
+
+    # Compression level. Can be described by string: `none`, `fast`, `default`,
+    # `best`.
+    #
+    # * optional
+    # * default: 6
+    # * type: uint
+    level = 0
+    level = 1
+    level = 6
+    level = 9
 
   #
   # Encoding
