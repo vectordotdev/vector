@@ -1,5 +1,4 @@
 use crate::{
-    dns::Resolver,
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -68,18 +67,19 @@ impl SinkConfig for ClickhouseConfig {
         );
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), tls_settings)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
             Buffer::new(batch.size, self.compression),
             request,
             batch.timeout,
-            tls_settings,
-            &cx,
+            client.clone(),
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal clickhouse sink error: {}", e));
 
-        let healthcheck = healthcheck(cx.resolver(), self.clone()).boxed().compat();
+        let healthcheck = healthcheck(client, self.clone()).boxed().compat();
 
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
@@ -133,7 +133,7 @@ impl HttpSink for ClickhouseConfig {
     }
 }
 
-async fn healthcheck(resolver: Resolver, config: ClickhouseConfig) -> crate::Result<()> {
+async fn healthcheck(mut client: HttpClient, config: ClickhouseConfig) -> crate::Result<()> {
     // TODO: check if table exists?
     let uri = format!("{}/?query=SELECT%201", config.host);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
@@ -141,9 +141,6 @@ async fn healthcheck(resolver: Resolver, config: ClickhouseConfig) -> crate::Res
     if let Some(auth) = &config.auth {
         auth.apply(&mut request);
     }
-
-    let tls = TlsSettings::from_options(&config.tls)?;
-    let mut client = HttpClient::new(resolver, tls)?;
 
     let response = client.send(request).await?;
 

@@ -1,12 +1,10 @@
 use crate::{
-    dns::Resolver,
     event::{log_schema, Event, Value},
     sinks::util::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
     },
-    tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::TryFutureExt;
@@ -48,17 +46,19 @@ impl SinkConfig for HoneycombConfig {
                 .timeout(1),
         );
 
+        let client = HttpClient::new(cx.resolver(), None)?;
+
         let sink = BatchedHttpSink::new(
             self.clone(),
             JsonArrayBuffer::new(batch_settings.size),
             request_settings,
             batch_settings.timeout,
-            None,
-            &cx,
+            client.clone(),
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal honeycomb sink error: {}", e));
 
-        let healthcheck = Box::new(Box::pin(healthcheck(self.clone(), cx.resolver())).compat());
+        let healthcheck = Box::new(Box::pin(healthcheck(self.clone(), client)).compat());
 
         Ok((Box::new(sink), healthcheck))
     }
@@ -112,9 +112,7 @@ impl HoneycombConfig {
     }
 }
 
-async fn healthcheck(config: HoneycombConfig, resolver: Resolver) -> crate::Result<()> {
-    let mut client = HttpClient::new(resolver, TlsSettings::from_options(&None)?)?;
-
+async fn healthcheck(config: HoneycombConfig, mut client: HttpClient) -> crate::Result<()> {
     let req = config
         .build_request(Vec::new())
         .await?

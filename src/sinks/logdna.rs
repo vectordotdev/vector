@@ -1,5 +1,4 @@
 use crate::{
-    dns::Resolver,
     event::{self, Event},
     sinks::util::{
         encoding::EncodingConfigWithDefault,
@@ -7,7 +6,6 @@ use crate::{
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
     },
-    tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
@@ -69,18 +67,19 @@ impl SinkConfig for LogdnaConfig {
                 .bytes(bytesize::mib(10u64))
                 .timeout(1),
         );
+        let client = HttpClient::new(cx.resolver(), None)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
             JsonArrayBuffer::new(batch_settings.size),
             request_settings,
             batch_settings.timeout,
-            None,
-            &cx,
+            client.clone(),
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal logdna sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
 
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
@@ -199,10 +198,8 @@ impl LogdnaConfig {
     }
 }
 
-async fn healthcheck(config: LogdnaConfig, resolver: Resolver) -> crate::Result<()> {
+async fn healthcheck(config: LogdnaConfig, mut client: HttpClient) -> crate::Result<()> {
     let uri = config.build_uri("");
-
-    let mut client = HttpClient::new(resolver, TlsSettings::from_options(&None)?)?;
 
     let req = Request::post(uri).body(hyper::Body::empty()).unwrap();
 

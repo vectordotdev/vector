@@ -1,5 +1,4 @@
 use crate::{
-    dns::Resolver,
     event::{self, Event},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -105,6 +104,7 @@ impl SinkConfig for HttpSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_headers(&self.headers, &self.auth)?;
         let tls = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), tls)?;
 
         let mut config = self.clone();
         config.uri = build_uri(config.uri.clone()).into();
@@ -122,8 +122,8 @@ impl SinkConfig for HttpSinkConfig {
             Buffer::new(batch.size, compression),
             request,
             batch.timeout,
-            Some(tls.clone()),
-            &cx,
+            client.clone(),
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal http sink error: {}", e));
 
@@ -131,10 +131,9 @@ impl SinkConfig for HttpSinkConfig {
 
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
-                let healthcheck =
-                    healthcheck(healthcheck_uri, self.auth.clone(), cx.resolver(), tls)
-                        .boxed()
-                        .compat();
+                let healthcheck = healthcheck(healthcheck_uri, self.auth.clone(), client)
+                    .boxed()
+                    .compat();
                 Ok((sink, Box::new(healthcheck)))
             }
             None => Ok((sink, Box::new(future::ok(())))),
@@ -240,8 +239,7 @@ impl HttpSink for HttpSinkConfig {
 async fn healthcheck(
     uri: UriSerde,
     auth: Option<Auth>,
-    resolver: Resolver,
-    tls_settings: TlsSettings,
+    mut client: HttpClient,
 ) -> crate::Result<()> {
     let uri = build_uri(uri);
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
@@ -250,7 +248,6 @@ async fn healthcheck(
         auth.apply(&mut request);
     }
 
-    let mut client = HttpClient::new(resolver, tls_settings)?;
     let response = client.send(request).await?;
 
     match response.status() {

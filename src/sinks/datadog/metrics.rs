@@ -1,5 +1,4 @@
 use crate::{
-    dns::Resolver,
     event::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
@@ -107,7 +106,8 @@ inventory::submit! {
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
+        let client = HttpClient::new(cx.resolver(), None)?;
+        let healthcheck = healthcheck(self.clone(), client.clone()).boxed().compat();
 
         let batch = self
             .batch
@@ -130,8 +130,8 @@ impl SinkConfig for DatadogConfig {
             MetricBuffer::new(batch.size),
             request,
             batch.timeout,
-            None,
-            &cx,
+            client,
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal datadog error: {}", e));
 
@@ -180,7 +180,7 @@ fn build_uri(host: &str) -> crate::Result<Uri> {
     Ok(uri)
 }
 
-async fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result<()> {
+async fn healthcheck(config: DatadogConfig, mut client: HttpClient) -> crate::Result<()> {
     let uri = format!("{}/api/v1/validate", config.host)
         .parse::<Uri>()
         .context(super::UriParseError)?;
@@ -190,7 +190,6 @@ async fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result
         .body(hyper::Body::empty())
         .unwrap();
 
-    let mut client = HttpClient::new(resolver, None)?;
     let response = client.send(request).await?;
 
     match response.status() {

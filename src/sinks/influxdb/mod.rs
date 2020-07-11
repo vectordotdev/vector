@@ -3,7 +3,7 @@ pub mod metrics;
 
 pub(self) use super::{Healthcheck, RouterSink};
 
-use crate::{dns::Resolver, sinks::util::http::HttpClient};
+use crate::sinks::util::http::HttpClient;
 use chrono::{DateTime, Utc};
 use futures::TryFutureExt;
 use futures01::Future;
@@ -148,15 +148,13 @@ fn healthcheck(
     endpoint: String,
     influxdb1_settings: Option<InfluxDB1Settings>,
     influxdb2_settings: Option<InfluxDB2Settings>,
-    resolver: Resolver,
+    mut client: HttpClient,
 ) -> crate::Result<super::Healthcheck> {
     let settings = influxdb_settings(influxdb1_settings, influxdb2_settings)?;
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
     let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
-
-    let mut client = HttpClient::new(resolver, None)?;
 
     let healthcheck = client
         .call(request)
@@ -729,6 +727,7 @@ mod tests {
 mod integration_tests {
     use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, DATABASE, ORG, TOKEN};
     use crate::sinks::influxdb::{healthcheck, InfluxDB1Settings, InfluxDB2Settings};
+    use crate::sinks::util::http::HttpClient;
     use crate::test_util::runtime;
     use crate::topology::SinkContext;
 
@@ -745,14 +744,10 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
+        let healthcheck =
+            healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
@@ -769,13 +764,10 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
+
+        let healthcheck =
+            healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client).unwrap();
         rt.block_on(healthcheck).unwrap_err();
     }
 
@@ -792,14 +784,10 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
+        let healthcheck =
+            healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
@@ -816,14 +804,10 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
+        let healthcheck =
+            healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client).unwrap();
         rt.block_on(healthcheck).unwrap_err();
     }
 }

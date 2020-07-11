@@ -1,5 +1,4 @@
 use crate::{
-    dns::Resolver,
     emit,
     event::Event,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
@@ -103,7 +102,9 @@ inventory::submit! {
 impl SinkConfig for ElasticSearchConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
-        let healthcheck = healthcheck(cx.resolver(), common).boxed().compat();
+        let client = HttpClient::new(cx.resolver(), common.tls_settings.clone())?;
+
+        let healthcheck = healthcheck(client.clone(), common).boxed().compat();
 
         let common = ElasticSearchCommon::parse_config(&self)?;
         let compression = common.compression;
@@ -117,7 +118,6 @@ impl SinkConfig for ElasticSearchConfig {
                     .timeout(1),
             );
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
-        let tls_settings = common.tls_settings.clone();
 
         let sink = BatchedHttpSink::with_retry_logic(
             common,
@@ -125,8 +125,8 @@ impl SinkConfig for ElasticSearchConfig {
             ElasticSearchRetryLogic,
             request,
             batch.timeout,
-            tls_settings,
-            &cx,
+            client,
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal elasticsearch sink error: {}", e));
 
@@ -446,7 +446,7 @@ impl ElasticSearchCommon {
     }
 }
 
-async fn healthcheck(resolver: Resolver, common: ElasticSearchCommon) -> crate::Result<()> {
+async fn healthcheck(mut client: HttpClient, common: ElasticSearchCommon) -> crate::Result<()> {
     let mut builder = Request::get(format!("{}/_cluster/health", common.base_url));
 
     match &common.credentials {
@@ -461,7 +461,6 @@ async fn healthcheck(resolver: Resolver, common: ElasticSearchCommon) -> crate::
         }
     }
     let request = builder.body(Body::empty())?;
-    let mut client = HttpClient::new(resolver, common.tls_settings.clone())?;
     let response = client.send(request).await?;
 
     match response.status() {
@@ -571,6 +570,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        dns::Resolver,
         event,
         sinks::util::http::HttpClient,
         test_util::{random_events_with_stream, random_string, runtime},

@@ -1,5 +1,4 @@
 use crate::{
-    dns::Resolver,
     event::{self, Event, LogEvent, Value},
     internal_events::{SplunkEventEncodeError, SplunkEventSent},
     sinks::util::{
@@ -89,18 +88,19 @@ impl SinkConfig for HecSinkConfig {
         );
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), tls_settings)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
             Buffer::new(batch.size, self.compression),
             request,
             batch.timeout,
-            tls_settings,
-            &cx,
+            client.clone(),
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal splunk_hec sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
 
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
@@ -205,7 +205,7 @@ enum HealthcheckError {
     QueuesFull,
 }
 
-pub async fn healthcheck(config: HecSinkConfig, resolver: Resolver) -> crate::Result<()> {
+pub async fn healthcheck(config: HecSinkConfig, mut client: HttpClient) -> crate::Result<()> {
     let uri =
         build_uri(&config.host, "/services/collector/health/1.0").context(super::UriParseError)?;
 
@@ -213,9 +213,6 @@ pub async fn healthcheck(config: HecSinkConfig, resolver: Resolver) -> crate::Re
         .header("Authorization", format!("Splunk {}", config.token))
         .body(Body::empty())
         .unwrap();
-
-    let tls = TlsSettings::from_options(&config.tls)?;
-    let mut client = HttpClient::new(resolver, tls)?;
 
     let response = client.send(request).await?;
     match response.status() {
@@ -587,11 +584,17 @@ mod integration_tests {
         let mut rt = runtime();
         let resolver = crate::dns::Resolver;
 
+        let config_to_healthcheck = move |config: super::HecSinkConfig| {
+            let tls_settings = TlsSettings::from_options(&config.tls).unwrap();
+            let client = HttpClient::new(resolver, tls_settings).unwrap();
+            sinks::splunk_hec::healthcheck(config, client)
+        };
+
         rt.block_on_std(async move {
             // OK
             {
                 let config = config(Encoding::Text, vec![]).await;
-                let healthcheck = sinks::splunk_hec::healthcheck(config, resolver.clone());
+                let healthcheck = config_to_healthcheck(config);
                 healthcheck.await.unwrap();
             }
 
@@ -601,7 +604,7 @@ mod integration_tests {
                     host: "http://localhost:1111".to_string(),
                     ..config(Encoding::Text, vec![]).await
                 };
-                let healthcheck = sinks::splunk_hec::healthcheck(config, resolver.clone());
+                let healthcheck = config_to_healthcheck(config);
                 healthcheck.await.unwrap_err();
             }
 
@@ -631,7 +634,7 @@ mod integration_tests {
                     warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
                 tokio::spawn(server);
 
-                let healthcheck = sinks::splunk_hec::healthcheck(config, resolver);
+                let healthcheck = config_to_healthcheck(config);
                 assert_downcast_matches!(
                     healthcheck.await.unwrap_err(),
                     HealthcheckError,

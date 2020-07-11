@@ -5,7 +5,7 @@ use crate::{
         Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
     },
     sinks::util::{
-        http::{HttpBatchService, HttpRetryLogic},
+        http::{HttpBatchService, HttpClient, HttpRetryLogic},
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, MetricBuffer,
     },
@@ -62,13 +62,14 @@ inventory::submit! {
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDBConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let client = HttpClient::new(cx.resolver(), None)?;
         let healthcheck = healthcheck(
             self.clone().endpoint,
             self.clone().influxdb1_settings,
             self.clone().influxdb2_settings,
-            cx.resolver(),
+            client.clone(),
         )?;
-        let sink = InfluxDBSvc::new(self.clone(), cx)?;
+        let sink = InfluxDBSvc::new(self.clone(), cx, client)?;
         Ok((sink, healthcheck))
     }
 
@@ -82,7 +83,11 @@ impl SinkConfig for InfluxDBConfig {
 }
 
 impl InfluxDBSvc {
-    pub fn new(config: InfluxDBConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
+    pub fn new(
+        config: InfluxDBConfig,
+        cx: SinkContext,
+        client: HttpClient,
+    ) -> crate::Result<super::RouterSink> {
         let settings = influxdb_settings(
             config.influxdb1_settings.clone(),
             config.influxdb2_settings.clone(),
@@ -101,8 +106,7 @@ impl InfluxDBSvc {
 
         let uri = settings.write_uri(endpoint)?;
 
-        let http_service =
-            HttpBatchService::new(cx.resolver(), None, create_build_request(uri, token));
+        let http_service = HttpBatchService::new(client, create_build_request(uri, token));
 
         let influxdb_http_service = InfluxDBSvc {
             config,
@@ -730,6 +734,7 @@ mod integration_tests {
     use crate::sinks::influxdb::metrics::{InfluxDBConfig, InfluxDBSvc};
     use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, ORG, TOKEN};
     use crate::sinks::influxdb::InfluxDB2Settings;
+    use crate::sinks::util::http::HttpClient;
     use crate::test_util::runtime;
     use crate::topology::SinkContext;
     use crate::Event;
@@ -797,7 +802,8 @@ mod integration_tests {
             events.push(event);
         }
 
-        let sink = InfluxDBSvc::new(config, cx).unwrap();
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
+        let sink = InfluxDBSvc::new(config, cx, client).unwrap();
 
         let stream = stream01::iter_ok(events.clone().into_iter());
 

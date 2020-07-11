@@ -73,23 +73,19 @@ impl SinkConfig for PubsubConfig {
         );
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), tls_settings)?;
 
-        let healthcheck = healthcheck(
-            cx.clone(),
-            sink.uri("")?,
-            tls_settings.clone(),
-            sink.creds.clone(),
-        )
-        .boxed()
-        .compat();
+        let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.creds.clone())
+            .boxed()
+            .compat();
 
         let sink = BatchedHttpSink::new(
             sink,
             JsonArrayBuffer::new(batch_settings.size),
             request_settings,
             batch_settings.timeout,
-            Some(tls_settings),
-            &cx,
+            client,
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal gcp pubsub sink error: {}", e));
 
@@ -178,9 +174,8 @@ impl HttpSink for PubsubSink {
 }
 
 async fn healthcheck(
-    cx: SinkContext,
+    mut client: HttpClient,
     uri: Uri,
-    tls: TlsSettings,
     creds: Option<GcpCredentials>,
 ) -> crate::Result<()> {
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
@@ -188,7 +183,6 @@ async fn healthcheck(
         creds.apply(&mut request);
     }
 
-    let mut client = HttpClient::new(cx.resolver(), tls.clone())?;
     let response = client.send(request).await?;
     healthcheck_response(creds, HealthcheckError::TopicNotFound.into())(response)
 }

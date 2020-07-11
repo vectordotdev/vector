@@ -119,6 +119,7 @@ impl SinkConfig for StackdriverConfig {
         );
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), tls_settings)?;
 
         let sink = StackdriverSink {
             config: self.clone(),
@@ -129,21 +130,15 @@ impl SinkConfig for StackdriverConfig {
                 .map(|key| Atom::from(key.as_str())),
         };
 
-        let healthcheck = healthcheck(
-            cx.clone(),
-            sink.clone(),
-            TlsSettings::from_options(&self.tls)?,
-        )
-        .boxed()
-        .compat();
+        let healthcheck = healthcheck(client.clone(), sink.clone()).boxed().compat();
 
         let sink = BatchedHttpSink::new(
             sink,
             JsonArrayBuffer::new(batch.size),
             request,
             batch.timeout,
-            tls_settings,
-            &cx,
+            client,
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal stackdriver sink error: {}", e));
 
@@ -247,14 +242,9 @@ fn remap_severity(severity: Value) -> Value {
     Value::Integer(n)
 }
 
-async fn healthcheck(
-    cx: SinkContext,
-    sink: StackdriverSink,
-    tls: TlsSettings,
-) -> crate::Result<()> {
+async fn healthcheck(mut client: HttpClient, sink: StackdriverSink) -> crate::Result<()> {
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
-    let mut client = HttpClient::new(cx.resolver(), tls)?;
     let response = client.send(request).await?;
     healthcheck_response(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
 }
