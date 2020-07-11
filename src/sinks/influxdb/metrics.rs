@@ -734,6 +734,7 @@ mod integration_tests {
     use crate::sinks::influxdb::metrics::{InfluxDBConfig, InfluxDBSvc};
     use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, ORG, TOKEN};
     use crate::sinks::influxdb::InfluxDB2Settings;
+    use crate::sinks::util::http::HttpClient;
     use crate::test_util::runtime;
     use crate::topology::SinkContext;
     use crate::Event;
