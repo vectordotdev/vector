@@ -8,7 +8,7 @@ use tracing::trace;
 use vector::event;
 use vector::test_util::{self, wait_for_atomic_usize};
 use vector::topology::{self, config};
-use vector::{buffers::BufferConfig, runtime, sinks};
+use vector::{buffers::BufferConfig, runtime};
 
 mod support;
 
