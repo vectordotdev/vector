@@ -6,9 +6,9 @@ use prost::Message;
 use tempfile::tempdir;
 use tracing::trace;
 use vector::event;
-use vector::test_util::{self, next_addr, wait_for_atomic_usize};
+use vector::test_util::{self, wait_for_atomic_usize};
 use vector::topology::{self, config};
-use vector::{buffers::BufferConfig, runtime, sinks};
+use vector::{buffers::BufferConfig, runtime};
 
 mod support;
 
@@ -212,67 +212,6 @@ fn test_max_size() {
     let output_events = output_events.wait();
     assert_eq!(num_events / 2, output_events.len());
     assert_eq!(&input_events[..num_events / 2], &output_events[..]);
-}
-
-#[test]
-fn test_max_size_resume() {
-    test_util::trace_init();
-
-    let data_dir = tempdir().unwrap();
-    let data_dir = data_dir.path().to_path_buf();
-
-    let num_events: usize = 1000;
-    let line_length = 1000;
-    let max_size = num_events * line_length / 2;
-
-    let out_addr = next_addr();
-
-    let mut config = config::Config::empty();
-    let (in1_tx, mut source_config) = support::source();
-    source_config.set_data_type(config::DataType::Log);
-    config.add_source("in1", source_config);
-    let (in2_tx, mut source_config) = support::source();
-    source_config.set_data_type(config::DataType::Log);
-    config.add_source("in2", source_config);
-    config.add_sink(
-        "out",
-        &["in1", "in2"],
-        sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
-    );
-    config.sinks["out"].buffer = BufferConfig::Disk {
-        max_size,
-        when_full: Default::default(),
-    };
-    config.global.data_dir = Some(data_dir);
-
-    // Use a multi-thread runtime here.
-    let mut rt = runtime::Runtime::new().unwrap();
-
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-
-    // Send all of the input events _before_ the output sink is ready.
-    // This causes the writers to stop writing to the on-disk buffer, and once
-    // the output sink is available and the size of the buffer begins to
-    // decrease, they should start writing again.
-    let (_, input_events_stream) = test_util::random_events_with_stream(line_length, num_events);
-    let send1 = in1_tx
-        .sink_map_err(|err| panic!(err))
-        .send_all(input_events_stream);
-    let (_, input_events_stream) = test_util::random_events_with_stream(line_length, num_events);
-    let send2 = in2_tx
-        .sink_map_err(|err| panic!(err))
-        .send_all(input_events_stream);
-    let _ = rt.block_on(send1.join(send2)).unwrap();
-
-    // Simulate a delay before enabling the sink as if sink server is going up.
-    std::thread::sleep(std::time::Duration::from_millis(1000));
-
-    let output_lines = test_util::receive(&out_addr);
-
-    terminate_gracefully(rt, topology);
-
-    let output_lines = output_lines.wait();
-    assert_eq!(num_events * 2, output_lines.len());
 }
 
 #[test]
