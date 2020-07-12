@@ -6,7 +6,7 @@ use crate::{
     stream::StreamExt,
 };
 use bytes::Bytes;
-use codec::BytesDelimitedCodec;
+use codec01::BytesDelimitedCodec;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::{io, net::SocketAddr};

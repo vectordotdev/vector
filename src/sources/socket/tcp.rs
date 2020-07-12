@@ -5,7 +5,7 @@ use crate::{
     tls::TlsConfig,
 };
 use bytes::Bytes;
-use codec::{self, BytesDelimitedCodec};
+use codec01::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 use tracing::field;
