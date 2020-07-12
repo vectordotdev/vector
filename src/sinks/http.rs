@@ -300,6 +300,7 @@ mod tests {
         test_util::{next_addr, random_lines_with_stream, runtime, shutdown_on_idle},
         topology::config::SinkContext,
     };
+    use bytes05::buf::BufExt;
     use futures01::{Sink, Stream};
     use headers::{Authorization, HeaderMapExt};
     use hyper::Method;
@@ -433,9 +434,8 @@ mod tests {
                     Some(Authorization::basic("waldo", "hunter2")),
                     parts.headers.typed_get()
                 );
-                body
+                body.reader()
             })
-            .map(std::io::Cursor::new)
             .map(flate2::read::GzDecoder::new)
             .map(BufReader::new)
             .flat_map(BufRead::lines)
@@ -496,9 +496,8 @@ mod tests {
                     Some(Authorization::basic("waldo", "hunter2")),
                     parts.headers.typed_get()
                 );
-                body
+                body.reader()
             })
-            .map(std::io::Cursor::new)
             .map(flate2::read::GzDecoder::new)
             .map(BufReader::new)
             .flat_map(BufRead::lines)
@@ -560,9 +559,8 @@ mod tests {
                     Some("quux"),
                     parts.headers.get("baz").map(|v| v.to_str().unwrap())
                 );
-                body
+                body.reader()
             })
-            .map(std::io::Cursor::new)
             .map(flate2::read::GzDecoder::new)
             .map(BufReader::new)
             .flat_map(BufRead::lines)

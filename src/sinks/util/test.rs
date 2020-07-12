@@ -4,8 +4,9 @@ use crate::{
     topology::config::{SinkConfig, SinkContext},
     Error,
 };
-use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt, TryStreamExt};
-use futures01::{sync::mpsc, Future, Sink, Stream};
+use bytes05::Bytes;
+use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
+use futures01::{sync::mpsc, Future, Sink};
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
@@ -27,7 +28,7 @@ pub fn build_test_server(
     addr: std::net::SocketAddr,
     rt: &mut Runtime,
 ) -> (
-    mpsc::Receiver<(http::request::Parts, Vec<u8>)>,
+    mpsc::Receiver<(http::request::Parts, Bytes)>,
     stream_cancel::Trigger,
     impl Future<Item = (), Error = ()>,
 ) {
@@ -39,16 +40,10 @@ pub fn build_test_server(
                 let tx = tx.clone();
                 async {
                     let (parts, body) = req.into_parts();
-
-                    tokio01::spawn(
-                        body.compat()
-                            .map(|bytes| bytes.to_vec())
-                            .concat2()
-                            .map_err(|e| panic!(e))
-                            .and_then(|body| tx.send((parts, body)))
-                            .map(|_| ())
-                            .map_err(|e| panic!(e)),
-                    );
+                    tokio::spawn(async move {
+                        let bytes = hyper::body::to_bytes(body).await.unwrap();
+                        tx.send((parts, bytes)).compat().await.unwrap();
+                    });
 
                     Ok::<_, Error>(Response::new(Body::empty()))
                 }

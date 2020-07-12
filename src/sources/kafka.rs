@@ -263,7 +263,7 @@ mod integration_test {
         shutdown::ShutdownSignal,
         test_util::{collect_n, random_string, runtime},
     };
-    use chrono::{TimeZone, Utc};
+    use chrono::Utc;
     use futures::compat::Compat;
     use futures01::{sync::mpsc, Future};
     use rdkafka::{

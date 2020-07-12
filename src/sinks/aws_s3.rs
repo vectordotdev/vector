@@ -542,7 +542,7 @@ mod integration_tests {
         test_util::{random_lines_with_stream, random_string, runtime},
         topology::config::SinkContext,
     };
-    use bytes05::BytesMut;
+    use bytes05::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;
     use futures::compat::Future01CompatExt;
     use futures::stream::{self, StreamExt};
@@ -550,7 +550,7 @@ mod integration_tests {
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
     use rusoto_s3::{S3Client, S3};
-    use std::io::{BufRead, BufReader, Cursor};
+    use std::io::{BufRead, BufReader};
 
     const BUCKET: &str = "router-tests";
 
@@ -863,7 +863,7 @@ mod integration_tests {
         buf_read.lines().map(|l| l.unwrap()).collect()
     }
 
-    async fn get_object_output_body(obj: rusoto_s3::GetObjectOutput) -> Cursor<Bytes> {
+    async fn get_object_output_body(obj: rusoto_s3::GetObjectOutput) -> impl std::io::Read {
         let bytes = obj
             .body
             .unwrap()
@@ -872,6 +872,6 @@ mod integration_tests {
                 store
             })
             .await;
-        Cursor::new(bytes.freeze())
+        bytes.freeze().reader()
     }
 }
