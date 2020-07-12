@@ -58,8 +58,9 @@ inventory::submit! {
 #[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = self.clone().healthcheck(cx.resolver()).boxed().compat();
-        let sink = CloudWatchMetricsSvc::new(self.clone(), cx)?;
+        let client = self.create_client(cx.resolver())?;
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
+        let sink = CloudWatchMetricsSvc::new(self.clone(), client, cx)?;
         Ok((sink, Box::new(healthcheck)))
     }
 
@@ -73,9 +74,7 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
 }
 
 impl CloudWatchMetricsSinkConfig {
-    async fn healthcheck(self, resolver: Resolver) -> crate::Result<()> {
-        let client = self.create_client(resolver)?;
-
+    async fn healthcheck(self, client: CloudWatchClient) -> crate::Result<()> {
         let datum = MetricDatum {
             metric_name: "healthcheck".into(),
             value: Some(1.0),
@@ -115,10 +114,9 @@ impl CloudWatchMetricsSinkConfig {
 impl CloudWatchMetricsSvc {
     pub fn new(
         config: CloudWatchMetricsSinkConfig,
+        client: CloudWatchClient,
         cx: SinkContext,
     ) -> crate::Result<super::RouterSink> {
-        let client = config.create_client(cx.resolver())?;
-
         let batch = config
             .batch
             .disallow_max_bytes()?
