@@ -559,7 +559,8 @@ mod integration_tests {
         rt.block_on_std(async move {
             let config = config(1000000).await;
             let prefix = config.key_prefix.clone();
-            let sink = config.new(cx).unwrap();
+            let client = config.create_client(cx.resolver()).unwrap();
+            let sink = config.new(client, cx).unwrap();
 
             let (lines, events) = random_lines_with_stream(100, 10);
 
@@ -592,7 +593,8 @@ mod integration_tests {
                 ..config(1010).await
             };
             let prefix = config.key_prefix.clone();
-            let sink = config.new(cx).unwrap();
+            let client = config.create_client(cx.resolver()).unwrap();
+            let sink = config.new(client, cx).unwrap();
 
             let (lines, _events) = random_lines_with_stream(100, 30);
 
@@ -646,7 +648,8 @@ mod integration_tests {
         });
 
         let prefix = config.key_prefix.clone();
-        let sink = config.new(cx).unwrap();
+        let client = config.create_client(cx.resolver()).unwrap();
+        let sink = config.new(client, cx).unwrap();
 
         let (lines, _) = random_lines_with_stream(100, 30);
 
@@ -713,7 +716,8 @@ mod integration_tests {
             };
 
             let prefix = config.key_prefix.clone();
-            let sink = config.new(cx).unwrap();
+            let client = config.create_client(cx.resolver()).unwrap();
+            let sink = config.new(client, cx).unwrap();
 
             let (lines, events) = random_lines_with_stream(100, 500);
 
@@ -743,7 +747,8 @@ mod integration_tests {
 
         rt.block_on_std(async move {
             let config = config(1).await;
-            config.healthcheck(resolver).await.unwrap();
+            let client = config.create_client(resolver).unwrap();
+            config.healthcheck(client).await.unwrap();
         });
     }
 
@@ -757,8 +762,9 @@ mod integration_tests {
                 bucket: "asdflkjadskdaadsfadf".to_string(),
                 ..config(1).await
             };
+            let client = config.create_client(resolver).unwrap();
             assert_downcast_matches!(
-                config.healthcheck(resolver).await.unwrap_err(),
+                config.healthcheck(client).await.unwrap_err(),
                 HealthcheckError,
                 HealthcheckError::UnknownBucket{ .. }
             );

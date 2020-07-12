@@ -442,15 +442,18 @@ mod integration_tests {
     #[test]
     fn cloudwatch_metrics_healthchecks() {
         let mut rt = runtime();
-        let resolver = Resolver;
-        let _ = rt.block_on_std(config().healthcheck(resolver));
+        let config = config();
+        let client = config.create_client(Resolver).unwrap();
+        let _ = rt.block_on_std(config.healthcheck(client));
     }
 
     #[test]
     fn cloudwatch_metrics_put_data() {
         let mut rt = runtime();
         let cx = SinkContext::new_test();
-        let sink = CloudWatchMetricsSvc::new(config(), cx).unwrap();
+        let config = config();
+        let client = config.create_client(cx.resolver()).unwrap();
+        let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
 
         let mut events = Vec::new();
 

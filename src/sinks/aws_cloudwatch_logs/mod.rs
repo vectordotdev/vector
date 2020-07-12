@@ -782,8 +782,8 @@ mod tests {
             stream: "stream".into(),
             group: "group".into(),
         };
-        let resolver = Resolver;
-        CloudwatchLogsSvc::new(&config, &key, resolver).unwrap()
+        let client = config.create_client(Resolver).unwrap();
+        CloudwatchLogsSvc::new(&config, &key, client)
     }
 
     #[test]
@@ -1273,9 +1273,9 @@ mod integration_tests {
         };
 
         let mut rt = runtime();
-        let resolver = Resolver;
 
-        rt.block_on_std(healthcheck(config, resolver)).unwrap();
+        let client = config.create_client(Resolver).unwrap();
+        rt.block_on_std(healthcheck(config, client)).unwrap();
     }
 
     fn create_client_test() -> CloudWatchLogsClient {

@@ -379,7 +379,8 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let sink = KinesisService::new(config, cx).unwrap();
+        let client = config.create_client(cx.resolver()).unwrap();
+        let sink = KinesisService::new(config, client, cx).unwrap();
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 

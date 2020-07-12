@@ -317,7 +317,8 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let sink = KinesisFirehoseService::new(config, cx).unwrap();
+        let client = config.create_client(cx.resolver()).unwrap();
+        let sink = KinesisFirehoseService::new(config, client, cx).unwrap();
 
         let (input, events) = random_events_with_stream(100, 100);
 
