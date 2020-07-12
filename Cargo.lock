@@ -539,6 +539,16 @@ dependencies = [
 name = "codec"
 version = "0.1.0"
 dependencies = [
+ "bytes 0.5.4",
+ "serde_json",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "codec01"
+version = "0.1.0"
+dependencies = [
  "bytes 0.4.12",
  "serde_json",
  "tokio-codec",
@@ -5378,6 +5388,7 @@ dependencies = [
  "chrono",
  "cidr-utils",
  "codec",
+ "codec01",
  "colored",
  "criterion",
  "db-key",
@@ -5463,7 +5474,6 @@ dependencies = [
  "tempfile",
  "tokio 0.1.22",
  "tokio 0.2.21",
- "tokio-codec",
  "tokio-compat",
  "tokio-openssl 0.3.0",
  "tokio-retry",

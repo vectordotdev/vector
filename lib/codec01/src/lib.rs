@@ -1,9 +1,9 @@
 #[macro_use]
 extern crate tracing;
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use std::{cmp, io, usize};
-use tokio_util::codec::{Decoder, Encoder};
+use tokio_codec::{Decoder, Encoder};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BytesDelimitedCodec {
@@ -76,16 +76,16 @@ impl Decoder for BytesDelimitedCodec {
 
                     let newpos_index = pos + self.next_index;
                     self.next_index = 0;
-                    let mut frame = buf.split_to(newpos_index + 1);
+                    let frame = buf.split_to(newpos_index + 1);
 
                     trace!(
                         message = "decoding the frame.",
                         bytes_proccesed = frame.len()
                     );
 
-                    let frame = frame.split_to(frame.len() - 1);
+                    let frame = &frame[..frame.len() - 1];
 
-                    return Ok(Some(frame.freeze()));
+                    return Ok(Some(frame.into()));
                 }
                 (false, None) if buf.len() > self.max_length => {
                     // We reached the max length without finding the
@@ -114,7 +114,7 @@ impl Decoder for BytesDelimitedCodec {
         let frame = match self.decode(buf)? {
             Some(frame) => Some(frame),
             None if !buf.is_empty() && !self.is_discarding => {
-                let frame = buf.split_to(buf.len());
+                let frame = buf.take();
                 self.next_index = 0;
 
                 Some(frame.into())
@@ -126,14 +126,11 @@ impl Decoder for BytesDelimitedCodec {
     }
 }
 
-impl<T> Encoder<T> for BytesDelimitedCodec
-where
-    T: AsRef<[u8]>,
-{
+impl Encoder for BytesDelimitedCodec {
+    type Item = Bytes;
     type Error = io::Error;
 
-    fn encode(&mut self, item: T, buf: &mut BytesMut) -> Result<(), io::Error> {
-        let item = item.as_ref();
+    fn encode(&mut self, item: Bytes, buf: &mut BytesMut) -> Result<(), io::Error> {
         buf.reserve(item.len() + 1);
         buf.put(item);
         buf.put_u8(self.delim);

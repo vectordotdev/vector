@@ -5,14 +5,14 @@ use crate::{
     tls::TlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
-use bytes05::Bytes;
+use bytes05::{Bytes, BytesMut};
 use chrono::Utc;
-use codec::{self, BytesDelimitedCodec};
+use codec::BytesDelimitedCodec;
 use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::net::SocketAddr;
-use tokio_codec::Decoder;
+use tokio_util::codec::Decoder;
 use warp::http::{HeaderMap, HeaderValue, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -103,9 +103,8 @@ fn add_headers(
     events
 }
 
-fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<bytes::Bytes, ErrorMessage>> {
-    // TODO: remove on bytes 0.4 => 0.5 update
-    let mut body = bytes::BytesMut::new();
+fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>> {
+    let mut body = BytesMut::new();
     body.extend_from_slice(&buf);
 
     let mut decoder = BytesDelimitedCodec::new(b'\n');
@@ -116,11 +115,11 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<bytes::Bytes, ErrorM
                 format!("Bad request: {}", e),
             ))),
             Ok(Some(b)) => Some(Ok(b)),
-            Ok(None) => None, //actually done
+            Ok(None) => None, // actually done
         }
     })
     .filter(|s| match s {
-        //filter empty lines
+        // filter empty lines
         Ok(b) => !b.is_empty(),
         _ => true,
     })

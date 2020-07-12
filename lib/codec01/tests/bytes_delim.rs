@@ -1,7 +1,7 @@
 use bytes::{BufMut, BytesMut};
-use codec::BytesDelimitedCodec;
+use codec01::BytesDelimitedCodec;
 use std::collections::HashMap;
-use tokio_util::codec::{Decoder, Encoder};
+use tokio_codec::{Decoder, Encoder};
 
 #[test]
 fn bytes_delim_decod() {
@@ -16,7 +16,7 @@ fn bytes_delim_encode() {
     let mut codec = BytesDelimitedCodec::new(b'\n');
 
     let mut buf = BytesMut::new();
-    codec.encode(b"abc", &mut buf).unwrap();
+    codec.encode("abc".into(), &mut buf).unwrap();
 
     assert_eq!(b"abc\n", &buf[..]);
 }
@@ -48,9 +48,9 @@ fn bytes_decoder_discard_repeat() {
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
-    buf.put(&b"aa"[..]);
+    buf.put("aa");
     assert!(codec.decode(buf).unwrap().is_none());
-    buf.put(&b"a"[..]);
+    buf.put("a");
     assert!(codec.decode(buf).unwrap().is_none());
 }
 
