@@ -3386,6 +3386,64 @@ module.exports = {
     },
     {
       "author_github": "https://github.com/hoverbear",
+      "date": "2020-05-04",
+      "description": "One step closer to Vector replacing `awk` and `sed`!",
+      "hide_on_release_notes": false,
+      "id": "2020-05-04-shutdown-vector-if-all-sources-finish",
+      "path": "website/highlights/2020-05-04-shutdown-vector-if-all-sources-finish.md",
+      "permalink": "/highlights/2020-05-04-shutdown-vector-if-all-sources-finish/",
+      "tags": [
+        "type: enhancement",
+        "source: stdin"
+      ],
+      "title": "Vector gracefully exits when specific sources finish"
+    },
+    {
+      "author_github": "https://github.com/hoverbear",
+      "date": "2020-05-13",
+      "description": "Efficiently run multiple regexes in the same transform!",
+      "hide_on_release_notes": false,
+      "id": "2020-05-13-add-regexset-support-to-regex",
+      "path": "website/highlights/2020-05-13-add-regexset-support-to-regex.md",
+      "permalink": "/highlights/2020-05-13-add-regexset-support-to-regex/",
+      "tags": [
+        "type: enhancement",
+        "domain: transforms",
+        "transform: regex_parser"
+      ],
+      "title": "Add RegexSet support to regex"
+    },
+    {
+      "author_github": "https://github.com/hoverbear",
+      "date": "2020-05-20",
+      "description": "Vector can now bear authentication tokens for relevant components.",
+      "hide_on_release_notes": false,
+      "id": "2020-05-20-add-bearer-auth-strategy",
+      "path": "website/highlights/2020-05-20-add-bearer-auth-strategy.md",
+      "permalink": "/highlights/2020-05-20-add-bearer-auth-strategy/",
+      "tags": [
+        "type: enhancement",
+        "domain: sinks",
+        "sink: http"
+      ],
+      "title": "Now supporting the bearer auth strategy"
+    },
+    {
+      "author_github": "https://github.com/hoverbear",
+      "date": "2020-05-27",
+      "description": "Complicated PEM? No PEM-blem with Vector!",
+      "hide_on_release_notes": false,
+      "id": "2020-05-27-add-support-for-loading-multiple-cas",
+      "path": "website/highlights/2020-05-27-add-support-for-loading-multiple-cas.md",
+      "permalink": "/highlights/2020-05-27-add-support-for-loading-multiple-cas/",
+      "tags": [
+        "type: enhancement",
+        "source: socket"
+      ],
+      "title": "Support for loading multiple CAs"
+    },
+    {
+      "author_github": "https://github.com/hoverbear",
       "date": "2020-06-18",
       "description": "Vector once again follows the guidance of the host on DNS lookups.",
       "hide_on_release_notes": false,
@@ -3395,7 +3453,7 @@ module.exports = {
       "tags": [
         "type: breaking change"
       ],
-      "title": "Remove custom DNS resolution"
+      "title": "Removal custom DNS resolution"
     }
   ],
   "installation": {
@@ -3830,7 +3888,7 @@ module.exports = {
     "tags": [
       "type: breaking change"
     ],
-    "title": "Remove custom DNS resolution"
+    "title": "Removal custom DNS resolution"
   },
   "latest_post": {
     "author_github": "https://github.com/lukesteensen",
@@ -4865,7 +4923,7 @@ module.exports = {
         "deletions_count": 6,
         "description": "Shutdown Vector if all sources finish",
         "files_count": 4,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-05-04-shutdown-vector-if-all-sources-finish/",
         "insertions_count": 70,
         "message": "enhancement(topology): Shutdown Vector if all sources finish (#2533)",
         "pr_number": 2533,
@@ -5569,7 +5627,7 @@ module.exports = {
         "deletions_count": 55,
         "description": "Add RegexSet support to regex",
         "files_count": 8,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-05-13-add-regexset-support-to-regex/",
         "insertions_count": 161,
         "message": "enhancement(regex_parser transform): Add RegexSet support to regex (#2493)",
         "pr_number": 2493,
@@ -5933,7 +5991,7 @@ module.exports = {
         "deletions_count": 14,
         "description": "add bearer auth strategy",
         "files_count": 9,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-05-20-add-bearer-auth-strategy/",
         "insertions_count": 149,
         "message": "enhancement(http sink): add bearer auth strategy (#2607)",
         "pr_number": 2607,
@@ -6202,7 +6260,7 @@ module.exports = {
         "deletions_count": 73,
         "description": "Add support for loading multiple CAs",
         "files_count": 7,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-05-27-add-support-for-loading-multiple-cas/",
         "insertions_count": 286,
         "message": "enhancement(security): Add support for loading multiple CAs (#2616)",
         "pr_number": 2616,
@@ -9114,6 +9172,64 @@ module.exports = {
     "highlights": [
       {
         "author_github": "https://github.com/hoverbear",
+        "date": "2020-05-04",
+        "description": "One step closer to Vector replacing `awk` and `sed`!",
+        "hide_on_release_notes": false,
+        "id": "2020-05-04-shutdown-vector-if-all-sources-finish",
+        "path": "website/highlights/2020-05-04-shutdown-vector-if-all-sources-finish.md",
+        "permalink": "/highlights/2020-05-04-shutdown-vector-if-all-sources-finish/",
+        "tags": [
+          "type: enhancement",
+          "source: stdin"
+        ],
+        "title": "Vector gracefully exits when specific sources finish"
+      },
+      {
+        "author_github": "https://github.com/hoverbear",
+        "date": "2020-05-13",
+        "description": "Efficiently run multiple regexes in the same transform!",
+        "hide_on_release_notes": false,
+        "id": "2020-05-13-add-regexset-support-to-regex",
+        "path": "website/highlights/2020-05-13-add-regexset-support-to-regex.md",
+        "permalink": "/highlights/2020-05-13-add-regexset-support-to-regex/",
+        "tags": [
+          "type: enhancement",
+          "domain: transforms",
+          "transform: regex_parser"
+        ],
+        "title": "Add RegexSet support to regex"
+      },
+      {
+        "author_github": "https://github.com/hoverbear",
+        "date": "2020-05-20",
+        "description": "Vector can now bear authentication tokens for relevant components.",
+        "hide_on_release_notes": false,
+        "id": "2020-05-20-add-bearer-auth-strategy",
+        "path": "website/highlights/2020-05-20-add-bearer-auth-strategy.md",
+        "permalink": "/highlights/2020-05-20-add-bearer-auth-strategy/",
+        "tags": [
+          "type: enhancement",
+          "domain: sinks",
+          "sink: http"
+        ],
+        "title": "Now supporting the bearer auth strategy"
+      },
+      {
+        "author_github": "https://github.com/hoverbear",
+        "date": "2020-05-27",
+        "description": "Complicated PEM? No PEM-blem with Vector!",
+        "hide_on_release_notes": false,
+        "id": "2020-05-27-add-support-for-loading-multiple-cas",
+        "path": "website/highlights/2020-05-27-add-support-for-loading-multiple-cas.md",
+        "permalink": "/highlights/2020-05-27-add-support-for-loading-multiple-cas/",
+        "tags": [
+          "type: enhancement",
+          "source: socket"
+        ],
+        "title": "Support for loading multiple CAs"
+      },
+      {
+        "author_github": "https://github.com/hoverbear",
         "date": "2020-06-18",
         "description": "Vector once again follows the guidance of the host on DNS lookups.",
         "hide_on_release_notes": false,
@@ -9123,7 +9239,7 @@ module.exports = {
         "tags": [
           "type: breaking change"
         ],
-        "title": "Remove custom DNS resolution"
+        "title": "Removal custom DNS resolution"
       }
     ],
     "insertions_count": 42685,
@@ -10190,7 +10306,7 @@ module.exports = {
           "deletions_count": 6,
           "description": "Shutdown Vector if all sources finish",
           "files_count": 4,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-05-04-shutdown-vector-if-all-sources-finish/",
           "insertions_count": 70,
           "message": "enhancement(topology): Shutdown Vector if all sources finish (#2533)",
           "pr_number": 2533,
@@ -10894,7 +11010,7 @@ module.exports = {
           "deletions_count": 55,
           "description": "Add RegexSet support to regex",
           "files_count": 8,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-05-13-add-regexset-support-to-regex/",
           "insertions_count": 161,
           "message": "enhancement(regex_parser transform): Add RegexSet support to regex (#2493)",
           "pr_number": 2493,
@@ -11258,7 +11374,7 @@ module.exports = {
           "deletions_count": 14,
           "description": "add bearer auth strategy",
           "files_count": 9,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-05-20-add-bearer-auth-strategy/",
           "insertions_count": 149,
           "message": "enhancement(http sink): add bearer auth strategy (#2607)",
           "pr_number": 2607,
@@ -11527,7 +11643,7 @@ module.exports = {
           "deletions_count": 73,
           "description": "Add support for loading multiple CAs",
           "files_count": 7,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-05-27-add-support-for-loading-multiple-cas/",
           "insertions_count": 286,
           "message": "enhancement(security): Add support for loading multiple CAs (#2616)",
           "pr_number": 2616,
@@ -14439,6 +14555,64 @@ module.exports = {
       "highlights": [
         {
           "author_github": "https://github.com/hoverbear",
+          "date": "2020-05-04",
+          "description": "One step closer to Vector replacing `awk` and `sed`!",
+          "hide_on_release_notes": false,
+          "id": "2020-05-04-shutdown-vector-if-all-sources-finish",
+          "path": "website/highlights/2020-05-04-shutdown-vector-if-all-sources-finish.md",
+          "permalink": "/highlights/2020-05-04-shutdown-vector-if-all-sources-finish/",
+          "tags": [
+            "type: enhancement",
+            "source: stdin"
+          ],
+          "title": "Vector gracefully exits when specific sources finish"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
+          "date": "2020-05-13",
+          "description": "Efficiently run multiple regexes in the same transform!",
+          "hide_on_release_notes": false,
+          "id": "2020-05-13-add-regexset-support-to-regex",
+          "path": "website/highlights/2020-05-13-add-regexset-support-to-regex.md",
+          "permalink": "/highlights/2020-05-13-add-regexset-support-to-regex/",
+          "tags": [
+            "type: enhancement",
+            "domain: transforms",
+            "transform: regex_parser"
+          ],
+          "title": "Add RegexSet support to regex"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
+          "date": "2020-05-20",
+          "description": "Vector can now bear authentication tokens for relevant components.",
+          "hide_on_release_notes": false,
+          "id": "2020-05-20-add-bearer-auth-strategy",
+          "path": "website/highlights/2020-05-20-add-bearer-auth-strategy.md",
+          "permalink": "/highlights/2020-05-20-add-bearer-auth-strategy/",
+          "tags": [
+            "type: enhancement",
+            "domain: sinks",
+            "sink: http"
+          ],
+          "title": "Now supporting the bearer auth strategy"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
+          "date": "2020-05-27",
+          "description": "Complicated PEM? No PEM-blem with Vector!",
+          "hide_on_release_notes": false,
+          "id": "2020-05-27-add-support-for-loading-multiple-cas",
+          "path": "website/highlights/2020-05-27-add-support-for-loading-multiple-cas.md",
+          "permalink": "/highlights/2020-05-27-add-support-for-loading-multiple-cas/",
+          "tags": [
+            "type: enhancement",
+            "source: socket"
+          ],
+          "title": "Support for loading multiple CAs"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
           "date": "2020-06-18",
           "description": "Vector once again follows the guidance of the host on DNS lookups.",
           "hide_on_release_notes": false,
@@ -14448,7 +14622,7 @@ module.exports = {
           "tags": [
             "type: breaking change"
           ],
-          "title": "Remove custom DNS resolution"
+          "title": "Removal custom DNS resolution"
         }
       ],
       "insertions_count": 42685,

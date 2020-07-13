@@ -184,11 +184,11 @@ Or use your own [preferred method][docs.installation].
 
 ## Latest Highlights
 
-* [2020/06/18 - Remove custom DNS resolution](https://vector.dev/highlights/2020-06-18-remove-custom-dns-resolution/) - available in [0.10.0][urls.vector_download]
-* [2020/04/20 - Improved Shutdown](https://vector.dev/highlights/2020-04-20-improved-shutdown/) - available in [0.9.0][urls.vector_download]
-* [2020/04/17 - 4 New Sinks!](https://vector.dev/highlights/2020-04-17-new-sinks/) - available in [0.9.0][urls.vector_download]
-* [2020/04/09 - Set the Lua transform `search_dirs` option to Vector's config dir by default](https://vector.dev/highlights/2020-04-09-set-search_dirs-to-config-dirs-by-default/) - available in [0.9.0][urls.vector_download]
-* [2020/04/09 - ACL is now optional for the Google Cloud Storage sink](https://vector.dev/highlights/2020-04-09-make-acl-optional/) - available in [0.9.0][urls.vector_download]
+* [2020/06/18 - Removal custom DNS resolution](https://vector.dev/highlights/2020-06-18-remove-custom-dns-resolution/) - available in [0.10.0][urls.vector_download]
+* [2020/05/27 - Support for loading multiple CAs](https://vector.dev/highlights/2020-05-27-add-support-for-loading-multiple-cas/) - available in [0.10.0][urls.vector_download]
+* [2020/05/20 - Now supporting the bearer auth strategy](https://vector.dev/highlights/2020-05-20-add-bearer-auth-strategy/) - available in [0.10.0][urls.vector_download]
+* [2020/05/13 - Add RegexSet support to regex](https://vector.dev/highlights/2020-05-13-add-regexset-support-to-regex/) - available in [0.10.0][urls.vector_download]
+* [2020/05/04 - Vector gracefully exits when specific sources finish](https://vector.dev/highlights/2020-05-04-shutdown-vector-if-all-sources-finish/) - available in [0.10.0][urls.vector_download]
 
 [view all...][urls.vector_highlights]
 
