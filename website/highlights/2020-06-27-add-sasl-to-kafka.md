@@ -7,14 +7,12 @@ author_github: "https://github.com/hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2897]
 release: "0.10.0"
-tags: ["type: new feature","domain: sinks","sink: kafka"]
+tags: ["type: enhancement","domain: sinks","sink: kafka"]
 ---
 
 The Kafka source and sink now support [SASL authentication][urls.kafka_sasl].
 
 You can review the option in the [component docs][urls.vector_sink_kafka_sasl].
-
-
 
 ```diff title="vector.toml"
   [sources.source0]

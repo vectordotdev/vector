@@ -3387,7 +3387,7 @@ module.exports = {
     {
       "author_github": "https://github.com/hoverbear",
       "date": "2020-05-04",
-      "description": "One step closer to Vector replacing `awk` and `sed`!",
+      "description": "One step closer to Vector replacing awk and sed!",
       "hide_on_release_notes": false,
       "id": "2020-05-04-shutdown-vector-if-all-sources-finish",
       "path": "website/highlights/2020-05-04-shutdown-vector-if-all-sources-finish.md",
@@ -3444,6 +3444,19 @@ module.exports = {
     },
     {
       "author_github": "https://github.com/hoverbear",
+      "date": "2020-06-10",
+      "description": "A little polish on a useful feature.",
+      "hide_on_release_notes": false,
+      "id": "2020-06-10-consolidate-and-beautify-validate",
+      "path": "website/highlights/2020-06-10-consolidate-and-beautify-validate.md",
+      "permalink": "/highlights/2020-06-10-consolidate-and-beautify-validate/",
+      "tags": [
+        "type: enhancement"
+      ],
+      "title": "Beautification of the validate command"
+    },
+    {
+      "author_github": "https://github.com/hoverbear",
       "date": "2020-06-11",
       "description": "Vector can be optionally built with an integrated WASM runtime",
       "hide_on_release_notes": false,
@@ -3478,11 +3491,25 @@ module.exports = {
       "path": "website/highlights/2020-06-27-add-sasl-to-kafka.md",
       "permalink": "/highlights/2020-06-27-add-sasl-to-kafka/",
       "tags": [
-        "type: new feature",
+        "type: enhancement",
         "domain: sinks",
         "sink: kafka"
       ],
       "title": "Kafka components support SASL"
+    },
+    {
+      "author_github": "https://github.com/hoverbear",
+      "date": "2020-06-29",
+      "description": "Vector's batching and buffering matures.",
+      "hide_on_release_notes": false,
+      "id": "2020-06-29-batch-buffer-rework",
+      "path": "website/highlights/2020-06-29-batch-buffer-rework.md",
+      "permalink": "/highlights/2020-06-29-batch-buffer-rework/",
+      "tags": [
+        "type: enhancement",
+        "domain: sinks"
+      ],
+      "title": "Batching and buffering reworked"
     }
   ],
   "installation": {
@@ -3908,18 +3935,17 @@ module.exports = {
   },
   "latest_highlight": {
     "author_github": "https://github.com/hoverbear",
-    "date": "2020-06-27",
-    "description": "Vector has a new way to authenticate with Kafka!",
+    "date": "2020-06-29",
+    "description": "Vector's batching and buffering matures.",
     "hide_on_release_notes": false,
-    "id": "2020-06-27-add-sasl-to-kafka",
-    "path": "website/highlights/2020-06-27-add-sasl-to-kafka.md",
-    "permalink": "/highlights/2020-06-27-add-sasl-to-kafka/",
+    "id": "2020-06-29-batch-buffer-rework",
+    "path": "website/highlights/2020-06-29-batch-buffer-rework.md",
+    "permalink": "/highlights/2020-06-29-batch-buffer-rework/",
     "tags": [
-      "type: new feature",
-      "domain: sinks",
-      "sink: kafka"
+      "type: enhancement",
+      "domain: sinks"
     ],
-    "title": "Kafka components support SASL"
+    "title": "Batching and buffering reworked"
   },
   "latest_post": {
     "author_github": "https://github.com/lukesteensen",
@@ -7056,7 +7082,7 @@ module.exports = {
         "deletions_count": 266,
         "description": "Consolidate and beautify `validate` ",
         "files_count": 14,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-06-10-consolidate-and-beautify-validate/",
         "insertions_count": 500,
         "message": "enhancement(cli): Consolidate and beautify `validate`  (#2622)",
         "pr_number": 2622,
@@ -8357,7 +8383,7 @@ module.exports = {
         "deletions_count": 680,
         "description": "Batch buffer rework",
         "files_count": 73,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-06-29-batch-buffer-rework/",
         "insertions_count": 1532,
         "message": "enhancement(sinks): Batch buffer rework (#2866)",
         "pr_number": 2866,
@@ -9204,7 +9230,7 @@ module.exports = {
       {
         "author_github": "https://github.com/hoverbear",
         "date": "2020-05-04",
-        "description": "One step closer to Vector replacing `awk` and `sed`!",
+        "description": "One step closer to Vector replacing awk and sed!",
         "hide_on_release_notes": false,
         "id": "2020-05-04-shutdown-vector-if-all-sources-finish",
         "path": "website/highlights/2020-05-04-shutdown-vector-if-all-sources-finish.md",
@@ -9261,6 +9287,19 @@ module.exports = {
       },
       {
         "author_github": "https://github.com/hoverbear",
+        "date": "2020-06-10",
+        "description": "A little polish on a useful feature.",
+        "hide_on_release_notes": false,
+        "id": "2020-06-10-consolidate-and-beautify-validate",
+        "path": "website/highlights/2020-06-10-consolidate-and-beautify-validate.md",
+        "permalink": "/highlights/2020-06-10-consolidate-and-beautify-validate/",
+        "tags": [
+          "type: enhancement"
+        ],
+        "title": "Beautification of the validate command"
+      },
+      {
+        "author_github": "https://github.com/hoverbear",
         "date": "2020-06-11",
         "description": "Vector can be optionally built with an integrated WASM runtime",
         "hide_on_release_notes": false,
@@ -9295,11 +9334,25 @@ module.exports = {
         "path": "website/highlights/2020-06-27-add-sasl-to-kafka.md",
         "permalink": "/highlights/2020-06-27-add-sasl-to-kafka/",
         "tags": [
-          "type: new feature",
+          "type: enhancement",
           "domain: sinks",
           "sink: kafka"
         ],
         "title": "Kafka components support SASL"
+      },
+      {
+        "author_github": "https://github.com/hoverbear",
+        "date": "2020-06-29",
+        "description": "Vector's batching and buffering matures.",
+        "hide_on_release_notes": false,
+        "id": "2020-06-29-batch-buffer-rework",
+        "path": "website/highlights/2020-06-29-batch-buffer-rework.md",
+        "permalink": "/highlights/2020-06-29-batch-buffer-rework/",
+        "tags": [
+          "type: enhancement",
+          "domain: sinks"
+        ],
+        "title": "Batching and buffering reworked"
       }
     ],
     "insertions_count": 42685,
@@ -12468,7 +12521,7 @@ module.exports = {
           "deletions_count": 266,
           "description": "Consolidate and beautify `validate` ",
           "files_count": 14,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-06-10-consolidate-and-beautify-validate/",
           "insertions_count": 500,
           "message": "enhancement(cli): Consolidate and beautify `validate`  (#2622)",
           "pr_number": 2622,
@@ -13769,7 +13822,7 @@ module.exports = {
           "deletions_count": 680,
           "description": "Batch buffer rework",
           "files_count": 73,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-06-29-batch-buffer-rework/",
           "insertions_count": 1532,
           "message": "enhancement(sinks): Batch buffer rework (#2866)",
           "pr_number": 2866,
@@ -14616,7 +14669,7 @@ module.exports = {
         {
           "author_github": "https://github.com/hoverbear",
           "date": "2020-05-04",
-          "description": "One step closer to Vector replacing `awk` and `sed`!",
+          "description": "One step closer to Vector replacing awk and sed!",
           "hide_on_release_notes": false,
           "id": "2020-05-04-shutdown-vector-if-all-sources-finish",
           "path": "website/highlights/2020-05-04-shutdown-vector-if-all-sources-finish.md",
@@ -14673,6 +14726,19 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/hoverbear",
+          "date": "2020-06-10",
+          "description": "A little polish on a useful feature.",
+          "hide_on_release_notes": false,
+          "id": "2020-06-10-consolidate-and-beautify-validate",
+          "path": "website/highlights/2020-06-10-consolidate-and-beautify-validate.md",
+          "permalink": "/highlights/2020-06-10-consolidate-and-beautify-validate/",
+          "tags": [
+            "type: enhancement"
+          ],
+          "title": "Beautification of the validate command"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
           "date": "2020-06-11",
           "description": "Vector can be optionally built with an integrated WASM runtime",
           "hide_on_release_notes": false,
@@ -14707,11 +14773,25 @@ module.exports = {
           "path": "website/highlights/2020-06-27-add-sasl-to-kafka.md",
           "permalink": "/highlights/2020-06-27-add-sasl-to-kafka/",
           "tags": [
-            "type: new feature",
+            "type: enhancement",
             "domain: sinks",
             "sink: kafka"
           ],
           "title": "Kafka components support SASL"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
+          "date": "2020-06-29",
+          "description": "Vector's batching and buffering matures.",
+          "hide_on_release_notes": false,
+          "id": "2020-06-29-batch-buffer-rework",
+          "path": "website/highlights/2020-06-29-batch-buffer-rework.md",
+          "permalink": "/highlights/2020-06-29-batch-buffer-rework/",
+          "tags": [
+            "type: enhancement",
+            "domain: sinks"
+          ],
+          "title": "Batching and buffering reworked"
         }
       ],
       "insertions_count": 42685,
