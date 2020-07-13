@@ -85,13 +85,12 @@ pub struct TimeHistogram {
 }
 
 impl TimeHistogram {
-    pub fn add(&mut self, index: usize) {
-        let now = Instant::now();
+    pub fn add(&mut self, index: usize, instant: Instant) {
         if let Some(last) = self.last_time {
-            let duration = (now - last).as_secs_f64();
+            let duration = instant.saturating_duration_since(last).as_secs_f64();
             self.histogram.add(index, duration);
         }
-        self.last_time = Some(now);
+        self.last_time = Some(instant);
     }
 }
 
@@ -118,8 +117,8 @@ pub struct LevelTimeHistogram {
 }
 
 impl LevelTimeHistogram {
-    pub fn adjust(&mut self, adjustment: isize) -> usize {
-        self.histogram.add(self.level);
+    pub fn adjust(&mut self, adjustment: isize, instant: Instant) -> usize {
+        self.histogram.add(self.level, instant);
         self.level = ((self.level as isize) + adjustment) as usize;
         self.level
     }
@@ -149,12 +148,23 @@ impl Display for LevelTimeHistogram {
 pub struct WeightedSum {
     total: f64,
     weights: f64,
+    min: Option<f64>,
+    max: Option<f64>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct WeightedSumStats {
+    pub min: f64,
+    pub max: f64,
+    pub mean: f64,
 }
 
 impl WeightedSum {
     pub fn add(&mut self, value: f64, weight: f64) {
         self.total += value * weight;
         self.weights += weight;
+        self.max = opt_max(self.max, value);
+        self.min = opt_min(self.min, value);
     }
 
     pub fn mean(&self) -> Option<f64> {
@@ -163,5 +173,55 @@ impl WeightedSum {
         } else {
             Some(self.total / self.weights)
         }
+    }
+
+    pub fn stats(&self) -> Option<WeightedSumStats> {
+        self.mean().map(|mean| WeightedSumStats {
+            mean,
+            min: self.min.unwrap(),
+            max: self.min.unwrap(),
+        })
+    }
+}
+
+fn opt_max(opt: Option<f64>, value: f64) -> Option<f64> {
+    Some(match opt {
+        None => value,
+        Some(s) if s > value => s,
+        _ => value,
+    })
+}
+
+fn opt_min(opt: Option<f64>, value: f64) -> Option<f64> {
+    Some(match opt {
+        None => value,
+        Some(s) if s < value => s,
+        _ => value,
+    })
+}
+
+/// A TimeWeightedSum is a wrapper around WeightedSum that keeps track
+/// of the last Instant a value was observed, and uses the duration
+/// since that last observance to weight the added value.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TimeWeightedSum {
+    sum: WeightedSum,
+    last_observation: Option<Instant>,
+}
+
+impl TimeWeightedSum {
+    pub fn add(&mut self, value: f64, instant: Instant) {
+        if let Some(then) = self.last_observation {
+            let duration = instant.saturating_duration_since(then).as_secs_f64();
+            self.sum.add(value, duration);
+        }
+        self.last_observation = Some(instant);
+    }
+}
+
+impl Deref for TimeWeightedSum {
+    type Target = WeightedSum;
+    fn deref(&self) -> &Self::Target {
+        &self.sum
     }
 }
