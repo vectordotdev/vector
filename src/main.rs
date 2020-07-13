@@ -123,7 +123,7 @@ fn main() {
         );
 
         let diff = topology::ConfigDiff::initial(&config);
-        let pieces = topology::validate(&config, &diff).unwrap_or_else(|| {
+        let pieces = topology::validate(&config, &diff).await.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
 

@@ -47,7 +47,7 @@ pub async fn start(
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let diff = ConfigDiff::initial(&config);
-    if let Some(pieces) = validate(&config, &diff) {
+    if let Some(pieces) = validate(&config, &diff).await {
         start_validated(config, diff, pieces, require_healthy).await
     } else {
         None
@@ -85,8 +85,8 @@ pub async fn start_validated(
     Some((running_topology, abort_rx))
 }
 
-pub fn validate(config: &Config, diff: &ConfigDiff) -> Option<Pieces> {
-    match builder::check_build(config, diff) {
+pub async fn validate(config: &Config, diff: &ConfigDiff) -> Option<Pieces> {
+    match builder::check_build(config, diff).await {
         Err(errors) => {
             for error in errors {
                 error!("Configuration error: {}", error);
@@ -248,7 +248,7 @@ impl RunningTopology {
         self.shutdown_diff(&diff).await;
 
         // Now let's actually build the new pieces.
-        if let Some(mut new_pieces) = validate(&new_config, &diff) {
+        if let Some(mut new_pieces) = validate(&new_config, &diff).await {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
@@ -264,7 +264,7 @@ impl RunningTopology {
         // We need to rebuild the removed.
         info!("Rebuilding old configuration.");
         let diff = diff.flip();
-        if let Some(mut new_pieces) = validate(&self.config, &diff) {
+        if let Some(mut new_pieces) = validate(&self.config, &diff).await {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
