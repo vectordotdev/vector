@@ -33,7 +33,7 @@ rescue Bundler::GemNotFound => e
 
         cd scripts
         bundle install
-    
+
     Alternatively, you can use our Docker environment via
 
         make environment
