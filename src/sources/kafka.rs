@@ -2,19 +2,19 @@ use crate::{
     event::{self, Event},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
-    stream::StreamExt,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::compat::Compat;
-use futures01::{future, sync::mpsc, Future, Poll, Sink, Stream};
-use owning_ref::OwningHandle;
+use futures::{
+    compat::{Compat, Future01CompatExt},
+    FutureExt, StreamExt,
+};
+use futures01::{sync::mpsc, Sink};
 use rdkafka::{
     config::ClientConfig,
-    consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer},
-    error::KafkaError,
-    message::{BorrowedMessage, Message},
+    consumer::{Consumer, StreamConsumer},
+    message::Message,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -101,72 +101,87 @@ fn kafka_source(
     out: mpsc::Sender<Event>,
 ) -> crate::Result<super::Source> {
     let key_field = config.key_field.clone();
+    let consumer = Arc::new(create_consumer(config)?);
 
-    let consumer = Arc::new(create_consumer(&config)?);
-    let source = future::lazy(move || {
-        let consumer_ref = Arc::clone(&consumer);
-
-        // See https://github.com/fede1024/rust-rdkafka/issues/85#issuecomment-439141656
-        let stream = OwnedConsumerStream {
-            upstream: OwningHandle::new_with_fn(consumer, |c| {
-                let cf = unsafe { &*c };
-                Box::new(Compat::new(cf.start()))
-            }),
-        };
-
-        stream
-            .take_until(shutdown)
+    let fut = async move {
+        Arc::clone(&consumer)
+            .start()
+            .take_until(shutdown.clone().compat())
             .then(move |message| {
-                match message {
-                    Err(e) => Err(error!(message = "Error reading message from Kafka", error = ?e)),
-                    Ok(msg) => {
-                        let payload = match msg.payload_view::<[u8]>() {
-                            None => return Err(()), // skip messages with empty payload
-                            Some(Err(e)) => {
-                                return Err(error!(message = "Cannot extract payload", error = ?e))
-                            }
-                            Some(Ok(payload)) => Bytes::from(payload),
-                        };
-                        let mut event = Event::new_empty_log();
-                        let log = event.as_mut_log();
+                let key_field = key_field.clone();
+                let consumer = Arc::clone(&consumer);
 
-                        log.insert(event::log_schema().message_key().clone(), payload);
-
-                        // Extract timestamp from kafka message
-                        let timestamp = msg
-                            .timestamp()
-                            .to_millis()
-                            .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
-                            .unwrap_or_else(Utc::now);
-                        log.insert(event::log_schema().timestamp_key().clone(), timestamp);
-
-                        // Add source type
-                        log.insert(event::log_schema().source_type_key(), "kafka");
-
-                        if let Some(key_field) = &key_field {
-                            match msg.key_view::<[u8]>() {
-                                None => (),
-                                Some(Err(e)) => {
-                                    return Err(error!(message = "Cannot extract key", error = ?e))
-                                }
-                                Some(Ok(key)) => {
-                                    log.insert(key_field.clone(), key);
-                                }
-                            }
+                async move {
+                    match message {
+                        Err(e) => {
+                            Err(error!(message = "Error reading message from Kafka", error = ?e))
                         }
+                        Ok(msg) => {
+                            let payload = match msg.payload_view::<[u8]>() {
+                                None => return Err(()), // skip messages with empty payload
+                                Some(Err(e)) => {
+                                    return Err(
+                                        error!(message = "Cannot extract payload", error = ?e),
+                                    )
+                                }
+                                Some(Ok(payload)) => Bytes::from(payload),
+                            };
+                            let mut event = Event::new_empty_log();
+                            let log = event.as_mut_log();
 
-                        consumer_ref.store_offset(&msg).map_err(
-                            |e| error!(message = "Cannot store offset for the message", error = ?e),
-                        )?;
-                        Ok(event)
+                            log.insert(event::log_schema().message_key().clone(), payload);
+
+                            // Extract timestamp from kafka message
+                            let timestamp = msg
+                                .timestamp()
+                                .to_millis()
+                                .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
+                                .unwrap_or_else(Utc::now);
+                            log.insert(event::log_schema().timestamp_key().clone(), timestamp);
+
+                            // Add source type
+                            log.insert(event::log_schema().source_type_key(), "kafka");
+
+                            if let Some(key_field) = &key_field {
+                                match msg.key_view::<[u8]>() {
+                                    None => (),
+                                    Some(Err(e)) => {
+                                        return Err(
+                                            error!(message = "Cannot extract key", error = ?e),
+                                        )
+                                    }
+                                    Some(Ok(key)) => {
+                                        log.insert(key_field.clone(), key);
+                                    }
+                                }
+                            }
+
+                            consumer.store_offset(&msg).map_err(|e| error!(message = "Cannot store offset for the message", error = ?e))?;
+                            Ok(event)
+                        }
                     }
                 }
             })
-            .forward(out.sink_map_err(|e| error!(message = "Error sending to sink", error = ?e)))
-            .map(|_| ())
-    });
+            // Not work =\
+            // .forward(
+            //     out.sink_compat()
+            //         .sink_map_err(|e| error!(message = "Error sending to sink", error = ?e)),
+            // )
+            .for_each(|item| {
+                let out = out.clone();
+                async move {
+                    if let Ok(item) = item {
+                        if let Err(e) = out.send(item).compat().await {
+                            error!(message = "Error sending to sink", error = ?e);
+                        }
+                    }
+                }
+            })
+            .await;
+        Ok(())
+    };
 
-    Ok(Box::new(source))
+    Ok(Box::new(Compat::new(fut.boxed())))
 }
 
 fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> {
@@ -200,22 +215,6 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> 
     consumer.subscribe(&topics).context(KafkaSubscribeError)?;
 
     Ok(consumer)
-}
-
-struct OwnedConsumerStream {
-    upstream: OwningHandle<
-        Arc<StreamConsumer>,
-        Box<Compat<MessageStream<'static, DefaultConsumerContext>>>,
-    >,
-}
-
-impl Stream for OwnedConsumerStream {
-    type Item = BorrowedMessage<'static>;
-    type Error = KafkaError;
-
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.upstream.poll()
-    }
 }
 
 #[cfg(test)]
