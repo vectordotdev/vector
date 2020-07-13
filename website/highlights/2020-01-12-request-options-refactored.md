@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-13"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Sink options have been refactored"
 description: "We've simplified and organized our sink options"
@@ -7,7 +7,13 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [1006, 1493, 1494, 1495]
 release: "0.7.0"
 hide_on_release_notes: false
-tags: ["type: breaking change", "domain: buffers", "domain: config", "domain: sinks"]
+tags:
+  [
+    "type: breaking change",
+    "domain: buffers",
+    "domain: config",
+    "domain: sinks",
+  ]
 ---
 
 In our preparation for 1.0 we took time to organize and cleanup our
@@ -16,26 +22,26 @@ request-based sink options. The specific changes include:
 1. `request_*` options have been moved under a `request` table.
 2. `retry_backoff_secs` must also be replaced with two new fields
    `retry_initial_backoff_secs` and `retry_max_duration_secs`.
-2. `batch_*` options have been moved under a `batch` table.
-3. `batch_size` has been relaced with either `batch.max_events` or
+3. `batch_*` options have been moved under a `batch` table.
+4. `batch_size` has been relaced with either `batch.max_events` or
    `batch.max_size` in order to clarify its purpose (capping discrete events or
    bytes respectively).
-3. `basic_auth` fields have been moved to a general purpose `auth` table
+5. `basic_auth` fields have been moved to a general purpose `auth` table
    complemented with a `strategy` field.
 
 These changes effect the following sinks:
 
-* `aws_cloudwatch_logs`
-* `aws_kinesis_firehose`
-* `aws_kinesis_streams`
-* `aws_s3`
-* `clickhouse`
-* `datadog_metrics`
-* `elasticsearch`
-* `gcp_pubsub`
-* `http`
-* `new_relic_logs`
-* `splunk_hec`
+- `aws_cloudwatch_logs`
+- `aws_kinesis_firehose`
+- `aws_kinesis_streams`
+- `aws_s3`
+- `clickhouse`
+- `datadog_metrics`
+- `elasticsearch`
+- `gcp_pubsub`
+- `http`
+- `new_relic_logs`
+- `splunk_hec`
 
 ## Upgrade Guide
 
@@ -62,6 +68,5 @@ These changes effect the following sinks:
 +    retry_initial_backoff_secs = 1
 +    retry_max_duration_secs = 10
 ```
-
 
 

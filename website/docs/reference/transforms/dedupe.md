@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-10"
+last_modified_on: "2020-07-13"
 component_title: "Dedupe events"
 description: "The Vector `dedupe` transform accepts and outputs `log` events, allowing you to prevent duplicate Events from being outputted by using an LRU cache."
 event_types: ["log"]
@@ -257,7 +257,6 @@ Fields with explicit null values will always be considered different than if
 that field was omitted entirely.  For example, if you run this transform with
 `fields.match = ["a"]`, the event "{a: null, b:5}" will be considered different
 than the event "{b:5}".
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

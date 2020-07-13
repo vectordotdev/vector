@@ -47,7 +47,6 @@ You can merge them with the following config:
 And if this doesn't do it, you can always fallback
 to our [`lua` transform][docs.transforms.lua].
 
-
 [docs.sources.docker#auto_partial_merge]: /docs/reference/sources/docker/#auto_partial_merge
 [docs.sources.file#multiline]: /docs/reference/sources/file/#multiline
 [docs.sources.file]: /docs/reference/sources/file/

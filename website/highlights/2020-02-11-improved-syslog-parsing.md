@@ -20,7 +20,6 @@ format you can always use the [`socket` source][docs.sources.socket] and the
 [`regex_parser` transform][docs.transforms.regex_parser] to roll your own
 collection parsing pipeline.
 
-
 [docs.sources.socket]: /docs/reference/sources/socket/
 [docs.sources.syslog]: /docs/reference/sources/syslog/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/

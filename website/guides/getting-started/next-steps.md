@@ -24,5 +24,4 @@ started:
   Unit Testing Your Configs
 </Jump>
 
-
 [guides.advanced]: /guides/advanced/

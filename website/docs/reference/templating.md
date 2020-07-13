@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-07-13"
 title: Templating
 description: Learn Vector's templating syntax used to creat dynamic values in Vector's configuration.
 status: beta
@@ -141,7 +142,6 @@ Nested fields can be accessed using Vector's
 ```text
 option = "{{ parent.child }}"
 ```
-
 
 [docs.data-model.log#timestamp]: /docs/about/data-model/log/#timestamp
 [docs.data-model.log]: /docs/about/data-model/log/

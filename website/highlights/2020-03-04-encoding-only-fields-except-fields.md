@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-17"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "New Encoding Options"
 description: "Vector now lets you whitelist, blacklist, and format fields when events are encoded"
@@ -13,10 +13,10 @@ tags: ["type: enhancement", "domain: sinks"]
 Vector has deprecated the root-level `encoding` option in favor of new
 `encoding.*` sub-options:
 
-* `encoding.only_fields` - Encode only the fields listed.
-* `encoding.except_fields` - Encode all fields except the ones listed.
-* `encoding.codec` - The codec to use (ex: `json`).
-* `encoding.timestamp_format` - Customize how timestamps are serialized.
+- `encoding.only_fields` - Encode only the fields listed.
+- `encoding.except_fields` - Encode all fields except the ones listed.
+- `encoding.codec` - The codec to use (ex: `json`).
+- `encoding.timestamp_format` - Customize how timestamps are serialized.
 
 ## Upgrade Guide
 
@@ -30,6 +30,5 @@ Updrading is easy:
 +  encoding.except_fields = ["_meta"] # optional
 +  encoding.timestamp_format = "rfc3339" # optional
 ```
-
 
 

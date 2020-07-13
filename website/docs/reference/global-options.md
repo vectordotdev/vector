@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-10"
+last_modified_on: "2020-07-13"
 title: Global Options
 description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---
@@ -190,7 +190,6 @@ Vector requires a [`data_dir`](#data_dir) value for on-disk operations. Currentl
 operation using this directory are Vector's on-disk buffers. Buffers, by
 default, are memory-based, but if you switch them to disk-based you'll need to
 specify a [`data_dir`](#data_dir).
-
 
 [docs.data-model.log#host]: /docs/about/data-model/log/#host
 [docs.data-model.log#message]: /docs/about/data-model/log/#message

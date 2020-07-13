@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-11"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/guides.json"
 title: Deploying Vector
 description: How to deploy Vector to your target environment
@@ -610,7 +610,6 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 </Tabs>
 </TabItem>
 </Tabs>
-
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.installation]: /docs/setup/installation/

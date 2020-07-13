@@ -107,7 +107,6 @@ Vector maintains special tags that are automatically updated whenever Vector is
 Vector's Docker source files are located
 [in it's Github repo][urls.vector_docker_source_files].
 
-
 [docs.administration]: https://vector.dev/docs/administration/
 [docs.configuration]: https://vector.dev/docs/setup/configuration/
 [docs.deployment]: https://vector.dev/docs/setup/deployment/

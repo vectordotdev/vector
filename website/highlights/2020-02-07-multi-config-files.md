@@ -21,5 +21,4 @@ vector -c ./configs/first.toml -c ./configs/second.toml -c ./more/*.toml
 [Subscribe to our newsletter][pages.community] and you'll be notified when we
 learn how to do this with human emotions.
 
-
 [pages.community]: /community/

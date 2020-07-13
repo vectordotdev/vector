@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-11"
+last_modified_on: "2020-07-13"
 title: Install Vector From Archives
 sidebar_label: From Archives
 description: Install Vector from pre-compiled archives
@@ -383,7 +383,6 @@ cp -av etc/systemd/vector.service /etc/systemd/system
 ### Updating
 
 Simply follow the same [installation instructions above](#installation).
-
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir

@@ -21,5 +21,4 @@ that shutdown is easily and correctly implemented. The result is not only faster
 shutdowns but much higher confidence that components in the future will reliably
 shutdown.
 
-
 [urls.pr_1994]: https://github.com/timberio/vector/pull/1994

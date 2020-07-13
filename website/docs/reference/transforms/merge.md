@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-10"
+last_modified_on: "2020-07-13"
 component_title: "Merge"
 description: "The Vector [`merge`](#merge) transform accepts and outputs `log` events, allowing you to merge partial log events into a single event."
 event_types: ["log"]
@@ -309,7 +309,6 @@ precisely these edge cases that this transform hopes to solve.
 
 If you're using this transform for a common use case, please consider
 [opening an issue][urls.new_feature_request] to let us know.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

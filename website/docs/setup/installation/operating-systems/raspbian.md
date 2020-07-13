@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-07-13"
 title: Install Vector On Raspbian
 sidebar_label: Raspbian
 description: Install Vector On Raspbian
@@ -140,7 +140,6 @@ compose!
 </Tabs>
 </TabItem>
 </Tabs>
-
 
 [docs.installation]: /docs/setup/installation/
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants

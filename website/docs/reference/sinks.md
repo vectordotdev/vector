@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-07-13"
 title: Sinks
 description: "Vector sinks fan-out logs and metrics data to a variety of downstream destinations. These could be exact services, like Elasticsearch, or generic protocols, like HTTP or TCP."
 sidebar_label: hidden
@@ -15,7 +16,6 @@ or outputting, this data.
 ---
 
 <VectorComponents titles={false} sources={false} transforms={false} />
-
 
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/

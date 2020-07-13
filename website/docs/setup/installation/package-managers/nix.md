@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-11"
+last_modified_on: "2020-07-13"
 title: Install Vector via Nix
 sidebar_label: Nix
 description: Install Vector through the Nix package manager
@@ -200,7 +200,6 @@ end
 
 Vector's Nix source files are located in the
 [Nix repo][urls.vector_nix_package].
-
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.deployment]: /docs/setup/deployment/
