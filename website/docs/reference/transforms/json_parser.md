@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-10"
+last_modified_on: "2020-07-13"
 component_title: "JSON Parser"
 description: "The Vector `json_parser` transform accepts and outputs `log` events, allowing you to parse a log field value as JSON."
 event_types: ["log"]
@@ -351,7 +351,6 @@ Parsing the `"message"` field would result the following structure:
 ```
 
 Notice that the `parent.child1` key was preserved.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

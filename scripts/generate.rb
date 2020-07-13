@@ -343,9 +343,9 @@ end
 erb_paths =
   Dir.glob("#{ROOT_DIR}/**/[^_]*.erb", File::FNM_DOTMATCH).
   to_a.
-  filter { |path| !path.start_with?("#{META_ROOT}/") }.
-  filter { |path| !path.start_with?("#{ROOT_DIR}/scripts") }.
-  filter { |path| !path.start_with?("#{ROOT_DIR}/distribution/nix") }
+  filter { |path| !path.start_with?("#{META_ROOT}/") || path.start_with?("#{META_ROOT}/.schemas/") }.
+  filter { |path| !path.start_with?("#{ROOT_DIR}/scripts/") }.
+  filter { |path| !path.start_with?("#{ROOT_DIR}/distribution/nix/") }
 
 #
 # Create missing .md files
@@ -366,7 +366,7 @@ metadata = Metadata.load!(META_ROOT, DOCS_ROOT, GUIDES_ROOT, PAGES_ROOT)
 templates = Templates.new(ROOT_DIR, metadata)
 root_erb_paths = erb_paths.select { |path| !templates.partial?(path) }
 
-Parallel.map(root_erb_paths, in_threads: Etc.nprocessors) do |template_path|
+Parallel.map(root_erb_paths.sort, in_threads: Etc.nprocessors) do |template_path|
   target_file = template_path.gsub(/^#{ROOT_DIR}\//, "").gsub(/\.erb$/, "")
   target_path = "#{ROOT_DIR}/#{target_file}"
   content = templates.render(target_file)

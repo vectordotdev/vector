@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "at_least_once"
 component_title: "STDIN"
 description: "The Vector `stdin` source ingests data through standard input (STDIN) and outputs `log` events."
@@ -233,7 +233,6 @@ You can learn more in the
 ### Line Delimiters
 
 Each line is read until a new line delimiter (the `0xA` byte) is found.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

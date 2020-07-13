@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-25"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "at_least_once"
 component_title: "HTTP"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
@@ -1229,7 +1229,6 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
 and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
 options.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

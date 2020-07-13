@@ -54,7 +54,6 @@ involved. This leads to fragmentation in the tooling used to build out these
 pipelines. Vector aims to solve this, and supporting Windows is a big step
 towards accomplishing that vision.
 
-
 [docs.operating-systems.windows]: /docs/setup/installation/operating-systems/windows/
 [docs.package-managers.msi]: /docs/setup/installation/package-managers/msi/
 [pages.community]: /community/

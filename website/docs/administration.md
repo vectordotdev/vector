@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-07-13"
 title: Administration
 description: "How to administer and operate Vector."
 sidebar_label: hidden
@@ -16,6 +17,5 @@ This section will cover adminsitrating and operating Vector.
 <Jump to="/docs/administration/tuning/">Tuning</Jump>
 <Jump to="/docs/administration/updating/">Updating</Jump>
 <Jump to="/docs/administration/validating/">Validating</Jump>
-
 
 

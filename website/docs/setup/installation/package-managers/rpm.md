@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-07-13"
 title: Install Vector via RPM
 sidebar_label: RPM
 description: Install Vector through the RPM package manager
@@ -260,7 +260,6 @@ Vector maintains special URLS that are automatically updated whenever Vector is
 
 Vector's RPM source files are located in
 [Vector's repo][urls.vector_rpm_source_files].
-
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.deployment]: /docs/setup/deployment/

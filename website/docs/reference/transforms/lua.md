@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-10"
+last_modified_on: "2020-07-13"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events, allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
@@ -775,7 +775,6 @@ Vector provides a [`search_dirs`](#search_dirs) option that allows you to specif
 paths that will be searched when using the [Lua `require`
 function][urls.lua_require]. If this option is not set, the directories of
 the [configuration files][docs.setup.configuration] will be used instead.
-
 
 [docs.about.data-model.log#arrays]: /docs/about/data-model/log/#arrays
 [docs.about.data-model.log#booleans]: /docs/about/data-model/log/#booleans

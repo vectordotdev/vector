@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "best_effort"
 component_title: "Docker"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
@@ -537,7 +537,6 @@ automatically merging these messages into a single message. You can turn this
 off via the [`auto_partial_merge`](#auto_partial_merge) option. Furthermore, you can adjust the marker
 that we use to determine if an event is partial via the
 `partial_event_marker_field` option.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

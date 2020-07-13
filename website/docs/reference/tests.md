@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-24"
+last_modified_on: "2020-07-13"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
@@ -873,7 +873,6 @@ transform will be checked against a table of conditions.
 
 </Field>
 </Fields>
-
 
 [docs.data-model.metric#counter]: /docs/about/data-model/metric/#counter
 [docs.data-model.metric#distribution]: /docs/about/data-model/metric/#distribution

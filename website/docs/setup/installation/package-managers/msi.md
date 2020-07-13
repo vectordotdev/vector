@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-07-13"
 title: Install Vector via Window Installer
 sidebar_label: MSI
 description: Install Vector through the Windows Installer
@@ -177,7 +177,6 @@ Vector maintains special URLS that are automatically updated whenever Vector is
 
 Vector's MSI source files are located in
 [Vector's repo][urls.vector_msi_source_files].
-
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.deployment]: /docs/setup/deployment/

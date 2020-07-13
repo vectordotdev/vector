@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-13"
+last_modified_on: "2020-07-13"
 title: "New Honeycomb Sink"
 description: "Sink logs to the Honeycomb logging service"
 author_github: "https://github.com/binarylogic"
@@ -15,7 +15,6 @@ For you [Honeycomb][urls.honeycomb] fans we have a new
 This tranformed is designed to produce "canoncial" events. These are flattened,
 wide events that represent an entire transaction, the concept that Honeycomb
 is built upon. Vector + Honeycomb = 👯.
-
 
 [docs.sinks.honeycomb]: /docs/reference/sinks/honeycomb/
 [urls.honeycomb]: https://honeycomb.io

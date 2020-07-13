@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-07-13"
 title: Install Vector On MacOS
 sidebar_label: MacOS
 description: Install Vector on MacOS
@@ -181,7 +181,6 @@ compose!
 </Tabs>
 </TabItem>
 </Tabs>
-
 
 [docs.installation]: /docs/setup/installation/
 [docs.package_managers.homebrew]: /docs/setup/installation/package-managers/homebrew/

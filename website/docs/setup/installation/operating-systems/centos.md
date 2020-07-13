@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-07-13"
 title: Install Vector On CentOS
 sidebar_label: CentOS
 description: Install Vector on CentOS
@@ -246,7 +246,6 @@ compose!
 </Tabs>
 </TabItem>
 </Tabs>
-
 
 [docs.installation]: /docs/setup/installation/
 [docs.package_managers.rpm#versions]: /docs/setup/installation/package-managers/rpm/#versions

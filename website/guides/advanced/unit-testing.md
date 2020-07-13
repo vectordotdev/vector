@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/guides.json"
 title: Unit Testing Your Configs
 description: Learn how to write and execute unit tests for your Vector configs
@@ -216,7 +216,6 @@ Test ./example.toml: check_simple_log ... passed
 The test passed! Now if we configure our CI system to execute our test we can
 ensure that uncle Cecil remains in Shoreditch after any future config change.
 What an insufferable hipster he is.
-
 
 [docs.about.concepts]: /docs/about/concepts/
 [docs.reference.tests]: /docs/reference/tests/

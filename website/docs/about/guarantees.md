@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-07-13"
 title: Guarantees
 description: Vector's gaurantees. Covering delivery and reliability guarantees for each Vector component.
 ---
@@ -143,7 +143,6 @@ which will keep you in the loop if this ever changes.
 
 Head over to the [components section][pages.components] and use the guarantee
 filters.
-
 
 [docs.data-model]: /docs/about/data-model/
 [docs.sinks]: /docs/reference/sinks/

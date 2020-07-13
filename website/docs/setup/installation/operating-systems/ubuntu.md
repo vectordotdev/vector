@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-07-13"
 title: Install Vector On Ubuntu
 sidebar_label: Ubuntu
 description: Install Vector on the Ubuntu operating system
@@ -289,7 +289,6 @@ compose!
 </Tabs>
 </TabItem>
 </Tabs>
-
 
 [docs.installation]: /docs/setup/installation/
 [docs.package_managers.dpkg#versions]: /docs/setup/installation/package-managers/dpkg/#versions

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Use Custom DNS Servers"
 description: "Point Vector to custom DNS servers"
@@ -24,6 +24,5 @@ dns_servers = ["0.0.0.0:53"]
 
 When `dns_servers` is set Vector will ignore the system configuration and use
 only the list of DNS servers provided.
-
 
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/guides.json"
 title: Building & Managing Complex Configs
 description: Strategies for building and managing complex Vector configs
@@ -193,7 +193,6 @@ reload the changes you've made by sending it a `SIGHUP` signal.
 If you're running Vector in environments where it's not possible to issue
 `SIGHUP` signals you can instead run it with the `--watch-config` flag and it'll
 automatically gobble up changes whenever the file is written to.
-
 
 [docs.about.concepts]: /docs/about/concepts/
 [guides.advanced.unit-testing]: /guides/advanced/unit-testing/

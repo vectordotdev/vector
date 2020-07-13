@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-07-13"
 title: Deployment Strategies
 description: The various strategies used to deploy Vector across your infrastructure.
 sidebar_label: Strategies
@@ -117,7 +117,6 @@ The following diagram demonstrates how it works.
 * Your downstream services support streaming where each individual host can
   write data directly to the services.
 * You do not need to perform operations across multiple hosts.
-
 
 [docs.sinks.vector]: /docs/reference/sinks/vector/
 [docs.sources.file]: /docs/reference/sources/file/

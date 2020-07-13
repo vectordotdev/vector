@@ -15,7 +15,6 @@ dynamic values in your [Vector configuration][docs.configuration] files. This
 has now been added to the [`add_fields` transform][docs.transforms.add_fields],
 enabling the ability to create fields from other fields values.
 
-
 [docs.configuration]: /docs/setup/configuration/
 [docs.templating]: /docs/reference/templating/
 [docs.transforms.add_fields]: /docs/reference/transforms/add_fields/

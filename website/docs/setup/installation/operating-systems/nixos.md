@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-11"
+last_modified_on: "2020-07-13"
 title: Install Vector On NixOS
 sidebar_label: NixOS
 description: Install Vector on NixOS
@@ -185,7 +185,6 @@ compose!
 </Tabs>
 </TabItem>
 </Tabs>
-
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.installation]: /docs/setup/installation/

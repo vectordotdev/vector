@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-09"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
@@ -1465,7 +1465,6 @@ values derived from the event's data. This syntax accepts
 
 You can learn more about the complete syntax in the
 [templating reference][docs.reference.templating].
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

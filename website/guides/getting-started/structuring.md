@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/guides.json"
 title: Structuring Your Log Data
 description: How to parse log data in Vector
@@ -334,7 +334,6 @@ Vector does not lock you into any specific schema.
 Now that you're a Vector pro you'll have endless ragtag groups of misfits
 trying to recruit you as their hacker, but it won't mean much if you can't
 deploy Vector. Onto the next guide!
-
 
 [docs.data-model]: /docs/about/data-model/
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema

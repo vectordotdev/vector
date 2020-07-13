@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-07-13"
 title: Glossary
 description: "Vector documentation glossary of terms"
 ---
@@ -150,7 +150,6 @@ reducing cost, etc.
 ## Vector
 
 "Vector" is the name of this project.
-
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.data-model.log]: /docs/about/data-model/log/

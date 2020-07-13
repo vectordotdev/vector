@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "at_least_once"
 component_title: "Generator"
 description: "The Vector `generator` source ingests data through an internal data generator and outputs `log` events."
@@ -168,7 +168,6 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

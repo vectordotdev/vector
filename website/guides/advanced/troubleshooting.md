@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/guides.json"
 title: Troubleshooting
 description: A guide on debugging and troubleshooting Vector
@@ -149,7 +149,6 @@ At this point we recommend reaching out to the community for help.
 1. If encountered a bug, please [file a bug report][urls.new_bug_report]
 2. If encountered a missing feature, please [file a feature request][urls.new_feature_request].
 3. If you need help, [join our chat community][urls.vector_chat]. You can post a question and search previous questions.
-
 
 [docs.monitoring#rate-limiting]: /docs/administration/monitoring/#rate-limiting
 [urls.new_bug_report]: https://github.com/timberio/vector/issues/new?labels=type%3A+bug

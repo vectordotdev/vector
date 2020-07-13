@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-07-13"
 title: "What is Vector?"
 description: "High-level description of the Vector observability data collector and router."
 ---
@@ -39,7 +39,6 @@ usage][urls.vector_performance].
 * Vector has **over 15 active contributors** and growing.
 
 <Jump to="/guides/getting-started/">Get started</Jump>
-
 
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/

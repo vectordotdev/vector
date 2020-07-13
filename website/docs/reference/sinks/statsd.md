@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` sink streams `metric` events to StatsD metrics service."
@@ -160,7 +160,6 @@ You can learn more in the
 
 The `statsd` sink streams data on a real-time
 event-by-event basis. It does not batch data.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.metric]: /docs/about/data-model/metric/
