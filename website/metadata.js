@@ -3387,7 +3387,7 @@ module.exports = {
     {
       "author_github": "https://github.com/a_hoverbear",
       "date": "2020-06-18",
-      "description": "<fill-in>",
+      "description": "Vector once again follows the guidance of the host on DNS lookups.",
       "hide_on_release_notes": false,
       "id": "2020-06-18-remove-custom-dns-resolution",
       "path": "website/highlights/2020-06-18-remove-custom-dns-resolution.md",
@@ -3822,7 +3822,7 @@ module.exports = {
   "latest_highlight": {
     "author_github": "https://github.com/a_hoverbear",
     "date": "2020-06-18",
-    "description": "<fill-in>",
+    "description": "Vector once again follows the guidance of the host on DNS lookups.",
     "hide_on_release_notes": false,
     "id": "2020-06-18-remove-custom-dns-resolution",
     "path": "website/highlights/2020-06-18-remove-custom-dns-resolution.md",
@@ -9115,7 +9115,7 @@ module.exports = {
       {
         "author_github": "https://github.com/a_hoverbear",
         "date": "2020-06-18",
-        "description": "<fill-in>",
+        "description": "Vector once again follows the guidance of the host on DNS lookups.",
         "hide_on_release_notes": false,
         "id": "2020-06-18-remove-custom-dns-resolution",
         "path": "website/highlights/2020-06-18-remove-custom-dns-resolution.md",
@@ -14440,7 +14440,7 @@ module.exports = {
         {
           "author_github": "https://github.com/a_hoverbear",
           "date": "2020-06-18",
-          "description": "<fill-in>",
+          "description": "Vector once again follows the guidance of the host on DNS lookups.",
           "hide_on_release_notes": false,
           "id": "2020-06-18-remove-custom-dns-resolution",
           "path": "website/highlights/2020-06-18-remove-custom-dns-resolution.md",
