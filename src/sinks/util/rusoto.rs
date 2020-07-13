@@ -2,6 +2,7 @@
 
 use crate::{dns::Resolver, sinks::util, tls::MaybeTlsSettings};
 use async_trait::async_trait;
+use bytes05::Bytes;
 use futures::{Stream, StreamExt};
 use http::{
     header::{HeaderMap, HeaderName, HeaderValue},
@@ -243,7 +244,7 @@ where
 }
 
 impl HttpBody for RusotoBody {
-    type Data = io::Cursor<Vec<u8>>;
+    type Data = Bytes;
     type Error = io::Error;
 
     fn poll_data(
@@ -254,7 +255,7 @@ impl HttpBody for RusotoBody {
             Some(SignedRequestPayload::Buffer(buf)) => {
                 if !buf.is_empty() {
                     let buf = buf.split_off(0);
-                    Poll::Ready(Some(Ok(io::Cursor::new(buf.into_iter().collect()))))
+                    Poll::Ready(Some(Ok(buf)))
                 } else {
                     Poll::Ready(None)
                 }
@@ -263,9 +264,7 @@ impl HttpBody for RusotoBody {
                 let stream = Pin::new(stream);
                 match stream.poll_next(cx) {
                     Poll::Ready(Some(result)) => match result {
-                        Ok(buf) => {
-                            Poll::Ready(Some(Ok(io::Cursor::new(buf.into_iter().collect()))))
-                        }
+                        Ok(buf) => Poll::Ready(Some(Ok(buf))),
                         Err(error) => Poll::Ready(Some(Err(error))),
                     },
                     Poll::Ready(None) => Poll::Ready(None),
