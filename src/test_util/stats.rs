@@ -179,7 +179,7 @@ impl WeightedSum {
         self.mean().map(|mean| WeightedSumStats {
             mean,
             min: self.min.unwrap(),
-            max: self.min.unwrap(),
+            max: self.max.unwrap(),
         })
     }
 }

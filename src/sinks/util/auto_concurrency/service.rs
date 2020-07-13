@@ -21,7 +21,7 @@ use tokio::sync::OwnedSemaphorePermit;
 #[derive(Debug)]
 pub struct AutoConcurrencyLimit<S, L> {
     inner: S,
-    controller: Arc<Controller<L>>,
+    pub(super) controller: Arc<Controller<L>>,
     state: State,
 }
 

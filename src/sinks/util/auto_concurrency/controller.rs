@@ -5,6 +5,8 @@ use crate::internal_events::{
     AutoConcurrencyObservedRtt,
 };
 use crate::sinks::util::retries2::RetryLogic;
+#[cfg(test)]
+use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use std::cmp::max;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
@@ -23,16 +25,27 @@ pub(super) struct Controller<L> {
     max: usize,
     logic: L,
     inner: Arc<Mutex<Inner>>,
+    #[cfg(test)]
+    pub(super) stats: Arc<Mutex<ControllerStatistics>>,
 }
 
 #[derive(Debug)]
-struct Inner {
+pub(super) struct Inner {
     current_limit: usize,
     in_flight: usize,
     past_rtt: EWMA,
     next_update: Instant,
     current_rtt: Mean,
     had_back_pressure: bool,
+}
+
+#[cfg(test)]
+#[derive(Debug, Default)]
+pub(super) struct ControllerStatistics {
+    pub(super) in_flight: TimeHistogram,
+    pub(super) concurrency_limit: TimeHistogram,
+    pub(super) observed_rtt: TimeWeightedSum,
+    pub(super) averaged_rtt: TimeWeightedSum,
 }
 
 impl<L> Controller<L> {
@@ -49,6 +62,8 @@ impl<L> Controller<L> {
                 current_rtt: Default::default(),
                 had_back_pressure: false,
             })),
+            #[cfg(test)]
+            stats: Arc::new(Mutex::new(ControllerStatistics::default())),
         }
     }
 
@@ -58,6 +73,11 @@ impl<L> Controller<L> {
 
     pub(super) fn start_request(&self) {
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
+        #[cfg(test)]
+        {
+            let mut stats = self.stats.lock().expect("Stats mutex is poisoned");
+            stats.in_flight.add(inner.in_flight, Instant::now());
+        }
         inner.in_flight += 1;
         emit!(AutoConcurrencyInFlight {
             in_flight: inner.in_flight as u64
@@ -66,22 +86,28 @@ impl<L> Controller<L> {
 
     fn adjust_to_back_pressure(&self, start: Instant, is_back_pressure: bool) {
         let now = Instant::now();
+        let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
+        #[cfg(test)]
+        let mut stats = self.stats.lock().expect("Stats mutex is poisoned");
+
         let rtt = now.saturating_duration_since(start);
         emit!(AutoConcurrencyObservedRtt { rtt });
-        let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
+        let rtt = rtt.as_secs_f64();
+        #[cfg(test)]
+        stats.observed_rtt.add(rtt, now);
+
         if is_back_pressure {
             inner.had_back_pressure = true;
         }
 
+        #[cfg(test)]
+        stats.in_flight.add(inner.in_flight, now);
         inner.in_flight -= 1;
         emit!(AutoConcurrencyInFlight {
             in_flight: inner.in_flight as u64
         });
 
-        let rtt = inner.current_rtt.update(rtt.as_secs_f64());
-        emit!(AutoConcurrencyAveragedRtt {
-            rtt: Duration::from_secs_f64(rtt)
-        });
+        let rtt = inner.current_rtt.update(rtt);
         let avg = inner.past_rtt.average();
 
         if avg == 0.0 {
@@ -89,6 +115,15 @@ impl<L> Controller<L> {
             inner.past_rtt.update(rtt);
             inner.next_update = now + Duration::from_secs_f64(rtt);
         } else if avg > 0.0 && now >= inner.next_update {
+            emit!(AutoConcurrencyAveragedRtt {
+                rtt: Duration::from_secs_f64(rtt)
+            });
+            #[cfg(test)]
+            {
+                stats.averaged_rtt.add(rtt, now);
+                stats.concurrency_limit.add(inner.current_limit, now);
+            }
+
             let threshold = avg * THRESHOLD_RATIO;
 
             // Back pressure responses, either explicit or implicit due

@@ -1,18 +1,16 @@
 #![cfg(all(test, feature = "sources-generator"))]
 
+use super::controller::ControllerStatistics;
 use crate::{
     assert_within,
-    event::{metric::MetricValue, Event, Metric},
+    event::{metric::MetricValue, Event},
     metrics::{capture_metrics, get_controller, init as metrics_init},
     sinks::{
         util::{retries2::RetryLogic, service2::TowerRequestConfig, BatchSettings, VecBuffer},
         Healthcheck, RouterSink,
     },
     sources::generator::GeneratorConfig,
-    test_util::{
-        block_on, runtime, shutdown_on_idle,
-        stats::{LevelTimeHistogram, WeightedSum},
-    },
+    test_util::{block_on, runtime, shutdown_on_idle, stats::LevelTimeHistogram},
     topology::{
         self,
         config::{self, DataType, SinkConfig, SinkContext},
@@ -64,6 +62,8 @@ struct TestConfig {
     // are created by `Default` and may be cloned to retain a handle.
     #[serde(skip)]
     stats: Arc<Mutex<Statistics>>,
+    #[serde(skip)]
+    controller_stats: Arc<Mutex<Arc<Mutex<ControllerStatistics>>>>,
 }
 
 #[typetag::serialize(name = "test")]
@@ -81,6 +81,19 @@ impl SinkConfig for TestConfig {
             )
             .sink_map_err(|e| panic!("Fatal test sink error: {}", e));
         let healthcheck = future::ok(());
+
+        // Dig deep to get at the internal controller statistics
+        let stats = sink
+            .get_ref()
+            .get_ref()
+            .get_ref()
+            .get_ref()
+            .get_ref()
+            .controller
+            .stats
+            .clone();
+        *self.controller_stats.lock().unwrap() = stats;
+
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
@@ -132,8 +145,9 @@ impl Service<Vec<Event>> for TestSink {
     }
 
     fn call(&mut self, _request: Vec<Event>) -> Self::Future {
+        let now = Instant::now();
         let mut stats = self.stats.lock().expect("Poisoned stats lock");
-        stats.in_flight.adjust(1);
+        stats.in_flight.adjust(1, now);
         let in_flight = stats.in_flight.level();
 
         let params = self.params;
@@ -143,14 +157,14 @@ impl Service<Vec<Event>> for TestSink {
         let delay = Delay::new(Instant::now() + delay).compat();
 
         if params.concurrency_drop > 0 && in_flight >= params.concurrency_drop {
-            stats.in_flight.adjust(-1);
+            stats.in_flight.adjust(-1, now);
             Box::pin(pending())
         } else {
             let stats2 = self.stats.clone();
             Box::pin(async move {
                 delay.await.expect("Delay failed!");
                 let mut stats = stats2.lock().expect("Poisoned stats lock");
-                stats.in_flight.adjust(-1);
+                stats.in_flight.adjust(-1, now);
 
                 if params.concurrency_defer > 0 && in_flight >= params.concurrency_defer {
                     Err(Error::Deferred)
@@ -190,46 +204,13 @@ impl Statistics {
     }
 }
 
-type MetricSet = HashMap<String, Metric>;
-
-#[derive(Copy, Clone, Debug, Default)]
-struct MetricStats {
-    min: f64,
-    max: f64,
-    mean: f64,
-    count: usize,
+struct TestData {
+    duration: f64,
+    stats: Statistics,
+    cstats: ControllerStatistics,
 }
 
-fn metric_stats(metrics: &MetricSet, name: &str) -> MetricStats {
-    let metric = metrics.get(name).unwrap();
-    match &metric.value {
-        MetricValue::Distribution {
-            values,
-            sample_rates,
-        } => {
-            let (min, max, ws) = values.iter().zip(sample_rates.iter()).fold(
-                (None, None, WeightedSum::default()),
-                |(min, max, mut ws), (&value, &rate)| {
-                    let min = min.unwrap_or(value);
-                    let min = Some(if value < min { value } else { min });
-                    let max = max.unwrap_or(value);
-                    let max = Some(if value > max { value } else { max });
-                    ws.add(value, rate as f64);
-                    (min, max, ws)
-                },
-            );
-            MetricStats {
-                min: min.unwrap(),
-                max: max.unwrap(),
-                mean: ws.mean().unwrap(),
-                count: values.len(),
-            }
-        }
-        _ => panic!("Expected distribution metric for {}", name),
-    }
-}
-
-fn run_test(lines: usize, params: TestParams) -> (f64, Statistics, MetricSet) {
+fn run_test(lines: usize, params: TestParams) -> TestData {
     metrics_init().ok();
 
     let test_config = TestConfig {
@@ -244,6 +225,7 @@ fn run_test(lines: usize, params: TestParams) -> (f64, Statistics, MetricSet) {
     };
 
     let stats = test_config.stats.clone();
+    let cstats = test_config.controller_stats.clone();
 
     let mut config = config::Config::empty();
     config.add_source("in", GeneratorConfig::repeat(vec!["line 1".into()], lines));
@@ -270,19 +252,48 @@ fn run_test(lines: usize, params: TestParams) -> (f64, Statistics, MetricSet) {
         .into_inner()
         .expect("Failed to unwrap stats Mutex");
     stats.report();
-    dbg!(&stats);
+
+    let cstats = Arc::try_unwrap(cstats)
+        .expect("Failed to unwrap controller_stats Arc")
+        .into_inner()
+        .expect("Failed to unwrap controller_stats Mutex");
+    let cstats = Arc::try_unwrap(cstats)
+        .expect("Failed to unwrap controller_stats Arc")
+        .into_inner()
+        .expect("Failed to unwrap controller_stats Mutex");
 
     let metrics = capture_metrics(&controller)
         .map(Event::into_metric)
         .map(|event| (event.name.clone(), event))
-        .collect::<MetricSet>();
+        .collect::<HashMap<_, _>>();
+    // Ensure basic statistics are captured, don't actually examine them
+    assert!(
+        matches!(metrics.get("auto_concurrency_observed_rtt").unwrap().value,
+                 MetricValue::Distribution { .. })
+    );
+    assert!(
+        matches!(metrics.get("auto_concurrency_averaged_rtt").unwrap().value,
+                 MetricValue::Distribution { .. })
+    );
+    assert!(
+        matches!(metrics.get("auto_concurrency_limit").unwrap().value,
+                 MetricValue::Distribution { .. })
+    );
+    assert!(
+        matches!(metrics.get("auto_concurrency_in_flight").unwrap().value,
+                 MetricValue::Distribution { .. })
+    );
 
-    (duration, stats, metrics)
+    TestData {
+        duration,
+        stats,
+        cstats,
+    }
 }
 
 #[test]
 fn constant_link() {
-    let (duration, stats, metrics) = run_test(
+    let results = run_test(
         500,
         TestParams {
             delay: Duration::from_millis(100),
@@ -290,7 +301,7 @@ fn constant_link() {
         },
     );
 
-    let in_flight = dbg!(stats.in_flight.stats().unwrap());
+    let in_flight = results.stats.in_flight.stats().unwrap();
     // With a constant response time link and enough responses, the
     // limiter will ramp up to or near the maximum concurrency (timing
     // issues may prevent it from hitting exactly the maximum without
@@ -301,21 +312,25 @@ fn constant_link() {
     assert_within!(in_flight.mode, 9, 10);
     assert_within!(in_flight.mean, 8.0, 10.0);
     // Normal times for 500 requests range from 6-7 seconds.
-    assert_within!(duration, 5.0, 8.0);
+    assert_within!(results.duration, 5.0, 8.0);
 
-    let observed_rtt = metric_stats(&metrics, "auto_concurrency_observed_rtt");
-    assert_within!(observed_rtt.mean, 100_000_000.0, 110_000_000.0);
-    let averaged_rtt = metric_stats(&metrics, "auto_concurrency_averaged_rtt");
-    assert_within!(averaged_rtt.mean, 100_000_000.0, 110_000_000.0);
-    let concurrency_limit = metric_stats(&metrics, "auto_concurrency_limit");
+    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
+    assert_within!(observed_rtt.mean, 0.100, 0.110);
+    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
+    assert_within!(averaged_rtt.mean, 0.100, 0.110);
+    let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
+    assert_within!(concurrency_limit.max, 9, 10);
+    assert_within!(concurrency_limit.mode, 9, 10);
     assert_within!(concurrency_limit.mean, 5.0, 10.0);
-    let in_flight = metric_stats(&metrics, "auto_concurrency_in_flight");
-    assert_within!(in_flight.mean, 8.0, 10.0);
+    let in_flight = results.cstats.in_flight.stats().unwrap();
+    assert_within!(in_flight.max, 9, 10);
+    assert_within!(in_flight.mode, 9, 10);
+    assert_within!(in_flight.mean, 7.5, 10.0);
 }
 
 #[test]
 fn defers_at_high_concurrency() {
-    let (duration, stats, metrics) = run_test(
+    let results = run_test(
         500,
         TestParams {
             delay: Duration::from_millis(100),
@@ -324,7 +339,7 @@ fn defers_at_high_concurrency() {
         },
     );
 
-    let in_flight = stats.in_flight.stats().unwrap();
+    let in_flight = results.stats.in_flight.stats().unwrap();
     // With a constant time link that gives deferrals over a certain
     // concurrency, the limiter will ramp up to that concurrency and
     // then drop down repeatedly. Note that, due to the timing of the
@@ -337,21 +352,25 @@ fn defers_at_high_concurrency() {
     assert_within!(in_flight.mean, 2.0, 4.0);
 
     // Normal times for 500 requests range from 20-22 seconds
-    assert_within!(duration, 18.0, 25.0);
+    assert_within!(results.duration, 18.0, 25.0);
 
-    let observed_rtt = metric_stats(&metrics, "auto_concurrency_observed_rtt");
-    assert_within!(observed_rtt.mean, 100_000_000.0, 110_000_000.0);
-    let averaged_rtt = metric_stats(&metrics, "auto_concurrency_averaged_rtt");
-    assert_within!(averaged_rtt.mean, 100_000_000.0, 110_000_000.0);
-    let concurrency_limit = metric_stats(&metrics, "auto_concurrency_limit");
+    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
+    assert_within!(observed_rtt.mean, 0.100, 0.110);
+    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
+    assert_within!(averaged_rtt.mean, 0.100, 0.110);
+    let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
+    assert_within!(concurrency_limit.max, 5, 6);
+    assert_within!(concurrency_limit.mode, 2, 4);
     assert_within!(concurrency_limit.mean, 2.0, 4.9);
-    let in_flight = metric_stats(&metrics, "auto_concurrency_in_flight");
+    let in_flight = results.cstats.in_flight.stats().unwrap();
+    assert_within!(in_flight.max, 5, 6);
+    assert_within!(in_flight.mode, 2, 4);
     assert_within!(in_flight.mean, 2.0, 4.0);
 }
 
 #[test]
 fn drops_at_high_concurrency() {
-    let (duration, stats, metrics) = run_test(
+    let results = run_test(
         500,
         TestParams {
             delay: Duration::from_millis(100),
@@ -360,34 +379,36 @@ fn drops_at_high_concurrency() {
         },
     );
 
-    let in_flight = stats.in_flight.stats().unwrap();
+    let in_flight = results.stats.in_flight.stats().unwrap();
     // Since our internal framework doesn't track the "dropped"
     // requests, the values won't be representative of the actual number
-    // of requests in flight (tracked below in the metrics).
-    assert_eq!(in_flight.max, 5);
-    assert_eq!(in_flight.mode, 4);
+    // of requests in flight (tracked below in the internal stats).
+    assert_within!(in_flight.max, 4, 5);
+    assert_within!(in_flight.mode, 3, 4);
     assert_within!(in_flight.mean, 2.0, 2.5);
 
     // Normal times for 500 requests range from 22-25 seconds
-    assert_within!(duration, 20.0, 27.0);
+    assert_within!(results.duration, 20.0, 27.0);
 
-    let observed_rtt = metric_stats(&metrics, "auto_concurrency_observed_rtt");
-    assert_within!(observed_rtt.min, 100_000_000.0, 110_000_000.0);
-    assert_within!(observed_rtt.max, 990_000_000.0, 1_010_000_000.0);
-    assert_within!(observed_rtt.mean, 150_000_000.0, 250_000_000.0);
-    let averaged_rtt = metric_stats(&metrics, "auto_concurrency_averaged_rtt");
-    assert_within!(averaged_rtt.min, 100_000_000.0, 110_000_000.0);
-    assert_within!(averaged_rtt.max, 990_000_000.0, 1_010_000_000.0);
-    assert_within!(averaged_rtt.mean, 150_000_000.0, 250_000_000.0);
-    let concurrency_limit = metric_stats(&metrics, "auto_concurrency_limit");
-    assert_within!(concurrency_limit.mean, 4.0, 5.0);
-    let in_flight = metric_stats(&metrics, "auto_concurrency_in_flight");
-    assert_within!(in_flight.mean, 4.0, 5.0);
+    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
+    assert_within!(observed_rtt.min, 0.100, 0.110);
+    assert_within!(observed_rtt.max, 1.000, 1.010);
+    assert_within!(observed_rtt.mean, 0.150, 0.350);
+    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
+    assert_within!(averaged_rtt.min, 0.100, 0.110);
+    assert_within!(averaged_rtt.max, 0.900, 1.010);
+    assert_within!(averaged_rtt.mean, 0.150, 0.350);
+    let concurrency_limit = dbg!(results.cstats.concurrency_limit.stats().unwrap());
+    assert_within!(concurrency_limit.mean, 3.5, 5.0);
+    let in_flight = dbg!(results.cstats.in_flight.stats().unwrap());
+    //assert_within!(in_flight.max, 9, 10);
+    //assert_within!(in_flight.mode, 9, 10);
+    assert_within!(in_flight.mean, 3.0, 5.0);
 }
 
 #[test]
 fn slow_link() {
-    let (duration, stats, metrics) = run_test(
+    let results = run_test(
         500,
         TestParams {
             delay: Duration::from_millis(100),
@@ -396,7 +417,7 @@ fn slow_link() {
         },
     );
 
-    let in_flight = stats.in_flight.stats().unwrap();
+    let in_flight = results.stats.in_flight.stats().unwrap();
     // With a link that slows down heavily as concurrency increases, the
     // limiter will keep the concurrency low (timing skews occasionally
     // has it reaching 3, but usually just 2),
@@ -405,17 +426,18 @@ fn slow_link() {
     assert_within!(in_flight.mode, 1, 2);
     assert_within!(in_flight.mean, 1.0, 2.0);
     // Normal times for 500 requests range around 61 seconds.
-    assert_within!(duration, 60.0, 65.0);
+    assert_within!(results.duration, 60.0, 65.0);
 
-    dbg!(metrics.get("auto_concurrency_observed_rtt"));
-    let observed_rtt = metric_stats(&metrics, "auto_concurrency_observed_rtt");
-    dbg!(observed_rtt);
-    assert_within!(observed_rtt.min, 100_000_000.0, 110_000_000.0);
-    assert_within!(observed_rtt.mean, 100_000_000.0, 310_000_000.0);
-    let averaged_rtt = metric_stats(&metrics, "auto_concurrency_averaged_rtt");
-    assert_within!(averaged_rtt.mean, 100_000_000.0, 310_000_000.0);
-    let concurrency_limit = metric_stats(&metrics, "auto_concurrency_limit");
+    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
+    assert_within!(observed_rtt.min, 0.100, 0.110);
+    assert_within!(observed_rtt.mean, 0.100, 0.310);
+    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
+    assert_within!(averaged_rtt.min, 0.100, 0.110);
+    assert_within!(averaged_rtt.mean, 0.100, 0.310);
+    let concurrency_limit = dbg!(results.cstats.concurrency_limit.stats().unwrap());
     assert_within!(concurrency_limit.mean, 1.0, 2.0);
-    let in_flight = metric_stats(&metrics, "auto_concurrency_in_flight");
+    let in_flight = dbg!(results.cstats.in_flight.stats().unwrap());
+    //assert_within!(in_flight.max, 9, 10);
+    //assert_within!(in_flight.mode, 9, 10);
     assert_within!(in_flight.mean, 1.0, 2.0);
 }
