@@ -89,7 +89,7 @@ impl SinkConfig for PulsarSinkConfig {
 
 impl PulsarSinkConfig {
     async fn create_pulsar_producer(&self) -> Result<Producer<TokioExecutor>, PulsarError> {
-        let mut builder = Pulsar::builder(&self.address);
+        let mut builder = Pulsar::builder(&self.address, TokioExecutor);
         if let Some(auth) = &self.auth {
             builder = builder.with_auth(Authentication {
                 name: auth.name.clone(),
@@ -268,7 +268,7 @@ mod integration_tests {
                 auth: None,
             };
 
-            let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.address)
+            let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.address, TokioExecutor)
                 .build()
                 .await
                 .unwrap();
