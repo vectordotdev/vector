@@ -19,7 +19,6 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::HashMap, sync::Arc};
-use tokio::task::block_in_place;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -107,14 +106,14 @@ fn kafka_source(
 
         // See https://github.com/fede1024/rust-rdkafka/issues/85#issuecomment-439141656
         let stream = OwnedConsumerStream {
-            upstream: OwningHandle::new_with_fn(consumer.clone(), |c| {
+            upstream: OwningHandle::new_with_fn(consumer, |c| {
                 let cf = unsafe { &*c };
                 Box::new(Compat::new(cf.start()))
             }),
         };
 
         stream
-            .take_until(shutdown.map(move |_| block_in_place(|| consumer.stop())))
+            .take_until(shutdown)
             .then(move |message| {
                 match message {
                     Err(e) => Err(error!(message = "Error reading message from Kafka", error = ?e)),
@@ -264,22 +263,17 @@ mod integration_test {
         test_util::{collect_n, random_string, runtime},
     };
     use chrono::Utc;
-    use futures::compat::Compat;
-    use futures01::{sync::mpsc, Future};
+    use futures01::sync::mpsc;
     use rdkafka::{
         config::ClientConfig,
         producer::{FutureProducer, FutureRecord},
+        util::Timeout,
     };
     use string_cache::DefaultAtom as Atom;
 
     const BOOTSTRAP_SERVER: &str = "localhost:9092";
 
-    fn send_event(
-        topic: &str,
-        key: &str,
-        text: &str,
-        timestamp: i64,
-    ) -> impl Future<Item = (), Error = ()> {
+    async fn send_event(topic: String, key: &str, text: &str, timestamp: i64) {
         let producer: FutureProducer = ClientConfig::new()
             .set("bootstrap.servers", BOOTSTRAP_SERVER)
             .set("produce.offset.report", "true")
@@ -287,14 +281,14 @@ mod integration_test {
             .create()
             .expect("Producer creation error");
 
-        let record = FutureRecord::to(topic)
+        let record = FutureRecord::to(&topic)
             .payload(text)
             .key(key)
             .timestamp(timestamp);
 
-        Compat::new(producer.send(record, 0))
-            .map(|_| ())
-            .map_err(|e| panic!("Cannot send event to Kafka: {:?}", e))
+        if let Err(err) = producer.send(record, Timeout::Never).await {
+            panic!("Cannot send event to Kafka: {:?}", err);
+        }
     }
 
     #[test]
@@ -320,13 +314,12 @@ mod integration_test {
 
         let mut rt = runtime();
         println!("Sending event...");
-        rt.block_on(send_event(
-            &topic,
+        rt.block_on_std(send_event(
+            topic.clone(),
             "my key",
             "my message",
             now.timestamp_millis(),
-        ))
-        .unwrap();
+        ));
         println!("Receiving event...");
         let (tx, rx) = mpsc::channel(1);
         rt.spawn(kafka_source(config, ShutdownSignal::noop(), tx).unwrap());
