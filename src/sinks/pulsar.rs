@@ -268,7 +268,7 @@ mod integration_tests {
                 auth: None,
             };
 
-            let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.address)
+            let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.address, TokioExecutor)
                 .build()
                 .await
                 .unwrap();
