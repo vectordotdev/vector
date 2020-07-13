@@ -184,11 +184,11 @@ Or use your own [preferred method][docs.installation].
 
 ## Latest Highlights
 
+* [2020/06/27 - Kafka components support SASL](https://vector.dev/highlights/2020-06-27-add-sasl-to-kafka/) - available in [0.10.0][urls.vector_download]
 * [2020/06/18 - Removal custom DNS resolution](https://vector.dev/highlights/2020-06-18-remove-custom-dns-resolution/) - available in [0.10.0][urls.vector_download]
+* [2020/06/11 - Experimental WASM Plugins (Dev builds only)](https://vector.dev/highlights/2020-06-11-introduce-wasm-plugins/) - available in [0.10.0][urls.vector_download]
 * [2020/05/27 - Support for loading multiple CAs](https://vector.dev/highlights/2020-05-27-add-support-for-loading-multiple-cas/) - available in [0.10.0][urls.vector_download]
 * [2020/05/20 - Now supporting the bearer auth strategy](https://vector.dev/highlights/2020-05-20-add-bearer-auth-strategy/) - available in [0.10.0][urls.vector_download]
-* [2020/05/13 - Add RegexSet support to regex](https://vector.dev/highlights/2020-05-13-add-regexset-support-to-regex/) - available in [0.10.0][urls.vector_download]
-* [2020/05/04 - Vector gracefully exits when specific sources finish](https://vector.dev/highlights/2020-05-04-shutdown-vector-if-all-sources-finish/) - available in [0.10.0][urls.vector_download]
 
 [view all...][urls.vector_highlights]
 

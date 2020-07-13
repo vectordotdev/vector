@@ -20,7 +20,7 @@ Just drop your token in, and you're done.
  [sinks.example]
    type = "http"
 +  auth.strategy = "bearer"
-+  auth.token = "B4CK-L1V35-M4TT4R"
++  auth.token = "B14CK-L1V35-M4TT4R"
 ```
 
 **Reminder:** If you're buidling a [12 Factor App][urls.twelve_factor_app] you may wish to use environment variables!

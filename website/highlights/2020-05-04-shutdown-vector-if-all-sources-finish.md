@@ -2,7 +2,7 @@
 last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Vector gracefully exits when specific sources finish"
-description: "One step closer to Vector replacing `awk` and `sed`!"
+description: "One step closer to Vector replacing awk and sed!"
 author_github: "https://github.com/hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2533]

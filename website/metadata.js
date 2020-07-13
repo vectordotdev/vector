@@ -3411,7 +3411,7 @@ module.exports = {
         "domain: transforms",
         "transform: regex_parser"
       ],
-      "title": "Add RegexSet support to regex"
+      "title": "RegexSet support to `regex` transform"
     },
     {
       "author_github": "https://github.com/hoverbear",
@@ -3444,6 +3444,20 @@ module.exports = {
     },
     {
       "author_github": "https://github.com/hoverbear",
+      "date": "2020-06-11",
+      "description": "Vector can be optionally built with an integrated WASM runtime",
+      "hide_on_release_notes": false,
+      "id": "2020-06-11-introduce-wasm-plugins",
+      "path": "website/highlights/2020-06-11-introduce-wasm-plugins.md",
+      "permalink": "/highlights/2020-06-11-introduce-wasm-plugins/",
+      "tags": [
+        "type: new feature",
+        "domain: transforms"
+      ],
+      "title": "Experimental WASM Plugins (Dev builds only)"
+    },
+    {
+      "author_github": "https://github.com/hoverbear",
       "date": "2020-06-18",
       "description": "Vector once again follows the guidance of the host on DNS lookups.",
       "hide_on_release_notes": false,
@@ -3454,6 +3468,21 @@ module.exports = {
         "type: breaking change"
       ],
       "title": "Removal custom DNS resolution"
+    },
+    {
+      "author_github": "https://github.com/hoverbear",
+      "date": "2020-06-27",
+      "description": "Vector has a new way to authenticate with Kafka!",
+      "hide_on_release_notes": false,
+      "id": "2020-06-27-add-sasl-to-kafka",
+      "path": "website/highlights/2020-06-27-add-sasl-to-kafka.md",
+      "permalink": "/highlights/2020-06-27-add-sasl-to-kafka/",
+      "tags": [
+        "type: new feature",
+        "domain: sinks",
+        "sink: kafka"
+      ],
+      "title": "Kafka components support SASL"
     }
   ],
   "installation": {
@@ -3879,16 +3908,18 @@ module.exports = {
   },
   "latest_highlight": {
     "author_github": "https://github.com/hoverbear",
-    "date": "2020-06-18",
-    "description": "Vector once again follows the guidance of the host on DNS lookups.",
+    "date": "2020-06-27",
+    "description": "Vector has a new way to authenticate with Kafka!",
     "hide_on_release_notes": false,
-    "id": "2020-06-18-remove-custom-dns-resolution",
-    "path": "website/highlights/2020-06-18-remove-custom-dns-resolution.md",
-    "permalink": "/highlights/2020-06-18-remove-custom-dns-resolution/",
+    "id": "2020-06-27-add-sasl-to-kafka",
+    "path": "website/highlights/2020-06-27-add-sasl-to-kafka.md",
+    "permalink": "/highlights/2020-06-27-add-sasl-to-kafka/",
     "tags": [
-      "type: breaking change"
+      "type: new feature",
+      "domain: sinks",
+      "sink: kafka"
     ],
-    "title": "Removal custom DNS resolution"
+    "title": "Kafka components support SASL"
   },
   "latest_post": {
     "author_github": "https://github.com/lukesteensen",
@@ -7090,7 +7121,7 @@ module.exports = {
         "deletions_count": 58,
         "description": "Introduce WASM Plugins",
         "files_count": 105,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-06-11-introduce-wasm-plugins/",
         "insertions_count": 4214,
         "message": "feat(new transform): Introduce WASM Plugins (#2006)",
         "pr_number": 2006,
@@ -8277,7 +8308,7 @@ module.exports = {
         "deletions_count": 107,
         "description": "Add SASL to kafka",
         "files_count": 13,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-06-27-add-sasl-to-kafka/",
         "insertions_count": 511,
         "message": "enhancement(kafka source, kafka sink): Add SASL to kafka (#2897)",
         "pr_number": 2897,
@@ -9197,7 +9228,7 @@ module.exports = {
           "domain: transforms",
           "transform: regex_parser"
         ],
-        "title": "Add RegexSet support to regex"
+        "title": "RegexSet support to `regex` transform"
       },
       {
         "author_github": "https://github.com/hoverbear",
@@ -9230,6 +9261,20 @@ module.exports = {
       },
       {
         "author_github": "https://github.com/hoverbear",
+        "date": "2020-06-11",
+        "description": "Vector can be optionally built with an integrated WASM runtime",
+        "hide_on_release_notes": false,
+        "id": "2020-06-11-introduce-wasm-plugins",
+        "path": "website/highlights/2020-06-11-introduce-wasm-plugins.md",
+        "permalink": "/highlights/2020-06-11-introduce-wasm-plugins/",
+        "tags": [
+          "type: new feature",
+          "domain: transforms"
+        ],
+        "title": "Experimental WASM Plugins (Dev builds only)"
+      },
+      {
+        "author_github": "https://github.com/hoverbear",
         "date": "2020-06-18",
         "description": "Vector once again follows the guidance of the host on DNS lookups.",
         "hide_on_release_notes": false,
@@ -9240,6 +9285,21 @@ module.exports = {
           "type: breaking change"
         ],
         "title": "Removal custom DNS resolution"
+      },
+      {
+        "author_github": "https://github.com/hoverbear",
+        "date": "2020-06-27",
+        "description": "Vector has a new way to authenticate with Kafka!",
+        "hide_on_release_notes": false,
+        "id": "2020-06-27-add-sasl-to-kafka",
+        "path": "website/highlights/2020-06-27-add-sasl-to-kafka.md",
+        "permalink": "/highlights/2020-06-27-add-sasl-to-kafka/",
+        "tags": [
+          "type: new feature",
+          "domain: sinks",
+          "sink: kafka"
+        ],
+        "title": "Kafka components support SASL"
       }
     ],
     "insertions_count": 42685,
@@ -12473,7 +12533,7 @@ module.exports = {
           "deletions_count": 58,
           "description": "Introduce WASM Plugins",
           "files_count": 105,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-06-11-introduce-wasm-plugins/",
           "insertions_count": 4214,
           "message": "feat(new transform): Introduce WASM Plugins (#2006)",
           "pr_number": 2006,
@@ -13660,7 +13720,7 @@ module.exports = {
           "deletions_count": 107,
           "description": "Add SASL to kafka",
           "files_count": 13,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-06-27-add-sasl-to-kafka/",
           "insertions_count": 511,
           "message": "enhancement(kafka source, kafka sink): Add SASL to kafka (#2897)",
           "pr_number": 2897,
@@ -14580,7 +14640,7 @@ module.exports = {
             "domain: transforms",
             "transform: regex_parser"
           ],
-          "title": "Add RegexSet support to regex"
+          "title": "RegexSet support to `regex` transform"
         },
         {
           "author_github": "https://github.com/hoverbear",
@@ -14613,6 +14673,20 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/hoverbear",
+          "date": "2020-06-11",
+          "description": "Vector can be optionally built with an integrated WASM runtime",
+          "hide_on_release_notes": false,
+          "id": "2020-06-11-introduce-wasm-plugins",
+          "path": "website/highlights/2020-06-11-introduce-wasm-plugins.md",
+          "permalink": "/highlights/2020-06-11-introduce-wasm-plugins/",
+          "tags": [
+            "type: new feature",
+            "domain: transforms"
+          ],
+          "title": "Experimental WASM Plugins (Dev builds only)"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
           "date": "2020-06-18",
           "description": "Vector once again follows the guidance of the host on DNS lookups.",
           "hide_on_release_notes": false,
@@ -14623,6 +14697,21 @@ module.exports = {
             "type: breaking change"
           ],
           "title": "Removal custom DNS resolution"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
+          "date": "2020-06-27",
+          "description": "Vector has a new way to authenticate with Kafka!",
+          "hide_on_release_notes": false,
+          "id": "2020-06-27-add-sasl-to-kafka",
+          "path": "website/highlights/2020-06-27-add-sasl-to-kafka.md",
+          "permalink": "/highlights/2020-06-27-add-sasl-to-kafka/",
+          "tags": [
+            "type: new feature",
+            "domain: sinks",
+            "sink: kafka"
+          ],
+          "title": "Kafka components support SASL"
         }
       ],
       "insertions_count": 42685,

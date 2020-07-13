@@ -1,7 +1,7 @@
 ---
 last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/highlights.json"
-title: "Add RegexSet support to regex"
+title: "RegexSet support to `regex` transform"
 description: "Efficiently run multiple regexes in the same transform!"
 author_github: "https://github.com/hoverbear"
 hide_on_release_notes: false
