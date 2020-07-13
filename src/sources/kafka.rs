@@ -83,7 +83,7 @@ impl SourceConfig for KafkaSourceConfig {
         shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        kafka_source(self.clone(), shutdown, out)
+        kafka_source(self, shutdown, out)
     }
 
     fn output_type(&self) -> DataType {
@@ -96,11 +96,13 @@ impl SourceConfig for KafkaSourceConfig {
 }
 
 fn kafka_source(
-    config: KafkaSourceConfig,
+    config: &KafkaSourceConfig,
     shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
 ) -> crate::Result<super::Source> {
-    let consumer = Arc::new(create_consumer(config.clone())?);
+    let key_field = config.key_field.clone();
+
+    let consumer = Arc::new(create_consumer(&config)?);
     let source = future::lazy(move || {
         let consumer_ref = Arc::clone(&consumer);
 
@@ -141,7 +143,7 @@ fn kafka_source(
                         // Add source type
                         log.insert(event::log_schema().source_type_key(), "kafka");
 
-                        if let Some(key_field) = &config.key_field {
+                        if let Some(key_field) = &key_field {
                             match msg.key_view::<[u8]>() {
                                 None => (),
                                 Some(Err(e)) => {
@@ -167,7 +169,7 @@ fn kafka_source(
     Ok(Box::new(source))
 }
 
-fn create_consumer(config: KafkaSourceConfig) -> crate::Result<StreamConsumer> {
+fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> {
     let mut client_config = ClientConfig::new();
     client_config
         .set("group.id", &config.group_id)
@@ -187,8 +189,8 @@ fn create_consumer(config: KafkaSourceConfig) -> crate::Result<StreamConsumer> {
 
     config.auth.apply(&mut client_config)?;
 
-    if let Some(librdkafka_options) = config.librdkafka_options {
-        for (key, value) in librdkafka_options.into_iter() {
+    if let Some(librdkafka_options) = &config.librdkafka_options {
+        for (key, value) in librdkafka_options {
             client_config.set(key.as_str(), value.as_str());
         }
     }
@@ -240,7 +242,7 @@ mod test {
     #[test]
     fn kafka_source_create_ok() {
         let config = make_config();
-        assert!(kafka_source(config, ShutdownSignal::noop(), mpsc::channel(1).0).is_ok());
+        assert!(kafka_source(&config, ShutdownSignal::noop(), mpsc::channel(1).0).is_ok());
     }
 
     #[test]
@@ -249,7 +251,7 @@ mod test {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
             ..make_config()
         };
-        assert!(kafka_source(config, ShutdownSignal::noop(), mpsc::channel(1).0).is_err());
+        assert!(kafka_source(&config, ShutdownSignal::noop(), mpsc::channel(1).0).is_err());
     }
 }
 
@@ -322,7 +324,7 @@ mod integration_test {
         ));
         println!("Receiving event...");
         let (tx, rx) = mpsc::channel(1);
-        rt.spawn(kafka_source(config, ShutdownSignal::noop(), tx).unwrap());
+        rt.spawn(kafka_source(&config, ShutdownSignal::noop(), tx).unwrap());
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
