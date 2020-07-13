@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-15"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "at_least_once"
 component_title: "Heroku Logplex"
 description: "The Vector `logplex` source ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events."
@@ -350,7 +350,6 @@ You can learn more in the
 Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
 and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
 options.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

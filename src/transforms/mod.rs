@@ -35,6 +35,8 @@ pub mod logfmt_parser;
 pub mod lua;
 #[cfg(feature = "transforms-merge")]
 pub mod merge;
+#[cfg(feature = "transforms-reduce")]
+pub mod reduce;
 #[cfg(feature = "transforms-regex_parser")]
 pub mod regex_parser;
 #[cfg(feature = "transforms-remove_fields")]

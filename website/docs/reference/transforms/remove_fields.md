@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-10"
+last_modified_on: "2020-07-13"
 component_title: "Remove Fields"
 description: "The Vector `remove_fields` transform accepts and outputs `log` events, allowing you to remove one or more log fields."
 event_types: ["log"]
@@ -176,7 +176,6 @@ Will result in the following log event:
 ```
 
 Notice that `parent.child1` field was preserved.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

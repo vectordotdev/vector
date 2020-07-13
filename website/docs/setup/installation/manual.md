@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-07-13"
 title: Install Vector Manually
 sidebar_label: hidden
 hide_pagination: true
@@ -12,7 +13,6 @@ installed through a supported [platform][docs.platforms] or
 
 <Jump to="/docs/setup/installation/manual/from-archives/">From Archives</Jump>
 <Jump to="/docs/setup/installation/manual/from-source/">From Source</Jump>
-
 
 [docs.operating_systems]: /docs/setup/installation/operating-systems/
 [docs.platforms]: /docs/setup/installation/platforms/

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` sink exposes `metric` events to Prometheus metrics service."
@@ -413,7 +413,6 @@ consider alternative strategies to reduce the cardinality. Such as leveraging
 logs for high cardinality analysis. [Issue #387][urls.issue_387] discusses the
 ability to provide safeguards around this. We encourage you to add to that
 discussion with your use case if you find this to be a problem.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.metric#aggregated_histogram]: /docs/about/data-model/metric/#aggregated_histogram

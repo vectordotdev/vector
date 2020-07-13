@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-07-13"
 title: About
 description: "About Vector, the monitoring and observability data router"
 sidebar_label: hidden
@@ -14,6 +15,5 @@ for the rest of the documentation.
 <Jump to="/docs/about/data-model/">Data model</Jump>
 <Jump to="/docs/about/guarantees/">Guarantees</Jump>
 <Jump to="/docs/about/what-is-vector/">What is vector</Jump>
-
 
 

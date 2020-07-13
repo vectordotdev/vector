@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-10"
+last_modified_on: "2020-07-13"
 component_title: "Add Fields"
 description: "The Vector `add_fields` transform accepts and outputs `log` events, allowing you to add one or more log fields."
 event_types: ["log"]
@@ -222,7 +222,6 @@ All supported [configuration value types][docs.configuration#types] are
 accepted. This includes primitivate types (`string`, `int`, `float`, `boolean`)
 and special types, such as [arrays](#arrays) and
 [nested fields](#nested-fields).
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.configuration#types]: /docs/setup/configuration/#types

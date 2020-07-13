@@ -4,10 +4,10 @@ use super::{
     sink, Batch,
 };
 use crate::{
+    buffers::Acker,
     dns::Resolver,
     event::Event,
     tls::{tls_connector_builder, MaybeTlsSettings},
-    topology::config::SinkContext,
 };
 use bytes05::{Buf, Bytes};
 use futures::future::BoxFuture;
@@ -84,8 +84,8 @@ where
         batch: B,
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
-        tls_settings: impl Into<MaybeTlsSettings>,
-        cx: &SinkContext,
+        client: HttpClient,
+        acker: Acker,
     ) -> Self {
         Self::with_retry_logic(
             sink,
@@ -93,8 +93,8 @@ where
             HttpRetryLogic,
             request_settings,
             batch_timeout,
-            tls_settings,
-            cx,
+            client,
+            acker,
         )
     }
 }
@@ -112,8 +112,8 @@ where
         logic: L,
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
-        tls_settings: impl Into<MaybeTlsSettings>,
-        cx: &SinkContext,
+        client: HttpClient,
+        acker: Acker,
     ) -> Self {
         let sink = Arc::new(sink);
 
@@ -124,8 +124,8 @@ where
                 Box::pin(async move { sink.build_request(b).await })
             };
 
-        let svc = HttpBatchService::new(cx.resolver(), tls_settings, request_builder);
-        let inner = request_settings.batch_sink(logic, svc, batch, batch_timeout, cx.acker());
+        let svc = HttpBatchService::new(client, request_builder);
+        let inner = request_settings.batch_sink(logic, svc, batch, batch_timeout, acker);
 
         Self {
             sink,
@@ -291,13 +291,9 @@ pub struct HttpBatchService<F, B = Vec<u8>> {
 
 impl<F, B> HttpBatchService<F, B> {
     pub fn new(
-        resolver: Resolver,
-        tls_settings: impl Into<MaybeTlsSettings>,
+        inner: HttpClient,
         request_builder: impl Fn(B) -> F + Send + Sync + 'static,
     ) -> Self {
-        let inner =
-            HttpClient::new(resolver, tls_settings).expect("Unable to initialize http client");
-
         HttpBatchService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
@@ -441,7 +437,8 @@ mod test {
             .unwrap();
 
         let request = b"hello".to_vec();
-        let mut service = HttpBatchService::new(resolver, None, move |body: Vec<u8>| {
+        let client = HttpClient::new(resolver, None).unwrap();
+        let mut service = HttpBatchService::new(client, move |body: Vec<u8>| {
             Box::pin(ready(Request::post(&uri).body(body).map_err(Into::into)))
         });
 

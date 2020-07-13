@@ -51,7 +51,6 @@ And for the curious:
 
 <Jump to="https://github.com/timberio/vector/blob/master/rfcs/2020-03-06-1999-api-extensions-for-lua-transform.md" leftIcon="book">Vector's Lua RFC</Jump>
 
-
 [docs.transforms.lua#hooks]: /docs/reference/transforms/lua/#hooks
 [docs.transforms.lua#representation-of-events]: /docs/reference/transforms/lua/#representation-of-events
 [docs.transforms.lua#timers]: /docs/reference/transforms/lua/#timers

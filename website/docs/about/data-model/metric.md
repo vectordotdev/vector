@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-21"
+last_modified_on: "2020-07-13"
 title: Metric Event
 description: A detailed guide on Vector's internal metric data model.
 ---
@@ -720,6 +720,5 @@ Vector.
 ## Components
 
 <Jump to="/components/?event-types[]=metric">View all metric compatible components</Jump>
-
 
 

@@ -28,7 +28,7 @@ extended-description-file = "target/debian-extended-description.txt"
 [workspace]
 members = [
   ".",
-  "lib/codec",
+  "lib/codec01",
   "lib/file-source",
   "lib/tracing-limit",
   "lib/vector-wasm",
@@ -37,22 +37,20 @@ members = [
 [dependencies]
 # Internal libs
 codec = { path = "lib/codec" }
+codec01 = { path = "lib/codec01" }
 file-source = { path = "lib/file-source" }
 tracing-limit = { path = "lib/tracing-limit" }
 
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio01 = { package = "tokio", version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing", "codec", "udp"], default-features = false }
+tokio01 = { package = "tokio", version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing", "codec", "udp", "sync", "fs"], default-features = false }
 tokio = { version = "0.2.13", features = ["blocking", "fs", "sync", "macros", "test-util", "rt-core", "io-std"] }
-tokio-codec = "0.1.2"
 tokio-openssl = "0.3.0"
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-compat = { version = "0.1", features = ["rt-full"] }
-# TODO: remove when pulsar is upgraded
-tokio-executor = "0.1.10"
-tokio-util = { version = "0.3.1", features = ["compat"] }
+tokio-util = { version = "0.3.1", features = ["codec", "compat"] }
 async-trait = "0.1"
 
 # Tracing
@@ -87,9 +85,8 @@ serde = { version = "1.0.80", features = ["derive"] }
 serde_json = { version = "1.0.33", features = ["raw_value"] }
 
 # Prost
-prost = "0.5"
-prost-derive = "0.5"
-prost-types = "0.5"
+prost = "0.6.1"
+prost-types = "0.6.1"
 
 # GCP
 goauth = { version = "0.7.1", optional = true }
@@ -152,7 +149,7 @@ once_cell = "1.3"
 getset = "0.1.0"
 lru = "0.4.3"
 bloom = "0.3.2"
-pulsar = { version = "0.3.0", optional = true }
+pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
 task-compat = "0.1"
 cidr-utils = "0.4.1"
 
@@ -162,6 +159,7 @@ lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a
 lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
 lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "d4fc14a03bdb99ac83173d27fddf1aca48412a86", optional = true }
 anyhow = { version = "1.0.28", optional = true }
+async-stream = "0.2.1"
 
 
 [target.'cfg(windows)'.dependencies]
@@ -175,7 +173,7 @@ atty = "0.2"
 nix = "0.16.1"
 
 [build-dependencies]
-prost-build = "0.5.0"
+prost-build = "0.6.1"
 built = { version = "0.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
@@ -292,6 +290,7 @@ transforms = [
   "transforms-swimlanes",
   "transforms-tag_cardinality_limit",
   "transforms-tokenizer",
+  "transforms-reduce",
 ]
 transforms-add_fields = []
 transforms-add_tags = []
@@ -319,6 +318,7 @@ transforms-swimlanes = []
 transforms-tag_cardinality_limit = []
 transforms-tokenizer = ["nom"]
 transforms-wasm = ["wasm"]
+transforms-reduce = []
 
 # Sinks
 sinks = [

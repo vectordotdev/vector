@@ -165,6 +165,8 @@ module.exports = {
             
               "reference/transforms/merge",
             
+              "reference/transforms/reduce",
+            
               "reference/transforms/regex_parser",
             
               "reference/transforms/remove_fields",

@@ -30,7 +30,7 @@ module PostProcessors
 
             The front matter is:
 
-                #{JSON.pretty_generate(front_matter)}
+            #{JSON.pretty_generate(front_matter).indent(4)}
 
             Please fix these errors and try again.
             EOF
@@ -45,11 +45,11 @@ module PostProcessors
 
           Error:
 
-            #{e.message}
+              #{e.message}
 
           Stacktrace:
 
-            #{e.backtrace.join("\n  ")}
+          #{e.backtrace.join("\n  ").indent(4)}
 
           EOF
         )

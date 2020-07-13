@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-03"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
@@ -957,7 +957,6 @@ the [`start_at_beginning`](#start_at_beginning) option to `true`.
 
 Previously discovered files will be [checkpointed](#checkpointing), and the
 read position will resume from the last checkpoint.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

@@ -32,7 +32,6 @@ is replaces our old `field_filter` transform since it is much more expressive.
 Check out the [docs][docs.transforms.filter] for a fill list of available
 conditions.
 
-
 [docs.reference.tests]: /docs/reference/tests/
 [docs.transforms.filter]: /docs/reference/transforms/filter/
 [docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/guides.json"
 title: Custom Aggregations with Lua
 description: Write a custom transform for aggregating log events into metrics using Lua scripting
@@ -291,7 +291,6 @@ providing a [rich set][docs.reference.transforms] of predefined transforms for b
 pipelines, it makes it possible to write custom aggregations as Lua scripts. This allows each role of Vector
 in a [deployment topology][docs.setup.deployment.topologies] to perform various kinds of aggregations, providing
 alternatives to centralized logs aggregation.
-
 
 [docs.about.concepts#pipelines]: /docs/about/concepts/#pipelines
 [docs.about.data-model.metric#counter]: /docs/about/data-model/metric/#counter

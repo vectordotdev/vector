@@ -19,7 +19,30 @@ Dir.chdir "scripts"
 
 require "rubygems"
 require "bundler"
-Bundler.require(:default)
+
+begin
+  Bundler.require(:default)
+rescue Bundler::GemNotFound => e
+  puts(
+    <<~EOF
+    You're missing a required Ruby gem dependency:
+
+        #{e.message}
+
+    Make sure you've installed all gems:
+
+        cd scripts
+        bundle install
+
+    Alternatively, you can use our Docker environment via
+
+        make environment
+        make <your-target>
+
+    EOF
+  )
+  exit(1)
+end
 
 require "date"
 require_relative "util"

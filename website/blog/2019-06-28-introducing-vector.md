@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-07-13"
 id: introducing-vector
 title: Introducing Vector
 description: "Hello World. Bringing Vector to life."
@@ -38,6 +38,5 @@ The end result is a tool that can **be** your pipeline, rather than just another
 ## Try it out!
 
 We're still very early in the process of building Vector, but it's already at a stage where we believe it's competitive with existing tools and ready to be trialed for production use. Not every feature mentioned above is present yet, but we're happy with the foundation and working quickly to flesh everything out. If you're interested in giving it a try, check out the project on GitHub, our docs, and please reach out! We'd love to hear about your use cases and are excited to see where we can take this project together.
-
 
 

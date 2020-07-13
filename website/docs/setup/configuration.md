@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-14"
+last_modified_on: "2020-07-13"
 title: Configuration
 description: Configuring Vector
 ---
@@ -196,7 +196,6 @@ All TOML values types are supported. For convenience this includes:
 * [Local Times](https://github.com/toml-lang/toml#local-time)
 * [Arrays](https://github.com/toml-lang/toml#array)
 * [Tables](https://github.com/toml-lang/toml#table)
-
 
 [docs.data-model]: /docs/about/data-model/
 [docs.installation]: /docs/setup/installation/

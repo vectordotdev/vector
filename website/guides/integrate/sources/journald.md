@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/guides.json"
 title: "Collect logs from Journald and send them anywhere"
 description: "A simple guide to collect logs from Journald and send them anywhere in just a few minutes."
@@ -142,7 +142,6 @@ flexibility of Vector:
   <div className="title">Vector documentation</div>
   <div className="sub-title">Thoughtful, detailed docs that respect your time.</div>
 </Jump>
-
 
 [docs.installation]: /docs/setup/installation/
 [docs.sources.journald]: /docs/reference/sources/journald/

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-25"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
@@ -1222,7 +1222,6 @@ value of `emergency` matches `emerg`), and the comparison ignores case.
 Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
 and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
 options.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

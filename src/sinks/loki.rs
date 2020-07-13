@@ -13,7 +13,6 @@
 //! does not match, we will add a default label `{agent="vector"}`.
 
 use crate::{
-    dns::Resolver,
     event::{self, Event, Value},
     runtime::FutureExt,
     sinks::util::{
@@ -84,21 +83,23 @@ impl SinkConfig for LokiConfig {
         let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
             BatchSettings::default()
                 .bytes(bytesize::mib(10u64))
+                .events(100_000)
                 .timeout(1),
         );
         let tls = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), tls)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
             VecBuffer::new(batch_settings.size),
             request_settings,
             batch_settings.timeout,
-            Some(tls),
-            &cx,
+            client.clone(),
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal loki sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed_compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed_compat();
 
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
@@ -228,11 +229,8 @@ impl HttpSink for LokiConfig {
     }
 }
 
-async fn healthcheck(config: LokiConfig, resolver: Resolver) -> crate::Result<()> {
+async fn healthcheck(config: LokiConfig, mut client: HttpClient) -> crate::Result<()> {
     let uri = format!("{}ready", config.endpoint);
-
-    let tls = TlsSettings::from_options(&config.tls)?;
-    let mut client = HttpClient::new(resolver, tls)?;
 
     let req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
 

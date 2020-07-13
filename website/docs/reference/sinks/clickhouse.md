@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-25"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "at_least_once"
 component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."
@@ -1104,7 +1104,6 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
 and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
 options.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

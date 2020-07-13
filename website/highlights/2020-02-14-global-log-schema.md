@@ -39,7 +39,6 @@ Why is this useful?
    [sinks][docs.sinks] to ensure that Vector's internal "host" field is mapped
    to the downstream service's "host" field.
 
-
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.global-options#log_schema]: /docs/reference/global-options/#log_schema
