@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Remove custom DNS resolution"
 description: "Vector once again follows the guidance of the host on DNS lookups."
@@ -22,3 +23,5 @@ Make the following changes in your `vector.toml` file:
 ```
 
 If you were using this feature with a custom DNS you may need to configure your host to consult this DNS, or wrap Vector in a container and set the DNS for the container. This can be done via [`--dns` in `podman`/`docker`][urls.docker_dns].
+
+[urls.docker_dns]: https://docs.docker.com/config/containers/container-networking/#dns-services

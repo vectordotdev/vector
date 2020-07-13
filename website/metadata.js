@@ -3385,7 +3385,7 @@ module.exports = {
       "title": "Improved Shutdown"
     },
     {
-      "author_github": "https://github.com/a_hoverbear",
+      "author_github": "https://github.com/hoverbear",
       "date": "2020-06-18",
       "description": "Vector once again follows the guidance of the host on DNS lookups.",
       "hide_on_release_notes": false,
@@ -3820,7 +3820,7 @@ module.exports = {
     }
   },
   "latest_highlight": {
-    "author_github": "https://github.com/a_hoverbear",
+    "author_github": "https://github.com/hoverbear",
     "date": "2020-06-18",
     "description": "Vector once again follows the guidance of the host on DNS lookups.",
     "hide_on_release_notes": false,
@@ -9113,7 +9113,7 @@ module.exports = {
     "description": "",
     "highlights": [
       {
-        "author_github": "https://github.com/a_hoverbear",
+        "author_github": "https://github.com/hoverbear",
         "date": "2020-06-18",
         "description": "Vector once again follows the guidance of the host on DNS lookups.",
         "hide_on_release_notes": false,
@@ -14438,7 +14438,7 @@ module.exports = {
       "description": "",
       "highlights": [
         {
-          "author_github": "https://github.com/a_hoverbear",
+          "author_github": "https://github.com/hoverbear",
           "date": "2020-06-18",
           "description": "Vector once again follows the guidance of the host on DNS lookups.",
           "hide_on_release_notes": false,
