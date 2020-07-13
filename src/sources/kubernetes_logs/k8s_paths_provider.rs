@@ -3,7 +3,6 @@
 #![deny(missing_docs)]
 
 use super::path_helpers::build_pod_logs_directory;
-use crate::kubernetes as k8s;
 use evmap10::ReadHandle;
 use file_source::paths_provider::PathsProvider;
 use k8s_openapi::api::core::v1::Pod;
@@ -12,12 +11,12 @@ use std::path::PathBuf;
 /// A paths provider implementation that uses the state obtained from the
 /// the k8s API.
 pub struct K8sPathsProvider {
-    pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
+    pods_state_reader: ReadHandle<String, k8s_runtime::state::evmap::Value<Pod>>,
 }
 
 impl K8sPathsProvider {
     /// Create a new [`K8sPathsProvider`].
-    pub fn new(pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>) -> Self {
+    pub fn new(pods_state_reader: ReadHandle<String, k8s_runtime::state::evmap::Value<Pod>>) -> Self {
         Self { pods_state_reader }
     }
 }

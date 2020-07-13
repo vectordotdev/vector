@@ -3,26 +3,27 @@
 use crate::internal_events::kubernetes::instrumenting_state as internal_events;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
+use k8s_runtime::state;
 
-/// A [`super::Write`] implementatiom that wraps another [`super::Write`] and
+/// A [`state::Write`] implementatiom that wraps another [`state::Write`] and
 /// adds instrumentation.
 pub struct Writer<T> {
     inner: T,
 }
 
 impl<T> Writer<T> {
-    /// Take a [`super::Write`] and return it wrapped with [`Self`].
+    /// Take a [`state::Write`] and return it wrapped with [`Self`].
     pub fn new(inner: T) -> Self {
         Self { inner }
     }
 }
 
 #[async_trait]
-impl<T> super::Write for Writer<T>
+impl<T> state::Write for Writer<T>
 where
-    T: super::Write + Send,
+    T: state::Write + Send,
 {
-    type Item = <T as super::Write>::Item;
+    type Item = <T as state::Write>::Item;
 
     async fn add(&mut self, item: Self::Item) {
         emit!(internal_events::StateItemAdded);
@@ -46,9 +47,9 @@ where
 }
 
 #[async_trait]
-impl<T> super::MaintainedWrite for Writer<T>
+impl<T> state::MaintainedWrite for Writer<T>
 where
-    T: super::MaintainedWrite + Send,
+    T: state::MaintainedWrite + Send,
 {
     fn maintenance_request(&mut self) -> Option<BoxFuture<'_, ()>> {
         self.inner.maintenance_request().map(|future| {
@@ -65,11 +66,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{mock, MaintainedWrite, Write};
-    use super::*;
+    use super::Writer;
     use crate::test_util;
     use futures::{channel::mpsc, SinkExt, StreamExt};
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+    use k8s_runtime::state::{mock, MaintainedWrite, Write};
     use once_cell::sync::OnceCell;
     use std::sync::{Mutex, MutexGuard};
 
@@ -177,7 +178,7 @@ mod tests {
                 let before = get_metric_value("item_added");
                 tokio::spawn(async move {
                     assert_eq!(
-                        events_rx.next().await.unwrap().unwrap_op(),
+                        events_rx.next().await.unwrap().unwrap_item(),
                         (pod, mock::OpKind::Add)
                     );
 
@@ -209,7 +210,7 @@ mod tests {
                 let before = get_metric_value("item_updated");
                 tokio::spawn(async move {
                     assert_eq!(
-                        events_rx.next().await.unwrap().unwrap_op(),
+                        events_rx.next().await.unwrap().unwrap_item(),
                         (pod, mock::OpKind::Update)
                     );
 
@@ -241,7 +242,7 @@ mod tests {
                 let before = get_metric_value("item_deleted");
                 tokio::spawn(async move {
                     assert_eq!(
-                        events_rx.next().await.unwrap().unwrap_op(),
+                        events_rx.next().await.unwrap().unwrap_item(),
                         (pod, mock::OpKind::Delete)
                     );
 

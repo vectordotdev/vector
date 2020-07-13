@@ -1,0 +1,39 @@
+[package]
+name = "k8s-runtime"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+
+[dependencies]
+async-stream = "0.2"
+async-trait = "0.1"
+bytes = "0.5"
+evmap = { version = "10", optional = true }
+futures = "0.3"
+http = "0.2"
+http-body = "0.3"
+k8s-openapi = "0.9"
+metrics = "0.12.1"
+serde = "1"
+snafu = "0.6"
+tokio = { version = "0.2", features = ["time", "full"] }
+tracing = "0.1"
+
+[dev-dependencies]
+env_logger = "0.7"
+hyper = "0.13"
+k8s-openapi = { version = "0.9", features = ["v1_15"] }
+rand = "0.7"
+tokio = { version = "0.2", features = ["test-util"] }
+tracing = { version = "0.1", features = ["max_level_trace", "log"] }
+
+[features]
+# Mocks
+mocks  = ["mock-watcher", "mock-state"]
+mock-watcher = []
+mock-state = []
+# Implementations
+impls = ["evmap-state"]
+evmap-state = ["evmap"]
+
+default = ["impls"]

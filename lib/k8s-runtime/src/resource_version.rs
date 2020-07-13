@@ -34,6 +34,7 @@ impl State {
 }
 
 /// A resource version candidate, can be used to update the resource version.
+#[derive(Debug)]
 pub struct Candidate(String);
 
 impl Candidate {

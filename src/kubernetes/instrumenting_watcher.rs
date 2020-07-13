@@ -1,6 +1,6 @@
 //! A watcher that adds instrumentation.
 
-use super::watcher::{self, Watcher};
+use k8s_runtime::watcher::{self, Watcher};
 use crate::internal_events::kubernetes::instrumenting_watcher as internal_events;
 use futures::{future::BoxFuture, stream::BoxStream, FutureExt, StreamExt};
 use k8s_openapi::{WatchOptional, WatchResponse};

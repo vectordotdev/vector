@@ -1898,6 +1898,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "k8s-runtime"
+version = "0.1.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "bytes 0.5.4",
+ "env_logger 0.7.1",
+ "evmap 10.0.2",
+ "futures 0.3.5",
+ "http 0.2.1",
+ "http-body",
+ "hyper",
+ "k8s-openapi",
+ "metrics",
+ "rand 0.7.3",
+ "serde",
+ "snafu",
+ "tokio 0.2.21",
+ "tracing",
+]
+
+[[package]]
 name = "kernel32-sys"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5523,6 +5545,7 @@ dependencies = [
  "inventory",
  "jemallocator",
  "k8s-openapi",
+ "k8s-runtime",
  "lazy_static 1.4.0",
  "leveldb",
  "libc",

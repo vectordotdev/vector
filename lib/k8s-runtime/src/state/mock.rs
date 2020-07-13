@@ -1,7 +1,5 @@
 //! A mock state.
 
-#![cfg(test)]
-
 use async_trait::async_trait;
 use futures::{
     channel::mpsc::{Receiver, Sender},
@@ -11,7 +9,7 @@ use futures::{
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
 
 /// The kind of item-scoped operation.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpKind {
     /// Item added.
     Add,
@@ -22,6 +20,7 @@ pub enum OpKind {
 }
 
 /// An event that's send to the test scenario driver for operations flow.
+#[derive(Debug)]
 pub enum ScenarioEvent<T>
 where
     T: Metadata<Ty = ObjectMeta> + Send,
@@ -38,10 +37,12 @@ impl<T> ScenarioEvent<T>
 where
     T: Metadata<Ty = ObjectMeta> + Send,
 {
-    pub fn unwrap_op(self) -> (T, OpKind) {
+    /// Unwraps the item and operation kind, or panics if the event is not
+    /// an item event.
+    pub fn unwrap_item(self) -> (T, OpKind) {
         match self {
             ScenarioEvent::Item(val, op) => (val, op),
-            _ => panic!("unwrap_op on non-item op"),
+            _ => panic!("unwrap_item on non-item event"),
         }
     }
 }
@@ -55,6 +56,7 @@ where
 ///
 /// Note: the only action available in the [`super::Write`] is to just continue
 /// and return.
+#[derive(Debug)]
 pub struct Writer<T>
 where
     T: Metadata<Ty = ObjectMeta> + Send,

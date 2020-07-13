@@ -5,6 +5,11 @@ use k8s_openapi::{Resource, WatchOptional, WatchResponse};
 use serde::de::DeserializeOwned;
 use snafu::Snafu;
 
+#[cfg(any(test, feature = "mock-watcher"))]
+pub mod mock;
+#[cfg(any(test, feature = "mock-watcher"))]
+pub use mock::Mock;
+
 /// Watch over the changes for a k8s resource.
 pub trait Watcher {
     /// The type of the watched object.

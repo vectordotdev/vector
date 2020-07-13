@@ -20,11 +20,13 @@
 //!
 
 use crate::{dns::Resolver, sinks::util::http::HttpClient, tls::TlsSettings};
+use async_trait::async_trait;
 use http::{
     header::{self, HeaderValue},
     uri, Request, Response, Uri,
 };
 use hyper::body::Body;
+use k8s_runtime::Client as RuntimeClient;
 
 pub mod config;
 
@@ -79,12 +81,6 @@ impl Client {
         })
     }
 
-    /// Alters a request according to the client configuraion and sends it.
-    pub async fn send<B: Into<Body>>(&mut self, req: Request<B>) -> crate::Result<Response<Body>> {
-        let req = self.prepare_request(req);
-        self.inner.send(req).await
-    }
-
     fn prepare_request<B: Into<Body>>(&self, req: Request<B>) -> Request<Body> {
         let (mut parts, body) = req.into_parts();
         let body = body.into();
@@ -102,5 +98,43 @@ impl Client {
         parts.scheme = Some(self.uri_scheme.clone());
         parts.authority = Some(self.uri_authority.clone());
         Uri::from_parts(parts).unwrap()
+    }
+}
+
+#[async_trait]
+impl RuntimeClient for Client {
+    type Body = Body;
+    type Error = Error;
+
+    /// Alters a request according to the client configuraion and sends it.
+    async fn send<B>(&mut self, req: Request<B>) -> Result<Response<Self::Body>, Self::Error>
+    where
+        B: Into<Self::Body> + Send,
+    {
+        let req = self.prepare_request(req);
+        Ok(self.inner.send(req).await?)
+    }
+}
+
+/// `Box<dyn Error>` doesn't implement `Error`, so we need this simple wrapper.
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct Error(pub crate::Error);
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.0.as_ref(), f)
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.0.source()
+    }
+}
+
+impl From<crate::Error> for Error {
+    fn from(val: crate::Error) -> Self {
+        Self(val)
     }
 }

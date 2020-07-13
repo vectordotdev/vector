@@ -8,6 +8,7 @@ use tokio::time::{delay_until, Instant};
 /// A [`super::Write`] implementatiom that wraps another [`super::Write`] and
 /// delays the delete calls.
 /// Implements the logic for delaying the deletion of items from the storage.
+#[allow(missing_debug_implementations)]
 pub struct Writer<T>
 where
     T: super::Write + Send,
@@ -137,7 +138,6 @@ where
 mod tests {
     use super::super::{mock, MaintainedWrite, Write};
     use super::*;
-    use crate::test_util;
     use futures::{channel::mpsc, SinkExt, StreamExt};
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 
@@ -166,131 +166,124 @@ mod tests {
         }
     }
 
-    fn no_maintenance_test_flow<FT, FA>(ft: FT, fa: FA)
+    async fn no_maintenance_test_flow<FT, FA>(ft: FT, fa: FA)
     where
         FT: for<'a> FnOnce(&'a mut (dyn Write<Item = Pod> + Send)) -> BoxFuture<'a, ()>
             + Send
             + 'static,
         FA: FnOnce(mock::ScenarioEvent<Pod>) + Send + 'static,
     {
-        test_util::trace_init();
-        test_util::block_on_std(async move {
-            tokio::time::pause();
-            let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
+        tokio::time::pause();
+        let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
-            // Ensure that right after construction maintenance is not required.
-            assert!(writer.maintenance_request().is_none());
+        // Ensure that right after construction maintenance is not required.
+        assert!(writer.maintenance_request().is_none());
 
-            let join = {
-                tokio::spawn(async move {
-                    let event = events_rx.next().await.unwrap();
-                    fa(event);
-                    actions_tx.send(()).await.unwrap();
-                })
-            };
+        let join = {
+            tokio::spawn(async move {
+                let event = events_rx.next().await.unwrap();
+                fa(event);
+                actions_tx.send(()).await.unwrap();
+            })
+        };
 
-            // Ensure that before the operation maintenance is not required.
-            assert!(writer.maintenance_request().is_none());
+        // Ensure that before the operation maintenance is not required.
+        assert!(writer.maintenance_request().is_none());
 
-            {
-                let fut = ft(&mut writer);
-                // pin_mut!(fut);
-                fut.await;
-            }
+        ft(&mut writer).await;
 
-            // Ensure that after the operation maintenance is not required.
-            assert!(writer.maintenance_request().is_none());
+        // Ensure that after the operation maintenance is not required.
+        assert!(writer.maintenance_request().is_none());
 
-            join.await.unwrap();
-            tokio::time::resume();
+        join.await.unwrap();
+        tokio::time::resume();
 
-            // Ensure that finally maintenance is not required.
-            assert!(writer.maintenance_request().is_none());
-        })
+        // Ensure that finally maintenance is not required.
+        assert!(writer.maintenance_request().is_none());
     }
 
-    #[test]
-    fn add() {
+    #[tokio::test]
+    async fn add() {
         let pod = make_pod();
         let assert_pod = pod.clone();
         no_maintenance_test_flow(
             |writer| Box::pin(writer.add(pod)),
-            |event| assert_eq!(event.unwrap_op(), (assert_pod, mock::OpKind::Add)),
+            |event| assert_eq!(event.unwrap_item(), (assert_pod, mock::OpKind::Add)),
         )
+        .await
     }
 
-    #[test]
-    fn update() {
+    #[tokio::test]
+    async fn update() {
         let pod = make_pod();
         let assert_pod = pod.clone();
         no_maintenance_test_flow(
             |writer| Box::pin(writer.update(pod)),
-            |event| assert_eq!(event.unwrap_op(), (assert_pod, mock::OpKind::Update)),
+            |event| assert_eq!(event.unwrap_item(), (assert_pod, mock::OpKind::Update)),
         )
+        .await
     }
 
-    #[test]
-    fn delete() {
-        test_util::trace_init();
-        test_util::block_on_std(async {
-            // Freeze time.
-            tokio::time::pause();
+    #[tokio::test]
+    async fn delete() {
+        // Freeze time.
+        tokio::time::pause();
 
-            // Prepare test parameters.
-            let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
+        // Prepare test parameters.
+        let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
-            // Ensure that right after construction maintenance is not required.
-            assert!(writer.maintenance_request().is_none());
+        // Ensure that right after construction maintenance is not required.
+        assert!(writer.maintenance_request().is_none());
 
-            // Prepare a mock pod.
-            let pod = make_pod();
+        // Prepare a mock pod.
+        let pod = make_pod();
 
-            writer.delete(pod.clone()).await;
+        writer.delete(pod.clone()).await;
 
-            // Ensure the deletion event didn't trigger the actual deletion immediately.
-            assert!(events_rx.try_next().is_err());
+        // Ensure the deletion event didn't trigger the actual deletion immediately.
+        assert!(events_rx.try_next().is_err());
 
-            // Ensure maintenance request is now present.
-            let maintenance_request = writer
-                .maintenance_request()
-                .expect("maintenance request should be present");
+        // Ensure maintenance request is now present.
+        let maintenance_request = writer
+            .maintenance_request()
+            .expect("maintenance request should be present");
 
-            // Advance time.
-            tokio::time::advance(DELAY_FOR * 2).await;
+        // Advance time.
+        tokio::time::advance(DELAY_FOR * 2).await;
 
-            // At this point, maintenance request should be ready.
-            maintenance_request.await;
+        // At this point, maintenance request should be ready.
+        maintenance_request.await;
 
-            // Run the assertion on the delete operation to ensure maintenance
-            // actually causes a delete.
-            let join = tokio::spawn(async move {
-                // Control for the deletion action.
-                let event = events_rx.next().await.unwrap();
-                assert_eq!(event.unwrap_op(), (pod, mock::OpKind::Delete));
-                actions_tx.send(()).await.unwrap();
+        // Run the assertion on the delete operation to ensure maintenance
+        // actually causes a delete.
+        let join = tokio::spawn(async move {
+            // Control for the deletion action.
+            let event = events_rx.next().await.unwrap();
+            assert_eq!(event.unwrap_item(), (pod, mock::OpKind::Delete));
+            actions_tx.send(()).await.unwrap();
 
-                // Control for the mock perform maintenance call (donwstream maintenance).
-                let event = events_rx.next().await.unwrap();
-                assert!(matches!(event, mock::ScenarioEvent::Maintenance));
-                actions_tx.send(()).await.unwrap();
-            });
+            // Control for the mock perform maintenance call (donwstream maintenance).
+            let event = events_rx.next().await.unwrap();
+            assert!(matches!(event, mock::ScenarioEvent::Maintenance));
+            actions_tx.send(()).await.unwrap();
+        });
 
-            // Perform maintenance.
-            writer.perform_maintenance().await;
+        // Perform maintenance.
+        writer.perform_maintenance().await;
 
-            // Join on assertion to guarantee panic propagation.
-            join.await.unwrap();
+        // Join on assertion to guarantee panic propagation.
+        join.await.unwrap();
 
-            // Unfreeze time.
-            tokio::time::resume();
-        })
+        // Unfreeze time.
+        tokio::time::resume();
     }
 
-    #[test]
-    fn resync() {
+    #[tokio::test]
+    async fn resync() {
         no_maintenance_test_flow(
             |writer| Box::pin(writer.resync()),
             |event| assert!(matches!(event, mock::ScenarioEvent::Resync)),
         )
+        .await
     }
 }

@@ -3,7 +3,7 @@
 #![deny(missing_docs)]
 
 use super::path_helpers::parse_log_file_path;
-use crate::{event::LogEvent, kubernetes as k8s, Event};
+use crate::{event::LogEvent, Event};
 use evmap10::ReadHandle;
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use serde::{Deserialize, Serialize};
@@ -30,14 +30,14 @@ impl Default for FieldsSpec {
 
 /// Annotate the event with pod metadata.
 pub struct PodMetadataAnnotator {
-    pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
+    pods_state_reader: ReadHandle<String, k8s_runtime::state::evmap::Value<Pod>>,
     fields_spec: FieldsSpec,
 }
 
 impl PodMetadataAnnotator {
     /// Create a new [`PodMetadataAnnotator`].
     pub fn new(
-        pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
+        pods_state_reader: ReadHandle<String, k8s_runtime::state::evmap::Value<Pod>>,
         fields_spec: FieldsSpec,
     ) -> Self {
         Self {

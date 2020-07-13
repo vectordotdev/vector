@@ -1,8 +1,6 @@
 //! A mock watcher.
 
-#![cfg(test)]
-
-use super::watcher::{self, Watcher};
+use super::Watcher;
 use async_stream::try_stream;
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{future::BoxFuture, stream::BoxStream, SinkExt, StreamExt};
@@ -13,12 +11,15 @@ use std::fmt;
 /// An event that's send to the test scenario driver.
 #[derive(Debug, PartialEq)]
 pub enum ScenarioEvent {
+    /// An invocation was issued.
     Invocation(OwnedWatchOptional),
+    /// The next stream item is being produced.
     Stream,
 }
 
 /// An action that's send from the test scenario driver to specify the
 /// invocation result.
+#[derive(Debug)]
 pub enum ScenarioActionInvocation<T>
 where
     T: DeserializeOwned + Resource,
@@ -34,6 +35,7 @@ where
 
 /// An action that's send from the test scenario driver to specify the
 /// stream item request result.
+#[derive(Debug)]
 pub enum ScenarioActionStream<T>
 where
     T: DeserializeOwned + Resource,
@@ -47,7 +49,8 @@ where
 }
 
 /// A mock watcher, useful for tests.
-pub struct MockWatcher<T>
+#[derive(Debug)]
+pub struct Mock<T>
 where
     T: DeserializeOwned + Resource,
 {
@@ -55,11 +58,11 @@ where
     invocation_rx: Receiver<ScenarioActionInvocation<T>>,
 }
 
-impl<T> MockWatcher<T>
+impl<T> Mock<T>
 where
     T: DeserializeOwned + Resource,
 {
-    /// Create a new [`MockWatcher`].
+    /// Create a new [`Mock`].
     pub fn new(
         events_tx: Sender<ScenarioEvent>,
         invocation_rx: Receiver<ScenarioActionInvocation<T>>,
@@ -71,7 +74,7 @@ where
     }
 }
 
-impl<T> Watcher for MockWatcher<T>
+impl<T> Watcher for Mock<T>
 where
     T: DeserializeOwned + Resource + Send + Sync + Unpin + 'static,
 {
@@ -85,8 +88,7 @@ where
     fn watch<'a>(
         &'a mut self,
         watch_optional: WatchOptional<'a>,
-    ) -> BoxFuture<'a, Result<Self::Stream, watcher::invocation::Error<Self::InvocationError>>>
-    {
+    ) -> BoxFuture<'a, Result<Self::Stream, super::invocation::Error<Self::InvocationError>>> {
         let mut stream_events_tx = self.events_tx.clone();
         Box::pin(async move {
             self.events_tx
@@ -123,10 +125,10 @@ where
                     Ok(stream)
                 }
                 ScenarioActionInvocation::ErrDesync => {
-                    Err(watcher::invocation::Error::desync(InvocationError))
+                    Err(super::invocation::Error::desync(InvocationError))
                 }
                 ScenarioActionInvocation::ErrOther => {
-                    Err(watcher::invocation::Error::other(InvocationError))
+                    Err(super::invocation::Error::other(InvocationError))
                 }
             }
         })
@@ -137,6 +139,7 @@ where
 /// Used to send it with [`ScenarioEvent`] to avoid the headaches with
 /// lifetimes.
 #[derive(Debug, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub struct OwnedWatchOptional {
     pub allow_watch_bookmarks: Option<bool>,
     pub field_selector: Option<String>,
@@ -160,11 +163,11 @@ impl<'a> From<WatchOptional<'a>> for OwnedWatchOptional {
 }
 
 /// An error kind for the mock watcher invocation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InvocationError;
 
 /// An error kind for the mock watcher stream.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StreamError;
 
 impl fmt::Display for InvocationError {

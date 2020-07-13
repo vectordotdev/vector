@@ -7,6 +7,7 @@ use std::time::Duration;
 use tokio::time::{delay_until, Instant};
 
 /// Provides an arbitrary signal debouncing.
+#[derive(Debug, Clone, Copy)]
 pub struct Debounce {
     sequence_start: Option<Instant>,
     time: Duration,

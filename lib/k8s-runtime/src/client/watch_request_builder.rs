@@ -5,7 +5,7 @@
 //! ## Non-namespaced and cluster-global
 //!
 //! ```rust
-//! # use vector::kubernetes::watch_request_builder::WatchRequestBuilder;
+//! # use k8s_runtime::client::watch_request_builder::WatchRequestBuilder;
 //! use k8s_openapi::api::core::v1::Pod;
 //!
 //! let _val: Box<dyn WatchRequestBuilder<Object = Pod>> =
@@ -15,7 +15,7 @@
 //! ## Namespaced
 //!
 //! ```rust
-//! # use vector::kubernetes::watch_request_builder::{WatchRequestBuilder, Namespaced};
+//! # use k8s_runtime::client::watch_request_builder::{WatchRequestBuilder, Namespaced};
 //! use k8s_openapi::api::core::v1::Pod;
 //!
 //! let _val: Box<dyn WatchRequestBuilder<Object = Pod>> =
@@ -73,6 +73,7 @@ where
 /// Specify the namespace and an API request building function.
 ///
 /// See module documentation for an example.
+#[derive(Debug)]
 pub struct Namespaced<N, F>(pub N, pub F);
 
 impl<N, F, T> WatchRequestBuilder for Namespaced<N, F>

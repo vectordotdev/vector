@@ -1,36 +1,34 @@
-//! A watcher based on the k8s API.
+//! A [`Watcher`] based on the Kubernetes API [`Client`].
 
-use super::{
-    client::Client,
-    stream as k8s_stream,
-    watch_request_builder::WatchRequestBuilder,
-    watcher::{self, Watcher},
-};
-use crate::internal_events::kubernetes::api_watcher as internal_events;
+use super::{stream as k8s_stream, watch_request_builder::WatchRequestBuilder, Client};
+use crate::watcher;
 use futures::{
     future::BoxFuture,
     stream::{BoxStream, Stream},
 };
 use http::StatusCode;
-use hyper::Error as BodyError;
+use http_body::Body;
 use k8s_openapi::{WatchOptional, WatchResponse};
 use snafu::{ResultExt, Snafu};
 
 /// A simple watcher atop of the Kubernetes API [`Client`].
-pub struct ApiWatcher<B>
+#[derive(Debug)]
+pub struct Watcher<C, B>
 where
+    C: 'static,
     B: 'static,
 {
-    client: Client,
+    client: C,
     request_builder: B,
 }
 
-impl<B> ApiWatcher<B>
+impl<C, B> Watcher<C, B>
 where
+    C: 'static,
     B: 'static,
 {
-    /// Create a new [`ApiWatcher`].
-    pub fn new(client: Client, request_builder: B) -> Self {
+    /// Create a new [`Watcher`].
+    pub fn new(client: C, request_builder: B) -> Self {
         Self {
             client,
             request_builder,
@@ -38,8 +36,13 @@ where
     }
 }
 
-impl<B> ApiWatcher<B>
+impl<C, B> Watcher<C, B>
 where
+    C: 'static + Client + Send,
+    Vec<u8>: Into<<C as Client>::Body>,
+    <C as Client>::Error: Send + Unpin,
+    <C as Client>::Body: std::fmt::Debug,
+    <<C as Client>::Body as Body>::Error: Send + Unpin + std::error::Error,
     B: 'static + WatchRequestBuilder,
     <B as WatchRequestBuilder>::Object: Send + Unpin,
 {
@@ -50,17 +53,17 @@ where
         impl Stream<
                 Item = Result<
                     WatchResponse<<B as WatchRequestBuilder>::Object>,
-                    k8s_stream::Error<BodyError>,
+                    k8s_stream::Error<<<C as Client>::Body as Body>::Error>,
                 >,
             > + 'static,
-        watcher::invocation::Error<invocation::Error>,
+        watcher::invocation::Error<invocation::Error<<C as Client>::Error>>,
     > {
         // Prepare request.
         let request = self
             .request_builder
             .build(watch_optional)
             .context(invocation::RequestPreparation)?;
-        emit!(internal_events::RequestPrepared { request: &request });
+        trace!(message = "request prepared", ?request);
 
         // Send request, get response.
         let response = self
@@ -68,9 +71,7 @@ where
             .send(request)
             .await
             .context(invocation::Request)?;
-        emit!(internal_events::ResponseReceived {
-            response: &response
-        });
+        trace!(message = "got response", ?response);
 
         // Handle response status code.
         let status = response.status();
@@ -90,16 +91,22 @@ where
     }
 }
 
-impl<B> Watcher for ApiWatcher<B>
+impl<C, B> watcher::Watcher for Watcher<C, B>
 where
+    C: 'static + Client + Send,
+    Vec<u8>: Into<<C as Client>::Body>,
+    <C as Client>::Error: Send + Unpin,
+    <C as Client>::Body: Send + Unpin + std::fmt::Debug,
+    <<C as Client>::Body as Body>::Error: Send + Unpin + std::error::Error,
+    <<C as Client>::Body as Body>::Data: Send + Unpin,
     B: 'static + WatchRequestBuilder + Send,
     <B as WatchRequestBuilder>::Object: Send + Unpin,
 {
     type Object = <B as WatchRequestBuilder>::Object;
 
-    type InvocationError = invocation::Error;
+    type InvocationError = invocation::Error<<C as Client>::Error>;
 
-    type StreamError = k8s_stream::Error<BodyError>;
+    type StreamError = k8s_stream::Error<<<C as Client>::Body as Body>::Error>;
     type Stream = BoxStream<'static, Result<WatchResponse<Self::Object>, Self::StreamError>>;
 
     fn watch<'a>(
@@ -123,7 +130,10 @@ pub mod invocation {
     /// Errors that can occur while watching.
     #[derive(Debug, Snafu)]
     #[snafu(visibility(pub))]
-    pub enum Error {
+    pub enum Error<RequestError>
+    where
+        RequestError: std::error::Error + 'static,
+    {
         /// Returned when the call-specific request builder fails.
         #[snafu(display("failed to prepare an HTTP request"))]
         RequestPreparation {
@@ -135,7 +145,7 @@ pub mod invocation {
         #[snafu(display("error during the HTTP request"))]
         Request {
             /// The error that API client retunred.
-            source: crate::Error,
+            source: RequestError,
         },
 
         /// Returned when the HTTP response has a bad status.
@@ -146,8 +156,11 @@ pub mod invocation {
         },
     }
 
-    impl From<Error> for watcher::invocation::Error<Error> {
-        fn from(source: Error) -> Self {
+    impl<RequestError> From<Error<RequestError>> for watcher::invocation::Error<Error<RequestError>>
+    where
+        RequestError: std::error::Error + 'static + Send,
+    {
+        fn from(source: Error<RequestError>) -> Self {
             watcher::invocation::Error::other(source)
         }
     }

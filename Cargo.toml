@@ -32,6 +32,7 @@ members = [
   "lib/file-source",
   "lib/tracing-limit",
   "lib/vector-wasm",
+  "lib/k8s-runtime",
 ]
 
 [dependencies]
@@ -154,6 +155,7 @@ task-compat = "0.1"
 cidr-utils = "0.4.2"
 pin-project = "0.4.22"
 k8s-openapi = { version = "0.9", features = ["v1_15"], optional = true }
+k8s-runtime = { version = "0.1", optional = true }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -197,6 +199,7 @@ tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
 assert_cmd = "1.0"
 reqwest = { version = "0.10.6", features = ["json"] }
+k8s-runtime = { version = "0.1", features = ["mocks"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -232,7 +235,7 @@ wasm-timings = ["wasm"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
-kubernetes = ["k8s-openapi", "evmap10"]
+kubernetes = ["k8s-openapi", "evmap10", "k8s-runtime"]
 
 # Sources
 sources = [
@@ -457,3 +460,6 @@ required-features = ["transforms-wasm", "transforms-lua"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
+
+[patch.crates-io]
+k8s-runtime = { path = "lib/k8s-runtime" }

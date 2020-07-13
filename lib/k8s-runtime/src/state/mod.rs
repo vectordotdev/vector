@@ -5,8 +5,9 @@ use futures::future::BoxFuture;
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
 
 pub mod delayed_delete;
+#[cfg(feature = "evmap-state")]
 pub mod evmap;
-pub mod instrumenting;
+#[cfg(any(test, feature = "mock-state"))]
 pub mod mock;
 
 /// Provides the interface for write access to the cached state.
