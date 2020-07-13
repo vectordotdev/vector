@@ -4,7 +4,7 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
-use bytes05::Bytes;
+use bytes05::{buf::BufExt, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
 use futures::{
@@ -18,7 +18,7 @@ use serde::{de, Deserialize, Serialize};
 use serde_json::{de::IoRead, json, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use std::{
-    io::{Cursor, Read},
+    io::Read,
     net::{Ipv4Addr, SocketAddr},
 };
 use string_cache::DefaultAtom as Atom;
@@ -157,13 +157,13 @@ impl SplunkSource {
                     async move {
                         // Construct event parser
                         if gzip {
-                            EventStream::new(GzDecoder::new(Cursor::new(body)), channel, host)
+                            EventStream::new(GzDecoder::new(body.reader()), channel, host)
                                 .forward(out.clone().sink_map_err(|_| ApiError::ServerShutdown))
                                 .map(|_| ())
                                 .compat()
                                 .await
                         } else {
-                            EventStream::new(Cursor::new(body), channel, host)
+                            EventStream::new(body.reader(), channel, host)
                                 .forward(out.clone().sink_map_err(|_| ApiError::ServerShutdown))
                                 .map(|_| ())
                                 .compat()
@@ -563,7 +563,7 @@ fn raw_event(
     // Process gzip
     let message: Value = if gzip {
         let mut data = Vec::new();
-        match GzDecoder::new(Cursor::new(bytes)).read_to_end(&mut data) {
+        match GzDecoder::new(bytes.reader()).read_to_end(&mut data) {
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => data.into(),
             Err(error) => {

@@ -217,7 +217,7 @@ mod tests {
         crate::test_util::trace_init();
         let (tx, mut rx) = mpsc::channel(10);
         let config = StdinConfig::default();
-        let buf = Cursor::new(String::from("hello world\nhello world again"));
+        let buf = Cursor::new("hello world\nhello world again");
 
         let mut rt = runtime();
         let source = stdin_source(buf, config, ShutdownSignal::noop(), tx).unwrap();

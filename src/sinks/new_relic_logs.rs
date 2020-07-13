@@ -149,6 +149,7 @@ mod tests {
         test_util::{next_addr, runtime, shutdown_on_idle},
         topology::config::SinkConfig,
     };
+    use bytes05::buf::BufExt;
     use futures01::{stream, Sink, Stream};
     use hyper::Method;
     use serde_json::Value;
@@ -300,9 +301,8 @@ mod tests {
                         .and_then(|v| v.to_str().ok()),
                     Some("foo")
                 );
-                body
+                body.reader()
             })
-            .map(std::io::Cursor::new)
             .flat_map(BufRead::lines)
             .map(Result::unwrap)
             .flat_map(|s| -> Vec<String> {

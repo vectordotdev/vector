@@ -5,12 +5,12 @@ use crate::{
     tls::TlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
-use bytes05::Bytes;
+use bytes05::{buf::BufExt, Bytes};
 use chrono::{DateTime, Utc};
 use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::{
-    io::{BufRead, BufReader, Cursor},
+    io::{BufRead, BufReader},
     net::SocketAddr,
     str::FromStr,
 };
@@ -102,7 +102,7 @@ fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
 }
 
 fn body_to_events(body: Bytes) -> Vec<Event> {
-    let rdr = BufReader::new(Cursor::new(body));
+    let rdr = BufReader::new(body.reader());
     rdr.lines()
         .filter_map(|res| {
             res.map_err(|error| error!(message = "Error reading request body", ?error))
