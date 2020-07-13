@@ -19,6 +19,5 @@ include it inthe actual data since it would be duplicative.
 To use this feature see the new `encoding` options for each sink. For example,
 the [`clickhouse` sink's `encoding` option][docs.sinks.clickhouse#encoding].
 
-
 [docs.sinks.clickhouse#encoding]: /docs/reference/sinks/clickhouse/#encoding
 [docs.sinks]: /docs/reference/sinks/

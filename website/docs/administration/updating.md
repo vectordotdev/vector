@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-07-13"
 title: Updating
 description: How to update Vector to a newer version.
 ---
@@ -49,7 +49,6 @@ upstream data will accumulate and buffer. To avoid overloading your instances,
 you'll want to make sure you have enough capacity to handle the surplus of
 data. We recommend provisioning at least 20% of head room, on all resources,
 to account for spikes and updating.
-
 
 [docs.installation]: /docs/setup/installation/
 [docs.topologies]: /docs/setup/deployment/topologies/

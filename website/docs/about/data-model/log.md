@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-25"
+last_modified_on: "2020-07-13"
 title: Log Event
 description: A detailed guide on Vector's internal log data model.
 ---
@@ -317,7 +317,6 @@ Maps are associative arrays mapping string fields to values of any type.
 #### Arrays
 
 Array fields are sequences of values of any type.
-
 
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema

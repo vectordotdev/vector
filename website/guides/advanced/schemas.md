@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-22"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/guides.json"
 title: Managing Schemas in Vector
 description: Learn how to manage log schemas with Vector.
@@ -335,7 +335,6 @@ Let's consider some novel uses for Vector, given these tools! Vector can work as
 * A data corrector, adapting legacy systems to more modern systems which have evolved.
 
 Where are you deploying Vector? Let us know, maybe we can help optimize it!
-
 
 [docs.about.concepts]: /docs/about/concepts/
 [docs.sinks.console]: /docs/reference/sinks/console/

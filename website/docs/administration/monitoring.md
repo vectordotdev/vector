@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-07-13"
 title: Monitoring
 description: How to monitor and observe Vector with logs, metrics, and more.
 ---
@@ -152,7 +152,6 @@ just as you would metrics from any other source.
 Please refer to our troubleshooting guide:
 
 <Jump to="/docs/setup/guides/troubleshooting">Troubleshooting Guide</Jump>
-
 
 [docs.process-management#flags]: /docs/administration/process-management/#flags
 [docs.sinks]: /docs/reference/sinks/

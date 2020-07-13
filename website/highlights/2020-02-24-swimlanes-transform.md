@@ -14,7 +14,6 @@ The new [`swimlanes` transform][docs.transforms.swimlanes] makes it much easier
 to configure conditional branches of transforms and sinks. For example, you can
 easily create [if/else pipelines][docs.transforms.swimlanes#examples].
 
-
 ```toml title="vector.toml"
 [transforms.lanes]
   types = "swimlanes"
@@ -28,7 +27,6 @@ easily create [if/else pipelines][docs.transforms.swimlanes#examples].
 
 Remember to occasionally let your branches mingle so that they don't completely
 lose touch.
-
 
 [docs.transforms.swimlanes#examples]: /docs/reference/transforms/swimlanes/#examples
 [docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/

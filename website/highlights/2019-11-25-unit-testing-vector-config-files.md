@@ -93,7 +93,6 @@ works well for everyone. Please let us know what you think either in our
 [community chat](https://chat.vector.dev/) or by
 [raising an issue](https://github.com/timberio/vector/issues/new).
 
-
 [docs.reference.tests]: /docs/reference/tests/
 [docs.sinks.aws_cloudwatch_logs]: /docs/reference/sinks/aws_cloudwatch_logs/
 [docs.sources.file]: /docs/reference/sources/file/

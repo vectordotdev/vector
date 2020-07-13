@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-14"
+last_modified_on: "2020-07-13"
 title: Install Vector via Homebrew
 sidebar_label: Homebrew
 description: Install Vector through the Homebrew package manager
@@ -157,7 +157,6 @@ directly [from an archive][docs.manual.from-archives].
 
 Vector's Homebrew source files are located in
 [Vector's brew repo][urls.vector_homebrew_source_files].
-
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.deployment]: /docs/setup/deployment/

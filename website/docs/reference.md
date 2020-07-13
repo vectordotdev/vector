@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-07-13"
 title: Reference
 description: "Vector technical reference, covering available options and settings."
 sidebar_label: hidden
@@ -19,6 +20,5 @@ and more.
 <Jump to="/docs/reference/templating/">Templating</Jump>
 <Jump to="/docs/reference/tests/">Tests</Jump>
 <Jump to="/docs/reference/transforms/">Transforms</Jump>
-
 
 

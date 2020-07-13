@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-30"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "A New Guides Section"
 description: "High quality guides and education for Vector"
@@ -22,7 +22,6 @@ updated continuously. To kick this new section off we've added the following:
 <Jump to="/guides/advanced/custom-aggregations-with-lua/" leftIcon="book-open">Custom Aggregations With Lua</Jump>
 <Jump to="/guides/advanced/parsing-csv-logs-with-lua/" leftIcon="book-open">Parsing CSV Logs With Lua</Jump>
 <Jump to="/guides/advanced/parsing-csv-logs-with-lua/" leftIcon="book-open">Unit Testing Your Configs</Jump>
-
 
 [pages.docs]: /docs//
 [pages.guides]: /guides//

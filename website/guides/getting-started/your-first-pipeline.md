@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/guides.json"
 title: Hello World. Your First Vector Pipeline.
 description: Building your very first Vector pipeline, the "Hello World" of Vector tutorials.
@@ -114,7 +114,6 @@ in the sink config.
 If you expected something more interesting to happen then that's on you. The
 text came out unchanged because we didn't ask Vector to change it, we can remedy
 that by following the next guide in the series.
-
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.data-model]: /docs/about/data-model/

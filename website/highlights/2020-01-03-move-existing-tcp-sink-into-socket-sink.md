@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-15"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Rename existing `tcp` sink to `socket` sink"
 description: "This renames the existing `tcp` sink to `socket`"
@@ -23,6 +23,5 @@ foundation for upcoming sinks.
    address = "92.12.333.224:5000"
 +  mode = "tcp"
 ```
-
 
 

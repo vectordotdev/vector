@@ -93,7 +93,7 @@ class Metadata
             The resulting hash from the `/.meta/**/*.toml` files failed
             validation against the following schema:
 
-                /.meta/schema/meta.json
+                ${metadata.fetch("$schema")}
 
             The errors include:
 

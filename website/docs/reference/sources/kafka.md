@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-05"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -711,7 +711,6 @@ The `kafka` source uses [`librdkafka`][urls.librdkafka] under the hood. This
 is a battle tested, performant, and reliabile library that facilitates
 communication with Kafka. And because Vector produces static MUSL builds,
 this dependency is packaged with Vector, meaning you do not need to install it.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

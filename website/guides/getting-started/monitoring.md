@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/guides.json"
 title: Monitoring Vector
 description: How to monitoring and observe Vector in production
@@ -157,7 +157,6 @@ machines.
 
 Vector should use very little memory. For average pipelines Vector uses around
 200mb, but this can vary widely dependind on your configuraton.
-
 
 [docs.sources]: /docs/reference/sources/
 [urls.vector_performance]: https://vector.dev/#performance

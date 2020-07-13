@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-11"
+last_modified_on: "2020-07-13"
 title: Install Vector On Docker
 sidebar_label: Docker
 description: Install Vector on the Docker platform
@@ -329,7 +329,6 @@ Vector maintains special tags that are automatically updated whenever Vector is
 
 Vector's Docker source files are located
 [in it's Github repo][urls.vector_docker_source_files].
-
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.deployment]: /docs/setup/deployment/

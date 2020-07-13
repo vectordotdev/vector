@@ -21,7 +21,6 @@
 * [**v0.5.0**][urls.release_notes_0.5.0] - 2019-10-10 - 7 new features, 2 enhancements, 1 bug fix
 * [**v0.4.0**][urls.release_notes_0.4.0] - 2019-09-24 - 12 new features, 45 enhancements, 14 bug fixes
 
-
 [urls.release_notes_0.4.0]: https://vector.dev/releases/0.4.0
 [urls.release_notes_0.5.0]: https://vector.dev/releases/0.5.0
 [urls.release_notes_0.6.0]: https://vector.dev/releases/0.6.0

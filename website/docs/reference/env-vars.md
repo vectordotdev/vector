@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-07-13"
 title: Environment Variables
 description: "A full list of Vector's supported environment variables and how to use them."
 sidebar_label: Env Vars
@@ -229,7 +229,6 @@ option = "${ENV_VAR:-default}"
 You can escape environment variable by preceding them with a `$` character. For
 example `$${HOSTNAME}` will be treated _literally_ in the above environment
 variable example.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.global-options]: /docs/reference/global-options/

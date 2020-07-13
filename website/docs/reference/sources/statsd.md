@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-05-01"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` source ingests data through the StatsD UDP protocol and outputs `metric` events."
@@ -217,7 +217,6 @@ special value which means "a real time metric" (not historical one). Normally su
 `null` timestamps will be substituted by current time by downstream sinks or
 3rd party services during sending/ingestion. See the [metric][docs.data-model.metric]
 data model page for more info.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.metric]: /docs/about/data-model/metric/

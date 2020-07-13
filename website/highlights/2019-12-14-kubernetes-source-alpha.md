@@ -22,5 +22,4 @@ this right, so we'd love to [get feedback][urls.vector_chat] from anyone willing
 
 The main ticket to follow is [issue #260](https://github.com/timberio/vector/issues/260).
 
-
 [urls.vector_chat]: https://chat.vector.dev

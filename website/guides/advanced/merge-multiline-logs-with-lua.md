@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/guides.json"
 title: Merge multi-line logs with Lua
 description: Combine multi-line CSV rows into single events using Lua transform
@@ -161,7 +161,6 @@ in checking out the following guides:
 
 * [Unit Testing Your Configs][guides.advanced.unit-testing]
 * [Custom Aggregations with Lua][guides.advanced.custom-aggregations-with-lua]
-
 
 [docs.about.concepts]: /docs/about/concepts/
 [docs.reference.sources.file#multiline]: /docs/reference/sources/file/#multiline

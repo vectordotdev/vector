@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-07-13"
 title: Field Path Notation
 description: "Vector's field path notation allows you to reference field values with a simple string syntax."
 ---
@@ -88,6 +89,5 @@ field\.with\.dots
 The above name will be treated literally.
 
 The `\` character, if used literally, must be escaped with a `\` as well.
-
 
 [docs.transforms.rename_fields]: /docs/reference/transforms/rename_fields/

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-16"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Use external tagging for metrics serialization"
 description: "We've improved the way we serialize metrics data"
@@ -42,7 +42,8 @@ It now serialized like:
   "tags": {
     "host": "my.host.com"
   },
-  "counter": { // <-- metric type
+  "counter": {
+    // <-- metric type
     "value": 24.2
   }
 }
@@ -52,6 +53,5 @@ It now serialized like:
 
 Upgrading should involve handling changes in any systems that are consuming
 metrics data from the `console` sink.
-
 
 

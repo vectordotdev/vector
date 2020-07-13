@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-09"
+last_modified_on: "2020-07-13"
 title: Process Management
 description: "How to manage the Vector process, such as starting, stopping, and reloading."
 ---
@@ -313,7 +313,6 @@ new configuration file.
 Vector will perform a diff between the new and old configuration, determining
 which sinks and sources should be started and shutdown and ensures the
 transition from the old to new pipeline is graceful.
-
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants

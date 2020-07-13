@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-10"
+last_modified_on: "2020-07-13"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
@@ -471,7 +471,6 @@ features one has to pass a comma-separated list of component features.
 
 </p>
 </details>
-
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.from_archives]: /docs/setup/installation/manual/from-archives/

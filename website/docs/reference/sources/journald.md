@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-05"
+last_modified_on: "2020-07-13"
 delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through Systemd's Journald utility and outputs `log` events."
@@ -443,7 +443,6 @@ For example, if the user is named `vector`, it can be done by running
 ```sh
 usermod -aG systemd-journal vector
 ```
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

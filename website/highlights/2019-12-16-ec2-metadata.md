@@ -39,5 +39,4 @@ For more guidance get on the [reference page][docs.transforms.aws_ec2_metadata].
 
 Data is better when it's thicc 👌
 
-
 [docs.transforms.aws_ec2_metadata]: /docs/reference/transforms/aws_ec2_metadata/

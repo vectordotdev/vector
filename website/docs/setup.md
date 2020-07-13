@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-29"
+last_modified_on: "2020-07-13"
 title: Setup
 description: "Everything you need to know to setup Vector"
 sidebar_label: hidden
@@ -14,6 +14,5 @@ installation to deployment:
 <Jump to="/docs/setup/configuration/">Configuration</Jump>
 <Jump to="/docs/setup/deployment/">Deployment</Jump>
 <Jump to="/docs/setup/installation/">Installation</Jump>
-
 
 

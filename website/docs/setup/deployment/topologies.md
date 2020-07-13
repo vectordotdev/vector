@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-07-13"
 title: Deployment Topologies
 description: The various topologies that Vector can accomplish and when to use each.
 sidebar_label: Topologies
@@ -113,6 +113,5 @@ service such as Kafka.
   managing production-grade streams.
 * **More expensive.** In addition the management cost, the added stream cluster
   will require more resources which will increase operational cost.
-
 
 [docs.strategies]: /docs/setup/deployment/strategies/

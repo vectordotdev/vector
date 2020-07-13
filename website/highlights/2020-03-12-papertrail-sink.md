@@ -13,5 +13,4 @@ tags: ["type: new feature", "domain: sinks", "sink: papertrail"]
 Tried, true, and simple. Our new [`papertrail` sink][docs.sinks.papertrail]
 lets you send logs to the [Papertrail][ursl.papertrail] loggign service.
 
-
 [docs.sinks.papertrail]: /docs/reference/sinks/papertrail/

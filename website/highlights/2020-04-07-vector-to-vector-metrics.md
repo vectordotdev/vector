@@ -19,7 +19,6 @@ metric data model development, as well as topology improvements.
 observability pipelines that can process both logs and metrics, such as
 the [centralized topology][docs.topologies#centralized].
 
-
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.sources.vector]: /docs/reference/sources/vector/
 [docs.topologies#centralized]: /docs/setup/deployment/topologies/#centralized

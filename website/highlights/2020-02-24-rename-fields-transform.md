@@ -13,5 +13,4 @@ tags: ["type: new feature", "domain: transforms", "transform: rename_fields"]
 Vector has a long overdue [`rename_fields` transform][docs.transforms.rename_fields].
 This does exactly what it says, rename fields :).
 
-
 [docs.transforms.rename_fields]: /docs/reference/transforms/rename_fields/

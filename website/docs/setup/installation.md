@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-07-13"
 title: Install Vector
 sidebar_label: hidden
 description: Install Vector on your platform
@@ -32,6 +33,5 @@ method to install Vector:
 <Jump to="/docs/setup/installation/operating-systems/">Operating systems</Jump>
 <Jump to="/docs/setup/installation/package-managers/">Package managers</Jump>
 <Jump to="/docs/setup/installation/platforms/">Platforms</Jump>
-
 
 

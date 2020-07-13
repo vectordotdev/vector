@@ -7,7 +7,13 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [1054, 1292]
 release: "0.6.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: platforms", "platform: arm64", "platform: armv7"]
+tags:
+  [
+    "type: new feature",
+    "domain: platforms",
+    "platform: arm64",
+    "platform: armv7",
+  ]
 ---
 
 Vector now supports [ARM architectures][urls.arm] on the Linux platform! These
@@ -15,11 +21,11 @@ architectures are widely used in embeded devices and recently started to get
 traction on servers. To get started, you can follow the installation
 instructions for your preferred method:
 
-* [DPKG][docs.package-managers.dpkg] (select the ARM tab)
-* [RPM][docs.package-managers.rpm] (select the ARM tab)
-* [Docker][docs.platforms.docker] (select the ARM tab)
-* [From archives][docs.manual.from-archives]
-* [Or, download the files directly][pages.releases]
+- [DPKG][docs.package-managers.dpkg] (select the ARM tab)
+- [RPM][docs.package-managers.rpm] (select the ARM tab)
+- [Docker][docs.platforms.docker] (select the ARM tab)
+- [From archives][docs.manual.from-archives]
+- [Or, download the files directly][pages.releases]
 
 <!--truncate-->
 
@@ -61,7 +67,6 @@ If you're using a vendor-based data collector it's likely they lack support
 for the ARM architectures, especially the new ARM64 architecture. This limits
 your flexibility, and in the case of AWS, can have direct cost implications.
 Supporting these platforms, properly, is Vector's core competency.
-
 
 [docs.manual.from-archives]: /docs/setup/installation/manual/from-archives/
 [docs.package-managers.dpkg]: /docs/setup/installation/package-managers/dpkg/

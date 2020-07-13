@@ -34,9 +34,8 @@ Simply add the transform to your pipeline:
 
 <CodeExplanation>
 
-* The `fields.match` option lets you control which fields are compared to determine if events are equal.
+- The `fields.match` option lets you control which fields are compared to determine if events are equal.
 
 </CodeExplanation>
-
 
 [docs.transforms.dedupe]: /docs/reference/transforms/dedupe/

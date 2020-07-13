@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-07-13"
 title: Deployment
 sidebar_label: hidden
 description: How to deploy Vector into your own infrastructure
@@ -21,7 +21,6 @@ and then take a closer look at the [topologies][docs.topologies] you can create.
 
 <Jump to="/docs/setup/deployment/strategies/">Strategies</Jump>
 <Jump to="/docs/setup/deployment/topologies/">Topologies</Jump>
-
 
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service

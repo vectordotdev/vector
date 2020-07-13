@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-07-13"
 title: Sources
 description: "Sources are reponsible for collect or receiving log and metrics data. These could be local sources, like a file, or a protocols, like HTTP or TCP."
 sidebar_label: hidden
@@ -20,7 +20,6 @@ over the network, like the [`vector`][docs.sources.vector],
 ---
 
 <VectorComponents titles={false} sinks={false} transforms={false} />
-
 
 [docs.data-model]: /docs/about/data-model/
 [docs.sources.file]: /docs/reference/sources/file/

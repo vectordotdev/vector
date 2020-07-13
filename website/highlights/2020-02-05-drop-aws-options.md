@@ -7,7 +7,13 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [1703]
 release: "0.8.0"
 hide_on_release_notes: true
-tags: ["type: breaking change", "provider: aws", "domain: sinks", "sink: elasticsearch"]
+tags:
+  [
+    "type: breaking change",
+    "provider: aws",
+    "domain: sinks",
+    "sink: elasticsearch",
+  ]
 ---
 
 The `endpoint` and `region` options have been dropped in the [`elasticsearch`
@@ -25,6 +31,5 @@ sink][docs.sinks.elasticsearch] in favor of using the `host` option.
 
 You can find your AWS ES domain in the AWS console. Simply provide the full
 domain URL as the `host` value.
-
 
 [docs.sinks.elasticsearch]: /docs/reference/sinks/elasticsearch/

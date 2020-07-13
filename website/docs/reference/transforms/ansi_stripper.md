@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-10"
+last_modified_on: "2020-07-13"
 component_title: "ANSI Stripper"
 description: "The Vector `ansi_stripper` transform accepts and outputs `log` events, allowing you to strips ANSI escape sequences from the specified field."
 event_types: ["log"]
@@ -120,7 +120,6 @@ enabling access to root-level, nested, and array field values. For example:
 
 You can learn more about Vector's field notation in the
 [field notation reference][docs.reference.field-path-notation].
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

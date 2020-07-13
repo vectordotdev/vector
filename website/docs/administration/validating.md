@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-09"
+last_modified_on: "2020-07-13"
 title: Validating
 description: How to validation Vector's configuration to ensure it is error free before applying it.
 ---
@@ -61,7 +61,6 @@ Vector will exit with a `0`.
 
 To see other customization options for the `validate` subcommand run
 `vector validate --help`.
-
 
 [docs.configuration#types]: /docs/setup/configuration/#types
 [docs.sinks]: /docs/reference/sinks/

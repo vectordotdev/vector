@@ -7,7 +7,14 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [1997, 2183, 2198]
 release: "0.9.0"
 hide_on_release_notes: true
-tags: ["type: enhancement", "domain: config", "domain: transforms", "transform: filter", "transform: swimlanes"]
+tags:
+  [
+    "type: enhancement",
+    "domain: config",
+    "domain: transforms",
+    "transform: filter",
+    "transform: swimlanes",
+  ]
 ---
 
 Vector has a concept "conditions" that are used to qualify events. For example,
@@ -17,12 +24,12 @@ this is used in Vector's [unit testing feature][guides.unit-testing],
 that enable powerful matching and condition expression. Specifically, the
 following predicates were added:
 
-* `begins_with`
-* `contains`
-* `ends_with`
-* `is_log`
-* `is_metric`
-* `regex`
+- `begins_with`
+- `contains`
+- `ends_with`
+- `is_log`
+- `is_metric`
+- `regex`
 
 ## Example
 
@@ -36,7 +43,6 @@ the new `contains` predicate:
 ```
 
 The world is your oyster.
-
 
 [docs.transforms.filter]: /docs/reference/transforms/filter/
 [docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/

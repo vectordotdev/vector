@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-07-13"
 title: Data Model
 sidebar_label: hidden
 description: Vector's internal data model -- event and it's subtypes.
@@ -47,6 +48,5 @@ Finally, a sophisticated data model that accounts for the various data types
 allows for _correct_ interoperability between observability systems. For
 example, a pipeline with a `statsd` source and a `prometheus` sink would not
 be possible without the correct internal metrics data types.
-
 
 

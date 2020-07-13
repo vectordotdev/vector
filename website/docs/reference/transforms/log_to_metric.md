@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-10"
+last_modified_on: "2020-07-13"
 component_title: "Log to Metric"
 description: "The Vector `log_to_metric` transform accepts `log` events, but outputs [`metric`](#metric) events, allowing you to convert logs into one or more metrics."
 event_types: ["log","metric"]
@@ -553,7 +553,6 @@ happens depends on your metrics storage. For example, the
 [`prometheus` sink][docs.sinks.prometheus] will reduce logs in the sink itself
 for the next scrape, while other metrics sinks will proceed to forward the
 individual metrics for reduction in the metrics storage itself.
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/guides.json"
 title: "Collect logs from Docker and send them anywhere"
 description: "A simple guide to collect logs from Docker and send them anywhere in just a few minutes."
@@ -145,7 +145,6 @@ flexibility of Vector:
   <div className="title">Vector documentation</div>
   <div className="sub-title">Thoughtful, detailed docs that respect your time.</div>
 </Jump>
-
 
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.sources.docker]: /docs/reference/sources/docker/

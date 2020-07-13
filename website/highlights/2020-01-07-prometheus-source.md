@@ -36,7 +36,6 @@ For more guidance get on the [reference page][docs.sources.prometheus].
 We believe the most common use cases for this source will be backups and
 migration, if you have an interesting use case we'd [love to hear about it][urls.vector_chat].
 
-
 [docs.sources.prometheus]: /docs/reference/sources/prometheus/
 [urls.prometheus]: https://prometheus.io/
 [urls.vector_chat]: https://chat.vector.dev

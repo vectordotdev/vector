@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-15"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Require `encoding` option for console and file sinks"
 description: "The `encoding` option is now required for these sinks"
@@ -29,6 +29,5 @@ Make the following changes in your `vector.toml` file:
 ```
 
 That's it!
-
 
 

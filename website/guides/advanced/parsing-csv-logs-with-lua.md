@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-19"
+last_modified_on: "2020-07-13"
 $schema: "/.meta/.schemas/guides.json"
 title: Parsing CSV logs with Lua
 description: Parse structured application logs in CSV format using Lua transform
@@ -248,7 +248,6 @@ By default, all columns are parsed as strings. It is possible to convert them to
 built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it is possible to add the
 [`coercer`][docs.reference.transforms.coercer] transform after the `lua` transform, for example, to
 [parse timestamps][docs.reference.transforms.coercer#timestamps].
-
 
 [docs.about.concepts]: /docs/about/concepts/
 [docs.administration.process-management#automatic-reload-on-changes]: /docs/administration/process-management/#automatic-reload-on-changes

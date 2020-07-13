@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-07-13"
 title: Concepts
 description: The fundamental Vector concepts. A great place to start learning about Vector.
 ---
@@ -75,7 +75,6 @@ A "pipeline" is the end result of connecting [sources](#sources),
 pipeline in the [configuration section][docs.configuration].
 
 <Jump to="/docs/setup/configuration/">View configuration</Jump>
-
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.data-model]: /docs/about/data-model/
