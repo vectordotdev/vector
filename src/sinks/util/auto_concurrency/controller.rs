@@ -15,7 +15,7 @@ use tokio::sync::OwnedSemaphorePermit;
 use tower03::timeout::error::Elapsed;
 
 const EWMA_ALPHA: f64 = 0.5;
-const THRESHOLD_RATIO: f64 = 0.01;
+const THRESHOLD_RATIO: f64 = 0.05;
 
 /// Shared class for `tokio::sync::Semaphore` that manages adjusting the
 /// semaphore size and other associated data.
