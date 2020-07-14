@@ -1,0 +1,3 @@
+# Using defaults.
+indent_style = "Block"
+reorder_imports = true
