@@ -2,9 +2,8 @@ name: Update install.sh Suite
 
 on:
   push:
-    tags:
-      - v0.*
-      - v1.*
+    branches:
+      - master
     paths:
       - 'distribution/install.sh'
 
