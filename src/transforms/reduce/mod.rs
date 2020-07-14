@@ -8,8 +8,7 @@ use crate::{
 use async_stream::stream;
 use futures::{
     compat::{Compat, Compat01As03},
-    stream,
-    stream::StreamExt,
+    stream, StreamExt,
 };
 use futures01::Stream as Stream01;
 use indexmap::IndexMap;

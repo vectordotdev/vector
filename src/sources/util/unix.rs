@@ -1,6 +1,6 @@
 use crate::{
     async_read::AsyncAllowReadExt, emit, event::Event, internal_events::UnixSocketError,
-    shutdown::ShutdownSignal, sources::Source, stream::StreamExt,
+    shutdown::ShutdownSignal, sources::Source, stream::StreamExt01,
 };
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};

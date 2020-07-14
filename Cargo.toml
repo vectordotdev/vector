@@ -151,6 +151,7 @@ bloom = "0.3.2"
 pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
 task-compat = "0.1"
 cidr-utils = "0.4.1"
+pin-project = "0.4.22"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }

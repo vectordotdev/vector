@@ -3,7 +3,7 @@ use crate::{
     internal_events::{UdpEventReceived, UdpSocketError},
     shutdown::ShutdownSignal,
     sources::Source,
-    stream::StreamExt,
+    stream::StreamExt01,
 };
 use bytes::Bytes;
 use codec01::BytesDelimitedCodec;

@@ -1,5 +1,5 @@
 use crate::sinks::HealthcheckError;
-use futures::stream::StreamExt;
+use futures::StreamExt;
 use goauth::scopes::Scope;
 use goauth::{
     auth::{JwtClaims, Token, TokenErr},

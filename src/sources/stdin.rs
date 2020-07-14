@@ -1,7 +1,7 @@
 use crate::{
     event::{self, Event},
     shutdown::ShutdownSignal,
-    stream::StreamExt,
+    stream::StreamExt01,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
