@@ -3534,7 +3534,11 @@ module.exports = {
       "path": "website/highlights/2020-07-06-add-compression-option-for-aws-sinks.md",
       "permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
       "tags": [
-        "type: new feature"
+        "type: new feature",
+        "sink: aws_s3",
+        "sink: humio_logs",
+        "sink: aws_kinesis_firehose",
+        "sink: aws_kinesis_streams"
       ],
       "title": "New compresison options compression option for aws sinks"
     },
@@ -9418,7 +9422,11 @@ module.exports = {
         "path": "website/highlights/2020-07-06-add-compression-option-for-aws-sinks.md",
         "permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
         "tags": [
-          "type: new feature"
+          "type: new feature",
+          "sink: aws_s3",
+          "sink: humio_logs",
+          "sink: aws_kinesis_firehose",
+          "sink: aws_kinesis_streams"
         ],
         "title": "New compresison options compression option for aws sinks"
       },
@@ -14898,7 +14906,11 @@ module.exports = {
           "path": "website/highlights/2020-07-06-add-compression-option-for-aws-sinks.md",
           "permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
           "tags": [
-            "type: new feature"
+            "type: new feature",
+            "sink: aws_s3",
+            "sink: humio_logs",
+            "sink: aws_kinesis_firehose",
+            "sink: aws_kinesis_streams"
           ],
           "title": "New compresison options compression option for aws sinks"
         },
