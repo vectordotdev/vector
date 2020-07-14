@@ -196,8 +196,8 @@ async fn healthcheck(
 mod tests {
     use super::*;
 
-    #[test]
-    fn fails_missing_creds() {
+    #[tokio::test]
+    async fn fails_missing_creds() {
         let config: PubsubConfig = toml::from_str(
             r#"
            project = "project"
@@ -205,7 +205,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).is_ok() {
+        if config.build_async(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }
@@ -233,9 +233,12 @@ mod integration_tests {
         }
     }
 
-    fn config_build(topic: &str) -> (crate::sinks::RouterSink, crate::sinks::Healthcheck) {
+    async fn config_build(topic: &str) -> (crate::sinks::RouterSink, crate::sinks::Healthcheck) {
         let cx = SinkContext::new_test();
-        config(topic).build(cx).expect("Building sink failed")
+        config(topic)
+            .build_async(cx)
+            .await
+            .expect("Building sink failed")
     }
 
     #[test]
@@ -245,7 +248,7 @@ mod integration_tests {
         let mut rt = runtime();
         rt.block_on_std(async {
             let (topic, subscription) = create_topic_subscription().await;
-            let (sink, healthcheck) = config_build(&topic);
+            let (sink, healthcheck) = config_build(&topic).await;
 
             healthcheck.compat().await.expect("Health check failed");
 
@@ -279,7 +282,7 @@ mod integration_tests {
         rt.block_on_std(async {
             let (topic, _subscription) = create_topic_subscription().await;
             let topic = format!("BAD{}", topic);
-            let (_sink, healthcheck) = config_build(&topic);
+            let (_sink, healthcheck) = config_build(&topic).await;
             healthcheck
                 .compat()
                 .await

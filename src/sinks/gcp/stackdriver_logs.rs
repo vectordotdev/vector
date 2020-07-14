@@ -406,8 +406,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn fails_missing_creds() {
+    #[tokio::test]
+    async fn fails_missing_creds() {
         let config: StackdriverConfig = toml::from_str(
             r#"
            project_id = "project"
@@ -417,7 +417,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).is_ok() {
+        if config.build_async(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }
