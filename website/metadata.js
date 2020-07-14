@@ -3451,7 +3451,8 @@ module.exports = {
       "path": "website/highlights/2020-06-10-consolidate-and-beautify-validate.md",
       "permalink": "/highlights/2020-06-10-consolidate-and-beautify-validate/",
       "tags": [
-        "type: enhancement"
+        "type: enhancement",
+        "domain: ux"
       ],
       "title": "Beautification of the validate command"
     },
@@ -3510,6 +3511,20 @@ module.exports = {
         "domain: sinks"
       ],
       "title": "Batching and buffering reworked"
+    },
+    {
+      "author_github": "https://github.com/hoverbear",
+      "date": "2020-07-09",
+      "description": "If your Linux uses glibc, Vector will too.",
+      "hide_on_release_notes": false,
+      "id": "2020-07-09-add-musl-and-glibc-support-to-install-sh",
+      "path": "website/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh.md",
+      "permalink": "/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/",
+      "tags": [
+        "type: breaking change",
+        "domain: operations"
+      ],
+      "title": "glibc enhancements"
     }
   ],
   "installation": {
@@ -3935,17 +3950,17 @@ module.exports = {
   },
   "latest_highlight": {
     "author_github": "https://github.com/hoverbear",
-    "date": "2020-06-29",
-    "description": "Vector's batching and buffering matures.",
+    "date": "2020-07-09",
+    "description": "If your Linux uses glibc, Vector will too.",
     "hide_on_release_notes": false,
-    "id": "2020-06-29-batch-buffer-rework",
-    "path": "website/highlights/2020-06-29-batch-buffer-rework.md",
-    "permalink": "/highlights/2020-06-29-batch-buffer-rework/",
+    "id": "2020-07-09-add-musl-and-glibc-support-to-install-sh",
+    "path": "website/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh.md",
+    "permalink": "/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/",
     "tags": [
-      "type: enhancement",
-      "domain: sinks"
+      "type: breaking change",
+      "domain: operations"
     ],
-    "title": "Batching and buffering reworked"
+    "title": "glibc enhancements"
   },
   "latest_post": {
     "author_github": "https://github.com/lukesteensen",
@@ -5919,7 +5934,7 @@ module.exports = {
         "deletions_count": 74,
         "description": "Build archives, DEB, and RPM packages with glibc",
         "files_count": 13,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/",
         "insertions_count": 136,
         "message": "chore(operations): Build archives, DEB, and RPM packages with glibc (#2518)",
         "pr_number": 2518,
@@ -9081,7 +9096,7 @@ module.exports = {
         "deletions_count": 2,
         "description": "Add musl and glibc support to install.sh",
         "files_count": 2,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/",
         "insertions_count": 17,
         "message": "enhancement(operations): Add musl and glibc support to install.sh (#2969)",
         "pr_number": 2969,
@@ -9294,7 +9309,8 @@ module.exports = {
         "path": "website/highlights/2020-06-10-consolidate-and-beautify-validate.md",
         "permalink": "/highlights/2020-06-10-consolidate-and-beautify-validate/",
         "tags": [
-          "type: enhancement"
+          "type: enhancement",
+          "domain: ux"
         ],
         "title": "Beautification of the validate command"
       },
@@ -9353,6 +9369,20 @@ module.exports = {
           "domain: sinks"
         ],
         "title": "Batching and buffering reworked"
+      },
+      {
+        "author_github": "https://github.com/hoverbear",
+        "date": "2020-07-09",
+        "description": "If your Linux uses glibc, Vector will too.",
+        "hide_on_release_notes": false,
+        "id": "2020-07-09-add-musl-and-glibc-support-to-install-sh",
+        "path": "website/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh.md",
+        "permalink": "/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/",
+        "tags": [
+          "type: breaking change",
+          "domain: operations"
+        ],
+        "title": "glibc enhancements"
       }
     ],
     "insertions_count": 42685,
@@ -11358,7 +11388,7 @@ module.exports = {
           "deletions_count": 74,
           "description": "Build archives, DEB, and RPM packages with glibc",
           "files_count": 13,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/",
           "insertions_count": 136,
           "message": "chore(operations): Build archives, DEB, and RPM packages with glibc (#2518)",
           "pr_number": 2518,
@@ -14520,7 +14550,7 @@ module.exports = {
           "deletions_count": 2,
           "description": "Add musl and glibc support to install.sh",
           "files_count": 2,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/",
           "insertions_count": 17,
           "message": "enhancement(operations): Add musl and glibc support to install.sh (#2969)",
           "pr_number": 2969,
@@ -14733,7 +14763,8 @@ module.exports = {
           "path": "website/highlights/2020-06-10-consolidate-and-beautify-validate.md",
           "permalink": "/highlights/2020-06-10-consolidate-and-beautify-validate/",
           "tags": [
-            "type: enhancement"
+            "type: enhancement",
+            "domain: ux"
           ],
           "title": "Beautification of the validate command"
         },
@@ -14792,6 +14823,20 @@ module.exports = {
             "domain: sinks"
           ],
           "title": "Batching and buffering reworked"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
+          "date": "2020-07-09",
+          "description": "If your Linux uses glibc, Vector will too.",
+          "hide_on_release_notes": false,
+          "id": "2020-07-09-add-musl-and-glibc-support-to-install-sh",
+          "path": "website/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh.md",
+          "permalink": "/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/",
+          "tags": [
+            "type: breaking change",
+            "domain: operations"
+          ],
+          "title": "glibc enhancements"
         }
       ],
       "insertions_count": 42685,

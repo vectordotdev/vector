@@ -7,7 +7,7 @@ author_github: "https://github.com/hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2622]
 release: "0.10.0"
-tags: ["type: enhancement"]
+tags: ["type: enhancement", "domain: ux"]
 ---
 
 We gave `vector validate` some touching up to make it look better, and feel nicer to use.
