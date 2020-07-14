@@ -294,9 +294,9 @@ dependencies = [
 
 [[package]]
 name = "bollard"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3008a3b2bc89543b1a5b207575fcb298ae4ef9901125ac1b81f6304280be8e69"
+checksum = "fdce3bde4e542df97483c11021b02cd04431dcef748bab92bbf57260ee64bb88"
 dependencies = [
  "arrayvec",
  "base64 0.12.0",
@@ -328,9 +328,9 @@ dependencies = [
 
 [[package]]
 name = "bollard-stubs"
-version = "1.40.0"
+version = "1.40.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f161a78a2f857947b2945f01499185392e03e23c8049eaa8787d1432b16c5e3"
+checksum = "4b008ffec6730a8f3177bd35659972886ca8ff21f5d7449c72ce7678c24bba94"
 dependencies = [
  "chrono",
  "lazy_static 0.2.11",
