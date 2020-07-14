@@ -184,6 +184,19 @@ impl WeightedSum {
     }
 }
 
+impl Display for WeightedSum {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        match self.stats() {
+            None => write!(fmt, "[No stats]"),
+            Some(stats) => write!(
+                fmt,
+                "[min={}, max={}, mean={}]",
+                stats.min, stats.max, stats.mean
+            ),
+        }
+    }
+}
+
 fn opt_max(opt: Option<f64>, value: f64) -> Option<f64> {
     Some(match opt {
         None => value,
@@ -223,5 +236,11 @@ impl Deref for TimeWeightedSum {
     type Target = WeightedSum;
     fn deref(&self) -> &Self::Target {
         &self.sum
+    }
+}
+
+impl Display for TimeWeightedSum {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        self.sum.fmt(fmt)
     }
 }
