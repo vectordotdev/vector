@@ -35,24 +35,9 @@ pub struct TakeUntil<S, F, O> {
     free: bool,
 }
 
-// NOTE: This construct is a modified copy of `Select` from crate `futures`.
-/// An adapter for merging the output of two streams where this stream ends if any
-/// of the streams end.
-///
-/// The merged stream produces items from either of the underlying streams as
-/// they become available, and the streams are polled in a round-robin fashion.
-/// Errors, however, are not merged: you get at most one error at a time.
-#[derive(Debug)]
-#[must_use = "streams do nothing unless polled"]
-pub struct WeakSelect<S1, S2> {
-    stream1: S1,
-    stream2: S2,
-    flag: bool,
-}
-
 /// This `Stream` extension trait provides a `take_until` method that terminates the stream once
 /// the given future resolves.
-pub trait StreamExt: Stream {
+pub trait StreamExt01: Stream {
     /// Take elements from this stream until the given future resolves.
     ///
     /// This function will take elements from this stream until the given future resolves. Once it
@@ -103,32 +88,9 @@ pub trait StreamExt: Stream {
             free: false,
         }
     }
-
-    /// Creates a stream that selects the next element from either this stream
-    /// or the provided one, whichever is ready first.
-    ///
-    /// This combinator will attempt to pull items from both streams. Each
-    /// stream will be polled in a round-robin fashion, and whenever a stream is
-    /// ready to yield an item that item is yielded.
-    ///
-    /// The `weak_select` function is similar to `select` except that
-    /// the resulting stream will end once any of of the streams end.
-    ///
-    /// Error are passed through from either stream.
-    fn weak_select<S>(self, stream: S) -> WeakSelect<Self, S>
-    where
-        Self: Sized,
-        S: Stream<Item = Self::Item, Error = Self::Error>,
-    {
-        WeakSelect {
-            stream1: self,
-            stream2: stream,
-            flag: false,
-        }
-    }
 }
 
-impl<S> StreamExt for S where S: Stream {}
+impl<S> StreamExt01 for S where S: Stream {}
 
 impl<S, F, O> Stream for TakeUntil<S, F, O>
 where
@@ -160,36 +122,91 @@ where
     }
 }
 
-impl<S1, S2> Stream for WeakSelect<S1, S2>
-where
-    S1: Stream,
-    S2: Stream<Item = S1::Item, Error = S1::Error>,
-{
-    type Item = S1::Item;
-    type Error = S1::Error;
+pub use new_futures::{SelectWeak, VecStreamExt};
 
-    fn poll(&mut self) -> Poll<Option<S1::Item>, S1::Error> {
-        let (a, b) = if self.flag {
-            (
-                &mut self.stream2 as &mut dyn Stream<Item = _, Error = _>,
-                &mut self.stream1 as &mut dyn Stream<Item = _, Error = _>,
-            )
-        } else {
-            (
-                &mut self.stream1 as &mut dyn Stream<Item = _, Error = _>,
-                &mut self.stream2 as &mut dyn Stream<Item = _, Error = _>,
-            )
-        };
-        self.flag = !self.flag;
+mod new_futures {
+    use futures::{stream::Fuse, Stream, StreamExt};
+    use pin_project::pin_project;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
 
-        match a.poll()? {
-            // Poll other stream
-            Async::NotReady => {
-                self.flag = !self.flag;
-                b.poll()
+    impl<T: ?Sized> VecStreamExt for T where T: Stream {}
+
+    pub trait VecStreamExt: Stream {
+        /// Creates a stream that selects the next element from either this stream
+        /// or the provided one, whichever is ready first.
+        ///
+        /// This combinator will attempt to pull items from both streams. Each
+        /// stream will be polled in a round-robin fashion, and whenever a stream is
+        /// ready to yield an item that item is yielded.
+        ///
+        /// The `select_weak` function is similar to `select` except that
+        /// the resulting stream will end once any of of the streams end.
+        ///
+        /// Error are passed through from either stream.
+        fn select_weak<S>(self, stream2: S) -> SelectWeak<Self, S>
+        where
+            Self: Sized,
+            S: Stream<Item = Self::Item>,
+        {
+            SelectWeak {
+                stream1: self.fuse(),
+                stream2: stream2.fuse(),
+                flag: false,
             }
-            // This stream is ready with an item or has ended.
-            ok => Ok(ok),
+        }
+    }
+
+    /// An adapter for merging the output of two streams where this stream ends if any
+    /// of the streams end.
+    ///
+    /// The merged stream produces items from either of the underlying streams as
+    /// they become available, and the streams are polled in a round-robin fashion.
+    /// Errors, however, are not merged: you get at most one error at a time.
+    #[pin_project]
+    pub struct SelectWeak<St1, St2> {
+        #[pin]
+        stream1: Fuse<St1>,
+        #[pin]
+        stream2: Fuse<St2>,
+        flag: bool,
+    }
+
+    impl<St1, St2> Stream for SelectWeak<St1, St2>
+    where
+        St1: Stream,
+        St2: Stream<Item = St1::Item>,
+    {
+        type Item = St1::Item;
+
+        fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<St1::Item>> {
+            let this = self.project();
+            if *this.flag {
+                poll_inner(this.flag, this.stream1, this.stream2, cx)
+            } else {
+                poll_inner(this.flag, this.stream2, this.stream1, cx)
+            }
+        }
+    }
+
+    fn poll_inner<St1, St2>(
+        flag: &mut bool,
+        a: Pin<&mut St1>,
+        b: Pin<&mut St2>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<St1::Item>>
+    where
+        St1: Stream,
+        St2: Stream<Item = St1::Item>,
+    {
+        match a.poll_next(cx) {
+            Poll::Ready(Some(item)) => {
+                // give the other stream a chance to go first next time
+                *flag = !*flag;
+                Poll::Ready(Some(item))
+            }
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => b.poll_next(cx),
         }
     }
 }

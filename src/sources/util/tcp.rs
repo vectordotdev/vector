@@ -1,7 +1,7 @@
 use crate::{
     internal_events::TcpConnectionError,
     shutdown::ShutdownSignal,
-    stream::StreamExt,
+    stream::StreamExt01,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     Event,
 };

@@ -2,7 +2,7 @@ use crate::{
     hyper::body_to_bytes,
     internal_events::{PrometheusHttpError, PrometheusParseError, PrometheusRequestCompleted},
     shutdown::ShutdownSignal,
-    stream::StreamExt as VStreamExt,
+    stream::StreamExt01,
     topology::config::GlobalOptions,
     Event,
 };

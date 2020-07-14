@@ -5,7 +5,7 @@ use crate::{
     event::{self, Event, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
-    stream::StreamExt,
+    stream::StreamExt01,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
