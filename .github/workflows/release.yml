@@ -6,9 +6,6 @@ on:
       - v0.*
       - v1.*
 
-env:
-  CHANNEL: nightly
-
 jobs:
   build-x86_64-unknown-linux-musl-packages:
     runs-on: ubuntu-latest
@@ -278,11 +275,6 @@ jobs:
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
           USE_CONTAINER: none
         run: make release-s3
-      - env:
-          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
-          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
-          USE_CONTAINER: none
-        run: make sync-install
 
   release-github:
     runs-on: ubuntu-latest
