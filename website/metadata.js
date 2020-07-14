@@ -3400,6 +3400,19 @@ module.exports = {
     },
     {
       "author_github": "https://github.com/hoverbear",
+      "date": "2020-05-05",
+      "description": "The journald source can now filter messages before they enter your pipeline.",
+      "hide_on_release_notes": false,
+      "id": "2020-05-05-add-support-for-include-exclude-units",
+      "path": "website/highlights/2020-05-05-add-support-for-include-exclude-units.md",
+      "permalink": "/highlights/2020-05-05-add-support-for-include-exclude-units/",
+      "tags": [
+        "type: new feature"
+      ],
+      "title": "Journald Unit Filtering"
+    },
+    {
+      "author_github": "https://github.com/hoverbear",
       "date": "2020-05-13",
       "description": "Efficiently run multiple regexes in the same transform!",
       "hide_on_release_notes": false,
@@ -3511,6 +3524,19 @@ module.exports = {
         "domain: sinks"
       ],
       "title": "Batching and buffering reworked"
+    },
+    {
+      "author_github": "https://github.com/hoverbear",
+      "date": "2020-07-06",
+      "description": "Stuff more data down a smaller hose in less time for cheaper.",
+      "hide_on_release_notes": false,
+      "id": "2020-07-06-add-compression-option-for-aws-sinks",
+      "path": "website/highlights/2020-07-06-add-compression-option-for-aws-sinks.md",
+      "permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
+      "tags": [
+        "type: new feature"
+      ],
+      "title": "New compresison options compression option for aws sinks"
     },
     {
       "author_github": "https://github.com/hoverbear",
@@ -5216,7 +5242,7 @@ module.exports = {
         "deletions_count": 58,
         "description": "Add support for include/exclude units",
         "files_count": 4,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-05-05-add-support-for-include-exclude-units/",
         "insertions_count": 195,
         "message": "enhancement(journald source): Add support for include/exclude units (#2540)",
         "pr_number": 2540,
@@ -6166,7 +6192,7 @@ module.exports = {
         "deletions_count": 271,
         "description": "Improve compression option",
         "files_count": 33,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
         "insertions_count": 315,
         "message": "chore: Improve compression option (#2637)",
         "pr_number": 2637,
@@ -6250,7 +6276,7 @@ module.exports = {
         "deletions_count": 3,
         "description": "Fix buffer compression",
         "files_count": 1,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
         "insertions_count": 10,
         "message": "fix(influxdb_logs sink): Fix buffer compression (#2679)",
         "pr_number": 2679,
@@ -6679,7 +6705,7 @@ module.exports = {
         "deletions_count": 2,
         "description": "Add compression to humio and new_relic",
         "files_count": 7,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
         "insertions_count": 112,
         "message": "enhancement(humio sink, new relic sink): Add compression to humio and new_relic (#2682)",
         "pr_number": 2682,
@@ -8581,7 +8607,7 @@ module.exports = {
         "deletions_count": 282,
         "description": "add compression option for aws sinks",
         "files_count": 17,
-        "highlight_permalink": null,
+        "highlight_permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
         "insertions_count": 417,
         "message": "enhancement(sinks): add compression option for aws sinks (#2953)",
         "pr_number": 2953,
@@ -9258,6 +9284,19 @@ module.exports = {
       },
       {
         "author_github": "https://github.com/hoverbear",
+        "date": "2020-05-05",
+        "description": "The journald source can now filter messages before they enter your pipeline.",
+        "hide_on_release_notes": false,
+        "id": "2020-05-05-add-support-for-include-exclude-units",
+        "path": "website/highlights/2020-05-05-add-support-for-include-exclude-units.md",
+        "permalink": "/highlights/2020-05-05-add-support-for-include-exclude-units/",
+        "tags": [
+          "type: new feature"
+        ],
+        "title": "Journald Unit Filtering"
+      },
+      {
+        "author_github": "https://github.com/hoverbear",
         "date": "2020-05-13",
         "description": "Efficiently run multiple regexes in the same transform!",
         "hide_on_release_notes": false,
@@ -9369,6 +9408,19 @@ module.exports = {
           "domain: sinks"
         ],
         "title": "Batching and buffering reworked"
+      },
+      {
+        "author_github": "https://github.com/hoverbear",
+        "date": "2020-07-06",
+        "description": "Stuff more data down a smaller hose in less time for cheaper.",
+        "hide_on_release_notes": false,
+        "id": "2020-07-06-add-compression-option-for-aws-sinks",
+        "path": "website/highlights/2020-07-06-add-compression-option-for-aws-sinks.md",
+        "permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
+        "tags": [
+          "type: new feature"
+        ],
+        "title": "New compresison options compression option for aws sinks"
       },
       {
         "author_github": "https://github.com/hoverbear",
@@ -10670,7 +10722,7 @@ module.exports = {
           "deletions_count": 58,
           "description": "Add support for include/exclude units",
           "files_count": 4,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-05-05-add-support-for-include-exclude-units/",
           "insertions_count": 195,
           "message": "enhancement(journald source): Add support for include/exclude units (#2540)",
           "pr_number": 2540,
@@ -11620,7 +11672,7 @@ module.exports = {
           "deletions_count": 271,
           "description": "Improve compression option",
           "files_count": 33,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
           "insertions_count": 315,
           "message": "chore: Improve compression option (#2637)",
           "pr_number": 2637,
@@ -11704,7 +11756,7 @@ module.exports = {
           "deletions_count": 3,
           "description": "Fix buffer compression",
           "files_count": 1,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
           "insertions_count": 10,
           "message": "fix(influxdb_logs sink): Fix buffer compression (#2679)",
           "pr_number": 2679,
@@ -12133,7 +12185,7 @@ module.exports = {
           "deletions_count": 2,
           "description": "Add compression to humio and new_relic",
           "files_count": 7,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
           "insertions_count": 112,
           "message": "enhancement(humio sink, new relic sink): Add compression to humio and new_relic (#2682)",
           "pr_number": 2682,
@@ -14035,7 +14087,7 @@ module.exports = {
           "deletions_count": 282,
           "description": "add compression option for aws sinks",
           "files_count": 17,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
           "insertions_count": 417,
           "message": "enhancement(sinks): add compression option for aws sinks (#2953)",
           "pr_number": 2953,
@@ -14712,6 +14764,19 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/hoverbear",
+          "date": "2020-05-05",
+          "description": "The journald source can now filter messages before they enter your pipeline.",
+          "hide_on_release_notes": false,
+          "id": "2020-05-05-add-support-for-include-exclude-units",
+          "path": "website/highlights/2020-05-05-add-support-for-include-exclude-units.md",
+          "permalink": "/highlights/2020-05-05-add-support-for-include-exclude-units/",
+          "tags": [
+            "type: new feature"
+          ],
+          "title": "Journald Unit Filtering"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
           "date": "2020-05-13",
           "description": "Efficiently run multiple regexes in the same transform!",
           "hide_on_release_notes": false,
@@ -14823,6 +14888,19 @@ module.exports = {
             "domain: sinks"
           ],
           "title": "Batching and buffering reworked"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
+          "date": "2020-07-06",
+          "description": "Stuff more data down a smaller hose in less time for cheaper.",
+          "hide_on_release_notes": false,
+          "id": "2020-07-06-add-compression-option-for-aws-sinks",
+          "path": "website/highlights/2020-07-06-add-compression-option-for-aws-sinks.md",
+          "permalink": "/highlights/2020-07-06-add-compression-option-for-aws-sinks/",
+          "tags": [
+            "type: new feature"
+          ],
+          "title": "New compresison options compression option for aws sinks"
         },
         {
           "author_github": "https://github.com/hoverbear",
