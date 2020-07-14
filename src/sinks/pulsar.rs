@@ -117,7 +117,7 @@ impl PulsarSinkConfig {
         acker: Acker,
     ) -> crate::Result<PulsarSink> {
         Ok(PulsarSink {
-            encoding: self.encoding.clone().into(),
+            encoding: self.encoding.into(),
             producer: Arc::new(Mutex::new(producer)),
             in_flight: FuturesUnordered::new(),
             seq_head: 0,
