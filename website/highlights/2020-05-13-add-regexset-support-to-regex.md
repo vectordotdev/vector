@@ -12,7 +12,7 @@ tags: ["type: enhancement", "domain: transforms","transform: regex_parser"]
 
 Contributor [Mattias Endler (@mre)][urls.endler_dev] taught the [`regex_parser` transform][urls.vector_regex_parser] how to handle multiple regexes at a time efficiently!
 
-## Upgrade Guide
+## Get Started
 
 Make the following changes in your `vector.toml` file:
 

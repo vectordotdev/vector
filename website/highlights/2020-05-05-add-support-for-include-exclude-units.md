@@ -14,7 +14,7 @@ Often when you tap into the Journald source you're only really interested in a s
 
 Vector can now filter those directly at the source, offering better performance and easier use.
 
-## Upgrade Guide
+## Get Started
 
 Consider if you should make the following changes in your `vector.toml` file:
 
