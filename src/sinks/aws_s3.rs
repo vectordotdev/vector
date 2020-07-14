@@ -141,8 +141,9 @@ inventory::submit! {
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = self.clone().healthcheck(cx.resolver()).boxed().compat();
-        let sink = self.new(cx)?;
+        let client = self.create_client(cx.resolver())?;
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
+        let sink = self.new(client, cx)?;
         Ok((sink, Box::new(healthcheck)))
     }
 
@@ -166,7 +167,7 @@ enum HealthcheckError {
 }
 
 impl S3SinkConfig {
-    pub fn new(&self, cx: SinkContext) -> crate::Result<super::RouterSink> {
+    pub fn new(&self, client: S3Client, cx: SinkContext) -> crate::Result<super::RouterSink> {
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = self.encoding.clone();
 
@@ -184,9 +185,7 @@ impl S3SinkConfig {
         let key_prefix = self.key_prefix.as_deref().unwrap_or("date=%F/");
         let key_prefix = Template::try_from(key_prefix)?;
 
-        let s3 = S3Sink {
-            client: self.create_client(cx.resolver())?,
-        };
+        let s3 = S3Sink { client };
 
         let filename_extension = self.filename_extension.clone();
         let bucket = self.bucket.clone();
@@ -217,9 +216,7 @@ impl S3SinkConfig {
         Ok(Box::new(sink))
     }
 
-    pub async fn healthcheck(self, resolver: Resolver) -> crate::Result<()> {
-        let client = self.create_client(resolver)?;
-
+    pub async fn healthcheck(self, client: S3Client) -> crate::Result<()> {
         let req = client.head_bucket(HeadBucketRequest {
             bucket: self.bucket.clone(),
         });
@@ -562,7 +559,8 @@ mod integration_tests {
         rt.block_on_std(async move {
             let config = config(1000000).await;
             let prefix = config.key_prefix.clone();
-            let sink = config.new(cx).unwrap();
+            let client = config.create_client(cx.resolver()).unwrap();
+            let sink = config.new(client, cx).unwrap();
 
             let (lines, events) = random_lines_with_stream(100, 10);
 
@@ -595,7 +593,8 @@ mod integration_tests {
                 ..config(1010).await
             };
             let prefix = config.key_prefix.clone();
-            let sink = config.new(cx).unwrap();
+            let client = config.create_client(cx.resolver()).unwrap();
+            let sink = config.new(client, cx).unwrap();
 
             let (lines, _events) = random_lines_with_stream(100, 30);
 
@@ -649,7 +648,8 @@ mod integration_tests {
         });
 
         let prefix = config.key_prefix.clone();
-        let sink = config.new(cx).unwrap();
+        let client = config.create_client(cx.resolver()).unwrap();
+        let sink = config.new(client, cx).unwrap();
 
         let (lines, _) = random_lines_with_stream(100, 30);
 
@@ -716,7 +716,8 @@ mod integration_tests {
             };
 
             let prefix = config.key_prefix.clone();
-            let sink = config.new(cx).unwrap();
+            let client = config.create_client(cx.resolver()).unwrap();
+            let sink = config.new(client, cx).unwrap();
 
             let (lines, events) = random_lines_with_stream(100, 500);
 
@@ -746,7 +747,8 @@ mod integration_tests {
 
         rt.block_on_std(async move {
             let config = config(1).await;
-            config.healthcheck(resolver).await.unwrap();
+            let client = config.create_client(resolver).unwrap();
+            config.healthcheck(client).await.unwrap();
         });
     }
 
@@ -760,8 +762,9 @@ mod integration_tests {
                 bucket: "asdflkjadskdaadsfadf".to_string(),
                 ..config(1).await
             };
+            let client = config.create_client(resolver).unwrap();
             assert_downcast_matches!(
-                config.healthcheck(resolver).await.unwrap_err(),
+                config.healthcheck(client).await.unwrap_err(),
                 HealthcheckError,
                 HealthcheckError::UnknownBucket{ .. }
             );
