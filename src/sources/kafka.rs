@@ -162,7 +162,8 @@ fn kafka_source(
                     }
                 }
             })
-            // Not work =\
+            // Try `forward` after removing old futures.
+            // Error: implementation of `futures_core::stream::Stream` is not general enough
             // .forward(
             //     out.sink_compat()
             //         .sink_map_err(|e| error!(message = "Error sending to sink", error = ?e)),
