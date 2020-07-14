@@ -86,12 +86,12 @@ impl Default for DnstapMessageSchema {
             response_address: String::from("responseAddress"),
             response_port: String::from("responsePort"),
             query_zone: String::from("queryZone"),
-            dnstap_message_type: String::from("data.type"),
-            dnstap_message_type_id: String::from("data.typeId"),
-            query_message: String::from("data.requestData"),
-            response_message: String::from("data.responseData"),
-            update_request_message: String::from("data.updateRequestData"),
-            update_response_message: String::from("data.udpateResponseData"),
+            dnstap_message_type: String::from("messageType"),
+            dnstap_message_type_id: String::from("messageTypeId"),
+            query_message: String::from("requestData"),
+            response_message: String::from("responseData"),
+            update_request_message: String::from("updateRequestData"),
+            update_response_message: String::from("udpateResponseData"),
         }
     }
 }
