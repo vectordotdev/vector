@@ -1,7 +1,7 @@
 ---
 last_modified_on: "2020-07-14"
 $schema: "/.meta/.schemas/highlights.json"
-title: "New compresison options compression option for aws sinks"
+title: "New compression options for some sinks"
 description: "Stuff more data down a smaller hose in less time for cheaper."
 author_github: "https://github.com/hoverbear"
 hide_on_release_notes: false
