@@ -1,4 +1,6 @@
-use crate::{shutdown::ShutdownSignal, stream::StreamExt, topology::config::GlobalOptions, Event};
+use crate::{
+    shutdown::ShutdownSignal, stream::StreamExt01, topology::config::GlobalOptions, Event,
+};
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use parser::parse;
 use serde::{Deserialize, Serialize};

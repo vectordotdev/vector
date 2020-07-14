@@ -52,7 +52,7 @@ pub struct WeakSelect<S1, S2> {
 
 /// This `Stream` extension trait provides a `take_until` method that terminates the stream once
 /// the given future resolves.
-pub trait StreamExt: Stream {
+pub trait StreamExt01: Stream {
     /// Take elements from this stream until the given future resolves.
     ///
     /// This function will take elements from this stream until the given future resolves. Once it
@@ -128,7 +128,7 @@ pub trait StreamExt: Stream {
     }
 }
 
-impl<S> StreamExt for S where S: Stream {}
+impl<S> StreamExt01 for S where S: Stream {}
 
 impl<S, F, O> Stream for TakeUntil<S, F, O>
 where

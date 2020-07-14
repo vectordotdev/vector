@@ -1,4 +1,4 @@
-use crate::{event::Event, stream::StreamExt as _, transforms::Transform};
+use crate::{event::Event, stream::StreamExt01 as _, transforms::Transform};
 use futures::{stream, StreamExt, TryStreamExt};
 use futures01::{stream as stream01, Async, Future, Stream as FutureStream};
 use std::time::Duration;
