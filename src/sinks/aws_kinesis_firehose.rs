@@ -74,8 +74,9 @@ inventory::submit! {
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = self.clone().healthcheck(cx.resolver()).boxed().compat();
-        let sink = KinesisFirehoseService::new(self.clone(), cx)?;
+        let client = self.create_client(cx.resolver())?;
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
+        let sink = KinesisFirehoseService::new(self.clone(), client, cx)?;
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
@@ -89,8 +90,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
 }
 
 impl KinesisFirehoseSinkConfig {
-    async fn healthcheck(self, resolver: Resolver) -> crate::Result<()> {
-        let client = self.create_client(resolver)?;
+    async fn healthcheck(self, client: KinesisFirehoseClient) -> crate::Result<()> {
         let stream_name = self.stream_name;
 
         let req = client.describe_delivery_stream(DescribeDeliveryStreamInput {
@@ -126,10 +126,9 @@ impl KinesisFirehoseSinkConfig {
 impl KinesisFirehoseService {
     pub fn new(
         config: KinesisFirehoseSinkConfig,
+        client: KinesisFirehoseClient,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = config.create_client(cx.resolver())?;
-
         let batch = config
             .batch
             .disallow_max_bytes()?
@@ -318,7 +317,8 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let sink = KinesisFirehoseService::new(config, cx).unwrap();
+        let client = config.create_client(cx.resolver()).unwrap();
+        let sink = KinesisFirehoseService::new(config, client, cx).unwrap();
 
         let (input, events) = random_events_with_stream(100, 100);
 

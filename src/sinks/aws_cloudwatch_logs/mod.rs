@@ -124,7 +124,7 @@ pub struct CloudwatchLogsPartitionSvc {
     config: CloudwatchLogsSinkConfig,
     clients: HashMap<CloudwatchKey, Svc>,
     request_settings: TowerRequestSettings,
-    resolver: Resolver,
+    client: CloudWatchLogsClient,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -171,12 +171,13 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let log_group = self.group_name.clone();
         let log_stream = self.stream_name.clone();
 
+        let client = self.create_client(cx.resolver())?;
         let svc = ServiceBuilder::new()
             .concurrency_limit(request.in_flight_limit)
             .service(CloudwatchLogsPartitionSvc::new(
                 self.clone(),
-                cx.resolver(),
-            )?);
+                client.clone(),
+            ));
 
         let encoding = self.encoding.clone();
         let sink = {
@@ -189,7 +190,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             Box::new(svc_sink)
         };
 
-        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
 
         Ok((sink, Box::new(healthcheck)))
     }
@@ -204,15 +205,15 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsPartitionSvc {
-    pub fn new(config: CloudwatchLogsSinkConfig, resolver: Resolver) -> crate::Result<Self> {
+    pub fn new(config: CloudwatchLogsSinkConfig, client: CloudWatchLogsClient) -> Self {
         let request_settings = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        Ok(Self {
+        Self {
             config,
             clients: HashMap::new(),
             request_settings,
-            resolver,
-        })
+            client,
+        }
     }
 }
 
@@ -239,7 +240,7 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
             let svc = {
                 let policy = self.request_settings.retry_policy(CloudwatchRetryLogic);
 
-                let cloudwatch = CloudwatchLogsSvc::new(&self.config, &key, self.resolver).unwrap();
+                let cloudwatch = CloudwatchLogsSvc::new(&self.config, &key, self.client.clone());
                 let timeout = Timeout::new(cloudwatch, self.request_settings.timeout);
 
                 let buffer = Buffer::new(timeout, 1);
@@ -273,17 +274,15 @@ impl CloudwatchLogsSvc {
     pub fn new(
         config: &CloudwatchLogsSinkConfig,
         key: &CloudwatchKey,
-        resolver: Resolver,
-    ) -> crate::Result<Self> {
-        let client = config.create_client(resolver)?;
-
+        client: CloudWatchLogsClient,
+    ) -> Self {
         let group_name = String::from_utf8_lossy(&key.group[..]).into_owned();
         let stream_name = String::from_utf8_lossy(&key.stream[..]).into_owned();
 
         let create_missing_group = config.create_missing_group.unwrap_or(true);
         let create_missing_stream = config.create_missing_stream.unwrap_or(true);
 
-        Ok(CloudwatchLogsSvc {
+        CloudwatchLogsSvc {
             client,
             stream_name,
             group_name,
@@ -291,7 +290,7 @@ impl CloudwatchLogsSvc {
             create_missing_stream,
             token: None,
             token_rx: None,
-        })
+        }
     }
 
     pub fn process_events(&self, events: Vec<InputLogEvent>) -> Vec<Vec<InputLogEvent>> {
@@ -488,7 +487,10 @@ enum HealthcheckError {
     GroupNameMismatch { expected: String, name: String },
 }
 
-async fn healthcheck(config: CloudwatchLogsSinkConfig, resolver: Resolver) -> crate::Result<()> {
+async fn healthcheck(
+    config: CloudwatchLogsSinkConfig,
+    client: CloudWatchLogsClient,
+) -> crate::Result<()> {
     if config.group_name.is_dynamic() {
         info!("cloudwatch group_name is dynamic; skipping healthcheck.");
         return Ok(());
@@ -496,8 +498,6 @@ async fn healthcheck(config: CloudwatchLogsSinkConfig, resolver: Resolver) -> cr
 
     let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
     let expected_group_name = group_name.clone();
-
-    let client = config.create_client(resolver)?;
 
     let request = DescribeLogGroupsRequest {
         limit: Some(1),
@@ -782,8 +782,8 @@ mod tests {
             stream: "stream".into(),
             group: "group".into(),
         };
-        let resolver = Resolver;
-        CloudwatchLogsSvc::new(&config, &key, resolver).unwrap()
+        let client = config.create_client(Resolver).unwrap();
+        CloudwatchLogsSvc::new(&config, &key, client)
     }
 
     #[test]
@@ -1273,9 +1273,9 @@ mod integration_tests {
         };
 
         let mut rt = runtime();
-        let resolver = Resolver;
 
-        rt.block_on_std(healthcheck(config, resolver)).unwrap();
+        let client = config.create_client(Resolver).unwrap();
+        rt.block_on_std(healthcheck(config, client)).unwrap();
     }
 
     fn create_client_test() -> CloudWatchLogsClient {
