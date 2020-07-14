@@ -58,7 +58,7 @@ mod tests {
 
     #[test]
     fn test_parsing() {
-        test_util::test_parser(|| Picker::new(), cases());
+        test_util::test_parser(Picker::new, cases());
     }
 
     #[test]

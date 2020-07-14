@@ -76,7 +76,7 @@ pub enum Error {
 /// To avoid needlessly complicating the logic here, we simply implement the
 /// `net.JoinHostPort` as it is in Go: https://golang.org/pkg/net/#JoinHostPort
 fn join_host_port(host: &str, port: &str) -> String {
-    if host.contains(":") {
+    if host.contains(':') {
         // If IPv6 address is used, use a special notation.
         return format!("[{}]:{}", host, port);
     }

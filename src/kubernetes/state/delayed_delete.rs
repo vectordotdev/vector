@@ -109,9 +109,7 @@ where
     <T as super::Write>::Item: Send + Sync,
 {
     fn maintenance_request(&mut self) -> Option<BoxFuture<'_, ()>> {
-        let delayed_delete_deadline = self
-            .next_deadline()
-            .map(|delayed_delete_deadline| delay_until(delayed_delete_deadline));
+        let delayed_delete_deadline = self.next_deadline().map(delay_until);
         let downstream = self.inner.maintenance_request();
 
         match (downstream, delayed_delete_deadline) {

@@ -4,7 +4,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent};
 use k8s_openapi::Metadata;
 
 /// Resource version state in the context of a chain of watch requests.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct State(Option<String>);
 
 impl State {

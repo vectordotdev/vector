@@ -81,7 +81,7 @@ where
             } else {
                 watcher::invocation::Error::other(source)
             };
-            Err(err)?;
+            return Err(err);
         }
 
         // Stream response body.

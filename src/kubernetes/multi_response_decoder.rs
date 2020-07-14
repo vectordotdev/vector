@@ -4,7 +4,7 @@ use k8s_openapi::{http::StatusCode, Response, ResponseError};
 
 /// Provides an algorithm to parse multiple [`Response`]s from multiple chunks
 /// of data represented as `&[u8]`.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MultiResponseDecoder<T> {
     pending_data: Vec<u8>,
     responses_buffer: Vec<Result<T, ResponseError>>,

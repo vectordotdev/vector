@@ -151,6 +151,6 @@ pub mod tests {
 
     #[test]
     fn test_parsing() {
-        test_util::test_parser(|| Cri::new(), cases());
+        test_util::test_parser(Cri::new, cases());
     }
 }

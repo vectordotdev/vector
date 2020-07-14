@@ -138,8 +138,8 @@ where
     ) -> Result<<W as Watcher>::Stream, watcher::invocation::Error<<W as Watcher>::InvocationError>>
     {
         let watch_optional = WatchOptional {
-            field_selector: self.field_selector.as_ref().map(|s| s.as_str()),
-            label_selector: self.label_selector.as_ref().map(|s| s.as_str()),
+            field_selector: self.field_selector.as_deref(),
+            label_selector: self.label_selector.as_deref(),
             pretty: None,
             resource_version: self.resource_version.get(),
             timeout_seconds: Some(290), // https://github.com/kubernetes/kubernetes/issues/6513
