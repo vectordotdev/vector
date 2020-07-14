@@ -181,7 +181,7 @@ mod new_futures {
 
         fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<St1::Item>> {
             let this = self.project();
-            if !*this.flag {
+            if *this.flag {
                 poll_inner(this.flag, this.stream1, this.stream2, cx)
             } else {
                 poll_inner(this.flag, this.stream2, this.stream1, cx)
