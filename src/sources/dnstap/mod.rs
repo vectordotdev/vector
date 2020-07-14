@@ -8,7 +8,6 @@ use crate::{
 use bytes::Bytes;
 use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
-
 use std::path::PathBuf;
 
 mod parser;
@@ -27,6 +26,8 @@ pub struct DnstapConfig {
     pub host_key: Option<String>,
     pub socket_path: PathBuf,
     pub raw_data_only: Option<bool>,
+    pub multithreaded: Option<bool>,
+    pub max_frame_handling_tasks: Option<u32>,
 }
 
 fn default_max_length() -> usize {
@@ -54,6 +55,8 @@ impl Default for DnstapConfig {
             max_length: default_max_length(),
             socket_path: PathBuf::from("/run/bind/dnstap.sock"),
             raw_data_only: None,
+            multithreaded: None,
+            max_frame_handling_tasks: None,
         }
     }
 }
@@ -78,13 +81,23 @@ impl SourceConfig for DnstapConfig {
 
         let frame_handler = DnstapFrameHandler::new(
             self.max_length,
-            host_key.clone(),
+            host_key,
             self.socket_path.clone(),
             self.content_type(),
             if let Some(v) = self.raw_data_only {
                 v
             } else {
                 false
+            },
+            if let Some(v) = self.multithreaded {
+                v
+            } else {
+                false
+            },
+            if let Some(v) = self.max_frame_handling_tasks {
+                v
+            } else {
+                1000
             },
         );
         Ok(build_framestream_unix_source(frame_handler, shutdown, out))
@@ -107,6 +120,8 @@ pub struct DnstapFrameHandler {
     content_type: String,
     schema: DnstapEventSchema,
     raw_data_only: bool,
+    multithreaded: bool,
+    max_frame_handling_tasks: u32,
 }
 
 impl DnstapFrameHandler {
@@ -116,6 +131,8 @@ impl DnstapFrameHandler {
         socket_path: PathBuf,
         content_type: String,
         raw_data_only: bool,
+        multithreaded: bool,
+        max_frame_handling_tasks: u32,
     ) -> Self {
         Self {
             max_length,
@@ -124,6 +141,8 @@ impl DnstapFrameHandler {
             content_type,
             schema: DnstapEventSchema::new(),
             raw_data_only,
+            multithreaded,
+            max_frame_handling_tasks: max_frame_handling_tasks,
         }
     }
 }
@@ -132,12 +151,15 @@ impl FrameHandler for DnstapFrameHandler {
     fn content_type(&self) -> String {
         self.content_type.clone()
     }
+
     fn max_length(&self) -> usize {
         self.max_length
     }
+
     fn host_key(&self) -> String {
         self.host_key.clone()
     }
+
     /**
      * Function to pass into util::framestream::build_framestream_unix_source
      * Takes a data frame from the unix socket and turns it into a Vector Event.
@@ -153,7 +175,10 @@ impl FrameHandler for DnstapFrameHandler {
         }
 
         if self.raw_data_only {
-            log_event.insert(&self.schema.dnstap_root_data_schema.raw_data, base64::encode(&frame));
+            log_event.insert(
+                &self.schema.dnstap_root_data_schema.raw_data,
+                base64::encode(&frame),
+            );
             Some(event)
         } else {
             match DnstapParser::new(&self.schema, log_event).parse_dnstap_data(frame) {
@@ -167,5 +192,13 @@ impl FrameHandler for DnstapFrameHandler {
     }
     fn socket_path(&self) -> PathBuf {
         self.socket_path.clone()
+    }
+
+    fn multithreaded(&self) -> bool {
+        self.multithreaded
+    }
+
+    fn max_frame_handling_tasks(&self) -> u32 {
+        self.max_frame_handling_tasks
     }
 }

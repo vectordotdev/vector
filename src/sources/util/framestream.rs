@@ -10,7 +10,15 @@ use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use std::convert::TryInto;
 use std::fs;
 use std::marker::{Send, Sync};
-use std::path::PathBuf;
+use std::{
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
+    thread,
+    time::Duration,
+};
 use tokio01::{
     self,
     codec::{length_delimited, Framed},
@@ -130,29 +138,27 @@ impl FrameStreamReader {
     }
 
     pub fn handle_frame(&mut self, frame: Bytes) -> Option<Bytes> {
-        if frame.len() == 0 {
+        if frame.is_empty() {
             //frame length of zero means the next frame is a control frame
             self.state.expect_control_frame = true;
             None
+        } else if self.state.expect_control_frame {
+            self.state.expect_control_frame = false;
+            let _ = self.handle_control_frame(frame);
+            None
         } else {
-            if self.state.expect_control_frame {
-                self.state.expect_control_frame = false;
-                let _ = self.handle_control_frame(frame);
-                None
+            //data frame
+            if self.state.control_state == ControlState::ReadingData {
+                emit!(UnixSocketEventReceived {
+                    byte_size: frame.len()
+                });
+                Some(frame) //return data frame
             } else {
-                //data frame
-                if self.state.control_state == ControlState::ReadingData {
-                    emit!(UnixSocketEventReceived {
-                        byte_size: frame.len()
-                    });
-                    Some(frame) //return data frame
-                } else {
-                    error!(
-                        "Received a data frame while in state {:?}",
-                        self.state.control_state
-                    );
-                    None
-                }
+                error!(
+                    "Received a data frame while in state {:?}",
+                    self.state.control_state
+                );
+                None
             }
         }
     }
@@ -171,6 +177,7 @@ impl FrameStreamReader {
                 match header {
                     ControlHeader::Ready => {
                         let content_type = self.process_fields(header, &mut frame)?.unwrap();
+
                         self.send_control_frame(Self::make_frame(
                             ControlHeader::Accept,
                             Some(content_type),
@@ -232,7 +239,7 @@ impl FrameStreamReader {
             }
             ControlHeader::Start => {
                 //can take one or zero content types
-                if frame.len() == 0 {
+                if frame.is_empty() {
                     Ok(None)
                 } else {
                     //should match expected content type
@@ -243,7 +250,7 @@ impl FrameStreamReader {
             }
             ControlHeader::Stop => {
                 //check that there are no fields
-                if frame.len() != 0 {
+                if !frame.is_empty() {
                     error!("Unexpected fields in STOP header");
                     Err(())
                 } else {
@@ -258,13 +265,13 @@ impl FrameStreamReader {
     }
 
     fn process_content_type(&self, frame: &mut Bytes, is_start_frame: bool) -> Result<String, ()> {
-        if frame.len() == 0 {
+        if frame.is_empty() {
             error!("No fields in control frame");
             return Err(());
         }
 
         let mut content_types = vec![];
-        while frame.len() > 0 {
+        while !frame.is_empty() {
             //4 bytes of ControlField
             let field_val = advance_u32(frame)?;
             let field_type = ControlField::from_u32(field_val)?;
@@ -346,6 +353,8 @@ pub trait FrameHandler {
     fn host_key(&self) -> String;
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event>;
     fn socket_path(&self) -> PathBuf;
+    fn multithreaded(&self) -> bool;
+    fn max_frame_handling_tasks(&self) -> u32;
 }
 
 /**
@@ -360,7 +369,7 @@ pub fn build_framestream_unix_source(
 ) -> Source {
     let path = frame_handler.socket_path();
 
-    let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
+    let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
     //check if the path already exists (and try to delete it)
     match fs::metadata(&path) {
@@ -375,6 +384,7 @@ pub fn build_framestream_unix_source(
 
     Box::new(future::lazy(move || {
         let listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
+        let parsing_task_counter = Arc::new(AtomicU32::new(0));
 
         info!(message = "listening.", ?path, r#type = "unix");
 
@@ -383,10 +393,11 @@ pub fn build_framestream_unix_source(
             .take_until(shutdown.clone())
             .map_err(|e| error!("failed to accept socket; error = {:?}", e))
             .for_each(move |socket| {
-                let out = out.clone();
                 let peer_addr = socket.peer_addr().ok();
                 let content_type = frame_handler.content_type();
                 let listen_path = path.clone();
+                let event_sink = out.clone();
+                let task_counter = parsing_task_counter.clone();
 
                 let span = info_span!("connection");
                 let path = if let Some(addr) = peer_addr {
@@ -411,25 +422,67 @@ pub fn build_framestream_unix_source(
                 .split();
                 let mut fs_reader = FrameStreamReader::new(Box::new(sock_sink), content_type);
                 let frame_handler_copy = frame_handler.clone();
-                let events = sock_stream
+                let frames = sock_stream
                     .take_until(shutdown.clone())
-                    .filter_map(
-                        move |frame| match fs_reader.handle_frame(Bytes::from(frame)) {
-                            Some(f) => frame_handler_copy.handle_event(received_from.clone(), f),
-                            None => None,
-                        },
-                    )
-                    .map_err(move |error| {
-                        emit!(UnixSocketError {
-                            error,
-                            path: &listen_path,
+                    .filter_map(move |frame| fs_reader.handle_frame(Bytes::from(frame)));
+                if !frame_handler.multithreaded() {
+                    let events = frames
+                        .filter_map(move |f| {
+                            frame_handler_copy.handle_event(received_from.clone(), f)
+                        })
+                        .map_err(move |error| {
+                            emit!(UnixSocketError {
+                                error,
+                                path: &listen_path,
+                            });
                         });
-                    });
 
-                let handler = events.forward(out).map(|_| info!("finished sending"));
-                tokio01::spawn(handler.instrument(span))
+                    let handler = events
+                        .forward(event_sink)
+                        .map(|_| info!("finished sending"));
+                    tokio01::spawn(handler.instrument(span))
+                } else {
+                    let handler = frames
+                        .for_each(move |f| {
+                            wait_for_task_quota(
+                                &task_counter,
+                                frame_handler_copy.max_frame_handling_tasks(),
+                            );
+
+                            let f_handler = frame_handler_copy.clone();
+                            let received_from_copy = received_from.clone();
+                            let mut event_sink_copy = event_sink.clone();
+                            let task_counter_copy = task_counter.clone();
+                            tokio01::spawn(future::lazy(move || {
+                                if let Some(e) = f_handler.handle_event(received_from_copy, f) {
+                                    if let Err(e) = event_sink_copy.get_mut().try_send(e) {
+                                        println!("{:#?}", e);
+                                    }
+                                };
+                                task_counter_copy.fetch_sub(1, Ordering::Relaxed);
+                                Ok(())
+                            }));
+                            Ok(())
+                        })
+                        .map_err(move |error| {
+                            emit!(UnixSocketError {
+                                error,
+                                path: &listen_path,
+                            });
+                        })
+                        .map(|_| info!("finished sending"));
+                    tokio01::spawn(handler)
+                }
             })
     }))
+}
+
+fn wait_for_task_quota(task_counter: &Arc<AtomicU32>, max_tasks: u32) {
+    let waiting_time = Duration::from_millis(100);
+    while max_tasks > 0 && max_tasks < task_counter.load(Ordering::Relaxed) {
+        thread::sleep(waiting_time);
+    }
+    task_counter.fetch_add(1, Ordering::Relaxed);
 }
 
 #[cfg(test)]
@@ -457,6 +510,8 @@ mod test {
         max_length: usize,
         host_key: String,
         socket_path: PathBuf,
+        multithreaded: bool,
+        max_frame_handling_tasks: u32,
     }
 
     impl MockFrameHandler {
@@ -466,6 +521,8 @@ mod test {
                 max_length: bytesize::kib(100u64) as usize,
                 host_key: "test_framestream".to_string(),
                 socket_path: tempfile::tempdir().unwrap().into_path().join("unix_test"),
+                multithreaded: false,
+                max_frame_handling_tasks: 0,
             }
         }
     }
@@ -475,7 +532,7 @@ mod test {
             self.content_type.clone()
         }
         fn max_length(&self) -> usize {
-            self.max_length.clone()
+            self.max_length
         }
         fn host_key(&self) -> String {
             self.host_key.clone()
@@ -495,17 +552,20 @@ mod test {
         fn socket_path(&self) -> PathBuf {
             self.socket_path.clone()
         }
+        fn multithreaded(&self) -> bool {
+            self.multithreaded
+        }
+        fn max_frame_handling_tasks(&self) -> u32 {
+            self.max_frame_handling_tasks
+        }
     }
 
     fn init_framstream_unix(
         frame_handler: MockFrameHandler,
         sender: mpsc::Sender<event::Event>,
     ) -> (PathBuf, runtime::Runtime) {
-        let server = build_framestream_unix_source(
-            frame_handler.clone(),
-            ShutdownSignal::noop(),
-            sender,
-        );
+        let server =
+            build_framestream_unix_source(frame_handler.clone(), ShutdownSignal::noop(), sender);
 
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
@@ -747,8 +807,7 @@ mod test {
 
         //1 - send START frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
-        let start_msg =
-            create_control_frame_with_content(ControlHeader::Start, vec![content_type.clone()]);
+        let start_msg = create_control_frame_with_content(ControlHeader::Start, vec![content_type]);
         sock_sink = send_control_frame(sock_sink, start_msg);
 
         //4 - send data
