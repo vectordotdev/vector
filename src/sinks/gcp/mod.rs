@@ -49,24 +49,14 @@ pub struct GcpAuthConfig {
 }
 
 impl GcpAuthConfig {
-    pub fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpCredentials>> {
-        let this = self.clone();
-        // We can not run new Runtime in thread which already used by other Runtime.
-        // Without new thread we get error: `default Tokio timer already set for execution context`
-        std::thread::spawn(|| {
-            let mut rt = crate::runtime::Runtime::single_threaded().unwrap();
-            rt.block_on_std(async move {
-                let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
-                let creds_path = this.credentials_path.as_ref().or_else(|| gap.as_ref());
-                Ok(match (&creds_path, &this.api_key) {
-                    (Some(path), _) => Some(GcpCredentials::from_file(path, scope).await?),
-                    (None, Some(_)) => None,
-                    (None, None) => Some(GcpCredentials::new_implicit(scope).await?),
-                })
-            })
+    pub async fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpCredentials>> {
+        let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
+        let creds_path = self.credentials_path.as_ref().or_else(|| gap.as_ref());
+        Ok(match (&creds_path, &self.api_key) {
+            (Some(path), _) => Some(GcpCredentials::from_file(path, scope).await?),
+            (None, Some(_)) => None,
+            (None, None) => Some(GcpCredentials::new_implicit(scope).await?),
         })
-        .join()
-        .expect("Runtime thread error")
     }
 }
 
@@ -194,11 +184,11 @@ mod tests {
     use super::*;
     use crate::assert_downcast_matches;
 
-    #[test]
+    #[tokio::test]
     #[ignore]
-    fn fails_missing_creds() {
+    async fn fails_missing_creds() {
         let config: GcpAuthConfig = toml::from_str("").unwrap();
-        match config.make_credentials(Scope::Compute) {
+        match config.make_credentials(Scope::Compute).await {
             Ok(_) => panic!("make_credentials failed to error"),
             Err(err) => assert_downcast_matches!(err, GcpError, GcpError::GetImplicitToken { .. }), // This should be a more relevant error
         }

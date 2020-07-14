@@ -107,10 +107,15 @@ lazy_static! {
         .unwrap();
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let creds = self.auth.make_credentials(Scope::LoggingWrite)?;
+    fn build(&self, _cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        unimplemented!()
+    }
+
+    async fn build_async(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
 
         let batch = self.batch.use_size_as_bytes()?.get_settings_or_default(
             BatchSettings::default()

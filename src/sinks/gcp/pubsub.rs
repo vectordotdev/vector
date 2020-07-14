@@ -61,10 +61,15 @@ inventory::submit! {
     SinkDescription::new::<PubsubConfig>("gcp_pubsub")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let sink = PubsubSink::from_config(self)?;
+    fn build(&self, _cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        unimplemented!()
+    }
+
+    async fn build_async(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        let sink = PubsubSink::from_config(self).await?;
         let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
             BatchSettings::default()
                 .bytes(bytesize::mib(10u64))
@@ -109,10 +114,10 @@ struct PubsubSink {
 }
 
 impl PubsubSink {
-    fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
+    async fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
         // We only need to load the credentials if we are not targetting an emulator.
         let creds = match config.emulator_host {
-            None => config.auth.make_credentials(Scope::PubSub)?,
+            None => config.auth.make_credentials(Scope::PubSub).await?,
             Some(_) => None,
         };
 
