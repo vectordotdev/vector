@@ -24,7 +24,7 @@ After some deliberation, we've opted to package and ship glibc builds where it's
 
 If you've fought with glibc before, you've probably got a burning question:
 
-**Which version do we support? 🕵️‍♀️**
+> Which version do we support? 🕵️‍♀️
 
 **Don't worry. We have your back. 🤜🤛** We're using a base of CentOS 7, which means new Vector glibc builds will support all the way back to **glibc 2.17**. If that's still too new for your machines, please keep using the Musl builds. (Also, [Let us know!][urls.new_bug_report])
 

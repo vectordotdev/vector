@@ -26,7 +26,7 @@ vic@sticky-keyboard-macbook:/git/timberio/vector$ vector validate test.toml
 
 Now an invalid:
 
-```
+```bash
 vic@sticky-keyboard-macbook:/git/timberio/vector$ vector validate test.toml
 Failed to parse "test.toml"
 ---------------------------
