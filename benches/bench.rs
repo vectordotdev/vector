@@ -4,7 +4,9 @@ use approx::assert_relative_eq;
 use futures01::future;
 use rand::distributions::{Alphanumeric, Uniform};
 use rand::prelude::*;
+use std::collections::HashMap;
 use std::convert::TryFrom;
+use string_cache::DefaultAtom as Atom;
 use vector::event::Event;
 use vector::test_util::{
     block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
@@ -31,6 +33,7 @@ criterion_group!(
     benchmark_complex,
     bench_elasticsearch_index,
     benchmark_regex,
+    benchmark_split_transform
 );
 criterion_main!(
     benches,
@@ -402,6 +405,78 @@ fn benchmark_transforms(c: &mut Criterion) {
         .noise_threshold(0.05)
         .throughput(Throughput::Bytes(
             (num_lines * (line_size + "status=404".len())) as u64,
+        )),
+    );
+}
+
+fn benchmark_split_transform(c: &mut Criterion) {
+    let num_lines: usize = 100_000;
+    let line_size: usize = 100;
+
+    let in_addr = next_addr();
+    let out_addr = next_addr();
+
+    c.bench(
+        "split transform",
+        Benchmark::new("split transform", move |b| {
+            b.iter_with_setup(
+                || {
+                    let mut config = config::Config::empty();
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
+                    let field_names = vec!["random_id".to_owned(), "status".to_owned()]
+                        .into_iter()
+                        .map(|s| s.into())
+                        .collect::<Vec<Atom>>();
+                    config.add_transform(
+                        "split",
+                        &["in"],
+                        transforms::split::SplitConfig {
+                            field_names: field_names,
+                            separator: Some(",".to_owned()),
+                            field: None,
+                            drop_field: false,
+                            types: HashMap::new(),
+                            ..Default::default()
+                        },
+                    );
+                    config.add_sink(
+                        "out",
+                        &["split"],
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr.to_string(),
+                        ),
+                    );
+                    let mut rt = runtime::Runtime::new().unwrap();
+
+                    let output_lines = count_receive(&out_addr);
+
+                    let (topology, _crash) =
+                        rt.block_on_std(topology::start(config, false)).unwrap();
+                    wait_for_tcp(in_addr);
+
+                    (rt, topology, output_lines)
+                },
+                |(mut rt, topology, output_lines)| {
+                    let send = send_lines(
+                        in_addr,
+                        random_lines(line_size).map(|l| l + ",404").take(num_lines),
+                    );
+                    rt.block_on(send).unwrap();
+
+                    block_on(topology.stop()).unwrap();
+
+                    shutdown_on_idle(rt);
+                    assert_eq!(num_lines, output_lines.wait());
+                },
+            );
+        })
+        .sample_size(10)
+        .noise_threshold(0.05)
+        .throughput(Throughput::Bytes(
+            (num_lines * (line_size + ",404".len())) as u64,
         )),
     );
 }
