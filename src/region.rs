@@ -205,6 +205,17 @@ mod tests {
     }
 
     #[test]
+    fn region_from_endpoint_without_scheme() {
+        assert_eq!(
+            region_from_endpoint("ams3.digitaloceanspaces.com").unwrap(),
+            Region::Custom {
+                name: "us-east-1".into(),
+                endpoint: "ams3.digitaloceanspaces.com".into()
+            }
+        );
+    }
+
+    #[test]
     fn region_from_endpoint_strips_path_query() {
         assert_eq!(
             region_from_endpoint("http://localhost:9000/path?query").unwrap(),
