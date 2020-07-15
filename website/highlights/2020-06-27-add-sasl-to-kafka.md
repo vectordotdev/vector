@@ -1,16 +1,30 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-15"
 $schema: "/.meta/.schemas/highlights.json"
-title: "Kafka components support SASL"
+title: "Kafka components support SASL (Dev builds only)"
 description: "Vector has a new way to authenticate with Kafka!"
 author_github: "https://github.com/hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2897]
 release: "0.10.0"
-tags: ["type: enhancement","domain: sinks","sink: kafka"]
+tags: ["type: new feature","domain: sinks","sink: kafka"]
 ---
 
+import Alert from '@site/src/components/Alert';
+
 The Kafka source and sink now support [SASL authentication][urls.kafka_sasl].
+
+<Alert type="warning">
+
+In order to use this feature, Vector must be built with the `sasl` feature. It is not (yet) included in distributed packages.
+
+```bash
+cargo build --release --features sasl
+```
+
+Then you can run Vector as `target/release/vector`.
+
+</Alert>
 
 You can review the option in the [component docs][urls.vector_sink_kafka_sasl].
 

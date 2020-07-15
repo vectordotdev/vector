@@ -323,6 +323,7 @@ vector_semantic_yml = "https://github.com/timberio/vector/blob/master/.github/se
 vector_stars = "https://github.com/timberio/vector/stargazers"
 vector_systemd_file = "https://github.com/timberio/vector/blob/master/distribution/systemd/vector.service"
 vector_test_harness = "https://github.com/timberio/vector-test-harness/"
+vector_transform_reduce = "https://vector.dev/docs/reference/transforms/reduce/"
 vector_twitter = "https://twitter.com/vectordotdev"
 vector_version_branches = "https://github.com/timberio/vector/branches/all?query=v"
 vector_website = "https://vector.dev"

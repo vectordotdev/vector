@@ -34,7 +34,7 @@ We're just getting started with this feature, so please try it out and give us y
 
 Recall that this is experimental code, and the API may have changed by the time you read this!
 
-In order to use this feature, Vector must be built with the `wasm` feature.
+In order to use this feature, Vector must be built with the `wasm` feature. It is not (yet) included in distributed packages.
 
 ```bash
 cargo build --release --features wasm

@@ -3505,11 +3505,11 @@ module.exports = {
       "path": "website/highlights/2020-06-27-add-sasl-to-kafka.md",
       "permalink": "/highlights/2020-06-27-add-sasl-to-kafka/",
       "tags": [
-        "type: enhancement",
+        "type: new feature",
         "domain: sinks",
         "sink: kafka"
       ],
-      "title": "Kafka components support SASL"
+      "title": "Kafka components support SASL (Dev builds only)"
     },
     {
       "author_github": "https://github.com/hoverbear",
@@ -3555,6 +3555,20 @@ module.exports = {
         "domain: operations"
       ],
       "title": "glibc enhancements"
+    },
+    {
+      "author_github": "https://github.com/hoverbear",
+      "date": "2020-07-10",
+      "description": "More flexibility around grouping events.",
+      "hide_on_release_notes": false,
+      "id": "2020-07-10-add-reduce-transform",
+      "path": "website/highlights/2020-07-10-add-reduce-transform.md",
+      "permalink": "/highlights/2020-07-10-add-reduce-transform/",
+      "tags": [
+        "type: new feature",
+        "domain: transforms"
+      ],
+      "title": "New Reduce transform"
     }
   ],
   "installation": {
@@ -3980,17 +3994,17 @@ module.exports = {
   },
   "latest_highlight": {
     "author_github": "https://github.com/hoverbear",
-    "date": "2020-07-09",
-    "description": "If your Linux uses glibc, Vector will too.",
+    "date": "2020-07-10",
+    "description": "More flexibility around grouping events.",
     "hide_on_release_notes": false,
-    "id": "2020-07-09-add-musl-and-glibc-support-to-install-sh",
-    "path": "website/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh.md",
-    "permalink": "/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/",
+    "id": "2020-07-10-add-reduce-transform",
+    "path": "website/highlights/2020-07-10-add-reduce-transform.md",
+    "permalink": "/highlights/2020-07-10-add-reduce-transform/",
     "tags": [
-      "type: breaking change",
-      "domain: operations"
+      "type: new feature",
+      "domain: transforms"
     ],
-    "title": "glibc enhancements"
+    "title": "New Reduce transform"
   },
   "latest_post": {
     "author_github": "https://github.com/lukesteensen",
@@ -9393,11 +9407,11 @@ module.exports = {
         "path": "website/highlights/2020-06-27-add-sasl-to-kafka.md",
         "permalink": "/highlights/2020-06-27-add-sasl-to-kafka/",
         "tags": [
-          "type: enhancement",
+          "type: new feature",
           "domain: sinks",
           "sink: kafka"
         ],
-        "title": "Kafka components support SASL"
+        "title": "Kafka components support SASL (Dev builds only)"
       },
       {
         "author_github": "https://github.com/hoverbear",
@@ -9443,6 +9457,20 @@ module.exports = {
           "domain: operations"
         ],
         "title": "glibc enhancements"
+      },
+      {
+        "author_github": "https://github.com/hoverbear",
+        "date": "2020-07-10",
+        "description": "More flexibility around grouping events.",
+        "hide_on_release_notes": false,
+        "id": "2020-07-10-add-reduce-transform",
+        "path": "website/highlights/2020-07-10-add-reduce-transform.md",
+        "permalink": "/highlights/2020-07-10-add-reduce-transform/",
+        "tags": [
+          "type: new feature",
+          "domain: transforms"
+        ],
+        "title": "New Reduce transform"
       }
     ],
     "insertions_count": 42685,
@@ -14888,11 +14916,11 @@ module.exports = {
           "path": "website/highlights/2020-06-27-add-sasl-to-kafka.md",
           "permalink": "/highlights/2020-06-27-add-sasl-to-kafka/",
           "tags": [
-            "type: enhancement",
+            "type: new feature",
             "domain: sinks",
             "sink: kafka"
           ],
-          "title": "Kafka components support SASL"
+          "title": "Kafka components support SASL (Dev builds only)"
         },
         {
           "author_github": "https://github.com/hoverbear",
@@ -14938,6 +14966,20 @@ module.exports = {
             "domain: operations"
           ],
           "title": "glibc enhancements"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
+          "date": "2020-07-10",
+          "description": "More flexibility around grouping events.",
+          "hide_on_release_notes": false,
+          "id": "2020-07-10-add-reduce-transform",
+          "path": "website/highlights/2020-07-10-add-reduce-transform.md",
+          "permalink": "/highlights/2020-07-10-add-reduce-transform/",
+          "tags": [
+            "type: new feature",
+            "domain: transforms"
+          ],
+          "title": "New Reduce transform"
         }
       ],
       "insertions_count": 42685,
