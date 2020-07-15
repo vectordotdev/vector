@@ -501,6 +501,7 @@ identifier_fields = [ "request_id" ]
 identifier_fields = [ "request_id" ]
 
 merge_strategies.foo = "array"
+merge_strategies.bar = "concat"
 
 [ends_when]
   "test_end.exists" = true
@@ -514,16 +515,25 @@ merge_strategies.foo = "array"
 
         let mut e = Event::from("test message 1");
         e.as_mut_log().insert("foo", json!([1, 3]));
+        e.as_mut_log().insert("bar", json!([1, 3]));
         e.as_mut_log().insert("request_id", "1");
         reduce.transform_into(&mut outputs, e);
 
         let mut e = Event::from("test message 2");
         e.as_mut_log().insert("foo", json!([2, 4]));
+        e.as_mut_log().insert("bar", json!([2, 4]));
         e.as_mut_log().insert("request_id", "2");
         reduce.transform_into(&mut outputs, e);
 
         let mut e = Event::from("test message 3");
         e.as_mut_log().insert("foo", json!([5, 7]));
+        e.as_mut_log().insert("bar", json!([5, 7]));
+        e.as_mut_log().insert("request_id", "1");
+        reduce.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 4");
+        e.as_mut_log().insert("foo", json!("done"));
+        e.as_mut_log().insert("bar", json!("done"));
         e.as_mut_log().insert("request_id", "1");
         e.as_mut_log().insert("test_end", "yep");
         reduce.transform_into(&mut outputs, e);
@@ -531,13 +541,26 @@ merge_strategies.foo = "array"
         assert_eq!(outputs.len(), 1);
         assert_eq!(
             outputs.first().unwrap().as_log()[&"foo".into()],
-            json!([[1, 3], [5, 7]]).into()
+            json!([[1, 3], [5, 7], "done"]).into()
+        );
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"bar".into()],
+            json!([1, 3, 5, 7, "done"]).into()
         );
 
         outputs.clear();
 
-        let mut e = Event::from("test message 4");
+        let mut e = Event::from("test message 5");
         e.as_mut_log().insert("foo", json!([6, 8]));
+        e.as_mut_log().insert("bar", json!([6, 8]));
+        e.as_mut_log().insert("request_id", "2");
+        reduce.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 6");
+        e.as_mut_log().insert("foo", json!("done"));
+        e.as_mut_log().insert("bar", json!("done"));
         e.as_mut_log().insert("request_id", "2");
         e.as_mut_log().insert("test_end", "yep");
         reduce.transform_into(&mut outputs, e);
@@ -545,7 +568,11 @@ merge_strategies.foo = "array"
         assert_eq!(outputs.len(), 1);
         assert_eq!(
             outputs.first().unwrap().as_log()[&"foo".into()],
-            json!([[2, 4], [6, 8]]).into()
+            json!([[2, 4], [6, 8], "done"]).into()
+        );
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"bar".into()],
+            json!([2, 4, 6, 8, "done"]).into()
         );
     }
 }
