@@ -149,10 +149,15 @@ inventory::submit! {
     SinkDescription::new_without_default::<GcsSinkConfig>(NAME)
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let sink = GcsSink::new(self, &cx)?;
+    fn build(&self, _cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        unimplemented!()
+    }
+
+    async fn build_async(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        let sink = GcsSink::new(self, &cx).await?;
         let healthcheck = sink.clone().healthcheck().boxed().compat();
         let service = sink.service(self, &cx)?;
 
@@ -179,8 +184,11 @@ enum HealthcheckError {
 }
 
 impl GcsSink {
-    fn new(config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
-        let creds = config.auth.make_credentials(Scope::DevStorageReadWrite)?;
+    async fn new(config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
+        let creds = config
+            .auth
+            .make_credentials(Scope::DevStorageReadWrite)
+            .await?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
         let client = HttpClient::new(cx.resolver(), tls)?;

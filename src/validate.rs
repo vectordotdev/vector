@@ -184,7 +184,7 @@ fn validate_topology(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool 
 async fn validate_environment(config: &Config, fmt: &mut Formatter) -> bool {
     let diff = ConfigDiff::initial(config);
 
-    let mut pieces = if let Some(pieces) = validate_components(config, &diff, fmt) {
+    let mut pieces = if let Some(pieces) = validate_components(config, &diff, fmt).await {
         pieces
     } else {
         return false;
@@ -193,12 +193,16 @@ async fn validate_environment(config: &Config, fmt: &mut Formatter) -> bool {
     validate_healthchecks(config, &diff, &mut pieces, fmt).await
 }
 
-fn validate_components(config: &Config, diff: &ConfigDiff, fmt: &mut Formatter) -> Option<Pieces> {
+async fn validate_components(
+    config: &Config,
+    diff: &ConfigDiff,
+    fmt: &mut Formatter,
+) -> Option<Pieces> {
     event::LOG_SCHEMA
         .set(config.global.log_schema.clone())
         .expect("Couldn't set schema");
 
-    match topology::builder::build_pieces(config, diff) {
+    match topology::builder::build_pieces(config, diff).await {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)

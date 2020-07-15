@@ -23,11 +23,11 @@ pub struct Pieces {
 }
 
 /// Builds only the new pieces and checks topology.
-pub fn check_build(
+pub async fn check_build(
     config: &super::Config,
     diff: &ConfigDiff,
 ) -> Result<(Pieces, Vec<String>), Vec<String>> {
-    match (check(config), build_pieces(config, diff)) {
+    match (check(config), build_pieces(config, diff).await) {
         (Ok(warnings), Ok(new_pieces)) => Ok((new_pieces, warnings)),
         (Err(t_errors), Err(p_errors)) => Err(t_errors.into_iter().chain(p_errors).collect()),
         (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
@@ -108,7 +108,10 @@ pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
-pub fn build_pieces(config: &super::Config, diff: &ConfigDiff) -> Result<Pieces, Vec<String>> {
+pub async fn build_pieces(
+    config: &super::Config,
+    diff: &ConfigDiff,
+) -> Result<Pieces, Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
     let mut tasks = HashMap::new();
@@ -221,7 +224,7 @@ pub fn build_pieces(config: &super::Config, diff: &ConfigDiff) -> Result<Pieces,
 
         let cx = SinkContext { resolver, acker };
 
-        let (sink, healthcheck) = match sink.inner.build(cx) {
+        let (sink, healthcheck) = match sink.inner.build_async(cx).await {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
                 continue;

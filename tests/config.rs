@@ -1,8 +1,13 @@
 use vector::topology::{self, Config, ConfigDiff};
 
 fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
+    let mut rt = vector::runtime::Runtime::new().unwrap();
     Config::load(config.as_bytes())
-        .and_then(|c| topology::builder::check_build(&c, &ConfigDiff::initial(&c)))
+        .and_then(|c| {
+            rt.block_on_std(async move {
+                topology::builder::check_build(&c, &ConfigDiff::initial(&c)).await
+            })
+        })
         .map(|(_topology, warnings)| warnings)
 }
 

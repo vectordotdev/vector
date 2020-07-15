@@ -107,10 +107,15 @@ lazy_static! {
         .unwrap();
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let creds = self.auth.make_credentials(Scope::LoggingWrite)?;
+    fn build(&self, _cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        unimplemented!()
+    }
+
+    async fn build_async(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
 
         let batch = self.batch.use_size_as_bytes()?.get_settings_or_default(
             BatchSettings::default()
@@ -401,8 +406,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn fails_missing_creds() {
+    #[tokio::test]
+    async fn fails_missing_creds() {
         let config: StackdriverConfig = toml::from_str(
             r#"
            project_id = "project"
@@ -412,7 +417,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).is_ok() {
+        if config.build_async(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }
