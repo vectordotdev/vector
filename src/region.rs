@@ -78,7 +78,7 @@ fn strip_endpoint(uri: &Uri) -> String {
     let pq_len = uri
         .path_and_query()
         .map(|pq| pq.as_str().len())
-        .unwrap_or(1);
+        .unwrap_or(0);
     let endpoint = uri.to_string();
     endpoint[..endpoint.len() - pq_len].to_string()
 }
