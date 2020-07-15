@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-15"
 component_title: "Coercer"
 description: "The Vector `coercer` transform accepts and outputs `log` events, allowing you to coerce log fields into fixed types."
 event_types: ["log"]
@@ -194,7 +194,7 @@ A [`log` event][docs.data-model.log] will be output with the following structure
   "host": "5.86.210.12",
   "message": "GET /embrace/supply-chains/dynamic/vertical",
   "status": 201,
-  "timestamp": <19/06/2019:17:20:49 -0400>,
+  "timestamp": "2019-06-19T17:20:49-04:00",
   "user_id": "zieme4647"
 }
 ```
