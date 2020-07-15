@@ -47,15 +47,9 @@ pub enum Encoding {
     Json,
 }
 
-enum PulsarProducerState {
-    NotReady(PulsarSinkConfig),
-    Creating(Box<dyn Future<Item = Producer<TokioExecutor>, Error = ()> + Send>),
-    Ready(Arc<Mutex<Producer<TokioExecutor>>>),
-}
-
 struct PulsarSink {
     encoding: EncodingConfig<Encoding>,
-    producer: PulsarProducerState,
+    producer: Arc<Mutex<Producer<TokioExecutor>>>,
     in_flight: FuturesUnordered<MetadataFuture<SendFuture, usize>>,
     // ack
     seq_head: usize,
@@ -70,11 +64,28 @@ inventory::submit! {
     SinkDescription::new_without_default::<PulsarSinkConfig>("pulsar")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = self.clone().new_sink(cx.acker())?;
-        let hc = self.clone().healthcheck();
+    fn build(&self, _cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        unimplemented!()
+    }
+
+    async fn build_async(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let producer = self
+            .create_pulsar_producer()
+            .await
+            .context(CreatePulsarSink)?;
+        let sink = self.clone().new_sink(producer, cx.acker())?;
+
+        let producer = self
+            .create_pulsar_producer()
+            .await
+            .context(CreatePulsarSink)?;
+        let hc = healthcheck(producer);
         Ok((Box::new(sink), Box::new(hc.boxed().compat())))
     }
 
@@ -100,10 +111,14 @@ impl PulsarSinkConfig {
         pulsar.producer().with_topic(&self.topic).build().await
     }
 
-    fn new_sink(self, acker: Acker) -> crate::Result<PulsarSink> {
+    fn new_sink(
+        self,
+        producer: Producer<TokioExecutor>,
+        acker: Acker,
+    ) -> crate::Result<PulsarSink> {
         Ok(PulsarSink {
-            encoding: self.encoding.clone().into(),
-            producer: PulsarProducerState::NotReady(self),
+            encoding: self.encoding.into(),
+            producer: Arc::new(Mutex::new(producer)),
             in_flight: FuturesUnordered::new(),
             seq_head: 0,
             seq_tail: 0,
@@ -111,41 +126,10 @@ impl PulsarSinkConfig {
             acker,
         })
     }
-
-    async fn healthcheck(self) -> crate::Result<()> {
-        let producer = self
-            .create_pulsar_producer()
-            .await
-            .context(CreatePulsarSink)?;
-        producer.check_connection().await.map_err(Into::into)
-    }
 }
 
-impl PulsarSink {
-    fn poll_producer(&mut self) -> Poll<Arc<Mutex<Producer<TokioExecutor>>>, ()> {
-        loop {
-            self.producer = match self.producer {
-                PulsarProducerState::NotReady(ref config) => {
-                    let config = config.clone();
-                    let fut = async move {
-                        let producer = config.create_pulsar_producer().await;
-                        Ok(producer.expect("fail on creating pulsar producer"))
-                    };
-                    PulsarProducerState::Creating(Box::new(fut.boxed().compat()))
-                }
-                PulsarProducerState::Creating(ref mut fut) => match fut.poll() {
-                    Ok(Async::NotReady) => return Ok(Async::NotReady),
-                    Ok(Async::Ready(producer)) => {
-                        PulsarProducerState::Ready(Arc::new(Mutex::new(producer)))
-                    }
-                    Err(_) => unreachable!(),
-                },
-                PulsarProducerState::Ready(ref producer) => {
-                    return Ok(Async::Ready(Arc::clone(producer)));
-                }
-            }
-        }
-    }
+async fn healthcheck(producer: Producer<TokioExecutor>) -> crate::Result<()> {
+    producer.check_connection().await.map_err(Into::into)
 }
 
 impl Sink for PulsarSink {
@@ -153,27 +137,22 @@ impl Sink for PulsarSink {
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        match self.poll_producer() {
-            Ok(Async::NotReady) => Ok(AsyncSink::NotReady(item)),
-            Ok(Async::Ready(producer)) => {
-                let message = encode_event(item, &self.encoding).map_err(|_| ())?;
+        let message = encode_event(item, &self.encoding).map_err(|_| ())?;
 
-                let fut = async move {
-                    let mut locked = producer.lock().await;
-                    match locked.send(message.clone()).await {
-                        Ok(fut) => fut.await,
-                        Err(e) => Err(e),
-                    }
-                };
-
-                let seqno = self.seq_head;
-                self.seq_head += 1;
-                self.in_flight
-                    .push((Box::new(fut.boxed().compat()) as SendFuture).join(future::ok(seqno)));
-                Ok(AsyncSink::Ready)
+        let producer = Arc::clone(&self.producer);
+        let fut = async move {
+            let mut locked = producer.lock().await;
+            match locked.send(message.clone()).await {
+                Ok(fut) => fut.await,
+                Err(e) => Err(e),
             }
-            Err(_) => unreachable!(),
-        }
+        };
+
+        let seqno = self.seq_head;
+        self.seq_head += 1;
+        self.in_flight
+            .push((Box::new(fut.boxed().compat()) as SendFuture).join(future::ok(seqno)));
+        Ok(AsyncSink::Ready)
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
@@ -283,7 +262,8 @@ mod integration_tests {
                 .unwrap();
 
             let (acker, ack_counter) = Acker::new_for_testing();
-            let sink = cnf.new_sink(acker).unwrap();
+            let producer = cnf.create_pulsar_producer().await.unwrap();
+            let sink = cnf.new_sink(producer, acker).unwrap();
             let _ = sink.send_all(events).compat().await.unwrap();
             assert_eq!(
                 ack_counter.load(std::sync::atomic::Ordering::Relaxed),

@@ -79,8 +79,9 @@ inventory::submit! {
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = self.clone().healthcheck(cx.resolver()).boxed().compat();
-        let sink = KinesisService::new(self.clone(), cx)?;
+        let client = self.create_client(cx.resolver())?;
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
+        let sink = KinesisService::new(self.clone(), client, cx)?;
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
@@ -94,8 +95,7 @@ impl SinkConfig for KinesisSinkConfig {
 }
 
 impl KinesisSinkConfig {
-    async fn healthcheck(self, resolver: Resolver) -> crate::Result<()> {
-        let client = self.create_client(resolver)?;
+    async fn healthcheck(self, client: KinesisClient) -> crate::Result<()> {
         let stream_name = self.stream_name;
 
         let req = client.describe_stream(DescribeStreamInput {
@@ -131,9 +131,10 @@ impl KinesisSinkConfig {
 impl KinesisService {
     pub fn new(
         config: KinesisSinkConfig,
+        client: KinesisClient,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = Arc::new(config.create_client(cx.resolver())?);
+        let client = Arc::new(client);
 
         let batch = config
             .batch
@@ -378,7 +379,8 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let sink = KinesisService::new(config, cx).unwrap();
+        let client = config.create_client(cx.resolver()).unwrap();
+        let sink = KinesisService::new(config, client, cx).unwrap();
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 

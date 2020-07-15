@@ -1,7 +1,7 @@
 //! Expiring Hash Map and related types. See [`ExpiringHashMap`].
 #![warn(missing_docs)]
 
-use futures::stream::StreamExt;
+use futures::StreamExt;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fmt;

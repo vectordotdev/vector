@@ -78,7 +78,7 @@ fn strip_endpoint(uri: &Uri) -> String {
     let pq_len = uri
         .path_and_query()
         .map(|pq| pq.as_str().len())
-        .unwrap_or(1);
+        .unwrap_or(0);
     let endpoint = uri.to_string();
     endpoint[..endpoint.len() - pq_len].to_string()
 }
@@ -200,6 +200,24 @@ mod tests {
                 endpoint:
                     "https://this-is-a-test-5dec2c2qbgsuekvsecuylqu.us-west-2.es.amazonaws.com"
                         .into()
+            }
+        );
+    }
+
+    #[test]
+    fn region_from_endpoint_without_scheme() {
+        assert_eq!(
+            region_from_endpoint("ams3.digitaloceanspaces.com").unwrap(),
+            Region::Custom {
+                name: "us-east-1".into(),
+                endpoint: "ams3.digitaloceanspaces.com".into()
+            }
+        );
+        assert_eq!(
+            region_from_endpoint("https://ams3.digitaloceanspaces.com/").unwrap(),
+            Region::Custom {
+                name: "us-east-1".into(),
+                endpoint: "https://ams3.digitaloceanspaces.com".into()
             }
         );
     }
