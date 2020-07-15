@@ -493,6 +493,7 @@ mod tests {
     use std::{
         net::{Ipv4Addr, Ipv6Addr},
         str::FromStr,
+        time::Instant,
     };
     use trust_dns_proto::rr::{domain::Name, rdata::TXT};
 
@@ -599,7 +600,23 @@ mod tests {
 
     #[test]
     fn test_parse_dns_udpate_message_failure() {
-        let raw_dns_message = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcq0ICAQQARgBIgSsFDetKgTAN1MeMMn/Ajg1QL6m6fcFTQLEKhVS+QMSSIIAAAEAAAAFAAUJZmFjZWJvb2sxA2NvbQAAAQABwAwAAgABAAKjAAAPA25zMQhyZW50b25kY8AWwAwAAgABAAKjAAAGA25zMsAvIENLMFBPSk1HODc0TEpSRUY3RUZOODQzMFFWSVQ4QlNNwBYAMgABAAFRgAAjAQEAAAAUZQGgwlcg7hVvbE45Y2s62gMS2SoAByIAAAAAApDATAAuAAEAAVGAALcAMggCAAFRgF8ACGFe9r15m6QDY29tAFOih16McCzogcR6RZIu3kqZa27Bo1jtfzwzDENJIZItSCRuLqRO6oA90sCLItOEQv0skpQKtJQXmTZUnqe3XK+1t/Op8G9cmeMXgCvynTJmm0WouSv+SuwBOjgqCaNuWpwbiIcaXY/NlId1lPpl8LJyTIRtFqGifW0FnYFe/Lzs3pfZLoKMAG4/8Upqqv4F+Ij1oue1C6KWe0hn+beIKkIgN0pLMjVFTUhITThBMDFNTzBBRVFRTjdHMlVQSjI4NjfAFgAyAAEAAVGAACIBAQAAABQ86ELf24DH1kAfgQ4dyyuf0+6y5wAGIAAAAAASwCsAAQABAAKjAAAEbD0TCsArAAEAAQACowAABKxiwCLARgABAAEAAqMAAAQuprYzwEYAAQABAAKjAAAEXXMcaAAAKRAAAACAAAAAWgUDY29tAGC+pun3BW2/LUQYcvkDEkiCAAABAAAABQAFCWZhY2Vib29rMQNjb20AAAEAAcAMAAIAAQACowAADwNuczEIcmVudG9uZGPAFsAMAAIAAQACowAABgNuczLALyBDSzBQT0pNRzg3NExKUkVGN0VGTjg0MzBRVklUOEJTTcAWADIAAQABUYAAIwEBAAAAFGUBoMJXIO4Vb2xOOWNrOtoDEtkqAAciAAAAAAKQwEwALgABAAFRgAC3ADIIAgABUYBfAAhhXva9eZukA2NvbQBToodejHAs6IHEekWSLt5KmWtuwaNY7X88MwxDSSGSLUgkbi6kTuqAPdLAiyLThEL9LJKUCrSUF5k2VJ6nt1yvtbfzqfBvXJnjF4Ar8p0yZptFqLkr/krsATo4KgmjblqcG4iHGl2PzZSHdZT6ZfCyckyEbRahon1tBZ2BXvy87N6X2S6CjABuP/FKaqr+BfiI9aLntQuilntIZ/m3iCpCIDdKSzI1RU1ISE04QTAxTU8wQUVRUU43RzJVUEoyODY3wBYAMgABAAFRgAAiAQEAAAAUPOhC39uAx9ZAH4EOHcsrn9PusucABiAAAAAAEsArAAEAAQACowAABGw9EwrAKwABAAEAAqMAAASsYsAiwEYAAQABAAKjAAAELqa2M8BGAAEAAQACowAABF1zHGgAACkQAAAAgAAAAHgB";
+        let raw_dns_message = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcq0ICAQQARgBIgSs\
+        FDetKgTAN1MeMMn/Ajg1QL6m6fcFTQLEKhVS+QMSSIIAAAEAAAAFAAUJZmFjZWJvb2sxA2NvbQAAAQABwAwAAgABAAKjA\
+        AAPA25zMQhyZW50b25kY8AWwAwAAgABAAKjAAAGA25zMsAvIENLMFBPSk1HODc0TEpSRUY3RUZOODQzMFFWSVQ4QlNNwB\
+        YAMgABAAFRgAAjAQEAAAAUZQGgwlcg7hVvbE45Y2s62gMS2SoAByIAAAAAApDATAAuAAEAAVGAALcAMggCAAFRgF8ACGF\
+        e9r15m6QDY29tAFOih16McCzogcR6RZIu3kqZa27Bo1jtfzwzDENJIZItSCRuLqRO6oA90sCLItOEQv0skpQKtJQXmTZU\
+        nqe3XK+1t/Op8G9cmeMXgCvynTJmm0WouSv+SuwBOjgqCaNuWpwbiIcaXY/NlId1lPpl8LJyTIRtFqGifW0FnYFe/Lzs3\
+        pfZLoKMAG4/8Upqqv4F+Ij1oue1C6KWe0hn+beIKkIgN0pLMjVFTUhITThBMDFNTzBBRVFRTjdHMlVQSjI4NjfAFgAyAA\
+        EAAVGAACIBAQAAABQ86ELf24DH1kAfgQ4dyyuf0+6y5wAGIAAAAAASwCsAAQABAAKjAAAEbD0TCsArAAEAAQACowAABKx\
+        iwCLARgABAAEAAqMAAAQuprYzwEYAAQABAAKjAAAEXXMcaAAAKRAAAACAAAAAWgUDY29tAGC+pun3BW2/LUQYcvkDEkiC\
+        AAABAAAABQAFCWZhY2Vib29rMQNjb20AAAEAAcAMAAIAAQACowAADwNuczEIcmVudG9uZGPAFsAMAAIAAQACowAABgNuc\
+        zLALyBDSzBQT0pNRzg3NExKUkVGN0VGTjg0MzBRVklUOEJTTcAWADIAAQABUYAAIwEBAAAAFGUBoMJXIO4Vb2xOOWNrOt\
+        oDEtkqAAciAAAAAAKQwEwALgABAAFRgAC3ADIIAgABUYBfAAhhXva9eZukA2NvbQBToodejHAs6IHEekWSLt5KmWtuwaN\
+        Y7X88MwxDSSGSLUgkbi6kTuqAPdLAiyLThEL9LJKUCrSUF5k2VJ6nt1yvtbfzqfBvXJnjF4Ar8p0yZptFqLkr/krsATo4\
+        KgmjblqcG4iHGl2PzZSHdZT6ZfCyckyEbRahon1tBZ2BXvy87N6X2S6CjABuP/FKaqr+BfiI9aLntQuilntIZ/m3iCpCI\
+        DdKSzI1RU1ISE04QTAxTU8wQUVRUU43RzJVUEoyODY3wBYAMgABAAFRgAAiAQEAAAAUPOhC39uAx9ZAH4EOHcsrn9Pusu\
+        cABiAAAAAAEsArAAEAAQACowAABGw9EwrAKwABAAEAAqMAAASsYsAiwEYAAQABAAKjAAAELqa2M8BGAAEAAQACowAABF1\
+        zHGgAACkQAAAAgAAAAHgB";
         if let Ok(raw_update_message) = base64::decode(raw_dns_message) {
             assert!(parse_dns_update_message(&raw_update_message).is_err());
         } else {
@@ -674,6 +691,27 @@ mod tests {
             assert!(raw_rdata.is_none());
             // println!("{}", parsed.unwrap());
             assert_eq!(r#""abc\"def" "gh\\i" "" "j""#, parsed.unwrap());
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn benchmark_parse_dns_query_message() {
+        let raw_dns_message = "szgAAAABAAAAAAAAAmg1B2V4YW1wbGUDY29tAAAGAAE=";
+        if let Ok(raw_qeury_message) = base64::decode(raw_dns_message) {
+            let start = Instant::now();
+            let num = 10_000;
+            for _ in 0..num {
+                let parse_result = parse_dns_query_message(&raw_qeury_message);
+                assert!(parse_result.is_ok());
+            }
+            let time_taken = Instant::now().duration_since(start);
+            println!(
+                "Time taken to parse {} DNS query messages: {:#?}",
+                num, time_taken
+            );
+        } else {
+            error!("Invalid base64 encoded data");
         }
     }
 }

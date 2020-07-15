@@ -949,6 +949,7 @@ mod tests {
     use super::{super::schema::DnstapEventSchema, *};
     use crate::event::Event;
     use crate::event::Value;
+    use std::time::Instant;
 
     #[test]
     fn test_parse_dnstap_data_with_query_message() {
@@ -1065,6 +1066,60 @@ mod tests {
             assert!(e.to_string().contains("Protobuf message"));
         } else {
             error!("Expected TrustDnsError");
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn benchmark_dnstap_parser_with_queries() {
+        let mut event = Event::new_empty_log();
+        let log_event = event.as_mut_log();
+        let schema = DnstapEventSchema::new();
+        let mut parser = DnstapParser::new(&schema, log_event);
+        let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcnoIAxACGAEiEAAAAAAAAA\
+        AAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb\
+        20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAHgB";
+        if let Ok(dnstap_data) = base64::decode(raw_dnstap_data) {
+            let start = Instant::now();
+            let num = 10_000;
+            for _ in 0..num {
+                let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data.clone()));
+                assert!(parse_result.is_ok());
+            }
+            let time_taken = Instant::now().duration_since(start);
+            println!(
+                "Time taken to parse {} dnstap events carrying DNS query messages: {:#?}",
+                num, time_taken
+            );
+        } else {
+            error!("Invalid base64 encoded data");
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn benchmark_dnstap_parser_with_udpates() {
+        let mut event = Event::new_empty_log();
+        let log_event = event.as_mut_log();
+        let schema = DnstapEventSchema::new();
+        let mut parser = DnstapParser::new(&schema, log_event);
+        let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcmsIDhABGAEiBH8AAA\
+        EqBH8AAAEwrG44AEC+iu73BU14gfofUh1wi6gAAAEAAAAAAAAHZXhhbXBsZQNjb20AAAYAAWC+iu73BW0agDwvch1wi6gAA\
+        AEAAAAAAAAHZXhhbXBsZQNjb20AAAYAAXgB";
+        if let Ok(dnstap_data) = base64::decode(raw_dnstap_data) {
+            let start = Instant::now();
+            let num = 10_000;
+            for _ in 0..num {
+                let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data.clone()));
+                assert!(parse_result.is_ok());
+            }
+            let time_taken = Instant::now().duration_since(start);
+            println!(
+                "Time taken to parse {} dnstap events carrying DNS update messages: {:#?}",
+                num, time_taken
+            );
+        } else {
+            error!("Invalid base64 encoded data");
         }
     }
 }
