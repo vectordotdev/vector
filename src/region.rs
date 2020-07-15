@@ -213,6 +213,13 @@ mod tests {
                 endpoint: "ams3.digitaloceanspaces.com".into()
             }
         );
+        assert_eq!(
+            region_from_endpoint("https://ams3.digitaloceanspaces.com/").unwrap(),
+            Region::Custom {
+                name: "us-east-1".into(),
+                endpoint: "https://ams3.digitaloceanspaces.com".into()
+            }
+        );
     }
 
     #[test]
