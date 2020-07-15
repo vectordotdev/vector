@@ -595,7 +595,7 @@ mod tests {
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
+                value: MetricValue::Samples {
                     values: (0..20).map(f64::from).collect::<Vec<_>>(),
                     sample_rates: vec![1; 20],
                     statistic: StatisticKind::Histogram,
