@@ -434,7 +434,7 @@ fn benchmark_split_transform(c: &mut Criterion) {
                         "split",
                         &["in"],
                         transforms::split::SplitConfig {
-                            field_names: field_names,
+                            field_names,
                             separator: Some(",".to_owned()),
                             field: None,
                             drop_field: false,
