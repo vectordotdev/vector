@@ -89,7 +89,7 @@ impl ReduceState {
                             }
                         }
                     } else {
-                        Some((k, v.clone().into()))
+                        Some((k, v.into()))
                     }
                 })
                 .collect(),

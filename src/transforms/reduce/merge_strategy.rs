@@ -375,9 +375,7 @@ pub fn get_value_merger(v: Value, m: &MergeStrategy) -> Result<Box<dyn ReduceVal
                 v.to_string_lossy()
             )),
         },
-        MergeStrategy::Array => match v {
-            _ => Ok(Box::new(ArrayMerger::new(v))),
-        },
+        MergeStrategy::Array => Ok(Box::new(ArrayMerger::new(v))),
         MergeStrategy::Discard => Ok(Box::new(DiscardMerger::new(v))),
     }
 }
