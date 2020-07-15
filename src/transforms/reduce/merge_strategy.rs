@@ -79,8 +79,8 @@ struct ArrayMerger {
 }
 
 impl ArrayMerger {
-    fn new(v: Vec<Value>) -> Self {
-        Self { v }
+    fn new(v: Value) -> Self {
+        Self { v: vec![v] }
     }
 }
 
@@ -376,8 +376,7 @@ pub fn get_value_merger(v: Value, m: &MergeStrategy) -> Result<Box<dyn ReduceVal
             )),
         },
         MergeStrategy::Array => match v {
-            Value::Array(a) => Ok(Box::new(ArrayMerger::new(a))),
-            _ => Ok(Box::new(ArrayMerger::new(vec![v]))),
+            _ => Ok(Box::new(ArrayMerger::new(v))),
         },
         MergeStrategy::Discard => Ok(Box::new(DiscardMerger::new(v))),
     }
