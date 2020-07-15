@@ -846,7 +846,8 @@ mod source_finished_tests {
         let mut rt = runtime();
 
         let mut old_config = Config::empty();
-        old_config.add_source("in", GeneratorConfig::repeat(vec!["text".to_owned()], 1));
+        let generator = GeneratorConfig::repeat(vec!["text".to_owned()], 1, None);
+        old_config.add_source("in", generator);
         old_config.add_sink(
             "out",
             &[&"in"],

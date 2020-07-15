@@ -27,10 +27,11 @@ pub struct GeneratorConfig {
 
 impl GeneratorConfig {
     #[allow(dead_code)] // to make check-component-features pass
-    pub fn repeat(lines: Vec<String>, count: usize) -> Self {
+    pub fn repeat(lines: Vec<String>, count: usize, batch_interval: Option<f64>) -> Self {
         Self {
             lines,
             count,
+            batch_interval,
             ..Self::default()
         }
     }

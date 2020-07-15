@@ -37,6 +37,7 @@ pub(super) struct Inner {
     next_update: Instant,
     current_rtt: Mean,
     had_back_pressure: bool,
+    reached_limit: bool,
 }
 
 #[cfg(test)]
@@ -61,6 +62,7 @@ impl<L> Controller<L> {
                 next_update: Instant::now(),
                 current_rtt: Default::default(),
                 had_back_pressure: false,
+                reached_limit: false,
             })),
             #[cfg(test)]
             stats: Arc::new(Mutex::new(ControllerStatistics::default())),
@@ -68,6 +70,10 @@ impl<L> Controller<L> {
     }
 
     pub(super) fn acquire(&self) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static {
+        let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
+        if inner.in_flight >= inner.current_limit {
+            inner.reached_limit = true;
+        }
         self.semaphore.clone().acquire()
     }
 
@@ -135,8 +141,15 @@ impl<L> Controller<L> {
                 self.semaphore.forget_permits(to_forget);
                 inner.current_limit -= to_forget;
             }
-            // Normal quick responses trigger an increase in the concurrency limit.
-            else if inner.current_limit < self.max && !inner.had_back_pressure && rtt <= avg {
+            // Normal quick responses trigger an increase in the
+            // concurrency limit. Note that we only check this if we had
+            // requests to go beyond the current limit to prevent
+            // increasing the limit beyond what we have evidence for.
+            else if inner.current_limit < self.max
+                && inner.reached_limit
+                && !inner.had_back_pressure
+                && rtt <= avg
+            {
                 // Increase (additive) the current concurrency limit
                 self.semaphore.add_permits(1);
                 inner.current_limit += 1;
@@ -145,10 +158,12 @@ impl<L> Controller<L> {
                 concurrency: inner.current_limit as u64,
             });
 
+            // Reset values for next interval
             let new_avg = inner.past_rtt.update(rtt);
             inner.next_update = now + Duration::from_secs_f64(new_avg);
-            inner.had_back_pressure = false;
             inner.current_rtt.reset();
+            inner.had_back_pressure = false;
+            inner.reached_limit = false;
         }
     }
 }

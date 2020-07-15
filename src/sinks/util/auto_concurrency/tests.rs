@@ -155,7 +155,7 @@ impl Service<Vec<Event>> for TestSink {
         let delay = params
             .delay
             .mul_f64(1.0 + (in_flight - 1) as f64 * params.concurrency_scale);
-        let delay = Delay::new(Instant::now() + delay).compat();
+        let delay = Delay::new(now + delay).compat();
 
         if params.concurrency_drop > 0 && in_flight >= params.concurrency_drop {
             stats.in_flight.adjust(-1, now);
@@ -206,7 +206,7 @@ struct TestData {
     cstats: ControllerStatistics,
 }
 
-fn run_test(lines: usize, params: TestParams) -> TestData {
+fn run_test(lines: usize, interval: Option<f64>, params: TestParams) -> TestData {
     metrics_init().ok();
 
     let test_config = TestConfig {
@@ -224,7 +224,8 @@ fn run_test(lines: usize, params: TestParams) -> TestData {
     let cstats = test_config.controller_stats.clone();
 
     let mut config = config::Config::empty();
-    config.add_source("in", GeneratorConfig::repeat(vec!["line 1".into()], lines));
+    let generator = GeneratorConfig::repeat(vec!["line 1".into()], lines, interval);
+    config.add_source("in", generator);
     config.add_sink("out", &["in"], test_config);
 
     let mut rt = runtime();
@@ -236,7 +237,8 @@ fn run_test(lines: usize, params: TestParams) -> TestData {
     let controller = get_controller().unwrap();
 
     // Give time for the generator to start and queue all its data.
-    std::thread::sleep(Duration::from_secs(1));
+    let delay = interval.unwrap_or(0.0) * (lines as f64) + 1.0;
+    std::thread::sleep(Duration::from_secs_f64(delay));
     block_on(topology.stop()).unwrap();
     shutdown_on_idle(rt);
 
@@ -288,6 +290,7 @@ fn run_test(lines: usize, params: TestParams) -> TestData {
 fn constant_link() {
     let results = run_test(
         500,
+        None,
         TestParams {
             delay: Duration::from_millis(100),
             ..Default::default()
@@ -325,6 +328,7 @@ fn constant_link() {
 fn defers_at_high_concurrency() {
     let results = run_test(
         500,
+        None,
         TestParams {
             delay: Duration::from_millis(100),
             concurrency_defer: 5,
@@ -366,6 +370,7 @@ fn defers_at_high_concurrency() {
 fn drops_at_high_concurrency() {
     let results = run_test(
         500,
+        None,
         TestParams {
             delay: Duration::from_millis(100),
             concurrency_drop: 5,
@@ -390,7 +395,7 @@ fn drops_at_high_concurrency() {
     assert_within!(averaged_rtt.max, 0.600, 1.010, "{:#?}", results);
     assert_within!(averaged_rtt.mean, 0.150, 0.350, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.mode, 2, 3, "{:#?}", results);
+    assert_within!(concurrency_limit.mode, 1, 3, "{:#?}", results);
     assert_within!(concurrency_limit.mean, 3.5, 5.0, "{:#?}", results);
     let in_flight = results.cstats.in_flight.stats().unwrap();
     assert_within!(in_flight.mode, 1, 3, "{:#?}", results);
@@ -401,6 +406,7 @@ fn drops_at_high_concurrency() {
 fn slow_link() {
     let results = run_test(
         500,
+        None,
         TestParams {
             delay: Duration::from_millis(100),
             concurrency_scale: 1.0,
@@ -425,6 +431,72 @@ fn slow_link() {
     assert_within!(averaged_rtt.mean, 0.100, 0.310, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
     assert_within!(concurrency_limit.mode, 1, 3, "{:#?}", results);
+    assert_within!(concurrency_limit.mean, 1.0, 2.0, "{:#?}", results);
+    let in_flight = results.cstats.in_flight.stats().unwrap();
+    assert_within!(in_flight.max, 1, 3, "{:#?}", results);
+    assert_within!(in_flight.mode, 1, 2, "{:#?}", results);
+    assert_within!(in_flight.mean, 1.0, 2.0, "{:#?}", results);
+}
+
+#[test]
+fn slow_send_1() {
+    let results = run_test(
+        100,
+        Some(0.100),
+        TestParams {
+            delay: Duration::from_millis(50),
+            ..Default::default()
+        },
+    );
+
+    let in_flight = results.stats.in_flight.stats().unwrap();
+    // With a generator running slower than the link can process, the
+    // limiter will never raise the concurrency above 1.
+    assert_eq!(in_flight.max, 1, "{:#?}", results);
+    assert_eq!(in_flight.mode, 1, "{:#?}", results);
+    assert_within!(in_flight.mean, 0.5, 1.0, "{:#?}", results);
+
+    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
+    assert_within!(observed_rtt.min, 0.050, 0.060, "{:#?}", results);
+    assert_within!(observed_rtt.mean, 0.050, 0.060, "{:#?}", results);
+    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
+    assert_within!(averaged_rtt.min, 0.050, 0.060, "{:#?}", results);
+    assert_within!(averaged_rtt.mean, 0.050, 0.060, "{:#?}", results);
+    let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
+    assert_eq!(concurrency_limit.mode, 1, "{:#?}", results);
+    assert_eq!(concurrency_limit.mean, 1.0, "{:#?}", results);
+    let in_flight = results.cstats.in_flight.stats().unwrap();
+    assert_eq!(in_flight.max, 1, "{:#?}", results);
+    assert_eq!(in_flight.mode, 1, "{:#?}", results);
+    assert_within!(in_flight.mean, 0.5, 1.0, "{:#?}", results);
+}
+
+#[test]
+fn slow_send_2() {
+    let results = run_test(
+        100,
+        Some(0.050),
+        TestParams {
+            delay: Duration::from_millis(50),
+            ..Default::default()
+        },
+    );
+
+    let in_flight = results.stats.in_flight.stats().unwrap();
+    // With a generator running at the same speed as the link RTT, the
+    // limiter will keep the limit around 1-2 depending on timing jitter.
+    assert_within!(in_flight.max, 1, 3, "{:#?}", results);
+    assert_within!(in_flight.mode, 1, 2, "{:#?}", results);
+    assert_within!(in_flight.mean, 0.5, 2.0, "{:#?}", results);
+
+    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
+    assert_within!(observed_rtt.min, 0.050, 0.060, "{:#?}", results);
+    assert_within!(observed_rtt.mean, 0.050, 0.110, "{:#?}", results);
+    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
+    assert_within!(averaged_rtt.min, 0.050, 0.060, "{:#?}", results);
+    assert_within!(averaged_rtt.mean, 0.050, 0.110, "{:#?}", results);
+    let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
+    assert_within!(concurrency_limit.mode, 1, 2, "{:#?}", results);
     assert_within!(concurrency_limit.mean, 1.0, 2.0, "{:#?}", results);
     let in_flight = results.cstats.in_flight.stats().unwrap();
     assert_within!(in_flight.max, 1, 3, "{:#?}", results);
