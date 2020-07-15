@@ -1,0 +1,18 @@
+name: Update install.sh Suite
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'distribution/install.sh'
+
+jobs:
+  sync-install:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
+          USE_CONTAINER: none
+        run: make sync-install
