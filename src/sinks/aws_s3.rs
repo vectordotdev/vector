@@ -241,15 +241,7 @@ impl S3SinkConfig {
         let region = (&self.region).try_into()?;
         let client = rusoto::client(resolver)?;
 
-        #[cfg(not(test))]
         let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
-
-        // Hack around the fact that rusoto will not pick up runtime
-        // env vars. This is designed to only for test purposes use
-        // static credentials.
-        #[cfg(test)]
-        let creds =
-            rusoto::AwsCredentialsProvider::new_minimal("test-access-key", "test-secret-key");
 
         Ok(S3Client::new_with(client, creds, region))
     }
@@ -774,7 +766,7 @@ mod integration_tests {
     fn client() -> S3Client {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:9000".to_owned(),
+            endpoint: "http://localhost:4572".to_owned(),
         };
 
         use rusoto_core::HttpClient;
@@ -798,7 +790,7 @@ mod integration_tests {
                 timeout_secs: Some(5),
                 ..Default::default()
             },
-            region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4572".to_owned()),
             ..Default::default()
         }
     }
