@@ -186,7 +186,6 @@ impl HttpSink for ElasticSearchCommon {
                 emit!(ElasticSearchMissingKeys { keys: missing_keys });
             })
             .ok()?;
-        info!("inserting into index: {}", index);
 
         let mut action = json!({
             "index": {
@@ -207,7 +206,8 @@ impl HttpSink for ElasticSearchCommon {
         body.push(b'\n');
 
         emit!(ElasticSearchEventReceived {
-            byte_size: body.len()
+            byte_size: body.len(),
+            index
         });
 
         Some(body)
