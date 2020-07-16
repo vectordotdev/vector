@@ -202,6 +202,7 @@ async fn open_file(path: impl AsRef<std::path::Path>) -> std::io::Result<File> {
         .read(false)
         .write(true)
         .create(true)
+        .append(true)
         .open(path)
         .await
 }
@@ -363,5 +364,47 @@ mod tests {
             input[7].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[5][0])
         );
+    }
+
+    #[tokio::test]
+    async fn reopening() {
+        use pretty_assertions::assert_eq;
+
+        test_util::trace_init();
+
+        let template = temp_file();
+
+        let config = FileSinkConfig {
+            path: template.clone().try_into().unwrap(),
+            idle_timeout_secs: Some(1),
+            encoding: Encoding::Text.into(),
+        };
+
+        let mut sink = FileSink::new(&config);
+        let (mut input, _) = random_lines_with_stream(10, 64);
+
+        let (mut tx, rx) = tokio::sync::mpsc::channel(1);
+
+        let _ = tokio::spawn(async move { sink.run(rx).await });
+
+        // send initial payload
+        for line in input.clone() {
+            tx.send(Event::from(line)).await.unwrap();
+        }
+
+        // wait for file to go idle and be closed
+        tokio::time::delay_for(Duration::from_secs(2)).await;
+
+        // trigger another write
+        let last_line = "i should go at the end";
+        tx.send(Event::from(last_line)).await.unwrap();
+        input.push(String::from(last_line));
+
+        // wait for another flush
+        tokio::time::delay_for(Duration::from_secs(1)).await;
+
+        // make sure we appended instead of overwriting
+        let output = lines_from_file(template);
+        assert_eq!(input, output);
     }
 }
