@@ -11,7 +11,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: x86_64-unknown-linux-musl
-      FEATURES: default-cmake
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -49,7 +49,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: armv7-unknown-linux-musleabihf
-      FEATURES: default-cmake
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -67,7 +67,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: aarch64-unknown-linux-musl
-      FEATURES: default-cmake
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -85,7 +85,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: x86_64-unknown-linux-musl
-      FEATURES: default-cmake
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -123,7 +123,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: armv7-unknown-linux-musleabihf
-      FEATURES: default-cmake
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -141,7 +141,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: aarch64-unknown-linux-musl
-      FEATURES: default-cmake
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -376,7 +376,6 @@ services:
     depends_on:
       - ec2_metadata
       - localstack
-      - minio
       - mockwatchlogs
 
   dependencies-clickhouse:
@@ -439,19 +438,12 @@ services:
     image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
     ports:
       - "4568:4568"
+      - "4572:4572"
       - "4582:4582"
       - "4571:4571"
       - "4573:4573"
     environment:
-      SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571,firehose:4573
-  minio:
-    image: minio/minio
-    ports:
-      - "9000:9000"
-    environment:
-      MINIO_ACCESS_KEY: "test-access-key"
-      MINIO_SECRET_KEY: "test-secret-key"
-    command: server /tmp
+      SERVICES: kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573
   mockwatchlogs:
     image: luciofranco/mockwatchlogs:latest
     ports:

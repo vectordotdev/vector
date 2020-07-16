@@ -77,7 +77,6 @@ The Vector `loki` sink
   auth.user = "${LOKI_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
-  batch.max_bytes = 10490000 # optional, default, bytes
   batch.max_events = 100000 # optional, default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
@@ -260,29 +259,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={10490000}
-  enumValues={null}
-  examples={[10490000]}
-  groups={[]}
-  name={"max_bytes"}
-  path={"batch"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"uint"}
-  unit={"bytes"}
-  warnings={[]}
-  >
-
-#### max_bytes
-
-The maximum size of a batch, in bytes, before it is flushed.
-
-
-
-</Field>
 <Field
   common={true}
   defaultValue={100000}

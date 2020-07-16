@@ -74,13 +74,42 @@ impl ReduceValueMerger for ConcatMerger {
 //------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
+struct ConcatArrayMerger {
+    v: Vec<Value>,
+}
+
+impl ConcatArrayMerger {
+    fn new(v: Vec<Value>) -> Self {
+        Self { v }
+    }
+}
+
+impl ReduceValueMerger for ConcatArrayMerger {
+    fn add(&mut self, v: Value) -> Result<(), String> {
+        if let Value::Array(a) = v {
+            self.v.extend_from_slice(&a);
+        } else {
+            self.v.push(v);
+        }
+        Ok(())
+    }
+
+    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(k, Value::Array(self.v));
+        Ok(())
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
 struct ArrayMerger {
     v: Vec<Value>,
 }
 
 impl ArrayMerger {
-    fn new(v: Vec<Value>) -> Self {
-        Self { v }
+    fn new(v: Value) -> Self {
+        Self { v: vec![v] }
     }
 }
 
@@ -370,15 +399,13 @@ pub fn get_value_merger(v: Value, m: &MergeStrategy) -> Result<Box<dyn ReduceVal
         },
         MergeStrategy::Concat => match v {
             Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b))),
+            Value::Array(a) => Ok(Box::new(ConcatArrayMerger::new(a))),
             _ => Err(format!(
-                "expected string value, found: '{}'",
+                "expected string or array value, found: '{}'",
                 v.to_string_lossy()
             )),
         },
-        MergeStrategy::Array => match v {
-            Value::Array(a) => Ok(Box::new(ArrayMerger::new(a))),
-            _ => Ok(Box::new(ArrayMerger::new(vec![v]))),
-        },
+        MergeStrategy::Array => Ok(Box::new(ArrayMerger::new(v))),
         MergeStrategy::Discard => Ok(Box::new(DiscardMerger::new(v))),
     }
 }
@@ -432,7 +459,7 @@ mod test {
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Max).is_err());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Min).is_err());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Array).is_ok());
-        assert!(get_value_merger(json!([]).into(), &MergeStrategy::Concat).is_err());
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::Concat).is_ok());
 
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Discard).is_ok());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Sum).is_err());
@@ -511,6 +538,15 @@ mod test {
         assert_eq!(
             merge(4.3.into(), 4.2.into(), &MergeStrategy::Min),
             Ok(4.2.into())
+        );
+
+        assert_eq!(
+            merge(json!([4]).into(), json!([2]).into(), &MergeStrategy::Concat),
+            Ok(json!([4, 2]).into())
+        );
+        assert_eq!(
+            merge(json!([]).into(), 42.into(), &MergeStrategy::Concat),
+            Ok(json!([42]).into())
         );
     }
 

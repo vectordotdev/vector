@@ -670,7 +670,8 @@ data_dir = "/home/user/vector/"
   #
 
   [sources.kafka.sasl]
-    # Enable SASL/SCRAM authentication to the remote.
+    # Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at
+    # this time.)
     #
     # * optional
     # * no default
@@ -7847,7 +7848,8 @@ require('custom_module')
   #
 
   [sinks.kafka.sasl]
-    # Enable SASL/SCRAM authentication to the remote.
+    # Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at
+    # this time.)
     #
     # * optional
     # * no default
@@ -8214,14 +8216,6 @@ require('custom_module')
   #
 
   [sinks.loki.batch]
-    # The maximum size of a batch, in bytes, before it is flushed.
-    #
-    # * optional
-    # * default: 10490000
-    # * type: uint
-    # * unit: bytes
-    max_bytes = 10490000
-
     # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional

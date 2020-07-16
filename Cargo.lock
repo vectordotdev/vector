@@ -1770,9 +1770,9 @@ dependencies = [
 
 [[package]]
 name = "inventory"
-version = "0.1.5"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bf98296081bd2cb540acc09ef9c97f22b7e487841520350293605db1b2c7a27"
+checksum = "621b50c176968fd3b0bd71f821a28a0ea98db2b5aea966b2fbb8bd1b7d310328"
 dependencies = [
  "ctor",
  "ghost",
@@ -1781,9 +1781,9 @@ dependencies = [
 
 [[package]]
 name = "inventory-impl"
-version = "0.1.5"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a8e30575afe28eea36a9a39136b70b2fb6b0dd0a212a5bd1f30a498395c0274"
+checksum = "f99a4111304bade76468d05beab3487c226e4fe4c4de1c4e8f006e815762db73"
 dependencies = [
  "proc-macro2 1.0.18",
  "quote 1.0.2",
@@ -1870,6 +1870,16 @@ checksum = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 dependencies = [
  "winapi 0.2.8",
  "winapi-build",
+]
+
+[[package]]
+name = "krb5-src"
+version = "0.2.4+1.18.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a01c2b7c3b70ca41646dafc8fc3b6053a8a0da9301251e8da8548fb067462d81"
+dependencies = [
+ "duct",
+ "openssl-sys",
 ]
 
 [[package]]
@@ -3837,6 +3847,7 @@ checksum = "7b82548e259466e09971e8b1d1adfffba6005c83a2ca2aca5b5d00a61f6b8058"
 dependencies = [
  "cc",
  "duct",
+ "krb5-src",
  "libc",
  "pkg-config",
 ]
@@ -4862,9 +4873,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-uds"
-version = "0.2.5"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "037ffc3ba0e12a0ab4aca92e5234e0dedeb48fddf6ccd260f1f150a36a9f2445"
+checksum = "ab57a4ac4111c8c9dbcf70779f6fc8bc35ae4b2454809febac840ad19bd7e4e0"
 dependencies = [
  "bytes 0.4.12",
  "futures 0.1.29",
