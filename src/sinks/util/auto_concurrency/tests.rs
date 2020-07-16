@@ -17,10 +17,7 @@ use crate::{
     },
 };
 use core::task::Context;
-use futures::{
-    compat::Future01CompatExt,
-    future::{pending, BoxFuture},
-};
+use futures::future::{pending, BoxFuture};
 use futures01::{future, Sink};
 use rand::{distributions::Exp1, prelude::*};
 use serde::Serialize;
@@ -29,7 +26,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::task::Poll;
 use std::time::{Duration, Instant};
-use tokio01::timer::Delay;
+use tokio::time::delay_until;
 use tower03::Service;
 
 #[derive(Copy, Clone, Debug, Default, Serialize)]
@@ -164,7 +161,7 @@ impl Service<Vec<Event>> for TestSink {
             1.0 + (in_flight - 1) as f64 * params.concurrency_scale
                 + thread_rng().sample(Exp1) * params.jitter,
         );
-        let delay = Delay::new(now + delay).compat();
+        let delay = delay_until((now + delay).into());
 
         if params.concurrency_drop > 0 && in_flight >= params.concurrency_drop {
             stats.in_flight.adjust(-1, now);
@@ -172,7 +169,7 @@ impl Service<Vec<Event>> for TestSink {
         } else {
             let stats2 = self.stats.clone();
             Box::pin(async move {
-                delay.await.expect("Delay failed!");
+                delay.await;
                 let mut stats = stats2.lock().expect("Poisoned stats lock");
                 let in_flight = stats.in_flight.level();
                 stats.in_flight.adjust(-1, Instant::now());
