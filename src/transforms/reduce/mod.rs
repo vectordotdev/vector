@@ -77,12 +77,11 @@ impl ReduceState {
     fn new(e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) -> Self {
         Self {
             stale_since: Instant::now(),
-            // TODO: all_fields alternative that consumes
             fields: e
-                .all_fields()
+                .into_iter()
                 .filter_map(|(k, v)| {
                     if let Some(strat) = strategies.get(&k) {
-                        match get_value_merger(v.clone(), strat) {
+                        match get_value_merger(v, strat) {
                             Ok(m) => Some((k, m)),
                             Err(err) => {
                                 warn!("failed to create merger for field '{}': {}", k, err);
@@ -90,7 +89,7 @@ impl ReduceState {
                             }
                         }
                     } else {
-                        Some((k, v.clone().into()))
+                        Some((k, v.into()))
                     }
                 })
                 .collect(),
@@ -98,12 +97,12 @@ impl ReduceState {
     }
 
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) {
-        for (k, v) in e.all_fields() {
+        for (k, v) in e.into_iter() {
             let strategy = strategies.get(&k);
             match self.fields.entry(k) {
                 hash_map::Entry::Vacant(entry) => {
                     if let Some(strat) = strategy {
-                        match get_value_merger(v.clone(), strat) {
+                        match get_value_merger(v, strat) {
                             Ok(m) => {
                                 entry.insert(m);
                             }
@@ -291,6 +290,7 @@ mod test {
         topology::config::{TransformConfig, TransformContext},
         Event,
     };
+    use serde_json::json;
 
     #[test]
     fn reduce_from_condition() {
@@ -491,6 +491,88 @@ identifier_fields = [ "request_id" ]
         assert_eq!(
             outputs.first().unwrap().as_log()[&"counter".into()],
             Value::from(7)
+        );
+    }
+
+    #[test]
+    fn arrays() {
+        let mut reduce = toml::from_str::<ReduceConfig>(
+            r#"
+identifier_fields = [ "request_id" ]
+
+merge_strategies.foo = "array"
+merge_strategies.bar = "concat"
+
+[ends_when]
+  "test_end.exists" = true
+"#,
+        )
+        .unwrap()
+        .build(TransformContext::new_test())
+        .unwrap();
+
+        let mut outputs = Vec::new();
+
+        let mut e = Event::from("test message 1");
+        e.as_mut_log().insert("foo", json!([1, 3]));
+        e.as_mut_log().insert("bar", json!([1, 3]));
+        e.as_mut_log().insert("request_id", "1");
+        reduce.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 2");
+        e.as_mut_log().insert("foo", json!([2, 4]));
+        e.as_mut_log().insert("bar", json!([2, 4]));
+        e.as_mut_log().insert("request_id", "2");
+        reduce.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 3");
+        e.as_mut_log().insert("foo", json!([5, 7]));
+        e.as_mut_log().insert("bar", json!([5, 7]));
+        e.as_mut_log().insert("request_id", "1");
+        reduce.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 4");
+        e.as_mut_log().insert("foo", json!("done"));
+        e.as_mut_log().insert("bar", json!("done"));
+        e.as_mut_log().insert("request_id", "1");
+        e.as_mut_log().insert("test_end", "yep");
+        reduce.transform_into(&mut outputs, e);
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"foo".into()],
+            json!([[1, 3], [5, 7], "done"]).into()
+        );
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"bar".into()],
+            json!([1, 3, 5, 7, "done"]).into()
+        );
+
+        outputs.clear();
+
+        let mut e = Event::from("test message 5");
+        e.as_mut_log().insert("foo", json!([6, 8]));
+        e.as_mut_log().insert("bar", json!([6, 8]));
+        e.as_mut_log().insert("request_id", "2");
+        reduce.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 6");
+        e.as_mut_log().insert("foo", json!("done"));
+        e.as_mut_log().insert("bar", json!("done"));
+        e.as_mut_log().insert("request_id", "2");
+        e.as_mut_log().insert("test_end", "yep");
+        reduce.transform_into(&mut outputs, e);
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"foo".into()],
+            json!([[2, 4], [6, 8], "done"]).into()
+        );
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"bar".into()],
+            json!([2, 4, 6, 8, "done"]).into()
         );
     }
 }
