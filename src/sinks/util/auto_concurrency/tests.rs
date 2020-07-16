@@ -278,11 +278,6 @@ fn run_test(lines: usize, interval: Option<f64>, params: TestParams) -> TestData
                  MetricValue::Distribution { .. })
     );
 
-    eprintln!("observed_rtt {}", cstats.observed_rtt);
-    eprintln!("averaged_rtt {}", cstats.averaged_rtt);
-    eprintln!("concurrency_limit {}", cstats.concurrency_limit);
-    eprintln!("in_flight {}", cstats.in_flight);
-
     TestData { stats, cstats }
 }
 
@@ -304,7 +299,7 @@ fn constant_link() {
     // and will spend most of its time in the top half of the
     // concurrency range.
     assert_eq!(in_flight.mode, 10, "{:#?}", results);
-    assert_within!(in_flight.mean, 7.0, 10.0, "{:#?}", results);
+    assert_within!(in_flight.mean, 6.5, 10.0, "{:#?}", results);
 
     let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
     assert_within!(observed_rtt.min, 0.100, 0.110, "{:#?}", results);
@@ -318,10 +313,10 @@ fn constant_link() {
     assert_within!(concurrency_limit.max, 9, 10, "{:#?}", results);
     assert_within!(concurrency_limit.mode, 9, 10, "{:#?}", results);
     assert_within!(concurrency_limit.mean, 5.0, 10.0, "{:#?}", results);
-    let in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 9, 10, "{:#?}", results);
-    assert_within!(in_flight.mode, 9, 10, "{:#?}", results);
-    assert_within!(in_flight.mean, 7.0, 10.0, "{:#?}", results);
+    let c_in_flight = results.cstats.in_flight.stats().unwrap();
+    assert_within!(c_in_flight.max, 9, 10, "{:#?}", results);
+    assert_within!(c_in_flight.mode, 9, 10, "{:#?}", results);
+    assert_within!(c_in_flight.mean, 6.5, 10.0, "{:#?}", results);
 }
 
 #[test]
@@ -358,12 +353,12 @@ fn defers_at_high_concurrency() {
     assert_within!(averaged_rtt.mean, 0.100, 0.110, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
     assert_within!(concurrency_limit.max, 5, 6, "{:#?}", results);
-    assert_within!(concurrency_limit.mode, 2, 4, "{:#?}", results);
+    assert_within!(concurrency_limit.mode, 2, 5, "{:#?}", results);
     assert_within!(concurrency_limit.mean, 2.0, 4.9, "{:#?}", results);
-    let in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 5, 6, "{:#?}", results);
-    assert_within!(in_flight.mode, 2, 4, "{:#?}", results);
-    assert_within!(in_flight.mean, 2.0, 4.0, "{:#?}", results);
+    let c_in_flight = results.cstats.in_flight.stats().unwrap();
+    assert_within!(c_in_flight.max, 5, 6, "{:#?}", results);
+    assert_within!(c_in_flight.mode, 2, 4, "{:#?}", results);
+    assert_within!(c_in_flight.mean, 2.0, 4.0, "{:#?}", results);
 }
 
 #[test]
@@ -384,7 +379,7 @@ fn drops_at_high_concurrency() {
     let in_flight = results.stats.in_flight.stats().unwrap();
     assert_within!(in_flight.max, 4, 5, "{:#?}", results);
     assert_within!(in_flight.mode, 3, 4, "{:#?}", results);
-    assert_within!(in_flight.mean, 1.5, 2.5, "{:#?}", results);
+    assert_within!(in_flight.mean, 1.5, 3.5, "{:#?}", results);
 
     let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
     assert_within!(observed_rtt.min, 0.100, 0.110, "{:#?}", results);
@@ -397,15 +392,15 @@ fn drops_at_high_concurrency() {
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
     assert_within!(concurrency_limit.mode, 1, 3, "{:#?}", results);
     assert_within!(concurrency_limit.mean, 3.5, 5.0, "{:#?}", results);
-    let in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(in_flight.mode, 1, 3, "{:#?}", results);
-    assert_within!(in_flight.mean, 3.0, 5.0, "{:#?}", results);
+    let c_in_flight = results.cstats.in_flight.stats().unwrap();
+    assert_within!(c_in_flight.mode, 1, 3, "{:#?}", results);
+    assert_within!(c_in_flight.mean, 3.0, 5.0, "{:#?}", results);
 }
 
 #[test]
 fn slow_link() {
     let results = run_test(
-        500,
+        200,
         None,
         TestParams {
             delay: Duration::from_millis(100),
@@ -432,10 +427,10 @@ fn slow_link() {
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
     assert_within!(concurrency_limit.mode, 1, 3, "{:#?}", results);
     assert_within!(concurrency_limit.mean, 1.0, 2.0, "{:#?}", results);
-    let in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 1, 3, "{:#?}", results);
-    assert_within!(in_flight.mode, 1, 2, "{:#?}", results);
-    assert_within!(in_flight.mean, 1.0, 2.0, "{:#?}", results);
+    let c_in_flight = results.cstats.in_flight.stats().unwrap();
+    assert_within!(c_in_flight.max, 1, 3, "{:#?}", results);
+    assert_within!(c_in_flight.mode, 1, 2, "{:#?}", results);
+    assert_within!(c_in_flight.mean, 1.0, 2.0, "{:#?}", results);
 }
 
 #[test]
@@ -465,10 +460,10 @@ fn slow_send_1() {
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
     assert_eq!(concurrency_limit.mode, 1, "{:#?}", results);
     assert_eq!(concurrency_limit.mean, 1.0, "{:#?}", results);
-    let in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_eq!(in_flight.max, 1, "{:#?}", results);
-    assert_eq!(in_flight.mode, 1, "{:#?}", results);
-    assert_within!(in_flight.mean, 0.5, 1.0, "{:#?}", results);
+    let c_in_flight = results.cstats.in_flight.stats().unwrap();
+    assert_eq!(c_in_flight.max, 1, "{:#?}", results);
+    assert_eq!(c_in_flight.mode, 1, "{:#?}", results);
+    assert_within!(c_in_flight.mean, 0.5, 1.0, "{:#?}", results);
 }
 
 #[test]
@@ -498,10 +493,10 @@ fn slow_send_2() {
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
     assert_within!(concurrency_limit.mode, 1, 2, "{:#?}", results);
     assert_within!(concurrency_limit.mean, 1.0, 2.0, "{:#?}", results);
-    let in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 1, 3, "{:#?}", results);
-    assert_within!(in_flight.mode, 1, 2, "{:#?}", results);
-    assert_within!(in_flight.mean, 1.0, 2.0, "{:#?}", results);
+    let c_in_flight = results.cstats.in_flight.stats().unwrap();
+    assert_within!(c_in_flight.max, 1, 3, "{:#?}", results);
+    assert_within!(c_in_flight.mode, 1, 2, "{:#?}", results);
+    assert_within!(c_in_flight.mean, 1.0, 2.0, "{:#?}", results);
 }
 
 #[test]
@@ -530,8 +525,8 @@ fn medium_send() {
     assert_within!(averaged_rtt.mean, 0.100, 0.500, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
     assert_within!(concurrency_limit.max, 4, 10, "{:#?}", results);
-    let in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 4, 10, "{:#?}", results);
-    assert_within!(in_flight.mode, 4, 5, "{:#?}", results);
-    assert_within!(in_flight.mean, 4.0, 5.0, "{:#?}", results);
+    let c_in_flight = results.cstats.in_flight.stats().unwrap();
+    assert_within!(c_in_flight.max, 4, 10, "{:#?}", results);
+    assert_within!(c_in_flight.mode, 4, 5, "{:#?}", results);
+    assert_within!(c_in_flight.mean, 4.0, 5.0, "{:#?}", results);
 }
