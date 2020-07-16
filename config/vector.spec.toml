@@ -8214,14 +8214,6 @@ require('custom_module')
   #
 
   [sinks.loki.batch]
-    # The maximum size of a batch, in bytes, before it is flushed.
-    #
-    # * optional
-    # * default: 10490000
-    # * type: uint
-    # * unit: bytes
-    max_bytes = 10490000
-
     # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional
