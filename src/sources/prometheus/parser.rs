@@ -105,7 +105,7 @@ fn parse_tags(input: &str) -> Result<BTreeMap<String, String>, ParserError> {
             continue;
         }
         let pair = pair.trim();
-        let parts = pair.split('=').collect::<Vec<_>>();
+        let parts = pair.splitn(2, '=').collect::<Vec<_>>();
         if parts.len() != 2 {
             return Err(ParserError::Malformed {
                 s: "expected 2 values separated by '='",
@@ -738,6 +738,40 @@ mod test {
                 },
             }]),
         );
+    }
+
+    #[test]
+    fn test_parse_tag_value_containing_equals() {
+        let exp = r##"
+            telemetry_scrape_size_bytes_count{registry="default",content_type="text/plain; version=0.0.4"} 1890
+            "##;
+
+        assert_eq!(
+            parse(exp),
+            Ok(vec![Metric {
+                name: "telemetry_scrape_size_bytes_count".into(),
+                timestamp: None,
+                tags: Some(
+                    vec![
+                        ("registry".into(), "default".into()),
+                        ("content_type".into(), "text/plain; version=0.0.4".into())
+                    ]
+                    .into_iter()
+                    .collect()
+                ),
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value: 1890.0 },
+            }]),
+        );
+    }
+
+    #[test]
+    fn test_parse_tag_error_no_value() {
+        let exp = r##"
+            telemetry_scrape_size_bytes_count{registry="default",content_type} 1890
+            "##;
+
+        assert!(parse(exp).is_err());
     }
 
     #[test]
