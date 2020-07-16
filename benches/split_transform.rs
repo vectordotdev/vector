@@ -24,7 +24,7 @@ fn bench_split_transform(c: &mut Criterion) {
     let mut input = Event::new_empty_log();
     input
         .as_mut_log()
-        .insert(format!("key"), format!("value,404,127.0.0.1"));
+        .insert("key".to_string(), "value,404,127.0.0.1".to_string());
 
     c.bench_function("split_transform", |bencher| {
         bencher.iter_with_setup(
