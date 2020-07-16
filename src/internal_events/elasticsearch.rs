@@ -5,9 +5,14 @@ use string_cache::DefaultAtom as Atom;
 #[derive(Debug)]
 pub struct ElasticSearchEventReceived {
     pub byte_size: usize,
+    pub index: String,
 }
 
 impl InternalEvent for ElasticSearchEventReceived {
+    fn emit_logs(&self) {
+        trace!(message = "inserting event", index = %self.index);
+    }
+
     fn emit_metrics(&self) {
         counter!(
             "events_processed", 1,
