@@ -198,10 +198,10 @@ reqwest = { version = "0.10.6", features = ["json"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb-plain", "rdkafka-plain", "sasl"]
-default-musl = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "vendor-sasl", "unix", "leveldb-cmake", "rdkafka-cmake"]
+default = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-plain", "rdkafka-plain"]
+default-musl = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-cmake", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb-cmake", "rdkafka-cmake", "sasl"]
+default-cmake = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-cmake", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
 default-msvc = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb-cmake", "rdkafka-cmake"]
@@ -209,6 +209,7 @@ default-msvc = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["jemallocator"]
 # These are **very** useful on Cross compilations!
+vendor-all = ["vendor-sasl", "vendor-openssl", "vendor-libz"]
 vendor-sasl = ["rdkafka/gssapi-vendored"]
 vendor-openssl = ["openssl/vendored"]
 vendor-libz = ["libz-sys/static"]

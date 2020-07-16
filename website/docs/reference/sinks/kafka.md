@@ -558,7 +558,8 @@ Options for SASL/SCRAM authentication support.
 
 #### enabled
 
-Enable SASL/SCRAM authentication to the remote.
+Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at
+this time.)
 
 
 
