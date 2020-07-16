@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-16"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -309,13 +309,12 @@ The options and their values. Accepts `string` values.
 
 ### sasl
 
-Options for SASL/SCRAM authentication support. Not supported in provided Vector
-binaries, you need build Vector with feature [`sasl`](#sasl).
+Options for SASL/SCRAM authentication support.
 
 
 <Fields filters={false}>
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[true,false]}
@@ -332,13 +331,14 @@ binaries, you need build Vector with feature [`sasl`](#sasl).
 
 #### enabled
 
-Enable SASL/SCRAM authentication to the remote.
+Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at
+this time.)
 
 
 
 </Field>
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["SCRAM-SHA-256","SCRAM-SHA-512"]}
@@ -361,7 +361,7 @@ The Kafka SASL/SCRAM mechanisms.
 
 </Field>
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["password"]}
@@ -384,7 +384,7 @@ The Kafka SASL/SCRAM authentication password.
 
 </Field>
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["username"]}

@@ -22,6 +22,7 @@ apt install --yes \
     gnupg-agent \
     ruby-bundler \
     nodejs \
+    libsasl2-dev \
     gnupg2
 
 # Locales

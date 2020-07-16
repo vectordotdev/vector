@@ -198,20 +198,21 @@ reqwest = { version = "0.10.6", features = ["json"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain", "rdkafka-plain"]
+default = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-plain", "rdkafka-plain"]
+default-musl = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-cmake", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake"]
+default-cmake = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-cmake", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
-default-msvc = ["sources", "transforms", "sinks", "vendored", "leveldb-cmake", "rdkafka-cmake"]
+# TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
+default-msvc = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb-cmake", "rdkafka-cmake"]
 
-# Enables features that work only on systems providing `cfg(unix)
+# Enables features that work only on systems providing `cfg(unix)`
 unix = ["jemallocator"]
-# Forces vendoring of OpenSSL and ZLib dependencies
-vendored = ["openssl/vendored", "libz-sys/static"]
-# Waiting for 1.1.25 to try this on musl again...
-# https://github.com/NixOS/nixpkgs/blob/master/pkgs/os-specific/linux/musl/default.nix
-# https://git.musl-libc.org/cgit/musl/commit/?id=7844ecb590893f8344324837956718001402d297
-# https://git.musl-libc.org/cgit/musl/commit/?id=ea9525c8bcf6170df59364c4bcd616de1acf8703
+# These are **very** useful on Cross compilations!
+vendor-all = ["vendor-sasl", "vendor-openssl", "vendor-libz"]
+vendor-sasl = ["rdkafka/gssapi-vendored"]
+vendor-openssl = ["openssl/vendored"]
+vendor-libz = ["libz-sys/static"]
 sasl = ["rdkafka/gssapi"]
 # This feature is less portable, but doesn't require `cmake` as build dependency
 rdkafka-plain = ["rdkafka"]

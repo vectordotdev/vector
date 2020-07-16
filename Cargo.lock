@@ -1873,6 +1873,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "krb5-src"
+version = "0.2.4+1.18.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a01c2b7c3b70ca41646dafc8fc3b6053a8a0da9301251e8da8548fb067462d81"
+dependencies = [
+ "duct",
+ "openssl-sys",
+]
+
+[[package]]
 name = "lazy_static"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3837,6 +3847,7 @@ checksum = "7b82548e259466e09971e8b1d1adfffba6005c83a2ca2aca5b5d00a61f6b8058"
 dependencies = [
  "cc",
  "duct",
+ "krb5-src",
  "libc",
  "pkg-config",
 ]

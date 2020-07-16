@@ -11,7 +11,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: x86_64-unknown-linux-musl
-      FEATURES: default-cmake
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -49,7 +49,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: armv7-unknown-linux-musleabihf
-      FEATURES: default-cmake
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -67,7 +67,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: aarch64-unknown-linux-musl
-      FEATURES: default-cmake
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -85,7 +85,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: x86_64-unknown-linux-musl
-      FEATURES: default-cmake
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -123,7 +123,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: armv7-unknown-linux-musleabihf
-      FEATURES: default-cmake
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
@@ -141,7 +141,7 @@ services:
     environment:
       NATIVE_BUILD: "false"
       TARGET: aarch64-unknown-linux-musl
-      FEATURES: default-cmake
+      FEATURES: default-musl
       CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
