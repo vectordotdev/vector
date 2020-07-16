@@ -3509,7 +3509,7 @@ module.exports = {
         "domain: sinks",
         "sink: kafka"
       ],
-      "title": "Kafka components support SASL (Dev builds only)"
+      "title": "Kafka components support SASL"
     },
     {
       "author_github": "https://github.com/hoverbear",
@@ -9279,13 +9279,901 @@ module.exports = {
         ],
         "sha": "9c0ecdbc5478b17503522f826ecb3dbd2bf68e10",
         "type": "fix"
+      },
+      {
+        "author": "Kirill Fomichev",
+        "breaking_change": false,
+        "date": "2020-07-11 00:03:22 +0000",
+        "deletions_count": 294,
+        "description": "update to 1.0.0-alpha-2",
+        "files_count": 13,
+        "highlight_permalink": null,
+        "insertions_count": 321,
+        "message": "chore(pulsar sink): update to 1.0.0-alpha-2 (#2977)",
+        "pr_number": 2977,
+        "scopes": [
+          {
+            "component": {
+              "name": "pulsar",
+              "type": "sink"
+            },
+            "name": "pulsar sink"
+          }
+        ],
+        "sha": "db85e2faf6b590b76eed72530ce9600fbbcc03b6",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-10 14:04:42 +0000",
+        "deletions_count": 1,
+        "description": "Remove dead envrc file",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 0,
+        "message": "chore(operations): Remove dead envrc file (#3023)",
+        "pr_number": 3023,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "0036ede7448f3b6f849d1f13fc832c24cc522890",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-10 14:05:14 +0000",
+        "deletions_count": 52,
+        "description": "Remove the dns-server options from docs",
+        "files_count": 6,
+        "highlight_permalink": null,
+        "insertions_count": 1,
+        "message": "docs: Remove the dns-server options from docs (#3021)",
+        "pr_number": 3021,
+        "scopes": [
+
+        ],
+        "sha": "63792bb8ef63fc560ff436122763a74cab30706b",
+        "type": "docs"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-07-10 16:24:08 +0000",
+        "deletions_count": 20,
+        "description": "Set a proper default for the batch buffer initialization",
+        "files_count": 5,
+        "highlight_permalink": null,
+        "insertions_count": 17,
+        "message": "fix(loki sink): Set a proper default for the batch buffer initialization (#3016)",
+        "pr_number": 3016,
+        "scopes": [
+          {
+            "component": {
+              "name": "loki",
+              "type": "sink"
+            },
+            "name": "loki sink"
+          }
+        ],
+        "sha": "36efd3970f6931221e5749539c93f218e9147dba",
+        "type": "fix"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2020-07-10 18:28:49 +0000",
+        "deletions_count": 3,
+        "description": "add reduce transform",
+        "files_count": 17,
+        "highlight_permalink": "/highlights/2020-07-10-add-reduce-transform/",
+        "insertions_count": 2496,
+        "message": "feat(new transform): add reduce transform (#2870)",
+        "pr_number": 2870,
+        "scopes": [
+          {
+            "component": {
+              "name": "new",
+              "type": "transform"
+            },
+            "name": "new transform"
+          }
+        ],
+        "sha": "bb497befcb38793573404e56fda3871ed0ece3c3",
+        "type": "feat"
+      },
+      {
+        "author": "Kirill Fomichev",
+        "breaking_change": false,
+        "date": "2020-07-11 09:59:29 +0000",
+        "deletions_count": 113,
+        "description": "update prost",
+        "files_count": 6,
+        "highlight_permalink": null,
+        "insertions_count": 33,
+        "message": "chore(deps): update prost (#3017)",
+        "pr_number": 3017,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "deps"
+          }
+        ],
+        "sha": "ccbb802c010c6109240a14be44b3c30dbae73564",
+        "type": "chore"
+      },
+      {
+        "author": "Kirill Fomichev",
+        "breaking_change": false,
+        "date": "2020-07-11 12:53:34 +0000",
+        "deletions_count": 2,
+        "description": "update crates in lock file after merges",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 2,
+        "message": "fix(deps): update crates in lock file after merges (#3030)",
+        "pr_number": 3030,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "deps"
+          }
+        ],
+        "sha": "f28b64b9f34f7da81597bb935359e1c4a3658431",
+        "type": "fix"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-07-12 00:11:46 +0000",
+        "deletions_count": 36,
+        "description": "Accept `octet-counting` encoded messages",
+        "files_count": 8,
+        "highlight_permalink": null,
+        "insertions_count": 226,
+        "message": "enhancement(syslog source): Accept `octet-counting` encoded messages (#2955)",
+        "pr_number": 2955,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "syslog source"
+          }
+        ],
+        "sha": "a9a5d3980db07ec51a23648f95721790c0c6397e",
+        "type": "enhancement"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-07-11 16:21:53 +0000",
+        "deletions_count": 3,
+        "description": "Drop 3 more clippy exclusions",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 0,
+        "message": "chore: Drop 3 more clippy exclusions (#3026)",
+        "pr_number": 3026,
+        "scopes": [
+
+        ],
+        "sha": "5c88a7c156bf4b0c96c5be329c1fe03e8f838aac",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-07-12 01:34:11 +0000",
+        "deletions_count": 16,
+        "description": "Delete `topology::config::watcher::tests::multi_file_update` ",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 0,
+        "message": "chore(tests): Delete `topology::config::watcher::tests::multi_file_update`  (#3034)",
+        "pr_number": 3034,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "tests"
+          }
+        ],
+        "sha": "feb4e44f7d6888e967ed650e8fde824a5d35c166",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-07-12 01:35:00 +0000",
+        "deletions_count": 38,
+        "description": "Delete `topology::reload_tests::topology_reuse_old_port` ",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 0,
+        "message": "chore(tests): Delete `topology::reload_tests::topology_reuse_old_port`  (#3036)",
+        "pr_number": 3036,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "tests"
+          }
+        ],
+        "sha": "e3dca13f68773ca690b75395a46aa4b4649b2d44",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-07-12 01:36:52 +0000",
+        "deletions_count": 155,
+        "description": "Build `HttpClient` once",
+        "files_count": 14,
+        "highlight_permalink": null,
+        "insertions_count": 114,
+        "message": "chore(sinks): Build `HttpClient` once (#3010)",
+        "pr_number": 3010,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "sinks"
+          }
+        ],
+        "sha": "20b2c504412c499503729bbf998f805c69de9b76",
+        "type": "chore"
+      },
+      {
+        "author": "Kirill Fomichev",
+        "breaking_change": false,
+        "date": "2020-07-12 18:20:19 +0000",
+        "deletions_count": 30,
+        "description": "remove tokio-codec crate",
+        "files_count": 11,
+        "highlight_permalink": null,
+        "insertions_count": 339,
+        "message": "chore(deps): remove tokio-codec crate (#3011)",
+        "pr_number": 3011,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "deps"
+          }
+        ],
+        "sha": "2e15006ac26f3699fa10a4811d9da7ad9914d7dc",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-07-12 17:54:22 +0000",
+        "deletions_count": 64,
+        "description": "Delete `tests\\tcp::merge` test",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 0,
+        "message": "chore(tests): Delete `tests\\tcp::merge` test (#3042)",
+        "pr_number": 3042,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "tests"
+          }
+        ],
+        "sha": "3848bfd7f23144f2da92775def678c6c750626cd",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-07-12 17:56:58 +0000",
+        "deletions_count": 65,
+        "description": "Delete `test_udp_syslog` test",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 1,
+        "message": "chore(tests): Delete `test_udp_syslog` test (#3044)",
+        "pr_number": 3044,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "tests"
+          }
+        ],
+        "sha": "359adb8c5a2a3040717dd87a2c09e5fdc0185dc9",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-07-12 17:58:30 +0000",
+        "deletions_count": 63,
+        "description": "Delete `test_max_size_resume`",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 2,
+        "message": "chore(tests): Delete `test_max_size_resume` (#3040)",
+        "pr_number": 3040,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "tests"
+          }
+        ],
+        "sha": "9880fbebb38c5bd4bdcbf795b74800794292fe31",
+        "type": "chore"
+      },
+      {
+        "author": "dependabot-preview[bot]",
+        "breaking_change": false,
+        "date": "2020-07-12 21:33:27 +0000",
+        "deletions_count": 2,
+        "description": "bump num_cpus from 1.12.0 to 1.13.0",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 2,
+        "message": "chore(deps): bump num_cpus from 1.12.0 to 1.13.0 (#2910)",
+        "pr_number": 2910,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "deps"
+          }
+        ],
+        "sha": "752fb6574503da0811d4033289fc45ab974926de",
+        "type": "chore"
+      },
+      {
+        "author": "dependabot-preview[bot]",
+        "breaking_change": false,
+        "date": "2020-07-13 06:29:10 +0000",
+        "deletions_count": 2,
+        "description": "bump serde_json from 1.0.55 to 1.0.56",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 2,
+        "message": "chore(deps): bump serde_json from 1.0.55 to 1.0.56 (#3051)",
+        "pr_number": 3051,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "deps"
+          }
+        ],
+        "sha": "680266eef07fa3f76c96ca9ea055bb704457a19a",
+        "type": "chore"
+      },
+      {
+        "author": "dependabot-preview[bot]",
+        "breaking_change": false,
+        "date": "2020-07-13 06:37:34 +0000",
+        "deletions_count": 2,
+        "description": "bump bytesize from 1.0.0 to 1.0.1",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 2,
+        "message": "chore(deps): bump bytesize from 1.0.0 to 1.0.1 (#3050)",
+        "pr_number": 3050,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "deps"
+          }
+        ],
+        "sha": "23888d1a7aff7629bf601abcaedbc7009f55ad45",
+        "type": "chore"
+      },
+      {
+        "author": "Alexandre DUVAL",
+        "breaking_change": false,
+        "date": "2020-07-13 17:36:14 +0000",
+        "deletions_count": 5,
+        "description": "bump to pulsar-rs 1.0.0",
+        "files_count": 3,
+        "highlight_permalink": null,
+        "insertions_count": 5,
+        "message": "chore(pulsar sink): bump to pulsar-rs 1.0.0 (#3053)",
+        "pr_number": 3053,
+        "scopes": [
+          {
+            "component": {
+              "name": "pulsar",
+              "type": "sink"
+            },
+            "name": "pulsar sink"
+          }
+        ],
+        "sha": "5d8f535454d9d9e6a166d2466f5f45bd26e8b5e2",
+        "type": "chore"
+      },
+      {
+        "author": "Kirill Fomichev",
+        "breaking_change": false,
+        "date": "2020-07-13 19:16:50 +0000",
+        "deletions_count": 40,
+        "description": "reduce std::io::Cursor usage",
+        "files_count": 9,
+        "highlight_permalink": null,
+        "insertions_count": 32,
+        "message": "chore: reduce std::io::Cursor usage (#3038)",
+        "pr_number": 3038,
+        "scopes": [
+
+        ],
+        "sha": "cd4620e3a2010259f988769c8a97388a9666f2da",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-13 10:58:46 +0000",
+        "deletions_count": 3,
+        "description": "Fixup integration test invocations",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 2,
+        "message": "chore(tests): Fixup integration test invocations (#3004)",
+        "pr_number": 3004,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "tests"
+          }
+        ],
+        "sha": "c1ca0295b3cda2fad9bef6b8212a220fc6feeffe",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-13 12:30:43 +0000",
+        "deletions_count": 999,
+        "description": "Fix broken `make generate`",
+        "files_count": 485,
+        "highlight_permalink": null,
+        "insertions_count": 566,
+        "message": "chore(operations): Fix broken `make generate` (#3058)",
+        "pr_number": 3058,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "e60d96d8d70e6d14118b4330eb5ccaa131afa896",
+        "type": "chore"
+      },
+      {
+        "author": "dependabot-preview[bot]",
+        "breaking_change": false,
+        "date": "2020-07-14 09:15:51 +0000",
+        "deletions_count": 5,
+        "description": "bump bollard from 0.7.0 to 0.7.1",
+        "files_count": 2,
+        "highlight_permalink": null,
+        "insertions_count": 5,
+        "message": "chore(deps): bump bollard from 0.7.0 to 0.7.1 (#3048)",
+        "pr_number": 3048,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "deps"
+          }
+        ],
+        "sha": "7aef527df7cdc3c2abb330a22911c94c62b1010c",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-07-14 12:05:45 +0000",
+        "deletions_count": 3,
+        "description": "Cleanup `generate` command",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 6,
+        "message": "fix(cli): Cleanup `generate` command (#3046)",
+        "pr_number": 3046,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "cli"
+          }
+        ],
+        "sha": "dc5c6cc7f38564d8ccb4f0774c0e398428428973",
+        "type": "fix"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-07-14 12:12:07 +0000",
+        "deletions_count": 60,
+        "description": "Build `aws` sinks clients only once",
+        "files_count": 5,
+        "highlight_permalink": null,
+        "insertions_count": 66,
+        "message": "chore(sinks): Build `aws` sinks clients only once (#3045)",
+        "pr_number": 3045,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "sinks"
+          }
+        ],
+        "sha": "60a9ded146a2188980c8d31cdd374ebd59b6e6f1",
+        "type": "chore"
+      },
+      {
+        "author": "Kirill Fomichev",
+        "breaking_change": false,
+        "date": "2020-07-14 20:20:12 +0000",
+        "deletions_count": 131,
+        "description": "remove owning_ref",
+        "files_count": 3,
+        "highlight_permalink": null,
+        "insertions_count": 166,
+        "message": "chore(kafka source): remove owning_ref (#3059)",
+        "pr_number": 3059,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "kafka source"
+          }
+        ],
+        "sha": "dc564ed54508da96f62de57b33e6b2a994114d3d",
+        "type": "chore"
+      },
+      {
+        "author": "Kirill Fomichev",
+        "breaking_change": false,
+        "date": "2020-07-14 22:45:40 +0000",
+        "deletions_count": 133,
+        "description": "update runtime_transform",
+        "files_count": 14,
+        "highlight_permalink": null,
+        "insertions_count": 165,
+        "message": "chore(transforms): update runtime_transform (#3065)",
+        "pr_number": 3065,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "transforms"
+          }
+        ],
+        "sha": "ae20875fc7cd4b38dc7215c0b65cb22073490864",
+        "type": "chore"
+      },
+      {
+        "author": "Harold Dost",
+        "breaking_change": false,
+        "date": "2020-07-14 21:55:00 +0000",
+        "deletions_count": 0,
+        "description": "Add .rustfmt.toml to assist IDE formatters.",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 3,
+        "message": "chore: Add .rustfmt.toml to assist IDE formatters. (#3063)",
+        "pr_number": 3063,
+        "scopes": [
+
+        ],
+        "sha": "b8fa14e21885af394586cf2ee7c736646a6ae7e2",
+        "type": "chore"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2020-07-14 19:44:15 +0000",
+        "deletions_count": 121,
+        "description": "add SinkConfig::build_async",
+        "files_count": 11,
+        "highlight_permalink": null,
+        "insertions_count": 132,
+        "message": "chore(sinks): add SinkConfig::build_async (#3066)",
+        "pr_number": 3066,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "sinks"
+          }
+        ],
+        "sha": "df65bf9830eaffdcb8798865abb710ad67a8628a",
+        "type": "chore"
+      },
+      {
+        "author": "Kirill Fomichev",
+        "breaking_change": false,
+        "date": "2020-07-15 16:07:33 +0000",
+        "deletions_count": 3,
+        "description": "adjust log event in coercer transform",
+        "files_count": 2,
+        "highlight_permalink": null,
+        "insertions_count": 3,
+        "message": "fix(docs): adjust log event in coercer transform (#3072)",
+        "pr_number": 3072,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "docs"
+          }
+        ],
+        "sha": "0faa07b42276dcdec3e077ff835610ebe865f21f",
+        "type": "fix"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-15 07:34:20 +0000",
+        "deletions_count": 967,
+        "description": "Remove CircleCI",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 0,
+        "message": "chore(operations): Remove CircleCI (#3001)",
+        "pr_number": 3001,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "64d7dc8d215c25e61d3e4937ac748a8342a6afad",
+        "type": "chore"
+      },
+      {
+        "author": "dependabot-preview[bot]",
+        "breaking_change": false,
+        "date": "2020-07-15 07:35:03 +0000",
+        "deletions_count": 8,
+        "description": "bump flate2 from 1.0.13 to 1.0.16",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 8,
+        "message": "chore(deps): bump flate2 from 1.0.13 to 1.0.16 (#3049)",
+        "pr_number": 3049,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "deps"
+          }
+        ],
+        "sha": "30123d970e586a634cae729b37fe918bd5b13fd2",
+        "type": "chore"
+      },
+      {
+        "author": "Kirill Fomichev",
+        "breaking_change": false,
+        "date": "2020-07-15 21:59:31 +0000",
+        "deletions_count": 1,
+        "description": "fix endpoint strip for aws region",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 19,
+        "message": "chore(sinks): fix endpoint strip for aws region (#3070)",
+        "pr_number": 3070,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "sinks"
+          }
+        ],
+        "sha": "2e29c36d8225c6fa82419932e88f92372c755847",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-15 14:29:20 +0000",
+        "deletions_count": 3,
+        "description": "Add sync-install to GA",
+        "files_count": 2,
+        "highlight_permalink": null,
+        "insertions_count": 18,
+        "message": "chore(operations): Add sync-install to GA (#3056)",
+        "pr_number": 3056,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "4866bded3c73d4340cb114efd73de3e872b5906f",
+        "type": "chore"
+      },
+      {
+        "author": "dependabot-preview[bot]",
+        "breaking_change": false,
+        "date": "2020-07-15 16:01:02 +0000",
+        "deletions_count": 2,
+        "description": "bump tokio-uds from 0.2.5 to 0.2.7",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 2,
+        "message": "chore(deps): bump tokio-uds from 0.2.5 to 0.2.7 (#2946)",
+        "pr_number": 2946,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "deps"
+          }
+        ],
+        "sha": "efcf4b934aa83bd41d2bc54e8dc5bb3a64a78266",
+        "type": "chore"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2020-07-15 19:02:35 +0000",
+        "deletions_count": 14,
+        "description": "improve array handling",
+        "files_count": 2,
+        "highlight_permalink": null,
+        "insertions_count": 132,
+        "message": "fix(reduce transform): improve array handling (#3076)",
+        "pr_number": 3076,
+        "scopes": [
+          {
+            "component": {
+              "name": "reduce",
+              "type": "transform"
+            },
+            "name": "reduce transform"
+          }
+        ],
+        "sha": "0b9e4cc40dc7e5c19a2451993da29c78e38f858a",
+        "type": "fix"
+      },
+      {
+        "author": "Kirill Fomichev",
+        "breaking_change": false,
+        "date": "2020-07-16 08:11:25 +0000",
+        "deletions_count": 1,
+        "description": "Fix warning message due .rustfmt.toml",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 2,
+        "message": "chore: Fix warning message due .rustfmt.toml (#3075)",
+        "pr_number": 3075,
+        "scopes": [
+
+        ],
+        "sha": "ff1884062e09956a7696a644f80c401e593d3e6f",
+        "type": "chore"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-07-16 09:13:51 +0000",
+        "deletions_count": 39,
+        "description": "Drop the batch byte size limit",
+        "files_count": 4,
+        "highlight_permalink": null,
+        "insertions_count": 5,
+        "message": "fix(loki sink): Drop the batch byte size limit (#3025)",
+        "pr_number": 3025,
+        "scopes": [
+          {
+            "component": {
+              "name": "loki",
+              "type": "sink"
+            },
+            "name": "loki sink"
+          }
+        ],
+        "sha": "6e097287b82ac48651649695593b3c7533873de1",
+        "type": "fix"
+      },
+      {
+        "author": "Kirill Fomichev",
+        "breaking_change": false,
+        "date": "2020-07-16 20:41:25 +0000",
+        "deletions_count": 20,
+        "description": "use localstack instead minio",
+        "files_count": 2,
+        "highlight_permalink": null,
+        "insertions_count": 4,
+        "message": "chore(tests): use localstack instead minio (#3073)",
+        "pr_number": 3073,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "tests"
+          }
+        ],
+        "sha": "ca6df186b089b3535eecf609e1aaf54aed4c4df3",
+        "type": "chore"
+      },
+      {
+        "author": "dependabot-preview[bot]",
+        "breaking_change": false,
+        "date": "2020-07-16 11:18:40 +0000",
+        "deletions_count": 4,
+        "description": "bump inventory from 0.1.5 to 0.1.7",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 4,
+        "message": "chore(deps): bump inventory from 0.1.5 to 0.1.7 (#2851)",
+        "pr_number": 2851,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "deps"
+          }
+        ],
+        "sha": "3af6816cceafcd6af56d5f8e9286915b50a8025f",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-16 11:51:19 +0000",
+        "deletions_count": 36,
+        "description": "Reenable sasl",
+        "files_count": 8,
+        "highlight_permalink": null,
+        "insertions_count": 56,
+        "message": "chore(deps): Reenable sasl (#3081)",
+        "pr_number": 3081,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "deps"
+          }
+        ],
+        "sha": "59871fd3f54bd4710d14fde4089088dcb2932d81",
+        "type": "chore"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
     "date": "2020-07-10",
-    "deletions_count": 21738,
+    "deletions_count": 25245,
     "description": "",
     "highlights": [
+      {
+        "author_github": "https://github.com/binarylogic",
+        "date": "2020-03-31",
+        "description": "High quality guides and education for Vector",
+        "hide_on_release_notes": false,
+        "id": "2020-03-31-guides-section",
+        "path": "website/highlights/2020-03-31-guides-section.md",
+        "permalink": "/highlights/2020-03-31-guides-section/",
+        "tags": [
+          "type: new feature",
+          "domain: website"
+        ],
+        "title": "A New Guides Section"
+      },
       {
         "author_github": "https://github.com/hoverbear",
         "date": "2020-05-04",
@@ -9411,7 +10299,7 @@ module.exports = {
           "domain: sinks",
           "sink: kafka"
         ],
-        "title": "Kafka components support SASL (Dev builds only)"
+        "title": "Kafka components support SASL"
       },
       {
         "author_github": "https://github.com/hoverbear",
@@ -9473,7 +10361,7 @@ module.exports = {
         "title": "New Reduce transform"
       }
     ],
-    "insertions_count": 42685,
+    "insertions_count": 47643,
     "last_version": "0.9.2",
     "permalink": "/releases/0.10.0/",
     "title": "Vector v0.10.0",
@@ -14788,13 +15676,901 @@ module.exports = {
           ],
           "sha": "9c0ecdbc5478b17503522f826ecb3dbd2bf68e10",
           "type": "fix"
+        },
+        {
+          "author": "Kirill Fomichev",
+          "breaking_change": false,
+          "date": "2020-07-11 00:03:22 +0000",
+          "deletions_count": 294,
+          "description": "update to 1.0.0-alpha-2",
+          "files_count": 13,
+          "highlight_permalink": null,
+          "insertions_count": 321,
+          "message": "chore(pulsar sink): update to 1.0.0-alpha-2 (#2977)",
+          "pr_number": 2977,
+          "scopes": [
+            {
+              "component": {
+                "name": "pulsar",
+                "type": "sink"
+              },
+              "name": "pulsar sink"
+            }
+          ],
+          "sha": "db85e2faf6b590b76eed72530ce9600fbbcc03b6",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-10 14:04:42 +0000",
+          "deletions_count": 1,
+          "description": "Remove dead envrc file",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 0,
+          "message": "chore(operations): Remove dead envrc file (#3023)",
+          "pr_number": 3023,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "0036ede7448f3b6f849d1f13fc832c24cc522890",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-10 14:05:14 +0000",
+          "deletions_count": 52,
+          "description": "Remove the dns-server options from docs",
+          "files_count": 6,
+          "highlight_permalink": null,
+          "insertions_count": 1,
+          "message": "docs: Remove the dns-server options from docs (#3021)",
+          "pr_number": 3021,
+          "scopes": [
+
+          ],
+          "sha": "63792bb8ef63fc560ff436122763a74cab30706b",
+          "type": "docs"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-07-10 16:24:08 +0000",
+          "deletions_count": 20,
+          "description": "Set a proper default for the batch buffer initialization",
+          "files_count": 5,
+          "highlight_permalink": null,
+          "insertions_count": 17,
+          "message": "fix(loki sink): Set a proper default for the batch buffer initialization (#3016)",
+          "pr_number": 3016,
+          "scopes": [
+            {
+              "component": {
+                "name": "loki",
+                "type": "sink"
+              },
+              "name": "loki sink"
+            }
+          ],
+          "sha": "36efd3970f6931221e5749539c93f218e9147dba",
+          "type": "fix"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-07-10 18:28:49 +0000",
+          "deletions_count": 3,
+          "description": "add reduce transform",
+          "files_count": 17,
+          "highlight_permalink": "/highlights/2020-07-10-add-reduce-transform/",
+          "insertions_count": 2496,
+          "message": "feat(new transform): add reduce transform (#2870)",
+          "pr_number": 2870,
+          "scopes": [
+            {
+              "component": {
+                "name": "new",
+                "type": "transform"
+              },
+              "name": "new transform"
+            }
+          ],
+          "sha": "bb497befcb38793573404e56fda3871ed0ece3c3",
+          "type": "feat"
+        },
+        {
+          "author": "Kirill Fomichev",
+          "breaking_change": false,
+          "date": "2020-07-11 09:59:29 +0000",
+          "deletions_count": 113,
+          "description": "update prost",
+          "files_count": 6,
+          "highlight_permalink": null,
+          "insertions_count": 33,
+          "message": "chore(deps): update prost (#3017)",
+          "pr_number": 3017,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "deps"
+            }
+          ],
+          "sha": "ccbb802c010c6109240a14be44b3c30dbae73564",
+          "type": "chore"
+        },
+        {
+          "author": "Kirill Fomichev",
+          "breaking_change": false,
+          "date": "2020-07-11 12:53:34 +0000",
+          "deletions_count": 2,
+          "description": "update crates in lock file after merges",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 2,
+          "message": "fix(deps): update crates in lock file after merges (#3030)",
+          "pr_number": 3030,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "deps"
+            }
+          ],
+          "sha": "f28b64b9f34f7da81597bb935359e1c4a3658431",
+          "type": "fix"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-07-12 00:11:46 +0000",
+          "deletions_count": 36,
+          "description": "Accept `octet-counting` encoded messages",
+          "files_count": 8,
+          "highlight_permalink": null,
+          "insertions_count": 226,
+          "message": "enhancement(syslog source): Accept `octet-counting` encoded messages (#2955)",
+          "pr_number": 2955,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "syslog source"
+            }
+          ],
+          "sha": "a9a5d3980db07ec51a23648f95721790c0c6397e",
+          "type": "enhancement"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-07-11 16:21:53 +0000",
+          "deletions_count": 3,
+          "description": "Drop 3 more clippy exclusions",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 0,
+          "message": "chore: Drop 3 more clippy exclusions (#3026)",
+          "pr_number": 3026,
+          "scopes": [
+
+          ],
+          "sha": "5c88a7c156bf4b0c96c5be329c1fe03e8f838aac",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-07-12 01:34:11 +0000",
+          "deletions_count": 16,
+          "description": "Delete `topology::config::watcher::tests::multi_file_update` ",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 0,
+          "message": "chore(tests): Delete `topology::config::watcher::tests::multi_file_update`  (#3034)",
+          "pr_number": 3034,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "tests"
+            }
+          ],
+          "sha": "feb4e44f7d6888e967ed650e8fde824a5d35c166",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-07-12 01:35:00 +0000",
+          "deletions_count": 38,
+          "description": "Delete `topology::reload_tests::topology_reuse_old_port` ",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 0,
+          "message": "chore(tests): Delete `topology::reload_tests::topology_reuse_old_port`  (#3036)",
+          "pr_number": 3036,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "tests"
+            }
+          ],
+          "sha": "e3dca13f68773ca690b75395a46aa4b4649b2d44",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-07-12 01:36:52 +0000",
+          "deletions_count": 155,
+          "description": "Build `HttpClient` once",
+          "files_count": 14,
+          "highlight_permalink": null,
+          "insertions_count": 114,
+          "message": "chore(sinks): Build `HttpClient` once (#3010)",
+          "pr_number": 3010,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "sinks"
+            }
+          ],
+          "sha": "20b2c504412c499503729bbf998f805c69de9b76",
+          "type": "chore"
+        },
+        {
+          "author": "Kirill Fomichev",
+          "breaking_change": false,
+          "date": "2020-07-12 18:20:19 +0000",
+          "deletions_count": 30,
+          "description": "remove tokio-codec crate",
+          "files_count": 11,
+          "highlight_permalink": null,
+          "insertions_count": 339,
+          "message": "chore(deps): remove tokio-codec crate (#3011)",
+          "pr_number": 3011,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "deps"
+            }
+          ],
+          "sha": "2e15006ac26f3699fa10a4811d9da7ad9914d7dc",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-07-12 17:54:22 +0000",
+          "deletions_count": 64,
+          "description": "Delete `tests\\tcp::merge` test",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 0,
+          "message": "chore(tests): Delete `tests\\tcp::merge` test (#3042)",
+          "pr_number": 3042,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "tests"
+            }
+          ],
+          "sha": "3848bfd7f23144f2da92775def678c6c750626cd",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-07-12 17:56:58 +0000",
+          "deletions_count": 65,
+          "description": "Delete `test_udp_syslog` test",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 1,
+          "message": "chore(tests): Delete `test_udp_syslog` test (#3044)",
+          "pr_number": 3044,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "tests"
+            }
+          ],
+          "sha": "359adb8c5a2a3040717dd87a2c09e5fdc0185dc9",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-07-12 17:58:30 +0000",
+          "deletions_count": 63,
+          "description": "Delete `test_max_size_resume`",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 2,
+          "message": "chore(tests): Delete `test_max_size_resume` (#3040)",
+          "pr_number": 3040,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "tests"
+            }
+          ],
+          "sha": "9880fbebb38c5bd4bdcbf795b74800794292fe31",
+          "type": "chore"
+        },
+        {
+          "author": "dependabot-preview[bot]",
+          "breaking_change": false,
+          "date": "2020-07-12 21:33:27 +0000",
+          "deletions_count": 2,
+          "description": "bump num_cpus from 1.12.0 to 1.13.0",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 2,
+          "message": "chore(deps): bump num_cpus from 1.12.0 to 1.13.0 (#2910)",
+          "pr_number": 2910,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "deps"
+            }
+          ],
+          "sha": "752fb6574503da0811d4033289fc45ab974926de",
+          "type": "chore"
+        },
+        {
+          "author": "dependabot-preview[bot]",
+          "breaking_change": false,
+          "date": "2020-07-13 06:29:10 +0000",
+          "deletions_count": 2,
+          "description": "bump serde_json from 1.0.55 to 1.0.56",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 2,
+          "message": "chore(deps): bump serde_json from 1.0.55 to 1.0.56 (#3051)",
+          "pr_number": 3051,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "deps"
+            }
+          ],
+          "sha": "680266eef07fa3f76c96ca9ea055bb704457a19a",
+          "type": "chore"
+        },
+        {
+          "author": "dependabot-preview[bot]",
+          "breaking_change": false,
+          "date": "2020-07-13 06:37:34 +0000",
+          "deletions_count": 2,
+          "description": "bump bytesize from 1.0.0 to 1.0.1",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 2,
+          "message": "chore(deps): bump bytesize from 1.0.0 to 1.0.1 (#3050)",
+          "pr_number": 3050,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "deps"
+            }
+          ],
+          "sha": "23888d1a7aff7629bf601abcaedbc7009f55ad45",
+          "type": "chore"
+        },
+        {
+          "author": "Alexandre DUVAL",
+          "breaking_change": false,
+          "date": "2020-07-13 17:36:14 +0000",
+          "deletions_count": 5,
+          "description": "bump to pulsar-rs 1.0.0",
+          "files_count": 3,
+          "highlight_permalink": null,
+          "insertions_count": 5,
+          "message": "chore(pulsar sink): bump to pulsar-rs 1.0.0 (#3053)",
+          "pr_number": 3053,
+          "scopes": [
+            {
+              "component": {
+                "name": "pulsar",
+                "type": "sink"
+              },
+              "name": "pulsar sink"
+            }
+          ],
+          "sha": "5d8f535454d9d9e6a166d2466f5f45bd26e8b5e2",
+          "type": "chore"
+        },
+        {
+          "author": "Kirill Fomichev",
+          "breaking_change": false,
+          "date": "2020-07-13 19:16:50 +0000",
+          "deletions_count": 40,
+          "description": "reduce std::io::Cursor usage",
+          "files_count": 9,
+          "highlight_permalink": null,
+          "insertions_count": 32,
+          "message": "chore: reduce std::io::Cursor usage (#3038)",
+          "pr_number": 3038,
+          "scopes": [
+
+          ],
+          "sha": "cd4620e3a2010259f988769c8a97388a9666f2da",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-13 10:58:46 +0000",
+          "deletions_count": 3,
+          "description": "Fixup integration test invocations",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 2,
+          "message": "chore(tests): Fixup integration test invocations (#3004)",
+          "pr_number": 3004,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "tests"
+            }
+          ],
+          "sha": "c1ca0295b3cda2fad9bef6b8212a220fc6feeffe",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-13 12:30:43 +0000",
+          "deletions_count": 999,
+          "description": "Fix broken `make generate`",
+          "files_count": 485,
+          "highlight_permalink": null,
+          "insertions_count": 566,
+          "message": "chore(operations): Fix broken `make generate` (#3058)",
+          "pr_number": 3058,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "e60d96d8d70e6d14118b4330eb5ccaa131afa896",
+          "type": "chore"
+        },
+        {
+          "author": "dependabot-preview[bot]",
+          "breaking_change": false,
+          "date": "2020-07-14 09:15:51 +0000",
+          "deletions_count": 5,
+          "description": "bump bollard from 0.7.0 to 0.7.1",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 5,
+          "message": "chore(deps): bump bollard from 0.7.0 to 0.7.1 (#3048)",
+          "pr_number": 3048,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "deps"
+            }
+          ],
+          "sha": "7aef527df7cdc3c2abb330a22911c94c62b1010c",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-07-14 12:05:45 +0000",
+          "deletions_count": 3,
+          "description": "Cleanup `generate` command",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 6,
+          "message": "fix(cli): Cleanup `generate` command (#3046)",
+          "pr_number": 3046,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "cli"
+            }
+          ],
+          "sha": "dc5c6cc7f38564d8ccb4f0774c0e398428428973",
+          "type": "fix"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-07-14 12:12:07 +0000",
+          "deletions_count": 60,
+          "description": "Build `aws` sinks clients only once",
+          "files_count": 5,
+          "highlight_permalink": null,
+          "insertions_count": 66,
+          "message": "chore(sinks): Build `aws` sinks clients only once (#3045)",
+          "pr_number": 3045,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "sinks"
+            }
+          ],
+          "sha": "60a9ded146a2188980c8d31cdd374ebd59b6e6f1",
+          "type": "chore"
+        },
+        {
+          "author": "Kirill Fomichev",
+          "breaking_change": false,
+          "date": "2020-07-14 20:20:12 +0000",
+          "deletions_count": 131,
+          "description": "remove owning_ref",
+          "files_count": 3,
+          "highlight_permalink": null,
+          "insertions_count": 166,
+          "message": "chore(kafka source): remove owning_ref (#3059)",
+          "pr_number": 3059,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "kafka source"
+            }
+          ],
+          "sha": "dc564ed54508da96f62de57b33e6b2a994114d3d",
+          "type": "chore"
+        },
+        {
+          "author": "Kirill Fomichev",
+          "breaking_change": false,
+          "date": "2020-07-14 22:45:40 +0000",
+          "deletions_count": 133,
+          "description": "update runtime_transform",
+          "files_count": 14,
+          "highlight_permalink": null,
+          "insertions_count": 165,
+          "message": "chore(transforms): update runtime_transform (#3065)",
+          "pr_number": 3065,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "transforms"
+            }
+          ],
+          "sha": "ae20875fc7cd4b38dc7215c0b65cb22073490864",
+          "type": "chore"
+        },
+        {
+          "author": "Harold Dost",
+          "breaking_change": false,
+          "date": "2020-07-14 21:55:00 +0000",
+          "deletions_count": 0,
+          "description": "Add .rustfmt.toml to assist IDE formatters.",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 3,
+          "message": "chore: Add .rustfmt.toml to assist IDE formatters. (#3063)",
+          "pr_number": 3063,
+          "scopes": [
+
+          ],
+          "sha": "b8fa14e21885af394586cf2ee7c736646a6ae7e2",
+          "type": "chore"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-07-14 19:44:15 +0000",
+          "deletions_count": 121,
+          "description": "add SinkConfig::build_async",
+          "files_count": 11,
+          "highlight_permalink": null,
+          "insertions_count": 132,
+          "message": "chore(sinks): add SinkConfig::build_async (#3066)",
+          "pr_number": 3066,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "sinks"
+            }
+          ],
+          "sha": "df65bf9830eaffdcb8798865abb710ad67a8628a",
+          "type": "chore"
+        },
+        {
+          "author": "Kirill Fomichev",
+          "breaking_change": false,
+          "date": "2020-07-15 16:07:33 +0000",
+          "deletions_count": 3,
+          "description": "adjust log event in coercer transform",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 3,
+          "message": "fix(docs): adjust log event in coercer transform (#3072)",
+          "pr_number": 3072,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "docs"
+            }
+          ],
+          "sha": "0faa07b42276dcdec3e077ff835610ebe865f21f",
+          "type": "fix"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-15 07:34:20 +0000",
+          "deletions_count": 967,
+          "description": "Remove CircleCI",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 0,
+          "message": "chore(operations): Remove CircleCI (#3001)",
+          "pr_number": 3001,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "64d7dc8d215c25e61d3e4937ac748a8342a6afad",
+          "type": "chore"
+        },
+        {
+          "author": "dependabot-preview[bot]",
+          "breaking_change": false,
+          "date": "2020-07-15 07:35:03 +0000",
+          "deletions_count": 8,
+          "description": "bump flate2 from 1.0.13 to 1.0.16",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 8,
+          "message": "chore(deps): bump flate2 from 1.0.13 to 1.0.16 (#3049)",
+          "pr_number": 3049,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "deps"
+            }
+          ],
+          "sha": "30123d970e586a634cae729b37fe918bd5b13fd2",
+          "type": "chore"
+        },
+        {
+          "author": "Kirill Fomichev",
+          "breaking_change": false,
+          "date": "2020-07-15 21:59:31 +0000",
+          "deletions_count": 1,
+          "description": "fix endpoint strip for aws region",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 19,
+          "message": "chore(sinks): fix endpoint strip for aws region (#3070)",
+          "pr_number": 3070,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "sinks"
+            }
+          ],
+          "sha": "2e29c36d8225c6fa82419932e88f92372c755847",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-15 14:29:20 +0000",
+          "deletions_count": 3,
+          "description": "Add sync-install to GA",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 18,
+          "message": "chore(operations): Add sync-install to GA (#3056)",
+          "pr_number": 3056,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "4866bded3c73d4340cb114efd73de3e872b5906f",
+          "type": "chore"
+        },
+        {
+          "author": "dependabot-preview[bot]",
+          "breaking_change": false,
+          "date": "2020-07-15 16:01:02 +0000",
+          "deletions_count": 2,
+          "description": "bump tokio-uds from 0.2.5 to 0.2.7",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 2,
+          "message": "chore(deps): bump tokio-uds from 0.2.5 to 0.2.7 (#2946)",
+          "pr_number": 2946,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "deps"
+            }
+          ],
+          "sha": "efcf4b934aa83bd41d2bc54e8dc5bb3a64a78266",
+          "type": "chore"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-07-15 19:02:35 +0000",
+          "deletions_count": 14,
+          "description": "improve array handling",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 132,
+          "message": "fix(reduce transform): improve array handling (#3076)",
+          "pr_number": 3076,
+          "scopes": [
+            {
+              "component": {
+                "name": "reduce",
+                "type": "transform"
+              },
+              "name": "reduce transform"
+            }
+          ],
+          "sha": "0b9e4cc40dc7e5c19a2451993da29c78e38f858a",
+          "type": "fix"
+        },
+        {
+          "author": "Kirill Fomichev",
+          "breaking_change": false,
+          "date": "2020-07-16 08:11:25 +0000",
+          "deletions_count": 1,
+          "description": "Fix warning message due .rustfmt.toml",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 2,
+          "message": "chore: Fix warning message due .rustfmt.toml (#3075)",
+          "pr_number": 3075,
+          "scopes": [
+
+          ],
+          "sha": "ff1884062e09956a7696a644f80c401e593d3e6f",
+          "type": "chore"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-07-16 09:13:51 +0000",
+          "deletions_count": 39,
+          "description": "Drop the batch byte size limit",
+          "files_count": 4,
+          "highlight_permalink": null,
+          "insertions_count": 5,
+          "message": "fix(loki sink): Drop the batch byte size limit (#3025)",
+          "pr_number": 3025,
+          "scopes": [
+            {
+              "component": {
+                "name": "loki",
+                "type": "sink"
+              },
+              "name": "loki sink"
+            }
+          ],
+          "sha": "6e097287b82ac48651649695593b3c7533873de1",
+          "type": "fix"
+        },
+        {
+          "author": "Kirill Fomichev",
+          "breaking_change": false,
+          "date": "2020-07-16 20:41:25 +0000",
+          "deletions_count": 20,
+          "description": "use localstack instead minio",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 4,
+          "message": "chore(tests): use localstack instead minio (#3073)",
+          "pr_number": 3073,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "tests"
+            }
+          ],
+          "sha": "ca6df186b089b3535eecf609e1aaf54aed4c4df3",
+          "type": "chore"
+        },
+        {
+          "author": "dependabot-preview[bot]",
+          "breaking_change": false,
+          "date": "2020-07-16 11:18:40 +0000",
+          "deletions_count": 4,
+          "description": "bump inventory from 0.1.5 to 0.1.7",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 4,
+          "message": "chore(deps): bump inventory from 0.1.5 to 0.1.7 (#2851)",
+          "pr_number": 2851,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "deps"
+            }
+          ],
+          "sha": "3af6816cceafcd6af56d5f8e9286915b50a8025f",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-16 11:51:19 +0000",
+          "deletions_count": 36,
+          "description": "Reenable sasl",
+          "files_count": 8,
+          "highlight_permalink": null,
+          "insertions_count": 56,
+          "message": "chore(deps): Reenable sasl (#3081)",
+          "pr_number": 3081,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "deps"
+            }
+          ],
+          "sha": "59871fd3f54bd4710d14fde4089088dcb2932d81",
+          "type": "chore"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
       "date": "2020-07-10",
-      "deletions_count": 21738,
+      "deletions_count": 25245,
       "description": "",
       "highlights": [
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-03-31",
+          "description": "High quality guides and education for Vector",
+          "hide_on_release_notes": false,
+          "id": "2020-03-31-guides-section",
+          "path": "website/highlights/2020-03-31-guides-section.md",
+          "permalink": "/highlights/2020-03-31-guides-section/",
+          "tags": [
+            "type: new feature",
+            "domain: website"
+          ],
+          "title": "A New Guides Section"
+        },
         {
           "author_github": "https://github.com/hoverbear",
           "date": "2020-05-04",
@@ -14920,7 +16696,7 @@ module.exports = {
             "domain: sinks",
             "sink: kafka"
           ],
-          "title": "Kafka components support SASL (Dev builds only)"
+          "title": "Kafka components support SASL"
         },
         {
           "author_github": "https://github.com/hoverbear",
@@ -14982,7 +16758,7 @@ module.exports = {
           "title": "New Reduce transform"
         }
       ],
-      "insertions_count": 42685,
+      "insertions_count": 47643,
       "last_version": "0.9.2",
       "permalink": "/releases/0.10.0/",
       "title": "Vector v0.10.0",

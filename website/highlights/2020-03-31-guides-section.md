@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-16"
 $schema: "/.meta/.schemas/highlights.json"
 title: "A New Guides Section"
 description: "High quality guides and education for Vector"

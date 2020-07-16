@@ -188,7 +188,7 @@ Or use your own [preferred method][docs.installation].
 * [2020/07/09 - glibc enhancements](https://vector.dev/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/) - available in [0.10.0][urls.vector_download]
 * [2020/07/06 - New compression options for some sinks](https://vector.dev/highlights/2020-07-06-add-compression-option-for-aws-sinks/) - available in [0.10.0][urls.vector_download]
 * [2020/06/29 - Batching and buffering reworked](https://vector.dev/highlights/2020-06-29-batch-buffer-rework/) - available in [0.10.0][urls.vector_download]
-* [2020/06/27 - Kafka components support SASL (Dev builds only)](https://vector.dev/highlights/2020-06-27-add-sasl-to-kafka/) - available in [0.10.0][urls.vector_download]
+* [2020/06/27 - Kafka components support SASL](https://vector.dev/highlights/2020-06-27-add-sasl-to-kafka/) - available in [0.10.0][urls.vector_download]
 
 [view all...][urls.vector_highlights]
 
