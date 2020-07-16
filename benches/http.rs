@@ -56,7 +56,7 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
             },
             |(mut rt, topology)| {
                 let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                rt.block_on(send).unwrap();
+                rt.block_on_std(send).unwrap();
 
                 rt.block_on(topology.stop()).unwrap();
 
@@ -114,7 +114,7 @@ fn benchmark_http_gzip(c: &mut Criterion) {
             },
             |(mut rt, topology)| {
                 let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                rt.block_on(send).unwrap();
+                rt.block_on_std(send).unwrap();
 
                 rt.block_on(topology.stop()).unwrap();
 

@@ -46,7 +46,8 @@ futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
 tokio01 = { package = "tokio", version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing", "codec", "udp", "sync", "fs"], default-features = false }
 tokio = { version = "0.2.13", features = ["blocking", "fs", "sync", "macros", "test-util", "rt-core", "io-std"] }
-tokio-openssl = "0.3.0"
+tokio-openssl03 = { package = "tokio-openssl", version = "0.3.0" }
+tokio-openssl = "0.4.0"
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-compat = { version = "0.1", features = ["rt-full"] }

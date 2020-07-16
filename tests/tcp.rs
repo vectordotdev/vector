@@ -43,7 +43,7 @@ fn pipe() {
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
-    rt.block_on(send).unwrap();
+    rt.block_on_std(send).unwrap();
 
     // Shut down server
     block_on(topology.stop()).unwrap();
@@ -91,7 +91,7 @@ fn sample() {
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
-    rt.block_on(send).unwrap();
+    rt.block_on_std(send).unwrap();
 
     // Shut down server
     block_on(topology.stop()).unwrap();
@@ -146,7 +146,7 @@ fn fork() {
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
-    rt.block_on(send).unwrap();
+    rt.block_on_std(send).unwrap();
 
     // Shut down server
     block_on(topology.stop()).unwrap();
@@ -205,8 +205,10 @@ fn merge_and_fork() {
     let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send1 = send_lines(in_addr1, input_lines1.clone().into_iter());
     let send2 = send_lines(in_addr2, input_lines2.clone().into_iter());
-    let send = send1.join(send2);
-    rt.block_on(send).unwrap();
+    rt.block_on_std(async move {
+        send1.await.unwrap();
+        send2.await.unwrap();
+    });
 
     // Shut down server
     block_on(topology.stop()).unwrap();
@@ -274,7 +276,7 @@ fn reconnect() {
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
-    rt.block_on(send).unwrap();
+    rt.block_on_std(send).unwrap();
 
     // Shut down server and wait for it to fully flush
     block_on(topology.stop()).unwrap();

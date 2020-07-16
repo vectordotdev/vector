@@ -1,6 +1,7 @@
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
 use approx::assert_relative_eq;
+use futures::{FutureExt, TryFutureExt};
 use futures01::future;
 use rand::distributions::{Alphanumeric, Uniform};
 use rand::prelude::*;
@@ -79,7 +80,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                 },
                 |(mut rt, topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                    rt.block_on(send).unwrap();
+                    rt.block_on_std(send).unwrap();
 
                     block_on(topology.stop()).unwrap();
 
@@ -131,7 +132,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                 },
                 |(mut rt, topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                    rt.block_on(send).unwrap();
+                    rt.block_on_std(send).unwrap();
 
                     block_on(topology.stop()).unwrap();
 
@@ -183,7 +184,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                 },
                 |(mut rt, topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                    rt.block_on(send).unwrap();
+                    rt.block_on_std(send).unwrap();
 
                     block_on(topology.stop()).unwrap();
 
@@ -238,7 +239,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                     let sends = (0..num_writers)
                         .map(|_| {
                             let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                            futures01::sync::oneshot::spawn(send, &rt.executor())
+                            futures01::sync::oneshot::spawn(send.boxed().compat(), &rt.executor())
                         })
                         .collect::<Vec<_>>();
 
@@ -314,8 +315,10 @@ fn benchmark_interconnected(c: &mut Criterion) {
                 |(mut rt, topology, output_lines1, output_lines2)| {
                     let send1 = send_lines(in_addr1, random_lines(line_size).take(num_lines));
                     let send2 = send_lines(in_addr2, random_lines(line_size).take(num_lines));
-                    let sends = vec![send1, send2];
-                    rt.block_on(future::join_all(sends)).unwrap();
+                    rt.block_on_std(async move {
+                        send1.await.unwrap();
+                        send2.await.unwrap();
+                    });
 
                     block_on(topology.stop()).unwrap();
 
@@ -389,7 +392,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                             .map(|l| l + "status=404")
                             .take(num_lines),
                     );
-                    rt.block_on(send).unwrap();
+                    rt.block_on_std(send).unwrap();
 
                     block_on(topology.stop()).unwrap();
 
@@ -575,7 +578,8 @@ fn benchmark_complex(c: &mut Criterion) {
                 )| {
                     // One sender generates pure random lines
                     let send1 = send_lines(in_addr1, random_lines(100).take(num_lines));
-                    let send1 = futures01::sync::oneshot::spawn(send1, &rt.executor());
+                    let send1 =
+                        futures01::sync::oneshot::spawn(send1.boxed().compat(), &rt.executor());
 
                     // The other includes either status=200 or status=404
                     let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
@@ -590,7 +594,8 @@ fn benchmark_complex(c: &mut Criterion) {
                             })
                             .take(num_lines),
                     );
-                    let send2 = futures01::sync::oneshot::spawn(send2, &rt.executor());
+                    let send2 =
+                        futures01::sync::oneshot::spawn(send2.boxed().compat(), &rt.executor());
                     let sends = vec![send1, send2];
                     rt.block_on(future::join_all(sends)).unwrap();
 

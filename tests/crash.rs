@@ -82,8 +82,7 @@ fn test_sink_panic() {
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
-    let mut rt2 = runtime();
-    rt2.block_on(send).unwrap();
+    runtime().block_on_std(send).unwrap();
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     let _ = std::panic::take_hook();
@@ -165,7 +164,7 @@ fn test_sink_error() {
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
-    rt2.block_on(send).unwrap();
+    rt2.block_on_std(send).unwrap();
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     assert!(crash.wait().next().is_some());
@@ -233,7 +232,7 @@ fn test_source_error() {
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
-    rt2.block_on(send).unwrap();
+    rt2.block_on_std(send).unwrap();
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     assert!(crash.wait().next().is_some());
@@ -304,7 +303,7 @@ fn test_source_panic() {
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
-    rt2.block_on(send).unwrap();
+    rt2.block_on_std(send).unwrap();
     std::thread::sleep(std::time::Duration::from_millis(100));
     let _ = std::panic::take_hook();
 

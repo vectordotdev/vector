@@ -1,11 +1,15 @@
 use crate::runtime::Runtime;
 use crate::{event::LogEvent, Event};
 
-use futures01::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
+use futures::{stream, SinkExt, StreamExt};
+use futures01::{
+    future, stream as stream01, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream,
+};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
+use std::convert::Infallible;
 use std::fs::File;
 use std::io::Read;
 use std::iter;
@@ -14,11 +18,14 @@ use std::net::{Shutdown, SocketAddr};
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use stream_cancel::{StreamExt, Trigger, Tripwire};
-use tokio01::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-use tokio01::net::{TcpListener, TcpStream};
+use stream_cancel::{StreamExt as _, Trigger, Tripwire};
+use tokio::net::TcpStream;
+use tokio01::codec::{
+    Encoder, FramedRead, FramedWrite as FramedWrite01, LinesCodec as LinesCodec01,
+};
+use tokio01::net::{TcpListener, TcpStream as TcpStream01};
 use tokio01::util::FutureExt;
-use tokio_openssl::SslConnectorExt;
+use tokio_util::codec::{FramedWrite, LinesCodec};
 
 #[macro_export]
 macro_rules! assert_downcast_matches {
@@ -50,24 +57,26 @@ pub fn trace_init() {
     let _ = tracing::dispatcher::set_global_default(tracing::Dispatch::new(subscriber));
 }
 
-pub fn send_lines(
+use futures::compat::Future01CompatExt;
+
+pub async fn send_lines(
     addr: SocketAddr,
     lines: impl Iterator<Item = String>,
-) -> impl Future<Item = (), Error = ()> {
-    send_encodable(addr, LinesCodec::new(), lines)
+) -> Result<(), Infallible> {
+    send_encodable(addr, LinesCodec01::new(), lines).await
 }
 
-pub fn send_encodable<I>(
+pub async fn send_encodable<I>(
     addr: SocketAddr,
     encoder: impl Encoder<Item = I, Error = std::io::Error>,
     items: impl Iterator<Item = I>,
-) -> impl Future<Item = (), Error = ()> {
-    let items = futures01::stream::iter_ok::<_, ()>(items);
+) -> Result<(), Infallible> {
+    let items = stream01::iter_ok::<_, ()>(items);
 
-    TcpStream::connect(&addr)
+    TcpStream01::connect(&addr)
         .map_err(|e| panic!("{:}", e))
         .and_then(|socket| {
-            let out = FramedWrite::new(socket, encoder).sink_map_err(|e| panic!("{:?}", e));
+            let out = FramedWrite01::new(socket, encoder).sink_map_err(|e| panic!("{:?}", e));
 
             items
                 .forward(out)
@@ -82,45 +91,33 @@ pub fn send_encodable<I>(
                 })
                 .map(|_| ())
         })
+        .compat()
+        .await
+        .unwrap();
+    Ok(())
 }
 
-pub fn send_lines_tls(
+pub async fn send_lines_tls(
     addr: SocketAddr,
     host: String,
     lines: impl Iterator<Item = String>,
-) -> impl Future<Item = (), Error = ()> {
-    let lines = futures01::stream::iter_ok::<_, ()>(lines);
+) -> Result<(), Infallible> {
+    let stream = TcpStream::connect(&addr).await.unwrap();
 
-    let mut connector =
-        SslConnector::builder(SslMethod::tls()).expect("Failed to create TLS builder");
+    let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
     connector.set_verify(SslVerifyMode::NONE);
-    let connector = connector.build();
+    let config = connector.build().configure().unwrap();
 
-    TcpStream::connect(&addr)
-        .map_err(|e| panic!("{:}", e))
-        .and_then(move |socket| {
-            connector
-                .connect_async(&host, socket)
-                .map_err(|e| panic!("{:}", e))
-                .and_then(|stream| {
-                    let out = FramedWrite::new(stream, LinesCodec::new())
-                        .sink_map_err(|e| panic!("{:?}", e));
+    let stream = tokio_openssl::connect(config, &host, stream).await.unwrap();
+    let mut sink = FramedWrite::new(stream, LinesCodec::new());
 
-                    lines
-                        .forward(out)
-                        .and_then(|(_source, sink)| {
-                            let mut stream = sink.into_inner().into_inner();
-                            // We should catch TLS shutdown errors here,
-                            // but doing so results in a repeatable
-                            // "Resource temporarily available" error,
-                            // and tests will be checking that contents
-                            // are received anyways.
-                            stream.get_mut().shutdown().ok();
-                            Ok(())
-                        })
-                        .map(|_| ())
-                })
-        })
+    let mut lines = stream::iter(lines).map(|line| Ok(line));
+    sink.send_all(&mut lines).await.unwrap();
+
+    let stream = sink.get_mut().get_mut();
+    stream.shutdown(std::net::Shutdown::Both).unwrap();
+
+    Ok(())
 }
 
 pub fn temp_file() -> std::path::PathBuf {
@@ -140,7 +137,7 @@ pub fn random_lines_with_stream(
     count: usize,
 ) -> (Vec<String>, impl Stream<Item = Event, Error = ()>) {
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = stream::iter_ok(lines.clone().into_iter().map(Event::from));
+    let stream = stream01::iter_ok(lines.clone().into_iter().map(Event::from));
     (lines, stream)
 }
 
@@ -396,7 +393,7 @@ pub fn receive(addr: &SocketAddr) -> Receiver<String> {
     let lines = listener
         .incoming()
         .take_until(tripwire)
-        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
+        .map(|socket| FramedRead::new(socket, LinesCodec01::new()))
         .flatten()
         .inspect(move |_| {
             count_clone.fetch_add(1, Ordering::Relaxed);
@@ -468,7 +465,7 @@ pub fn count_receive(addr: &SocketAddr) -> CountReceiver {
     let count = listener
         .incoming()
         .take_until(tripwire)
-        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
+        .map(|socket| FramedRead::new(socket, LinesCodec01::new()))
         .flatten()
         .map_err(|e| panic!("{:?}", e))
         .fold(0, |n, _| future::ok(n + 1));
@@ -489,7 +486,7 @@ where
     F: Fn() -> Event,
 {
     let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
-    let stream = stream::iter_ok(events.clone().into_iter());
+    let stream = stream01::iter_ok(events.clone().into_iter());
     (events, stream)
 }
 

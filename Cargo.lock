@@ -5529,6 +5529,7 @@ dependencies = [
  "tokio 0.2.21",
  "tokio-compat",
  "tokio-openssl 0.3.0",
+ "tokio-openssl 0.4.0",
  "tokio-retry",
  "tokio-signal",
  "tokio-test",

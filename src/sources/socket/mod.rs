@@ -177,7 +177,7 @@ mod test {
         rt.spawn(server);
         wait_for_tcp(addr);
 
-        rt.block_on(send_lines(addr, vec!["test".to_owned()].into_iter()))
+        rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();
 
         let event = rx.wait().next().unwrap().unwrap();
@@ -205,7 +205,7 @@ mod test {
         rt.spawn(server);
         wait_for_tcp(addr);
 
-        rt.block_on(send_lines(addr, vec!["test".to_owned()].into_iter()))
+        rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();
 
         let event = rx.wait().next().unwrap().unwrap();
@@ -242,7 +242,8 @@ mod test {
             "more short".to_owned(),
         ];
 
-        rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
+        rt.block_on_std(send_lines(addr, lines.into_iter()))
+            .unwrap();
 
         let (event, rx) = block_on(rx.into_future()).unwrap();
         assert_eq!(
@@ -292,7 +293,7 @@ mod test {
             "more short".to_owned(),
         ];
 
-        rt.block_on(send_lines_tls(addr, "localhost".into(), lines.into_iter()))
+        rt.block_on_std(send_lines_tls(addr, "localhost".into(), lines.into_iter()))
             .unwrap();
 
         let (event, rx) = block_on(rx.into_future()).unwrap();
@@ -326,7 +327,7 @@ mod test {
         wait_for_tcp(addr);
 
         // Send data to Source.
-        rt.block_on(send_lines(addr, vec!["test".to_owned()].into_iter()))
+        rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();
 
         let event = rx.wait().next().unwrap().unwrap();

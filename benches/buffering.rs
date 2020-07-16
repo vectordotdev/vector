@@ -52,7 +52,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                 },
                 |(mut rt, topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                    rt.block_on(send).unwrap();
+                    rt.block_on_std(send).unwrap();
 
                     block_on(topology.stop()).unwrap();
 
@@ -94,7 +94,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                 },
                 |(mut rt, topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                    rt.block_on(send).unwrap();
+                    rt.block_on_std(send).unwrap();
 
                     block_on(topology.stop()).unwrap();
 
@@ -136,7 +136,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                 },
                 |(mut rt, topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                    rt.block_on(send).unwrap();
+                    rt.block_on_std(send).unwrap();
 
                     block_on(topology.stop()).unwrap();
 

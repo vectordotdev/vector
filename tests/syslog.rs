@@ -55,7 +55,9 @@ fn test_tcp_syslog() {
 
     let input_lines: Vec<String> = input_messages.iter().map(|msg| msg.to_string()).collect();
 
-    block_on(send_lines(in_addr, input_lines.into_iter())).unwrap();
+    runtime()
+        .block_on_std(send_lines(in_addr, input_lines.into_iter()))
+        .unwrap();
 
     // Shut down server
     block_on(topology.stop()).unwrap();
@@ -193,12 +195,13 @@ fn test_octet_counting_syslog() {
         })
         .collect();
 
-    block_on(send_encodable(
-        in_addr,
-        BytesCodec::new(),
-        input_lines.into_iter().map(Into::into),
-    ))
-    .unwrap();
+    runtime()
+        .block_on_std(send_encodable(
+            in_addr,
+            BytesCodec::new(),
+            input_lines.into_iter().map(Into::into),
+        ))
+        .unwrap();
 
     // Shut down server
     block_on(topology.stop()).unwrap();
