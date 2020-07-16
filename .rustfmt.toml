@@ -1,3 +1,4 @@
 # Using defaults.
-indent_style = "Block"
+# Not stable yet.
+# indent_style = "Block"
 reorder_imports = true
