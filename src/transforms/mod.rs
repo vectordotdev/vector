@@ -1,3 +1,5 @@
+mod kv_parser;
+
 use crate::Event;
 use snafu::Snafu;
 
