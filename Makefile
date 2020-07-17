@@ -159,19 +159,22 @@ build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
 build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${DEFAULT_FEATURES}
 
-build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
+build-all: build-x86_64-unknown-linux-gnu build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
 build-x86_64-unknown-linux-gnu: ## Build dynamically linked binary in release mode for the x86_64 architecture
-	$(RUN) build-x86_64-unknown-linux-gnu
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features default --target x86_64-unknown-linux-gnu
 
 build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture
-	$(RUN) build-x86_64-unknown-linux-musl
+	${MAYBE_ENVIRONMENT_EXEC} \
+		CC=x86_64-linux-musl-gcc \
+		CXX=x86_64-linux-musl-g++ \
+		cargo build --release --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
-build-armv7-unknown-linux-musleabihf: load-qemu-binfmt ## Build static binary in release mode for the armv7 architecture
-	$(RUN) build-armv7-unknown-linux-musleabihf
+build-armv7-unknown-linux-musleabihf: ## Build static binary in release mode for the armv7 architecture
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features default-musl --target armv7-unknown-linux-musleabihf
 
-build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in release mode for the aarch64 architecture
-	$(RUN) build-aarch64-unknown-linux-musl
+build-aarch64-unknown-linux-musl: ## Build static binary in release mode for the aarch64 architecture
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features default-musl --target aarch64-unknown-linux-musl
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 

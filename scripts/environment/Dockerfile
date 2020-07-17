@@ -1,10 +1,15 @@
 FROM docker.io/ubuntu:20.04 AS ENVIRONMENT
 ENV DEBIAN_FRONTEND=noninteractive \
+    DOCKER_CLI_EXPERIMENTAL=enabled \
     TZ='America/New York' \
     PATH=/root/.cargo/bin:/root/.local/bin/:$PATH \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
-    LC_ALL=en_US.UTF-8
+    LC_ALL=en_US.UTF-8 \
+    PKG_CONFIG_ALLOW_CROSS=true \
+    PKG_CONFIG_ALL_STATIC=true \
+    LIBZ_SYS_STATIC=1 \
+    OPENSSL_STATIC=1
 
 # Container junk
 RUN echo $TZ > /etc/timezone
