@@ -1,15 +1,16 @@
 //! Future types
 //!
 use super::controller::Controller;
+use super::instant_now;
 use crate::sinks::util::retries2::RetryLogic;
 use futures::ready;
 use pin_project::pin_project;
-use std::time::Instant;
 use std::{
     future::Future,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
+    time::Instant,
 };
 use tokio::sync::OwnedSemaphorePermit;
 
@@ -35,7 +36,7 @@ impl<F, L> ResponseFuture<F, L> {
             inner,
             _permit,
             controller,
-            start: Instant::now(),
+            start: instant_now(),
         }
     }
 }

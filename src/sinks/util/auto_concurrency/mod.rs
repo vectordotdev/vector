@@ -9,3 +9,7 @@ mod tests;
 
 pub(crate) use layer::AutoConcurrencyLimitLayer;
 pub(crate) use service::AutoConcurrencyLimit;
+
+pub(self) fn instant_now() -> std::time::Instant {
+    tokio::time::Instant::now().into()
+}

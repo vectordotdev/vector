@@ -1,3 +1,4 @@
+use super::instant_now;
 use super::semaphore::ShrinkableSemaphore;
 use crate::emit;
 use crate::internal_events::{
@@ -59,7 +60,7 @@ impl<L> Controller<L> {
                 current_limit,
                 in_flight: 0,
                 past_rtt: Default::default(),
-                next_update: Instant::now(),
+                next_update: instant_now(),
                 current_rtt: Default::default(),
                 had_back_pressure: false,
                 reached_limit: false,
@@ -82,7 +83,7 @@ impl<L> Controller<L> {
         #[cfg(test)]
         {
             let mut stats = self.stats.lock().expect("Stats mutex is poisoned");
-            stats.in_flight.add(inner.in_flight, Instant::now());
+            stats.in_flight.add(inner.in_flight, instant_now());
         }
         inner.in_flight += 1;
         emit!(AutoConcurrencyInFlight {
@@ -91,7 +92,7 @@ impl<L> Controller<L> {
     }
 
     fn adjust_to_back_pressure(&self, start: Instant, is_back_pressure: bool) {
-        let now = Instant::now();
+        let now = instant_now();
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
         #[cfg(test)]
         let mut stats = self.stats.lock().expect("Stats mutex is poisoned");
