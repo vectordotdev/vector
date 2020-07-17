@@ -26,8 +26,6 @@ apt install --yes \
     libsasl2-dev \
     tcl-dev \
     cmake \
-    musl-dev \
-    musl-tools \
     binutils-arm-linux-gnueabihf \
     gcc-arm-linux-gnueabihf \
     g++-arm-linux-gnueabihf \

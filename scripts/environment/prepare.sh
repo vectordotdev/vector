@@ -5,10 +5,9 @@ curl https://sh.rustup.rs -sSf | sh -s -- -y
 source $HOME/.cargo/env
 
 rustup target add wasm32-wasi
-rustup target add x86_64-unknown-linux-gnu
-rustup target add x86_64-unknown-linux-musl
-rustup target add armv7-unknown-linux-musleabihf
-rustup target add aarch64-unknown-linux-musl
+rustup toolchain install nightly --target x86_64-unknown-linux-musl
+rustup toolchain install nightly --target armv7-unknown-linux-musleabihf
+rustup toolchain install nightly --target aarch64-unknown-linux-musl
 rustup component add rustfmt
 rustup component add clippy
 rustup default "$(cat rust-toolchain)"

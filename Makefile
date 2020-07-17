@@ -166,15 +166,16 @@ build-x86_64-unknown-linux-gnu: ## Build dynamically linked binary in release mo
 
 build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture
 	${MAYBE_ENVIRONMENT_EXEC} \
+		CROSS_COMPOSE=x86_64-linux-musl \
 		CC=/git/richfelker/musl-cross-make/output/bin/x86_64-linux-musl-gcc \
 		CXX=/git/richfelker/musl-cross-make/output/bin/x86_64-linux-musl-g++ \
-		TCLPATH=/dev/null
-		cargo build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
+		TCLPATH=/dev/null \
+		cargo +nightly build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
 build-armv7-unknown-linux-musleabihf: ## Build static binary in release mode for the armv7 architecture
 	${MAYBE_ENVIRONMENT_EXEC} \
-		CC=/git/richfelker/musl-cross-make/output/bin/armv7-linux-musl-gcc \
-		CXX=/git/richfelker/musl-cross-make/output/bin/armv7-linux-musl-g++ \
+		CC=/git/richfelker/musl-cross-make/output/bin/armv7l-linux-musl-gcc \
+		CXX=/git/richfelker/musl-cross-make/output/bin/armv7l-linux-musl-g++ \
 		TCLPATH=/dev/null \
 		cargo build --no-default-features --features default-musl --target armv7-unknown-linux-musleabihf
 
