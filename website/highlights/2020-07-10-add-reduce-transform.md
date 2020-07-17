@@ -11,7 +11,7 @@ tags: ["type: new feature","domain: transforms"]
 ---
 
 Fan of [Stripe's Canonical Log Lines][urls.stripe_blog_canonical_log_lines]? We are too. You can now find a new
-[Reduce][urls.vector_transform_reduce]! This allows you to turn a stream of many small events into a stream of
+[Reduce][docs.transforms.reduce]! This allows you to turn a stream of many small events into a stream of
 less small events!
 
 The fantastic article by Brandur Leach describes them best:
@@ -95,5 +95,5 @@ data_dir = "tmp"
 
 We hope you find this useful!
 
+[docs.transforms.reduce]: /docs/reference/transforms/reduce/
 [urls.stripe_blog_canonical_log_lines]: https://stripe.com/blog/canonical-log-lines
-[urls.vector_transform_reduce]: https://vector.dev/docs/reference/transforms/reduce/
