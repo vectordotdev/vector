@@ -20,7 +20,7 @@ impl InternalEvent for UnixSocketConnectionEstablished<'_> {
 
 #[derive(Debug)]
 pub struct UnixSocketConnectionFailure<'a> {
-    pub error: std::io::Error,
+    pub error: tokio::io::Error,
     pub path: &'a std::path::Path,
 }
 
