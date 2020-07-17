@@ -197,18 +197,17 @@ impl Sink for UnixSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::{random_lines_with_stream, runtime, shutdown_on_idle};
-    use futures01::{sync::mpsc, Sink, Stream};
-    use stream_cancel::{StreamExt, Tripwire};
-    use tokio01::codec::{FramedRead, LinesCodec};
-    use tokio_uds::UnixListener;
+    use crate::test_util::{random_lines_with_stream, runtime, shutdown_on_idle, CountReceiver};
+    use futures::compat::Future01CompatExt;
+    use futures01::Sink;
+    use tokio::net::UnixListener;
 
     fn temp_uds_path(name: &str) -> PathBuf {
         tempfile::tempdir().unwrap().into_path().join(name)
     }
 
-    #[test]
-    fn unix_sink_healthcheck() {
+    #[tokio::test]
+    async fn unix_sink_healthcheck() {
         let path = temp_uds_path("valid_uds");
         let _listener = UnixListener::bind(&path).unwrap();
         let healthcheck = unix_healthcheck(path);
@@ -221,45 +220,26 @@ mod tests {
 
     #[test]
     fn basic_unix_sink() {
-        let num_lines = 1000;
-        let out_path = temp_uds_path("unix_test");
-
-        // Set up Sink
-        let config = UnixSinkConfig::new(out_path.clone(), Encoding::Text.into());
         let mut rt = runtime();
-        let cx = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(cx).unwrap();
+        rt.block_on_std(async move {
+            let num_lines = 1000;
+            let out_path = temp_uds_path("unix_test");
 
-        // Set up server to receive events from the Sink.
-        let listener = UnixListener::bind(&out_path).expect("failed to bind to listener socket");
+            // Set up server to receive events from the Sink.
+            let receiver = CountReceiver::receive_lines_unix(out_path.clone());
 
-        let (tx, rx) = mpsc::channel(num_lines);
-        let (trigger, tripwire) = Tripwire::new();
+            // Set up Sink
+            let config = UnixSinkConfig::new(out_path, Encoding::Text.into());
+            let cx = SinkContext::new_test();
+            let (sink, _healthcheck) = config.build(cx).unwrap();
 
-        let receive_future = listener
-            .incoming()
-            .take_until(tripwire)
-            .map_err(|e| error!("failed to accept socket; error = {:?}", e))
-            .for_each(move |socket| {
-                let tx = tx.clone();
-                FramedRead::new(socket, LinesCodec::new())
-                    .map_err(|e| error!("error reading line: {:?}", e))
-                    .forward(tx.sink_map_err(|e| error!("error sending event: {:?}", e)))
-                    .map(|_| ())
-            });
-        rt.spawn(receive_future);
+            // Send the test data
+            let (input_lines, events) = random_lines_with_stream(100, num_lines);
+            let _ = sink.send_all(events).compat().await.unwrap();
 
-        // Send the test data
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.send_all(events);
-        let _ = rt.block_on(pump).unwrap();
-        drop(trigger);
-
-        // Receive the data sent by the Sink to the receive_future
-        let output_lines = rx.wait().map(Result::unwrap).collect::<Vec<_>>();
+            // Receive the data sent by the Sink to the receiver
+            assert_eq!(input_lines, receiver.wait().await);
+        });
         shutdown_on_idle(rt);
-
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
     }
 }

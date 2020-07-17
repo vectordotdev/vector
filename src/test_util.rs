@@ -1,8 +1,10 @@
 use crate::runtime::Runtime;
 use crate::{event::LogEvent, Event};
 
-use futures::{compat::Stream01CompatExt, stream, SinkExt, StreamExt, TryStreamExt};
-use futures01::{future, stream as stream01, sync::mpsc, try_ready, Async, Future, Poll, Stream};
+use futures::{compat::Stream01CompatExt, stream, SinkExt, Stream, StreamExt, TryStreamExt};
+use futures01::{
+    future, stream as stream01, sync::mpsc, try_ready, Async, Future, Poll, Stream as Stream01,
+};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{
@@ -12,11 +14,12 @@ use std::{
     io::Read,
     iter, mem,
     net::{Shutdown, SocketAddr},
-    path::Path,
+    path::{Path, PathBuf},
     sync::atomic::{AtomicUsize, Ordering},
     sync::Arc,
 };
 use tokio::{
+    io::{AsyncRead, AsyncWrite, Result as IoResult},
     net::{TcpListener, TcpStream},
     sync::oneshot,
     task::JoinHandle,
@@ -101,13 +104,13 @@ pub async fn send_lines_tls(
     Ok(())
 }
 
-pub fn temp_file() -> std::path::PathBuf {
+pub fn temp_file() -> PathBuf {
     let path = std::env::temp_dir();
     let file_name = random_string(16);
     path.join(file_name + ".log")
 }
 
-pub fn temp_dir() -> std::path::PathBuf {
+pub fn temp_dir() -> PathBuf {
     let path = std::env::temp_dir();
     let dir_name = random_string(16);
     path.join(dir_name)
@@ -116,7 +119,7 @@ pub fn temp_dir() -> std::path::PathBuf {
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<String>, impl Stream<Item = Event, Error = ()>) {
+) -> (Vec<String>, impl Stream01<Item = Event, Error = ()>) {
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
     let stream = stream01::iter_ok(lines.clone().into_iter().map(Event::from));
     (lines, stream)
@@ -125,7 +128,7 @@ pub fn random_lines_with_stream(
 pub fn random_events_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<Event>, impl Stream<Item = Event, Error = ()>) {
+) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>) {
     random_events_with_stream_generic(count, move || Event::from(random_string(len)))
 }
 
@@ -134,7 +137,7 @@ pub fn random_nested_events_with_stream(
     breadth: usize,
     depth: usize,
     count: usize,
-) -> (Vec<Event>, impl Stream<Item = Event, Error = ()>) {
+) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>) {
     random_events_with_stream_generic(count, move || {
         let mut log = LogEvent::default();
 
@@ -246,14 +249,14 @@ pub fn shutdown_on_idle(runtime: Runtime) {
 #[derive(Debug)]
 pub struct CollectN<S>
 where
-    S: Stream,
+    S: Stream01,
 {
     stream: Option<S>,
     remaining: usize,
     items: Option<Vec<S::Item>>,
 }
 
-impl<S: Stream> CollectN<S> {
+impl<S: Stream01> CollectN<S> {
     pub fn new(s: S, n: usize) -> Self {
         Self {
             stream: Some(s),
@@ -265,7 +268,7 @@ impl<S: Stream> CollectN<S> {
 
 impl<S> Future for CollectN<S>
 where
-    S: Stream,
+    S: Stream01,
 {
     type Item = (S, Vec<S::Item>);
     type Error = S::Error;
@@ -304,12 +307,12 @@ where
 #[derive(Debug)]
 pub struct CollectCurrent<S>
 where
-    S: Stream,
+    S: Stream01,
 {
     stream: Option<S>,
 }
 
-impl<S: Stream> CollectCurrent<S> {
+impl<S: Stream01> CollectCurrent<S> {
     pub fn new(s: S) -> Self {
         Self { stream: Some(s) }
     }
@@ -317,7 +320,7 @@ impl<S: Stream> CollectCurrent<S> {
 
 impl<S> Future for CollectCurrent<S>
 where
-    S: Stream,
+    S: Stream01,
 {
     type Item = (S, Vec<S::Item>);
     type Error = S::Error;
@@ -378,29 +381,50 @@ impl<T: Send + 'static> CountReceiver<T> {
 impl CountReceiver<String> {
     pub fn receive_lines(addr: SocketAddr) -> CountReceiver<String> {
         CountReceiver::new(|count, tripwire| async move {
-            TcpListener::bind(addr)
-                .await
-                .unwrap()
-                .incoming()
-                .take_until(tripwire)
-                .map_ok(|socket| FramedRead::new(socket, LinesCodec::new()))
-                .map(|x| x.unwrap())
-                .flatten()
-                .map(|x| x.unwrap())
-                .inspect(move |_| {
-                    count.fetch_add(1, Ordering::Relaxed);
-                })
-                .collect::<Vec<String>>()
-                .await
+            let mut listener = TcpListener::bind(addr).await.unwrap();
+            CountReceiver::receive_lines_stream(listener.incoming(), count, tripwire).await
         })
+    }
+
+    #[cfg(unix)]
+    pub fn receive_lines_unix<P>(path: P) -> CountReceiver<String>
+    where
+        P: AsRef<Path> + Send + 'static,
+    {
+        CountReceiver::new(|count, tripwire| async move {
+            let mut listener = tokio::net::UnixListener::bind(path).unwrap();
+            CountReceiver::receive_lines_stream(listener.incoming(), count, tripwire).await
+        })
+    }
+
+    async fn receive_lines_stream<S, T>(
+        stream: S,
+        count: Arc<AtomicUsize>,
+        tripwire: oneshot::Receiver<()>,
+    ) -> Vec<String>
+    where
+        S: Stream<Item = IoResult<T>>,
+        T: AsyncWrite + AsyncRead,
+    {
+        stream
+            .take_until(tripwire)
+            .map_ok(|socket| FramedRead::new(socket, LinesCodec::new()))
+            .map(|x| x.unwrap())
+            .flatten()
+            .map(|x| x.unwrap())
+            .inspect(move |_| {
+                count.fetch_add(1, Ordering::Relaxed);
+            })
+            .collect::<Vec<String>>()
+            .await
     }
 }
 
 impl CountReceiver<Event> {
     pub fn receive_events<S>(stream: S) -> CountReceiver<Event>
     where
-        S: Stream<Item = Event> + Send + 'static,
-        <S as Stream>::Error: std::fmt::Debug,
+        S: Stream01<Item = Event> + Send + 'static,
+        <S as Stream01>::Error: std::fmt::Debug,
     {
         CountReceiver::new(|count, tripwire| async move {
             stream
@@ -419,7 +443,7 @@ impl CountReceiver<Event> {
 fn random_events_with_stream_generic<F>(
     count: usize,
     generator: F,
-) -> (Vec<Event>, impl Stream<Item = Event, Error = ()>)
+) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>)
 where
     F: Fn() -> Event,
 {
