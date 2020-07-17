@@ -6,16 +6,15 @@
 
 use approx::assert_relative_eq;
 use futures::compat::Future01CompatExt;
-use futures01::{Future, Stream};
-use stream_cancel::{StreamExt, Tripwire};
-use tokio01::codec::{FramedRead, LinesCodec};
-use tokio01::net::TcpListener;
-use vector::test_util::{
-    block_on, next_addr, random_lines, runtime, send_lines, shutdown_on_idle, wait_for_tcp,
-    CountReceiver,
+use tokio::net::TcpListener;
+use vector::{
+    sinks, sources,
+    test_util::{
+        next_addr, random_lines, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
+    },
+    topology::{self, config},
+    transforms,
 };
-use vector::topology::{self, config};
-use vector::{sinks, sources, transforms};
 
 #[test]
 fn pipe() {
@@ -256,46 +255,32 @@ fn reconnect() {
     );
 
     let mut rt = runtime();
-    let output_rt = runtime();
+    rt.block_on_std(async move {
+        let output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (output_trigger, output_tripwire) = Tripwire::new();
-    let output_listener = TcpListener::bind(&out_addr).unwrap();
-    let output_lines = output_listener
-        .incoming()
-        .take_until(output_tripwire)
-        .map(|socket| FramedRead::new(socket, LinesCodec::new()).take(1))
-        .flatten()
-        .map_err(|e| panic!("{:?}", e))
-        .collect();
-    let output_lines = futures01::sync::oneshot::spawn(output_lines, &output_rt.executor());
+        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr);
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-    // Wait for server to accept traffic
-    wait_for_tcp(in_addr);
+        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        send_lines(in_addr, input_lines.clone()).await.unwrap();
 
-    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
-    let send = send_lines(in_addr, input_lines.clone().into_iter());
-    rt.block_on_std(send).unwrap();
+        // Shut down server and wait for it to fully flush
+        topology.stop().compat().await.unwrap();
 
-    // Shut down server and wait for it to fully flush
-    block_on(topology.stop()).unwrap();
+        let output_lines = output_lines.wait().await;
+        assert!(num_lines >= 2);
+        assert!(output_lines.iter().all(|line| input_lines.contains(line)))
+    });
     shutdown_on_idle(rt);
-
-    drop(output_trigger);
-    shutdown_on_idle(output_rt);
-
-    let output_lines = output_lines.wait().unwrap();
-    assert!(num_lines >= 2);
-    assert!(output_lines.iter().all(|line| input_lines.contains(line)))
 }
 
-#[test]
-fn healthcheck() {
+#[tokio::test]
+async fn healthcheck() {
     let addr = next_addr();
-    let mut rt = runtime();
     let resolver = vector::dns::Resolver;
 
-    let _listener = TcpListener::bind(&addr).unwrap();
+    let _listener = TcpListener::bind(&addr).await.unwrap();
 
     let healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
         addr.ip().to_string(),
@@ -304,7 +289,7 @@ fn healthcheck() {
         None.into(),
     );
 
-    assert!(rt.block_on(healthcheck).is_ok());
+    assert!(healthcheck.compat().await.is_ok());
 
     let bad_addr = next_addr();
     let bad_healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
@@ -314,5 +299,5 @@ fn healthcheck() {
         None.into(),
     );
 
-    assert!(rt.block_on(bad_healthcheck).is_err());
+    assert!(bad_healthcheck.compat().await.is_err());
 }
