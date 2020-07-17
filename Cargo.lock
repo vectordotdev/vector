@@ -1908,12 +1908,12 @@ checksum = "3576a87f2ba00f6f106fdfcd16db1d698d648a26ad8e0573cad8537c3c362d2a"
 
 [[package]]
 name = "leveldb"
-version = "0.8.4"
-source = "git+https://github.com/timberio/leveldb#64265815bcf1b69f30e6cb35bf687fbd6dd64afb"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5a2fa830c44ac4762564389a7efe22688a469c8d7b71dd11da2e35c33ae96c2"
 dependencies = [
  "db-key",
- "leveldb-sys 2.0.5",
- "leveldb-sys 3.0.0",
+ "leveldb-sys",
  "libc",
 ]
 
@@ -1924,16 +1924,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71f46429bb70612c3e939aaeed27ffd31a24a773d21728a1a426e4089d6778d2"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "leveldb-sys"
-version = "3.0.0"
-source = "git+https://github.com/timberio/leveldb-sys?branch=v3.0.0#bbdd99a6fab0a7444a8c6eb0cc86a1a5a75f7fa1"
-dependencies = [
- "cmake",
- "libc",
- "num_cpus",
 ]
 
 [[package]]
