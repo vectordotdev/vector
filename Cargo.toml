@@ -44,7 +44,7 @@ tracing-limit = { path = "lib/tracing-limit" }
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio01 = { package = "tokio", version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing", "codec", "udp", "sync", "fs"], default-features = false }
+tokio01 = { package = "tokio", version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing", "codec", "udp", "sync"], default-features = false }
 tokio = { version = "0.2.13", features = ["blocking", "fs", "sync", "macros", "test-util", "rt-core", "io-std"] }
 tokio-openssl03 = { package = "tokio-openssl", version = "0.3.0" }
 tokio-openssl = "0.4.0"
