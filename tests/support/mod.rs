@@ -112,9 +112,12 @@ impl SourceConfig for MockSourceConfig {
         let mut shutdown = Some(shutdown);
         let source = future::lazy(move || {
             stream::poll_fn(move || {
+                let mut token = None;
+
                 if let Some(until) = shutdown.as_mut() {
                     match until.poll() {
-                        Ok(Async::Ready(_)) => {
+                        Ok(Async::Ready(tk)) => {
+                            token = Some(tk);
                             shutdown.take();
                             recv.close();
                         }
@@ -124,7 +127,10 @@ impl SourceConfig for MockSourceConfig {
                         Ok(Async::NotReady) => {}
                     }
                 }
-                recv.poll()
+
+                let result = recv.poll();
+                let _ = token.take();
+                result
             })
             .map(move |x| {
                 if let Some(counter) = &event_counter {

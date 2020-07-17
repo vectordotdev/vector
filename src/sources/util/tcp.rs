@@ -164,10 +164,13 @@ fn handle_stream(
     let mut shutdown = Some(shutdown);
     let mut reader = FramedRead::new(socket, source.decoder());
     let handler = stream::poll_fn(move || {
+        let mut token = None;
+
         // Gracefull shutdown procedure
         if let Some(future) = shutdown.as_mut() {
             match future.poll() {
-                Ok(Async::Ready(_)) => {
+                Ok(Async::Ready(tk)) => {
+                    token = Some(tk);
                     debug!("Start gracefull shutdown");
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
@@ -188,7 +191,9 @@ fn handle_stream(
         }
 
         // Actual work
-        reader.poll()
+        let result = reader.poll();
+        let _ = token.take();
+        result
     })
     .take_until(tripwire)
     .filter_map(move |frame| {
