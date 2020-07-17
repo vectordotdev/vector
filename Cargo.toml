@@ -193,7 +193,7 @@ tower-test01 = { package = "tower-test", version = "0.1" }
 serde_yaml = "0.8.9"
 dirs = "2.0.2"
 tokio-test = "0.2"
-tokio = { version = "0.2", features = ["test-util"] }
+tokio = { version = "0.2", features = ["test-util", "uds"] }
 assert_cmd = "1.0"
 reqwest = { version = "0.10.6", features = ["json"] }
 

@@ -1,28 +1,31 @@
 #![cfg(all(feature = "sources-syslog", feature = "sinks-socket"))]
 
+use bytes05::Bytes;
 use futures::compat::Future01CompatExt;
 #[cfg(unix)]
-use futures01::{Future, Sink, Stream};
+use futures::{stream, SinkExt, StreamExt};
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use serde_json::Value;
-use sinks::socket::SocketSinkConfig;
-use sinks::util::{encoding::EncodingConfig, Encoding};
+use sinks::{
+    socket::SocketSinkConfig,
+    util::{encoding::EncodingConfig, Encoding},
+};
 use std::fmt;
 use std::{collections::HashMap, str::FromStr};
 #[cfg(unix)]
-use tokio01::codec::{FramedWrite, LinesCodec};
-#[cfg(unix)]
-use tokio_uds::UnixStream;
+use tokio::net::UnixStream;
 use tokio_util::codec::BytesCodec;
-use vector::test_util::{
-    next_addr, random_maps, random_string, runtime, send_encodable, send_lines, shutdown_on_idle,
-    trace_init, wait_for_tcp, CountReceiver,
-};
-use vector::topology::{self, config};
+#[cfg(unix)]
+use tokio_util::codec::{FramedWrite, LinesCodec};
 use vector::{
     sinks,
     sources::syslog::{Mode, SyslogConfig},
+    test_util::{
+        next_addr, random_maps, random_string, runtime, send_encodable, send_lines,
+        shutdown_on_idle, trace_init, wait_for_tcp, CountReceiver,
+    },
+    topology::{self, config},
 };
 
 #[test]
@@ -107,31 +110,15 @@ fn test_unix_stream_syslog() {
             .map(|i| SyslogMessageRFC5424::random(i, 30, 4, 3, 3))
             .collect();
 
-        let input_lines: Vec<String> = input_messages.iter().map(|msg| msg.to_string()).collect();
-        let input_stream = futures01::stream::iter_ok::<_, ()>(input_lines.into_iter());
+        let stream = UnixStream::connect(&in_path).await.unwrap();
+        let mut sink = FramedWrite::new(stream, LinesCodec::new());
 
-        UnixStream::connect(&in_path)
-            .map_err(|e| panic!("{:}", e))
-            .and_then(|socket| {
-                let out =
-                    FramedWrite::new(socket, LinesCodec::new()).sink_map_err(|e| panic!("{:?}", e));
+        let lines: Vec<String> = input_messages.iter().map(|msg| msg.to_string()).collect();
+        let mut lines = stream::iter(lines).map(Ok);
+        sink.send_all(&mut lines).await.unwrap();
 
-                input_stream
-                    .forward(out)
-                    .map(|(_source, sink)| sink)
-                    .and_then(|sink| {
-                        let socket = sink.into_inner().into_inner();
-                        // In tokio 0.1 `AsyncWrite::shutdown` for `TcpStream` is a noop.
-                        // See https://docs.rs/tokio-tcp/0.1.4/src/tokio_tcp/stream.rs.html#917
-                        // Use `TcpStream::shutdown` instead - it actually does something.
-                        socket
-                            .shutdown(std::net::Shutdown::Both)
-                            .map(|_| ())
-                            .map_err(|e| panic!("{:}", e))
-                    })
-            })
-            .wait()
-            .unwrap();
+        let stream = sink.get_mut();
+        stream.shutdown(std::net::Shutdown::Both).unwrap();
 
         // Shut down server
         topology.stop().compat().await.unwrap();
@@ -172,9 +159,9 @@ fn test_octet_counting_syslog() {
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
     let mut rt = runtime();
-    let output_lines = CountReceiver::receive_lines(out_addr);
-
     rt.block_on_std(async move {
+        let output_lines = CountReceiver::receive_lines(out_addr);
+
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
@@ -189,7 +176,7 @@ fn test_octet_counting_syslog() {
             .collect();
 
         let codec = BytesCodec::new();
-        let input_lines: Vec<bytes05::Bytes> = input_messages
+        let input_lines: Vec<Bytes> = input_messages
             .iter()
             .map(|msg| {
                 let s = msg.to_string();
