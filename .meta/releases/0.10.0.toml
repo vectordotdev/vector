@@ -1,6 +1,6 @@
 [releases."0.10.0"]
 date = 2020-07-10
-codename = "Vic's Stick"
+codename = "Lamport Clock"
 whats_next = [
 {title = "Kubernetes! ⎈", description = """\
 We're doing this integration right. We've been alpha testing with a number of \
@@ -8,9 +8,9 @@ large clusters and we've honed in on a very high-quality approach that \
 reflects the UX Vector is going after. You can learn more in our \
 [Kubernetes Integration RFC][urls.pr_2222]. Do you want to beta test? [Tell us!][urls.vector_chat]\
 """},
-{title = "More mature WASM plugins 🔌", description = """\
-This release included an experimental implementation of a WASM transform. \
-Vector plans to add [WASM][urls.wasm] sinks and sources, \
+{title = "WASM plugins 🔌", description = """\
+This release included an experimental implementation of a WASM transform behind a `wasm` build flag. \
+We plan to stabilize WASM transforms, as well as add [WASM][urls.wasm] sinks and sources, \
 enabling you to extend Vector in the language of your choice \
 with little performance penalty. ❤️ WASM. Check out the \
 [WASM Plugin RFC][urls.pr_2341] for more info.\

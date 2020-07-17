@@ -10,7 +10,8 @@ release: "0.10.0"
 tags: ["type: enhancement", "domain: ux"]
 ---
 
-We gave `vector validate` some touching up to make it look better, and feel nicer to use.
+We gave `vector validate` some touching up to make it look better, and feel nicer to use. This was heavily inspired by
+the fantastic `linkerd validate` command.
 
 Take a gander at the new output on a good valid configuration:
 

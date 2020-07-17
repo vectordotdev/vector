@@ -3401,15 +3401,16 @@ module.exports = {
     {
       "author_github": "https://github.com/hoverbear",
       "date": "2020-05-05",
-      "description": "The journald source can now filter messages before they enter your pipeline.",
+      "description": "The journald source can now exclude units.",
       "hide_on_release_notes": false,
       "id": "2020-05-05-add-support-for-include-exclude-units",
       "path": "website/highlights/2020-05-05-add-support-for-include-exclude-units.md",
       "permalink": "/highlights/2020-05-05-add-support-for-include-exclude-units/",
       "tags": [
-        "type: new feature"
+        "type: new feature",
+        "source: journald"
       ],
-      "title": "Journald Unit Filtering"
+      "title": "Journald Unit Filtering Exclusions"
     },
     {
       "author_github": "https://github.com/hoverbear",
@@ -3471,20 +3472,6 @@ module.exports = {
     },
     {
       "author_github": "https://github.com/hoverbear",
-      "date": "2020-06-11",
-      "description": "Vector can be optionally built with an integrated WASM runtime",
-      "hide_on_release_notes": false,
-      "id": "2020-06-11-introduce-wasm-plugins",
-      "path": "website/highlights/2020-06-11-introduce-wasm-plugins.md",
-      "permalink": "/highlights/2020-06-11-introduce-wasm-plugins/",
-      "tags": [
-        "type: new feature",
-        "domain: transforms"
-      ],
-      "title": "Experimental WASM Plugins (Dev builds only)"
-    },
-    {
-      "author_github": "https://github.com/hoverbear",
       "date": "2020-06-18",
       "description": "Vector once again follows the guidance of the host on DNS lookups.",
       "hide_on_release_notes": false,
@@ -3513,20 +3500,6 @@ module.exports = {
     },
     {
       "author_github": "https://github.com/hoverbear",
-      "date": "2020-06-29",
-      "description": "Vector's batching and buffering matures.",
-      "hide_on_release_notes": false,
-      "id": "2020-06-29-batch-buffer-rework",
-      "path": "website/highlights/2020-06-29-batch-buffer-rework.md",
-      "permalink": "/highlights/2020-06-29-batch-buffer-rework/",
-      "tags": [
-        "type: enhancement",
-        "domain: sinks"
-      ],
-      "title": "Batching and buffering reworked"
-    },
-    {
-      "author_github": "https://github.com/hoverbear",
       "date": "2020-07-06",
       "description": "Stuff more data down a smaller hose in less time for cheaper.",
       "hide_on_release_notes": false,
@@ -3551,15 +3524,15 @@ module.exports = {
       "path": "website/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh.md",
       "permalink": "/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/",
       "tags": [
-        "type: breaking change",
+        "type: performance",
         "domain: operations"
       ],
-      "title": "glibc enhancements"
+      "title": "Leveraging glibc when possible"
     },
     {
       "author_github": "https://github.com/hoverbear",
       "date": "2020-07-10",
-      "description": "More flexibility around grouping events.",
+      "description": "Canonical Log Lines in Vector",
       "hide_on_release_notes": false,
       "id": "2020-07-10-add-reduce-transform",
       "path": "website/highlights/2020-07-10-add-reduce-transform.md",
@@ -3995,7 +3968,7 @@ module.exports = {
   "latest_highlight": {
     "author_github": "https://github.com/hoverbear",
     "date": "2020-07-10",
-    "description": "More flexibility around grouping events.",
+    "description": "Canonical Log Lines in Vector",
     "hide_on_release_notes": false,
     "id": "2020-07-10-add-reduce-transform",
     "path": "website/highlights/2020-07-10-add-reduce-transform.md",
@@ -4020,7 +3993,7 @@ module.exports = {
     "title": "How We Test Vector"
   },
   "latest_release": {
-    "codename": "Vic's Stick",
+    "codename": "Lamport Clock",
     "commits": [
       {
         "author": "Kruno Tomola Fabro",
@@ -7206,7 +7179,7 @@ module.exports = {
         "deletions_count": 58,
         "description": "Introduce WASM Plugins",
         "files_count": 105,
-        "highlight_permalink": "/highlights/2020-06-11-introduce-wasm-plugins/",
+        "highlight_permalink": null,
         "insertions_count": 4214,
         "message": "feat(new transform): Introduce WASM Plugins (#2006)",
         "pr_number": 2006,
@@ -8442,7 +8415,7 @@ module.exports = {
         "deletions_count": 680,
         "description": "Batch buffer rework",
         "files_count": 73,
-        "highlight_permalink": "/highlights/2020-06-29-batch-buffer-rework/",
+        "highlight_permalink": null,
         "insertions_count": 1532,
         "message": "enhancement(sinks): Batch buffer rework (#2866)",
         "pr_number": 2866,
@@ -10161,20 +10134,6 @@ module.exports = {
     "description": "",
     "highlights": [
       {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-31",
-        "description": "High quality guides and education for Vector",
-        "hide_on_release_notes": false,
-        "id": "2020-03-31-guides-section",
-        "path": "website/highlights/2020-03-31-guides-section.md",
-        "permalink": "/highlights/2020-03-31-guides-section/",
-        "tags": [
-          "type: new feature",
-          "domain: website"
-        ],
-        "title": "A New Guides Section"
-      },
-      {
         "author_github": "https://github.com/hoverbear",
         "date": "2020-05-04",
         "description": "One step closer to Vector replacing awk and sed!",
@@ -10191,15 +10150,16 @@ module.exports = {
       {
         "author_github": "https://github.com/hoverbear",
         "date": "2020-05-05",
-        "description": "The journald source can now filter messages before they enter your pipeline.",
+        "description": "The journald source can now exclude units.",
         "hide_on_release_notes": false,
         "id": "2020-05-05-add-support-for-include-exclude-units",
         "path": "website/highlights/2020-05-05-add-support-for-include-exclude-units.md",
         "permalink": "/highlights/2020-05-05-add-support-for-include-exclude-units/",
         "tags": [
-          "type: new feature"
+          "type: new feature",
+          "source: journald"
         ],
-        "title": "Journald Unit Filtering"
+        "title": "Journald Unit Filtering Exclusions"
       },
       {
         "author_github": "https://github.com/hoverbear",
@@ -10261,20 +10221,6 @@ module.exports = {
       },
       {
         "author_github": "https://github.com/hoverbear",
-        "date": "2020-06-11",
-        "description": "Vector can be optionally built with an integrated WASM runtime",
-        "hide_on_release_notes": false,
-        "id": "2020-06-11-introduce-wasm-plugins",
-        "path": "website/highlights/2020-06-11-introduce-wasm-plugins.md",
-        "permalink": "/highlights/2020-06-11-introduce-wasm-plugins/",
-        "tags": [
-          "type: new feature",
-          "domain: transforms"
-        ],
-        "title": "Experimental WASM Plugins (Dev builds only)"
-      },
-      {
-        "author_github": "https://github.com/hoverbear",
         "date": "2020-06-18",
         "description": "Vector once again follows the guidance of the host on DNS lookups.",
         "hide_on_release_notes": false,
@@ -10303,20 +10249,6 @@ module.exports = {
       },
       {
         "author_github": "https://github.com/hoverbear",
-        "date": "2020-06-29",
-        "description": "Vector's batching and buffering matures.",
-        "hide_on_release_notes": false,
-        "id": "2020-06-29-batch-buffer-rework",
-        "path": "website/highlights/2020-06-29-batch-buffer-rework.md",
-        "permalink": "/highlights/2020-06-29-batch-buffer-rework/",
-        "tags": [
-          "type: enhancement",
-          "domain: sinks"
-        ],
-        "title": "Batching and buffering reworked"
-      },
-      {
-        "author_github": "https://github.com/hoverbear",
         "date": "2020-07-06",
         "description": "Stuff more data down a smaller hose in less time for cheaper.",
         "hide_on_release_notes": false,
@@ -10341,15 +10273,15 @@ module.exports = {
         "path": "website/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh.md",
         "permalink": "/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/",
         "tags": [
-          "type: breaking change",
+          "type: performance",
           "domain: operations"
         ],
-        "title": "glibc enhancements"
+        "title": "Leveraging glibc when possible"
       },
       {
         "author_github": "https://github.com/hoverbear",
         "date": "2020-07-10",
-        "description": "More flexibility around grouping events.",
+        "description": "Canonical Log Lines in Vector",
         "hide_on_release_notes": false,
         "id": "2020-07-10-add-reduce-transform",
         "path": "website/highlights/2020-07-10-add-reduce-transform.md",
@@ -10374,8 +10306,8 @@ module.exports = {
         "description": "We're doing this integration right. We've been alpha testing with a number of large clusters and we've honed in on a very high-quality approach that reflects the UX Vector is going after. You can learn more in our [Kubernetes Integration RFC][urls.pr_2222]. Do you want to beta test? [Tell us!][urls.vector_chat]"
       },
       {
-        "title": "More mature WASM plugins 🔌",
-        "description": "This release included an experimental implementation of a WASM transform. Vector plans to add [WASM][urls.wasm] sinks and sources, enabling you to extend Vector in the language of your choice with little performance penalty. ❤️ WASM. Check out the [WASM Plugin RFC][urls.pr_2341] for more info."
+        "title": "WASM plugins 🔌",
+        "description": "This release included an experimental implementation of a WASM transform behind a `wasm` build flag. We plan to stabilize WASM transforms, as well as add [WASM][urls.wasm] sinks and sources, enabling you to extend Vector in the language of your choice with little performance penalty. ❤️ WASM. Check out the [WASM Plugin RFC][urls.pr_2341] for more info."
       },
       {
         "title": "Dynamic HTTP Rate-Limiting (AIMD)",
@@ -10417,7 +10349,7 @@ module.exports = {
   ],
   "releases": {
     "0.10.0": {
-      "codename": "Vic's Stick",
+      "codename": "Lamport Clock",
       "commits": [
         {
           "author": "Kruno Tomola Fabro",
@@ -13603,7 +13535,7 @@ module.exports = {
           "deletions_count": 58,
           "description": "Introduce WASM Plugins",
           "files_count": 105,
-          "highlight_permalink": "/highlights/2020-06-11-introduce-wasm-plugins/",
+          "highlight_permalink": null,
           "insertions_count": 4214,
           "message": "feat(new transform): Introduce WASM Plugins (#2006)",
           "pr_number": 2006,
@@ -14839,7 +14771,7 @@ module.exports = {
           "deletions_count": 680,
           "description": "Batch buffer rework",
           "files_count": 73,
-          "highlight_permalink": "/highlights/2020-06-29-batch-buffer-rework/",
+          "highlight_permalink": null,
           "insertions_count": 1532,
           "message": "enhancement(sinks): Batch buffer rework (#2866)",
           "pr_number": 2866,
@@ -16558,20 +16490,6 @@ module.exports = {
       "description": "",
       "highlights": [
         {
-          "author_github": "https://github.com/binarylogic",
-          "date": "2020-03-31",
-          "description": "High quality guides and education for Vector",
-          "hide_on_release_notes": false,
-          "id": "2020-03-31-guides-section",
-          "path": "website/highlights/2020-03-31-guides-section.md",
-          "permalink": "/highlights/2020-03-31-guides-section/",
-          "tags": [
-            "type: new feature",
-            "domain: website"
-          ],
-          "title": "A New Guides Section"
-        },
-        {
           "author_github": "https://github.com/hoverbear",
           "date": "2020-05-04",
           "description": "One step closer to Vector replacing awk and sed!",
@@ -16588,15 +16506,16 @@ module.exports = {
         {
           "author_github": "https://github.com/hoverbear",
           "date": "2020-05-05",
-          "description": "The journald source can now filter messages before they enter your pipeline.",
+          "description": "The journald source can now exclude units.",
           "hide_on_release_notes": false,
           "id": "2020-05-05-add-support-for-include-exclude-units",
           "path": "website/highlights/2020-05-05-add-support-for-include-exclude-units.md",
           "permalink": "/highlights/2020-05-05-add-support-for-include-exclude-units/",
           "tags": [
-            "type: new feature"
+            "type: new feature",
+            "source: journald"
           ],
-          "title": "Journald Unit Filtering"
+          "title": "Journald Unit Filtering Exclusions"
         },
         {
           "author_github": "https://github.com/hoverbear",
@@ -16658,20 +16577,6 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/hoverbear",
-          "date": "2020-06-11",
-          "description": "Vector can be optionally built with an integrated WASM runtime",
-          "hide_on_release_notes": false,
-          "id": "2020-06-11-introduce-wasm-plugins",
-          "path": "website/highlights/2020-06-11-introduce-wasm-plugins.md",
-          "permalink": "/highlights/2020-06-11-introduce-wasm-plugins/",
-          "tags": [
-            "type: new feature",
-            "domain: transforms"
-          ],
-          "title": "Experimental WASM Plugins (Dev builds only)"
-        },
-        {
-          "author_github": "https://github.com/hoverbear",
           "date": "2020-06-18",
           "description": "Vector once again follows the guidance of the host on DNS lookups.",
           "hide_on_release_notes": false,
@@ -16700,20 +16605,6 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/hoverbear",
-          "date": "2020-06-29",
-          "description": "Vector's batching and buffering matures.",
-          "hide_on_release_notes": false,
-          "id": "2020-06-29-batch-buffer-rework",
-          "path": "website/highlights/2020-06-29-batch-buffer-rework.md",
-          "permalink": "/highlights/2020-06-29-batch-buffer-rework/",
-          "tags": [
-            "type: enhancement",
-            "domain: sinks"
-          ],
-          "title": "Batching and buffering reworked"
-        },
-        {
-          "author_github": "https://github.com/hoverbear",
           "date": "2020-07-06",
           "description": "Stuff more data down a smaller hose in less time for cheaper.",
           "hide_on_release_notes": false,
@@ -16738,15 +16629,15 @@ module.exports = {
           "path": "website/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh.md",
           "permalink": "/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/",
           "tags": [
-            "type: breaking change",
+            "type: performance",
             "domain: operations"
           ],
-          "title": "glibc enhancements"
+          "title": "Leveraging glibc when possible"
         },
         {
           "author_github": "https://github.com/hoverbear",
           "date": "2020-07-10",
-          "description": "More flexibility around grouping events.",
+          "description": "Canonical Log Lines in Vector",
           "hide_on_release_notes": false,
           "id": "2020-07-10-add-reduce-transform",
           "path": "website/highlights/2020-07-10-add-reduce-transform.md",
@@ -16771,8 +16662,8 @@ module.exports = {
           "description": "We're doing this integration right. We've been alpha testing with a number of large clusters and we've honed in on a very high-quality approach that reflects the UX Vector is going after. You can learn more in our [Kubernetes Integration RFC][urls.pr_2222]. Do you want to beta test? [Tell us!][urls.vector_chat]"
         },
         {
-          "title": "More mature WASM plugins 🔌",
-          "description": "This release included an experimental implementation of a WASM transform. Vector plans to add [WASM][urls.wasm] sinks and sources, enabling you to extend Vector in the language of your choice with little performance penalty. ❤️ WASM. Check out the [WASM Plugin RFC][urls.pr_2341] for more info."
+          "title": "WASM plugins 🔌",
+          "description": "This release included an experimental implementation of a WASM transform behind a `wasm` build flag. We plan to stabilize WASM transforms, as well as add [WASM][urls.wasm] sinks and sources, enabling you to extend Vector in the language of your choice with little performance penalty. ❤️ WASM. Check out the [WASM Plugin RFC][urls.pr_2341] for more info."
         },
         {
           "title": "Dynamic HTTP Rate-Limiting (AIMD)",

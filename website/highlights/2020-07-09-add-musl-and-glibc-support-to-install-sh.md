@@ -1,37 +1,46 @@
 ---
-last_modified_on: "2020-07-14"
+last_modified_on: "2020-07-17"
 $schema: "/.meta/.schemas/highlights.json"
-title: "glibc enhancements"
+title: "Leveraging glibc when possible"
 description: "If your Linux uses glibc, Vector will too."
 author_github: "https://github.com/hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2969,2518]
 release: "0.10.0"
-tags: ["type: breaking change", "domain: operations"]
+tags: ["type: performance", "domain: operations"]
 ---
 
-As a result of some recent profiling and benchmarking, we determined that builds of Vector targetting `x86_64-unknown-linux-gnu` outperformed builds targetting `x86_64-unknown-linux-musl` under most usage scenarios on supported operating systems.
+As a result of some recent profiling and benchmarking, we determined that builds of Vector targeting
+`x86_64-unknown-linux-gnu` outperformed builds targeting `x86_64-unknown-linux-musl` under most usage scenarios on
+supported operating systems.
 
-After some deliberation, we've opted to package and ship glibc builds where it's safe. While this change means Vector is no longer fully static on operating systems which use glibc, it should provide a better user experience.
+Glibc builds may see performance improve by up to 20% over musl. For more information see
+the [original issue][urls.vector_glibc_benchmarks]. We're investigating ways to improve our MUSL performance, too! Stay
+tuned to future releases.
+
+After some deliberation, we've opted to package and ship glibc builds where it's safe. While this change means Vector
+is no longer fully static on operating systems which use glibc, it should provide a better user experience.
+
+For the vast majority of users **no special action needs to be taken.**
 
 ## Measures we've take to safeguard your deployments
 
 * This change **only affects** x86 platforms.
-* This change **affects** `.deb` and `.rpm` packages.
-* This change **affects** Vectors installed via `https://sh.vector.dev`.
-* This change **does not affect** any [archives][urls.vector_download] you may already be using. We now publish archives with the `gnu` prefix that contain glibc builds. *Musl builds are untouched as `musl` still.*
+* This change **affects** `.deb` and `.rpm` packages and Vectors **installed via** `https://sh.vector.dev`.
+* This change **does not affect** any [archives][urls.vector_download] you may already be using. We now publish archives
+  with the `gnu` prefix that contain glibc builds. *Musl builds are untouched as `musl` still.*
 * This change **does not affect** non-Linux platforms.
 
 If you've fought with glibc before, you've probably got a burning question:
 
 > Which version do we support? 🕵️‍♀️
 
-**Don't worry. We have your back. 🤜🤛** We're using a base of CentOS 7, which means new Vector glibc builds will support all the way back to **glibc 2.17**. If that's still too new for your machines, please keep using the Musl builds. (Also, [Let us know!][urls.new_bug_report])
+**Don't worry. We have your back. 🤜🤛** We're using a base of CentOS 7, which means new Vector glibc builds will support all the way back to **glibc 2.17** (released 2012-12-25). If that's still too new for your machines, please keep using the Musl builds. (Also, [Let us know!][urls.new_bug_report])
 
 
 ## Upgrade Guide
 
-You should not need to do anything. If you are using a normal, reccommended method of installing Vector, you should not experience issues.
+You **should not need to do anything**. If you are using a normal, recommended method of installing Vector, you should not experience issues.
 
 [**If you do. That's a bug. 🐞 We squash bugs. Report it.**][urls.new_bug_report]
 
@@ -50,3 +59,4 @@ Interested in packaging Vector for your OS? We are too. [Why don't you let us kn
 [urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
 [urls.nixos]: https://nixos.org/
 [urls.vector_download]: https://vector.dev/releases/latest/download/
+[urls.vector_glibc_benchmarks]: https://github.com/timberio/vector/issues/2313

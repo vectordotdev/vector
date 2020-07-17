@@ -1,8 +1,8 @@
 ---
-last_modified_on: "2020-07-15"
+last_modified_on: "2020-07-17"
 $schema: "/.meta/.schemas/highlights.json"
 title: "New Reduce transform"
-description: "More flexibility around grouping events."
+description: "Canonical Log Lines in Vector"
 author_github: "https://github.com/hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2870]
@@ -10,43 +10,81 @@ release: "0.10.0"
 tags: ["type: new feature","domain: transforms"]
 ---
 
-You can now find a new [Reduce][urls.vector_transform_reduce]! This allows you to turn a stream of many small events into a stream of less small events!
+Fan of [Stripe's Canonical Log Lines][urls.stripe_blog_canonical_log_lines]? We are too. You can now find a new
+[Reduce][urls.vector_transform_reduce]! This allows you to turn a stream of many small events into a stream of
+less small events!
 
-Say you had a stream of events like:
+The fantastic article by Brandur Leach describes them best:
 
-```json file=test.json
-{ "transaction_id": 1, "sum_this": 1 }
-{ "transaction_id": 2, "sum_this": 24 }
-{ "transaction_id": 1, "stop_summing": true }
-{ "transaction_id": 2, "sum_this": 24 }
-{ "transaction_id": 3, "sum_this": 2 }
-{ "transaction_id": 3, "sum_this": 2, "note": "This one will expire after a configured time" }
-{ "transaction_id": 1, "sum_this": 1, "note": "This is a new one!" }
-{ "transaction_id": 1, "stop_summing": true }
+> They’re a simple idea: in addition to their normal log traces, requests (or some other unit of work that’s executing)
+> also emit one long log line at the end that pulls all its key telemetry into one place.
+
+Here's a *canonical* example:
+
+```log
+[2019-03-18 22:48:32.999] canonical-log-line alloc_count=9123 auth_type=api_key database_queries=34 duration=0.009 http_method=POST http_path=/v1/charges http_status=200 key_id=mk_123 permissions_used=account_write rate_allowed=true rate_quota=100 rate_remaining=99 request_id=req_123 team=acquiring user_id=usr_123
 ```
 
-And you wanted to turn them into this:
+Let's build similar in Vector!
 
-```json file=output.json
-{ "transaction_id": 1, "sum_this": 1 }
-{ "transaction_id": 2, "sum_this": 48 }
-{ "transaction_id": 1, "stop_summing": true }
-{ "transaction_id": 2, "sum_this": 24 }
-{ "transaction_id": 3, "sum_this": 2 }
-{ "transaction_id": 3, "sum_this": 2, "note": "This one will expire after a configured time" }
-{ "transaction_id": 1, "sum_this": 1, "note": "This is a new one!" }
-{ "transaction_id": 1, "stop_summing": true }
+We'll take a series of events:
+
+```log file=input.log
+{"timestamp": "...", "message": "Received GET /path", "request_id": "abcd1234", "request_path": "/path", "request_params": "..."}
+{"timestamp": "...", "message": "Executed query in 5.2ms", "request_id": "abcd1234", "query": "SELECT * FROM table", "query_duration_ms": 5.2}
+{"timestamp": "...", "message": "Rendered partial _partial.erb in 2.3ms", "request_id": "abcd1234", "template": "_partial.erb", "render_duration_ms": 2.3}
+{"timestamp": "...", "message": "Executed query in 7.8ms", "request_id": "abcd1234", "query": "SELECT * FROM table", "query_duration_ms": 7.8}
+{"timestamp": "...", "message": "Sent 200 in 15.2ms", "request_id": "abcd1234", "response_status": 200, "response_duration_ms": 5.2}
 ```
 
-You could use a transform like this!
+Then output this (but not formatted so nicely!):
+
+```json file=output.log
+{
+  "timestamp_start": "...",
+  "timestamp_end": "...",
+  "request_id": "abcd1234",
+  "request_path": "/path",
+  "request_params": "...",
+  "query_duration_ms": 13.0,
+  "render_duration_ms": 2.3,
+  "status": 200,
+  "response_duration_ms": 5.2
+}
+```
+
+We'll run this config:
 
 ```toml file=vector.toml
-[transforms.my_transform_id]
+data_dir = "tmp"
+
+[sources.source0]
+  include = ["input.log"]
+  start_at_beginning = false
+  type = "file"
+  fingerprinting.strategy = "inode"
+
+[transforms.transform0]
+  inputs = ["source0"]
+  identifier_fields = []
   type = "reduce"
-  inputs = ["database_log"]
-  identifier_fields = ["transaction_id"]
-  ends_when.type = "check_fields"
-  ends_when."stop_summing.eq" = true
+  merge_strategies.message = "discard"
+  merge_strategies.query = "discard"
+  merge_strategies.template = "discard"
+  merge_strategies.query_duration_ms = "sum"
+  merge_strategies.render_duration_ms = "sum"
+  merge_strategies.response_duration_ms = "sum"
+
+[sinks.sink0]
+  healthcheck = true
+  inputs = ["transform0"]
+  type = "file"
+  path = "output.log"
+  buffer.type = "memory"
+  buffer.max_events = 500
+  buffer.when_full = "block"
+
 ```
 
+[urls.stripe_blog_canonical_log_lines]: https://stripe.com/blog/canonical-log-lines
 [urls.vector_transform_reduce]: https://vector.dev/docs/reference/transforms/reduce/
