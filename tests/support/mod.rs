@@ -110,13 +110,11 @@ impl SourceConfig for MockSourceConfig {
         let event_counter = self.event_counter.clone();
         let mut recv = wrapped.lock().unwrap().take().unwrap();
         let mut shutdown = Some(shutdown);
-        let mut token = None;
         let source = future::lazy(move || {
             stream::poll_fn(move || {
                 if let Some(until) = shutdown.as_mut() {
                     match until.poll() {
-                        Ok(Async::Ready(res)) => {
-                            token = Some(res);
+                        Ok(Async::Ready(_)) => {
                             shutdown.take();
                             recv.close();
                         }

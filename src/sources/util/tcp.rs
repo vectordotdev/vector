@@ -162,13 +162,12 @@ fn handle_stream(
     out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
 ) {
     let mut shutdown = Some(shutdown);
-    let mut token = None;
     let mut reader = FramedRead::new(socket, source.decoder());
     let handler = stream::poll_fn(move || {
         // Gracefull shutdown procedure
         if let Some(future) = shutdown.as_mut() {
             match future.poll() {
-                Ok(Async::Ready(tk)) => {
+                Ok(Async::Ready(_)) => {
                     debug!("Start gracefull shutdown");
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
@@ -181,7 +180,6 @@ fn handle_stream(
                         debug!("Closing connection that hasn't yet been fully established.");
                         return Ok(Async::Ready(None));
                     }
-                    token = Some(tk);
                     shutdown = None;
                 }
                 Err(()) => shutdown = None,
