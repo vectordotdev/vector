@@ -110,3 +110,139 @@ impl fmt::Debug for State {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::controller::{ControllerStatistics, Inner};
+    use super::super::AutoConcurrencyLimitLayer;
+    use super::*;
+    use snafu::Snafu;
+    use std::sync::{Mutex, MutexGuard};
+    use std::time::Duration;
+    use tokio::time::{advance, pause};
+    use tokio_test::{assert_pending, assert_ready_ok};
+    use tower_test03::{
+        assert_request_eq,
+        mock::{
+            self, future::ResponseFuture as MockResponseFuture, Handle, Mock, SendResponse, Spawn,
+        },
+    };
+
+    #[derive(Clone, Copy, Debug, Snafu)]
+    enum TestError {}
+
+    #[derive(Clone, Copy, Debug)]
+    struct TestRetryLogic;
+    impl RetryLogic for TestRetryLogic {
+        type Error = TestError;
+        type Response = &'static str;
+        fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+            true
+        }
+    }
+
+    type TestInner = AutoConcurrencyLimit<Mock<&'static str, &'static str>, TestRetryLogic>;
+    struct TestService {
+        service: Spawn<TestInner>,
+        handle: Handle<&'static str, &'static str>,
+        inner: Arc<Mutex<Inner>>,
+        stats: Arc<Mutex<ControllerStatistics>>,
+    }
+
+    struct Send {
+        request: ResponseFuture<MockResponseFuture<&'static str>, TestRetryLogic>,
+        response: SendResponse<&'static str>,
+    }
+
+    impl TestService {
+        fn start() -> Self {
+            let layer = AutoConcurrencyLimitLayer::new(10, TestRetryLogic);
+            let (service, handle) = mock::spawn_layer(layer);
+            let controller = service.get_ref().controller.clone();
+            let inner = controller.inner.clone();
+            let stats = controller.stats.clone();
+            Self {
+                service,
+                handle,
+                inner,
+                stats,
+            }
+        }
+
+        async fn run<F, Ret>(doit: F) -> ControllerStatistics
+        where
+            F: FnOnce(Self) -> Ret,
+            Ret: Future<Output = ()>,
+        {
+            let svc = Self::start();
+            //let inner = svc.inner.clone();
+            let stats = svc.stats.clone();
+            pause();
+            doit(svc).await;
+            //dbg!(inner);
+            Arc::try_unwrap(stats).unwrap().into_inner().unwrap()
+        }
+
+        async fn send(&mut self) -> Send {
+            assert_ready_ok!(self.service.poll_ready());
+            let request = self.service.call("DATA");
+            let response = assert_request_eq!(self.handle, "DATA");
+            Send { request, response }
+        }
+
+        fn is_ready(&mut self) {
+            assert_ready_ok!(self.service.poll_ready());
+        }
+
+        fn is_pending(&mut self) {
+            assert_pending!(self.service.poll_ready());
+        }
+
+        fn inner(&self) -> MutexGuard<Inner> {
+            self.inner.lock().unwrap()
+        }
+    }
+
+    impl Send {
+        async fn respond(self) {
+            self.response.send_response("RESPONSE");
+            assert_eq!(self.request.await.unwrap(), "RESPONSE");
+        }
+    }
+
+    #[tokio::test]
+    async fn simple() {
+        let stats = TestService::run(|mut svc| async move {
+            // Concurrency starts at 1
+            assert_eq!(svc.inner().current_limit, 1);
+            svc.is_ready();
+            let req = svc.send().await;
+            svc.is_pending();
+
+            advance(Duration::from_secs(1)).await;
+
+            req.respond().await;
+
+            // Concurrency stays at 1 until a measurement
+            assert_eq!(svc.inner().current_limit, 1);
+            svc.is_ready();
+            let req = svc.send().await;
+            svc.is_pending();
+
+            advance(Duration::from_secs(1)).await;
+
+            req.respond().await;
+
+            // After a constant speed measurement, concurrency is increased
+            assert_eq!(svc.inner().current_limit, 2);
+        })
+        .await;
+
+        let in_flight = stats.in_flight.stats().unwrap();
+        assert_eq!(in_flight.max, 1);
+        assert_eq!(in_flight.mean, 1.0);
+
+        let observed_rtt = stats.observed_rtt.stats().unwrap();
+        assert_eq!(observed_rtt.mean, 1.0);
+    }
+}

@@ -25,14 +25,14 @@ pub(super) struct Controller<L> {
     semaphore: Arc<ShrinkableSemaphore>,
     max: usize,
     logic: L,
-    inner: Arc<Mutex<Inner>>,
+    pub(super) inner: Arc<Mutex<Inner>>,
     #[cfg(test)]
     pub(super) stats: Arc<Mutex<ControllerStatistics>>,
 }
 
 #[derive(Debug)]
 pub(super) struct Inner {
-    current_limit: usize,
+    pub(super) current_limit: usize,
     in_flight: usize,
     past_rtt: EWMA,
     next_update: Instant,
