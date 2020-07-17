@@ -60,14 +60,21 @@ data_dir = "tmp"
 
 [sources.source0]
   include = ["input.log"]
-  start_at_beginning = false
+  start_at_beginning = true
   type = "file"
-  fingerprinting.strategy = "inode"
+  fingerprinting.strategy = "device_and_inode"
 
 [transforms.transform0]
   inputs = ["source0"]
-  identifier_fields = []
+  type = "json_parser"
+  field = "message"
+
+[transforms.transform1]
+  inputs = ["transform0"]
   type = "reduce"
+  identifier_fields = ["request_id"]
+  ends_when.type = "check_fields"
+  ends_when."response_status.exists" = true
   merge_strategies.message = "discard"
   merge_strategies.query = "discard"
   merge_strategies.template = "discard"
@@ -77,14 +84,16 @@ data_dir = "tmp"
 
 [sinks.sink0]
   healthcheck = true
-  inputs = ["transform0"]
+  inputs = ["transform1"]
   type = "file"
   path = "output.log"
+  encoding = "ndjson"
   buffer.type = "memory"
   buffer.max_events = 500
-  buffer.when_full = "block"
-
+  buffer.when_full = "block"s
 ```
+
+We hope you find this useful!
 
 [urls.stripe_blog_canonical_log_lines]: https://stripe.com/blog/canonical-log-lines
 [urls.vector_transform_reduce]: https://vector.dev/docs/reference/transforms/reduce/
