@@ -1,9 +1,7 @@
-use crate::{
-    shutdown::ShutdownSignal, topology::config::GlobalOptions, Event,
-};
+use crate::{shutdown::ShutdownSignal, topology::config::GlobalOptions, Event};
 use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt}, stream,
-    FutureExt, StreamExt, TryFutureExt,
+    compat::{Future01CompatExt, Sink01CompatExt},
+    stream, FutureExt, StreamExt, TryFutureExt,
 };
 use futures01::{sync::mpsc, Sink};
 use parser::parse;
