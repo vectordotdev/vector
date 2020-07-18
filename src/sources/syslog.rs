@@ -5,25 +5,28 @@ use crate::{
     event::{self, Event, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
-    stream::StreamExt01,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes05::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use futures::{
+    compat::{Future01CompatExt, Sink01CompatExt},
+    FutureExt, StreamExt, TryFutureExt,
+};
+use futures01::{sync::mpsc, Sink};
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
-use tokio01::{
-    codec::BytesCodec,
-    net::{UdpFramed, UdpSocket},
+use tokio::net::UdpSocket;
+use tokio_util::{
+    codec::{BytesCodec, Decoder, LinesCodec, LinesCodecError},
+    udp::UdpFramed,
 };
-use tokio_util::codec::{Decoder, LinesCodec, LinesCodecError};
 use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -256,34 +259,43 @@ pub fn udp(
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(
-        future::lazy(move || {
-            let socket = UdpSocket::bind(&addr).expect("failed to bind to udp listener socket");
-
+        async move {
+            let socket = UdpSocket::bind(&addr)
+                .await
+                .expect("failed to bind to udp listener socket");
             info!(
                 message = "listening.",
                 addr = &field::display(addr),
                 r#type = "udp"
             );
 
-            future::ok(socket)
-        })
-        .and_then(move |socket| {
-            let host_key = host_key.clone();
-
-            let lines_in = UdpFramed::new(socket, BytesCodec::new())
-                .take_until(shutdown)
-                .filter_map(move |(bytes, received_from)| {
+            let stream = UdpFramed::new(socket, BytesCodec::new())
+                .take_until(shutdown.compat())
+                .filter_map(|frame| {
                     let host_key = host_key.clone();
-                    let received_from = received_from.to_string().into();
+                    async move {
+                        match frame {
+                            Ok((bytes, received_from)) => {
+                                let received_from = received_from.to_string().into();
 
-                    std::str::from_utf8(&bytes)
-                        .ok()
-                        .and_then(|s| event_from_str(&host_key, Some(received_from), s))
-                })
-                .map_err(|error| emit!(SyslogUdpReadError { error }));
+                                std::str::from_utf8(&bytes).ok().and_then(|s| {
+                                    event_from_str(&host_key, Some(received_from), s).map(Ok)
+                                })
+                            }
+                            Err(error) => {
+                                emit!(SyslogUdpReadError { error });
+                                None
+                            }
+                        }
+                    }
+                });
 
-            lines_in.forward(out).map(|_| info!("finished sending"))
-        }),
+            let _ = stream.forward(out.sink_compat()).await;
+            info!("finished sending");
+            Ok(())
+        }
+        .boxed()
+        .compat(),
     )
 }
 
