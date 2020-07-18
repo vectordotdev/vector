@@ -269,7 +269,7 @@ pub fn udp(
                 r#type = "udp"
             );
 
-            let stream = UdpFramed::new(socket, BytesCodec::new())
+            let _ = UdpFramed::new(socket, BytesCodec::new())
                 .take_until(shutdown.compat())
                 .filter_map(|frame| {
                     let host_key = host_key.clone();
@@ -288,9 +288,10 @@ pub fn udp(
                             }
                         }
                     }
-                });
+                })
+                .forward(out.sink_compat())
+                .await;
 
-            let _ = stream.forward(out.sink_compat()).await;
             info!("finished sending");
             Ok(())
         }

@@ -3,15 +3,18 @@ use crate::{
     internal_events::{UdpEventReceived, UdpSocketError},
     shutdown::ShutdownSignal,
     sources::Source,
-    stream::StreamExt01,
 };
-use bytes::Bytes;
-use codec01::BytesDelimitedCodec;
-use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use codec::BytesDelimitedCodec;
+use futures::{
+    compat::{Future01CompatExt, Sink01CompatExt},
+    FutureExt, StreamExt, TryFutureExt,
+};
+use futures01::{sync::mpsc, Sink};
 use serde::{Deserialize, Serialize};
-use std::{io, net::SocketAddr};
+use std::{net::SocketAddr};
 use string_cache::DefaultAtom as Atom;
-use tokio01::net::udp::{UdpFramed, UdpSocket};
+use tokio::net::UdpSocket;
+use tokio_util::udp::UdpFramed;
 
 /// UDP processes messages per packet, where messages are separated by newline.
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -39,41 +42,46 @@ pub fn udp(
     let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
     Box::new(
-        future::lazy(move || {
-            let socket = UdpSocket::bind(&address).expect("failed to bind to udp listener socket");
-
+        async move {
+            let socket = UdpSocket::bind(&address)
+                .await
+                .expect("failed to bind to udp listener socket");
             info!(message = "listening.", %address);
 
-            Ok(socket)
-        })
-        .and_then(move |socket| {
-            let host_key = host_key.clone();
-            // UDP processes messages per packet, where messages are separated by newline.
-            // And stretch to end of packet.
-            UdpFramed::with_decode(socket, BytesDelimitedCodec::new(b'\n'), true)
-                .take_until(shutdown)
-                .map(move |(line, addr): (Bytes, _)| {
-                    let byte_size = line.len();
-                    let mut event = Event::from(line);
+            let _ = UdpFramed::new(socket, BytesDelimitedCodec::new(b'\n'))
+                .take_until(shutdown.compat())
+                .filter_map(|frame| {
+                    let host_key = host_key.clone();
+                    async move {
+                        match frame {
+                            Ok((line, addr)) => {
+                                let byte_size = line.len();
+                                let mut event = Event::from(line);
 
-                    event
-                        .as_mut_log()
-                        .insert(event::log_schema().source_type_key(), "socket");
+                                event
+                                    .as_mut_log()
+                                    .insert(event::log_schema().source_type_key(), "socket");
 
-                    event
-                        .as_mut_log()
-                        .insert(host_key.clone(), addr.to_string());
+                                event
+                                    .as_mut_log()
+                                    .insert(host_key, addr.to_string());
 
-                    emit!(UdpEventReceived { byte_size });
-                    event
+                                emit!(UdpEventReceived { byte_size });
+                                Some(Ok(event))
+                            }
+                            Err(error) => {
+                                emit!(UdpSocketError { error });
+                                None
+                            }
+                        }
+                    }
                 })
-                // Error from Decoder or UdpSocket
-                .map_err(|error: io::Error| {
-                    emit!(UdpSocketError { error });
-                })
-                .forward(out)
-                // Done with listening and sending
-                .map(|_| ())
-        }),
+                .forward(out.sink_compat())
+                .await;
+
+            Ok(())
+        }
+        .boxed()
+        .compat(),
     )
 }
