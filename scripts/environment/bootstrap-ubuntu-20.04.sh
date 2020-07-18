@@ -16,6 +16,8 @@ apt install --yes \
     jq \
     shellcheck \
     software-properties-common \
+    musl-tools \
+    musl-dev \
     locales \
     apt-transport-https \
     ca-certificates \

@@ -166,7 +166,7 @@ build-x86_64-unknown-linux-gnu: ## Build dynamically linked binary in release mo
 
 build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture
 	${MAYBE_ENVIRONMENT_EXEC} \
-		CROSS_COMPOSE=x86_64-linux-musl \
+		CROSS_COMPILE=x86_64-linux-musl \
 		CC=/git/richfelker/musl-cross-make/output/bin/x86_64-linux-musl-gcc \
 		CXX=/git/richfelker/musl-cross-make/output/bin/x86_64-linux-musl-g++ \
 		TCLPATH=/dev/null \
@@ -174,17 +174,25 @@ build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the 
 
 build-armv7-unknown-linux-musleabihf: ## Build static binary in release mode for the armv7 architecture
 	${MAYBE_ENVIRONMENT_EXEC} \
+		CROSS_COMPILE=armv7l-linux-musl \
 		CC=/git/richfelker/musl-cross-make/output/bin/armv7l-linux-musl-gcc \
 		CXX=/git/richfelker/musl-cross-make/output/bin/armv7l-linux-musl-g++ \
 		TCLPATH=/dev/null \
-		cargo build --no-default-features --features default-musl --target armv7-unknown-linux-musleabihf
+		cargo +nightly build --no-default-features --features default-musl --target armv7-unknown-linux-musleabihf
 
+build-aarch64-unknown-linux-musl: export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=/git/richfelker/musl-cross-make/output/bin/aarch64-linux-musl-cc
+build-aarch64-unknown-linux-musl: export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS=-C link-arg=-lgcc
+build-aarch64-unknown-linux-musl: export CC=/git/richfelker/musl-cross-make/output/bin/aarch64-linux-musl-gcc
+build-aarch64-unknown-linux-musl: export CXX=/git/richfelker/musl-cross-make/output/bin/aarch64-linux-musl-g++
+build-aarch64-unknown-linux-musl: export HOST_CC=musl-gcc
+build-aarch64-unknown-linux-musl: export TCLPATH=/dev/null
+build-aarch64-unknown-linux-musl: export PKG_CONFIG_ALLOW_CROSS=true
+build-aarch64-unknown-linux-musl: export PKG_CONFIG_ALL_STATIC=true
+build-aarch64-unknown-linux-musl: export LIBZ_SYS_STATIC=1
+build-aarch64-unknown-linux-musl: export OPENSSL_STATIC=1
 build-aarch64-unknown-linux-musl: ## Build static binary in release mode for the aarch64 architecture
 	${MAYBE_ENVIRONMENT_EXEC} \
-		CC=/git/richfelker/musl-cross-make/output/bin/aarch64-linux-musl-gcc \
-		CXX=/git/richfelker/musl-cross-make/output/bin/aarch64-linux-musl-g++ \
-		TCLPATH=/dev/null \
-		cargo build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
+		cargo +nightly build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
