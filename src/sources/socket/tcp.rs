@@ -48,6 +48,7 @@ pub struct RawTcpSource {
 }
 
 impl TcpSource for RawTcpSource {
+    type Error = std::io::Error;
     type Decoder = BytesDelimitedCodec;
 
     fn decoder(&self) -> Self::Decoder {

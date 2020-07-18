@@ -9,7 +9,7 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
-use bytes::{Bytes, BytesMut};
+use bytes05::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
@@ -18,12 +18,12 @@ use std::io;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
-use syslog_loose::{self, IncompleteDate, Message, ProcId, Protocol};
+use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use tokio01::{
-    self,
-    codec::{BytesCodec, Decoder, LinesCodec},
+    codec::BytesCodec,
     net::{UdpFramed, UdpSocket},
 };
+use tokio_util::codec::{Decoder, LinesCodec, LinesCodecError};
 use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -125,6 +125,7 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
+    type Error = LinesCodecError;
     type Decoder = SyslogDecoder;
 
     fn decoder(&self) -> Self::Decoder {
@@ -156,7 +157,7 @@ impl SyslogDecoder {
         }
     }
 
-    fn octet_decode(&self, src: &mut BytesMut) -> Result<Option<String>, io::Error> {
+    fn octet_decode(&self, src: &mut BytesMut) -> Result<Option<String>, LinesCodecError> {
         // Encoding scheme:
         //
         // len ' ' data
@@ -171,10 +172,10 @@ impl SyslogDecoder {
                 .map_err(|_| ())
                 .and_then(|num| num.parse().map_err(|_| ()))
                 .map_err(|_| {
-                    io::Error::new(
+                    LinesCodecError::Io(io::Error::new(
                         io::ErrorKind::InvalidData,
                         "Unable to decode message len as number",
-                    )
+                    ))
                 })?;
 
             let from = i + 1;
@@ -183,10 +184,10 @@ impl SyslogDecoder {
             if let Some(msg) = src.get(from..to) {
                 let s = std::str::from_utf8(msg)
                     .map_err(|_| {
-                        io::Error::new(
+                        LinesCodecError::Io(io::Error::new(
                             io::ErrorKind::InvalidData,
                             "Unable to decode message as UTF8",
-                        )
+                        ))
                     })?
                     .to_string();
                 src.advance(to);
@@ -198,15 +199,18 @@ impl SyslogDecoder {
             Ok(None)
         } else {
             // This is certainly mallformed, and there is no recovering from this.
-            Err(io::Error::new(
+            Err(LinesCodecError::Io(io::Error::new(
                 io::ErrorKind::Other,
                 "frame length limit exceeded",
-            ))
+            )))
         }
     }
 
     /// None if this is not octet counting encoded
-    fn checked_decode(&self, src: &mut BytesMut) -> Option<Result<Option<String>, io::Error>> {
+    fn checked_decode(
+        &self,
+        src: &mut BytesMut,
+    ) -> Option<Result<Option<String>, LinesCodecError>> {
         if let Some(&first_byte) = src.get(0) {
             if 49 <= first_byte && first_byte <= 57 {
                 // First character is non zero number so we can assume that
@@ -221,10 +225,9 @@ impl SyslogDecoder {
 
 impl Decoder for SyslogDecoder {
     type Item = String;
+    type Error = LinesCodecError;
 
-    type Error = io::Error;
-
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<String>, io::Error> {
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if let Some(ret) = self.checked_decode(src) {
             ret
         } else {
@@ -233,7 +236,7 @@ impl Decoder for SyslogDecoder {
         }
     }
 
-    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<String>, io::Error> {
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if let Some(ret) = self.checked_decode(buf) {
             ret
         } else {
@@ -321,7 +324,8 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
         event.as_mut_log().insert("source_ip", default_host);
     }
 
-    if let Some(parsed_host) = parsed.hostname.map(Bytes::from).or(default_host) {
+    let parsed_hostname = parsed.hostname.map(|x| Bytes::from(x.to_owned()));
+    if let Some(parsed_host) = parsed_hostname.or(default_host) {
         event.as_mut_log().insert(host_key, parsed_host);
     }
 

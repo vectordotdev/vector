@@ -4,7 +4,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::{util::build_unix_source, Source},
 };
-use bytes::Bytes;
+use bytes05::Bytes;
 use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

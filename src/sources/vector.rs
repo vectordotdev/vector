@@ -7,11 +7,11 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event,
 };
-use bytes::{Bytes, BytesMut};
+use bytes05::{Bytes, BytesMut};
 use futures01::sync::mpsc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use tokio01::codec::LengthDelimitedCodec;
+use tokio_util::codec::LengthDelimitedCodec;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -68,6 +68,7 @@ impl SourceConfig for VectorConfig {
 struct VectorSource;
 
 impl TcpSource for VectorSource {
+    type Error = std::io::Error;
     type Decoder = LengthDelimitedCodec;
 
     fn decoder(&self) -> Self::Decoder {
@@ -75,8 +76,6 @@ impl TcpSource for VectorSource {
     }
 
     fn build_event(&self, frame: BytesMut, _host: Bytes) -> Option<Event> {
-        let frame = bytes05::Bytes::copy_from_slice(&frame);
-
         let byte_size = frame.len();
         match proto::EventWrapper::decode(frame).map(Event::from) {
             Ok(event) => {

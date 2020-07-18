@@ -16,7 +16,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio01::{
-    // codec::Decoder,
     net::{TcpListener, TcpStream},
     reactor::Handle,
     timer,
@@ -62,7 +61,10 @@ fn make_listener(
 }
 
 pub trait TcpSource: Clone + Send + 'static {
-    type Decoder: Decoder<Error = io::Error> + Send + 'static;
+    // Should be default: `std::io::Error`.
+    // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
+    type Error: From<io::Error> + std::fmt::Debug + std::fmt::Display;
+    type Decoder: Decoder<Error = Self::Error> + Send + 'static;
 
     fn decoder(&self) -> Self::Decoder;
 

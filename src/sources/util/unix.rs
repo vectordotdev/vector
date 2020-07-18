@@ -2,7 +2,7 @@ use crate::{
     async_read::AsyncReadExt, emit, event::Event, internal_events::UnixSocketError,
     shutdown::ShutdownSignal, sources::Source,
 };
-use bytes::Bytes;
+use bytes05::Bytes;
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     future, FutureExt, StreamExt, TryFutureExt,
@@ -53,7 +53,7 @@ where
             let shutdown = shutdown.clone();
 
             let span = info_span!("connection");
-            let path = if let Some(addr) = socket.peer_addr().ok() {
+            let path = if let Ok(addr) = socket.peer_addr() {
                 if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
                     span.record("peer_path", &field::debug(&path));
                     Some(path)
