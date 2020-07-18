@@ -546,16 +546,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codec01"
-version = "0.1.0"
-dependencies = [
- "bytes 0.4.12",
- "serde_json",
- "tokio-codec",
- "tracing",
-]
-
-[[package]]
 name = "colored"
 version = "1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5410,7 +5400,6 @@ dependencies = [
  "chrono",
  "cidr-utils",
  "codec",
- "codec01",
  "colored",
  "criterion",
  "db-key",
