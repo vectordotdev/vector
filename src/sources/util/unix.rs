@@ -29,7 +29,7 @@ pub fn build_unix_source<D, E>(
 ) -> Source
 where
     D: Decoder<Item = String, Error = E> + Clone + Send + 'static,
-    E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display, // change to std::io::Error ? internal_events too!
+    E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display,
 {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
