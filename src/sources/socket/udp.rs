@@ -11,7 +11,7 @@ use futures::{
 };
 use futures01::{sync::mpsc, Sink};
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr};
+use std::net::SocketAddr;
 use string_cache::DefaultAtom as Atom;
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
@@ -62,9 +62,7 @@ pub fn udp(
                                     .as_mut_log()
                                     .insert(event::log_schema().source_type_key(), "socket");
 
-                                event
-                                    .as_mut_log()
-                                    .insert(host_key, addr.to_string());
+                                event.as_mut_log().insert(host_key, addr.to_string());
 
                                 emit!(UdpEventReceived { byte_size });
                                 Some(Ok(event))
