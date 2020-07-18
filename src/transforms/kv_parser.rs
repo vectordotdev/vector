@@ -20,10 +20,10 @@ pub struct KeyValueConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new::<KeyValueConfig>("kv")
+    TransformDescription::new::<KeyValueConfig>("kv_parser")
 }
 
-#[typetag::serde(name = "kv")]
+#[typetag::serde(name = "kv_parser")]
 impl TransformConfig for KeyValueConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
@@ -38,7 +38,7 @@ impl TransformConfig for KeyValueConfig {
             self.field_split.clone(),
             field.clone(),
             self.drop_field,
-            conversions
+            conversions,
         )))
     }
 
@@ -51,7 +51,7 @@ impl TransformConfig for KeyValueConfig {
     }
 
     fn transform_type(&self) -> &'static str {
-        "kv"
+        "kv_parser"
     }
 }
 
@@ -60,7 +60,7 @@ pub struct KeyValue {
     field_split: String,
     field: Atom,
     drop_field: bool,
-    conversions: HashMap<Atom, Conversion>
+    conversions: HashMap<Atom, Conversion>,
 }
 
 impl KeyValue {
@@ -76,7 +76,7 @@ impl KeyValue {
             field_split,
             field,
             drop_field,
-            conversions
+            conversions,
         }
     }
 }
@@ -92,9 +92,7 @@ fn kv_parser(pair: String, field_split: &String) -> Option<(Atom, String)> {
         if count < 2 {
             return None;
         } else if count > 2 {
-            debug!(
-                message = "KV parser expected 2 values"
-            )
+            debug!(message = "KV parser expected 2 values, but got {count}", count=count)
         }
 
         Some((Atom::from(key), value))
@@ -155,7 +153,6 @@ impl Transform for KeyValue {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::KeyValueConfig;
@@ -165,7 +162,13 @@ mod tests {
         Event,
     };
 
-    fn parse_log(text: &str, separator: String, field_split: String, drop_field: bool, types: &[(&str, &str)]) -> LogEvent {
+    fn parse_log(
+        text: &str,
+        separator: String,
+        field_split: String,
+        drop_field: bool,
+        types: &[(&str, &str)],
+    ) -> LogEvent {
         let event = Event::from(text);
 
         let mut parser = KeyValueConfig {
@@ -188,7 +191,7 @@ mod tests {
             " ".to_string(),
             "=".to_string(),
             false,
-            &[]
+            &[],
         );
         assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
         assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
@@ -201,7 +204,7 @@ mod tests {
             ",".to_string(),
             "=".to_string(),
             false,
-            &[]
+            &[],
         );
         assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
         assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
@@ -214,7 +217,7 @@ mod tests {
             ",".to_string(),
             " ".to_string(),
             false,
-            &[]
+            &[],
         );
         assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
         assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
@@ -227,7 +230,7 @@ mod tests {
             ",".to_string(),
             ":".to_string(),
             false,
-            &[("score", "integer")]
+            &[("score", "integer")],
         );
         assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
         assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
@@ -241,7 +244,7 @@ mod tests {
             "||".to_string(),
             "=>".to_string(),
             false,
-            &[("score", "integer")]
+            &[("score", "integer")],
         );
 
         assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
@@ -256,7 +259,7 @@ mod tests {
             ",".to_string(),
             "=".to_string(),
             false,
-            &[("score", "integer")]
+            &[("score", "integer")],
         );
         assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
         assert_eq!(log[&"beep".into()], Value::Bytes("bop=bap".into()));
@@ -270,12 +273,10 @@ mod tests {
             ",".to_string(),
             "::".to_string(),
             false,
-            &[]
+            &[],
         );
         assert!(log.contains(&"foo".into()));
         assert!(!log.contains(&"beep".into()));
         assert!(!log.contains(&"score".into()));
     }
-
 }
-
