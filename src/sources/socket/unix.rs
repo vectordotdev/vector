@@ -8,7 +8,7 @@ use bytes::Bytes;
 use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tokio01::codec::LinesCodec;
+use tokio_util::codec::LinesCodec;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]

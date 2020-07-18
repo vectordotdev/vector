@@ -41,12 +41,14 @@ impl InternalEvent for UnixSocketConnectionFailure<'_> {
 }
 
 #[derive(Debug)]
-pub struct UnixSocketError<'a> {
-    pub error: std::io::Error,
+pub struct UnixSocketError<'a, E> {
+    pub error: E,
     pub path: &'a std::path::Path,
 }
 
-impl InternalEvent for UnixSocketError<'_> {
+impl<E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display> InternalEvent
+    for UnixSocketError<'_, E>
+{
     fn emit_logs(&self) {
         debug!(
             message = "unix socket error.",
