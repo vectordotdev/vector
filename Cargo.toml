@@ -49,7 +49,7 @@ tokio-openssl = "0.4.0"
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-compat = { version = "0.1", features = ["rt-full"] }
-tokio-util = { version = "0.3.1", features = ["codec", "compat", "udp"] }
+tokio-util = { version = "0.3.1", features = ["codec", "compat"] }
 async-trait = "0.1"
 
 # Tracing
@@ -254,9 +254,9 @@ sources-journald = []
 sources-kafka = []
 sources-logplex = ["warp", "sources-tls"]
 sources-prometheus = []
-sources-socket = ["bytesize", "listenfd", "tokio/uds", "sources-tls"]
+sources-socket = ["bytesize", "listenfd", "tokio/uds", "tokio-util/udp", "sources-tls"]
 sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
-sources-statsd = []
+sources-statsd = ["tokio-util/udp"]
 sources-stdin = ["bytesize"]
 sources-syslog = ["sources-socket", "syslog_loose"]
 sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
@@ -375,7 +375,7 @@ sinks-sematext_logs = ["sinks-elasticsearch"]
 sinks-socket = ["tokio/uds"]
 sinks-papertrail = ["sinks-socket"]
 sinks-splunk_hec = ["bytesize"]
-sinks-statsd = []
+sinks-statsd = ["tokio-util/udp"]
 sinks-vector = []
 sinks-pulsar = ["pulsar"]
 
