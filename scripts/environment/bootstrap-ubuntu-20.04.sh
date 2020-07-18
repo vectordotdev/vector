@@ -64,4 +64,4 @@ cd /git/richfelker/musl-cross-make
 export NUM_CPUS=$(awk '/^processor/ { N++} END { print N }' /proc/cpuinfo)
 make install -j${NUM_CPUS} TARGET=x86_64-linux-musl
 make install -j${NUM_CPUS} TARGET=aarch64-linux-musl
-make install -j${NUM_CPUS} TARGET=armv7l-linux-musleabihf
+make install -j${NUM_CPUS} TARGET=armv7-linux-musleabihf
