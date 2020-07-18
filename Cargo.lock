@@ -4594,7 +4594,6 @@ dependencies = [
  "tokio-threadpool",
  "tokio-timer",
  "tokio-udp",
- "tokio-uds",
  "tracing-core",
 ]
 
@@ -4854,24 +4853,6 @@ dependencies = [
  "futures 0.1.29",
  "log 0.4.8",
  "mio",
- "tokio-codec",
- "tokio-io",
- "tokio-reactor",
-]
-
-[[package]]
-name = "tokio-uds"
-version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab57a4ac4111c8c9dbcf70779f6fc8bc35ae4b2454809febac840ad19bd7e4e0"
-dependencies = [
- "bytes 0.4.12",
- "futures 0.1.29",
- "iovec",
- "libc",
- "log 0.4.8",
- "mio",
- "mio-uds",
  "tokio-codec",
  "tokio-io",
  "tokio-reactor",
@@ -5521,7 +5502,6 @@ dependencies = [
  "tokio-retry",
  "tokio-signal",
  "tokio-test",
- "tokio-uds",
  "tokio-util",
  "tokio01-test",
  "toml 0.4.10",

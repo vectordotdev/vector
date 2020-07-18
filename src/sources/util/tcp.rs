@@ -5,7 +5,8 @@ use crate::{
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     Event,
 };
-use bytes::Bytes;
+use bytes05::Bytes;
+use futures::compat::{Compat, Compat01As03};
 use futures01::{future, stream, sync::mpsc, Async, Future, Sink, Stream};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -15,10 +16,14 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio01::{
-    codec::{Decoder, FramedRead},
+    // codec::Decoder,
     net::{TcpListener, TcpStream},
     reactor::Handle,
     timer,
+};
+use tokio_util::{
+    codec::{Decoder, FramedRead},
+    compat::FuturesAsyncReadCompatExt,
 };
 use tracing::{field, Span};
 use tracing_futures::Instrument;
@@ -61,11 +66,7 @@ pub trait TcpSource: Clone + Send + 'static {
 
     fn decoder(&self) -> Self::Decoder;
 
-    fn build_event(
-        &self,
-        frame: <Self::Decoder as tokio01::codec::Decoder>::Item,
-        host: Bytes,
-    ) -> Option<Event>;
+    fn build_event(&self, frame: <Self::Decoder as Decoder>::Item, host: Bytes) -> Option<Event>;
 
     fn run(
         self,
@@ -163,7 +164,8 @@ fn handle_stream(
 ) {
     let mut shutdown = Some(shutdown);
     let mut token = None;
-    let mut reader = FramedRead::new(socket, source.decoder());
+    let socket = Compat01As03::new(socket).compat();
+    let mut reader = Compat::new(FramedRead::new(socket, source.decoder()));
     let handler = stream::poll_fn(move || {
         // Gracefull shutdown procedure
         if let Some(future) = shutdown.as_mut() {
@@ -172,8 +174,8 @@ fn handle_stream(
                     debug!("Start gracefull shutdown");
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
-                    if let Some(socket) = reader.get_ref().get_ref() {
-                        if let Err(error)=socket.shutdown(Shutdown::Write){
+                    if let Some(socket) = reader.get_ref().get_ref().get_ref().get_ref().get_ref() {
+                        if let Err(error) = socket.shutdown(Shutdown::Write) {
                             warn!(message = "Failed in signalling to the other side to close the TCP channel.",%error);
                         }
                     } else {
