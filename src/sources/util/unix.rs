@@ -1,11 +1,11 @@
 use crate::{
-    async_read::AsyncReadExt, emit, event::Event, internal_events::UnixSocketError,
+    async_read::VecAsyncReadExt, emit, event::Event, internal_events::UnixSocketError,
     shutdown::ShutdownSignal, sources::Source,
 };
 use bytes05::Bytes;
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
-    future, FutureExt, StreamExt, TryFutureExt,
+    future, FutureExt, SinkExt, StreamExt, TryFutureExt,
 };
 use futures01::{sync::mpsc, Sink};
 use std::path::PathBuf;
@@ -50,7 +50,6 @@ where
 
             let listen_path = listen_path.clone();
             let host_key = host_key.clone();
-            let shutdown = shutdown.clone();
 
             let span = info_span!("connection");
             let path = if let Ok(addr) = socket.peer_addr() {
@@ -68,8 +67,8 @@ where
             let received_from: Option<Bytes> =
                 path.map(|p| p.to_string_lossy().into_owned().into());
 
-            let stream = socket.allow_read_until(shutdown.compat().map(|_| ()));
-            let stream = FramedRead::new(stream, decoder.clone()).filter_map(move |line| {
+            let stream = socket.allow_read_until(shutdown.clone().compat().map(|_| ()));
+            let mut stream = FramedRead::new(stream, decoder.clone()).filter_map(move |line| {
                 future::ready(match line {
                     Ok(line) => build_event(&host_key, received_from.clone(), &line).map(Ok),
                     Err(error) => {
@@ -82,12 +81,17 @@ where
                 })
             });
 
-            let fut = stream
-                .forward(out.clone().sink_compat())
-                .map(|_| info!("finished sending"))
-                .instrument(span);
+            let mut out = out.clone().sink_compat();
+            tokio::spawn(
+                async move {
+                    let _ = out.send_all(&mut stream).await;
+                    info!("finished sending");
 
-            tokio::spawn(fut);
+                    let socket = stream.get_ref().get_ref().get_ref();
+                    let _ = socket.shutdown(std::net::Shutdown::Both);
+                }
+                .instrument(span),
+            );
         }
 
         Ok(())

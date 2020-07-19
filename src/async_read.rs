@@ -7,7 +7,7 @@ use std::{
 };
 use tokio::io::{AsyncRead, Result as IoResult};
 
-pub trait AsyncReadExt: AsyncRead {
+pub trait VecAsyncReadExt: AsyncRead {
     /// Read data from this reader until the given future resolves.
     fn allow_read_until<F>(self, until: F) -> AllowReadUntil<Self, F>
     where
@@ -21,7 +21,7 @@ pub trait AsyncReadExt: AsyncRead {
     }
 }
 
-impl<S> AsyncReadExt for S where S: AsyncRead {}
+impl<S> VecAsyncReadExt for S where S: AsyncRead {}
 
 /// A AsyncRead combinator which reads from a reader until a future resolves.
 #[pin_project]
@@ -33,6 +33,12 @@ pub struct AllowReadUntil<S, F> {
     until: F,
 }
 
+impl<S, F> AllowReadUntil<S, F> {
+    pub fn get_ref(&self) -> &S {
+        &self.reader
+    }
+}
+
 impl<S, F> AsyncRead for AllowReadUntil<S, F>
 where
     S: AsyncRead,
@@ -41,10 +47,7 @@ where
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context, buf: &mut [u8]) -> Poll<IoResult<usize>> {
         let this = self.project();
         match this.until.poll(cx) {
-            Poll::Ready(_) => {
-                // TODO: Need proper shutdown
-                Poll::Ready(Ok(0))
-            }
+            Poll::Ready(_) => Poll::Ready(Ok(0)),
             Poll::Pending => this.reader.poll_read(cx, buf),
         }
     }
