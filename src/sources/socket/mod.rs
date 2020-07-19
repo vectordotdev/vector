@@ -10,6 +10,7 @@ use crate::{
     tls::MaybeTlsSettings,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
+use futures::compat::Compat;
 use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -94,7 +95,13 @@ impl SourceConfig for SocketConfig {
                     .host_key
                     .clone()
                     .unwrap_or_else(|| event::log_schema().host_key().clone());
-                Ok(udp::udp(config.address, host_key, shutdown, out))
+                Ok(Box::new(Compat::new(Box::pin(udp::udp(
+                    config.address,
+                    config.max_length,
+                    host_key,
+                    shutdown,
+                    out,
+                )))) as super::Source)
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
@@ -135,7 +142,8 @@ mod test {
     use crate::shutdown::{ShutdownSignal, SourceShutdownCoordinator};
     use crate::sinks::util::tcp::TcpSink;
     use crate::test_util::{
-        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, wait_for_tcp, CollectN,
+        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, trace_init,
+        wait_for_tcp, CollectN,
     };
     use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
@@ -694,6 +702,7 @@ mod test {
 
     #[test]
     fn udp_shutdown_infinite_stream() {
+        trace_init();
         let (tx, rx) = mpsc::channel(10);
         let source_name = "udp_shutdown_infinite_stream";
 
