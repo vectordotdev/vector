@@ -3,7 +3,7 @@
 use assert_cmd::prelude::*;
 use std::process::Command;
 
-/// Returns `stdout` of `vector $command`
+/// Returns `stdout` of `vector arguments`
 fn run_command(arguments: Vec<&str>) -> Vec<u8> {
     let mut cmd = Command::cargo_bin("vector").unwrap();
     for arg in arguments {
