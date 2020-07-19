@@ -1,9 +1,10 @@
+use futures::{FutureExt, TryFutureExt};
 use futures01::{future, Async, Future};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use stream_cancel::{Trigger, Tripwire};
-use tokio01::timer;
+use tokio::time;
 
 /// When this struct goes out of scope and its internal refcount goes to 0 it is a signal that its
 /// corresponding Source has completed executing and may be cleaned up.  It is the responsibility
@@ -283,17 +284,15 @@ impl SourceShutdownCoordinator {
     ) -> impl Future<Item = bool, Error = ()> {
         let success = shutdown_complete_tripwire.map(move |_| true);
 
-        let timeout = timer::Delay::new(deadline)
-            .map(move |_| {
-                error!(
-                    "Source '{}' failed to shutdown before deadline. Forcing shutdown.",
-                    name,
-                );
-                false
-            })
-            .map_err(|err| panic!("Timer error: {:?}", err));
+        let timeout = time::delay_until(deadline.into()).map(move |_| {
+            error!(
+                "Source '{}' failed to shutdown before deadline. Forcing shutdown.",
+                name,
+            );
+            false
+        });
 
-        let union = success.select(timeout);
+        let union = success.select(timeout.map(Ok).compat());
         union
             .map(|(success, _)| {
                 if success {
