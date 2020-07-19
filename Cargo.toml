@@ -153,7 +153,7 @@ pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runti
 task-compat = "0.1"
 cidr-utils = "0.4.2"
 pin-project = "0.4.22"
-k8s-openapi = { version = "0.8", features = ["v1_15"], optional = true }
+k8s-openapi = { version = "0.9", features = ["v1_15"], optional = true }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -457,7 +457,3 @@ required-features = ["transforms-wasm", "transforms-lua"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
-
-[patch.crates-io]
-# TODO: switch to crates.io after fix for https://github.com/Arnavion/k8s-openapi/issues/70 is released
-k8s-openapi = { git = "https://github.com/Arnavion/k8s-openapi.git", rev = "f506c01134b5280faaa1d003c7445178df7fa36e" }
