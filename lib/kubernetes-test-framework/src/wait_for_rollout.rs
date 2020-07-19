@@ -8,17 +8,17 @@ use tokio::process::Command;
 /// Wait for a rollout of a `resource` within a `namespace` to complete via
 /// the specifed `kubectl_command`.
 /// Use `extra` to pass additional arguments to `kubectl`.
-pub async fn run<CMD, NS, R, EX>(
-    kubectl_command: CMD,
+pub async fn run<Cmd, NS, R, Ex>(
+    kubectl_command: Cmd,
     namespace: NS,
     resource: R,
-    extra: impl IntoIterator<Item = EX>,
+    extra: impl IntoIterator<Item = Ex>,
 ) -> Result<()>
 where
-    CMD: AsRef<OsStr>,
+    Cmd: AsRef<OsStr>,
     NS: AsRef<OsStr>,
     R: AsRef<OsStr>,
-    EX: AsRef<OsStr>,
+    Ex: AsRef<OsStr>,
 {
     let mut command = Command::new(kubectl_command);
 

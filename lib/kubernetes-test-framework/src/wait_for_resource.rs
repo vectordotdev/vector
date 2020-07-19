@@ -20,19 +20,19 @@ where
 /// Wait for a set of `resources` within a `namespace` to reach a `wait_for`
 /// condition.
 /// Use `extra` to pass additional arguments to `kubectl`.
-pub async fn namespace<CMD, NS, R, COND, EX>(
-    kubectl_command: CMD,
+pub async fn namespace<Cmd, NS, R, Cond, Ex>(
+    kubectl_command: Cmd,
     namespace: NS,
     resources: impl IntoIterator<Item = R>,
-    wait_for: WaitFor<COND>,
-    extra: impl IntoIterator<Item = EX>,
+    wait_for: WaitFor<Cond>,
+    extra: impl IntoIterator<Item = Ex>,
 ) -> Result<()>
 where
-    CMD: AsRef<OsStr>,
+    Cmd: AsRef<OsStr>,
     NS: AsRef<OsStr>,
     R: AsRef<OsStr>,
-    COND: std::fmt::Display,
-    EX: AsRef<OsStr>,
+    Cond: std::fmt::Display,
+    Ex: AsRef<OsStr>,
 {
     let mut command = prepare_base_command(kubectl_command, resources, wait_for, extra);
     command.arg("-n").arg(namespace);
@@ -42,34 +42,34 @@ where
 /// Wait for a set of `resources` at any namespace to reach a `wait_for`
 /// condition.
 /// Use `extra` to pass additional arguments to `kubectl`.
-pub async fn all_namespaces<CMD, R, COND, EX>(
-    kubectl_command: CMD,
+pub async fn all_namespaces<Cmd, R, Cond, Ex>(
+    kubectl_command: Cmd,
     resources: impl IntoIterator<Item = R>,
-    wait_for: WaitFor<COND>,
-    extra: impl IntoIterator<Item = EX>,
+    wait_for: WaitFor<Cond>,
+    extra: impl IntoIterator<Item = Ex>,
 ) -> Result<()>
 where
-    CMD: AsRef<OsStr>,
+    Cmd: AsRef<OsStr>,
     R: AsRef<OsStr>,
-    COND: std::fmt::Display,
-    EX: AsRef<OsStr>,
+    Cond: std::fmt::Display,
+    Ex: AsRef<OsStr>,
 {
     let mut command = prepare_base_command(kubectl_command, resources, wait_for, extra);
     command.arg("--all-namespaces=true");
     run_command(command).await
 }
 
-fn prepare_base_command<CMD, R, COND, EX>(
-    kubectl_command: CMD,
+fn prepare_base_command<Cmd, R, Cond, Ex>(
+    kubectl_command: Cmd,
     resources: impl IntoIterator<Item = R>,
-    wait_for: WaitFor<COND>,
-    extra: impl IntoIterator<Item = EX>,
+    wait_for: WaitFor<Cond>,
+    extra: impl IntoIterator<Item = Ex>,
 ) -> Command
 where
-    CMD: AsRef<OsStr>,
+    Cmd: AsRef<OsStr>,
     R: AsRef<OsStr>,
-    COND: std::fmt::Display,
-    EX: AsRef<OsStr>,
+    Cond: std::fmt::Display,
+    Ex: AsRef<OsStr>,
 {
     let mut command = Command::new(kubectl_command);
 
