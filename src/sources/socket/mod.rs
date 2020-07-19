@@ -142,8 +142,7 @@ mod test {
     use crate::shutdown::{ShutdownSignal, SourceShutdownCoordinator};
     use crate::sinks::util::tcp::TcpSink;
     use crate::test_util::{
-        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, trace_init,
-        wait_for_tcp, CollectN,
+        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, wait_for_tcp, CollectN,
     };
     use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
@@ -702,7 +701,6 @@ mod test {
 
     #[test]
     fn udp_shutdown_infinite_stream() {
-        trace_init();
         let (tx, rx) = mpsc::channel(10);
         let source_name = "udp_shutdown_infinite_stream";
 
