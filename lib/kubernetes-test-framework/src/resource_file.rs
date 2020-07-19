@@ -19,9 +19,3 @@ impl ResourceFile {
         self.path.as_path()
     }
 }
-
-impl Drop for ResourceFile {
-    fn drop(&mut self) {
-        std::fs::remove_file(&self.path).expect("unable to clean up custom resource file");
-    }
-}
