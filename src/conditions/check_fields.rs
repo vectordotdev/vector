@@ -441,7 +441,7 @@ fn build_predicates(
                     None
                 }
             })
-            .and_then(|i| {
+            .map(|i| {
                 let mut target = target_pred.clone();
                 let pred = target.split_off(i + 1);
                 target.truncate(target.len() - 1);
@@ -450,8 +450,7 @@ fn build_predicates(
                         predicates.insert(format!("{}: {:?}", target_pred, arg), pred);
                     }
                     Err(err) => errors.push(err),
-                }
-                Some(())
+                };
             })
             .is_none()
         {

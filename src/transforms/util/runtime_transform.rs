@@ -20,26 +20,26 @@ pub trait RuntimeTransform {
     /// Call user-defined "init" hook.
     fn hook_init<F>(&mut self, _emit_fn: F)
     where
-        F: FnMut(Event) -> (),
+        F: FnMut(Event),
     {
     }
 
     /// Call user-defined "process" hook.
     fn hook_process<F>(&mut self, event: Event, emit_fn: F)
     where
-        F: FnMut(Event) -> ();
+        F: FnMut(Event);
 
     /// Call user-defined "shutdown" hook.
     fn hook_shutdown<F>(&mut self, _emit_fn: F)
     where
-        F: FnMut(Event) -> (),
+        F: FnMut(Event),
     {
     }
 
     /// Call user-defined timer handler.
     fn timer_handler<F>(&mut self, _timer: Timer, _emit_fn: F)
     where
-        F: FnMut(Event) -> (),
+        F: FnMut(Event),
     {
     }
 
