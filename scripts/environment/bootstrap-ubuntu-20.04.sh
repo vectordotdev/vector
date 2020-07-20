@@ -31,6 +31,7 @@ apt install --yes \
     binutils-arm-linux-gnueabihf \
     gcc-arm-linux-gnueabihf \
     g++-arm-linux-gnueabihf \
+    crossbuild-essential-i386  \
     gnupg2
 # Stupid, right? Sadly it works.
 ln -s "/usr/bin/g++" "/usr/bin/musl-g++"
@@ -64,4 +65,4 @@ cd /git/richfelker/musl-cross-make
 export NUM_CPUS=$(awk '/^processor/ { N++} END { print N }' /proc/cpuinfo)
 make install -j${NUM_CPUS} TARGET=x86_64-linux-musl
 make install -j${NUM_CPUS} TARGET=aarch64-linux-musl
-make install -j${NUM_CPUS} TARGET=armv7-linux-musleabihf
+make install -j${NUM_CPUS} TARGET=arm-linux-musleabihf GCC_CONFIG="--with-float=softfp"
