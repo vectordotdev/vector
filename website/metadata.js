@@ -39996,7 +39996,7 @@ module.exports = {
           "deletions_count": 6156,
           "description": "Add new guides section",
           "files_count": 1118,
-          "highlight_permalink": null,
+          "highlight_permalink": "/highlights/2020-03-31-guides-section/",
           "insertions_count": 74832,
           "message": "chore(website): Add new guides section (#2132)",
           "pr_number": 2132,
@@ -42161,6 +42161,20 @@ module.exports = {
             "transform: filter"
           ],
           "title": "New Filter Transform"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-03-31",
+          "description": "High quality guides and education for Vector",
+          "hide_on_release_notes": false,
+          "id": "2020-03-31-guides-section",
+          "path": "website/highlights/2020-03-31-guides-section.md",
+          "permalink": "/highlights/2020-03-31-guides-section/",
+          "tags": [
+            "type: new feature",
+            "domain: website"
+          ],
+          "title": "A New Guides Section"
         },
         {
           "author_github": "https://github.com/binarylogic",
