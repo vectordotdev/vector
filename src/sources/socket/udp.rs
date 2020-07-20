@@ -4,17 +4,15 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::Source,
 };
+use bytes05::BytesMut;
 use codec::BytesDelimitedCodec;
-use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    FutureExt, StreamExt, TryFutureExt,
-};
+use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::{sync::mpsc, Sink};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use string_cache::DefaultAtom as Atom;
 use tokio::net::UdpSocket;
-use tokio_util::udp::UdpFramed;
+use tokio_util::codec::Decoder;
 
 /// UDP processes messages per packet, where messages are separated by newline.
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -39,45 +37,57 @@ pub fn udp(
     shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
 ) -> Source {
-    let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
+    let mut out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
     Box::new(
         async move {
-            let socket = UdpSocket::bind(&address)
+            let mut socket = UdpSocket::bind(&address)
                 .await
                 .expect("failed to bind to udp listener socket");
             info!(message = "listening.", %address);
 
-            let _ = UdpFramed::new(socket, BytesDelimitedCodec::new(b'\n'))
-                .take_until(shutdown.compat())
-                .filter_map(|frame| {
-                    let host_key = host_key.clone();
-                    async move {
-                        match frame {
-                            Ok((line, addr)) => {
-                                let byte_size = line.len();
-                                let mut event = Event::from(line);
+            let mut shutdown = shutdown.compat();
 
-                                event
-                                    .as_mut_log()
-                                    .insert(event::log_schema().source_type_key(), "socket");
+            // TODO: need to be changed to max_length from config
+            // Issue: https://github.com/timberio/vector/issues/3117
+            let max_length = 100 * 1024;
+            let mut buf = BytesMut::with_capacity(max_length);
+            loop {
+                buf.resize(max_length, 0);
+                tokio::select! {
+                    recv = socket.recv_from(&mut buf) => {
+                        let (byte_size, address) = recv.map_err(|error| {
+                            emit!(UdpSocketError { error });
+                        })?;
 
-                                event.as_mut_log().insert(host_key, addr.to_string());
+                        let mut payload = buf.split_to(byte_size);
 
-                                emit!(UdpEventReceived { byte_size });
-                                Some(Ok(event))
-                            }
-                            Err(error) => {
-                                emit!(UdpSocketError { error });
-                                None
+                        // UDP processes messages per payload, where messages are separated by newline
+                        // and stretch to end of payload.
+                        let mut decoder = BytesDelimitedCodec::new(b'\n');
+                        while let Ok(Some(line)) = decoder.decode_eof(&mut payload) {
+                            let mut event = Event::from(line);
+
+                            event
+                                .as_mut_log()
+                                .insert(event::log_schema().source_type_key(), "socket");
+                            event
+                                .as_mut_log()
+                                .insert(host_key.clone(), address.to_string());
+
+                            emit!(UdpEventReceived { byte_size });
+
+                            tokio::select!{
+                                result = out.send(event).compat() => {
+                                    out = result?;
+                                }
+                                _ = &mut shutdown => return Ok(()),
                             }
                         }
                     }
-                })
-                .forward(out.sink_compat())
-                .await;
-
-            Ok(())
+                    _ = &mut shutdown => return Ok(()),
+                }
+            }
         }
         .boxed()
         .compat(),
