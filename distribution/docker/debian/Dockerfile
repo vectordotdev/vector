@@ -1,9 +1,9 @@
-FROM debian:sid-slim AS builder
+FROM debian:buster-slim AS builder
 
 COPY vector-*.deb ./
 RUN dpkg -i vector-$(dpkg --print-architecture).deb
 
-FROM debian:sid-slim
+FROM debian:buster-slim
 
 RUN apt-get update && apt-get install -y ca-certificates tzdata systemd && rm -rf /var/lib/apt/lists/*
 
