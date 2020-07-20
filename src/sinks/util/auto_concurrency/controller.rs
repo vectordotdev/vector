@@ -94,12 +94,14 @@ impl<L> Controller<L> {
     fn adjust_to_back_pressure(&self, start: Instant, is_back_pressure: bool) {
         let now = instant_now();
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
+
         #[cfg(test)]
         let mut stats = self.stats.lock().expect("Stats mutex is poisoned");
 
         let rtt = now.saturating_duration_since(start);
         emit!(AutoConcurrencyObservedRtt { rtt });
         let rtt = rtt.as_secs_f64();
+
         #[cfg(test)]
         stats.observed_rtt.add(rtt, now);
 
@@ -109,6 +111,7 @@ impl<L> Controller<L> {
 
         #[cfg(test)]
         stats.in_flight.add(inner.in_flight, now);
+
         inner.in_flight -= 1;
         emit!(AutoConcurrencyInFlight {
             in_flight: inner.in_flight as u64
@@ -194,6 +197,7 @@ where
     }
 }
 
+/// Exponentially Weighted Moving Average
 #[derive(Clone, Copy, Debug, Default)]
 struct EWMA {
     average: f64,
@@ -204,6 +208,7 @@ impl EWMA {
         self.average
     }
 
+    /// Update and return the current average
     fn update(&mut self, point: f64) -> f64 {
         self.average = match self.average {
             avg if avg == 0.0 => point,
@@ -213,6 +218,7 @@ impl EWMA {
     }
 }
 
+/// Simple unweighted arithmetic mean
 #[derive(Clone, Copy, Debug, Default)]
 struct Mean {
     sum: f64,
@@ -220,10 +226,10 @@ struct Mean {
 }
 
 impl Mean {
+    /// Update and return the current average
     fn update(&mut self, point: f64) -> f64 {
         self.sum += point;
         self.count += 1;
-        // Return current average
         self.sum / max(self.count, 1) as f64
     }
 
