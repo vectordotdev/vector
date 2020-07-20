@@ -400,11 +400,8 @@ package-deb: ## Build the deb package
 
 package-deb-all: package-deb-x86_64 package-deb-armv7 package-deb-aarch64 ## Build all deb packages
 
-package-deb-x86_64-gnu: package-archive-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
-	$(RUN) package-deb-x86_64-gnu
-
-package-deb-x86_64-musl: package-archive-x86_64-unknown-linux-musl ## Build the x86_64 deb package
-	$(RUN) package-deb-x86_64-musl
+package-deb-x86_64: package-archive-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
+	$(RUN) package-deb-x86_64
 
 package-deb-armv7: package-archive-armv7-unknown-linux-musleabihf ## Build the armv7 deb package
 	$(RUN) package-deb-armv7
