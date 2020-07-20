@@ -1,4 +1,4 @@
-FROM debian:stable-slim AS builder
+FROM debian:sid-slim AS builder
 
 COPY vector-*.deb ./
 RUN dpkg -i vector-$(dpkg --print-architecture).deb
