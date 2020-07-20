@@ -290,6 +290,7 @@ mod tests {
         .await;
     }
 
+    #[allow(clippy::needless_range_loop)]
     #[tokio::test]
     async fn rapid_decrease() {
         TestService::run(|mut svc| async move {
