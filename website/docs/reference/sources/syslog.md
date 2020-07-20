@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-20"
 delivery_guarantee: "best_effort"
 component_title: "Syslog"
 description: "The Vector `syslog` source ingests data through the Syslog protocol and outputs `log` events."
@@ -382,17 +382,17 @@ will not request a certificate from the client.
 {
   // ...
   "appname": "app-name",
-  "facility": "1",
   "host": "my.host.com",
   "hostname": "my.host.com",
+  "custom_field1": "custom value 1",
+  "facility": "1",
   "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
   "msgid": "ID47",
   "procid": "8710",
   "severity": "notice",
   "source_ip": "127.0.0.1",
   "timestamp": "2019-11-01T21:15:47+00:00",
-  "version": 1,
-  "custom_field1": "custom value 1"
+  "version": 1
   // ...
 }
 ```
@@ -418,30 +418,6 @@ will not request a certificate from the client.
 
 The appname extracted from the Syslog formatted line. If a appname is not
 found, then the key will not be added.
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["1"]}
-  groups={[]}
-  name={"facility"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### facility
-
-The facility extracted from the Syslog line. If a facility is not found, then
-the key will not be added.
 
 
 
@@ -491,6 +467,54 @@ socket path will be used. This key can be renamed via the [`host_key`](#host_key
 
 The hostname extracted from the Syslog line. (`host` is also this value if it
 exists in the log.)
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"custom_field1":"custom value 1"}]}
+  groups={[]}
+  name={"`[field-name]`"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"*"}
+  unit={null}
+  warnings={[]}
+  >
+
+### `[field-name]`
+
+In addition to the defined fields, any Syslog 5424 structured fields are parsed
+and inserted as root level fields.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["1"]}
+  groups={[]}
+  name={"facility"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### facility
+
+The facility extracted from the Syslog line. If a facility is not found, then
+the key will not be added.
 
 
 
@@ -658,30 +682,6 @@ then Vector will use the current time.
 
 The version extracted from the Syslog line. If a version is not found, then the
 key will not be added.
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"custom_field1":"custom value 1"}]}
-  groups={[]}
-  name={"`[field-name]`"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"*"}
-  unit={null}
-  warnings={[]}
-  >
-
-### `[field-name]`
-
-In addition to the defined fields, any Syslog 5424 structured fields are parsed
-and inserted as root level fields.
 
 
 

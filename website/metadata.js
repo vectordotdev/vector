@@ -10126,13 +10126,115 @@ module.exports = {
         ],
         "sha": "59871fd3f54bd4710d14fde4089088dcb2932d81",
         "type": "chore"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2020-07-16 14:26:19 +0000",
+        "deletions_count": 0,
+        "description": "append instead of overwriting files",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 43,
+        "message": "fix(file sink): append instead of overwriting files (#3084)",
+        "pr_number": 3084,
+        "scopes": [
+          {
+            "component": {
+              "name": "file",
+              "type": "sink"
+            },
+            "name": "file sink"
+          }
+        ],
+        "sha": "773e5e5c85c5d5849e306783468e4cfb7fd82f74",
+        "type": "fix"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2020-07-16 16:26:39 +0000",
+        "deletions_count": 2,
+        "description": "stop logging every received event",
+        "files_count": 2,
+        "highlight_permalink": null,
+        "insertions_count": 7,
+        "message": "fix(elasticsearch sink): stop logging every received event (#3085)",
+        "pr_number": 3085,
+        "scopes": [
+          {
+            "component": {
+              "name": "elasticsearch",
+              "type": "sink"
+            },
+            "name": "elasticsearch sink"
+          }
+        ],
+        "sha": "1de26d27ed36062e58c702e4c5af168175d4ca87",
+        "type": "fix"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-07-19 21:41:16 +0000",
+        "deletions_count": 111,
+        "description": "Remove `tcp_graceful_shutdown` ",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 0,
+        "message": "chore(tests): Remove `tcp_graceful_shutdown`  (#3103)",
+        "pr_number": 3103,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "tests"
+          }
+        ],
+        "sha": "e31f20da83114449109c3a9f14a9ac097da28dfb",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-07-19 21:42:21 +0000",
+        "deletions_count": 70,
+        "description": "Remove `s3_waits_for_full_batch_or_timeout_before_sending`",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 0,
+        "message": "chore(tests): Remove `s3_waits_for_full_batch_or_timeout_before_sending` (#3105)",
+        "pr_number": 3105,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "tests"
+          }
+        ],
+        "sha": "f37f2e0ce3d94679bf88ba5826b43e705977bfdc",
+        "type": "chore"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
     "date": "2020-07-10",
-    "deletions_count": 25245,
+    "deletions_count": 25428,
     "description": "",
     "highlights": [
+      {
+        "author_github": "https://github.com/binarylogic",
+        "date": "2020-03-31",
+        "description": "High quality guides and education for Vector",
+        "hide_on_release_notes": false,
+        "id": "2020-03-31-guides-section",
+        "path": "website/highlights/2020-03-31-guides-section.md",
+        "permalink": "/highlights/2020-03-31-guides-section/",
+        "tags": [
+          "type: new feature",
+          "domain: website"
+        ],
+        "title": "A New Guides Section"
+      },
       {
         "author_github": "https://github.com/hoverbear",
         "date": "2020-05-04",
@@ -10293,7 +10395,7 @@ module.exports = {
         "title": "New Reduce transform"
       }
     ],
-    "insertions_count": 47643,
+    "insertions_count": 47693,
     "last_version": "0.9.2",
     "permalink": "/releases/0.10.0/",
     "title": "Vector v0.10.0",
@@ -16482,13 +16584,115 @@ module.exports = {
           ],
           "sha": "59871fd3f54bd4710d14fde4089088dcb2932d81",
           "type": "chore"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-07-16 14:26:19 +0000",
+          "deletions_count": 0,
+          "description": "append instead of overwriting files",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 43,
+          "message": "fix(file sink): append instead of overwriting files (#3084)",
+          "pr_number": 3084,
+          "scopes": [
+            {
+              "component": {
+                "name": "file",
+                "type": "sink"
+              },
+              "name": "file sink"
+            }
+          ],
+          "sha": "773e5e5c85c5d5849e306783468e4cfb7fd82f74",
+          "type": "fix"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-07-16 16:26:39 +0000",
+          "deletions_count": 2,
+          "description": "stop logging every received event",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 7,
+          "message": "fix(elasticsearch sink): stop logging every received event (#3085)",
+          "pr_number": 3085,
+          "scopes": [
+            {
+              "component": {
+                "name": "elasticsearch",
+                "type": "sink"
+              },
+              "name": "elasticsearch sink"
+            }
+          ],
+          "sha": "1de26d27ed36062e58c702e4c5af168175d4ca87",
+          "type": "fix"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-07-19 21:41:16 +0000",
+          "deletions_count": 111,
+          "description": "Remove `tcp_graceful_shutdown` ",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 0,
+          "message": "chore(tests): Remove `tcp_graceful_shutdown`  (#3103)",
+          "pr_number": 3103,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "tests"
+            }
+          ],
+          "sha": "e31f20da83114449109c3a9f14a9ac097da28dfb",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-07-19 21:42:21 +0000",
+          "deletions_count": 70,
+          "description": "Remove `s3_waits_for_full_batch_or_timeout_before_sending`",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 0,
+          "message": "chore(tests): Remove `s3_waits_for_full_batch_or_timeout_before_sending` (#3105)",
+          "pr_number": 3105,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "tests"
+            }
+          ],
+          "sha": "f37f2e0ce3d94679bf88ba5826b43e705977bfdc",
+          "type": "chore"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
       "date": "2020-07-10",
-      "deletions_count": 25245,
+      "deletions_count": 25428,
       "description": "",
       "highlights": [
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2020-03-31",
+          "description": "High quality guides and education for Vector",
+          "hide_on_release_notes": false,
+          "id": "2020-03-31-guides-section",
+          "path": "website/highlights/2020-03-31-guides-section.md",
+          "permalink": "/highlights/2020-03-31-guides-section/",
+          "tags": [
+            "type: new feature",
+            "domain: website"
+          ],
+          "title": "A New Guides Section"
+        },
         {
           "author_github": "https://github.com/hoverbear",
           "date": "2020-05-04",
@@ -16649,7 +16853,7 @@ module.exports = {
           "title": "New Reduce transform"
         }
       ],
-      "insertions_count": 47643,
+      "insertions_count": 47693,
       "last_version": "0.9.2",
       "permalink": "/releases/0.10.0/",
       "title": "Vector v0.10.0",

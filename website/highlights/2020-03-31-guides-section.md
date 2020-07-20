@@ -1,11 +1,11 @@
 ---
-last_modified_on: "2020-07-16"
+last_modified_on: "2020-07-20"
 $schema: "/.meta/.schemas/highlights.json"
 title: "A New Guides Section"
 description: "High quality guides and education for Vector"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [2132]
-release: "0.10.0"
+release: "nightly"
 hide_on_release_notes: false
 tags: ["type: new feature", "domain: website"]
 ---
