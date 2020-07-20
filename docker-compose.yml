@@ -152,7 +152,7 @@ services:
     user: $USER
     command: ./scripts/package-archive.sh
 
-  package-deb-x86_64:
+  package-deb-x86_64-gnu:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-gnu/Dockerfile
@@ -165,6 +165,23 @@ services:
       - ./target/x86_64-unknown-linux-gnu/cargo/registry:/usr/local/cargo/registry
       - ./target/x86_64-unknown-linux-gnu/cargo/git:/usr/local/cargo/git
       - ./target/x86_64-unknown-linux-gnu/rustup/tmp:/usr/local/rustup/tmp
+    working_dir: $PWD
+    user: $USER
+    command: ./scripts/package-deb.sh
+
+  package-deb-x86_64-musl:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+      args:
+        USER: $USER
+    environment:
+      TARGET: x86_64-unknown-linux-musl
+    volumes:
+      - $PWD:$PWD
+      - ./target/x86_64-unknown-linux-musl/cargo/registry:/usr/local/cargo/registry
+      - ./target/x86_64-unknown-linux-musl/cargo/git:/usr/local/cargo/git
+      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/usr/local/rustup/tmp
     working_dir: $PWD
     user: $USER
     command: ./scripts/package-deb.sh
