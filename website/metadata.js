@@ -10222,20 +10222,6 @@ module.exports = {
     "description": "",
     "highlights": [
       {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2020-03-31",
-        "description": "High quality guides and education for Vector",
-        "hide_on_release_notes": false,
-        "id": "2020-03-31-guides-section",
-        "path": "website/highlights/2020-03-31-guides-section.md",
-        "permalink": "/highlights/2020-03-31-guides-section/",
-        "tags": [
-          "type: new feature",
-          "domain: website"
-        ],
-        "title": "A New Guides Section"
-      },
-      {
         "author_github": "https://github.com/hoverbear",
         "date": "2020-05-04",
         "description": "One step closer to Vector replacing awk and sed!",
@@ -16679,20 +16665,6 @@ module.exports = {
       "deletions_count": 25428,
       "description": "",
       "highlights": [
-        {
-          "author_github": "https://github.com/binarylogic",
-          "date": "2020-03-31",
-          "description": "High quality guides and education for Vector",
-          "hide_on_release_notes": false,
-          "id": "2020-03-31-guides-section",
-          "path": "website/highlights/2020-03-31-guides-section.md",
-          "permalink": "/highlights/2020-03-31-guides-section/",
-          "tags": [
-            "type: new feature",
-            "domain: website"
-          ],
-          "title": "A New Guides Section"
-        },
         {
           "author_github": "https://github.com/hoverbear",
           "date": "2020-05-04",
