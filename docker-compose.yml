@@ -152,7 +152,7 @@ services:
     user: $USER
     command: ./scripts/package-archive.sh
 
-  package-deb-x86_64-gnu:
+  package-deb-x86_64:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-gnu/Dockerfile
