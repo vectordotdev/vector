@@ -116,6 +116,7 @@ mod tests {
     use super::super::controller::{ControllerStatistics, Inner};
     use super::super::AutoConcurrencyLimitLayer;
     use super::*;
+    use crate::assert_downcast_matches;
     use snafu::Snafu;
     use std::sync::{Mutex, MutexGuard};
     use std::time::Duration;
@@ -129,29 +130,33 @@ mod tests {
     };
 
     #[derive(Clone, Copy, Debug, Snafu)]
-    enum TestError {}
+    enum TestError {
+        Deferral,
+    }
 
     #[derive(Clone, Copy, Debug)]
     struct TestRetryLogic;
     impl RetryLogic for TestRetryLogic {
         type Error = TestError;
-        type Response = &'static str;
+        type Response = String;
         fn is_retriable_error(&self, _error: &Self::Error) -> bool {
             true
         }
     }
 
-    type TestInner = AutoConcurrencyLimit<Mock<&'static str, &'static str>, TestRetryLogic>;
+    type TestInner = AutoConcurrencyLimit<Mock<String, String>, TestRetryLogic>;
     struct TestService {
         service: Spawn<TestInner>,
-        handle: Handle<&'static str, &'static str>,
+        handle: Handle<String, String>,
         inner: Arc<Mutex<Inner>>,
         stats: Arc<Mutex<ControllerStatistics>>,
+        sequence: usize,
     }
 
     struct Send {
-        request: ResponseFuture<MockResponseFuture<&'static str>, TestRetryLogic>,
-        response: SendResponse<&'static str>,
+        request: ResponseFuture<MockResponseFuture<String>, TestRetryLogic>,
+        response: SendResponse<String>,
+        sequence: usize,
     }
 
     impl TestService {
@@ -166,6 +171,7 @@ mod tests {
                 handle,
                 inner,
                 stats,
+                sequence: 0,
             }
         }
 
@@ -183,19 +189,22 @@ mod tests {
             Arc::try_unwrap(stats).unwrap().into_inner().unwrap()
         }
 
-        async fn send(&mut self) -> Send {
+        async fn send(&mut self, is_ready: bool) -> Send {
             assert_ready_ok!(self.service.poll_ready());
-            let request = self.service.call("DATA");
-            let response = assert_request_eq!(self.handle, "DATA");
-            Send { request, response }
-        }
-
-        fn is_ready(&mut self) {
-            assert_ready_ok!(self.service.poll_ready());
-        }
-
-        fn is_pending(&mut self) {
-            assert_pending!(self.service.poll_ready());
+            self.sequence += 1;
+            let data = format!("REQUEST #{}", self.sequence);
+            let request = self.service.call(data.clone());
+            let response = assert_request_eq!(self.handle, data);
+            if is_ready {
+                assert_ready_ok!(self.service.poll_ready());
+            } else {
+                assert_pending!(self.service.poll_ready());
+            }
+            Send {
+                request,
+                response,
+                sequence: self.sequence,
+            }
         }
 
         fn inner(&self) -> MutexGuard<Inner> {
@@ -205,32 +214,44 @@ mod tests {
 
     impl Send {
         async fn respond(self) {
-            self.response.send_response("RESPONSE");
-            assert_eq!(self.request.await.unwrap(), "RESPONSE");
+            let data = format!("RESPONSE #{}", self.sequence);
+            self.response.send_response(data.clone());
+            assert_eq!(self.request.await.unwrap(), data);
+        }
+
+        async fn defer(self) {
+            self.response.send_error(TestError::Deferral);
+            assert_downcast_matches!(
+                self.request.await.unwrap_err(),
+                TestError,
+                TestError::Deferral
+            );
         }
     }
 
     #[tokio::test]
-    async fn simple() {
+    async fn startup_conditions() {
+        TestService::run(|mut svc| async move {
+            // Concurrency starts at 1
+            assert_eq!(svc.inner().current_limit, 1);
+            svc.send(false).await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn increases_limit() {
         let stats = TestService::run(|mut svc| async move {
             // Concurrency starts at 1
             assert_eq!(svc.inner().current_limit, 1);
-            svc.is_ready();
-            let req = svc.send().await;
-            svc.is_pending();
-
+            let req = svc.send(false).await;
             advance(Duration::from_secs(1)).await;
-
             req.respond().await;
 
             // Concurrency stays at 1 until a measurement
             assert_eq!(svc.inner().current_limit, 1);
-            svc.is_ready();
-            let req = svc.send().await;
-            svc.is_pending();
-
+            let req = svc.send(false).await;
             advance(Duration::from_secs(1)).await;
-
             req.respond().await;
 
             // After a constant speed measurement, concurrency is increased
@@ -244,5 +265,54 @@ mod tests {
 
         let observed_rtt = stats.observed_rtt.stats().unwrap();
         assert_eq!(observed_rtt.mean, 1.0);
+    }
+
+    #[tokio::test]
+    async fn handles_deferral() {
+        TestService::run(|mut svc| async move {
+            assert_eq!(svc.inner().current_limit, 1);
+            let req = svc.send(false).await;
+            advance(Duration::from_secs(1)).await;
+            req.respond().await;
+
+            assert_eq!(svc.inner().current_limit, 1);
+            let req = svc.send(false).await;
+            advance(Duration::from_secs(1)).await;
+            req.respond().await;
+
+            assert_eq!(svc.inner().current_limit, 2);
+
+            let req = svc.send(true).await;
+            advance(Duration::from_secs(1)).await;
+            req.defer().await;
+            assert_eq!(svc.inner().current_limit, 1);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn rapid_decrease() {
+        TestService::run(|mut svc| async move {
+            let mut reqs = [None, None, None];
+            for &concurrent in &[1, 1, 2, 3] {
+                assert_eq!(svc.inner().current_limit, concurrent);
+                for i in 0..concurrent {
+                    reqs[i] = Some(svc.send(i < concurrent - 1).await);
+                }
+                advance(Duration::from_secs(1)).await;
+                for i in 0..concurrent {
+                    reqs[i].take().unwrap().respond().await;
+                }
+            }
+
+            assert_eq!(svc.inner().current_limit, 4);
+
+            let req = svc.send(true).await;
+            advance(Duration::from_secs(1)).await;
+            req.defer().await;
+
+            assert_eq!(svc.inner().current_limit, 2);
+        })
+        .await;
     }
 }
