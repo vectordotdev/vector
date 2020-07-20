@@ -10214,11 +10214,49 @@ module.exports = {
         ],
         "sha": "f37f2e0ce3d94679bf88ba5826b43e705977bfdc",
         "type": "chore"
+      },
+      {
+        "author": "Kirill Fomichev",
+        "breaking_change": false,
+        "date": "2020-07-20 20:57:33 +0000",
+        "deletions_count": 18,
+        "description": "Bump rust-toolchain to 1.45.0",
+        "files_count": 7,
+        "highlight_permalink": null,
+        "insertions_count": 18,
+        "message": "chore: Bump rust-toolchain to 1.45.0 (#3089)",
+        "pr_number": 3089,
+        "scopes": [
+
+        ],
+        "sha": "75b89d490c17f9985089237111e83e4e8c5f71df",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-20 14:03:22 +0000",
+        "deletions_count": 3,
+        "description": "Docker debian packages systemd",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 3,
+        "message": "chore(operations): Docker debian packages systemd (#3129)",
+        "pr_number": 3129,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "876b4104c2009b8e7be71a6c90c4c0f810a90c76",
+        "type": "chore"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
     "date": "2020-07-10",
-    "deletions_count": 25428,
+    "deletions_count": 25449,
     "description": "",
     "highlights": [
       {
@@ -10381,7 +10419,7 @@ module.exports = {
         "title": "New Reduce transform"
       }
     ],
-    "insertions_count": 47693,
+    "insertions_count": 47714,
     "last_version": "0.9.2",
     "permalink": "/releases/0.10.0/",
     "title": "Vector v0.10.0",
@@ -16658,11 +16696,49 @@ module.exports = {
           ],
           "sha": "f37f2e0ce3d94679bf88ba5826b43e705977bfdc",
           "type": "chore"
+        },
+        {
+          "author": "Kirill Fomichev",
+          "breaking_change": false,
+          "date": "2020-07-20 20:57:33 +0000",
+          "deletions_count": 18,
+          "description": "Bump rust-toolchain to 1.45.0",
+          "files_count": 7,
+          "highlight_permalink": null,
+          "insertions_count": 18,
+          "message": "chore: Bump rust-toolchain to 1.45.0 (#3089)",
+          "pr_number": 3089,
+          "scopes": [
+
+          ],
+          "sha": "75b89d490c17f9985089237111e83e4e8c5f71df",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-20 14:03:22 +0000",
+          "deletions_count": 3,
+          "description": "Docker debian packages systemd",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 3,
+          "message": "chore(operations): Docker debian packages systemd (#3129)",
+          "pr_number": 3129,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "876b4104c2009b8e7be71a6c90c4c0f810a90c76",
+          "type": "chore"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
       "date": "2020-07-10",
-      "deletions_count": 25428,
+      "deletions_count": 25449,
       "description": "",
       "highlights": [
         {
@@ -16825,7 +16901,7 @@ module.exports = {
           "title": "New Reduce transform"
         }
       ],
-      "insertions_count": 47693,
+      "insertions_count": 47714,
       "last_version": "0.9.2",
       "permalink": "/releases/0.10.0/",
       "title": "Vector v0.10.0",
