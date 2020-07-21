@@ -282,7 +282,7 @@ impl SourceShutdownCoordinator {
         name: String,
         deadline: Instant,
     ) -> impl Future<Item = bool, Error = ()> {
-        let done = async move {
+        async move {
             select! {
                 _ = shutdown_complete_tripwire.compat() => {
                     shutdown_force_trigger.disable();
@@ -297,9 +297,10 @@ impl SourceShutdownCoordinator {
                     false
                 }
             }
-        };
-
-        Box::pin(done.map(Ok)).compat()
+        }
+        .map(Ok)
+        .boxed()
+        .compat()
     }
 }
 
