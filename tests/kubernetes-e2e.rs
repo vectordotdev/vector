@@ -7,7 +7,7 @@ use k8s_openapi::{
     api::core::v1::{Container, Pod, PodSpec},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
-use kubernetes_test_framework::{
+use k8s_test_framework::{
     lock, test_pod, wait_for_resource::WaitFor, Framework, Interface, Reader,
 };
 use std::collections::HashSet;

@@ -1888,6 +1888,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "k8s-test-framework"
+version = "0.1.0"
+dependencies = [
+ "k8s-openapi",
+ "once_cell",
+ "serde_json",
+ "tempfile",
+ "tokio 0.2.21",
+]
+
+[[package]]
 name = "kernel32-sys"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1905,17 +1916,6 @@ checksum = "a01c2b7c3b70ca41646dafc8fc3b6053a8a0da9301251e8da8548fb067462d81"
 dependencies = [
  "duct",
  "openssl-sys",
-]
-
-[[package]]
-name = "kubernetes-test-framework"
-version = "0.1.0"
-dependencies = [
- "k8s-openapi",
- "once_cell",
- "serde_json",
- "tempfile",
- "tokio 0.2.21",
 ]
 
 [[package]]
@@ -5454,7 +5454,7 @@ dependencies = [
  "inventory",
  "jemallocator",
  "k8s-openapi",
- "kubernetes-test-framework",
+ "k8s-test-framework",
  "lazy_static 1.4.0",
  "leveldb",
  "libc",
