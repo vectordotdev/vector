@@ -231,8 +231,7 @@ mod test {
     use futures::compat::{Future01CompatExt, Sink01CompatExt};
     use futures::{SinkExt, StreamExt, TryStreamExt};
     use futures01::{sync::mpsc, Sink};
-    use std::time::Duration;
-    use tokio::{net::UdpSocket, time::delay_for};
+    use tokio::{net::UdpSocket};
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
@@ -362,8 +361,8 @@ mod test {
             ];
             let (tx, rx) = mpsc::channel(1);
 
+            let socket = UdpSocket::bind(default_address()).await.unwrap();
             tokio::spawn(async move {
-                let socket = UdpSocket::bind(default_address()).await.unwrap();
                 UdpFramed::new(socket, BytesCodec::new())
                     .map_err(|e| error!("error reading line: {:?}", e))
                     .map_ok(|(bytes, _addr)| bytes.freeze())
@@ -375,10 +374,6 @@ mod test {
                     .unwrap()
             });
 
-            // Add a delay to the write side to let the read side
-            // poll for read interest. Otherwise, this could cause
-            // a race condition in noisy environments.
-            delay_for(Duration::from_millis(100)).await;
             let stream = stream::iter_ok(events);
             let _ = sink.send_all(stream).compat().await.unwrap();
 
