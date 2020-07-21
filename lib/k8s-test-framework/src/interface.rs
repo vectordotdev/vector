@@ -10,7 +10,7 @@ pub struct Interface {
     /// delete if from there.
     pub deploy_vector_command: String,
 
-    /// A `kubectl` command used to
+    /// A `kubectl` command used for generic cluster interaction.
     pub kubectl_command: String,
 }
 
