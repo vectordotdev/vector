@@ -10290,11 +10290,112 @@ module.exports = {
         ],
         "sha": "1c91ed0883f6743f471095cdad2ec570f1e74bee",
         "type": "chore"
+      },
+      {
+        "author": "dependabot[bot]",
+        "breaking_change": false,
+        "date": "2020-07-20 23:52:26 +0000",
+        "deletions_count": 3,
+        "description": "bump lodash from 4.17.15 to 4.17.19 in /website",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 3,
+        "message": "chore(deps): bump lodash from 4.17.15 to 4.17.19 in /website (#3098)",
+        "pr_number": 3098,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "deps"
+          }
+        ],
+        "sha": "129a861500f435f94e4b4153f49f1f821715ee46",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-07-21 12:53:47 +0000",
+        "deletions_count": 14,
+        "description": "Update benches",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 16,
+        "message": "chore(tests): Update benches (#3107)",
+        "pr_number": 3107,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "tests"
+          }
+        ],
+        "sha": "5885c7d579ebd95e231589da38056db476d6040c",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-07-21 13:50:27 +0000",
+        "deletions_count": 21,
+        "description": "Remove tokio 0.1 from shutdown",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 18,
+        "message": "chore: Remove tokio 0.1 from shutdown (#3106)",
+        "pr_number": 3106,
+        "scopes": [
+
+        ],
+        "sha": "bfb0fcaa89a118913547ad01c6c2a98fdec29cf7",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-21 09:32:09 +0000",
+        "deletions_count": 7,
+        "description": "Update cidr-utils",
+        "files_count": 2,
+        "highlight_permalink": null,
+        "insertions_count": 7,
+        "message": "chore(operations): Update cidr-utils (#3139)",
+        "pr_number": 3139,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "b6004be220b2071093a066bb16449f1a4e5814ba",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-21 10:26:37 +0000",
+        "deletions_count": 2,
+        "description": "Pin back Rust 1.45 until after 0.10.0",
+        "files_count": 2,
+        "highlight_permalink": null,
+        "insertions_count": 2,
+        "message": "chore(operations): Pin back Rust 1.45 until after 0.10.0 (#3142)",
+        "pr_number": 3142,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "3b8bf31a4f6cd5a47016bba934e16aabe04c18ff",
+        "type": "chore"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
     "date": "2020-07-10",
-    "deletions_count": 25451,
+    "deletions_count": 25498,
     "description": "",
     "highlights": [
       {
@@ -10457,7 +10558,7 @@ module.exports = {
         "title": "New Reduce transform"
       }
     ],
-    "insertions_count": 47717,
+    "insertions_count": 47763,
     "last_version": "0.9.2",
     "permalink": "/releases/0.10.0/",
     "title": "Vector v0.10.0",
@@ -16810,11 +16911,112 @@ module.exports = {
           ],
           "sha": "1c91ed0883f6743f471095cdad2ec570f1e74bee",
           "type": "chore"
+        },
+        {
+          "author": "dependabot[bot]",
+          "breaking_change": false,
+          "date": "2020-07-20 23:52:26 +0000",
+          "deletions_count": 3,
+          "description": "bump lodash from 4.17.15 to 4.17.19 in /website",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 3,
+          "message": "chore(deps): bump lodash from 4.17.15 to 4.17.19 in /website (#3098)",
+          "pr_number": 3098,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "deps"
+            }
+          ],
+          "sha": "129a861500f435f94e4b4153f49f1f821715ee46",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-07-21 12:53:47 +0000",
+          "deletions_count": 14,
+          "description": "Update benches",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 16,
+          "message": "chore(tests): Update benches (#3107)",
+          "pr_number": 3107,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "tests"
+            }
+          ],
+          "sha": "5885c7d579ebd95e231589da38056db476d6040c",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-07-21 13:50:27 +0000",
+          "deletions_count": 21,
+          "description": "Remove tokio 0.1 from shutdown",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 18,
+          "message": "chore: Remove tokio 0.1 from shutdown (#3106)",
+          "pr_number": 3106,
+          "scopes": [
+
+          ],
+          "sha": "bfb0fcaa89a118913547ad01c6c2a98fdec29cf7",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-21 09:32:09 +0000",
+          "deletions_count": 7,
+          "description": "Update cidr-utils",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 7,
+          "message": "chore(operations): Update cidr-utils (#3139)",
+          "pr_number": 3139,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "b6004be220b2071093a066bb16449f1a4e5814ba",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-21 10:26:37 +0000",
+          "deletions_count": 2,
+          "description": "Pin back Rust 1.45 until after 0.10.0",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 2,
+          "message": "chore(operations): Pin back Rust 1.45 until after 0.10.0 (#3142)",
+          "pr_number": 3142,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "3b8bf31a4f6cd5a47016bba934e16aabe04c18ff",
+          "type": "chore"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
       "date": "2020-07-10",
-      "deletions_count": 25451,
+      "deletions_count": 25498,
       "description": "",
       "highlights": [
         {
@@ -16977,7 +17179,7 @@ module.exports = {
           "title": "New Reduce transform"
         }
       ],
-      "insertions_count": 47717,
+      "insertions_count": 47763,
       "last_version": "0.9.2",
       "permalink": "/releases/0.10.0/",
       "title": "Vector v0.10.0",
