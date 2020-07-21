@@ -213,7 +213,8 @@ impl Sink for TcpSink {
                 //
                 // If this returns `WouldBlock` we know the connection is still
                 // valid and the write will most likely succeed.
-                let stream = connection.get_mut().get_mut().get_mut().get_mut();
+                let stream: &mut MaybeTlsStream<TcpStream> =
+                    connection.get_mut().get_mut().get_mut().get_mut();
                 match stream.read(&mut [0u8; 1]) {
                     Err(error) if error.kind() != ErrorKind::WouldBlock => {
                         emit!(TcpConnectionDisconnected { error });

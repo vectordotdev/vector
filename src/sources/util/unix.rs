@@ -9,7 +9,7 @@ use futures::{
 };
 use futures01::{sync::mpsc, Sink};
 use std::path::PathBuf;
-use tokio::net::UnixListener;
+use tokio::net::{UnixListener, UnixStream};
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::field;
 use tracing_futures::Instrument;
@@ -87,7 +87,7 @@ where
                     let _ = out.send_all(&mut stream).await;
                     info!("finished sending");
 
-                    let socket = stream.get_ref().get_ref().get_ref();
+                    let socket: &UnixStream = stream.get_ref().get_ref().get_ref();
                     let _ = socket.shutdown(std::net::Shutdown::Both);
                 }
                 .instrument(span),

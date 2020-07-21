@@ -176,7 +176,8 @@ fn handle_stream(
                     debug!("Start gracefull shutdown");
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
-                    if let Some(socket) = reader.get_ref().get_ref().get_ref().get_ref().get_ref() {
+                    let socket: Option<&TcpStream> = reader.get_ref().get_ref().get_ref().get_ref().get_ref();
+                    if let Some(socket) = socket {
                         if let Err(error) = socket.shutdown(Shutdown::Write) {
                             warn!(message = "Failed in signalling to the other side to close the TCP channel.",%error);
                         }

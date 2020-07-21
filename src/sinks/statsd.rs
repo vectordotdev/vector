@@ -231,7 +231,7 @@ mod test {
     use futures::compat::{Future01CompatExt, Sink01CompatExt};
     use futures::{SinkExt, StreamExt, TryStreamExt};
     use futures01::{sync::mpsc, Sink};
-    use tokio::{net::UdpSocket};
+    use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
