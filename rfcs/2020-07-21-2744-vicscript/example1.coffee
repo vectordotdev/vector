@@ -35,7 +35,7 @@ let column_names = $rows.0
 # And here's the meaty part where we bring it all together. We walk each element
 # of our array of arrays of values, and enumerate the value array. Then, using
 # the index of the value, we create a temporary object with a key taken from the
-# column_names variable and fold it. 
+# column_names variable and fold it.
 doc.items = $rows.slice(1).map_each(
   this.enumerated().fold({}, tally.merge({
       $column_names.index(value.index): value.value
