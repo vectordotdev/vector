@@ -3,8 +3,8 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries2::RetryLogic, rusoto, service2::TowerRequestConfig, BatchConfig, BatchSettings,
-        Compression, MetricBuffer,
+        retries2::RetryLogic, rusoto, service2::TowerRequestConfig, Batch, BatchConfig,
+        BatchSettings, Compression, MetricBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -117,11 +117,10 @@ impl CloudWatchMetricsSvc {
         client: CloudWatchClient,
         cx: SinkContext,
     ) -> crate::Result<super::RouterSink> {
-        let batch = config
-            .batch
-            .disallow_max_bytes()?
-            .use_size_as_events()?
-            .get_settings_or_default(BatchSettings::default().events(20).timeout(1));
+        let batch = MetricBuffer::get_settings_defaults(
+            config.batch,
+            BatchSettings::default().events(20).timeout(1),
+        )?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let cloudwatch_metrics = CloudWatchMetricsSvc { client, config };

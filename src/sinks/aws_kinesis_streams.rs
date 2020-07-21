@@ -9,7 +9,7 @@ use crate::{
         rusoto,
         service2::TowerRequestConfig,
         sink::Response,
-        BatchConfig, BatchSettings, Compression, VecBuffer,
+        Batch, BatchConfig, BatchSettings, Compression, VecBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -136,11 +136,10 @@ impl KinesisService {
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
         let client = Arc::new(client);
 
-        let batch = config
-            .batch
-            .disallow_max_bytes()?
-            .use_size_as_events()?
-            .get_settings_or_default(BatchSettings::default().events(500).timeout(1));
+        let batch = VecBuffer::<String>::get_settings_defaults(
+            config.batch,
+            BatchSettings::default().events(500).timeout(1),
+        )?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();

@@ -9,7 +9,7 @@ use crate::{
         retries2::{RetryAction, RetryLogic},
         rusoto,
         service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, Buffer, Compression,
+        Batch, BatchConfig, BatchSettings, Buffer, Compression,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
@@ -108,15 +108,12 @@ impl SinkConfig for ElasticSearchConfig {
 
         let common = ElasticSearchCommon::parse_config(&self)?;
         let compression = common.compression;
-        let batch = self
-            .batch
-            .clone()
-            .use_size_as_bytes()?
-            .get_settings_or_default(
-                BatchSettings::default()
-                    .bytes(bytesize::mib(10u64))
-                    .timeout(1),
-            );
+        let batch = Buffer::get_settings_defaults(
+            self.batch,
+            BatchSettings::default()
+                .bytes(bytesize::mib(10u64))
+                .timeout(1),
+        )?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let sink = BatchedHttpSink::with_retry_logic(

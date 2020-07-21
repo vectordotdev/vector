@@ -6,7 +6,7 @@ use crate::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
             service2::TowerRequestConfig,
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer,
+            Batch, BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer,
         },
         Healthcheck, RouterSink, UriParseError,
     },
@@ -70,12 +70,13 @@ impl SinkConfig for PubsubConfig {
 
     async fn build_async(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self).await?;
-        let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
+        let batch_settings = JsonArrayBuffer::get_settings_defaults(
+            self.batch,
             BatchSettings::default()
                 .bytes(bytesize::mib(10u64))
                 .events(1000)
                 .timeout(1),
-        );
+        )?;
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(cx.resolver(), tls_settings)?;

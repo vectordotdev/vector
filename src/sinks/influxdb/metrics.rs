@@ -7,7 +7,7 @@ use crate::{
     sinks::util::{
         http::{HttpBatchService, HttpClient, HttpRetryLogic},
         service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, MetricBuffer,
+        Batch, BatchConfig, BatchSettings, MetricBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -97,11 +97,10 @@ impl InfluxDBSvc {
         let token = settings.token();
         let protocol_version = settings.protocol_version();
 
-        let batch = config
-            .batch
-            .disallow_max_bytes()?
-            .use_size_as_events()?
-            .get_settings_or_default(BatchSettings::default().events(20).timeout(1));
+        let batch = MetricBuffer::get_settings_defaults(
+            config.batch,
+            BatchSettings::default().events(20).timeout(1),
+        )?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = settings.write_uri(endpoint)?;

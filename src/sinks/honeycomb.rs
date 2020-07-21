@@ -3,7 +3,7 @@ use crate::{
     sinks::util::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
+        Batch, BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -40,11 +40,12 @@ inventory::submit! {
 impl SinkConfig for HoneycombConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
+        let batch_settings = JsonArrayBuffer::get_settings_defaults(
+            self.batch,
             BatchSettings::default()
                 .bytes(bytesize::kib(100u64))
                 .timeout(1),
-        );
+        )?;
 
         let client = HttpClient::new(cx.resolver(), None)?;
 

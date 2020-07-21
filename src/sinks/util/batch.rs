@@ -24,6 +24,7 @@ pub struct BatchConfig {
 }
 
 impl BatchConfig {
+    // This is used internally by new_relic_logs sink, else it could be pub(super) too
     pub fn use_size_as_bytes(&self) -> Result<Self, BatchError> {
         let max_bytes = match (self.max_bytes, self.max_size) {
             (Some(_), Some(_)) => return Err(BatchError::BytesAndSize),
@@ -38,7 +39,7 @@ impl BatchConfig {
         })
     }
 
-    pub fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
+    pub(super) fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
         // Sinks that used `max_size` for an event count cannot count
         // bytes, so err if `max_bytes` is set.
         match self.max_bytes {
@@ -47,7 +48,7 @@ impl BatchConfig {
         }
     }
 
-    pub fn use_size_as_events(&self) -> Result<Self, BatchError> {
+    pub(super) fn use_size_as_events(&self) -> Result<Self, BatchError> {
         let max_events = match (self.max_events, self.max_size) {
             (Some(_), Some(_)) => return Err(BatchError::EventsAndSize),
             (Some(events), None) => Some(events),
@@ -61,7 +62,7 @@ impl BatchConfig {
         })
     }
 
-    pub fn get_settings_or_default(&self, defaults: BatchSettings) -> BatchSettings {
+    pub(super) fn get_settings_or_default(&self, defaults: BatchSettings) -> BatchSettings {
         BatchSettings {
             size: BatchSize {
                 bytes: self.max_bytes.unwrap_or(defaults.size.bytes),
