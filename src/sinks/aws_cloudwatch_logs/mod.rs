@@ -7,7 +7,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto, Batch, BatchConfig, BatchSettings, Compression, Length, PartitionBatchSink,
+        rusoto, BatchConfig, BatchSettings, Compression, Length, PartitionBatchSink,
         PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings,
         VecBuffer2,
     },
@@ -160,13 +160,11 @@ impl CloudwatchLogsSinkConfig {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let batch = VecBuffer2::<InputLogEvent>::get_settings_defaults(
-            self.batch,
-            BatchSettings::default()
-                .bytes(1_048_576)
-                .events(10_000)
-                .timeout(1),
-        )?;
+        let batch = BatchSettings::default()
+            .bytes(1_048_576)
+            .events(10_000)
+            .timeout(1)
+            .parse_config::<VecBuffer2<InputLogEvent>>(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let log_group = self.group_name.clone();

@@ -8,8 +8,8 @@ use crate::{
             http::{HttpClient, HttpClientFuture},
             retries2::{RetryAction, RetryLogic},
             service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
-            Batch, BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink,
-            PartitionBuffer, PartitionInnerBuffer,
+            BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
+            PartitionInnerBuffer,
         },
         Healthcheck, RouterSink,
     },
@@ -207,12 +207,10 @@ impl GcsSink {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
-        let batch = Buffer::get_settings_defaults(
-            config.batch,
-            BatchSettings::default()
-                .bytes(bytesize::mib(10u64))
-                .timeout(300),
-        )?;
+        let batch = BatchSettings::default()
+            .bytes(bytesize::mib(10u64))
+            .timeout(300)
+            .parse_config::<Buffer>(config.batch)?;
 
         let key_prefix = config.key_prefix.as_deref().unwrap_or("date=%F/");
         let key_prefix = Template::try_from(key_prefix).context(KeyPrefixTemplate)?;

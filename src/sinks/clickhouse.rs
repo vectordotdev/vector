@@ -5,7 +5,7 @@ use crate::{
         http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink},
         retries2::{RetryAction, RetryLogic},
         service2::TowerRequestConfig,
-        Batch, BatchConfig, BatchSettings, Buffer, Compression,
+        BatchConfig, BatchSettings, Buffer, Compression,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -60,12 +60,10 @@ pub enum Encoding {
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let batch = Buffer::get_settings_defaults(
-            self.batch,
-            BatchSettings::default()
-                .bytes(bytesize::mib(10u64))
-                .timeout(1),
-        )?;
+        let batch = BatchSettings::default()
+            .bytes(bytesize::mib(10u64))
+            .timeout(1)
+            .parse_config::<Buffer>(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(cx.resolver(), tls_settings)?;

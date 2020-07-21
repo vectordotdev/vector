@@ -92,6 +92,10 @@ pub struct BatchSettings {
 }
 
 impl BatchSettings {
+    pub fn parse_config<B: Batch>(self, config: BatchConfig) -> Result<BatchSettings, BatchError> {
+        B::get_settings_defaults(config, self)
+    }
+
     // Fake the builder pattern
     pub const fn bytes(self, bytes: u64) -> Self {
         Self {

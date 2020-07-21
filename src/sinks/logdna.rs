@@ -4,7 +4,7 @@ use crate::{
         encoding::EncodingConfigWithDefault,
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
-        Batch, BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
+        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -62,12 +62,10 @@ pub enum Encoding {
 impl SinkConfig for LogdnaConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch_settings = JsonArrayBuffer::get_settings_defaults(
-            self.batch,
-            BatchSettings::default()
-                .bytes(bytesize::mib(10u64))
-                .timeout(1),
-        )?;
+        let batch_settings = BatchSettings::default()
+            .bytes(bytesize::mib(10u64))
+            .timeout(1)
+            .parse_config::<JsonArrayBuffer>(self.batch)?;
         let client = HttpClient::new(cx.resolver(), None)?;
 
         let sink = BatchedHttpSink::new(
