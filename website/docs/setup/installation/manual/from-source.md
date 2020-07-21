@@ -70,7 +70,7 @@ The following steps should be used to compile Vector directly on Linux based sys
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.2)', value: 'latest'},
+        { label: 'Latest (0.10.0)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -78,7 +78,7 @@ The following steps should be used to compile Vector directly on Linux based sys
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.9 | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.10 | \
       tar xzf - -C vector --strip-components=1
     ```
 
@@ -158,7 +158,7 @@ operating systems.
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.2)', value: 'latest'},
+        { label: 'Latest (0.10.0)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -166,7 +166,7 @@ operating systems.
 
     ```bat
     git clone https://github.com/timberio/vector
-    git checkout v0.9.2
+    git checkout v0.10.0
     cd vector
     ```
 
@@ -217,7 +217,7 @@ Building steps:
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.9.2)', value: 'latest'},
+        { label: 'Latest (0.10.0)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -225,7 +225,7 @@ Building steps:
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.9.X | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.10.X | \
       tar xzf - -C vector --strip-components=1
     ```
 

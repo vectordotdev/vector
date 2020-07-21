@@ -5,7 +5,7 @@ title: "A New Guides Section"
 description: "High quality guides and education for Vector"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [2132]
-release: "nightly"
+release: "0.9.0"
 hide_on_release_notes: false
 tags: ["type: new feature", "domain: website"]
 ---

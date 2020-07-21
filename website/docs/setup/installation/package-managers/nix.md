@@ -77,7 +77,7 @@ The following diagram demonstrates how it works.
     <CodeExplanation>
 
     * The `--file` flag ensures that you're installing the latest stable version
-      of Vector (0.9.2).
+      of Vector (0.10.0).
     * The `--attr` improves installation speed.
 
     </CodeExplanation>
