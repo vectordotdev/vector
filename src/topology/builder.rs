@@ -177,7 +177,7 @@ pub async fn build_pieces(
         let cx = TransformContext { resolver };
 
         let input_type = transform.inner.input_type();
-        let transform = match transform.inner.build(cx) {
+        let transform = match transform.inner.build_async(cx).await {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;

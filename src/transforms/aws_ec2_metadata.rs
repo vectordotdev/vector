@@ -112,9 +112,14 @@ inventory::submit! {
     TransformDescription::new_without_default::<Ec2Metadata>("aws_ec2_metadata")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+        unimplemented!()
+    }
+
+    async fn build_async(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
@@ -147,11 +152,13 @@ impl TransformConfig for Ec2Metadata {
 
         let http_client = HttpClient::new(cx.resolver(), None)?;
 
+        let mut client =
+            MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
+
+        client.refresh_metadata().await?;
+
         tokio::spawn(
             async move {
-                let mut client =
-                    MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
-
                 client.run().await;
             }
             // TODO: Once #1338 is done we can fetch the current span
@@ -513,8 +520,12 @@ mod integration_tests {
             host: Some(HOST.clone()),
             ..Default::default()
         };
-        let mut transform =
-            rt.block_on_std(async move { config.build(TransformContext::new_test()).unwrap() });
+        let mut transform = rt.block_on_std(async move {
+            config
+                .build_async(TransformContext::new_test())
+                .await
+                .unwrap()
+        });
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -562,8 +573,12 @@ mod integration_tests {
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
-        let mut transform =
-            rt.block_on_std(async move { config.build(TransformContext::new_test()).unwrap() });
+        let mut transform = rt.block_on_std(async move {
+            config
+                .build_async(TransformContext::new_test())
+                .await
+                .unwrap()
+        });
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -593,8 +608,12 @@ mod integration_tests {
             namespace: Some("ec2.metadata".into()),
             ..Default::default()
         };
-        let mut transform =
-            rt.block_on_std(async move { config.build(TransformContext::new_test()).unwrap() });
+        let mut transform = rt.block_on_std(async move {
+            config
+                .build_async(TransformContext::new_test())
+                .await
+                .unwrap()
+        });
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -619,8 +638,12 @@ mod integration_tests {
             namespace: Some("".into()),
             ..Default::default()
         };
-        let mut transform =
-            rt.block_on_std(async move { config.build(TransformContext::new_test()).unwrap() });
+        let mut transform = rt.block_on_std(async move {
+            config
+                .build_async(TransformContext::new_test())
+                .await
+                .unwrap()
+        });
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
