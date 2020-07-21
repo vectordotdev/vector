@@ -10412,11 +10412,28 @@ module.exports = {
         ],
         "sha": "675ad3be743cc754197e108d2da4427d636dd682",
         "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-21 12:34:52 +0000",
+        "deletions_count": 140,
+        "description": "Prepare v0.10.0",
+        "files_count": 42,
+        "highlight_permalink": null,
+        "insertions_count": 14414,
+        "message": "chore: Prepare v0.10.0 (#3022)",
+        "pr_number": 3022,
+        "scopes": [
+
+        ],
+        "sha": "22fa53afbef21189d7eb8c7eea68864fc494fa93",
+        "type": "chore"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
     "date": "2020-07-10",
-    "deletions_count": 25499,
+    "deletions_count": 25639,
     "description": "",
     "highlights": [
       {
@@ -10579,7 +10596,7 @@ module.exports = {
         "title": "New Reduce transform"
       }
     ],
-    "insertions_count": 47764,
+    "insertions_count": 62178,
     "last_version": "0.9.2",
     "permalink": "/releases/0.10.0/",
     "title": "Vector v0.10.0",
@@ -17054,11 +17071,28 @@ module.exports = {
           ],
           "sha": "675ad3be743cc754197e108d2da4427d636dd682",
           "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-21 12:34:52 +0000",
+          "deletions_count": 140,
+          "description": "Prepare v0.10.0",
+          "files_count": 42,
+          "highlight_permalink": null,
+          "insertions_count": 14414,
+          "message": "chore: Prepare v0.10.0 (#3022)",
+          "pr_number": 3022,
+          "scopes": [
+
+          ],
+          "sha": "22fa53afbef21189d7eb8c7eea68864fc494fa93",
+          "type": "chore"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
       "date": "2020-07-10",
-      "deletions_count": 25499,
+      "deletions_count": 25639,
       "description": "",
       "highlights": [
         {
@@ -17221,7 +17255,7 @@ module.exports = {
           "title": "New Reduce transform"
         }
       ],
-      "insertions_count": 47764,
+      "insertions_count": 62178,
       "last_version": "0.9.2",
       "permalink": "/releases/0.10.0/",
       "title": "Vector v0.10.0",
