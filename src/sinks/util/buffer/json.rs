@@ -11,11 +11,11 @@ pub type BoxedRawValue = Box<RawValue>;
 pub struct JsonArrayBuffer {
     buffer: Vec<BoxedRawValue>,
     total_bytes: usize,
-    settings: BatchSize,
+    settings: BatchSize<Self>,
 }
 
 impl JsonArrayBuffer {
-    pub fn new(settings: BatchSize) -> Self {
+    pub fn new(settings: BatchSize<Self>) -> Self {
         Self {
             buffer: Vec::new(),
             total_bytes: 0,
@@ -30,8 +30,8 @@ impl Batch for JsonArrayBuffer {
 
     fn get_settings_defaults(
         config: BatchConfig,
-        defaults: BatchSettings,
-    ) -> Result<BatchSettings, BatchError> {
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
         Ok(config
             .use_size_as_bytes()?
             .get_settings_or_default(defaults))
@@ -78,10 +78,7 @@ mod tests {
 
     #[test]
     fn multi_object_array() {
-        let batch = BatchSize {
-            bytes: 9999,
-            events: 2,
-        };
+        let batch = BatchSettings::default().bytes(9999).events(2).size;
         let mut buffer = JsonArrayBuffer::new(batch);
 
         assert_eq!(

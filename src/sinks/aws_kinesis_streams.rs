@@ -139,7 +139,7 @@ impl KinesisService {
         let batch = BatchSettings::default()
             .events(500)
             .timeout(1)
-            .parse_config::<VecBuffer<String>>(config.batch)?;
+            .parse_config(config.batch)?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();

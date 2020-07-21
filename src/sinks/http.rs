@@ -113,7 +113,7 @@ impl SinkConfig for HttpSinkConfig {
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
             .timeout(1)
-            .parse_config::<Buffer>(config.batch)?;
+            .parse_config(config.batch)?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let sink = BatchedHttpSink::new(

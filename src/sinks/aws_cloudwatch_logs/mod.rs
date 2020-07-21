@@ -164,7 +164,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             .bytes(1_048_576)
             .events(10_000)
             .timeout(1)
-            .parse_config::<VecBuffer2<InputLogEvent>>(self.batch)?;
+            .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let log_group = self.group_name.clone();

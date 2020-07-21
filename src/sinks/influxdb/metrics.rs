@@ -100,7 +100,7 @@ impl InfluxDBSvc {
         let batch = BatchSettings::default()
             .events(20)
             .timeout(1)
-            .parse_config::<MetricBuffer>(config.batch)?;
+            .parse_config(config.batch)?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = settings.write_uri(endpoint)?;

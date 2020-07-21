@@ -14,15 +14,15 @@ pub trait Length {
 pub struct VecBuffer2<T> {
     batch: Vec<T>,
     bytes: usize,
-    settings: BatchSize,
+    settings: BatchSize<Self>,
 }
 
 impl<T> VecBuffer2<T> {
-    pub fn new(settings: BatchSize) -> Self {
+    pub fn new(settings: BatchSize<Self>) -> Self {
         Self::new_with_settings(settings)
     }
 
-    fn new_with_settings(settings: BatchSize) -> Self {
+    fn new_with_settings(settings: BatchSize<Self>) -> Self {
         Self {
             batch: Vec::with_capacity(settings.events),
             bytes: 0,
@@ -37,8 +37,8 @@ impl<T: Length> Batch for VecBuffer2<T> {
 
     fn get_settings_defaults(
         config: BatchConfig,
-        defaults: BatchSettings,
-    ) -> Result<BatchSettings, BatchError> {
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
         Ok(config
             .use_size_as_events()?
             .get_settings_or_default(defaults))

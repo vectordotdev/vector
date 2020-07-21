@@ -92,7 +92,7 @@ impl StatsdSvc {
             .bytes(1300)
             .events(1000)
             .timeout(1)
-            .parse_config::<Buffer>(config.batch)?;
+            .parse_config(config.batch)?;
         let namespace = config.namespace.clone();
 
         let client = Client::new(config.address)?;

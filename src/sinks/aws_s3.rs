@@ -180,7 +180,7 @@ impl S3SinkConfig {
         let batch = BatchSettings::default()
             .bytes(10_000_000)
             .timeout(300)
-            .parse_config::<Buffer>(self.batch)?;
+            .parse_config(self.batch)?;
 
         let key_prefix = self.key_prefix.as_deref().unwrap_or("date=%F/");
         let key_prefix = Template::try_from(key_prefix)?;

@@ -43,7 +43,7 @@ impl SinkConfig for HoneycombConfig {
         let batch_settings = BatchSettings::default()
             .bytes(bytesize::kib(100u64))
             .timeout(1)
-            .parse_config::<JsonArrayBuffer>(self.batch)?;
+            .parse_config(self.batch)?;
 
         let client = HttpClient::new(cx.resolver(), None)?;
 

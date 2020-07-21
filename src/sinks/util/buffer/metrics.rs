@@ -99,7 +99,7 @@ impl MetricBuffer {
     //   Absolute AggregatedHistogram => Absolute AggregatedHistogram
     //   Absolute AggregatedSummary   => Absolute AggregatedSummary
     //
-    pub fn new(settings: BatchSize) -> Self {
+    pub fn new(settings: BatchSize<Self>) -> Self {
         Self::new_with_state(settings.events, HashSet::new())
     }
 
@@ -118,8 +118,8 @@ impl Batch for MetricBuffer {
 
     fn get_settings_defaults(
         config: BatchConfig,
-        defaults: BatchSettings,
-    ) -> Result<BatchSettings, BatchError> {
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
         Ok(config
             .disallow_max_bytes()?
             .use_size_as_events()?
@@ -282,7 +282,7 @@ fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>,
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::sinks::util::{BatchSink, BatchSize};
+    use crate::sinks::util::BatchSink;
     use crate::{
         buffers::Acker,
         event::metric::{Metric, MetricValue},
@@ -329,10 +329,7 @@ mod test {
 
             future::ok::<_, std::io::Error>(())
         });
-        let batch_size = BatchSize {
-            bytes: 9999,
-            events: 6,
-        };
+        let batch_size = BatchSettings::default().bytes(9999).events(6).size;
         let buffered = BatchSink::with_executor(
             svc,
             MetricBuffer::new(batch_size),

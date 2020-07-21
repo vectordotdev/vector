@@ -210,7 +210,7 @@ impl GcsSink {
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
             .timeout(300)
-            .parse_config::<Buffer>(config.batch)?;
+            .parse_config(config.batch)?;
 
         let key_prefix = config.key_prefix.as_deref().unwrap_or("date=%F/");
         let key_prefix = Template::try_from(key_prefix).context(KeyPrefixTemplate)?;

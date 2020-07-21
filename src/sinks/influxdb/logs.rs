@@ -83,7 +83,7 @@ impl SinkConfig for InfluxDBLogsConfig {
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(1u64))
             .timeout(1)
-            .parse_config::<Buffer>(self.batch)?;
+            .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let settings = influxdb_settings(

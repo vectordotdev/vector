@@ -112,7 +112,7 @@ impl SinkConfig for DatadogConfig {
         let batch = BatchSettings::default()
             .events(20)
             .timeout(1)
-            .parse_config::<MetricBuffer>(self.batch)?;
+            .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = build_uri(&self.host)?;

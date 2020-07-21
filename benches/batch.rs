@@ -29,10 +29,10 @@ fn batching(
             |input| {
                 let mut rt = vector::test_util::runtime();
                 let (acker, _) = Acker::new_for_testing();
-                let batch = BatchSize {
-                    bytes: max_bytes,
-                    events: num_events,
-                };
+                let batch = BatchSettings::default()
+                    .bytes(max_bytes as u64)
+                    .events(num_events)
+                    .size;
                 let batch_sink = BatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
                     Buffer::new(batch, compression),
@@ -74,10 +74,10 @@ fn partitioned_batching(
             |input| {
                 let mut rt = vector::test_util::runtime();
                 let (acker, _) = Acker::new_for_testing();
-                let batch = BatchSize {
-                    bytes: max_bytes,
-                    events: num_events,
-                };
+                let batch = BatchSettings::default()
+                    .bytes(max_bytes as u64)
+                    .events(num_events)
+                    .size;
                 let batch_sink = PartitionBatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
                     PartitionedBuffer::new(batch, compression),
@@ -169,7 +169,7 @@ impl Partition<Bytes> for InnerBuffer {
 }
 
 impl PartitionedBuffer {
-    pub fn new(batch: BatchSize, compression: Compression) -> Self {
+    pub fn new(batch: BatchSize<Buffer>, compression: Compression) -> Self {
         Self {
             inner: Buffer::new(batch, compression),
             key: None,
@@ -183,9 +183,9 @@ impl Batch for PartitionedBuffer {
 
     fn get_settings_defaults(
         config: BatchConfig,
-        defaults: BatchSettings,
-    ) -> Result<BatchSettings, BatchError> {
-        Buffer::get_settings_defaults(config, defaults)
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(Buffer::get_settings_defaults(config, defaults.into())?.into())
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {

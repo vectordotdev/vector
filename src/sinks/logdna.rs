@@ -65,7 +65,7 @@ impl SinkConfig for LogdnaConfig {
         let batch_settings = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
             .timeout(1)
-            .parse_config::<JsonArrayBuffer>(self.batch)?;
+            .parse_config(self.batch)?;
         let client = HttpClient::new(cx.resolver(), None)?;
 
         let sink = BatchedHttpSink::new(

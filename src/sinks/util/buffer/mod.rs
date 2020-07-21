@@ -58,7 +58,7 @@ pub struct Buffer {
     inner: InnerBuffer,
     num_items: usize,
     num_bytes: usize,
-    settings: BatchSize,
+    settings: BatchSize<Self>,
     compression: Compression,
 }
 
@@ -69,7 +69,7 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
-    pub fn new(settings: BatchSize, compression: Compression) -> Self {
+    pub fn new(settings: BatchSize<Self>, compression: Compression) -> Self {
         let buffer = Vec::with_capacity(settings.bytes);
         let inner = match compression {
             Compression::None => InnerBuffer::Plain(buffer),
@@ -121,8 +121,8 @@ impl Batch for Buffer {
 
     fn get_settings_defaults(
         config: BatchConfig,
-        defaults: BatchSettings,
-    ) -> Result<BatchSettings, BatchError> {
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
         Ok(config
             .use_size_as_bytes()?
             .get_settings_or_default(defaults))
@@ -172,7 +172,7 @@ impl Batch for Buffer {
 mod test {
     use super::{Buffer, Compression};
     use crate::buffers::Acker;
-    use crate::sinks::util::{BatchSink, BatchSize};
+    use crate::sinks::util::{BatchSettings, BatchSink};
     use crate::test_util::runtime;
     use futures01::{future, Future, Sink};
     use std::io::Read;
@@ -197,10 +197,7 @@ mod test {
 
             future::ok::<_, std::io::Error>(())
         });
-        let batch_size = BatchSize {
-            bytes: 100_000,
-            events: 1_000,
-        };
+        let batch_size = BatchSettings::default().bytes(100_000).events(1_000).size;
         let timeout = Duration::from_secs(0);
 
         let buffered = BatchSink::with_executor(

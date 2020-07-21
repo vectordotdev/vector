@@ -7,7 +7,7 @@ pub struct VecBuffer<T> {
 }
 
 impl<T> VecBuffer<T> {
-    pub fn new(settings: BatchSize) -> Self {
+    pub fn new(settings: BatchSize<Self>) -> Self {
         Self::new_with_max(settings.events)
     }
 
@@ -23,8 +23,8 @@ impl<T> Batch for VecBuffer<T> {
 
     fn get_settings_defaults(
         config: BatchConfig,
-        defaults: BatchSettings,
-    ) -> Result<BatchSettings, BatchError> {
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
         Ok(config
             .disallow_max_bytes()?
             .use_size_as_events()?

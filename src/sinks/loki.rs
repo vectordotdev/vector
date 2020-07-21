@@ -83,7 +83,7 @@ impl SinkConfig for LokiConfig {
         let batch_settings = BatchSettings::default()
             .events(100_000)
             .timeout(1)
-            .parse_config::<VecBuffer<String>>(self.batch)?;
+            .parse_config(self.batch)?;
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(cx.resolver(), tls)?;
 

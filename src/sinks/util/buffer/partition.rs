@@ -31,9 +31,9 @@ where
 
     fn get_settings_defaults(
         config: BatchConfig,
-        defaults: BatchSettings,
-    ) -> Result<BatchSettings, BatchError> {
-        T::get_settings_defaults(config, defaults)
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(T::get_settings_defaults(config, defaults.into())?.into())
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {

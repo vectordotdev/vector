@@ -74,7 +74,7 @@ impl SinkConfig for PubsubConfig {
             .bytes(bytesize::mib(10u64))
             .events(1000)
             .timeout(1)
-            .parse_config::<JsonArrayBuffer>(self.batch)?;
+            .parse_config(self.batch)?;
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(cx.resolver(), tls_settings)?;

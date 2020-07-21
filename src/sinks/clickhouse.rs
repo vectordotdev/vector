@@ -63,7 +63,7 @@ impl SinkConfig for ClickhouseConfig {
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
             .timeout(1)
-            .parse_config::<Buffer>(self.batch)?;
+            .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(cx.resolver(), tls_settings)?;
