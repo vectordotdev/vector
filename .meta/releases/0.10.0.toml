@@ -331,5 +331,6 @@ commits = [
 {sha = "bfb0fcaa89a118913547ad01c6c2a98fdec29cf7", message = "chore: Remove tokio 0.1 from shutdown (#3106)", author = "Kruno Tomola Fabro", date = 2020-07-21T13:50:27Z, pr_number = 3106, files_count = 1, insertions_count = 18, deletions_count = 21},
 {sha = "b6004be220b2071093a066bb16449f1a4e5814ba", message = "chore(operations): Update cidr-utils (#3139)", author = "Ana Hobden", date = 2020-07-21T09:32:09Z, pr_number = 3139, files_count = 2, insertions_count = 7, deletions_count = 7},
 {sha = "3b8bf31a4f6cd5a47016bba934e16aabe04c18ff", message = "chore(operations): Pin back Rust 1.45 until after 0.10.0 (#3142)", author = "Ana Hobden", date = 2020-07-21T10:26:37Z, pr_number = 3142, files_count = 2, insertions_count = 2, deletions_count = 2},
-{sha = "675ad3be743cc754197e108d2da4427d636dd682", message = "chore(operations): Fixup clippy issues from 1.44 rollback (#3143)", author = "Ana Hobden", date = 2020-07-21T11:25:33Z, pr_number = 3143, files_count = 1, insertions_count = 1, deletions_count = 1}
+{sha = "675ad3be743cc754197e108d2da4427d636dd682", message = "chore(operations): Fixup clippy issues from 1.44 rollback (#3143)", author = "Ana Hobden", date = 2020-07-21T11:25:33Z, pr_number = 3143, files_count = 1, insertions_count = 1, deletions_count = 1},
+{sha = "22fa53afbef21189d7eb8c7eea68864fc494fa93", message = "chore: Prepare v0.10.0 (#3022)", author = "Ana Hobden", date = 2020-07-21T12:34:52Z, pr_number = 3022, files_count = 42, insertions_count = 14414, deletions_count = 140}
 ]
