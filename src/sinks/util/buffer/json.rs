@@ -1,4 +1,6 @@
-use crate::sinks::util::{batch::err_event_too_large, Batch, BatchSize, PushResult};
+use super::super::batch::{
+    err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+};
 use serde_json::value::{to_raw_value, RawValue, Value};
 
 pub type BoxedRawValue = Box<RawValue>;
@@ -25,6 +27,15 @@ impl JsonArrayBuffer {
 impl Batch for JsonArrayBuffer {
     type Input = Value;
     type Output = Vec<BoxedRawValue>;
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings,
+    ) -> Result<BatchSettings, BatchError> {
+        Ok(config
+            .use_size_as_bytes()?
+            .get_settings_or_default(defaults))
+    }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         let raw_item = to_raw_value(&item).expect("Value should be valid json");

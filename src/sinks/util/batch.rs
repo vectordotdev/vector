@@ -140,6 +140,15 @@ pub trait Batch {
     type Input;
     type Output;
 
+    /// Turn the batch configuration into an actualized set of settings,
+    /// and deal with the proper behavior of `max_size` and if
+    /// `max_bytes` may be set. This is in the trait to ensure all batch
+    /// buffers implement it.
+    fn get_settings_defaults(
+        _config: BatchConfig,
+        _defaults: BatchSettings,
+    ) -> Result<BatchSettings, BatchError>;
+
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input>;
     fn is_empty(&self) -> bool;
     fn fresh(&self) -> Self;
@@ -187,6 +196,13 @@ where
 {
     type Input = B::Input;
     type Output = B::Output;
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings,
+    ) -> Result<BatchSettings, BatchError> {
+        B::get_settings_defaults(config, defaults)
+    }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         if self.was_full {

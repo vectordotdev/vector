@@ -1,4 +1,6 @@
-use super::{err_event_too_large, Batch, BatchSize, PushResult};
+use super::{
+    err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+};
 
 pub trait Length {
     fn len(&self) -> usize;
@@ -32,6 +34,15 @@ impl<T> VecBuffer2<T> {
 impl<T: Length> Batch for VecBuffer2<T> {
     type Input = T;
     type Output = Vec<T>;
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings,
+    ) -> Result<BatchSettings, BatchError> {
+        Ok(config
+            .use_size_as_events()?
+            .get_settings_or_default(defaults))
+    }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         let new_bytes = self.bytes + item.len();

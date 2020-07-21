@@ -1,6 +1,8 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use crate::event::Event;
-use crate::sinks::util::{Batch, BatchSize, PushResult};
+use crate::sinks::util::batch::{
+    Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+};
 use std::cmp::Ordering;
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
@@ -113,6 +115,16 @@ impl MetricBuffer {
 impl Batch for MetricBuffer {
     type Input = Event;
     type Output = Vec<Metric>;
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings,
+    ) -> Result<BatchSettings, BatchError> {
+        Ok(config
+            .disallow_max_bytes()?
+            .use_size_as_events()?
+            .get_settings_or_default(defaults))
+    }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         if self.num_items() >= self.max_events {

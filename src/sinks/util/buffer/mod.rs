@@ -1,4 +1,6 @@
-use super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
+use super::batch::{
+    err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+};
 use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -116,6 +118,15 @@ impl Buffer {
 impl Batch for Buffer {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings,
+    ) -> Result<BatchSettings, BatchError> {
+        Ok(config
+            .use_size_as_bytes()?
+            .get_settings_or_default(defaults))
+    }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         // The compressed encoders don't flush bytes immediately, so we
