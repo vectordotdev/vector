@@ -2,7 +2,7 @@
 // clippy's warning that an AtomicUsize would work better is incorrect.
 #![allow(clippy::mutex_atomic)]
 
-use futures::ready;
+use futures::{future::BoxFuture, ready};
 use std::future::Future;
 use std::mem::{drop, replace};
 use std::pin::Pin;
@@ -69,7 +69,7 @@ impl ShrinkableSemaphore {
 /// number of permits before yielding a valid one.
 struct MaybeForgetFuture {
     master: Arc<ShrinkableSemaphore>,
-    future: Pin<Box<dyn Future<Output = OwnedSemaphorePermit> + Send + 'static>>,
+    future: BoxFuture<'static, OwnedSemaphorePermit>,
 }
 
 impl Future for MaybeForgetFuture {

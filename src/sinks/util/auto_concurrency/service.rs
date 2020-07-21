@@ -4,12 +4,11 @@ use crate::sinks::util::retries2::RetryLogic;
 
 use tower03::Service;
 
-use futures::ready;
+use futures::{future::BoxFuture, ready};
 use std::{
     fmt,
     future::Future,
     mem,
-    pin::Pin,
     sync::Arc,
     task::{Context, Poll},
 };
@@ -26,7 +25,7 @@ pub struct AutoConcurrencyLimit<S, L> {
 }
 
 enum State {
-    Waiting(Pin<Box<dyn Future<Output = OwnedSemaphorePermit> + Send + 'static>>),
+    Waiting(BoxFuture<'static, OwnedSemaphorePermit>),
     Ready(OwnedSemaphorePermit),
     Empty,
 }
