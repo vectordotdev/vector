@@ -296,6 +296,12 @@ mod tests {
             let mut reqs = [None, None, None];
             for &concurrent in &[1, 1, 2, 3] {
                 assert_eq!(svc.inner().current_limit, concurrent);
+                // This would ideally be done with something like:
+                // let reqs = futures::future::join_all((0..concurrent).map(svc.send)).await
+                // but that runs afoul of the borrow checker since `svc`
+                // must be borrowed mutable with a non-static
+                // lifetime. Resolving it is more work than it's worth
+                // for this test, so the clippy lint allow remains above.
                 for i in 0..concurrent {
                     reqs[i] = Some(svc.send(i < concurrent - 1).await);
                 }
