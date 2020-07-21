@@ -6,6 +6,7 @@ use hyper::{
     Body, Response, Server,
 };
 use std::net::SocketAddr;
+use tokio::runtime::{Builder, Runtime};
 use vector::test_util::{next_addr, random_lines, send_lines, wait_for_tcp};
 use vector::{
     runtime, sinks, sources,
@@ -20,7 +21,7 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    serve(out_addr);
+    let _ = serve(out_addr);
 
     let bench = Benchmark::new("http_no_compression", move |b| {
         b.iter_with_setup(
@@ -78,7 +79,7 @@ fn benchmark_http_gzip(c: &mut Criterion) {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    serve(out_addr);
+    let _ = serve(out_addr);
 
     let bench = Benchmark::new("http_gzip", move |b| {
         b.iter_with_setup(
@@ -129,21 +130,22 @@ fn benchmark_http_gzip(c: &mut Criterion) {
     c.bench("http", bench);
 }
 
-fn serve(addr: SocketAddr) {
-    std::thread::spawn(move || {
-        let make_service = make_service_fn(|_| async {
-            Ok::<_, Error>(service_fn(|_req| async {
-                Ok::<_, Error>(Response::new(Body::empty()))
-            }))
-        });
+fn serve(addr: SocketAddr) -> Runtime {
+    let runtime = Builder::new().core_threads(1).build().unwrap();
 
-        let fut = Server::bind(&addr)
-            .serve(make_service)
-            .compat()
-            .map_err(|e| panic!(e));
-
-        tokio01::runtime::current_thread::run(fut);
+    let make_service = make_service_fn(|_| async {
+        Ok::<_, Error>(service_fn(|_req| async {
+            Ok::<_, Error>(Response::new(Body::empty()))
+        }))
     });
+
+    runtime.spawn(
+        Server::bind(&addr)
+            .serve(make_service)
+            .map_err(|e| panic!(e)),
+    );
+
+    runtime
 }
 
 criterion_group!(http, benchmark_http_no_compression, benchmark_http_gzip);
