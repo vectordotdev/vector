@@ -85,7 +85,7 @@ impl Future for MaybeForgetFuture {
             permit.forget();
             *to_forget -= 1;
             let future = self.master.semaphore.clone().acquire_owned();
-            replace(&mut self.future, Box::pin(future));
+            drop(replace(&mut self.future, Box::pin(future)));
         }
         drop(to_forget);
         self.future.as_mut().poll(cx)
