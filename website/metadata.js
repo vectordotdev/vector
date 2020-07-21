@@ -10391,11 +10391,32 @@ module.exports = {
         ],
         "sha": "3b8bf31a4f6cd5a47016bba934e16aabe04c18ff",
         "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-21 11:25:33 +0000",
+        "deletions_count": 1,
+        "description": "Fixup clippy issues from 1.44 rollback",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 1,
+        "message": "chore(operations): Fixup clippy issues from 1.44 rollback (#3143)",
+        "pr_number": 3143,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "675ad3be743cc754197e108d2da4427d636dd682",
+        "type": "chore"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
     "date": "2020-07-10",
-    "deletions_count": 25498,
+    "deletions_count": 25499,
     "description": "",
     "highlights": [
       {
@@ -10558,7 +10579,7 @@ module.exports = {
         "title": "New Reduce transform"
       }
     ],
-    "insertions_count": 47763,
+    "insertions_count": 47764,
     "last_version": "0.9.2",
     "permalink": "/releases/0.10.0/",
     "title": "Vector v0.10.0",
@@ -17012,11 +17033,32 @@ module.exports = {
           ],
           "sha": "3b8bf31a4f6cd5a47016bba934e16aabe04c18ff",
           "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-21 11:25:33 +0000",
+          "deletions_count": 1,
+          "description": "Fixup clippy issues from 1.44 rollback",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 1,
+          "message": "chore(operations): Fixup clippy issues from 1.44 rollback (#3143)",
+          "pr_number": 3143,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "675ad3be743cc754197e108d2da4427d636dd682",
+          "type": "chore"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
       "date": "2020-07-10",
-      "deletions_count": 25498,
+      "deletions_count": 25499,
       "description": "",
       "highlights": [
         {
@@ -17179,7 +17221,7 @@ module.exports = {
           "title": "New Reduce transform"
         }
       ],
-      "insertions_count": 47763,
+      "insertions_count": 47764,
       "last_version": "0.9.2",
       "permalink": "/releases/0.10.0/",
       "title": "Vector v0.10.0",
