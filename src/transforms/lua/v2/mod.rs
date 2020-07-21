@@ -232,7 +232,7 @@ fn wrap_emit_fn<'lua, 'scope, F: 'scope>(
     mut emit_fn: F,
 ) -> rlua::Result<rlua::Function<'lua>>
 where
-    F: FnMut(Event) -> (),
+    F: FnMut(Event),
 {
     scope.create_function_mut(move |_, event: Event| -> rlua::Result<()> {
         emit_fn(event);
@@ -243,7 +243,7 @@ where
 impl RuntimeTransform for Lua {
     fn hook_process<F>(self: &mut Self, event: Event, emit_fn: F)
     where
-        F: FnMut(Event) -> (),
+        F: FnMut(Event),
     {
         let _ = self
             .lua
@@ -262,7 +262,7 @@ impl RuntimeTransform for Lua {
 
     fn hook_init<F>(self: &mut Self, emit_fn: F)
     where
-        F: FnMut(Event) -> (),
+        F: FnMut(Event),
     {
         let _ = self
             .lua
@@ -282,7 +282,7 @@ impl RuntimeTransform for Lua {
 
     fn hook_shutdown<F>(self: &mut Self, emit_fn: F)
     where
-        F: FnMut(Event) -> (),
+        F: FnMut(Event),
     {
         let _ = self
             .lua
@@ -304,7 +304,7 @@ impl RuntimeTransform for Lua {
 
     fn timer_handler<F>(self: &mut Self, timer: Timer, emit_fn: F)
     where
-        F: FnMut(Event) -> (),
+        F: FnMut(Event),
     {
         let _ = self
             .lua

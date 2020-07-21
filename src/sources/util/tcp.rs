@@ -165,7 +165,7 @@ fn handle_stream(
     out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
 ) {
     let mut shutdown = Some(shutdown);
-    let mut token = None;
+    let mut _token = None;
     let socket = Compat01As03::new(socket).compat();
     let mut reader = Compat::new(FramedRead::new(socket, source.decoder()));
     let handler = stream::poll_fn(move || {
@@ -185,7 +185,7 @@ fn handle_stream(
                         debug!("Closing connection that hasn't yet been fully established.");
                         return Ok(Async::Ready(None));
                     }
-                    token = Some(tk);
+                    _token = Some(tk);
                     shutdown = None;
                 }
                 Err(()) => shutdown = None,
