@@ -1,5 +1,6 @@
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
+#![allow(clippy::blocks_in_if_condition_stmt)]
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::new_ret_no_self)]
 #![allow(clippy::ptr_arg)]
@@ -7,7 +8,6 @@
 #![allow(clippy::trivial_regex)]
 #![allow(clippy::type_complexity)]
 #![allow(clippy::unit_arg)]
-#![allow(clippy::block_in_if_condition_stmt)]
 
 #[macro_use]
 extern crate tracing;
