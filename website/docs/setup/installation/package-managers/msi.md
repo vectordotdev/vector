@@ -67,7 +67,7 @@ The following diagram demonstrates how it works.
 1.  ### Download the Vector `.msi` file
 
     ```bat
-    powershell Invoke-WebRequest https://packages.timber.io/vector/0.9.X/vector-x64.msi -OutFile vector-x64.msi
+    powershell Invoke-WebRequest https://packages.timber.io/vector/0.10.X/vector-x64.msi -OutFile vector-x64.msi
     ```
 
     [Looking for a specific version?][docs.package_managers.msi#versions]
