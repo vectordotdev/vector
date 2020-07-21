@@ -1,5 +1,5 @@
 #![allow(clippy::approx_constant)]
-#![allow(clippy::block_in_if_condition_stmt)]
+#![allow(clippy::blocks_in_if_conditions)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::new_ret_no_self)]
