@@ -10252,11 +10252,49 @@ module.exports = {
         ],
         "sha": "876b4104c2009b8e7be71a6c90c4c0f810a90c76",
         "type": "chore"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-07-20 15:38:34 +0000",
+        "deletions_count": 0,
+        "description": "Add Rust 2018 edition tag to .rustfmt.toml",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 1,
+        "message": "chore: Add Rust 2018 edition tag to .rustfmt.toml (#3120)",
+        "pr_number": 3120,
+        "scopes": [
+
+        ],
+        "sha": "ed9006f783445c1636fb50a56fae1fffec4ab1e3",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-20 15:22:41 +0000",
+        "deletions_count": 2,
+        "description": "Debian buster is stable, not sid",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 2,
+        "message": "chore(operations): Debian buster is stable, not sid (#3131)",
+        "pr_number": 3131,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "1c91ed0883f6743f471095cdad2ec570f1e74bee",
+        "type": "chore"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
     "date": "2020-07-10",
-    "deletions_count": 25449,
+    "deletions_count": 25451,
     "description": "",
     "highlights": [
       {
@@ -10419,7 +10457,7 @@ module.exports = {
         "title": "New Reduce transform"
       }
     ],
-    "insertions_count": 47714,
+    "insertions_count": 47717,
     "last_version": "0.9.2",
     "permalink": "/releases/0.10.0/",
     "title": "Vector v0.10.0",
@@ -16734,11 +16772,49 @@ module.exports = {
           ],
           "sha": "876b4104c2009b8e7be71a6c90c4c0f810a90c76",
           "type": "chore"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-07-20 15:38:34 +0000",
+          "deletions_count": 0,
+          "description": "Add Rust 2018 edition tag to .rustfmt.toml",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 1,
+          "message": "chore: Add Rust 2018 edition tag to .rustfmt.toml (#3120)",
+          "pr_number": 3120,
+          "scopes": [
+
+          ],
+          "sha": "ed9006f783445c1636fb50a56fae1fffec4ab1e3",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-20 15:22:41 +0000",
+          "deletions_count": 2,
+          "description": "Debian buster is stable, not sid",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 2,
+          "message": "chore(operations): Debian buster is stable, not sid (#3131)",
+          "pr_number": 3131,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "1c91ed0883f6743f471095cdad2ec570f1e74bee",
+          "type": "chore"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
       "date": "2020-07-10",
-      "deletions_count": 25449,
+      "deletions_count": 25451,
       "description": "",
       "highlights": [
         {
@@ -16901,7 +16977,7 @@ module.exports = {
           "title": "New Reduce transform"
         }
       ],
-      "insertions_count": 47714,
+      "insertions_count": 47717,
       "last_version": "0.9.2",
       "permalink": "/releases/0.10.0/",
       "title": "Vector v0.10.0",
