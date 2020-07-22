@@ -80,11 +80,13 @@ impl<L> Controller<L> {
 
     pub(super) fn start_request(&self) {
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
+
         #[cfg(test)]
         {
             let mut stats = self.stats.lock().expect("Stats mutex is poisoned");
             stats.in_flight.add(inner.in_flight, instant_now());
         }
+
         inner.in_flight += 1;
         emit!(AutoConcurrencyInFlight {
             in_flight: inner.in_flight as u64
@@ -128,6 +130,7 @@ impl<L> Controller<L> {
             emit!(AutoConcurrencyAveragedRtt {
                 rtt: Duration::from_secs_f64(rtt)
             });
+
             #[cfg(test)]
             {
                 stats.averaged_rtt.add(rtt, now);
