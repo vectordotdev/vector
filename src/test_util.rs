@@ -239,6 +239,16 @@ where
     rt.block_on(future)
 }
 
+pub fn block_on_std<F>(future: F) -> F::Output
+where
+    F: std::future::Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    let mut rt = runtime();
+
+    rt.block_on_std(future)
+}
+
 pub fn runtime() -> Runtime {
     Runtime::single_threaded().unwrap()
 }
