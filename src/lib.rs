@@ -1,3 +1,4 @@
+#![recursion_limit = "256"] // for async-stream
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::blocks_in_if_conditions)]
@@ -33,6 +34,7 @@ pub mod async_read;
 pub mod hyper;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
+pub mod kubernetes;
 pub mod list;
 pub mod metrics;
 pub mod region;
