@@ -167,7 +167,7 @@ impl TcpSink {
                 TcpSinkState::Backoff(ref mut delay) => match delay.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     // Err can only occur if the tokio runtime has been shutdown or if more than 2^63 timers have been created
-                    Err(_) => unreachable!(),
+                    Err(()) => unreachable!(),
                     Ok(Async::Ready(())) => {
                         debug!(message = "disconnected.");
                         TcpSinkState::Disconnected

@@ -125,7 +125,7 @@ impl UnixSink {
                 },
                 UnixSinkState::Backoff(ref mut delay) => match delay.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
-                    Err(_) => unreachable!(),
+                    Err(()) => unreachable!(),
                     Ok(Async::Ready(())) => UnixSinkState::Disconnected,
                 },
                 UnixSinkState::Disconnected => {
