@@ -11,26 +11,36 @@ image:
   version: ""
   base: "debian"
 
+# Image pull secrets to use at the `Pod`s managed by `DaemonSet`.
 imagePullSecrets: []
+
+# Override the chart name used in templates.
 nameOverride: ""
+# Override the full chart name (name prefixed with release name) used in
+# templates.
 fullnameOverride: ""
 
 updateStrategy: RollingUpdate
 
 serviceAccount:
-  # Specifies whether a service account should be created
+  # Specifies whether a service account should be created.
   create: true
-  # Annotations to add to the service account
+  # Annotations to add to the service account.
   annotations: {}
   # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
+  # If not set and `create` is true, a name is generated using the `fullname`
+  # template.
   name: ""
 
+# Annotations to add to the `Pod`s managed by `DaemonSet`.
 podAnnotations: {}
 
+# PodSecurityContext to set at the `Pod`s managed by `DaemonSet`.
 podSecurityContext: {}
   # fsGroup: 2000
 
+# Security context to set at the `vector` container at the `Pod`s managed by
+# `DaemonSet`.
 securityContext: {}
   # capabilities:
   #   drop:
@@ -39,53 +49,76 @@ securityContext: {}
   # runAsNonRoot: true
   # runAsUser: 1000
 
+# Extra env vars to pass to the `vector` container.
 env: []
 
+# Various tweakables for the `Pod`s managed by `DaemonSet`.
 resources: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
 
+# Additional volmes to pass to the `Pod`s managed by `DaemonSet`.
 extraVolumes: []
 
+# Additional volme mounts to pass to the `vector` container of the `Pod`s
+# managed by `DaemonSet`.
 extraVolumeMounts: []
 
 rbac:
+  # Whether to create rbac resources or not. Disable for non-rbac clusters.
   enabled: true
 
 psp:
+  # Whether to create `PodSecurityPolicy` or not.
   enabled: false
 
+# Set this to non-empty value to use existing `ConfigMap` for `vector`, instead
+# of using a generated one.
 existingConfigMap: ""
 
+# Global parts of the generated `vector` config.
 globalOptions:
+  # Specifies the (in-container) data dir used by `vector`.
   dataDir: "/vector-data-dir"
 
+# Schema part of the generated `vector` config.
 logSchema:
   hostKey: "host"
   messageKey: "message"
   sourceTypeKey: "source_type"
   timestampKey: "timestamp"
 
-# The built-in kubernetes logs source.
+# The "built-in" kubernetes logs source. Will be added by default, unless
+# explicitly disabled.
 kubernetesLogsSource:
+  # Disable to omit the kubernetes logs source from being added.
   enabled: true
+  # The name to use for the "built-in" kubernetes logs source.
   sourceId: kubernetes_logs
+  # Raw TOML config to embed at the kubernetes logs source.
   rawConfig: null
 
+# Sources to add to the generated `vector` config (besides "built-in" kubernetes
+# logs source).
 sources: {}
-  # type: "source_type"
-  # rawConfig: |
-  #   option = "value"
+  # source_name:
+  #   type: "source_type"
+  #   rawConfig: |
+  #     option = "value"
 
+# Transforms to add to the generated `vector` config.
 transforms: {}
-  # type: "transform_type"
-  # inputs: ["input1", "input2"]
-  # rawConfig: |
-  #   option = "value"
+  # transform_name:
+  #   type: "transform_type"
+  #   inputs: ["input1", "input2"]
+  #   rawConfig: |
+  #     option = "value"
 
+# Sinks to add to the generated `vector` config.
 sinks: {}
-  # type: "sink_type"
-  # inputs: ["input1", "input2"]
-  # rawConfig: |
-  #   option = "value"
+  # sink_name:
+  #   type: "sink_type"
+  #   inputs: ["input1", "input2"]
+  #   rawConfig: |
+  #     option = "value"
