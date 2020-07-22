@@ -4137,16 +4137,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fdf1b9db47230893d76faad238fd6097fd6d6a9245cd7a4d90dbd639536bbd2"
 
 [[package]]
-name = "signal-hook"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10b9f3a1686a29f53cfd91ee5e3db3c12313ec02d33765f02c1a9645a1811e2c"
-dependencies = [
- "libc",
- "signal-hook-registry",
-]
-
-[[package]]
 name = "signal-hook-registry"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4821,15 +4811,15 @@ dependencies = [
 
 [[package]]
 name = "tokio-signal"
-version = "0.2.7"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd6dc5276ea05ce379a16de90083ec80836440d5ef8a6a39545a3207373b8296"
+checksum = "d0c34c6e548f101053321cba3da7cbb87a610b85555884c41b07da2eb91aff12"
 dependencies = [
  "futures 0.1.29",
  "libc",
  "mio",
  "mio-uds",
- "signal-hook",
+ "signal-hook-registry",
  "tokio-executor",
  "tokio-io",
  "tokio-reactor",
