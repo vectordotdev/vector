@@ -500,7 +500,7 @@ mod tests {
 
     #[test]
     // https://github.com/timberio/vector/issues/3096
-    fn correctly_maps_capture_groups_for_if_matching_pattern_is_not_first() {
+    fn correctly_maps_capture_groups_if_matching_pattern_is_not_first() {
         let log = do_transform(
             "match1234 235.42 true",
             r#"[
