@@ -122,6 +122,7 @@ pub enum DataType {
     Metric,
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     fn build(
@@ -131,6 +132,16 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
         shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<sources::Source>;
+
+    async fn build_async(
+        &self,
+        name: &str,
+        globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
+        out: mpsc::Sender<Event>,
+    ) -> crate::Result<sources::Source> {
+        self.build(name, globals, shutdown, out)
+    }
 
     fn output_type(&self) -> DataType;
 
