@@ -2,12 +2,8 @@ use super::{
     err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
 };
 
-pub trait Length {
-    fn len(&self) -> usize;
-
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
+pub trait EncodedLength {
+    fn encoded_length(&self) -> usize;
 }
 
 #[derive(Clone)]
@@ -31,7 +27,7 @@ impl<T> VecBuffer2<T> {
     }
 }
 
-impl<T: Length> Batch for VecBuffer2<T> {
+impl<T: EncodedLength> Batch for VecBuffer2<T> {
     type Input = T;
     type Output = Vec<T>;
 
@@ -45,9 +41,9 @@ impl<T: Length> Batch for VecBuffer2<T> {
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
-        let new_bytes = self.bytes + item.len();
-        if self.is_empty() && item.len() > self.settings.bytes {
-            err_event_too_large(item.len())
+        let new_bytes = self.bytes + item.encoded_length();
+        if self.is_empty() && item.encoded_length() > self.settings.bytes {
+            err_event_too_large(item.encoded_length())
         } else if self.batch.len() >= self.settings.events || new_bytes > self.settings.bytes {
             PushResult::Overflow(item)
         } else {
@@ -81,8 +77,8 @@ mod tests {
     use super::*;
     use crate::sinks::util::BatchSettings;
 
-    impl Length for String {
-        fn len(&self) -> usize {
+    impl EncodedLength for String {
+        fn encoded_length(&self) -> usize {
             self.len() + 1
         }
     }

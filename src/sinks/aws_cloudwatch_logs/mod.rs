@@ -7,7 +7,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto, BatchConfig, BatchSettings, Compression, Length, PartitionBatchSink,
+        rusoto, BatchConfig, BatchSettings, Compression, EncodedLength, PartitionBatchSink,
         PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings,
         VecBuffer2,
     },
@@ -397,8 +397,8 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
     }
 }
 
-impl Length for InputLogEvent {
-    fn len(&self) -> usize {
+impl EncodedLength for InputLogEvent {
+    fn encoded_length(&self) -> usize {
         self.message.len() + 26
     }
 }
