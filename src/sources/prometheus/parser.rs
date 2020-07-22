@@ -105,25 +105,30 @@ fn parse_tags(input: &str) -> Result<BTreeMap<String, String>, ParserError> {
             continue;
         }
         let pair = pair.trim();
-        let parts = pair.splitn(2, '=').collect::<Vec<_>>();
-        if parts.len() != 2 {
-            return Err(ParserError::Malformed {
-                s: "expected 2 values separated by '='",
-            });
+
+        match pair.find('=') {
+            None => {
+                return Err(ParserError::Malformed {
+                    s: "expected 2 values separated by '='",
+                });
+            }
+            Some(equals) => {
+                let key = pair[..equals].trim().to_string();
+                let mut value = pair[equals + 1..].trim();
+
+                if value.starts_with('"') {
+                    value = &value[1..];
+                };
+                if value.ends_with('"') {
+                    value = &value[..value.len() - 1];
+                };
+                let value = value.trim();
+                let value = value.replace(r#"\\"#, "\\");
+                let value = value.replace(r#"\n"#, "\n");
+                let value = value.replace(r#"\""#, "\"");
+                result.insert(key, value);
+            }
         }
-        let key = parts[0].trim().to_string();
-        let mut value = parts[1].trim();
-        if value.starts_with('"') {
-            value = &value[1..];
-        };
-        if value.ends_with('"') {
-            value = &value[..value.len() - 1];
-        };
-        let value = value.trim();
-        let value = value.replace(r#"\\"#, "\\");
-        let value = value.replace(r#"\n"#, "\n");
-        let value = value.replace(r#"\""#, "\"");
-        result.insert(key, value);
     }
 
     Ok(result)
@@ -772,6 +777,33 @@ mod test {
             "##;
 
         assert!(parse(exp).is_err());
+    }
+
+    #[test]
+    fn test_parse_tag_error_equals_empty_value() {
+        let exp = r##"
+            telemetry_scrape_size_bytes_count{registry="default",content_type=} 1890
+            "##;
+
+        // This test is designed to ensure we do not panic in this scenario
+        // I wouldn't consider this test case a requirement for all future parsers
+        assert_eq!(
+            parse(exp),
+            Ok(vec![Metric {
+                name: "telemetry_scrape_size_bytes_count".into(),
+                timestamp: None,
+                tags: Some(
+                    vec![
+                        ("registry".into(), "default".into()),
+                        ("content_type".into(), "".into())
+                    ]
+                    .into_iter()
+                    .collect()
+                ),
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value: 1890.0 },
+            }]),
+        );
     }
 
     #[test]
