@@ -531,7 +531,7 @@ target-graph: ## Display dependencies between targets in this Makefile
 	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))) && docker-compose run --rm target-graph $(TARGET)
 
 version: ## Get the current Vector version
-	$(RUN) version
+	@scripts/version.sh
 
 git-hooks: ## Add Vector-local git hooks for commit sign-off
 	@scripts/install-git-hooks.sh
