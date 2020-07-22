@@ -62,7 +62,7 @@ pub struct RegexParser {
     drop_failed: bool,
     target_field: Option<Atom>,
     overwrite_target: bool,
-    capture_names: Vec<(usize, Atom, Conversion)>,
+    capture_names: Vec<Vec<(usize, Atom, Conversion)>>,
     capture_locs: Vec<CaptureLocations>,
 }
 
@@ -152,7 +152,7 @@ impl RegexParser {
 
         // Calculate the location (index into the capture locations) of
         // each named capture, and the required type coercion.
-        let capture_names: Vec<(usize, Atom, Conversion)> = patterns
+        let capture_names: Vec<Vec<(usize, Atom, Conversion)>> = patterns
             .iter()
             .map(|regex| {
                 let capture_names: Vec<(usize, Atom, Conversion)> = regex
@@ -168,11 +168,10 @@ impl RegexParser {
                     .collect();
                 capture_names
             })
-            .flatten()
             .collect();
 
         // Pre-calculate if the source field name should be dropped.
-        drop_field = drop_field && !capture_names.iter().any(|(_, f, _)| *f == field);
+        drop_field = drop_field && !capture_names.iter().flatten().any(|(_, f, _)| *f == field);
 
         Self {
             regexset,
@@ -232,7 +231,7 @@ impl Transform for RegexParser {
                     }
                 }
 
-                for (idx, name, conversion) in &self.capture_names {
+                for (idx, name, conversion) in &self.capture_names[id] {
                     if let Some((start, end)) = capture_locs.get(*idx) {
                         let capture: Value = value[start..end].into();
                         match conversion.convert(capture) {
@@ -474,24 +473,53 @@ mod tests {
     }
 
     #[test]
-    fn supports_multiple_patterns() {
+    fn chooses_first_of_multiple_matching_patterns() {
         let log = do_transform(
             "1234 235.42 true",
             r#"[
-                '^(?P<id>\d+)$',
-                '^(?P<id>\d+) (?P<time>[\d.]+) (?P<check>\S+)$',
+                '^(?P<id1>\d+)',
+                '^(?P<id2>\d+) (?P<time>[\d.]+) (?P<check>\S+)$',
             ]"#,
             r#"
             drop_field = false
             [types]
-            id = "int"
+            id1 = "int"
+            id2 = "int"
             time = "float"
             check = "boolean"
             "#,
         )
         .unwrap();
 
-        assert_eq!(log[&"id".into()], Value::Integer(1234));
+        assert_eq!(log[&"id1".into()], Value::Integer(1234));
+        assert_eq!(log.get(&"id2".into()), None);
+        assert_eq!(log.get(&"time".into()), None);
+        assert_eq!(log.get(&"check".into()), None);
+        assert!(log.get(&"message".into()).is_some());
+    }
+
+    #[test]
+    // https://github.com/timberio/vector/issues/3096
+    fn correctly_maps_capture_groups_for_if_matching_pattern_is_not_first() {
+        let log = do_transform(
+            "match1234 235.42 true",
+            r#"[
+                '^nomatch(?P<id1>\d+)$',
+                '^match(?P<id2>\d+) (?P<time>[\d.]+) (?P<check>\S+)$',
+            ]"#,
+            r#"
+            drop_field = false
+            [types]
+            id1 = "int"
+            id2 = "int"
+            time = "float"
+            check = "boolean"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(log.get(&"id1".into()), None);
+        assert_eq!(log[&"id2".into()], Value::Integer(1234));
         assert_eq!(log[&"time".into()], Value::Float(235.42));
         assert_eq!(log[&"check".into()], Value::Boolean(true));
         assert!(log.get(&"message".into()).is_some());
