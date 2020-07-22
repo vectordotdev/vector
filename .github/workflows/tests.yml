@@ -271,7 +271,7 @@ jobs:
     strategy:
       matrix:
         minikube_version:
-          - 'v1.12.1'
+          - 'v1.11.0' # https://github.com/kubernetes/minikube/issues/8799
         kubernetes_version:
           - 'v1.18.6'
           - 'v1.17.9'
