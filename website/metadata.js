@@ -10429,11 +10429,95 @@ module.exports = {
         ],
         "sha": "22fa53afbef21189d7eb8c7eea68864fc494fa93",
         "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-22 09:51:17 +0000",
+        "deletions_count": 1,
+        "description": "Fixup release-homebrew",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 1,
+        "message": "chore(operations): Fixup release-homebrew (#3158)",
+        "pr_number": 3158,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "c6d0cad0fe058ad7a5a5603410d03ff2d4b321c5",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-22 09:35:22 +0000",
+        "deletions_count": 1,
+        "description": "Fixup version invocation to not have info",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 1,
+        "message": "chore(operations): Fixup version invocation to not have info (#3153)",
+        "pr_number": 3153,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "680b7eeb5cfcbd6f7a338591270066560c5397ab",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-22 09:35:03 +0000",
+        "deletions_count": 1,
+        "description": "Fixup release s3 job",
+        "files_count": 1,
+        "highlight_permalink": null,
+        "insertions_count": 1,
+        "message": "chore(operations): Fixup release s3 job (#3155)",
+        "pr_number": 3155,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "341183a2034493ad2f7236c07e1f35d546fca514",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-07-22 11:13:37 +0000",
+        "deletions_count": 1,
+        "description": "Fixup release commit",
+        "files_count": 2,
+        "highlight_permalink": null,
+        "insertions_count": 11,
+        "message": "chore(operations): Fixup release commit (#3163)",
+        "pr_number": 3163,
+        "scopes": [
+          {
+            "component": {
+            },
+            "name": "operations"
+          }
+        ],
+        "sha": "19e62802df15dc21f6c4f2e3f94f1e5bbe9437e4",
+        "type": "chore"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
     "date": "2020-07-10",
-    "deletions_count": 25639,
+    "deletions_count": 25643,
     "description": "",
     "highlights": [
       {
@@ -10596,7 +10680,7 @@ module.exports = {
         "title": "New Reduce transform"
       }
     ],
-    "insertions_count": 62178,
+    "insertions_count": 62192,
     "last_version": "0.9.2",
     "permalink": "/releases/0.10.0/",
     "title": "Vector v0.10.0",
@@ -17088,11 +17172,95 @@ module.exports = {
           ],
           "sha": "22fa53afbef21189d7eb8c7eea68864fc494fa93",
           "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-22 09:51:17 +0000",
+          "deletions_count": 1,
+          "description": "Fixup release-homebrew",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 1,
+          "message": "chore(operations): Fixup release-homebrew (#3158)",
+          "pr_number": 3158,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "c6d0cad0fe058ad7a5a5603410d03ff2d4b321c5",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-22 09:35:22 +0000",
+          "deletions_count": 1,
+          "description": "Fixup version invocation to not have info",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 1,
+          "message": "chore(operations): Fixup version invocation to not have info (#3153)",
+          "pr_number": 3153,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "680b7eeb5cfcbd6f7a338591270066560c5397ab",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-22 09:35:03 +0000",
+          "deletions_count": 1,
+          "description": "Fixup release s3 job",
+          "files_count": 1,
+          "highlight_permalink": null,
+          "insertions_count": 1,
+          "message": "chore(operations): Fixup release s3 job (#3155)",
+          "pr_number": 3155,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "341183a2034493ad2f7236c07e1f35d546fca514",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-07-22 11:13:37 +0000",
+          "deletions_count": 1,
+          "description": "Fixup release commit",
+          "files_count": 2,
+          "highlight_permalink": null,
+          "insertions_count": 11,
+          "message": "chore(operations): Fixup release commit (#3163)",
+          "pr_number": 3163,
+          "scopes": [
+            {
+              "component": {
+              },
+              "name": "operations"
+            }
+          ],
+          "sha": "19e62802df15dc21f6c4f2e3f94f1e5bbe9437e4",
+          "type": "chore"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
       "date": "2020-07-10",
-      "deletions_count": 25639,
+      "deletions_count": 25643,
       "description": "",
       "highlights": [
         {
@@ -17255,7 +17423,7 @@ module.exports = {
           "title": "New Reduce transform"
         }
       ],
-      "insertions_count": 62178,
+      "insertions_count": 62192,
       "last_version": "0.9.2",
       "permalink": "/releases/0.10.0/",
       "title": "Vector v0.10.0",
