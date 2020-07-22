@@ -409,5 +409,5 @@ jobs:
           path: target/artifacts
       - run: |
           export PASS_VERSION=$(make version)
-          export PASS_GITHUB_TOKEN="${{ secrets.GH_PACKAGE_PUBLISHER_TOKEN }}"
+          export GITHUB_TOKEN="${{ secrets.GH_PACKAGE_PUBLISHER_TOKEN }}"
           make release-homebrew
