@@ -15,6 +15,8 @@ pub mod internal_metrics;
 pub mod journald;
 #[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]
 pub mod kafka;
+#[cfg(feature = "sources-kubernetes-logs")]
+pub mod kubernetes_logs;
 #[cfg(feature = "sources-logplex")]
 pub mod logplex;
 #[cfg(feature = "sources-prometheus")]

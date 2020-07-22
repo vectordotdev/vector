@@ -27,7 +27,8 @@ docker save "${IMAGES[@]}" | gzip >"$IMAGES_ARCHIVE"
 # Start a subshell to preserve the env state.
 (
   # Switch to minikube docker.
-  eval "$(minikube --shell bash docker-env)"
+  # shellcheck source=minikube-docker-env.sh disable=SC1091
+  . scripts/minikube-docker-env.sh
 
   # Load images.
   docker load -i "$IMAGES_ARCHIVE"

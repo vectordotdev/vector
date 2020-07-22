@@ -71,8 +71,5 @@ fi
 export KUBE_TEST_DEPLOY_COMMAND="scripts/deploy-kubernetes-test.sh"
 
 
-# TODO: enable kubernetes tests when they're implemented
-exit 0 # disable the test and make them pass
-
 # Run the tests.
 cargo test --no-default-features --features kubernetes-integration-tests
