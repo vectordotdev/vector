@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/components/">Components<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog/">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download/">Download v0.9.2<a/>
+    <a href="https://vector.dev/components/">Components<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog/">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download/">Download v0.10.0<a/>
   </strong>
 </p>
 
@@ -80,7 +80,7 @@ usage][urls.vector_performance].
 ### Resources
 
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.9.2 (latest)][urls.v0.9.2]
+* [**Releases**][urls.vector_releases] - [v0.10.0 (latest)][urls.v0.10.0]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 * **Policies** - [Security][urls.vector_security_policy], [Privacy][urls.vector_privacy_policy], [Code of Conduct][urls.vector_code_of_conduct]
 
@@ -184,11 +184,11 @@ Or use your own [preferred method][docs.installation].
 
 ## Latest Highlights
 
-* [2020/04/20 - Improved Shutdown](https://vector.dev/highlights/2020-04-20-improved-shutdown/) - available in [0.9.0][urls.vector_download]
-* [2020/04/17 - 4 New Sinks!](https://vector.dev/highlights/2020-04-17-new-sinks/) - available in [0.9.0][urls.vector_download]
-* [2020/04/09 - Set the Lua transform `search_dirs` option to Vector's config dir by default](https://vector.dev/highlights/2020-04-09-set-search_dirs-to-config-dirs-by-default/) - available in [0.9.0][urls.vector_download]
-* [2020/04/09 - ACL is now optional for the Google Cloud Storage sink](https://vector.dev/highlights/2020-04-09-make-acl-optional/) - available in [0.9.0][urls.vector_download]
-* [2020/04/07 - The Vector Source Now Accepts Metrics](https://vector.dev/highlights/2020-04-07-vector-to-vector-metrics/) - available in [0.9.0][urls.vector_download]
+* [2020/07/10 - New Reduce transform](https://vector.dev/highlights/2020-07-10-add-reduce-transform/) - available in [0.10.0][urls.vector_download]
+* [2020/07/09 - Leveraging glibc when possible](https://vector.dev/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/) - available in [0.10.0][urls.vector_download]
+* [2020/07/06 - New compression options for some sinks](https://vector.dev/highlights/2020-07-06-add-compression-option-for-aws-sinks/) - available in [0.10.0][urls.vector_download]
+* [2020/06/27 - Kafka components support SASL](https://vector.dev/highlights/2020-06-27-add-sasl-to-kafka/) - available in [0.10.0][urls.vector_download]
+* [2020/06/18 - Removal custom DNS resolution](https://vector.dev/highlights/2020-06-18-remove-custom-dns-resolution/) - available in [0.10.0][urls.vector_download]
 
 [view all...][urls.vector_highlights]
 
@@ -264,7 +264,7 @@ Or use your own [preferred method][docs.installation].
 [urls.pr_721]: https://github.com/timberio/vector/pull/721
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/
-[urls.v0.9.2]: https://vector.dev/releases/0.9.2/download
+[urls.v0.10.0]: https://vector.dev/releases/0.10.0/download
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
 [urls.vector_community]: https://vector.dev/community/
