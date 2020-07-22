@@ -122,6 +122,7 @@ pub enum DataType {
     Metric,
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     fn build(
@@ -131,6 +132,16 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
         shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<sources::Source>;
+
+    async fn build_async(
+        &self,
+        name: &str,
+        globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
+        out: mpsc::Sender<Event>,
+    ) -> crate::Result<sources::Source> {
+        self.build(name, globals, shutdown, out)
+    }
 
     fn output_type(&self) -> DataType;
 
@@ -204,9 +215,17 @@ pub struct TransformOuter {
     pub inner: Box<dyn TransformConfig>,
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug + Send + Sync {
     fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn transforms::Transform>>;
+
+    async fn build_async(
+        &self,
+        cx: TransformContext,
+    ) -> crate::Result<Box<dyn transforms::Transform>> {
+        self.build(cx)
+    }
 
     fn input_type(&self) -> DataType;
 

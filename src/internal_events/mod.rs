@@ -5,6 +5,8 @@ mod blackhole;
 mod elasticsearch;
 mod file;
 mod json;
+#[cfg(feature = "sources-kubernetes-logs")]
+mod kubernetes_logs;
 #[cfg(feature = "transforms-lua")]
 mod lua;
 #[cfg(feature = "sources-prometheus")]
@@ -19,6 +21,8 @@ mod vector;
 #[cfg(feature = "wasm")]
 mod wasm;
 
+pub mod kubernetes;
+
 pub use self::add_fields::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
@@ -26,6 +30,8 @@ pub use self::blackhole::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
 pub use self::json::*;
+#[cfg(feature = "sources-kubernetes-logs")]
+pub use self::kubernetes_logs::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
 #[cfg(feature = "sources-prometheus")]

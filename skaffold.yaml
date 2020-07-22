@@ -1,0 +1,15 @@
+apiVersion: skaffold/v2beta3
+kind: Config
+metadata:
+  name: vector
+build:
+  local:
+    useDockerCLI: true
+    push: false
+  artifacts:
+    - image: timberio/vector
+      context: target/debug
+      docker:
+        dockerfile: ../../skaffold/docker/Dockerfile
+deploy:
+  kustomize: {}
