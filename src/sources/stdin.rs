@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    internal_events::StdinEventReceived,
     shutdown::ShutdownSignal,
     stream::StreamExt01,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -163,7 +164,12 @@ where
     Ok(Box::new(
         Compat::new(receiver)
             .take_until(shutdown)
-            .map(move |line| create_event(line, &host_key, &hostname))
+            .map(move |line| {
+                emit!(StdinEventReceived {
+                    byte_size: line.len(),
+                });
+                create_event(line, &host_key, &hostname)
+            })
             .map_err(|e| error!("error reading line: {:?}", e))
             .forward(
                 out.sink_map_err(|e| error!(message = "Unable to send event to out.", error = %e)),
