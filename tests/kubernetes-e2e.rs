@@ -620,6 +620,13 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         tokio::spawn(async move {
             // Wait for two minutes - a reasonable time for vector internals to
             // pick up new `Pod` and collect events from them in idle load.
+            // Here, we're assuming that if the `Pod` that was supposed to be
+            // ignored was in fact collected (meaning something's wrong with
+            // the exclusion logic), we'd see it's data within this time frame.
+            // It's not enough to just wait for `Pod` complete, we should still
+            // apply a reasonably big timeout before we stop waiting for the
+            // logs to appear to have high confidence that Vector has enough
+            // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(120);
             println!("Starting stop timer, due in {} seconds", duration.as_secs());
             tokio::time::delay_for(duration).await;
