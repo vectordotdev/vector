@@ -9,7 +9,7 @@ use crate::{
         rusoto,
         service2::TowerRequestConfig,
         sink::Response,
-        BatchConfig, BatchSettings, Compression, EncodedLength, VecBuffer2,
+        BatchConfig, BatchSettings, Compression, EncodedLength, VecBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -151,7 +151,7 @@ impl KinesisService {
             .batch_sink(
                 KinesisRetryLogic,
                 kinesis,
-                VecBuffer2::new(batch.size),
+                VecBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
             )
