@@ -8,7 +8,7 @@ update_configs:
     default_assignees:
       - "hoverbear"
     default_labels:
-      - "domain: dependencies"
+      - "domain: deps"
     # https://dependabot.com/docs/config-file/#version_requirement_updates
     version_requirement_updates: "off" # We should consider switching this to "auto"
     commit_message:
