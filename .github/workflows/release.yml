@@ -341,8 +341,7 @@ jobs:
           path: target/artifacts
       - run: |
           export PASS_VERSION=$(make version)
-          export PASS_CIRCLE_SHA1="${{ github.sha }}"
-          export PASS_GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           make release-github
 
   release-homebrew:
