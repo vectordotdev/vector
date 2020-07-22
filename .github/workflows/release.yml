@@ -342,7 +342,8 @@ jobs:
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: |
-          export PASS_VERSION=$(make version)
+          export VERSION=$(make version)
+          export SHA1="${{ github.sha }}"
           export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           make release-github
 
