@@ -32,7 +32,7 @@ impl<'a> FromLua<'a> for MetricKind {
 impl<'a> ToLua<'a> for StatisticKind {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
         let kind = match self {
-            StatisticKind::Summary => "distribution",
+            StatisticKind::Summary => "summary",
             StatisticKind::Histogram => "histogram",
         };
         ctx.create_string(kind).map(LuaValue::String)
@@ -42,13 +42,13 @@ impl<'a> ToLua<'a> for StatisticKind {
 impl<'a> FromLua<'a> for StatisticKind {
     fn from_lua(value: LuaValue<'a>, _: LuaContext<'a>) -> LuaResult<Self> {
         match value {
-            LuaValue::String(s) if s == "distribution" => Ok(StatisticKind::Summary),
+            LuaValue::String(s) if s == "summary" => Ok(StatisticKind::Summary),
             LuaValue::String(s) if s == "histogram" => Ok(StatisticKind::Histogram),
             _ => Err(LuaError::FromLuaConversionError {
                 from: value.type_name(),
                 to: "StatisticKind",
                 message: Some(
-                    "Statistic kind should be either \"distribution\" or \"histogram\"".to_string(),
+                    "Statistic kind should be either \"summary\" or \"histogram\"".to_string(),
                 ),
             }),
         }
