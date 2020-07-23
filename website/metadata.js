@@ -30,6 +30,15 @@ module.exports = {
         {
           "author_github": "https://github.com/hoverbear",
           "description": null,
+          "id": "/advanced/wasm-hello",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/wasm-hello.md",
+          "series_position": null,
+          "title": "Hello, WASM world"
+        },
+        {
+          "author_github": "https://github.com/hoverbear",
+          "description": null,
           "id": "/advanced/schemas",
           "last_modified_on": null,
           "path": "website/guides/advanced/schemas.md",
