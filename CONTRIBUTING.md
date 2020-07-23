@@ -663,9 +663,6 @@ CONTAINER_IMAGE_REPO=<your name>/vector-test make test-e2e-kubernetes
 Where `CONTAINER_IMAGE_REPO` is the docker image repo name to use, without part
 after the `:`. Replace `<your name>` with your Docker Hub username.
 
-This will run Kubernetes E2E tests suite. If the command exit with 0 status
-code - tests passed.
-
 You can also pass additional parameters to adjust the behavior of the test:
 
 * `QUICK_BUILD=true` - use development build and a skaffold image from the dev
