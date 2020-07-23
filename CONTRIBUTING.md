@@ -633,7 +633,7 @@ Essentially, the steps you have to take to deploy manually are the same that
 
 #### Kubernetes E2E tests
 
-Kubernetes integration is quite complicated, a lot of things can go wrong.
+Kubernetes integration has a lot of parts that can go wrong.
 
 To cope with the complexity and ensure we maintain high quality, we use
 E2E (end-to-end) tests.
