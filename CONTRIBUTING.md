@@ -680,7 +680,7 @@ You can also pass additional parameters to adjust the behavior of the test:
   Requires you to test against a `minikube` cluster. Eliminates the need to have
   a registry to run tests.
 
-* `CONTAINER_IMAGE_REPO=<your name>/vector-test:tag` - completely skip the step
+* `CONTAINER_IMAGE=<your name>/vector-test:tag` - completely skip the step
   of building the Vector docker image, and use the specified image instead.
   Useful to speed up the iterations speed when you already have a Vector docker
   image you want to test against.
