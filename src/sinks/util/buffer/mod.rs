@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 
 pub mod json;
+pub mod loki;
 pub mod metrics;
 pub mod partition;
 pub mod vec;
