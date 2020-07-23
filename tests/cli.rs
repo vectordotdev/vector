@@ -1,5 +1,3 @@
-#![cfg(all(feature = "cli-tests"))]
-
 use assert_cmd::prelude::*;
 use std::process::Command;
 

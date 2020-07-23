@@ -103,21 +103,7 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make test-shutdown
-
-  test-cli:
-    name: CLI - Linux
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
+      # Currently has too few tests to justify a separate task in CI.
       - run: make test-cli
 
   test-integration-aws:
