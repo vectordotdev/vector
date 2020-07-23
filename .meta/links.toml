@@ -173,6 +173,7 @@ loki_multi_tenancy = "https://github.com/grafana/loki/blob/master/docs/operation
 log_event_source = "https://github.com/timberio/vector/blob/master/src/event/"
 logplex = "https://devcenter.heroku.com/articles/logplex"
 logplex_protocol = "https://github.com/heroku/logplex/blob/master/doc/README.http_drains.md"
+lucet = "https://bytecodealliance.github.io/lucet/"
 lua = "https://www.lua.org/"
 lua_boolean = "https://www.lua.org/pil/2.2.html"
 lua_csv_repo = "https://github.com/geoffleyland/lua-csv"
