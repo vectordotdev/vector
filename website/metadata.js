@@ -3481,7 +3481,7 @@ module.exports = {
       "tags": [
         "type: breaking change"
       ],
-      "title": "Removal custom DNS resolution"
+      "title": "Custom DNS resolution removal"
     },
     {
       "author_github": "https://github.com/hoverbear",
@@ -10432,7 +10432,7 @@ module.exports = {
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
-    "date": "2020-07-10",
+    "date": "2020-07-23",
     "deletions_count": 25639,
     "description": "",
     "highlights": [
@@ -10533,7 +10533,7 @@ module.exports = {
         "tags": [
           "type: breaking change"
         ],
-        "title": "Removal custom DNS resolution"
+        "title": "Custom DNS resolution removal"
       },
       {
         "author_github": "https://github.com/hoverbear",
@@ -17091,7 +17091,7 @@ module.exports = {
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.9.2...v0.10.0",
-      "date": "2020-07-10",
+      "date": "2020-07-23",
       "deletions_count": 25639,
       "description": "",
       "highlights": [
@@ -17192,7 +17192,7 @@ module.exports = {
           "tags": [
             "type: breaking change"
           ],
-          "title": "Removal custom DNS resolution"
+          "title": "Custom DNS resolution removal"
         },
         {
           "author_github": "https://github.com/hoverbear",
