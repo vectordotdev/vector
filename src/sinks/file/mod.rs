@@ -120,7 +120,7 @@ impl FileSink {
                     match event {
                         None => {
                             // If we got `None` - terminate the processing.
-                            debug!(message = "Receiver exausted, terminating the processing loop.");
+                            debug!(message = "Receiver exhausted, terminating the processing loop.");
                             break;
                         }
                         Some(event) => self.process_event(event).await,

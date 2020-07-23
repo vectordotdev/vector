@@ -8,7 +8,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, FutureExt, TryFutureExt};
-use futures01::{stream::iter_ok, Sink};
+use futures01::{stream, Sink};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
@@ -106,7 +106,7 @@ impl StatsdSvc {
             acker,
         )
         .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
-        .with_flat_map(move |event| iter_ok(encode_event(event, &namespace)));
+        .with_flat_map(move |event| stream::iter_ok(encode_event(event, &namespace)));
 
         Ok(Box::new(sink))
     }
@@ -227,14 +227,12 @@ mod test {
         test_util::{collect_n, runtime},
         Event,
     };
-    use bytes::Bytes;
-    use futures01::{future, stream::Stream, sync::mpsc, Future, Sink};
-    use std::time::{Duration, Instant};
-    use tokio01::{
-        self,
-        codec::BytesCodec,
-        net::{UdpFramed, UdpSocket},
-    };
+    use bytes05::Bytes;
+    use futures::compat::{Future01CompatExt, Sink01CompatExt};
+    use futures::{SinkExt, StreamExt, TryStreamExt};
+    use futures01::{sync::mpsc, Sink};
+    use tokio::net::UdpSocket;
+    use tokio_util::{codec::BytesCodec, udp::UdpFramed};
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
 
@@ -329,75 +327,61 @@ mod test {
     fn test_send_to_statsd() {
         crate::test_util::trace_init();
 
-        let config = StatsdSinkConfig {
-            namespace: "vector".into(),
-            address: default_address(),
-            batch: BatchConfig {
-                max_bytes: Some(512),
-                timeout_secs: Some(1),
-                ..Default::default()
-            },
-        };
-
         let mut rt = runtime();
-        let sink = StatsdSvc::new(config, Acker::Null).unwrap();
+        rt.block_on_std(async move {
+            let config = StatsdSinkConfig {
+                namespace: "vector".into(),
+                address: default_address(),
+                batch: BatchConfig {
+                    max_bytes: Some(512),
+                    timeout_secs: Some(1),
+                    ..Default::default()
+                },
+            };
+            let sink = StatsdSvc::new(config, Acker::Null).unwrap();
 
-        let mut events = Vec::new();
-        let event = Event::Metric(Metric {
-            name: "counter".to_owned(),
-            timestamp: None,
-            tags: Some(tags()),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Counter { value: 1.5 },
-        });
-        events.push(event);
+            let events = vec![
+                Event::Metric(Metric {
+                    name: "counter".to_owned(),
+                    timestamp: None,
+                    tags: Some(tags()),
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 1.5 },
+                }),
+                Event::Metric(Metric {
+                    name: "histogram".to_owned(),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Distribution {
+                        values: vec![2.0],
+                        sample_rates: vec![100],
+                    },
+                }),
+            ];
+            let (tx, rx) = mpsc::channel(1);
 
-        let event = Event::Metric(Metric {
-            name: "histogram".to_owned(),
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Incremental,
-            value: MetricValue::Distribution {
-                values: vec![2.0],
-                sample_rates: vec![100],
-            },
-        });
-        events.push(event);
-
-        let stream = iter_ok(events.into_iter());
-        let sender = sink.send_all(stream);
-        let deadline = Instant::now() + Duration::from_millis(100);
-
-        // Add a delay to the write side to let the read side
-        // poll for read interest. Otherwise, this could cause
-        // a race condition in noisy environments.
-        let sender = tokio01::timer::Delay::new(deadline)
-            .map_err(drop)
-            .and_then(|_| sender);
-
-        let (tx, rx) = mpsc::channel(1);
-
-        let receiver = Box::new(
-            future::lazy(|| {
-                let socket = UdpSocket::bind(&default_address()).unwrap();
-                future::ok(socket)
-            })
-            .and_then(|socket| {
+            let socket = UdpSocket::bind(default_address()).await.unwrap();
+            tokio::spawn(async move {
                 UdpFramed::new(socket, BytesCodec::new())
                     .map_err(|e| error!("error reading line: {:?}", e))
-                    .map(|(bytes, _addr)| bytes)
-                    .forward(tx.sink_map_err(|e| error!("error sending event: {:?}", e)))
-                    .map(|_| ())
-            }),
-        );
+                    .map_ok(|(bytes, _addr)| bytes.freeze())
+                    .forward(
+                        tx.sink_compat()
+                            .sink_map_err(|e| error!("error sending event: {:?}", e)),
+                    )
+                    .await
+                    .unwrap()
+            });
 
-        rt.spawn(receiver);
-        let _ = rt.block_on(sender).unwrap();
+            let stream = stream::iter_ok(events);
+            let _ = sink.send_all(stream).compat().await.unwrap();
 
-        let messages = rt.block_on(collect_n(rx, 1)).ok().unwrap();
-        assert_eq!(
-            messages[0],
-            Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01")
-        );
+            let messages = collect_n(rx, 1).compat().await.ok().unwrap();
+            assert_eq!(
+                messages[0],
+                Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01"),
+            );
+        });
     }
 }

@@ -1,19 +1,20 @@
 #![cfg(all(
-    feature = "sources-socket",
+    feature = "sinks-socket",
     feature = "transforms-sampler",
-    feature = "sinks-socket"
+    feature = "sources-socket",
 ))]
 
 use approx::assert_relative_eq;
-use futures01::{Future, Stream};
-use stream_cancel::{StreamExt, Tripwire};
-use tokio01::codec::{FramedRead, LinesCodec};
-use tokio01::net::TcpListener;
-use vector::test_util::{
-    block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle, wait_for_tcp,
+use futures::compat::Future01CompatExt;
+use tokio::net::TcpListener;
+use vector::{
+    sinks, sources,
+    test_util::{
+        next_addr, random_lines, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
+    },
+    topology::{self, config},
+    transforms,
 };
-use vector::topology::{self, config};
-use vector::{sinks, sources, transforms};
 
 #[test]
 fn pipe() {
@@ -34,24 +35,24 @@ fn pipe() {
     );
 
     let mut rt = runtime();
+    rt.block_on_std(async move {
+        let output_lines = CountReceiver::receive_lines(out_addr);
 
-    let output_lines = receive(&out_addr);
+        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr);
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-    // Wait for server to accept traffic
-    wait_for_tcp(in_addr);
+        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        send_lines(in_addr, input_lines.clone()).await.unwrap();
 
-    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
-    let send = send_lines(in_addr, input_lines.clone().into_iter());
-    rt.block_on(send).unwrap();
+        // Shut down server
+        topology.stop().compat().await.unwrap();
 
-    // Shut down server
-    block_on(topology.stop()).unwrap();
+        let output_lines = output_lines.wait().await;
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    });
     shutdown_on_idle(rt);
-
-    let output_lines = output_lines.wait();
-    assert_eq!(num_lines, output_lines.len());
-    assert_eq!(input_lines, output_lines);
 }
 
 #[test]
@@ -82,33 +83,33 @@ fn sample() {
     );
 
     let mut rt = runtime();
+    rt.block_on_std(async move {
+        let output_lines = CountReceiver::receive_lines(out_addr);
 
-    let output_lines = receive(&out_addr);
+        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr);
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-    // Wait for server to accept traffic
-    wait_for_tcp(in_addr);
+        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        send_lines(in_addr, input_lines.clone()).await.unwrap();
 
-    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
-    let send = send_lines(in_addr, input_lines.clone().into_iter());
-    rt.block_on(send).unwrap();
+        // Shut down server
+        topology.stop().compat().await.unwrap();
 
-    // Shut down server
-    block_on(topology.stop()).unwrap();
+        let output_lines = output_lines.wait().await;
+        let num_output_lines = output_lines.len();
 
+        let output_lines_ratio = num_output_lines as f32 / num_lines as f32;
+        assert_relative_eq!(output_lines_ratio, 0.1, epsilon = 0.01);
+
+        let mut input_lines = input_lines.into_iter();
+        // Assert that all of the output lines were present in the input and in the same order
+        for output_line in output_lines {
+            let next_line = input_lines.by_ref().find(|l| l == &output_line);
+            assert_eq!(Some(output_line), next_line);
+        }
+    });
     shutdown_on_idle(rt);
-    let output_lines = output_lines.wait();
-    let num_output_lines = output_lines.len();
-
-    let output_lines_ratio = num_output_lines as f32 / num_lines as f32;
-    assert_relative_eq!(output_lines_ratio, 0.1, epsilon = 0.01);
-
-    let mut input_lines = input_lines.into_iter();
-    // Assert that all of the output lines were present in the input and in the same order
-    for output_line in output_lines {
-        let next_line = input_lines.by_ref().find(|l| l == &output_line);
-        assert_eq!(Some(output_line), next_line);
-    }
 }
 
 #[test]
@@ -136,28 +137,28 @@ fn fork() {
     );
 
     let mut rt = runtime();
+    rt.block_on_std(async move {
+        let output_lines1 = CountReceiver::receive_lines(out_addr1);
+        let output_lines2 = CountReceiver::receive_lines(out_addr2);
 
-    let output_lines1 = receive(&out_addr1);
-    let output_lines2 = receive(&out_addr2);
+        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr);
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-    // Wait for server to accept traffic
-    wait_for_tcp(in_addr);
+        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        send_lines(in_addr, input_lines.clone()).await.unwrap();
 
-    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
-    let send = send_lines(in_addr, input_lines.clone().into_iter());
-    rt.block_on(send).unwrap();
+        // Shut down server
+        topology.stop().compat().await.unwrap();
 
-    // Shut down server
-    block_on(topology.stop()).unwrap();
-
+        let output_lines1 = output_lines1.wait().await;
+        let output_lines2 = output_lines2.wait().await;
+        assert_eq!(num_lines, output_lines1.len());
+        assert_eq!(num_lines, output_lines2.len());
+        assert_eq!(input_lines, output_lines1);
+        assert_eq!(input_lines, output_lines2);
+    });
     shutdown_on_idle(rt);
-    let output_lines1 = output_lines1.wait();
-    let output_lines2 = output_lines2.wait();
-    assert_eq!(num_lines, output_lines1.len());
-    assert_eq!(num_lines, output_lines2.len());
-    assert_eq!(input_lines, output_lines1);
-    assert_eq!(input_lines, output_lines2);
 }
 
 #[test]
@@ -192,48 +193,47 @@ fn merge_and_fork() {
     );
 
     let mut rt = runtime();
+    rt.block_on_std(async move {
+        let output_lines1 = CountReceiver::receive_lines(out_addr1);
+        let output_lines2 = CountReceiver::receive_lines(out_addr2);
 
-    let output_lines1 = receive(&out_addr1);
-    let output_lines2 = receive(&out_addr2);
+        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr1);
+        wait_for_tcp(in_addr2);
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-    // Wait for server to accept traffic
-    wait_for_tcp(in_addr1);
-    wait_for_tcp(in_addr2);
+        let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        send_lines(in_addr1, input_lines1.clone()).await.unwrap();
+        send_lines(in_addr2, input_lines2.clone()).await.unwrap();
 
-    let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
-    let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
-    let send1 = send_lines(in_addr1, input_lines1.clone().into_iter());
-    let send2 = send_lines(in_addr2, input_lines2.clone().into_iter());
-    let send = send1.join(send2);
-    rt.block_on(send).unwrap();
+        // Shut down server
+        topology.stop().compat().await.unwrap();
 
-    // Shut down server
-    block_on(topology.stop()).unwrap();
+        let output_lines1 = output_lines1.wait().await;
+        let output_lines2 = output_lines2.wait().await;
 
-    shutdown_on_idle(rt);
-    let output_lines1 = output_lines1.wait();
-    let output_lines2 = output_lines2.wait();
+        assert_eq!(num_lines, output_lines2.len());
 
-    assert_eq!(num_lines, output_lines2.len());
+        assert_eq!(input_lines2, output_lines2);
 
-    assert_eq!(input_lines2, output_lines2);
-
-    assert_eq!(num_lines * 2, output_lines1.len());
-    // Assert that all of the output lines were present in the input and in the same order
-    let mut input_lines1 = input_lines1.into_iter().peekable();
-    let mut input_lines2 = input_lines2.into_iter().peekable();
-    for output_line in &output_lines1 {
-        if Some(output_line) == input_lines1.peek() {
-            input_lines1.next();
-        } else if Some(output_line) == input_lines2.peek() {
-            input_lines2.next();
-        } else {
-            panic!("Got line in output that wasn't in input");
+        assert_eq!(num_lines * 2, output_lines1.len());
+        // Assert that all of the output lines were present in the input and in the same order
+        let mut input_lines1 = input_lines1.into_iter().peekable();
+        let mut input_lines2 = input_lines2.into_iter().peekable();
+        for output_line in &output_lines1 {
+            if Some(output_line) == input_lines1.peek() {
+                input_lines1.next();
+            } else if Some(output_line) == input_lines2.peek() {
+                input_lines2.next();
+            } else {
+                panic!("Got line in output that wasn't in input");
+            }
         }
-    }
-    assert_eq!(input_lines1.next(), None);
-    assert_eq!(input_lines2.next(), None);
+        assert_eq!(input_lines1.next(), None);
+        assert_eq!(input_lines2.next(), None);
+    });
+    shutdown_on_idle(rt);
 }
 
 #[test]
@@ -255,46 +255,32 @@ fn reconnect() {
     );
 
     let mut rt = runtime();
-    let output_rt = runtime();
+    rt.block_on_std(async move {
+        let output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (output_trigger, output_tripwire) = Tripwire::new();
-    let output_listener = TcpListener::bind(&out_addr).unwrap();
-    let output_lines = output_listener
-        .incoming()
-        .take_until(output_tripwire)
-        .map(|socket| FramedRead::new(socket, LinesCodec::new()).take(1))
-        .flatten()
-        .map_err(|e| panic!("{:?}", e))
-        .collect();
-    let output_lines = futures01::sync::oneshot::spawn(output_lines, &output_rt.executor());
+        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr);
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-    // Wait for server to accept traffic
-    wait_for_tcp(in_addr);
+        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        send_lines(in_addr, input_lines.clone()).await.unwrap();
 
-    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
-    let send = send_lines(in_addr, input_lines.clone().into_iter());
-    rt.block_on(send).unwrap();
+        // Shut down server and wait for it to fully flush
+        topology.stop().compat().await.unwrap();
 
-    // Shut down server and wait for it to fully flush
-    block_on(topology.stop()).unwrap();
+        let output_lines = output_lines.wait().await;
+        assert!(num_lines >= 2);
+        assert!(output_lines.iter().all(|line| input_lines.contains(line)))
+    });
     shutdown_on_idle(rt);
-
-    drop(output_trigger);
-    shutdown_on_idle(output_rt);
-
-    let output_lines = output_lines.wait().unwrap();
-    assert!(num_lines >= 2);
-    assert!(output_lines.iter().all(|line| input_lines.contains(line)))
 }
 
-#[test]
-fn healthcheck() {
+#[tokio::test]
+async fn healthcheck() {
     let addr = next_addr();
-    let mut rt = runtime();
     let resolver = vector::dns::Resolver;
 
-    let _listener = TcpListener::bind(&addr).unwrap();
+    let _listener = TcpListener::bind(&addr).await.unwrap();
 
     let healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
         addr.ip().to_string(),
@@ -303,7 +289,7 @@ fn healthcheck() {
         None.into(),
     );
 
-    assert!(rt.block_on(healthcheck).is_ok());
+    assert!(healthcheck.compat().await.is_ok());
 
     let bad_addr = next_addr();
     let bad_healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
@@ -313,5 +299,5 @@ fn healthcheck() {
         None.into(),
     );
 
-    assert!(rt.block_on(bad_healthcheck).is_err());
+    assert!(bad_healthcheck.compat().await.is_err());
 }

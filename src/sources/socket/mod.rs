@@ -141,22 +141,26 @@ mod test {
     use crate::topology::config::{GlobalOptions, SourceConfig};
     use bytes::Bytes;
     #[cfg(unix)]
-    use futures01::Sink;
+    use futures::{compat::Future01CompatExt, stream, SinkExt};
     use futures01::{
-        stream,
         sync::{mpsc, oneshot},
         Future, Stream,
     };
-    use std::net::UdpSocket;
     #[cfg(unix)]
     use std::path::PathBuf;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::Arc;
-    use std::{net::SocketAddr, thread, time::Duration, time::Instant};
+    use std::{
+        net::{SocketAddr, UdpSocket},
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
+        thread,
+        time::{Duration, Instant},
+    };
     #[cfg(unix)]
-    use tokio01::codec::{FramedWrite, LinesCodec};
+    use tokio::net::UnixStream;
     #[cfg(unix)]
-    use tokio_uds::UnixStream;
+    use tokio_util::codec::{FramedWrite, LinesCodec};
 
     //////// TCP TESTS ////////
     #[test]
@@ -177,7 +181,7 @@ mod test {
         rt.spawn(server);
         wait_for_tcp(addr);
 
-        rt.block_on(send_lines(addr, vec!["test".to_owned()].into_iter()))
+        rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();
 
         let event = rx.wait().next().unwrap().unwrap();
@@ -205,7 +209,7 @@ mod test {
         rt.spawn(server);
         wait_for_tcp(addr);
 
-        rt.block_on(send_lines(addr, vec!["test".to_owned()].into_iter()))
+        rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();
 
         let event = rx.wait().next().unwrap().unwrap();
@@ -242,7 +246,8 @@ mod test {
             "more short".to_owned(),
         ];
 
-        rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
+        rt.block_on_std(send_lines(addr, lines.into_iter()))
+            .unwrap();
 
         let (event, rx) = block_on(rx.into_future()).unwrap();
         assert_eq!(
@@ -292,7 +297,7 @@ mod test {
             "more short".to_owned(),
         ];
 
-        rt.block_on(send_lines_tls(addr, "localhost".into(), lines.into_iter()))
+        rt.block_on_std(send_lines_tls(addr, "localhost".into(), lines.into_iter()))
             .unwrap();
 
         let (event, rx) = block_on(rx.into_future()).unwrap();
@@ -326,7 +331,7 @@ mod test {
         wait_for_tcp(addr);
 
         // Send data to Source.
-        rt.block_on(send_lines(addr, vec!["test".to_owned()].into_iter()))
+        rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();
 
         let event = rx.wait().next().unwrap().unwrap();
@@ -377,7 +382,7 @@ mod test {
             MaybeTlsSettings::Raw(()),
         );
         rt.spawn(
-            stream::iter_ok::<_, ()>(std::iter::repeat(()))
+            futures01::stream::iter_ok::<_, ()>(std::iter::repeat(()))
                 .map(|_| Bytes::from("test\n"))
                 .map_err(|_| ())
                 .forward(sink)
@@ -648,95 +653,79 @@ mod test {
     }
 
     #[cfg(unix)]
-    fn send_lines_unix(path: PathBuf, lines: Vec<&str>) {
-        let input_stream =
-            futures01::stream::iter_ok::<_, ()>(lines.clone().into_iter().map(|s| s.to_string()));
+    async fn send_lines_unix(path: PathBuf, lines: Vec<&str>) {
+        let socket = UnixStream::connect(path).await.unwrap();
+        let mut sink = FramedWrite::new(socket, LinesCodec::new());
 
-        UnixStream::connect(&path)
-            .map_err(|e| panic!("{:}", e))
-            .and_then(|socket| {
-                let out =
-                    FramedWrite::new(socket, LinesCodec::new()).sink_map_err(|e| panic!("{:?}", e));
+        let lines = lines.into_iter().map(|s| Ok(s.to_string()));
+        let lines = lines.collect::<Vec<_>>();
+        sink.send_all(&mut stream::iter(lines)).await.unwrap();
 
-                input_stream
-                    .forward(out)
-                    .map(|(_source, sink)| sink)
-                    .and_then(|sink| {
-                        let socket = sink.into_inner().into_inner();
-                        // In tokio 0.1 `AsyncWrite::shutdown` for `TcpStream` is a noop.
-                        // See https://docs.rs/tokio-tcp/0.1.4/src/tokio_tcp/stream.rs.html#917
-                        // Use `TcpStream::shutdown` instead - it actually does something.
-                        socket
-                            .shutdown(std::net::Shutdown::Both)
-                            .map(|_| ())
-                            .map_err(|e| panic!("{:}", e))
-                    })
-            })
-            .wait()
-            .unwrap();
+        let socket = sink.into_inner();
+        socket.shutdown(std::net::Shutdown::Both).unwrap();
     }
 
     #[cfg(unix)]
     #[test]
     fn unix_message() {
         let (tx, rx) = mpsc::channel(2);
-
         let (path, mut rt) = init_unix(tx);
+        rt.block_on_std(async move {
+            send_lines_unix(path, vec!["test"]).await;
 
-        send_lines_unix(path, vec!["test"]);
+            let events = collect_n(rx, 1).compat().await.ok().unwrap();
 
-        let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
-
-        assert_eq!(1, events.len());
-        assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
-            "test".into()
-        );
-        assert_eq!(
-            events[0].as_log()[event::log_schema().source_type_key()],
-            "socket".into()
-        );
+            assert_eq!(1, events.len());
+            assert_eq!(
+                events[0].as_log()[&event::log_schema().message_key()],
+                "test".into()
+            );
+            assert_eq!(
+                events[0].as_log()[event::log_schema().source_type_key()],
+                "socket".into()
+            );
+        });
     }
 
     #[cfg(unix)]
     #[test]
     fn unix_multiple_messages() {
         let (tx, rx) = mpsc::channel(10);
-
         let (path, mut rt) = init_unix(tx);
+        rt.block_on_std(async move {
+            send_lines_unix(path, vec!["test\ntest2"]).await;
+            let events = collect_n(rx, 2).compat().await.ok().unwrap();
 
-        send_lines_unix(path, vec!["test\ntest2"]);
-        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
-
-        assert_eq!(2, events.len());
-        assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
-            "test".into()
-        );
-        assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
-            "test2".into()
-        );
+            assert_eq!(2, events.len());
+            assert_eq!(
+                events[0].as_log()[&event::log_schema().message_key()],
+                "test".into()
+            );
+            assert_eq!(
+                events[1].as_log()[&event::log_schema().message_key()],
+                "test2".into()
+            );
+        });
     }
 
     #[cfg(unix)]
     #[test]
     fn unix_multiple_packets() {
         let (tx, rx) = mpsc::channel(10);
-
         let (path, mut rt) = init_unix(tx);
+        rt.block_on_std(async move {
+            send_lines_unix(path, vec!["test", "test2"]).await;
+            let events = collect_n(rx, 2).compat().await.ok().unwrap();
 
-        send_lines_unix(path, vec!["test", "test2"]);
-        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
-
-        assert_eq!(2, events.len());
-        assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
-            "test".into()
-        );
-        assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
-            "test2".into()
-        );
+            assert_eq!(2, events.len());
+            assert_eq!(
+                events[0].as_log()[&event::log_schema().message_key()],
+                "test".into()
+            );
+            assert_eq!(
+                events[1].as_log()[&event::log_schema().message_key()],
+                "test2".into()
+            );
+        });
     }
 }

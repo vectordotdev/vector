@@ -3,7 +3,7 @@ use futures01::{Async, Future};
 use openssl::ssl::{ConnectConfiguration, HandshakeError};
 use std::net::SocketAddr;
 use tokio01::net::tcp::{ConnectFuture, TcpStream};
-use tokio_openssl::{ConnectAsync, ConnectConfigurationExt};
+use tokio_openssl03::{ConnectAsync, ConnectConfigurationExt};
 
 enum State {
     Connecting(ConnectFuture, Option<ConnectConfiguration>),

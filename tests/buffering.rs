@@ -1,21 +1,19 @@
-#![allow(clippy::match_bool)]
 #![cfg(feature = "leveldb")]
 
+use futures::compat::Future01CompatExt;
 use futures01::{Future, Sink};
 use prost::Message;
 use tempfile::tempdir;
 use tracing::trace;
 use vector::event;
-use vector::test_util::{self, wait_for_atomic_usize};
+use vector::test_util::{
+    random_events_with_stream, runtime, shutdown_on_idle, trace_init, wait_for_atomic_usize,
+    CountReceiver,
+};
 use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, runtime};
 
 mod support;
-
-fn terminate_gracefully(mut rt: runtime::Runtime, topology: topology::RunningTopology) {
-    rt.block_on(topology.stop()).unwrap();
-    test_util::shutdown_on_idle(rt);
-}
 
 fn terminate_abruptly(rt: runtime::Runtime, topology: topology::RunningTopology) {
     rt.shutdown_now().wait().unwrap();
@@ -24,7 +22,7 @@ fn terminate_abruptly(rt: runtime::Runtime, topology: topology::RunningTopology)
 
 #[test]
 fn test_buffering() {
-    test_util::trace_init();
+    trace_init();
 
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
@@ -57,12 +55,11 @@ fn test_buffering() {
         config
     };
 
-    let mut rt = test_util::runtime();
+    let mut rt = runtime();
 
     let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
-    let (input_events, input_events_stream) =
-        test_util::random_events_with_stream(line_length, num_events);
+    let (input_events, input_events_stream) = random_events_with_stream(line_length, num_events);
     let send = in_tx
         .sink_map_err(|err| panic!(err))
         .send_all(input_events_stream);
@@ -100,31 +97,35 @@ fn test_buffering() {
         config
     };
 
-    let mut rt = test_util::runtime();
+    let mut rt = runtime();
+    rt.block_on_std(async move {
+        let (topology, _crash) = topology::start(config, false).await.unwrap();
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+        let (input_events2, input_events_stream) =
+            random_events_with_stream(line_length, num_events);
 
-    let (input_events2, input_events_stream) =
-        test_util::random_events_with_stream(line_length, num_events);
+        let _ = in_tx
+            .sink_map_err(|err| panic!(err))
+            .send_all(input_events_stream)
+            .compat()
+            .await
+            .unwrap();
 
-    let send = in_tx
-        .sink_map_err(|err| panic!(err))
-        .send_all(input_events_stream);
-    let _ = rt.block_on(send).unwrap();
+        let output_events = CountReceiver::receive_events(out_rx);
 
-    let output_events = test_util::receive_events(out_rx);
+        topology.stop().compat().await.unwrap();
 
-    terminate_gracefully(rt, topology);
-
-    let output_events = output_events.wait();
-    assert_eq!(expected_events_count, output_events.len());
-    assert_eq!(input_events, &output_events[..num_events]);
-    assert_eq!(input_events2, &output_events[num_events..]);
+        let output_events = output_events.wait().await;
+        assert_eq!(expected_events_count, output_events.len());
+        assert_eq!(input_events, &output_events[..num_events]);
+        assert_eq!(input_events2, &output_events[num_events..]);
+    });
+    shutdown_on_idle(rt);
 }
 
 #[test]
 fn test_max_size() {
-    test_util::trace_init();
+    trace_init();
 
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
@@ -132,8 +133,7 @@ fn test_max_size() {
 
     let num_events: usize = 1000;
     let line_length = 1000;
-    let (input_events, input_events_stream) =
-        test_util::random_events_with_stream(line_length, num_events);
+    let (input_events, input_events_stream) = random_events_with_stream(line_length, num_events);
 
     let max_size = input_events
         .clone()
@@ -159,7 +159,7 @@ fn test_max_size() {
         config
     };
 
-    let mut rt = test_util::runtime();
+    let mut rt = runtime();
 
     let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
@@ -201,22 +201,24 @@ fn test_max_size() {
         config
     };
 
-    let mut rt = test_util::runtime();
+    let mut rt = runtime();
+    rt.block_on_std(async move {
+        let (topology, _crash) = topology::start(config, false).await.unwrap();
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+        let output_events = CountReceiver::receive_events(out_rx);
 
-    let output_events = test_util::receive_events(out_rx);
+        topology.stop().compat().await.unwrap();
 
-    terminate_gracefully(rt, topology);
-
-    let output_events = output_events.wait();
-    assert_eq!(num_events / 2, output_events.len());
-    assert_eq!(&input_events[..num_events / 2], &output_events[..]);
+        let output_events = output_events.wait().await;
+        assert_eq!(num_events / 2, output_events.len());
+        assert_eq!(&input_events[..num_events / 2], &output_events[..]);
+    });
+    shutdown_on_idle(rt);
 }
 
 #[test]
 fn test_reclaim_disk_space() {
-    test_util::trace_init();
+    trace_init();
 
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
@@ -241,12 +243,11 @@ fn test_reclaim_disk_space() {
         config
     };
 
-    let mut rt = test_util::runtime();
+    let mut rt = runtime();
 
     let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
 
-    let (input_events, input_events_stream) =
-        test_util::random_events_with_stream(line_length, num_events);
+    let (input_events, input_events_stream) = random_events_with_stream(line_length, num_events);
     let send = in_tx
         .sink_map_err(|err| panic!(err))
         .send_all(input_events_stream);
@@ -286,32 +287,36 @@ fn test_reclaim_disk_space() {
         config
     };
 
-    let mut rt = test_util::runtime();
+    let mut rt = runtime();
+    rt.block_on_std(async move {
+        let (topology, _crash) = topology::start(config, false).await.unwrap();
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+        let (input_events2, input_events_stream) =
+            random_events_with_stream(line_length, num_events);
 
-    let (input_events2, input_events_stream) =
-        test_util::random_events_with_stream(line_length, num_events);
+        let _ = in_tx
+            .sink_map_err(|err| panic!(err))
+            .send_all(input_events_stream)
+            .compat()
+            .await
+            .unwrap();
 
-    let send = in_tx
-        .sink_map_err(|err| panic!(err))
-        .send_all(input_events_stream);
-    let _ = rt.block_on(send).unwrap();
+        let output_events = CountReceiver::receive_events(out_rx);
 
-    let output_events = test_util::receive_events(out_rx);
+        topology.stop().compat().await.unwrap();
 
-    terminate_gracefully(rt, topology);
+        let output_events = output_events.wait().await;
+        assert_eq!(num_events * 2, output_events.len());
+        assert_eq!(input_events, &output_events[..num_events]);
+        assert_eq!(input_events2, &output_events[num_events..]);
 
-    let output_events = output_events.wait();
-    assert_eq!(num_events * 2, output_events.len());
-    assert_eq!(input_events, &output_events[..num_events]);
-    assert_eq!(input_events2, &output_events[num_events..]);
+        let after_disk_size: u64 = compute_disk_size(&data_dir);
 
-    let after_disk_size: u64 = compute_disk_size(&data_dir);
-
-    // Ensure that the disk space after is less than half of the size that it
-    // was before we reclaimed the space.
-    assert!(after_disk_size < before_disk_size / 2);
+        // Ensure that the disk space after is less than half of the size that it
+        // was before we reclaimed the space.
+        assert!(after_disk_size < before_disk_size / 2);
+    });
+    shutdown_on_idle(rt);
 }
 
 fn compute_disk_size(dir: impl AsRef<std::path::Path>) -> u64 {

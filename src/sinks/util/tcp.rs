@@ -10,21 +10,28 @@ use crate::{
     tls::{MaybeTlsConnector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
     topology::config::SinkContext,
 };
-use bytes::Bytes;
+use bytes05::Bytes;
+use futures::{
+    compat::{Compat01As03, CompatSink},
+    FutureExt, TryFutureExt,
+};
 use futures01::{
     future, stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend,
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::io::{ErrorKind, Read};
-use std::net::SocketAddr;
-use std::time::{Duration, Instant};
-use tokio01::{
-    codec::{BytesCodec, FramedWrite},
-    net::tcp::TcpStream,
-    timer::Delay,
+use std::{
+    io::{ErrorKind, Read},
+    net::SocketAddr,
+    time::Duration,
 };
+use tokio::time::{delay_for, Delay};
+use tokio01::net::tcp::TcpStream;
 use tokio_retry::strategy::ExponentialBackoff;
+use tokio_util::{
+    codec::{BytesCodec, FramedWrite},
+    compat::{Compat, FuturesAsyncWriteCompatExt},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -79,10 +86,11 @@ enum TcpSinkState {
     ResolvingDns(crate::dns::ResolverFuture),
     Connecting(MaybeTlsConnector),
     Connected(TcpOrTlsStream),
-    Backoff(Delay),
+    Backoff(Box<dyn Future<Item = (), Error = ()> + Send>),
 }
 
-type TcpOrTlsStream = FramedWrite<MaybeTlsStream<TcpStream>, BytesCodec>;
+type TcpOrTlsStream =
+    CompatSink<FramedWrite<Compat<Compat01As03<MaybeTlsStream<TcpStream>>>, BytesCodec>, Bytes>;
 
 impl TcpSink {
     pub fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
@@ -115,7 +123,12 @@ impl TcpSink {
     }
 
     fn next_delay(&mut self) -> Delay {
-        Delay::new(Instant::now() + self.backoff.next().unwrap())
+        delay_for(self.backoff.next().unwrap())
+    }
+
+    fn next_delay01(&mut self) -> Box<dyn Future<Item = (), Error = ()> + Send> {
+        let delay = self.next_delay();
+        Box::new(async move { Ok(delay.await) }.boxed().compat())
     }
 
     fn poll_connection(&mut self) -> Poll<&mut TcpOrTlsStream, ()> {
@@ -137,24 +150,24 @@ impl TcpSink {
                                 Ok(connector) => TcpSinkState::Connecting(connector),
                                 Err(error) => {
                                     error!(message = "unable to connect", %error);
-                                    TcpSinkState::Backoff(self.next_delay())
+                                    TcpSinkState::Backoff(self.next_delay01())
                                 }
                             }
                         } else {
                             error!("DNS resolved but there were no IP addresses.");
-                            TcpSinkState::Backoff(self.next_delay())
+                            TcpSinkState::Backoff(self.next_delay01())
                         }
                     }
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Err(error) => {
                         error!(message = "unable to resolve dns.", %error);
-                        TcpSinkState::Backoff(self.next_delay())
+                        TcpSinkState::Backoff(self.next_delay01())
                     }
                 },
                 TcpSinkState::Backoff(ref mut delay) => match delay.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     // Err can only occur if the tokio runtime has been shutdown or if more than 2^63 timers have been created
-                    Err(err) => unreachable!(err),
+                    Err(()) => unreachable!(),
                     Ok(Async::Ready(())) => {
                         debug!(message = "disconnected.");
                         TcpSinkState::Disconnected
@@ -166,12 +179,14 @@ impl TcpSink {
                             peer_addr: stream.peer_addr().ok(),
                         });
                         self.backoff = Self::fresh_backoff();
-                        TcpSinkState::Connected(FramedWrite::new(stream, BytesCodec::new()))
+                        let stream = Compat01As03::new(stream).compat_write();
+                        let out = FramedWrite::new(stream, BytesCodec::new());
+                        TcpSinkState::Connected(CompatSink::new(out))
                     }
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Err(error) => {
                         emit!(TcpConnectionFailed { error });
-                        TcpSinkState::Backoff(self.next_delay())
+                        TcpSinkState::Backoff(self.next_delay01())
                     }
                 },
                 TcpSinkState::Connected(ref mut connection) => return Ok(Async::Ready(connection)),
@@ -181,7 +196,7 @@ impl TcpSink {
 }
 
 impl Sink for TcpSink {
-    type SinkItem = Bytes;
+    type SinkItem = bytes::Bytes;
     type SinkError = ();
 
     fn start_send(&mut self, line: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
@@ -198,7 +213,9 @@ impl Sink for TcpSink {
                 //
                 // If this returns `WouldBlock` we know the connection is still
                 // valid and the write will most likely succeed.
-                match connection.get_mut().read(&mut [0u8; 1]) {
+                let stream: &mut MaybeTlsStream<TcpStream> =
+                    connection.get_mut().get_mut().get_mut().get_mut();
+                match stream.read(&mut [0u8; 1]) {
                     Err(error) if error.kind() != ErrorKind::WouldBlock => {
                         emit!(TcpConnectionDisconnected { error });
                         self.state = TcpSinkState::Disconnected;
@@ -225,13 +242,20 @@ impl Sink for TcpSink {
                         emit!(TcpEventSent {
                             byte_size: line.len()
                         });
+                        let line = Bytes::copy_from_slice(&line);
                         match connection.start_send(line) {
                             Err(error) => {
                                 error!(message = "connection disconnected.", %error);
                                 self.state = TcpSinkState::Disconnected;
                                 Ok(AsyncSink::Ready)
                             }
-                            Ok(ok) => Ok(ok),
+                            Ok(res) => Ok(match res {
+                                AsyncSink::Ready => AsyncSink::Ready,
+                                AsyncSink::NotReady(bytes) => {
+                                    let bytes = bytes::Bytes::from(&bytes[..]);
+                                    AsyncSink::NotReady(bytes)
+                                }
+                            }),
                         }
                     }
                 }

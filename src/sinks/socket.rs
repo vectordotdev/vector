@@ -88,7 +88,7 @@ mod test {
     use super::*;
     use crate::{
         event::Event,
-        test_util::{next_addr, random_lines_with_stream, receive, runtime},
+        test_util::{next_addr, random_lines_with_stream, runtime, CountReceiver},
         topology::config::SinkContext,
     };
     use futures::compat::Future01CompatExt;
@@ -141,25 +141,26 @@ mod test {
             }),
         };
         let mut rt = runtime();
-        let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        rt.block_on_std(async move {
+            let context = SinkContext::new_test();
+            let (sink, _healthcheck) = config.build(context).unwrap();
 
-        let receiver = receive(&addr);
+            let receiver = CountReceiver::receive_lines(addr);
 
-        let (lines, events) = random_lines_with_stream(10, 100);
-        let pump = sink.send_all(events);
-        let _ = rt.block_on(pump).unwrap();
+            let (lines, events) = random_lines_with_stream(10, 100);
+            let _ = sink.send_all(events).compat().await.unwrap();
 
-        // Some CI machines are very slow, be generous.
-        std::thread::sleep(std::time::Duration::from_secs(2));
+            // Some CI machines are very slow, be generous.
+            std::thread::sleep(std::time::Duration::from_secs(2));
 
-        let output = receiver.wait();
-        assert_eq!(output.len(), lines.len());
-        for (source, received) in lines.iter().zip(output) {
-            let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
-            let received = json.get("message").unwrap().as_str().unwrap();
-            assert_eq!(source, received);
-        }
+            let output = receiver.wait().await;
+            assert_eq!(lines.len(), output.len());
+            for (source, received) in lines.iter().zip(output) {
+                let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
+                let received = json.get("message").unwrap().as_str().unwrap();
+                assert_eq!(source, received);
+            }
+        });
     }
 
     // This is a test that checks that we properly receieve all events in the

@@ -8,7 +8,7 @@ use std::io::Error as IoError;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use tokio01::net::TcpStream;
-use tokio_openssl::SslStream;
+use tokio_openssl03::SslStream;
 
 #[cfg(feature = "sources-tls")]
 mod incoming;

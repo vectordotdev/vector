@@ -1,7 +1,3 @@
-#![allow(clippy::bool_comparison)]
-#![allow(clippy::match_bool)]
-#![allow(clippy::redundant_clone)]
-
 mod support;
 
 use crate::support::{sink, sink_failing_healthcheck, source, transform, MockSourceConfig};
@@ -202,7 +198,7 @@ fn topology_transform_chain() {
 
     let event = Event::from("this");
 
-    in1.send(event.clone()).wait().unwrap();
+    in1.send(event).wait().unwrap();
 
     rt.block_on(topology.stop()).unwrap();
 
@@ -476,12 +472,13 @@ fn topology_swap_transform_is_atomic() {
     let send_total = send_counter.clone();
     let recv_total = recv_counter.clone();
 
-    let events = move || match running.load(Ordering::Acquire) {
-        true => {
+    let events = move || {
+        if running.load(Ordering::Acquire) {
             send_counter.fetch_add(1, Ordering::Release);
             Some(Event::from("this"))
+        } else {
+            None
         }
-        false => None,
     };
     let input = iter_ok::<_, ()>(iter::from_fn(events));
     let input = input
@@ -595,12 +592,9 @@ fn topology_healthcheck_run_for_changes_on_reload() {
         config.add_source("in1", src);
         config.add_sink("out2", &["in1"], sink_failing_healthcheck(10).1);
 
-        assert!(
-            topology
-                .reload_config_and_respawn(config, true)
-                .await
-                .unwrap()
-                == false
-        );
+        assert!(!topology
+            .reload_config_and_respawn(config, true)
+            .await
+            .unwrap());
     });
 }

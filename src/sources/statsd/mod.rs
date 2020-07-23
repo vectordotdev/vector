@@ -1,15 +1,14 @@
-use crate::{
-    shutdown::ShutdownSignal, stream::StreamExt01, topology::config::GlobalOptions, Event,
+use crate::{shutdown::ShutdownSignal, topology::config::GlobalOptions, Event};
+use futures::{
+    compat::{Future01CompatExt, Sink01CompatExt},
+    stream, FutureExt, StreamExt, TryFutureExt,
 };
-use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{sync::mpsc, Sink};
 use parser::parse;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use tokio01::{
-    self,
-    codec::BytesCodec,
-    net::{UdpFramed, UdpSocket},
-};
+use tokio::net::UdpSocket;
+use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 use tracing::field;
 
 pub mod parser;
@@ -44,35 +43,46 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: mpsc::Sender<Event>) 
     let out = out.sink_map_err(|e| error!("error sending metric: {:?}", e));
 
     Box::new(
-        future::lazy(move || {
-            let socket = UdpSocket::bind(&addr).expect("failed to bind to udp listener socket");
-
+        async move {
+            let socket = UdpSocket::bind(&addr)
+                .await
+                .expect("failed to bind to udp listener socket");
             info!(
                 message = "listening.",
                 addr = &field::display(addr),
                 r#type = "udp"
             );
 
-            future::ok(socket)
-        })
-        .and_then(move |socket| {
-            let metrics_in = UdpFramed::new(socket, BytesCodec::new())
-                .take_until(shutdown)
-                .map(|(bytes, _sock)| {
-                    let packet = String::from_utf8_lossy(bytes.as_ref());
-                    let metrics = packet
-                        .lines()
-                        .map(parse)
-                        .filter_map(|res| res.map_err(|e| error!("{}", e)).ok())
-                        .map(Event::Metric)
-                        .collect::<Vec<_>>();
-                    futures01::stream::iter_ok::<_, std::io::Error>(metrics)
+            let _ = UdpFramed::new(socket, BytesCodec::new())
+                .take_until(shutdown.compat())
+                .filter_map(|frame| async move {
+                    match frame {
+                        Ok((bytes, _sock)) => {
+                            let packet = String::from_utf8_lossy(bytes.as_ref());
+                            let metrics = packet
+                                .lines()
+                                .map(parse)
+                                .filter_map(|res| res.map_err(|e| error!("{}", e)).ok())
+                                .map(Event::Metric)
+                                .map(Ok)
+                                .collect::<Vec<_>>();
+                            Some(stream::iter(metrics))
+                        }
+                        Err(error) => {
+                            error!("error reading datagram: {:?}", error);
+                            None
+                        }
+                    }
                 })
                 .flatten()
-                .map_err(|e| error!("error reading datagram: {:?}", e));
+                .forward(out.sink_compat())
+                .await;
 
-            metrics_in.forward(out).map(|_| info!("finished sending"))
-        }),
+            info!("finished sending");
+            Ok(())
+        }
+        .boxed()
+        .compat(),
     )
 }
 

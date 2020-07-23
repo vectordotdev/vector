@@ -5,24 +5,27 @@ use crate::{
     event::{self, Event, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
-    stream::StreamExt01,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
-use bytes::{Bytes, BytesMut};
+use bytes05::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use futures::{
+    compat::{Future01CompatExt, Sink01CompatExt},
+    FutureExt, StreamExt, TryFutureExt,
+};
+use futures01::{sync::mpsc, Sink};
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
-use syslog_loose::{self, IncompleteDate, Message, ProcId, Protocol};
-use tokio01::{
-    self,
-    codec::{BytesCodec, Decoder, LinesCodec},
-    net::{UdpFramed, UdpSocket},
+use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
+use tokio::net::UdpSocket;
+use tokio_util::{
+    codec::{BytesCodec, Decoder, LinesCodec, LinesCodecError},
+    udp::UdpFramed,
 };
 use tracing::field;
 
@@ -125,6 +128,7 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
+    type Error = LinesCodecError;
     type Decoder = SyslogDecoder;
 
     fn decoder(&self) -> Self::Decoder {
@@ -156,7 +160,7 @@ impl SyslogDecoder {
         }
     }
 
-    fn octet_decode(&self, src: &mut BytesMut) -> Result<Option<String>, io::Error> {
+    fn octet_decode(&self, src: &mut BytesMut) -> Result<Option<String>, LinesCodecError> {
         // Encoding scheme:
         //
         // len ' ' data
@@ -171,10 +175,10 @@ impl SyslogDecoder {
                 .map_err(|_| ())
                 .and_then(|num| num.parse().map_err(|_| ()))
                 .map_err(|_| {
-                    io::Error::new(
+                    LinesCodecError::Io(io::Error::new(
                         io::ErrorKind::InvalidData,
                         "Unable to decode message len as number",
-                    )
+                    ))
                 })?;
 
             let from = i + 1;
@@ -183,10 +187,10 @@ impl SyslogDecoder {
             if let Some(msg) = src.get(from..to) {
                 let s = std::str::from_utf8(msg)
                     .map_err(|_| {
-                        io::Error::new(
+                        LinesCodecError::Io(io::Error::new(
                             io::ErrorKind::InvalidData,
                             "Unable to decode message as UTF8",
-                        )
+                        ))
                     })?
                     .to_string();
                 src.advance(to);
@@ -198,15 +202,18 @@ impl SyslogDecoder {
             Ok(None)
         } else {
             // This is certainly mallformed, and there is no recovering from this.
-            Err(io::Error::new(
+            Err(LinesCodecError::Io(io::Error::new(
                 io::ErrorKind::Other,
                 "frame length limit exceeded",
-            ))
+            )))
         }
     }
 
     /// None if this is not octet counting encoded
-    fn checked_decode(&self, src: &mut BytesMut) -> Option<Result<Option<String>, io::Error>> {
+    fn checked_decode(
+        &self,
+        src: &mut BytesMut,
+    ) -> Option<Result<Option<String>, LinesCodecError>> {
         if let Some(&first_byte) = src.get(0) {
             if 49 <= first_byte && first_byte <= 57 {
                 // First character is non zero number so we can assume that
@@ -221,10 +228,9 @@ impl SyslogDecoder {
 
 impl Decoder for SyslogDecoder {
     type Item = String;
+    type Error = LinesCodecError;
 
-    type Error = io::Error;
-
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<String>, io::Error> {
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if let Some(ret) = self.checked_decode(src) {
             ret
         } else {
@@ -233,7 +239,7 @@ impl Decoder for SyslogDecoder {
         }
     }
 
-    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<String>, io::Error> {
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if let Some(ret) = self.checked_decode(buf) {
             ret
         } else {
@@ -253,34 +259,44 @@ pub fn udp(
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(
-        future::lazy(move || {
-            let socket = UdpSocket::bind(&addr).expect("failed to bind to udp listener socket");
-
+        async move {
+            let socket = UdpSocket::bind(&addr)
+                .await
+                .expect("failed to bind to udp listener socket");
             info!(
                 message = "listening.",
                 addr = &field::display(addr),
                 r#type = "udp"
             );
 
-            future::ok(socket)
-        })
-        .and_then(move |socket| {
-            let host_key = host_key.clone();
-
-            let lines_in = UdpFramed::new(socket, BytesCodec::new())
-                .take_until(shutdown)
-                .filter_map(move |(bytes, received_from)| {
+            let _ = UdpFramed::new(socket, BytesCodec::new())
+                .take_until(shutdown.compat())
+                .filter_map(|frame| {
                     let host_key = host_key.clone();
-                    let received_from = received_from.to_string().into();
+                    async move {
+                        match frame {
+                            Ok((bytes, received_from)) => {
+                                let received_from = received_from.to_string().into();
 
-                    std::str::from_utf8(&bytes)
-                        .ok()
-                        .and_then(|s| event_from_str(&host_key, Some(received_from), s))
+                                std::str::from_utf8(&bytes).ok().and_then(|s| {
+                                    event_from_str(&host_key, Some(received_from), s).map(Ok)
+                                })
+                            }
+                            Err(error) => {
+                                emit!(SyslogUdpReadError { error });
+                                None
+                            }
+                        }
+                    }
                 })
-                .map_err(|error| emit!(SyslogUdpReadError { error }));
+                .forward(out.sink_compat())
+                .await;
 
-            lines_in.forward(out).map(|_| info!("finished sending"))
-        }),
+            info!("finished sending");
+            Ok(())
+        }
+        .boxed()
+        .compat(),
     )
 }
 
@@ -321,7 +337,8 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
         event.as_mut_log().insert("source_ip", default_host);
     }
 
-    if let Some(parsed_host) = parsed.hostname.map(Bytes::from).or(default_host) {
+    let parsed_hostname = parsed.hostname.map(|x| Bytes::from(x.to_owned()));
+    if let Some(parsed_host) = parsed_hostname.or(default_host) {
         event.as_mut_log().insert(host_key, parsed_host);
     }
 
