@@ -1,14 +1,15 @@
-use bytes::Bytes;
+use bytes05::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
-use futures01::{sink::Sink, stream::Stream, Future};
+use futures::{compat::Future01CompatExt, stream, SinkExt, StreamExt};
+use futures01::Future;
 use std::convert::TryInto;
 use std::path::PathBuf;
 use tempfile::tempdir;
-use tokio01::codec::{BytesCodec, FramedWrite};
-use tokio01::fs::OpenOptions;
-use vector::test_util::random_lines;
+use tokio::fs::OpenOptions;
+use tokio_util::codec::{BytesCodec, FramedWrite};
 use vector::{
-    runtime, sinks, sources,
+    sinks, sources,
+    test_util::{random_lines, runtime},
     topology::{self, config},
 };
 
@@ -55,30 +56,31 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                     },
                 );
 
-                let mut rt = runtime::Runtime::new().unwrap();
-                let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+                let mut rt = runtime();
+                let (topology, input) = rt.block_on_std(async move {
+                    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
-                let mut options = OpenOptions::new();
-                options.create(true).write(true);
+                    let mut options = OpenOptions::new();
+                    options.create(true).write(true);
 
-                let input = rt.block_on(options.open(input)).unwrap();
-                let input =
-                    FramedWrite::new(input, BytesCodec::new()).sink_map_err(|e| panic!("{:?}", e));
+                    let input = options.open(input).await.unwrap();
+                    let input = FramedWrite::new(input, BytesCodec::new())
+                        .sink_map_err(|e| panic!("{:?}", e));
 
+                    (topology, input)
+                });
                 (rt, topology, input)
             },
             |(mut rt, topology, input)| {
-                let lines = random_lines(line_size).take(num_lines).map(|mut line| {
-                    line.push('\n');
-                    Bytes::from(line)
+                rt.block_on_std(async move {
+                    let lines = random_lines(line_size).take(num_lines).map(|mut line| {
+                        line.push('\n');
+                        Ok(Bytes::from(line))
+                    });
+                    let _ = stream::iter(lines).forward(input).await.unwrap();
+
+                    topology.stop().compat().await.unwrap();
                 });
-
-                let lines = futures01::stream::iter_ok::<_, ()>(lines);
-
-                let pump = lines.forward(input);
-                let (_, _) = rt.block_on(pump).unwrap();
-
-                rt.block_on(topology.stop()).unwrap();
                 rt.shutdown_now().wait().unwrap();
             },
         )

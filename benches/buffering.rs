@@ -1,11 +1,16 @@
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
+use futures::compat::Future01CompatExt;
+use rand::{distributions::Alphanumeric, rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use tempfile::tempdir;
 use vector::test_util::{
-    block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
+    next_addr, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
 };
-use vector::topology::{self, config};
-use vector::{buffers::BufferConfig, runtime, sinks, sources};
+use vector::{
+    buffers::BufferConfig,
+    sinks, sources,
+    topology::{self, config},
+};
 
 fn benchmark_buffers(c: &mut Criterion) {
     let num_lines: usize = 100_000;
@@ -40,24 +45,24 @@ fn benchmark_buffers(c: &mut Criterion) {
                         when_full: Default::default(),
                     };
 
-                    let mut rt = runtime::Runtime::new().unwrap();
-
-                    let output_lines = count_receive(&out_addr);
-
-                    let (topology, _crash) =
-                        rt.block_on_std(topology::start(config, false)).unwrap();
+                    let mut rt = runtime();
+                    let (output_lines, topology) = rt.block_on_std(async move {
+                        let output_lines = CountReceiver::receive_lines(out_addr);
+                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        (output_lines, topology)
+                    });
                     wait_for_tcp(in_addr);
-
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
-                    let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                    rt.block_on(send).unwrap();
+                    rt.block_on_std(async move {
+                        let lines = random_lines(line_size).take(num_lines);
+                        send_lines(in_addr, lines).await.unwrap();
 
-                    block_on(topology.stop()).unwrap();
-
+                        topology.stop().compat().await.unwrap();
+                        assert_eq!(num_lines, output_lines.wait().await.len());
+                    });
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait());
                 },
             );
         })
@@ -82,24 +87,25 @@ fn benchmark_buffers(c: &mut Criterion) {
                     };
                     config.global.data_dir = Some(data_dir.clone());
 
-                    let mut rt = runtime::Runtime::new().unwrap();
-
-                    let output_lines = count_receive(&out_addr);
-
-                    let (topology, _crash) =
-                        rt.block_on_std(topology::start(config, false)).unwrap();
+                    let mut rt = runtime();
+                    let (output_lines, topology) = rt.block_on_std(async move {
+                        let output_lines = CountReceiver::receive_lines(out_addr);
+                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        (output_lines, topology)
+                    });
                     wait_for_tcp(in_addr);
-
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
-                    let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                    rt.block_on(send).unwrap();
+                    rt.block_on_std(async move {
+                        let lines = random_lines(line_size).take(num_lines);
+                        send_lines(in_addr, lines).await.unwrap();
+                        tokio::time::delay_for(std::time::Duration::from_secs(100)).await;
 
-                    block_on(topology.stop()).unwrap();
-
+                        topology.stop().compat().await.unwrap();
+                        assert_eq!(num_lines, output_lines.wait().await.len());
+                    });
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait());
                 },
             );
         })
@@ -124,24 +130,25 @@ fn benchmark_buffers(c: &mut Criterion) {
                     };
                     config.global.data_dir = Some(data_dir2.clone());
 
-                    let mut rt = runtime::Runtime::new().unwrap();
-
-                    let output_lines = count_receive(&out_addr);
-
-                    let (topology, _crash) =
-                        rt.block_on_std(topology::start(config, false)).unwrap();
+                    let mut rt = runtime();
+                    let (output_lines, topology) = rt.block_on_std(async move {
+                        let output_lines = CountReceiver::receive_lines(out_addr);
+                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        (output_lines, topology)
+                    });
                     wait_for_tcp(in_addr);
-
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
-                    let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                    rt.block_on(send).unwrap();
+                    rt.block_on_std(async move {
+                        let lines = random_lines(line_size).take(num_lines);
+                        send_lines(in_addr, lines).await.unwrap();
+                        tokio::time::delay_for(std::time::Duration::from_secs(100)).await;
 
-                    block_on(topology.stop()).unwrap();
-
+                        topology.stop().compat().await.unwrap();
+                        assert_eq!(num_lines, output_lines.wait().await.len());
+                    });
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait());
                 },
             );
         })
@@ -155,9 +162,6 @@ criterion_group!(buffers, benchmark_buffers);
 criterion_main!(buffers);
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {
-    use rand::distributions::Alphanumeric;
-    use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
-
     let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
 
     std::iter::repeat(()).map(move |_| {

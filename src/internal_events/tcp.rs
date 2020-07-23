@@ -74,11 +74,11 @@ impl InternalEvent for TcpConnectionShutdown {
 }
 
 #[derive(Debug)]
-pub struct TcpConnectionError {
-    pub error: std::io::Error,
+pub struct TcpConnectionError<T> {
+    pub error: T,
 }
 
-impl InternalEvent for TcpConnectionError {
+impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for TcpConnectionError<T> {
     fn emit_logs(&self) {
         warn!(message = "connection error.", error = %self.error, rate_limit_secs = 10);
     }
