@@ -348,7 +348,7 @@ jobs:
           make release-github
 
   release-homebrew:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
@@ -410,6 +410,8 @@ jobs:
         with:
           name: vector-aarch64.rpm
           path: target/artifacts
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
       - run: |
           export VERSION=$(make version)
           export GITHUB_TOKEN="${{ secrets.GH_PACKAGE_PUBLISHER_TOKEN }}"
