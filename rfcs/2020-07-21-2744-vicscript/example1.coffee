@@ -1,3 +1,7 @@
+# NOTE: This example is intended to demonstrate larger applications for
+# Vicscript in order to get a feel for the syntax. However, this uses features
+# and concepts that aren't yet decided upon and aren't part of the RFC.
+#
 # Problem: My nan likes to send me CSV files embedded within JSON documents:
 #
 # {"items":"item,count\napples,10\noranges,2\n","doc":{"title":"shopping list","description":"get me this stuff"}}
