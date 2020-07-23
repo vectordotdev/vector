@@ -281,17 +281,5 @@ jobs:
           - v1.14.10
       fail-fast: false
     steps:
-      - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@v1.0.2
-        with:
-          minikube version: 'v1.9.2'
-          kubernetes version: '${{ matrix.kubernetes }}'
-          github token: '${{ secrets.GITHUB_TOKEN }}'
-      - name: Checkout
-        uses: actions/checkout@v1
-      - run: USE_CONTAINER=none make slim-builds
-      - run: make test-integration-kubernetes
-        env:
-          USE_MINIKUBE_DOCKER: "true"
-          CONTAINER_IMAGE_REPO: vector-test
-          PACKAGE_DEB_USE_CONTAINER: docker
+      - name: Temporarily off
+        run: "true"
