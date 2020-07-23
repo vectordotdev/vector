@@ -127,11 +127,13 @@ pub enum DataType {
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     fn build(
         &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<sources::Source>;
+        _name: &str,
+        _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
+        _out: mpsc::Sender<Event>,
+    ) -> crate::Result<sources::Source> {
+        unimplemented!()
+    }
 
     async fn build_async(
         &self,
@@ -166,7 +168,9 @@ pub struct SinkOuter {
 #[async_trait::async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SinkConfig: core::fmt::Debug + Send + Sync {
-    fn build(&self, cx: SinkContext) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)>;
+    fn build(&self, _cx: SinkContext) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)> {
+        unimplemented!()
+    }
 
     async fn build_async(
         &self,
@@ -218,7 +222,9 @@ pub struct TransformOuter {
 #[async_trait::async_trait]
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug + Send + Sync {
-    fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn transforms::Transform>>;
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn transforms::Transform>> {
+        unimplemented!()
+    }
 
     async fn build_async(
         &self,

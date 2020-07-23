@@ -115,10 +115,6 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        unimplemented!()
-    }
-
     async fn build_async(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let (read, write) = evmap::new();
 

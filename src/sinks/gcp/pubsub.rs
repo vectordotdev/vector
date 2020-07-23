@@ -64,10 +64,6 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        unimplemented!()
-    }
-
     async fn build_async(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self).await?;
         let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
