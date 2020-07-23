@@ -50,7 +50,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             # Set a reasonable log level to avoid issues with internal logs
-            # overwriting console output at E2E tests. Fell free to change at
+            # overwriting console output at E2E tests. Feel free to change at
             # a real deployment.
             - name: LOG
               value: info
