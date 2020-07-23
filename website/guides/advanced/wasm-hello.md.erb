@@ -16,18 +16,29 @@ tags: ["type: guide", "domain: transforms", "transform: wasm"]
 Vector supports a robust, language agnostic WebAssembly runtime with WASI support. While support
 matures, we encourage you to try out the transform and consider how it might fit into your pipelines.
 
-First, let's talk a bit about them!
-
-Just want to dig in? [**Fastpath to Hacking!**][]
+First, let's talk a bit about them! Just want to dig in? [**Fastpath to Hacking!**][#Understanding-the-Current-Limitations]
 
 ## Why does Vector need plugins?
 
-* Avro/protobuf
-* DSLs and user scripts
-* Lua is popular and this offers more of that.
-* Modularity vs monolithic-ness
+We had a few reasons to add plugin support!
+
+**Build Complexity is first.** Vector connects sources to sinks -- With some transformation magic in between. The more **stuff** you support, the more Vector grows in size. Each component we add brings with it a new set of dependencies, increasing things like binary size, testing time, and linkage which need to be made and optimized.
+
+Eventually, Vector will grow large enough that some folks won't be able to contribute to it, their computers won't be able to handle it. What a nightmare scenario 😔. *Fear not. Plugins can help us.* They allow us to decompose Vector components into small units that don't need to be part of the main linkage.
+
+**Language capabilities & limitations is up next.** Vector is built on Rust. It's a static, systems language which relies on ahead-of-time compilation. Normally, this is a most excellent decision, but in some niche cases it creates big problems! *Protobufs* are a good example of this problem. See, most fast protobuf libraries are *generated* by a tool called `protoc` or something like `prost`, a protobuf crate that generates code at build time.
+
+This is not something Vector can do without adding a **lot** of dependencies. Normally in a situation like this, the best solution would be to work with the upstream ecosystem to come up with efficient runtime solutions. We tried this, and there was a path forward here, for protobufs. But we knew there were other formats like Avro or Cap'n Proto. This is a problem that would keep repeating. Plugins let our users go ahead and roll their own custom deserializers for any protocol they want, and we can build tooling to help them do that in a nice way.
+
+**Lua, DSLs, and other configuration methods are so fun to use!** We found users really enjoy the feeling of using a language they're familiar with to use Vector. Our Lua transform is very popular, and we are often getting requests for other languages like Javascript.
+
+WASM lets us solve this. By exposing a WASM interface, we can support any language that compiles to WASM. We hope this will let us provide a better, more familiar experience to users who like to write their own scripts.
 
 ## What's a WASM
+
+WebAssembly (or WASM) is an execution format.
+
+Compilers like `rustc` can output code into WebAssembly format (either binary `.wasm` or UTF-8 `.wat`)
 
 * WASM is a stack machine, explanation.
 * WASM is a compile target.
