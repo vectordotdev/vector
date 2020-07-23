@@ -346,6 +346,32 @@ mod test {
     }
 
     #[test]
+    fn sampled_distribution() {
+        assert_eq!(
+            parse("glork:320|d|@0.1|#region:us-west1,production,e:"),
+            Ok(Metric {
+                name: "glork".into(),
+                timestamp: None,
+                tags: Some(
+                    vec![
+                        ("region".to_owned(), "us-west1".to_owned()),
+                        ("production".to_owned(), "true".to_owned()),
+                        ("e".to_owned(), "".to_owned()),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![320.0],
+                    sample_rates: vec![10],
+                    statistic: StatisticKind::Distribution
+                },
+            }),
+        );
+    }
+
+    #[test]
     fn simple_gauge() {
         assert_eq!(
             parse("gaugor:333|g"),
