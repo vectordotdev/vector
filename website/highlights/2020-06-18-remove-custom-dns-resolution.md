@@ -1,7 +1,7 @@
 ---
 last_modified_on: "2020-07-23"
 $schema: "/.meta/.schemas/highlights.json"
-title: "Removal custom DNS resolution"
+title: "Custom DNS resolution removal"
 description: "Vector once again follows the guidance of the host on DNS lookups."
 author_github: "https://github.com/hoverbear"
 hide_on_release_notes: false
