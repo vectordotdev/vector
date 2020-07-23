@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-23"
 $schema: "/.meta/.schemas/highlights.json"
 title: "Removal custom DNS resolution"
 description: "Vector once again follows the guidance of the host on DNS lookups."
@@ -10,7 +10,7 @@ release: "0.10.0"
 tags: ["type: breaking change"]
 ---
 
-In Vector 0.10.0, we no longer support custom DNS servers. This feature was adding considerable code complexity and we found the feature to be relatively unused based on our survey of users and feedback.
+In Vector 0.10.0, we no longer support custom DNS servers. This feature was adding considerable code complexity and is better handled outside of Vector through tools like [`systemd-resolved`][urls.systemd_resolved].
 
 In the interest of keeping Vector lean and understandable, as well as improving it's maintainability, we've chosen to remove it.
 
@@ -22,6 +22,9 @@ Make the following changes in your `vector.toml` file:
 -  dns_servers = [...]
 ```
 
-If you were using this feature with a custom DNS you may need to configure your host to consult this DNS, or wrap Vector in a container and set the DNS for the container. This can be done via [`--dns` in `podman`/`docker`][urls.docker_dns].
+### Enabling DNS outside of Vector
+
+If you were using this feature you may need to configure your host to consult DNS. This can be achieved through tools like [`systemd-resolved`][urls.systemd_resolved]. Alternatively, you can wrap Vector in a container and set the DNS for the container. This can be done via [`--dns` in `podman`/`docker`][urls.docker_dns] or
 
 [urls.docker_dns]: https://docs.docker.com/config/containers/container-networking/#dns-services
+[urls.systemd_resolved]: https://wiki.archlinux.org/index.php/Systemd-resolved
