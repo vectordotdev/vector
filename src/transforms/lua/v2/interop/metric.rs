@@ -32,7 +32,7 @@ impl<'a> FromLua<'a> for MetricKind {
 impl<'a> ToLua<'a> for StatisticKind {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
         let kind = match self {
-            StatisticKind::Distribution => "distribution",
+            StatisticKind::Summary => "distribution",
             StatisticKind::Histogram => "histogram",
         };
         ctx.create_string(kind).map(LuaValue::String)
@@ -42,7 +42,7 @@ impl<'a> ToLua<'a> for StatisticKind {
 impl<'a> FromLua<'a> for StatisticKind {
     fn from_lua(value: LuaValue<'a>, _: LuaContext<'a>) -> LuaResult<Self> {
         match value {
-            LuaValue::String(s) if s == "distribution" => Ok(StatisticKind::Distribution),
+            LuaValue::String(s) if s == "distribution" => Ok(StatisticKind::Summary),
             LuaValue::String(s) if s == "histogram" => Ok(StatisticKind::Histogram),
             _ => Err(LuaError::FromLuaConversionError {
                 from: value.type_name(),
@@ -84,7 +84,7 @@ impl<'a> ToLua<'a> for Metric {
                 set.set("values", ctx.create_sequence_from(values.into_iter())?)?;
                 tbl.set("set", set)?;
             }
-            MetricValue::Samples {
+            MetricValue::Distribution {
                 values,
                 sample_rates,
                 statistic,
@@ -163,7 +163,7 @@ impl<'a> FromLua<'a> for Metric {
                 values: set.get::<_, LuaTable>("values").and_then(table_to_set)?,
             }
         } else if let Some(distribution) = table.get::<_, Option<LuaTable>>("distribution")? {
-            MetricValue::Samples {
+            MetricValue::Distribution {
                 values: distribution.get("values")?,
                 sample_rates: distribution.get("sample_rates")?,
                 statistic: distribution.get("statistic")?,
@@ -316,7 +316,7 @@ mod test {
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
-            value: MetricValue::Samples {
+            value: MetricValue::Distribution {
                 values: vec![1.0, 1.0],
                 sample_rates: vec![10, 20],
                 statistic: StatisticKind::Histogram,
@@ -503,7 +503,7 @@ mod test {
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
-            value: MetricValue::Samples {
+            value: MetricValue::Distribution {
                 values: vec![1.0, 1.0],
                 sample_rates: vec![10, 20],
                 statistic: StatisticKind::Histogram,

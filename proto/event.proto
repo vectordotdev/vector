@@ -77,7 +77,7 @@ message Distribution {
   repeated uint32 sample_rates = 2;
   enum StatisticKind {
     Histogram = 0;
-    Distribution = 1;
+    Summary = 1;
   }
   StatisticKind statistic = 3;
 }

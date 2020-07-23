@@ -32,7 +32,7 @@ pub enum MetricValue {
     Set {
         values: BTreeSet<String>,
     },
-    Samples {
+    Distribution {
         values: Vec<f64>,
         sample_rates: Vec<u32>,
         statistic: StatisticKind,
@@ -57,7 +57,7 @@ pub enum StatisticKind {
     Histogram,
     /// Corresponds to DataDog's Distribution Metric
     /// https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition
-    Distribution,
+    Summary,
 }
 
 impl Metric {
@@ -89,12 +89,12 @@ impl Metric {
                 }
             }
             (
-                MetricValue::Samples {
+                MetricValue::Distribution {
                     ref mut values,
                     ref mut sample_rates,
                     statistic: statistic_a,
                 },
-                MetricValue::Samples {
+                MetricValue::Distribution {
                     values: values2,
                     sample_rates: sample_rates2,
                     statistic: statistic_b,
@@ -140,7 +140,7 @@ impl Metric {
             MetricValue::Set { ref mut values } => {
                 values.clear();
             }
-            MetricValue::Samples {
+            MetricValue::Distribution {
                 ref mut values,
                 ref mut sample_rates,
                 ..
@@ -301,7 +301,7 @@ mod test {
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
-            value: MetricValue::Samples {
+            value: MetricValue::Distribution {
                 values: vec![1.0],
                 sample_rates: vec![10],
                 statistic: StatisticKind::Histogram,
@@ -313,7 +313,7 @@ mod test {
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
-            value: MetricValue::Samples {
+            value: MetricValue::Distribution {
                 values: vec![1.0],
                 sample_rates: vec![20],
                 statistic: StatisticKind::Histogram,
@@ -328,7 +328,7 @@ mod test {
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
-                value: MetricValue::Samples {
+                value: MetricValue::Distribution {
                     values: vec![1.0, 1.0],
                     sample_rates: vec![10, 20],
                     statistic: StatisticKind::Histogram

@@ -144,12 +144,12 @@ fn encode_metric_header(namespace: &str, metric: &Metric) -> String {
     let r#type = match &metric.value {
         MetricValue::Counter { .. } => "counter",
         MetricValue::Gauge { .. } => "gauge",
-        MetricValue::Samples {
+        MetricValue::Distribution {
             statistic: StatisticKind::Histogram,
             ..
         } => "histogram",
-        MetricValue::Samples {
-            statistic: StatisticKind::Distribution,
+        MetricValue::Distribution {
+            statistic: StatisticKind::Summary,
             ..
         } => "distribution",
         MetricValue::Set { .. } => "gauge",
@@ -181,7 +181,7 @@ fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: 
                 let value = if expired { 0 } else { values.len() };
                 s.push_str(&format!("{}{} {}\n", fullname, encode_tags(tags), value));
             }
-            MetricValue::Samples {
+            MetricValue::Distribution {
                 values,
                 sample_rates,
                 statistic: _,
@@ -532,7 +532,7 @@ mod tests {
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
-            value: MetricValue::Samples {
+            value: MetricValue::Distribution {
                 values: vec![1.0, 2.0, 3.0],
                 sample_rates: vec![3, 3, 2],
                 statistic: StatisticKind::Histogram,

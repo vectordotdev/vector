@@ -152,14 +152,14 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
                     buf.push(format!("#{}", encode_tags(t)));
                 };
             }
-            MetricValue::Samples {
+            MetricValue::Distribution {
                 values,
                 sample_rates,
                 statistic,
             } => {
                 let metric_type = match statistic {
                     StatisticKind::Histogram => "h",
-                    StatisticKind::Distribution => "d",
+                    StatisticKind::Summary => "d",
                 };
                 for (val, sample_rate) in values.iter().zip(sample_rates.iter()) {
                     buf.push(format!("{}:{}", metric.name, val));
@@ -300,7 +300,7 @@ mod test {
             timestamp: None,
             tags: Some(tags()),
             kind: MetricKind::Incremental,
-            value: MetricValue::Samples {
+            value: MetricValue::Distribution {
                 values: vec![1.5],
                 sample_rates: vec![1],
                 statistic: StatisticKind::Histogram,
@@ -360,7 +360,7 @@ mod test {
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Incremental,
-                    value: MetricValue::Samples {
+                    value: MetricValue::Distribution {
                         values: vec![2.0],
                         sample_rates: vec![100],
                         statistic: StatisticKind::Histogram

@@ -290,7 +290,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
                         points: vec![DatadogPoint(ts, value)],
                         tags,
                     }]),
-                    MetricValue::Samples {
+                    MetricValue::Distribution {
                         values,
                         sample_rates,
                         statistic: _,
@@ -648,7 +648,7 @@ mod tests {
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Incremental,
-            value: MetricValue::Samples {
+            value: MetricValue::Distribution {
                 values: vec![1.0, 2.0, 3.0],
                 sample_rates: vec![3, 3, 2],
                 statistic: StatisticKind::Histogram,

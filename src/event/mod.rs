@@ -537,14 +537,12 @@ impl From<proto::EventWrapper> for Event {
                     MetricProto::Set(set) => MetricValue::Set {
                         values: set.values.into_iter().collect(),
                     },
-                    MetricProto::Distribution(dist) => MetricValue::Samples {
+                    MetricProto::Distribution(dist) => MetricValue::Distribution {
                         statistic: match dist.statistic() {
                             proto::distribution::StatisticKind::Histogram => {
                                 StatisticKind::Histogram
                             }
-                            proto::distribution::StatisticKind::Distribution => {
-                                StatisticKind::Distribution
-                            }
+                            proto::distribution::StatisticKind::Summary => StatisticKind::Summary,
                         },
                         values: dist.values,
                         sample_rates: dist.sample_rates,
@@ -649,7 +647,7 @@ impl From<Event> for proto::EventWrapper {
                     MetricValue::Set { values } => MetricProto::Set(proto::Set {
                         values: values.into_iter().collect(),
                     }),
-                    MetricValue::Samples {
+                    MetricValue::Distribution {
                         values,
                         sample_rates,
                         statistic,
@@ -660,9 +658,7 @@ impl From<Event> for proto::EventWrapper {
                             StatisticKind::Histogram => {
                                 proto::distribution::StatisticKind::Histogram
                             }
-                            StatisticKind::Distribution => {
-                                proto::distribution::StatisticKind::Distribution
-                            }
+                            StatisticKind::Summary => proto::distribution::StatisticKind::Summary,
                         }
                         .into(),
                     }),

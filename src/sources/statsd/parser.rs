@@ -73,7 +73,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 timestamp: None,
                 tags,
                 kind: MetricKind::Incremental,
-                value: MetricValue::Samples {
+                value: MetricValue::Distribution {
                     values: vec![convert_to_base_units(unit, val)],
                     sample_rates: vec![sample_rate as u32],
                     statistic: convert_to_statistic(unit),
@@ -200,7 +200,7 @@ fn convert_to_base_units(unit: &str, val: f64) -> f64 {
 
 fn convert_to_statistic(unit: &str) -> StatisticKind {
     match unit {
-        "d" => StatisticKind::Distribution,
+        "d" => StatisticKind::Summary,
         _ => StatisticKind::Histogram,
     }
 }
@@ -310,7 +310,7 @@ mod test {
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
-                value: MetricValue::Samples {
+                value: MetricValue::Distribution {
                     values: vec![0.320],
                     sample_rates: vec![10],
                     statistic: StatisticKind::Histogram
@@ -336,7 +336,7 @@ mod test {
                     .collect(),
                 ),
                 kind: MetricKind::Incremental,
-                value: MetricValue::Samples {
+                value: MetricValue::Distribution {
                     values: vec![320.0],
                     sample_rates: vec![10],
                     statistic: StatisticKind::Histogram
@@ -362,10 +362,10 @@ mod test {
                     .collect(),
                 ),
                 kind: MetricKind::Incremental,
-                value: MetricValue::Samples {
+                value: MetricValue::Distribution {
                     values: vec![320.0],
                     sample_rates: vec![10],
-                    statistic: StatisticKind::Distribution
+                    statistic: StatisticKind::Summary
                 },
             }),
         );
