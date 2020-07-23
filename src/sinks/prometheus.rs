@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::metric::{Metric, MetricKind, MetricValue},
+    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     sinks::util::MetricEntry,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
@@ -184,6 +184,7 @@ fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: 
             MetricValue::Samples {
                 values,
                 sample_rates,
+                statistic: _,
             } => {
                 // convert ditributions into aggregated histograms
                 let mut counts = Vec::new();

@@ -232,12 +232,14 @@ impl Batch for MetricBuffer {
                 if let MetricValue::Samples {
                     values,
                     sample_rates,
+                    statistic,
                 } = metric.value
                 {
                     let compressed = compress_distribution(values, sample_rates);
                     metric.value = MetricValue::Samples {
                         values: compressed.0,
                         sample_rates: compressed.1,
+                        statistic,
                     };
                 };
                 metric

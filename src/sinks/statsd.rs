@@ -360,9 +360,10 @@ mod test {
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Incremental,
-                    value: MetricValue::Distribution {
+                    value: MetricValue::Samples {
                         values: vec![2.0],
                         sample_rates: vec![100],
+                        statistic: StatisticKind::Histogram
                     },
                 }),
             ];
