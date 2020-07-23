@@ -116,7 +116,37 @@ A metric event will be output with the following structure:
     "type": "distribution",
     "values": [0.022], // ms become seconds
     "sample_rates": [10]
+    "statistic": "histogram"
   }
 }
 ```\
+"""
+
+[[sources.statsd.examples]]
+label = "Distribution"
+body = """\
+Given the following input:
+
+```text title="Example input"
+request.response_time:2|d|@0.2
+```
+
+A metric event will be output with the following structure:
+
+```json title="Example metric event"
+{
+  "name": "request.response_time",
+  "kind": "incremental",
+  "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
+  "value": {
+    "type": "distribution",
+    "values": [2],
+    "sample_rates": [5]
+    "statistic": "summary"
+  }
+}
+```\
+
+Corresponds to [distribution][urls.datadog_distribution] in DataDog. 
+
 """
