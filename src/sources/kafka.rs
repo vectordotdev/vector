@@ -2,6 +2,7 @@ use crate::{
     event::{self, Event},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
+    internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
@@ -113,10 +114,13 @@ fn kafka_source(
 
                 async move {
                     match message {
-                        Err(e) => {
-                            Err(error!(message = "Error reading message from Kafka", error = ?e))
+                        Err(error) => {
+                            emit!(KafkaEventFailed{ error: error.clone() });
+                            Err(error!(message = "Error reading message from Kafka", error = ?error))
                         }
                         Ok(msg) => {
+                            emit!(KafkaEventReceived{ byte_size: msg.payload_len() });
+
                             let payload = match msg.payload_view::<[u8]>() {
                                 None => return Err(()), // skip messages with empty payload
                                 Some(Err(e)) => {
@@ -156,7 +160,10 @@ fn kafka_source(
                                 }
                             }
 
-                            consumer.store_offset(&msg).map_err(|e| error!(message = "Cannot store offset for the message", error = ?e))?;
+                            consumer.store_offset(&msg).map_err(|error| {
+                                emit!(KafkaOffsetUpdateFailed { error: error.clone() });
+                                error!(message = "Cannot store offset for the message", error = ?error)
+                            })?;
                             Ok(event)
                         }
                     }
