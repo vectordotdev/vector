@@ -202,7 +202,7 @@ where
 
     fn layer(&self, inner: S) -> Self::Service {
         Map {
-            f: self.f.clone(),
+            f: Arc::clone(&self.f),
             inner,
         }
     }
@@ -237,7 +237,7 @@ where
 impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
     fn clone(&self) -> Self {
         Self {
-            f: self.f.clone(),
+            f: Arc::clone(&self.f),
             inner: self.inner.clone(),
         }
     }

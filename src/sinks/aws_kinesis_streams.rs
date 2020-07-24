@@ -177,7 +177,7 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
             events = %records.len(),
         );
 
-        let client = self.client.clone();
+        let client = Arc::clone(&self.client);
         let request = PutRecordsInput {
             records,
             stream_name: self.config.stream_name.clone(),

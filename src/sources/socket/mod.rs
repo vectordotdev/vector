@@ -597,7 +597,7 @@ mod test {
 
         // Stream that keeps sending lines to the UDP source forever.
         let run_pump_atomic_sender = Arc::new(AtomicBool::new(true));
-        let run_pump_atomic_receiver = run_pump_atomic_sender.clone();
+        let run_pump_atomic_receiver = Arc::clone(&run_pump_atomic_sender);
         let pump_handle = std::thread::spawn(move || {
             send_lines_udp(
                 address,
