@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    internal_events::StdinEventReceived,
+    internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
     stream::StreamExt01,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -125,8 +125,8 @@ where
 
                 for line in stdin.lines() {
                     match line {
-                        Err(e) => {
-                            error!(message = "Unable to read from source.", error = %e);
+                        Err(error) => {
+                            emit!(StdinReadFailed { error });
                             break;
                         }
                         Ok(line) => {

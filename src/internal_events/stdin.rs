@@ -24,3 +24,22 @@ impl InternalEvent for StdinEventReceived {
         );
     }
 }
+
+#[derive(Debug)]
+pub struct StdinReadFailed {
+    pub error: std::io::Error,
+}
+
+impl InternalEvent for StdinReadFailed {
+    fn emit_logs(&self) {
+        error!(message = "unable to read from source.", error = %self.error);
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "stdin_reads_failed", 1,
+            "component_kind" => "source",
+            "component_type" => "stdin",
+        );
+    }
+}
