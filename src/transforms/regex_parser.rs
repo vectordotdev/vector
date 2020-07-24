@@ -74,17 +74,17 @@ impl CompiledRegex {
     fn new(regex: Regex, types: &HashMap<Atom, Conversion>) -> CompiledRegex {
         // Calculate the location (index into the capture locations) of
         // each named capture, and the required type coercion.
-        let capture_names: Vec<(usize, Atom, Conversion)> = regex
+        let capture_names = regex
             .capture_names()
             .enumerate()
             .filter_map(|(idx, cn)| {
                 cn.map(|cn| {
-                    let cn: Atom = cn.into();
+                    let cn = Atom::from(cn);
                     let conv = types.get(&cn).unwrap_or(&Conversion::Bytes);
                     (idx, cn, conv.clone())
                 })
             })
-            .collect();
+            .collect::<Vec<_>>();
         let capture_locs = regex.capture_locations();
         CompiledRegex {
             regex,
@@ -101,27 +101,24 @@ impl CompiledRegex {
                 let values = self
                     .capture_names
                     .iter()
-                    .filter_map(
-                        |(idx, name, conversion)| match self.capture_locs.get(*idx) {
-                            Some((start, end)) => {
-                                let capture: Value = value[start..end].into();
+                    .filter_map(|(idx, name, conversion)| {
+                        self.capture_locs.get(*idx).map_or(None, |(start, end)| {
+                            let capture: Value = value[start..end].into();
 
-                                match conversion.convert(capture) {
-                                    Ok(value) => Some((name, value)),
-                                    Err(error) => {
-                                        debug!(
-                                            message = "Could not convert types.",
-                                            name = &name[..],
-                                            %error,
-                                            rate_limit_secs = 30
-                                        );
-                                        None
-                                    }
+                            match conversion.convert(capture) {
+                                Ok(value) => Some((name, value)),
+                                Err(error) => {
+                                    debug!(
+                                        message = "Could not convert types.",
+                                        name = &name[..],
+                                        %error,
+                                        rate_limit_secs = 30
+                                    );
+                                    None
                                 }
                             }
-                            None => None,
-                        },
-                    )
+                        })
+                    })
                     .collect();
                 Some(values)
             }
@@ -276,10 +273,10 @@ impl Transform for RegexParser {
                 }
 
                 for (name, value) in captures {
-                    let name = match &self.target_field {
-                        Some(target) => Atom::from(format!("{}.{}", target, name)),
-                        None => name.clone(),
-                    };
+                    let name = (&self.target_field)
+                        .as_ref()
+                        .map(|target| Atom::from(format!("{}.{}", target, name)))
+                        .unwrap_or_else(|| name.clone());
                     log.insert(name, value);
                 }
                 if self.drop_field {
