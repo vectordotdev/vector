@@ -16,6 +16,15 @@ random-string() {
   echo
 }
 
+# Whether to use `minikube cache` to pass image to the k8s cluster.
+# After we build vector docker image, instead of pushing to the remote repo,
+# we'll be using `minikube cache` to make image available to the cluster.
+# This effectively eliminates the requirement to have a docker registry, but
+# it requires that we run against minikube cluster.
+is_minikube_cache_enabled() {
+  [[ "${USE_MINIKUBE_CACHE:-"false"}" == "true" ]]
+}
+
 # Build a docker image if it wasn't provided.
 if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
   # Require a repo to put the container image at.
@@ -25,10 +34,25 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
   # also not work if you k8s cluster doesn't have network connectivity to the
   # registry.
   #
-  # Hint #2: if using with minikube, set `USE_MINIKUBE_CACHE` to `true` and use
-  # any value for `CONTAINER_IMAGE_REPO` (for instance, `vector-test` will do).
+  # Hint #2: if using with minikube, set `USE_MINIKUBE_CACHE` to `true` and you
+  # can omit the `CONTAINER_IMAGE_REPO`.
   #
-  CONTAINER_IMAGE_REPO="${CONTAINER_IMAGE_REPO:?"You have to specify CONTAINER_IMAGE_REPO to upload the test image to."}"
+  if is_minikube_cache_enabled; then
+    # If `minikube cache` will be used, the push access to the docker repo
+    # is not required, and we can provide a default value for the
+    # `CONTAINER_IMAGE_REPO`.
+    # CRIO prefixes the image name with `localhost/` when it's passed via
+    # `minikube cache`, so, in our default value default, to work around that
+    # issue, we use the repo name that already contains that prefix, such that
+    # the effective image name on the minikube node matches the one expected in
+    # tests.
+    CONTAINER_IMAGE_REPO="${CONTAINER_IMAGE_REPO:-"localhost/vector-test"}"
+  else
+    # If not using `minikube cache`, it's mandatory to have a push access to the
+    # repo, so we don't offer a default value and explicilty require the user to
+    # specify a `CONTAINER_IMAGE_REPO`.
+    CONTAINER_IMAGE_REPO="${CONTAINER_IMAGE_REPO:?"You have to specify CONTAINER_IMAGE_REPO to upload the test image to."}"
+  fi
 
   # Assign a default test run ID if none is provided by the user.
   TEST_RUN_ID="${TEST_RUN_ID:-"$(date +%s)-$(random-string)"}"
@@ -70,15 +94,8 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
 fi
 
 if [[ -z "${SKIP_CONTAINER_IMAGE_PUBLISHING:-}" ]]; then
-  # Whether to use minikube cache to pass image to the k8s cluster.
-  # After we build vector docker image, instead of pushing to the remote repo,
-  # we'll be using `minikube cache` to make image available to the cluster.
-  # This effectively eliminates the requirement to have a docker registry, but
-  # it requires that we run against minikube cluster.
-  USE_MINIKUBE_CACHE="${USE_MINIKUBE_CACHE:-"false"}"
-
   # Make the container image accessible to the k8s cluster.
-  if [[ "$USE_MINIKUBE_CACHE" == "true" ]]; then
+  if is_minikube_cache_enabled; then
     minikube cache add "$CONTAINER_IMAGE"
   else
     docker push "$CONTAINER_IMAGE"
