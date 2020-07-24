@@ -11,9 +11,9 @@ use super::{
 use serde_json::{json, value::to_raw_value};
 use std::collections::HashMap;
 
-const WRAPPER_OVERHEAD: usize = 14; // JSON: {"streams":[…]}
-const STREAM_OVERHEAD: usize = 25; // JSON: {"stream":{…},"values":[…]}
-const LABEL_OVERHEAD: usize = 5; // JSON: "…":"…"
+const WRAPPER_OVERHEAD: usize = r#"{"streams":[]}"#.len();
+const STREAM_OVERHEAD: usize = r#"{"stream":{},"values":[]}"#.len();
+const LABEL_OVERHEAD: usize = r#""":"""#.len();
 
 pub type Labels = Vec<(String, String)>;
 
