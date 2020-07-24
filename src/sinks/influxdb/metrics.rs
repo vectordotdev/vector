@@ -97,11 +97,10 @@ impl InfluxDBSvc {
         let token = settings.token();
         let protocol_version = settings.protocol_version();
 
-        let batch = config
-            .batch
-            .disallow_max_bytes()?
-            .use_size_as_events()?
-            .get_settings_or_default(BatchSettings::default().events(20).timeout(1));
+        let batch = BatchSettings::default()
+            .events(20)
+            .timeout(1)
+            .parse_config(config.batch)?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = settings.write_uri(endpoint)?;

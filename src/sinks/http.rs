@@ -110,11 +110,10 @@ impl SinkConfig for HttpSinkConfig {
         config.uri = build_uri(config.uri.clone()).into();
 
         let compression = config.compression;
-        let batch = config.batch.use_size_as_bytes()?.get_settings_or_default(
-            BatchSettings::default()
-                .bytes(bytesize::mib(10u64))
-                .timeout(1),
-        );
+        let batch = BatchSettings::default()
+            .bytes(bytesize::mib(10u64))
+            .timeout(1)
+            .parse_config(config.batch)?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let sink = BatchedHttpSink::new(

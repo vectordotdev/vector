@@ -80,11 +80,10 @@ impl SinkConfig for InfluxDBLogsConfig {
         let client = HttpClient::new(cx.resolver(), None)?;
         let healthcheck = self.healthcheck(client.clone())?;
 
-        let batch = self.batch.use_size_as_bytes()?.get_settings_or_default(
-            BatchSettings::default()
-                .bytes(bytesize::mib(1u64))
-                .timeout(1),
-        );
+        let batch = BatchSettings::default()
+            .bytes(bytesize::mib(1u64))
+            .timeout(1)
+            .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let settings = influxdb_settings(

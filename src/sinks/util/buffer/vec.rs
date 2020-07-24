@@ -1,4 +1,4 @@
-use super::super::{Batch, BatchSize, PushResult};
+use super::super::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult};
 
 #[derive(Clone)]
 pub struct VecBuffer<T> {
@@ -7,7 +7,7 @@ pub struct VecBuffer<T> {
 }
 
 impl<T> VecBuffer<T> {
-    pub fn new(settings: BatchSize) -> Self {
+    pub fn new(settings: BatchSize<Self>) -> Self {
         Self::new_with_max(settings.events)
     }
 
@@ -20,6 +20,16 @@ impl<T> VecBuffer<T> {
 impl<T> Batch for VecBuffer<T> {
     type Input = T;
     type Output = Vec<T>;
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(config
+            .disallow_max_bytes()?
+            .use_size_as_events()?
+            .get_settings_or_default(defaults))
+    }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         if self.batch.len() >= self.max_events {

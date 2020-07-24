@@ -88,10 +88,11 @@ impl StatsdSvc {
         // However we need to leave some space for +1 extra trailing event in the buffer.
         // Also one might keep an eye on server side limitations, like
         // mentioned here https://github.com/DataDog/dd-agent/issues/2638
-        let batch = config
-            .batch
-            .use_size_as_bytes()?
-            .get_settings_or_default(BatchSettings::default().bytes(1300).events(1000).timeout(1));
+        let batch = BatchSettings::default()
+            .bytes(1300)
+            .events(1000)
+            .timeout(1)
+            .parse_config(config.batch)?;
         let namespace = config.namespace.clone();
 
         let client = Client::new(config.address)?;
