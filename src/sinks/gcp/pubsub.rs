@@ -70,12 +70,11 @@ impl SinkConfig for PubsubConfig {
 
     async fn build_async(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self).await?;
-        let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
-            BatchSettings::default()
-                .bytes(bytesize::mib(10u64))
-                .events(1000)
-                .timeout(1),
-        );
+        let batch_settings = BatchSettings::default()
+            .bytes(bytesize::mib(10u64))
+            .events(1000)
+            .timeout(1)
+            .parse_config(self.batch)?;
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(cx.resolver(), tls_settings)?;

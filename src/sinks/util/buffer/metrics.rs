@@ -1,6 +1,8 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use crate::event::Event;
-use crate::sinks::util::{Batch, BatchSize, PushResult};
+use crate::sinks::util::batch::{
+    Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+};
 use std::cmp::Ordering;
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
@@ -97,7 +99,7 @@ impl MetricBuffer {
     //   Absolute AggregatedHistogram => Absolute AggregatedHistogram
     //   Absolute AggregatedSummary   => Absolute AggregatedSummary
     //
-    pub fn new(settings: BatchSize) -> Self {
+    pub fn new(settings: BatchSize<Self>) -> Self {
         Self::new_with_state(settings.events, HashSet::new())
     }
 
@@ -113,6 +115,16 @@ impl MetricBuffer {
 impl Batch for MetricBuffer {
     type Input = Event;
     type Output = Vec<Metric>;
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(config
+            .disallow_max_bytes()?
+            .use_size_as_events()?
+            .get_settings_or_default(defaults))
+    }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         if self.num_items() >= self.max_events {
@@ -270,7 +282,7 @@ fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>,
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::sinks::util::{BatchSink, BatchSize};
+    use crate::sinks::util::BatchSink;
     use crate::{
         buffers::Acker,
         event::metric::{Metric, MetricValue},
@@ -317,10 +329,7 @@ mod test {
 
             future::ok::<_, std::io::Error>(())
         });
-        let batch_size = BatchSize {
-            bytes: 9999,
-            events: 6,
-        };
+        let batch_size = BatchSettings::default().bytes(9999).events(6).size;
         let buffered = BatchSink::with_executor(
             svc,
             MetricBuffer::new(batch_size),

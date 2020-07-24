@@ -109,11 +109,10 @@ impl SinkConfig for DatadogConfig {
         let client = HttpClient::new(cx.resolver(), None)?;
         let healthcheck = healthcheck(self.clone(), client.clone()).boxed().compat();
 
-        let batch = self
-            .batch
-            .disallow_max_bytes()?
-            .use_size_as_events()?
-            .get_settings_or_default(BatchSettings::default().events(20).timeout(1));
+        let batch = BatchSettings::default()
+            .events(20)
+            .timeout(1)
+            .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = build_uri(&self.host)?;

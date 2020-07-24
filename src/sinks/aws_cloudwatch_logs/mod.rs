@@ -160,12 +160,11 @@ impl CloudwatchLogsSinkConfig {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let batch = self.batch.use_size_as_events()?.get_settings_or_default(
-            BatchSettings::default()
-                .bytes(1_048_576)
-                .events(10_000)
-                .timeout(1),
-        );
+        let batch = BatchSettings::default()
+            .bytes(1_048_576)
+            .events(10_000)
+            .timeout(1)
+            .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let log_group = self.group_name.clone();

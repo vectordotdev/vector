@@ -177,10 +177,10 @@ impl S3SinkConfig {
             .clone()
             .unwrap_or_else(|| "%s".into());
         let filename_append_uuid = self.filename_append_uuid.unwrap_or(true);
-        let batch = self
-            .batch
-            .use_size_as_bytes()?
-            .get_settings_or_default(BatchSettings::default().bytes(10_000_000).timeout(300));
+        let batch = BatchSettings::default()
+            .bytes(10_000_000)
+            .timeout(300)
+            .parse_config(self.batch)?;
 
         let key_prefix = self.key_prefix.as_deref().unwrap_or("date=%F/");
         let key_prefix = Template::try_from(key_prefix)?;

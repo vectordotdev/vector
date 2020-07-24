@@ -207,11 +207,10 @@ impl GcsSink {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
-        let batch = config.batch.use_size_as_bytes()?.get_settings_or_default(
-            BatchSettings::default()
-                .bytes(bytesize::mib(10u64))
-                .timeout(300),
-        );
+        let batch = BatchSettings::default()
+            .bytes(bytesize::mib(10u64))
+            .timeout(300)
+            .parse_config(config.batch)?;
 
         let key_prefix = config.key_prefix.as_deref().unwrap_or("date=%F/");
         let key_prefix = Template::try_from(key_prefix).context(KeyPrefixTemplate)?;
