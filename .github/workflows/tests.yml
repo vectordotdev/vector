@@ -300,7 +300,7 @@ jobs:
           minikube config set vm-driver docker
           minikube config set kubernetes-version '${{ matrix.kubernetes_version }}'
           minikube config set container-runtime '${{ matrix.container_runtime }}'
-          minikube start
+          minikube start || { minikube delete && minikube start } # try again once if failed initially
           kubectl cluster-info
       - name: Checkout
         uses: actions/checkout@v1
