@@ -62,3 +62,23 @@ impl InternalEvent for KafkaEventFailed {
         );
     }
 }
+
+#[derive(Debug)]
+pub struct KafkaPayloadExtractionFailed;
+
+impl InternalEvent for KafkaPayloadExtractionFailed {
+    fn emit_logs(&self) {
+        error!(message = "failed to extract payload.");
+    }
+}
+
+#[derive(Debug)]
+pub struct KafkaKeyExtractionFailed<'a> {
+    pub key_field: &'a str,
+}
+
+impl InternalEvent for KafkaKeyExtractionFailed<'_> {
+    fn emit_logs(&self) {
+        error!(message = "failed to extract key.", key_field = %self.key_field);
+    }
+}

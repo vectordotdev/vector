@@ -1,8 +1,11 @@
 use crate::{
     event::{self, Event},
+    internal_events::{
+        KafkaEventFailed, KafkaEventReceived, KafkaKeyExtractionFailed, KafkaOffsetUpdateFailed,
+        KafkaPayloadExtractionFailed,
+    },
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
-    internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
@@ -115,18 +118,19 @@ fn kafka_source(
                 async move {
                     match message {
                         Err(error) => {
-                            emit!(KafkaEventFailed{ error: error.clone() });
-                            Err(error!(message = "Error reading message from Kafka", error = ?error))
+                            emit!(KafkaEventFailed { error });
+                            Err(())
                         }
                         Ok(msg) => {
-                            emit!(KafkaEventReceived{ byte_size: msg.payload_len() });
+                            emit!(KafkaEventReceived {
+                                byte_size: msg.payload_len()
+                            });
 
                             let payload = match msg.payload_view::<[u8]>() {
                                 None => return Err(()), // skip messages with empty payload
-                                Some(Err(e)) => {
-                                    return Err(
-                                        error!(message = "Cannot extract payload", error = ?e),
-                                    )
+                                Some(Err(_)) => {
+                                    emit!(KafkaPayloadExtractionFailed);
+                                    return Err(());
                                 }
                                 Some(Ok(payload)) => Bytes::from(payload),
                             };
@@ -149,10 +153,9 @@ fn kafka_source(
                             if let Some(key_field) = &key_field {
                                 match msg.key_view::<[u8]>() {
                                     None => (),
-                                    Some(Err(e)) => {
-                                        return Err(
-                                            error!(message = "Cannot extract key", error = ?e),
-                                        )
+                                    Some(Err(_)) => {
+                                        emit!(KafkaKeyExtractionFailed { key_field });
+                                        return Err(());
                                     }
                                     Some(Ok(key)) => {
                                         log.insert(key_field.clone(), key);
@@ -161,9 +164,9 @@ fn kafka_source(
                             }
 
                             consumer.store_offset(&msg).map_err(|error| {
-                                emit!(KafkaOffsetUpdateFailed { error: error.clone() });
-                                error!(message = "Cannot store offset for the message", error = ?error)
+                                emit!(KafkaOffsetUpdateFailed { error });
                             })?;
+
                             Ok(event)
                         }
                     }
