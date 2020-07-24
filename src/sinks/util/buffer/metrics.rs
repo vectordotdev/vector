@@ -308,10 +308,10 @@ mod test {
 
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
-        let sent_requests1 = sent_requests.clone();
+        let sent_requests1 = Arc::clone(&sent_requests);
 
         let svc = tower::service_fn(move |req| {
-            let sent_requests = sent_requests1.clone();
+            let sent_requests = Arc::clone(&sent_requests1);
 
             sent_requests.lock().unwrap().push(req);
 
