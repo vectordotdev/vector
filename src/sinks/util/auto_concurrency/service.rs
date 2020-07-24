@@ -60,7 +60,7 @@ where
                     let permit = ready!(fut.poll(cx));
                     State::Ready(permit)
                 }
-                State::Empty => State::Waiting(Box::pin(self.controller.clone().acquire())),
+                State::Empty => State::Waiting(Box::pin(Arc::clone(&self.controller).acquire())),
             };
         }
     }
@@ -79,7 +79,7 @@ where
         // Call the inner service
         let future = self.inner.call(request);
 
-        ResponseFuture::new(future, permit, self.controller.clone())
+        ResponseFuture::new(future, permit, Arc::clone(&self.controller))
     }
 }
 
@@ -91,7 +91,7 @@ where
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            controller: self.controller.clone(),
+            controller: Arc::clone(&self.controller),
             state: State::Empty,
         }
     }
@@ -163,8 +163,8 @@ mod tests {
             let layer = AutoConcurrencyLimitLayer::new(10, TestRetryLogic);
             let (service, handle) = mock::spawn_layer(layer);
             let controller = service.get_ref().controller.clone();
-            let inner = controller.inner.clone();
-            let stats = controller.stats.clone();
+            let inner = Arc::clone(&controller.inner);
+            let stats = Arc::clone(&controller.stats);
             Self {
                 service,
                 handle,
@@ -181,7 +181,7 @@ mod tests {
         {
             let svc = Self::start();
             //let inner = svc.inner.clone();
-            let stats = svc.stats.clone();
+            let stats = Arc::clone(&svc.stats);
             pause();
             doit(svc).await;
             //dbg!(inner);

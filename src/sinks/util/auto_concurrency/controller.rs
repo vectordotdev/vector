@@ -75,7 +75,7 @@ impl<L> Controller<L> {
         if inner.in_flight >= inner.current_limit {
             inner.reached_limit = true;
         }
-        self.semaphore.clone().acquire()
+        Arc::clone(&self.semaphore).acquire()
     }
 
     pub(super) fn start_request(&self) {

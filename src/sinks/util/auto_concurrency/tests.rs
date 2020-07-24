@@ -89,15 +89,16 @@ impl SinkConfig for TestConfig {
         let healthcheck = future::ok(());
 
         // Dig deep to get at the internal controller statistics
-        let stats = sink
-            .get_ref()
-            .get_ref()
-            .get_ref()
-            .get_ref()
-            .get_ref()
-            .controller
-            .stats
-            .clone();
+        let stats = Arc::clone(
+            &sink
+                .get_ref()
+                .get_ref()
+                .get_ref()
+                .get_ref()
+                .get_ref()
+                .controller
+                .stats,
+        );
         *self.controller_stats.lock().unwrap() = stats;
 
         Ok((Box::new(sink), Box::new(healthcheck)))
@@ -125,7 +126,7 @@ struct TestSink {
 impl TestSink {
     fn new(config: &TestConfig) -> Self {
         Self {
-            stats: config.stats.clone(),
+            stats: Arc::clone(&config.stats),
             params: config.params,
         }
     }
@@ -167,7 +168,7 @@ impl Service<Vec<Event>> for TestSink {
             stats.in_flight.adjust(-1, now);
             Box::pin(pending())
         } else {
-            let stats2 = self.stats.clone();
+            let stats2 = Arc::clone(&self.stats);
             Box::pin(async move {
                 delay.await;
                 let mut stats = stats2.lock().expect("Poisoned stats lock");
@@ -226,8 +227,8 @@ fn run_test(lines: usize, interval: Option<f64>, params: TestParams) -> TestData
         ..Default::default()
     };
 
-    let stats = test_config.stats.clone();
-    let cstats = test_config.controller_stats.clone();
+    let stats = Arc::clone(&test_config.stats);
+    let cstats = Arc::clone(&test_config.controller_stats);
 
     let mut config = config::Config::empty();
     let generator = GeneratorConfig::repeat(vec!["line 1".into()], lines, interval);

@@ -31,7 +31,7 @@ impl ShrinkableSemaphore {
     ) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static {
         MaybeForgetFuture {
             master: self.clone(),
-            future: Box::pin(self.semaphore.clone().acquire_owned()),
+            future: Box::pin(Arc::clone(&self.semaphore).acquire_owned()),
         }
     }
 
@@ -75,7 +75,7 @@ struct MaybeForgetFuture {
 impl Future for MaybeForgetFuture {
     type Output = OwnedSemaphorePermit;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let master = self.master.clone();
+        let master = Arc::clone(&self.master);
         let mut to_forget = master
             .to_forget
             .lock()
@@ -84,7 +84,7 @@ impl Future for MaybeForgetFuture {
             let permit = ready!(self.future.as_mut().poll(cx));
             permit.forget();
             *to_forget -= 1;
-            let future = self.master.semaphore.clone().acquire_owned();
+            let future = Arc::clone(&self.master.semaphore).acquire_owned();
             drop(replace(&mut self.future, Box::pin(future)));
         }
         drop(to_forget);
