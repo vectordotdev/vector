@@ -207,9 +207,9 @@ mod test {
         let (sink, _healthcheck) = config.build(context).unwrap();
 
         let msg_counter = Arc::new(AtomicUsize::new(0));
-        let msg_counter1 = msg_counter.clone();
+        let msg_counter1 = Arc::clone(&msg_counter);
         let conn_counter = Arc::new(AtomicUsize::new(0));
-        let conn_counter1 = conn_counter.clone();
+        let conn_counter1 = Arc::clone(&conn_counter);
 
         let (mut close_tx, mut close_rx) = tokio01::sync::mpsc::unbounded_channel::<()>();
 

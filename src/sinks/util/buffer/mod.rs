@@ -180,7 +180,7 @@ mod test {
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
+            let sent_requests = Arc::clone(&sent_requests);
 
             sent_requests.lock().unwrap().push(req);
 

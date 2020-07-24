@@ -9,6 +9,7 @@
 #![allow(clippy::trivial_regex)]
 #![allow(clippy::type_complexity)]
 #![allow(clippy::unit_arg)]
+#![deny(clippy::clone_on_ref_ptr)]
 
 #[macro_use]
 extern crate tracing;

@@ -332,7 +332,7 @@ impl<F, B> Clone for HttpBatchService<F, B> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            request_builder: self.request_builder.clone(),
+            request_builder: Arc::clone(&self.request_builder),
         }
     }
 }
