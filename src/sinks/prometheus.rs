@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+    event::metric::{Metric, MetricKind, MetricValue},
     sinks::util::MetricEntry,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
