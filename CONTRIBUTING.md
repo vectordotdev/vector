@@ -676,6 +676,8 @@ You can also pass additional parameters to adjust the behavior of the test:
   a `minikube`-controlled cluster node.
   Requires you to test against a `minikube` cluster. Eliminates the need to have
   a registry to run tests.
+  When `USE_MINIKUBE_CACHE=true` is set, we provide a default value for the
+  `CONTAINER_IMAGE_REPO` so it can be omitted.
 
 * `CONTAINER_IMAGE=<your name>/vector-test:tag` - completely skip the step
   of building the Vector docker image, and use the specified image instead.
@@ -693,7 +695,13 @@ You can also pass additional parameters to adjust the behavior of the test:
 Passing additional commands is done like so:
 
 ```shell
-QUICK_BUILD=true USE_MINIKUBE_DOCKER=true CONTAINER_IMAGE_REPO=<your name>/vector-test make test-e2e-kubernetes
+QUICK_BUILD=true USE_MINIKUBE_CACHE=true make test-e2e-kubernetes
+```
+
+or
+
+```shell
+QUICK_BUILD=true CONTAINER_IMAGE_REPO=<your name>/vector-test make test-e2e-kubernetes
 ```
 
 ## Humans
