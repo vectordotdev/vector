@@ -127,11 +127,13 @@ pub enum DataType {
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     fn build(
         &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<sources::Source>;
+        _name: &str,
+        _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
+        _out: mpsc::Sender<Event>,
+    ) -> crate::Result<sources::Source> {
+        unimplemented!()
+    }
 
     async fn build_async(
         &self,

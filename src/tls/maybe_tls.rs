@@ -1,13 +1,19 @@
-use futures01::Poll;
-use std::fmt::{self, Debug, Formatter};
-use std::io::{self, Read, Write};
-use tokio01::io::{AsyncRead, AsyncWrite};
+use bytes05::{Buf, BufMut};
+use pin_project::pin_project;
+use std::{
+    fmt,
+    mem::MaybeUninit,
+    pin::Pin,
+    task::{Context, Poll},
+};
+use tokio::io::{self, AsyncRead, AsyncWrite};
 
 /// A type wrapper for objects that can exist in either a raw state or
 /// wrapped by TLS handling.
+#[pin_project(project = MaybeTlsProj)]
 pub enum MaybeTls<R, T> {
-    Raw(R),
-    Tls(T),
+    Raw(#[pin] R),
+    Tls(#[pin] T),
 }
 
 impl<R, T> MaybeTls<R, T> {
@@ -54,8 +60,8 @@ impl<R: Clone, T: Clone> Clone for MaybeTls<R, T> {
 }
 
 // Conditionally implement Debug for Debugable types
-impl<R: Debug, T: Debug> Debug for MaybeTls<R, T> {
-    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+impl<R: fmt::Debug, T: fmt::Debug> fmt::Debug for MaybeTls<R, T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Raw(raw) => write!(fmt, "MaybeTls::Raw({:?})", raw),
             Self::Tls(tls) => write!(fmt, "MaybeTls::Tls({:?})", tls),
@@ -63,38 +69,67 @@ impl<R: Debug, T: Debug> Debug for MaybeTls<R, T> {
     }
 }
 
-impl<R: Read, T: Read> Read for MaybeTls<R, T> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self {
-            Self::Tls(s) => s.read(buf),
-            Self::Raw(s) => s.read(buf),
-        }
-    }
-}
-
-impl<R: AsyncRead, T: AsyncRead> AsyncRead for MaybeTls<R, T> {}
-
-impl<R: Write, T: Write> Write for MaybeTls<R, T> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self {
-            Self::Tls(s) => s.write(buf),
-            Self::Raw(s) => s.write(buf),
+impl<R: AsyncRead, T: AsyncRead> AsyncRead for MaybeTls<R, T> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        match self.project() {
+            MaybeTlsProj::Tls(s) => s.poll_read(cx, buf),
+            MaybeTlsProj::Raw(s) => s.poll_read(cx, buf),
         }
     }
 
-    fn flush(&mut self) -> io::Result<()> {
+    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
         match self {
-            Self::Tls(s) => s.flush(),
-            Self::Raw(s) => s.flush(),
+            MaybeTls::Tls(s) => s.prepare_uninitialized_buffer(buf),
+            MaybeTls::Raw(s) => s.prepare_uninitialized_buffer(buf),
+        }
+    }
+
+    fn poll_read_buf<B: BufMut>(
+        self: Pin<&mut Self>,
+        cx: &mut Context,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
+        match self.project() {
+            MaybeTlsProj::Tls(s) => s.poll_read_buf(cx, buf),
+            MaybeTlsProj::Raw(s) => s.poll_read_buf(cx, buf),
         }
     }
 }
 
 impl<R: AsyncWrite, T: AsyncWrite> AsyncWrite for MaybeTls<R, T> {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        match self {
-            Self::Tls(s) => s.shutdown(),
-            Self::Raw(s) => s.shutdown(),
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context, buf: &[u8]) -> Poll<io::Result<usize>> {
+        match self.project() {
+            MaybeTlsProj::Tls(s) => s.poll_write(cx, buf),
+            MaybeTlsProj::Raw(s) => s.poll_write(cx, buf),
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
+        match self.project() {
+            MaybeTlsProj::Tls(s) => s.poll_flush(cx),
+            MaybeTlsProj::Raw(s) => s.poll_flush(cx),
+        }
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
+        match self.project() {
+            MaybeTlsProj::Tls(s) => s.poll_shutdown(cx),
+            MaybeTlsProj::Raw(s) => s.poll_shutdown(cx),
+        }
+    }
+
+    fn poll_write_buf<B: Buf>(
+        self: Pin<&mut Self>,
+        cx: &mut Context,
+        buf: &mut B,
+    ) -> Poll<io::Result<usize>> {
+        match self.project() {
+            MaybeTlsProj::Tls(s) => s.poll_write_buf(cx, buf),
+            MaybeTlsProj::Raw(s) => s.poll_write_buf(cx, buf),
         }
     }
 }

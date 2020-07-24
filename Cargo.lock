@@ -5622,9 +5622,8 @@ dependencies = [
 
 [[package]]
 name = "warp"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e95175b7a927258ecbb816bdada3cc469cb68593e7940b96a60f4af366a9970"
+version = "0.2.4"
+source = "git+https://github.com/timberio/warp?branch=serve-incoming-lifetime#0b25bd3c78c90432dc68225d25d737fcbfab63b3"
 dependencies = [
  "bytes 0.5.4",
  "futures 0.3.5",
@@ -5641,6 +5640,8 @@ dependencies = [
  "serde_urlencoded",
  "tokio 0.2.21",
  "tower-service 0.3.0",
+ "tracing",
+ "tracing-futures 0.2.1",
  "urlencoding",
 ]
 

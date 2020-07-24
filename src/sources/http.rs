@@ -5,6 +5,7 @@ use crate::{
     tls::TlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
+use async_trait::async_trait;
 use bytes05::{Bytes, BytesMut};
 use chrono::Utc;
 use codec::BytesDelimitedCodec;
@@ -61,8 +62,19 @@ impl HttpSource for SimpleHttpSource {
 }
 
 #[typetag::serde(name = "http")]
+#[async_trait]
 impl SourceConfig for SimpleHttpConfig {
     fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
+        _out: mpsc::Sender<Event>,
+    ) -> crate::Result<super::Source> {
+        unimplemented!()
+    }
+
+    async fn build_async(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -73,7 +85,7 @@ impl SourceConfig for SimpleHttpConfig {
             encoding: self.encoding,
             headers: self.headers.clone(),
         };
-        source.run(self.address, "", &self.tls, out, shutdown)
+        source.run(self.address, "", &self.tls, out, shutdown).await
     }
 
     fn output_type(&self) -> DataType {

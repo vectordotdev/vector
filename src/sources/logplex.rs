@@ -5,6 +5,7 @@ use crate::{
     tls::TlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
+use async_trait::async_trait;
 use bytes05::{buf::BufExt, Bytes};
 use chrono::{DateTime, Utc};
 use futures01::sync::mpsc;
@@ -32,8 +33,19 @@ impl HttpSource for LogplexSource {
 }
 
 #[typetag::serde(name = "logplex")]
+#[async_trait]
 impl SourceConfig for LogplexConfig {
     fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
+        _out: mpsc::Sender<Event>,
+    ) -> crate::Result<super::Source> {
+        unimplemented!()
+    }
+
+    async fn build_async(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -41,7 +53,9 @@ impl SourceConfig for LogplexConfig {
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let source = LogplexSource::default();
-        source.run(self.address, "events", &self.tls, out, shutdown)
+        source
+            .run(self.address, "events", &self.tls, out, shutdown)
+            .await
     }
 
     fn output_type(&self) -> DataType {
