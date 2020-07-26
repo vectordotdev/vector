@@ -1,11 +1,11 @@
-#[cfg(feature = "warp")]
+#[cfg(all(feature = "sources-tls", feature = "warp"))]
 mod http;
 #[cfg(all(feature = "sources-tls", feature = "listenfd"))]
 mod tcp;
 #[cfg(unix)]
 mod unix;
 
-#[cfg(feature = "warp")]
+#[cfg(all(feature = "sources-tls", feature = "warp"))]
 pub use self::http::{ErrorMessage, HttpSource};
 #[cfg(all(feature = "sources-tls", feature = "listenfd"))]
 pub use tcp::{SocketListenAddr, TcpSource};
