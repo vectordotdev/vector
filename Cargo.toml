@@ -43,7 +43,7 @@ tracing-limit = { path = "lib/tracing-limit" }
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
 tokio01 = { package = "tokio", version = "0.1.22", features = ["io", "tcp", "rt-full", "experimental-tracing", "sync"], default-features = false }
-tokio = { version = "0.2.13", features = ["blocking", "fs", "sync", "macros", "test-util", "rt-core", "io-std"] }
+tokio = { version = "0.2.13", features = ["blocking", "fs", "sync", "macros", "test-util", "rt-core", "io-std","uds"] }
 tokio-openssl03 = { package = "tokio-openssl", version = "0.3.0" }
 tokio-openssl = "0.4.0"
 tokio-retry = "0.2.0"
@@ -261,7 +261,7 @@ sources-journald = []
 sources-kafka = []
 sources-logplex = ["warp", "sources-tls"]
 sources-prometheus = []
-sources-socket = ["bytesize", "listenfd", "tokio/uds", "tokio-util/udp", "sources-tls"]
+sources-socket = ["bytesize", "listenfd",  "tokio-util/udp", "sources-tls"]
 sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
 sources-statsd = ["tokio-util/udp"]
 sources-stdin = ["bytesize"]
