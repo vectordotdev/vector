@@ -4,18 +4,22 @@ extern crate tracing;
 mod cli;
 
 use cli::{Color, LogFormat, Opts, SubCommand};
-use futures::compat::Future01CompatExt;
-use futures01::{future, Future, Stream};
+use futures::{
+    compat::{Future01CompatExt, Stream01CompatExt},
+    StreamExt,
+};
+use futures01::Future;
 use std::{
     cmp::max,
     fs::File,
     path::{Path, PathBuf},
 };
-#[cfg(unix)]
-use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
+use tokio::select;
 use topology::Config;
 use vector::{
-    config_paths, event, generate, list, metrics, runtime, topology, trace, unit_test, validate,
+    config_paths, event, generate, list, metrics, runtime,
+    signal::{self, SignalTo},
+    topology, trace, unit_test, validate,
 };
 
 fn main() {
@@ -128,120 +132,67 @@ fn main() {
         });
 
         let result = topology::start_validated(config, diff, pieces, opts.require_healthy).await;
-        let (topology, mut graceful_crash) = result.unwrap_or_else(|| {
+        let (mut topology, graceful_crash) = result.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
 
-        #[cfg(unix)]
-        {
-            let mut topology = topology;
-            let sigint = Signal::new(SIGINT).flatten_stream();
-            let sigterm = Signal::new(SIGTERM).flatten_stream();
-            let sigquit = Signal::new(SIGQUIT).flatten_stream();
-            let sighup = Signal::new(SIGHUP).flatten_stream();
+        let mut signals = signal::signals();
+        let mut sources_finished = topology.sources_finished().compat();
+        let mut graceful_crash = graceful_crash.compat();
 
-            let mut signals = sigint.select(sigterm.select(sigquit.select(sighup)));
+        let signal = loop {
+            select! {
+                Some(signal) = signals.next() => {
+                    if signal == SignalTo::Reload{
+                        // Reload config
+                        info!(
+                            message = "Reloading configs.",
+                            path = ?config_paths
+                        );
+                        let new_config = read_configs(&config_paths);
 
-            let signal = loop {
-                let signal = future::poll_fn(|| signals.poll());
-                let to_shutdown = future::poll_fn(|| graceful_crash.poll())
-                    .map(|_| ())
-                    .select(topology.sources_finished());
-
-                let next = signal
-                    .select2(to_shutdown)
-                    .compat()
-                    .await
-                    .map_err(|_| ())
-                    .expect("Neither stream errors");
-
-                let signal = match next {
-                    future::Either::A((signal, _)) => signal.expect("Signal streams never end"),
-                    // Trigger graceful shutdown if a component crashed, or all sources have ended.
-                    future::Either::B((_to_shutdown, _)) => SIGINT,
-                };
-
-                if signal != SIGHUP {
-                    break signal;
-                }
-
-                // Reload config
-                info!(
-                    message = "Reloading configs.",
-                    path = ?config_paths
-                );
-                let new_config = read_configs(&config_paths);
-
-                trace!("Parsing config");
-                let new_config = handle_config_errors(new_config);
-                if let Some(new_config) = new_config {
-                    match topology
-                        .reload_config_and_respawn(new_config, opts.require_healthy)
-                        .await
-                    {
-                        Ok(true) => (),
-                        Ok(false) => error!("Reload was not successful."),
-                        // Trigger graceful shutdown for what remains of the topology
-                        Err(()) => break SIGINT,
+                        trace!("Parsing config");
+                        let new_config = handle_config_errors(new_config);
+                        if let Some(new_config) = new_config {
+                            match topology
+                                .reload_config_and_respawn(new_config, opts.require_healthy)
+                                .await
+                            {
+                                Ok(true) => (),
+                                Ok(false) => error!("Reload was not successful."),
+                                // Trigger graceful shutdown for what remains of the topology
+                                Err(()) => break SignalTo::Shutdown,
+                            }
+                        } else {
+                            error!("Reload aborted.");
+                        }
+                    }else{
+                        break signal;
                     }
-                } else {
-                    error!("Reload aborted.");
                 }
-            };
+                // Trigger graceful shutdown if a component crashed, or all sources have ended.
+                _ = graceful_crash.next() => break SignalTo::Shutdown,
+                _ = &mut sources_finished => break SignalTo::Shutdown,
+                else => unreachable!("Signal streams never end"),
+            }
+        };
 
-            if signal == SIGINT || signal == SIGTERM {
-                use futures01::future::Either;
-
+        match signal {
+            SignalTo::Shutdown => {
                 info!("Shutting down.");
-                let shutdown = topology.stop();
-
-                match shutdown.select2(signals.into_future()).compat().await {
-                    Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
-                    Ok(Either::B(_)) => {
+                select! {
+                    _ = topology.stop().compat() => (), // Graceful shutdown finished
+                    _ = signals.next() => {
                         info!("Shutting down immediately.");
                         // Dropping the shutdown future will immediately shut the server down
                     }
-                    Err(_) => unreachable!(),
                 }
-            } else if signal == SIGQUIT {
+            }
+            SignalTo::Quit => {
                 info!("Shutting down immediately");
                 drop(topology);
-            } else {
-                unreachable!();
             }
-        }
-        #[cfg(windows)]
-        {
-            let ctrl_c = tokio_signal::ctrl_c().flatten_stream().into_future();
-            let to_shutdown = future::poll_fn(move || graceful_crash.poll())
-                .map(|_| ())
-                .select(topology.sources_finished());
-
-            let interruption = ctrl_c
-                .select2(to_shutdown)
-                .compat()
-                .await
-                .map_err(|_| ())
-                .expect("Neither stream errors");
-
-            use futures01::future::Either;
-
-            let ctrl_c = match interruption {
-                Either::A(((_, ctrl_c_stream), _)) => ctrl_c_stream.into_future(),
-                Either::B((_, ctrl_c)) => ctrl_c,
-            };
-
-            info!("Shutting down.");
-            let shutdown = topology.stop();
-
-            match shutdown.select2(ctrl_c).compat().await {
-                Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
-                Ok(Either::B(_)) => {
-                    info!("Shutting down immediately.");
-                    // Dropping the shutdown future will immediately shut the server down
-                }
-                Err(_) => unreachable!(),
-            }
+            SignalTo::Reload => unreachable!(),
         }
     });
 
