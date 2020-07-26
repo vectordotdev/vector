@@ -103,7 +103,8 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make test-shutdown
-
+      # Currently has too few tests to justify a separate task in CI.
+      - run: make test-cli
 
   test-integration-aws:
     name: Integration - Linux, AWS
