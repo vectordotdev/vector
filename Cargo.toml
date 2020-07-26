@@ -270,7 +270,7 @@ sources-stdin = ["bytesize"]
 sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "syslog_loose"]
 sources-tls = []
 sources-vector = ["listenfd" ,"sources-tls"]
-sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-json_parser", "transforms-regex_parser"]
+sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser"]
 
 # Transforms
 transforms = [

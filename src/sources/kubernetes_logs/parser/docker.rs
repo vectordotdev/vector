@@ -1,12 +1,10 @@
 use crate::{
     event::{self, Event, LogEvent, Value},
-    transforms::{
-        json_parser::{JsonParser, JsonParserConfig},
-        Transform,
-    },
+    transforms::Transform,
 };
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
+use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
 use string_cache::DefaultAtom as Atom;
 
@@ -22,32 +20,29 @@ lazy_static! {
 ///
 /// Normalizes parsed data for consistency.
 #[derive(Debug)]
-pub struct Docker {
-    json_parser: JsonParser,
-}
+pub struct Docker;
 
-impl Docker {
-    /// Create a new [`Docker`] parser.
-    pub fn new() -> Self {
-        let json_parser = {
-            let mut config = JsonParserConfig::default();
-            config.drop_field = true;
-
-            // Drop so that it's possible to detect if message is in json format.
-            config.drop_invalid = true;
-
-            config.into()
-        };
-
-        Self { json_parser }
+impl Transform for Docker {
+    fn transform(&mut self, mut event: Event) -> Option<Event> {
+        let log = event.as_mut_log();
+        parse_json(log)?;
+        normalize_event(log).ok()?;
+        Some(event)
     }
 }
 
-impl Transform for Docker {
-    fn transform(&mut self, event: Event) -> Option<Event> {
-        let mut event = self.json_parser.transform(event)?;
-        normalize_event(event.as_mut_log()).ok()?;
-        Some(event)
+/// Parses `message` as json object and removes it.
+fn parse_json(log: &mut LogEvent) -> Option<()> {
+    let to_parse = log.remove(&event::log_schema().message_key())?.as_bytes();
+
+    match serde_json::from_slice(to_parse.as_ref()) {
+        Ok(JsonValue::Object(object)) => {
+            for (key, value) in object {
+                log.insert_flat(key, value);
+            }
+            Some(())
+        }
+        Ok(_) | Err(_) => None,
     }
 }
 
