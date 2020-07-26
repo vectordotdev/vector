@@ -295,6 +295,9 @@ ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
+test-cli: ## Runs cli tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --test cli -- --test-threads 4
+
 .PHONY: build-wasm-tests
 test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
 
