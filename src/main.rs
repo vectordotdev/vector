@@ -143,7 +143,7 @@ fn main() {
         let signal = loop {
             select! {
                 Some(signal) = signals.next() => {
-                    if signal == SignalTo::Reload{
+                    if signal == SignalTo::Reload {
                         // Reload config
                         info!(
                             message = "Reloading configs.",
@@ -166,7 +166,7 @@ fn main() {
                         } else {
                             error!("Reload aborted.");
                         }
-                    }else{
+                    } else {
                         break signal;
                     }
                 }
