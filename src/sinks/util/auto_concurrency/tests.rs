@@ -4,7 +4,7 @@ use super::controller::ControllerStatistics;
 use crate::{
     assert_within,
     event::{metric::MetricValue, Event},
-    metrics::{capture_metrics, get_controller, init as metrics_init},
+    metrics::{self, capture_metrics, get_controller},
     sinks::{
         util::{retries2::RetryLogic, service2::TowerRequestConfig, BatchSettings, VecBuffer},
         Healthcheck, RouterSink,
@@ -214,7 +214,7 @@ struct TestData {
 }
 
 fn run_test(lines: usize, interval: Option<f64>, params: TestParams) -> TestData {
-    metrics_init().ok();
+    let _ = metrics::init();
 
     let test_config = TestConfig {
         request: TowerRequestConfig {
