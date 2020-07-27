@@ -469,14 +469,14 @@ checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
 name = "chrono"
-version = "0.4.11"
+version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80094f509cf8b5ae86a4966a39b3ff66cd7e2a3e594accec3743ff3fabeab5b2"
+checksum = "c74d84029116787153e02106bf53e66828452a4b325cc8652b788b5967c0a0b6"
 dependencies = [
  "num-integer",
  "num-traits",
  "serde",
- "time 0.1.42",
+ "time 0.1.43",
 ]
 
 [[package]]
@@ -1535,7 +1535,7 @@ dependencies = [
  "http 0.2.1",
  "mime",
  "sha-1",
- "time 0.1.42",
+ "time 0.1.43",
 ]
 
 [[package]]
@@ -1662,7 +1662,7 @@ dependencies = [
  "log 0.4.8",
  "pin-project",
  "socket2",
- "time 0.1.42",
+ "time 0.1.43",
  "tokio 0.2.21",
  "tower-service 0.3.0",
  "want",
@@ -4459,7 +4459,7 @@ dependencies = [
  "error-chain",
  "libc",
  "log 0.4.8",
- "time 0.1.42",
+ "time 0.1.43",
 ]
 
 [[package]]
@@ -4551,12 +4551,11 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.1.42"
+version = "0.1.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db8dcfca086c1143c9270ac42a2bbd8a7ee477b78ac8e45b19abfb0cbede4b6f"
+checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
 dependencies = [
  "libc",
- "redox_syscall",
  "winapi 0.3.8",
 ]
 
