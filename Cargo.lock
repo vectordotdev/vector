@@ -5125,9 +5125,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-futures"
-version = "0.2.1"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33848db47a7c848ab48b66aab3293cb9c61ea879a3586ecfcd17302fcea0baf1"
+checksum = "ab7bb6f14721aa00656086e9335d363c5c8747bae02ebe32ea2c7dece5689b4c"
 dependencies = [
  "futures 0.1.29",
  "futures 0.3.5",
@@ -5517,7 +5517,7 @@ dependencies = [
  "tower-test 0.1.0",
  "tower-test 0.3.0",
  "tracing",
- "tracing-futures 0.2.1",
+ "tracing-futures 0.2.4",
  "tracing-limit",
  "tracing-log",
  "tracing-subscriber",
