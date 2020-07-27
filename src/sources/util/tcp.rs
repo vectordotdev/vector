@@ -212,13 +212,13 @@ async fn handle_stream(
             let host = host.clone();
             source.build_event(frame, host).map(Ok)
         }
-        Err(_) => {
-            // Drop error, or?
-            Some(Err(()))
+        Err(error) => {
+            warn!(message = "Failed to read data from TCP source.", %error);
+            None
         }
     }))
     .forward(out.sink_compat())
-    .map_err(|_| warn!("Error received while processing TCP source"))
+    .map_err(|error| warn!("Error received while processing TCP source.", %error))
     .map(|_| debug!("connection closed."))
     .await
 }
