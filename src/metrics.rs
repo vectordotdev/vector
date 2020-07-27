@@ -19,7 +19,7 @@ pub fn init() -> crate::Result<()> {
 }
 
 pub fn get_controller() -> crate::Result<Controller> {
-    crate::metrics::CONTROLLER
+    CONTROLLER
         .get()
         .cloned()
         .ok_or_else(|| "metrics system not initialized".into())
