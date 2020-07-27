@@ -1,6 +1,4 @@
-use super::{
-    tls_connector, Connect, Handshake, MaybeTlsSettings, MaybeTlsStream, Result as TlsResult,
-};
+use super::{tls_connector, Connect, Handshake, MaybeTlsSettings, MaybeTlsStream};
 use snafu::ResultExt;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
@@ -10,7 +8,7 @@ impl MaybeTlsSettings {
         self,
         host: String,
         addr: SocketAddr,
-    ) -> TlsResult<MaybeTlsStream<TcpStream>> {
+    ) -> crate::tls::Result<MaybeTlsStream<TcpStream>> {
         let stream = TcpStream::connect(&addr).await.context(Connect)?;
 
         match self {

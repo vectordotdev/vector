@@ -55,7 +55,6 @@ async fn make_listener(
     }
 }
 
-// TODO: add async_trait for making `run` async.
 pub trait TcpSource: Clone + Send + Sync + 'static {
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661

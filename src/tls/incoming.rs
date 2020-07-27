@@ -1,6 +1,6 @@
 use super::{
-    CreateAcceptor, Handshake, MaybeTls, MaybeTlsSettings, MaybeTlsStream, PeerAddress,
-    Result as TlsResult, TcpBind, TlsError, TlsSettings,
+    CreateAcceptor, Handshake, MaybeTls, MaybeTlsSettings, MaybeTlsStream, PeerAddress, TcpBind,
+    TlsError, TlsSettings,
 };
 use bytes05::{Buf, BufMut};
 use futures::{future::BoxFuture, FutureExt, Stream, StreamExt};
@@ -19,7 +19,7 @@ use tokio::{
 use tokio_openssl::{HandshakeError, SslStream};
 
 impl TlsSettings {
-    pub(crate) fn acceptor(&self) -> TlsResult<SslAcceptor> {
+    pub(crate) fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {
         match self.identity {
             None => Err(TlsError::MissingRequiredIdentity),
             Some(_) => {
@@ -33,7 +33,7 @@ impl TlsSettings {
 }
 
 impl MaybeTlsSettings {
-    pub(crate) async fn bind(&self, addr: &SocketAddr) -> TlsResult<MaybeTlsListener> {
+    pub(crate) async fn bind(&self, addr: &SocketAddr) -> crate::tls::Result<MaybeTlsListener> {
         let listener = TcpListener::bind(addr).await.context(TcpBind)?;
 
         let acceptor = match self {
@@ -53,7 +53,7 @@ pub(crate) struct MaybeTlsListener {
 impl MaybeTlsListener {
     pub(crate) fn incoming(
         &mut self,
-    ) -> impl Stream<Item = TlsResult<MaybeTlsIncomingStream<TcpStream>>> + '_ {
+    ) -> impl Stream<Item = crate::tls::Result<MaybeTlsIncomingStream<TcpStream>>> + '_ {
         let acceptor = self.acceptor.clone();
         self.listener
             .incoming()
@@ -108,7 +108,10 @@ impl<S> MaybeTlsIncomingStream<S> {
 }
 
 impl MaybeTlsIncomingStream<TcpStream> {
-    pub(super) fn new(stream: TcpStream, acceptor: Option<SslAcceptor>) -> TlsResult<Self> {
+    pub(super) fn new(
+        stream: TcpStream,
+        acceptor: Option<SslAcceptor>,
+    ) -> crate::tls::Result<Self> {
         let peer_addr = stream.peer_addr().context(PeerAddress)?;
         let state = match acceptor {
             Some(acceptor) => StreamState::Accepting(
@@ -120,7 +123,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
     }
 
     // Explicit handshake method
-    pub(crate) async fn handshake(&mut self) -> TlsResult<()> {
+    pub(crate) async fn handshake(&mut self) -> crate::tls::Result<()> {
         if let StreamState::Accepting(fut) = &mut self.state {
             let stream = fut.await.context(Handshake)?;
             self.state = StreamState::Accepted(MaybeTlsStream::Tls(stream));

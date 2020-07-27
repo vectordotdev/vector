@@ -18,12 +18,10 @@ pub(crate) use incoming::{MaybeTlsIncomingStream, MaybeTlsListener};
 pub(crate) use maybe_tls::MaybeTls;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
 
-// TODO: Rename to TlsResult?
 pub type Result<T> = std::result::Result<T, TlsError>;
 
 pub type MaybeTlsStream<S> = MaybeTls<S, SslStream<S>>;
 
-// TODO: check what not used and remove
 #[derive(Debug, Snafu)]
 pub enum TlsError {
     #[snafu(display("Could not open {} file {:?}: {}", note, filename, source))]
