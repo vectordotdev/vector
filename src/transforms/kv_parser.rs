@@ -189,6 +189,7 @@ mod tests {
         topology::config::{TransformConfig, TransformContext},
         Event,
     };
+    use string_cache::DefaultAtom as Atom;
 
     fn parse_log(
         text: &str,
@@ -196,6 +197,9 @@ mod tests {
         field_split: String,
         drop_field: bool,
         types: &[(&str, &str)],
+        target_field: Option<Atom>,
+        trim_key: Option<String>,
+        trim_value: Option<String>,
     ) -> LogEvent {
         let event = Event::from(text);
 
@@ -205,6 +209,10 @@ mod tests {
             field: None,
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
+            target_field,
+            overwrite_target: false,
+            trim_key,
+            trim_value,
         }
         .build(TransformContext::new_test())
         .unwrap();
@@ -220,6 +228,9 @@ mod tests {
             "=".to_string(),
             false,
             &[],
+            None,
+            None,
+            None,
         );
         assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
         assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
@@ -233,6 +244,9 @@ mod tests {
             "=".to_string(),
             false,
             &[],
+            None,
+            None,
+            None,
         );
         assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
         assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
@@ -246,6 +260,9 @@ mod tests {
             " ".to_string(),
             false,
             &[],
+            None,
+            None,
+            None,
         );
         assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
         assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
@@ -259,6 +276,9 @@ mod tests {
             ":".to_string(),
             false,
             &[("score", "integer")],
+            None,
+            None,
+            None,
         );
         assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
         assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
@@ -273,6 +293,9 @@ mod tests {
             "=>".to_string(),
             false,
             &[("score", "integer")],
+            None,
+            None,
+            None,
         );
 
         assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
@@ -288,6 +311,9 @@ mod tests {
             "=".to_string(),
             false,
             &[("score", "integer")],
+            None,
+            None,
+            None,
         );
         assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
         assert_eq!(log[&"beep".into()], Value::Bytes("bop=bap".into()));
@@ -302,6 +328,9 @@ mod tests {
             "::".to_string(),
             false,
             &[],
+            None,
+            None,
+            None,
         );
         assert!(log.contains(&"foo".into()));
         assert!(!log.contains(&"beep".into()));
