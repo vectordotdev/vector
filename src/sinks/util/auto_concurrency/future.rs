@@ -15,6 +15,16 @@ use std::{
 use tokio::sync::OwnedSemaphorePermit;
 
 /// Future for the `AutoConcurrencyLimit` service.
+///
+/// This future runs the inner future, which is used to collect the
+/// response from the inner service, and then tells the controller to
+/// adjust its measurements when that future is ready. It also owns the
+/// semaphore permit that is used to control concurrency such that the
+/// semaphore is returned when this future is dropped.
+///
+/// Note that this future must be 'await'ed immediately (such as by
+/// spawning it) to prevent extraneous delays from causing discrepancies
+/// in the measurements.
 #[pin_project]
 #[derive(Debug)]
 pub struct ResponseFuture<F, L> {
