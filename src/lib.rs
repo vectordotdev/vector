@@ -42,6 +42,7 @@ pub mod region;
 pub mod runtime;
 pub mod serde;
 pub mod shutdown;
+pub mod signal;
 pub mod sinks;
 pub mod sources;
 pub mod stream;
