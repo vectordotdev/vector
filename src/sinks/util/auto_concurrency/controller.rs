@@ -248,3 +248,29 @@ impl Mean {
         self.count = 0;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mean_update_works() {
+        let mut mean = Mean::default();
+        assert_eq!(mean.update(0.0), 0.0);
+        assert_eq!(mean.update(2.0), 1.0);
+        assert_eq!(mean.update(4.0), 2.0);
+        assert_eq!(mean.count, 3);
+        assert_eq!(mean.sum, 6.0);
+    }
+
+    #[test]
+    fn ewma_update_works() {
+        let mut mean = EWMA::default();
+        assert_eq!(mean.average, 0.0);
+        assert_eq!(mean.update(2.0), 2.0);
+        assert_eq!(mean.update(2.0), 2.0);
+        assert_eq!(mean.update(1.0), 1.5);
+        assert_eq!(mean.update(2.0), 1.75);
+        assert_eq!(mean.average, 1.75);
+    }
+}
