@@ -175,14 +175,17 @@ mod test {
     #[cfg(feature = "sources-tls")]
     #[test]
     fn tcp_stream_detects_disconnect() {
-        use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions, MaybeTlsIncomingStream};
+        use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
+        use futures::{task::noop_waker_ref, StreamExt};
         use std::{
             net::Shutdown,
-            sync::{atomic::{AtomicUsize, Ordering}, Arc},
-            task::{Context, Poll},
             pin::Pin,
+            sync::{
+                atomic::{AtomicUsize, Ordering},
+                Arc,
+            },
+            task::{Context, Poll},
         };
-        use futures::{task::noop_waker_ref, StreamExt};
         use tokio::{io::AsyncRead, net::TcpStream, sync::Mutex};
 
         crate::test_util::trace_init();
@@ -254,7 +257,7 @@ mod test {
                                     } else {
                                         msg_counter1.fetch_add(1, Ordering::SeqCst);
                                     }
-                                },
+                                }
                                 Poll::Ready(Err(error)) => panic!("{}", error),
                             }
                         }
