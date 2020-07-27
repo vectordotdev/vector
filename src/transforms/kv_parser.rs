@@ -9,13 +9,20 @@ use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Debug, Default, Derivative, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct KeyValueConfig {
-    pub separator: String,
-    pub field_split: String,
-    pub field: Option<Atom>,
+    #[derivative(Default(value = "true"))]
     pub drop_field: bool,
+    pub field: Option<Atom>,
+    #[derivative(Default(value = " "))]
+    pub field_split: String,
+    #[derivative(Default(value = "true"))]
+    pub overwrite_target: bool,
+    pub separator: String,
+    pub target_field: Option<Atom>,
+    pub trim_key: Option<String>,
+    pub trim_value: Option<String>,
     pub types: HashMap<Atom, String>,
 }
 
@@ -33,13 +40,17 @@ impl TransformConfig for KeyValueConfig {
 
         let conversions = parse_conversion_map(&self.types)?;
 
-        Ok(Box::new(KeyValue::new(
-            self.separator.clone(),
-            self.field_split.clone(),
-            field.clone(),
-            self.drop_field,
+        Ok(Box::new(KeyValue {
             conversions,
-        )))
+            drop_field: self.drop_field,
+            field: field.clone(),
+            field_split: self.field_split.clone(),
+            overwrite_target: self.overwrite_target,
+            separator: self.separator.clone(),
+            target_field: self.target_field.clone(),
+            trim_key: self.trim_key.clone(),
+            trim_value: self.trim_value.clone(),
+        }))
     }
 
     fn input_type(&self) -> DataType {
@@ -56,46 +67,36 @@ impl TransformConfig for KeyValueConfig {
 }
 
 pub struct KeyValue {
-    separator: String,
-    field_split: String,
-    field: Atom,
-    drop_field: bool,
     conversions: HashMap<Atom, Conversion>,
+    drop_field: bool,
+    field: Atom,
+    field_split: String,
+    overwrite_target: bool,
+    separator: String,
+    target_field: Option<Atom>,
+    trim_key: Option<String>,
+    trim_value: Option<String>,
 }
 
-impl KeyValue {
-    pub fn new(
-        separator: String,
-        field_split: String,
-        field: Atom,
-        drop_field: bool,
-        conversions: HashMap<Atom, Conversion>,
-    ) -> Self {
-        Self {
-            separator,
-            field_split,
-            field,
-            drop_field,
-            conversions,
-        }
-    }
-}
 
-fn kv_parser(pair: String, field_split: &String) -> Option<(Atom, String)> {
+fn kv_parser(pair: String, field_split: &String, trim_key: &Option<String>, trim_value: &Option<String>) -> Option<(Atom, String)> {
     let pair = pair.trim();
+    let mut field;
+
     if field_split.is_empty() {
         let mut kv_pair = pair.split_whitespace();
-        let key = kv_pair.nth(0)?.to_string();
-        let value = kv_pair.nth(1)?.to_string();
+        let key = kv_pair.nth(0)?;
+        let value = kv_pair.nth(1)?;
         let count = kv_pair.count();
 
         if count < 2 {
             return None;
         } else if count > 2 {
-            debug!(message = "KV parser expected 2 values, but got {count}", count=count)
+            error!(message = "KV parser expected 2 values, but got {count}", count=count, rate_limit_secs=30);
+            return None
         }
 
-        Some((Atom::from(key), value))
+        field = [key, value];
     } else {
         let split_index = pair.find(field_split).unwrap_or(0);
         let (key, val) = pair.split_at(split_index);
@@ -106,25 +107,50 @@ fn kv_parser(pair: String, field_split: &String) -> Option<(Atom, String)> {
             return None;
         }
 
-        Some((Atom::from(key), val.to_string()))
+        field = [key, val];
     }
+
+    for (i, trim) in [trim_key, trim_value].iter().enumerate() {
+        if let Some(trim) = trim {
+            let trim_chars: Vec<char> = trim.chars().collect();
+            field[i] = field[i].trim_matches(&trim_chars as &[_]);
+        }
+    }
+
+    Some((Atom::from(field[0]), field[1].to_string()))
 }
 
 impl Transform for KeyValue {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
-        let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
+        let log = event.as_mut_log();
+        let value = log.get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
-            //let pairs = parse_kv(value, self.separator.copy(), self.field_split.copy());
             let pairs = value
                 .split(&self.separator)
-                .filter_map(|pair| kv_parser(pair.to_string(), &self.field_split));
+                .filter_map(|pair| kv_parser(pair.to_string(), &self.field_split, &self.trim_key, &self.trim_value));
 
-            for (key, val) in pairs {
+            // Handle optional overwriting of the target field
+            if let Some(target_field) = &self.target_field {
+                if log.contains(target_field) {
+                    if self.overwrite_target {
+                        log.remove(target_field);
+                    } else {
+                        error!(message = "target field already exists", %target_field, rate_limit_secs = 30);
+                        return Some(event);
+                    }
+                }
+            }
+
+            for (mut key, val) in pairs {
+                if let Some(target_field) = self.target_field.to_owned() {
+                    key = Atom::from(format!("{}.{}", target_field, key));
+                }
+
                 if let Some(conv) = self.conversions.get(&key) {
                     match conv.convert(val.as_bytes().into()) {
                         Ok(value) => {
-                            event.as_mut_log().insert(key, value);
+                            log.insert(key, value);
                         }
                         Err(error) => {
                             debug!(
@@ -136,12 +162,14 @@ impl Transform for KeyValue {
                         }
                     }
                 } else {
-                    event.as_mut_log().insert(key, val);
+                    log.insert(key, val);
                 }
             }
+
             if self.drop_field {
-                event.as_mut_log().remove(&self.field);
+                log.remove(&self.field);
             }
+
         } else {
             debug!(
                 message = "Field does not exist.",
