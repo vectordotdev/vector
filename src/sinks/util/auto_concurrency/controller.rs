@@ -8,7 +8,6 @@ use crate::internal_events::{
 use crate::sinks::util::retries2::RetryLogic;
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
-use std::cmp::max;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -241,7 +240,7 @@ impl Mean {
     fn update(&mut self, point: f64) -> f64 {
         self.sum += point;
         self.count += 1;
-        self.sum / max(self.count, 1) as f64
+        self.sum / self.count as f64
     }
 
     fn reset(&mut self) {
