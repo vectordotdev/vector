@@ -218,7 +218,7 @@ async fn handle_stream(
         }
     }))
     .forward(out.sink_compat())
-    .map_err(|error| warn!("Error received while processing TCP source.", %error))
+    .map_err(|_| warn!(message = "Error received while processing TCP source."))
     .map(|_| debug!("connection closed."))
     .await
 }
