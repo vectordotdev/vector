@@ -79,6 +79,7 @@ impl SinkConfig for LokiConfig {
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = BatchSettings::default()
+            .bytes(102_400)
             .events(100_000)
             .timeout(1)
             .parse_config(self.batch)?;
