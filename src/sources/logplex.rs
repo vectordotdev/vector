@@ -186,17 +186,22 @@ mod tests {
         test_util::trace_init();
         let (sender, recv) = mpsc::channel(100);
         let address = test_util::next_addr();
-        rt.spawn(
+        let address2 = address.clone();
+        rt.spawn_std(async move {
             LogplexConfig { address, tls: None }
-                .build(
+                .build_async(
                     "default",
                     &GlobalOptions::default(),
                     ShutdownSignal::noop(),
                     sender,
                 )
-                .unwrap(),
-        );
-        (recv, address)
+                .await
+                .unwrap()
+                .compat()
+                .await
+                .unwrap()
+        });
+        (recv, address2)
     }
 
     async fn send(address: SocketAddr, body: &str) -> u16 {
