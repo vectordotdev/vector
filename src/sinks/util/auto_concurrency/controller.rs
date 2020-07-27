@@ -15,7 +15,15 @@ use std::time::{Duration, Instant};
 use tokio::sync::OwnedSemaphorePermit;
 use tower03::timeout::error::Elapsed;
 
+// This value was picked as a reasonable default while we ensure the
+// viability of the system. This value may need adjustment if later
+// analysis descovers we need higher or lower weighting on past RTT
+// weighting.
 const EWMA_ALPHA: f64 = 0.5;
+
+// This was picked as a reasonable default threshold ratio to avoid
+// dropping concurrency too aggressively when there is fluctuation in
+// the RTT measurements.
 const THRESHOLD_RATIO: f64 = 0.05;
 
 /// Shared class for `tokio::sync::Semaphore` that manages adjusting the
