@@ -95,31 +95,34 @@ impl CompiledRegex {
 
     /// Returns a list of captures (name, value) or None if the regex does not
     /// match
-    fn captures<'a>(&'a mut self, value: &[u8]) -> Option<Vec<(&'a Atom, Value)>> {
+    fn captures<'a>(
+        &'a mut self,
+        value: &'a [u8],
+    ) -> Option<impl Iterator<Item = (Atom, Value)> + 'a> {
         match self.regex.captures_read(&mut self.capture_locs, value) {
             Some(_) => {
-                let values = self
-                    .capture_names
-                    .iter()
-                    .filter_map(|(idx, name, conversion)| {
-                        self.capture_locs.get(*idx).and_then(|(start, end)| {
-                            let capture: Value = value[start..end].into();
+                let capture_locs = &self.capture_locs;
+                let values =
+                    self.capture_names
+                        .iter()
+                        .filter_map(move |(idx, name, conversion)| {
+                            capture_locs.get(*idx).and_then(|(start, end)| {
+                                let capture: Value = value[start..end].into();
 
-                            match conversion.convert(capture) {
-                                Ok(value) => Some((name, value)),
-                                Err(error) => {
-                                    debug!(
-                                        message = "Could not convert types.",
-                                        name = &name[..],
-                                        %error,
-                                        rate_limit_secs = 30
-                                    );
-                                    None
+                                match conversion.convert(capture) {
+                                    Ok(value) => Some((name.clone(), value)),
+                                    Err(error) => {
+                                        debug!(
+                                            message = "Could not convert types.",
+                                            name = &name[..],
+                                            %error,
+                                            rate_limit_secs = 30
+                                        );
+                                        None
+                                    }
                                 }
-                            }
-                        })
-                    })
-                    .collect();
+                            })
+                        });
                 Some(values)
             }
             None => None,
@@ -251,17 +254,16 @@ impl Transform for RegexParser {
                 }
             };
 
-            let pattern = match self.patterns.get_mut(id) {
-                Some(pattern) => pattern,
-                None => {
-                    error!(message = "Cannot find capture locations for pattern", %id, rate_limit_secs = 30);
-                    return None;
-                }
-            };
+            let target_field = self.target_field.as_ref();
+
+            let pattern = self
+                .patterns
+                .get_mut(id)
+                .expect("Mismatch between capture patterns and regexset");
 
             if let Some(captures) = pattern.captures(&value) {
                 // Handle optional overwriting of the target field
-                if let Some(target_field) = &self.target_field {
+                if let Some(target_field) = target_field {
                     if log.contains(target_field) {
                         if self.overwrite_target {
                             log.remove(target_field);
@@ -272,14 +274,12 @@ impl Transform for RegexParser {
                     }
                 }
 
-                for (name, value) in captures {
-                    let name = self
-                        .target_field
-                        .as_ref()
+                log.extend(captures.map(|(name, value)| {
+                    let name = target_field
                         .map(|target| Atom::from(format!("{}.{}", target, name)))
                         .unwrap_or_else(|| name.clone());
-                    log.insert(name, value);
-                }
+                    (name, value)
+                }));
                 if self.drop_field {
                     log.remove(&self.field);
                 }
