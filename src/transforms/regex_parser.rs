@@ -102,7 +102,7 @@ impl CompiledRegex {
                     .capture_names
                     .iter()
                     .filter_map(|(idx, name, conversion)| {
-                        self.capture_locs.get(*idx).map_or(None, |(start, end)| {
+                        self.capture_locs.get(*idx).and_then(|(start, end)| {
                             let capture: Value = value[start..end].into();
 
                             match conversion.convert(capture) {
@@ -273,7 +273,8 @@ impl Transform for RegexParser {
                 }
 
                 for (name, value) in captures {
-                    let name = (&self.target_field)
+                    let name = self
+                        .target_field
                         .as_ref()
                         .map(|target| Atom::from(format!("{}.{}", target, name)))
                         .unwrap_or_else(|| name.clone());
