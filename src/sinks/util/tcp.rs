@@ -206,7 +206,7 @@ impl Sink for TcpSink {
                 // This can return a proper disconnect error or `Ok(0)`
                 // which means the pipe is broken and we should try to reconnect.
                 //
-                // If this return `Poll::Pending` we know the connection is still
+                // If this returns `Poll::Pending` we know the connection is still
                 // valid and the write will most likely succeed.
 
                 let stream: &mut MaybeTlsStream<TcpStream> = connection.get_mut().get_mut();
