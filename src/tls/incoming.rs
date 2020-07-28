@@ -14,7 +14,7 @@ use tokio01::{
     io::{AsyncRead, AsyncWrite},
     net::{tcp::Incoming, TcpListener, TcpStream},
 };
-use tokio_openssl::{AcceptAsync, SslAcceptorExt};
+use tokio_openssl03::{AcceptAsync, SslAcceptorExt};
 
 pub(crate) struct MaybeTlsIncoming<I: Stream> {
     incoming: I,

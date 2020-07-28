@@ -26,6 +26,8 @@ apt install --yes \
     ruby-bundler \
     nodejs \
     libsasl2-dev \
+    gnupg2 \
+    wget \
     tcl-dev \
     cmake \
     binutils-arm-linux-gnueabihf \
@@ -33,8 +35,14 @@ apt install --yes \
     g++-arm-linux-gnueabihf \
     crossbuild-essential-i386  \
     gnupg2
+
 # Stupid, right? Sadly it works.
 ln -s "/usr/bin/g++" "/usr/bin/musl-g++"
+
+# We use Grease for parts of release.
+curl -LO https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz
+tar -xvf grease-1.0.1-linux-amd64.tar.gz
+cp grease/bin/grease /usr/bin/grease
 
 # Locales
 locale-gen en_US.UTF-8

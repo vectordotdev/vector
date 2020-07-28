@@ -1,12 +1,12 @@
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
+use futures::compat::Future01CompatExt;
 use futures01::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use vector::{
     shutdown::ShutdownSignal,
     test_util::{
-        block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
-        wait_for_tcp,
+        next_addr, random_lines, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
     },
     topology::{
         self,
@@ -72,29 +72,29 @@ fn test_sink_panic() {
     config.add_sink("panic", &["in"], PanicSink);
 
     let mut rt = runtime();
+    rt.block_on_std(async move {
+        let output_lines = CountReceiver::receive_lines(out_addr);
 
-    let output_lines = receive(&out_addr);
-    std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let (topology, crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-    // Wait for server to accept traffic
-    wait_for_tcp(in_addr);
-    std::thread::sleep(std::time::Duration::from_millis(100));
+        std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
+        let (topology, crash) = topology::start(config, false).await.unwrap();
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr);
+        std::thread::sleep(std::time::Duration::from_millis(100));
 
-    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
-    let send = send_lines(in_addr, input_lines.clone().into_iter());
-    let mut rt2 = runtime();
-    rt2.block_on(send).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        send_lines(in_addr, input_lines.clone()).await.unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100));
 
-    let _ = std::panic::take_hook();
-    assert!(crash.wait().next().is_some());
-    block_on(topology.stop()).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+        let _ = std::panic::take_hook();
+        assert!(crash.wait().next().is_some());
+        topology.stop().compat().await.unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let output_lines = output_lines.wait().await;
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    });
     shutdown_on_idle(rt);
-
-    let output_lines = output_lines.wait();
-    assert_eq!(num_lines, output_lines.len());
-    assert_eq!(input_lines, output_lines);
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -154,28 +154,27 @@ fn test_sink_error() {
     config.add_sink("error", &["in"], ErrorSink);
 
     let mut rt = runtime();
+    rt.block_on_std(async move {
+        let output_lines = CountReceiver::receive_lines(out_addr);
 
-    let output_lines = receive(&out_addr);
+        let (topology, crash) = topology::start(config, false).await.unwrap();
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr);
+        std::thread::sleep(std::time::Duration::from_millis(100));
 
-    let (topology, crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-    // Wait for server to accept traffic
-    wait_for_tcp(in_addr);
-    std::thread::sleep(std::time::Duration::from_millis(100));
+        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        send_lines(in_addr, input_lines.clone()).await.unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100));
 
-    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
-    let send = send_lines(in_addr, input_lines.clone().into_iter());
-    let mut rt2 = runtime();
-    rt2.block_on(send).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+        assert!(crash.wait().next().is_some());
+        topology.stop().compat().await.unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100));
 
-    assert!(crash.wait().next().is_some());
-    block_on(topology.stop()).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+        let output_lines = output_lines.wait().await;
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    });
     shutdown_on_idle(rt);
-
-    let output_lines = output_lines.wait();
-    assert_eq!(num_lines, output_lines.len());
-    assert_eq!(input_lines, output_lines);
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -222,28 +221,27 @@ fn test_source_error() {
     );
 
     let mut rt = runtime();
+    rt.block_on_std(async move {
+        let output_lines = CountReceiver::receive_lines(out_addr);
 
-    let output_lines = receive(&out_addr);
+        let (topology, crash) = topology::start(config, false).await.unwrap();
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr);
+        std::thread::sleep(std::time::Duration::from_millis(100));
 
-    let (topology, crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-    // Wait for server to accept traffic
-    wait_for_tcp(in_addr);
-    std::thread::sleep(std::time::Duration::from_millis(100));
+        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        send_lines(in_addr, input_lines.clone()).await.unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100));
 
-    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
-    let send = send_lines(in_addr, input_lines.clone().into_iter());
-    let mut rt2 = runtime();
-    rt2.block_on(send).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+        assert!(crash.wait().next().is_some());
+        topology.stop().compat().await.unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100));
 
-    assert!(crash.wait().next().is_some());
-    block_on(topology.stop()).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+        let output_lines = output_lines.wait().await;
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    });
     shutdown_on_idle(rt);
-
-    let output_lines = output_lines.wait();
-    assert_eq!(num_lines, output_lines.len());
-    assert_eq!(input_lines, output_lines);
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -292,28 +290,27 @@ fn test_source_panic() {
     );
 
     let mut rt = runtime();
+    rt.block_on_std(async move {
+        let output_lines = CountReceiver::receive_lines(out_addr);
 
-    let output_lines = receive(&out_addr);
+        std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
+        let (topology, crash) = topology::start(config, false).await.unwrap();
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr);
+        std::thread::sleep(std::time::Duration::from_millis(100));
 
-    std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let (topology, crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-    // Wait for server to accept traffic
-    wait_for_tcp(in_addr);
-    std::thread::sleep(std::time::Duration::from_millis(100));
+        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        send_lines(in_addr, input_lines.clone()).await.unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        let _ = std::panic::take_hook();
 
-    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
-    let send = send_lines(in_addr, input_lines.clone().into_iter());
-    let mut rt2 = runtime();
-    rt2.block_on(send).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
-    let _ = std::panic::take_hook();
+        assert!(crash.wait().next().is_some());
+        topology.stop().compat().await.unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100));
 
-    assert!(crash.wait().next().is_some());
-    block_on(topology.stop()).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+        let output_lines = output_lines.wait().await;
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    });
     shutdown_on_idle(rt);
-
-    let output_lines = output_lines.wait();
-    assert_eq!(num_lines, output_lines.len());
-    assert_eq!(input_lines, output_lines);
 }

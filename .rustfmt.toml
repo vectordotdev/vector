@@ -2,3 +2,4 @@
 # Not stable yet.
 # indent_style = "Block"
 reorder_imports = true
+edition = "2018"

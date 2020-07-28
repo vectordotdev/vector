@@ -1,13 +1,15 @@
-use super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
+use super::batch::{
+    err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+};
 use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 
 pub mod json;
+pub mod loki;
 pub mod metrics;
 pub mod partition;
 pub mod vec;
-pub mod vec2;
 
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
@@ -56,7 +58,7 @@ pub struct Buffer {
     inner: InnerBuffer,
     num_items: usize,
     num_bytes: usize,
-    settings: BatchSize,
+    settings: BatchSize<Self>,
     compression: Compression,
 }
 
@@ -67,7 +69,7 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
-    pub fn new(settings: BatchSize, compression: Compression) -> Self {
+    pub fn new(settings: BatchSize<Self>, compression: Compression) -> Self {
         let buffer = Vec::with_capacity(settings.bytes);
         let inner = match compression {
             Compression::None => InnerBuffer::Plain(buffer),
@@ -117,6 +119,15 @@ impl Batch for Buffer {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(config
+            .use_size_as_bytes()?
+            .get_settings_or_default(defaults))
+    }
+
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         // The compressed encoders don't flush bytes immediately, so we
         // can't track compressed sizes. Keep a running count of the
@@ -161,7 +172,7 @@ impl Batch for Buffer {
 mod test {
     use super::{Buffer, Compression};
     use crate::buffers::Acker;
-    use crate::sinks::util::{BatchSink, BatchSize};
+    use crate::sinks::util::{BatchSettings, BatchSink};
     use crate::test_util::runtime;
     use futures01::{future, Future, Sink};
     use std::io::Read;
@@ -180,16 +191,13 @@ mod test {
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
+            let sent_requests = Arc::clone(&sent_requests);
 
             sent_requests.lock().unwrap().push(req);
 
             future::ok::<_, std::io::Error>(())
         });
-        let batch_size = BatchSize {
-            bytes: 100_000,
-            events: 1_000,
-        };
+        let batch_size = BatchSettings::default().bytes(100_000).events(1_000).size;
         let timeout = Duration::from_secs(0);
 
         let buffered = BatchSink::with_executor(

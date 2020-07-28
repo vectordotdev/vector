@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.10.0"
+version = "0.11.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -28,7 +28,6 @@ extended-description-file = "target/debian-extended-description.txt"
 [workspace]
 members = [
   ".",
-  "lib/codec01",
   "lib/file-source",
   "lib/tracing-limit",
   "lib/vector-wasm",
@@ -37,16 +36,16 @@ members = [
 [dependencies]
 # Internal libs
 codec = { path = "lib/codec" }
-codec01 = { path = "lib/codec01" }
 file-source = { path = "lib/file-source" }
 tracing-limit = { path = "lib/tracing-limit" }
 
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio01 = { package = "tokio", version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing", "codec", "udp", "sync", "fs"], default-features = false }
+tokio01 = { package = "tokio", version = "0.1.22", features = ["io", "tcp", "rt-full", "experimental-tracing", "sync"], default-features = false }
 tokio = { version = "0.2.13", features = ["blocking", "fs", "sync", "macros", "test-util", "rt-core", "io-std"] }
-tokio-openssl = "0.3.0"
+tokio-openssl03 = { package = "tokio-openssl", version = "0.3.0" }
+tokio-openssl = "0.4.0"
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-compat = { version = "0.1", features = ["rt-full"] }
@@ -113,7 +112,6 @@ typetag = "0.1"
 toml = "0.4"
 syslog = "5"
 syslog_loose = { version = "0.3.0", optional = true }
-tokio-uds = { version = "0.2.5", optional = true }
 derive_is_enum_variant = "0.1.1"
 leveldb = { version = "0.8.5", optional = true, default-features = false }
 db-key = "0.0.5"
@@ -142,6 +140,7 @@ strip-ansi-escapes = { version = "0.1.0"}
 colored = "1.9"
 warp = { package = "warp", version = "0.2", default-features = false, optional = true }
 evmap = { version = "7", features = ["bytes"], optional = true }
+evmap10 = { package = "evmap", version = "10", features = ["bytes"], optional = true }
 logfmt = { version = "0.0.2", optional = true }
 notify = "4.0.14"
 once_cell = "1.3"
@@ -150,8 +149,9 @@ lru = "0.4.3"
 bloom = "0.3.2"
 pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
 task-compat = "0.1"
-cidr-utils = "0.4.1"
+cidr-utils = "0.4.2"
 pin-project = "0.4.22"
+k8s-openapi = { version = "0.9", features = ["v1_15"], optional = true }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -224,6 +224,10 @@ rdkafka-cmake = ["rdkafka", "rdkafka/cmake_build"]
 wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm", "anyhow"]
 wasm-timings = ["wasm"]
 
+# Enables kubernetes dependencies and shared code. Kubernetes-related sources,
+# transforms and sinks should depend on this feature.
+kubernetes = ["k8s-openapi", "evmap10"]
+
 # Sources
 sources = [
   "sources-docker",
@@ -242,6 +246,7 @@ sources = [
   "sources-syslog",
   "sources-tls",
   "sources-vector",
+  "sources-kubernetes-logs",
 ]
 sources-docker = ["bollard"]
 sources-file = ["bytesize"]
@@ -252,13 +257,14 @@ sources-journald = []
 sources-kafka = []
 sources-logplex = ["warp", "sources-tls"]
 sources-prometheus = []
-sources-socket = ["bytesize", "listenfd", "tokio-uds", "sources-tls"]
+sources-socket = ["bytesize", "listenfd", "tokio/uds", "tokio-util/udp", "sources-tls"]
 sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
-sources-statsd = []
+sources-statsd = ["tokio-util/udp"]
 sources-stdin = ["bytesize"]
 sources-syslog = ["sources-socket", "syslog_loose"]
 sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-vector = ["sources-socket"]
+sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-json_parser", "transforms-regex_parser"]
 
 # Transforms
 transforms = [
@@ -370,10 +376,10 @@ sinks-loki = ["bytesize"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-prometheus = []
 sinks-sematext_logs = ["sinks-elasticsearch"]
-sinks-socket = ["tokio-uds"]
+sinks-socket = ["tokio/uds"]
 sinks-papertrail = ["sinks-socket"]
 sinks-splunk_hec = ["bytesize"]
-sinks-statsd = []
+sinks-statsd = ["tokio-util/udp"]
 sinks-vector = []
 sinks-pulsar = ["pulsar"]
 
@@ -421,6 +427,7 @@ kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
+kubernetes-integration-tests = ["sources-kubernetes-logs"]
 
 shutdown-tests = ["sources","sinks-console","sinks-prometheus","sinks-blackhole","unix","rdkafka","transforms-log_to_metric","transforms-lua"]
 disable-resolv-conf = []

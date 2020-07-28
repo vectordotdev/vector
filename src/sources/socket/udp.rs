@@ -3,28 +3,36 @@ use crate::{
     internal_events::{UdpEventReceived, UdpSocketError},
     shutdown::ShutdownSignal,
     sources::Source,
-    stream::StreamExt01,
 };
-use bytes::Bytes;
-use codec01::BytesDelimitedCodec;
-use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use bytes05::BytesMut;
+use codec::BytesDelimitedCodec;
+use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
+use futures01::{sync::mpsc, Sink};
 use serde::{Deserialize, Serialize};
-use std::{io, net::SocketAddr};
+use std::net::SocketAddr;
 use string_cache::DefaultAtom as Atom;
-use tokio01::net::udp::{UdpFramed, UdpSocket};
+use tokio::net::UdpSocket;
+use tokio_util::codec::Decoder;
 
 /// UDP processes messages per packet, where messages are separated by newline.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct UdpConfig {
     pub address: SocketAddr,
+    #[serde(default = "default_max_length")]
+    pub max_length: usize,
     pub host_key: Option<Atom>,
+}
+
+fn default_max_length() -> usize {
+    bytesize::kib(100u64) as usize
 }
 
 impl UdpConfig {
     pub fn new(address: SocketAddr) -> Self {
         Self {
             address,
+            max_length: default_max_length(),
             host_key: None,
         }
     }
@@ -32,48 +40,60 @@ impl UdpConfig {
 
 pub fn udp(
     address: SocketAddr,
+    max_length: usize,
     host_key: Atom,
     shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
 ) -> Source {
-    let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
+    let mut out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
     Box::new(
-        future::lazy(move || {
-            let socket = UdpSocket::bind(&address).expect("failed to bind to udp listener socket");
-
+        async move {
+            let mut socket = UdpSocket::bind(&address)
+                .await
+                .expect("failed to bind to udp listener socket");
             info!(message = "listening.", %address);
 
-            Ok(socket)
-        })
-        .and_then(move |socket| {
-            let host_key = host_key.clone();
-            // UDP processes messages per packet, where messages are separated by newline.
-            // And stretch to end of packet.
-            UdpFramed::with_decode(socket, BytesDelimitedCodec::new(b'\n'), true)
-                .take_until(shutdown)
-                .map(move |(line, addr): (Bytes, _)| {
-                    let byte_size = line.len();
-                    let mut event = Event::from(line);
+            let mut shutdown = shutdown.compat();
+            let mut buf = BytesMut::with_capacity(max_length);
+            loop {
+                buf.resize(max_length, 0);
+                tokio::select! {
+                    recv = socket.recv_from(&mut buf) => {
+                        let (byte_size, address) = recv.map_err(|error| {
+                            emit!(UdpSocketError { error });
+                        })?;
 
-                    event
-                        .as_mut_log()
-                        .insert(event::log_schema().source_type_key(), "socket");
+                        let mut payload = buf.split_to(byte_size);
 
-                    event
-                        .as_mut_log()
-                        .insert(host_key.clone(), addr.to_string());
+                        // UDP processes messages per payload, where messages are separated by newline
+                        // and stretch to end of payload.
+                        let mut decoder = BytesDelimitedCodec::new(b'\n');
+                        while let Ok(Some(line)) = decoder.decode_eof(&mut payload) {
+                            let mut event = Event::from(line);
 
-                    emit!(UdpEventReceived { byte_size });
-                    event
-                })
-                // Error from Decoder or UdpSocket
-                .map_err(|error: io::Error| {
-                    emit!(UdpSocketError { error });
-                })
-                .forward(out)
-                // Done with listening and sending
-                .map(|_| ())
-        }),
+                            event
+                                .as_mut_log()
+                                .insert(event::log_schema().source_type_key(), "socket");
+                            event
+                                .as_mut_log()
+                                .insert(host_key.clone(), address.to_string());
+
+                            emit!(UdpEventReceived { byte_size });
+
+                            tokio::select!{
+                                result = out.send(event).compat() => {
+                                    out = result?;
+                                }
+                                _ = &mut shutdown => return Ok(()),
+                            }
+                        }
+                    }
+                    _ = &mut shutdown => return Ok(()),
+                }
+            }
+        }
+        .boxed()
+        .compat(),
     )
 }

@@ -767,7 +767,9 @@ impl<'a> Response for &'a str {}
 mod tests {
     use super::*;
     use crate::buffers::Acker;
-    use crate::sinks::util::{buffer::partition::Partition, BatchSize, VecBuffer};
+    use crate::sinks::util::{
+        buffer::partition::Partition, BatchSettings, EncodedLength, VecBuffer,
+    };
     use crate::test_util::runtime;
     use bytes::Bytes;
     use futures01::{future, Sink};
@@ -777,11 +779,13 @@ mod tests {
     };
     use tokio01_test::clock::MockClock;
 
-    const BATCH_SIZE: BatchSize = BatchSize {
-        events: 10,
-        bytes: 9999,
-    };
     const TIMEOUT: Duration = Duration::from_secs(10);
+
+    impl EncodedLength for usize {
+        fn encoded_length(&self) -> usize {
+            22
+        }
+    }
 
     #[test]
     fn batch_sink_acking_sequential() {
@@ -791,10 +795,11 @@ mod tests {
 
         let (acker, ack_counter) = Acker::new_for_testing();
 
+        let batch = BatchSettings::default().events(10).bytes(9999);
         let svc = tower::service_fn(|_| future::ok::<_, std::io::Error>(()));
         let buffered = BatchSink::with_executor(
             svc,
-            VecBuffer::new(BATCH_SIZE),
+            VecBuffer::new(batch.size),
             TIMEOUT,
             acker,
             rt.executor(),
@@ -842,14 +847,11 @@ mod tests {
             Delay::new(deadline).map(drop)
         });
 
-        let batch_size = BatchSize {
-            events: 1,
-            ..BATCH_SIZE
-        };
+        let batch = BatchSettings::default().bytes(9999).events(1);
 
         let mut sink = BatchSink::with_executor(
             svc,
-            VecBuffer::new(batch_size),
+            VecBuffer::new(batch.size),
             TIMEOUT,
             acker,
             exec.clone(),
@@ -912,15 +914,16 @@ mod tests {
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
+            let sent_requests = Arc::clone(&sent_requests);
 
             sent_requests.lock().unwrap().push(req);
 
             future::ok::<_, std::io::Error>(())
         });
+        let batch = BatchSettings::default().bytes(9999).events(10);
         let buffered = BatchSink::with_executor(
             svc,
-            VecBuffer::new(BATCH_SIZE),
+            VecBuffer::new(batch.size),
             TIMEOUT,
             acker,
             rt.executor(),
@@ -954,15 +957,16 @@ mod tests {
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
+            let sent_requests = Arc::clone(&sent_requests);
 
             sent_requests.lock().unwrap().push(req);
 
             future::ok::<_, std::io::Error>(())
         });
+        let batch = BatchSettings::default().bytes(9999).events(10);
         let mut buffered = BatchSink::with_executor(
             svc,
-            VecBuffer::new(BATCH_SIZE),
+            VecBuffer::new(batch.size),
             TIMEOUT,
             acker,
             rt.executor(),
@@ -988,15 +992,16 @@ mod tests {
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
+            let sent_requests = Arc::clone(&sent_requests);
 
             sent_requests.lock().unwrap().push(req);
 
             future::ok::<_, std::io::Error>(())
         });
+        let batch = BatchSettings::default().bytes(9999).events(10);
         let mut buffered = BatchSink::with_executor(
             svc,
-            VecBuffer::new(BATCH_SIZE),
+            VecBuffer::new(batch.size),
             TIMEOUT,
             acker,
             rt.executor(),
@@ -1023,15 +1028,16 @@ mod tests {
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
+            let sent_requests = Arc::clone(&sent_requests);
 
             sent_requests.lock().unwrap().push(req);
 
             future::ok::<_, std::io::Error>(())
         });
+        let batch = BatchSettings::default().bytes(9999).events(10);
         let buffered = PartitionBatchSink::with_executor(
             svc,
-            VecBuffer::new(BATCH_SIZE),
+            VecBuffer::new(batch.size),
             TIMEOUT,
             acker,
             rt.executor(),
@@ -1061,21 +1067,18 @@ mod tests {
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
+            let sent_requests = Arc::clone(&sent_requests);
 
             sent_requests.lock().unwrap().push(req);
 
             future::ok::<_, std::io::Error>(())
         });
 
-        let batch_size = BatchSize {
-            events: 1,
-            ..BATCH_SIZE
-        };
+        let batch = BatchSettings::default().bytes(9999).events(1);
 
         let buffered = PartitionBatchSink::with_executor(
             svc,
-            VecBuffer::new(batch_size),
+            VecBuffer::new(batch.size),
             TIMEOUT,
             acker,
             rt.executor(),
@@ -1101,21 +1104,18 @@ mod tests {
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
+            let sent_requests = Arc::clone(&sent_requests);
 
             sent_requests.lock().unwrap().push(req);
 
             future::ok::<_, std::io::Error>(())
         });
 
-        let batch_size = BatchSize {
-            events: 2,
-            ..BATCH_SIZE
-        };
+        let batch = BatchSettings::default().bytes(9999).events(2);
 
         let buffered = PartitionBatchSink::with_executor(
             svc,
-            VecBuffer::new(batch_size),
+            VecBuffer::new(batch.size),
             TIMEOUT,
             acker,
             rt.executor(),
@@ -1148,16 +1148,17 @@ mod tests {
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
+            let sent_requests = Arc::clone(&sent_requests);
 
             sent_requests.lock().unwrap().push(req);
 
             future::ok::<_, std::io::Error>(())
         });
 
+        let batch = BatchSettings::default().bytes(9999).events(10);
         let mut buffered = PartitionBatchSink::with_executor(
             svc,
-            VecBuffer::new(BATCH_SIZE),
+            VecBuffer::new(batch.size),
             TIMEOUT,
             acker,
             rt.executor(),
@@ -1259,6 +1260,12 @@ mod tests {
     enum Partitions {
         A,
         B,
+    }
+
+    impl EncodedLength for Partitions {
+        fn encoded_length(&self) -> usize {
+            10 // Dummy value
+        }
     }
 
     impl Partition<Bytes> for Partitions {

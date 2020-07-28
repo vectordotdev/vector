@@ -227,7 +227,7 @@ mod test {
     fn ack_with_none() {
         let counter = Arc::new(AtomicUsize::new(0));
         let task = Arc::new(AtomicTask::new());
-        let acker = Acker::Disk(counter, task.clone());
+        let acker = Acker::Disk(counter, Arc::clone(&task));
 
         let mut mock = MockTask::new();
 

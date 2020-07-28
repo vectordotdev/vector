@@ -9,7 +9,7 @@ use crate::{
         rusoto,
         service2::TowerRequestConfig,
         sink::Response,
-        BatchConfig, BatchSettings, Compression, VecBuffer,
+        BatchConfig, BatchSettings, Compression, EncodedLength, VecBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -136,11 +136,11 @@ impl KinesisService {
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
         let client = Arc::new(client);
 
-        let batch = config
-            .batch
-            .disallow_max_bytes()?
-            .use_size_as_events()?
-            .get_settings_or_default(BatchSettings::default().events(500).timeout(1));
+        let batch = BatchSettings::default()
+            .bytes(5_000_000)
+            .events(500)
+            .timeout(1)
+            .parse_config(config.batch)?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();
@@ -177,7 +177,7 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
             events = %records.len(),
         );
 
-        let client = self.client.clone();
+        let client = Arc::clone(&self.client);
         let request = PutRecordsInput {
             records,
             stream_name: self.config.stream_name.clone(),
@@ -192,6 +192,20 @@ impl fmt::Debug for KinesisService {
         f.debug_struct("KinesisService")
             .field("config", &self.config)
             .finish()
+    }
+}
+
+impl EncodedLength for PutRecordsRequestEntry {
+    fn encoded_length(&self) -> usize {
+        // data is base64 encoded
+        (self.data.len() + 2) / 3 * 4
+            + self
+                .explicit_hash_key
+                .as_ref()
+                .map(|s| s.len())
+                .unwrap_or_default()
+            + self.partition_key.len()
+            + 10
     }
 }
 

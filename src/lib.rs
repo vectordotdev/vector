@@ -1,6 +1,7 @@
+#![recursion_limit = "256"] // for async-stream
 #![allow(clippy::approx_constant)]
-#![allow(clippy::block_in_if_condition_stmt)]
 #![allow(clippy::float_cmp)]
+#![allow(clippy::blocks_in_if_conditions)]
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::new_ret_no_self)]
 #![allow(clippy::ptr_arg)]
@@ -8,6 +9,7 @@
 #![allow(clippy::trivial_regex)]
 #![allow(clippy::type_complexity)]
 #![allow(clippy::unit_arg)]
+#![deny(clippy::clone_on_ref_ptr)]
 
 #[macro_use]
 extern crate tracing;
@@ -33,12 +35,14 @@ pub mod async_read;
 pub mod hyper;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
+pub mod kubernetes;
 pub mod list;
 pub mod metrics;
 pub mod region;
 pub mod runtime;
 pub mod serde;
 pub mod shutdown;
+pub mod signal;
 pub mod sinks;
 pub mod sources;
 pub mod stream;
