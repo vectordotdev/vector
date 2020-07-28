@@ -60,7 +60,8 @@ up() {
 }
 
 down() {
-  $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f - < "distribution/kubernetes/vector-namespaced.yaml"
+  # A workaround for `kubectl` from a `snap` package.
+  cat < "distribution/kubernetes/vector-namespaced.yaml" | $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f -
 
   if [[ -n "$CUSTOM_RESOURCE_CONIFGS_FILE" ]]; then
     $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONIFGS_FILE"
