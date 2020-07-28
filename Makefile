@@ -11,6 +11,7 @@ else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
 	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
     export DEFAULT_FEATURES = default
+	export NUM_CPUS=$(awk '/^processor/ { N++} END { print N }' /proc/cpuinfo)
 endif
 
 # Override this with any scopes for testing/benching.
@@ -41,9 +42,67 @@ export WASM_MODULES = $(patsubst tests/data/wasm/%/,%,$(wildcard tests/data/wasm
 export WASM_MODULE_OUTPUTS = $(patsubst %,/target/wasm32-wasi/%,$(WASM_MODULES))
 
 
+export CC ?= gcc
+export CXX ?= g++
+export HOST_CXX ?= g++
+export HOST_CC ?= gcc
+# Some cross compile builds don't have access to TCL, since it's only used in some C SASL unit tests, we just make it null.
+export TCLPATH ?= /dev/null
+# We like cross compiles!
+export PKG_CONFIG_ALLOW_CROSS ?= true
+# We also like static packages!
+export PKG_CONFIG_ALL_STATIC ?= true
+# In case it didn't get the memo
+export LIBZ_SYS_STATIC ?= 1
+# In case it didn't get the memo
+export OPENSSL_STATIC ?= 1
+export CROSS_COMPILE ?= true
+
+export MUSL_CROSS_MAKE ?= ./target/musl-cross-make
+export MUSL_CROSS_MAKE_PATH ?= ${MUSL_CROSS_MAKE}/output
+export MUSL_CROSS_MAKE_x86_64-unknown-linux_musl ?= ${MUSL_CROSS_MAKE_PATH}/x86_64-linux-musl
+export MUSL_CROSS_MAKE_aarch64-unknown-linux_musl ?= ${MUSL_CROSS_MAKE_PATH}/aarch64-linux-musl
+# Yes! the `armv7` and `arm` differences here are on purpose!
+export MUSL_CROSS_MAKE_armv7-unknown-linux_musleabifi ?= ${MUSL_CROSS_MAKE_PATH}/arm-linux-musl
+
+
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER ?= x86_64-linux-gnu-cc
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS ?= -C link-arg=-lgcc
+export CC_x86_64-unknown-linux-gnu ?= x86_64-linux-musl-gcc
+export CXX_x86_64-unknown-linux-gnu ?= x86_64-linux-musl-g++
+#export AR_x86_64-unknown-linux-gnu ?= x86_64-linux-musl-ld
+#export LD_x86_64-unknown-linux-gnu ?= x86_64-linux-musl-ar
+
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-cc
+#export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc
+export CC_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-gcc
+export CXX_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-g++
+#export AR_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-ld
+#export LD_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-ar
+
+export CARGO_TARGET_aarch64-unknown-linux-musl_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-cc
+export CARGO_TARGET_aarch64-unknown-linux-musl_RUSTFLAGS ?= -C link-arg=-lgcc
+export CC_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-gcc
+export CXX_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-g++
+#export AR_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-ld
+#export LD_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-ar
+
+export CARGO_TARGET_armv7_unknown_linux_musleabihf_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/arm-linux-musleabihf-cc
+#export CARGO_TARGET_armv7_unknown_linux_musleabihf_RUSTFLAGS ?= -C link-arg=-lgcc
+export CC_armv7-unknown-linux-musleabihf ?= ${MUSL_CROSS_MAKE_PATH}/bin/arm-linux-musleabihf-gcc
+export CXX_armv7-unknown-linux-musleabihf ?= ${MUSL_CROSS_MAKE_PATH}/bin/arm-linux-musleabihf-g++
+#export AR_armv7-unknown-linux-musleabihf ?= ${MUSL_CROSS_MAKE_PATH}/bin/arm-linux-musleabihf-ld
+#export LD_armv7-unknown-linux-musleabihf ?= ${MUSL_CROSS_MAKE_PATH}/bin/arm-linux-musleabihf-ar
+
 
  # Deprecated.
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
+
+# Important vars we don't really want folks changing without knowledge of what they're doing.
+export VECTOR_BINARY_x86_64_unknown_linux_gnu ?= /target/x86_64-unknown-linux-gnu/release/vector
+export VECTOR_BINARY_x86_64-unknown-linux-musl ?= /target/x86_64-unknown-linux-musl/release/vector
+export VECTOR_BINARY_aarch64-unknown-linux-musl ?= /target/aarch64-unknown-linux-musl/release/vector
+export VECTOR_BINARY_armv7_unknown_linux_musleabihf ?= /target/armv7-unknown-linux-musleabihf/release/vector
 
 FORMATTING_BEGIN_YELLOW = \033[0;33m
 FORMATTING_BEGIN_BLUE = \033[36m
@@ -163,78 +222,57 @@ build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`
 
 build-all: build-x86_64-unknown-linux-gnu build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
-build-x86_64-unknown-linux-gnu: ## Build dynamically linked binary in release mode for the x86_64 architecture
+
+
+build-x86_64-unknown-linux-gnu: ${VECTOR_BINARY_x86_64_unknown_linux_gnu} ## Build dynamically linked binary in release mode for the x86_64 architecture
+
+${VECTOR_BINARY_x86_64_unknown_linux_gnu}:
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features default --target x86_64-unknown-linux-gnu
 
-export CC ?= gcc
-export CXX ?= g++
-export HOST_CXX ?= g++
-export HOST_CC ?= gcc
-# Some cross compile builds don't have access to TCL, since it's only used in some C SASL unit tests, we just make it null.
-export TCLPATH ?= /dev/null
-# We like cross compiles!
-export PKG_CONFIG_ALLOW_CROSS ?= true
-# We also like static packages!
-export PKG_CONFIG_ALL_STATIC ?= true
-# In case it didn't get the memo
-export LIBZ_SYS_STATIC ?= 1
-# In case it didn't get the memo
-export OPENSSL_STATIC ?= 1
-export CROSS_COMPILE ?= true
-export MUSL_CROSS_MAKE_OUTPUT ?= /git/richfelker/musl-cross-make/output/
+build-x86_64-unknown-linux-musl: ${VECTOR_BINARY_x86_64-unknown-linux-musl} ## Build static binary in release mode for the x86_64 architecture
 
-
-export CARGO_TARGET_X84_64_UNKNOWN_LINUX_GNU_LINKER ?= x86_64-linux-gnu-cc
-export CARGO_TARGET_X84_64_UNKNOWN_LINUX_GNU_RUSTFLAGS ?= -C link-arg=-lgcc
-export CC_x84_64-unknown-linux-gnu ?= x86_64-linux-musl-gcc
-export CXX_x84_64-unknown-linux-gnu ?= x86_64-linux-musl-g++
-#export AR_x84_64-unknown-linux-gnu ?= x86_64-linux-musl-ld
-#export LD_x84_64-unknown-linux-gnu ?= x86_64-linux-musl-ar
-
-export CARGO_TARGET_X84_64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/x86_64-linux-musl-cc
-#export CARGO_TARGET_X84_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc
-export CC_x84_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/x86_64-linux-musl-gcc
-export CXX_x84_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/x86_64-linux-musl-g++
-#export AR_x84_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/x86_64-linux-musl-ld
-#export LD_x84_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/x86_64-linux-musl-ar
-
-export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/aarch64-linux-musl-cc
-export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc
-export CC_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/aarch64-linux-musl-gcc
-export CXX_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/aarch64-linux-musl-g++
-#export AR_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/aarch64-linux-musl-ld
-#export LD_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/aarch64-linux-musl-ar
-
-export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABIHF_LINKER ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/arm-linux-musleabihf-cc
-#export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABIHF_RUSTFLAGS ?= -C link-arg=-lgcc
-export CC_armv7-unknown-linux-musleabihf ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/arm-linux-musleabihf-gcc
-export CXX_armv7-unknown-linux-musleabihf ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/arm-linux-musleabihf-g++
-#export AR_armv7-unknown-linux-musleabihf ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/arm-linux-musleabihf-ld
-#export LD_armv7-unknown-linux-musleabihf ?= ${MUSL_CROSS_MAKE_OUTPUT}/bin/arm-linux-musleabihf-ar
-
-build-x86_64-unknown-linux-musl: export CC = ${CC_x86_64-unknown-linux-musl}
-build-x86_64-unknown-linux-musl: export CXX = ${CXX_x86_64-unknown-linux-musl}
-build-x86_64-unknown-linux-musl: export HOST_CXX = musl-g++
-build-x86_64-unknown-linux-musl: export HOST_CC = musl-gcc
-build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: CC := ${CC_x86_64-unknown-linux-musl}
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: CXX := ${CXX_x86_64-unknown-linux-musl}
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: HOST_CXX := musl-g++
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: HOST_CC := musl-gcc
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: PATH := $(PATH):${MUSL_CROSS_MAKE_PATH}
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: ${MUSL_CROSS_MAKE_x86_64-unknown-linux_musl} rust-target-x86_64-unknown-linux-musl
+	echo ${CC}
 	${MAYBE_ENVIRONMENT_EXEC} \
-		cargo +nightly build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
+		cargo build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
+
+${MUSL_CROSS_MAKE}:
+	git clone https://github.com/richfelker/musl-cross-make.git ${MUSL_CROSS_MAKE}
+
+${MUSL_CROSS_MAKE_x86_64-unknown-linux_musl}: ${MUSL_CROSS_MAKE}
+	make install -j${NUM_CPUS} TARGET=x86_64-linux-musl -C ${MUSL_CROSS_MAKE} 
+
+${MUSL_CROSS_MAKE_aarch64-unknown-linux_musl}: ${MUSL_CROSS_MAKE} rust-target-aarch64-unknown-linux_musl
+	make install -j${NUM_CPUS} TARGET=aarch64-linux-musl -C ${MUSL_CROSS_MAKE} 
+
+${MUSL_CROSS_MAKE_armv7-unknown-linux_musl}: ${MUSL_CROSS_MAKE}
+	make install -j${NUM_CPUS} TARGET=arm-linux-musleabihf GCC_CONFIG="--with-float=softfp" -C ${MUSL_CROSS_MAKE}
 
 
-build-armv7-unknown-linux-musleabihf: export CC = ${CC_armv7-unknown-linux-musleabihf}
-build-armv7-unknown-linux-musleabihf: export CXX = ${CXX_armv7-unknown-linux-musleabihf}
-build-armv7-unknown-linux-musleabihf: export HOST_CXX = musl-g++
-build-armv7-unknown-linux-musleabihf: export HOST_CC = musl-gcc
-build-armv7-unknown-linux-musleabihf: ## Build static binary in release mode for the armv7 architecture
+build-armv7-unknown-linux-musleabihf: ${VECTOR_BINARY_armv7-unknown-linux-musleabihf} ## Build static binary in release mode for the armv7 architecture
+
+${VECTOR_BINARY_armv7-unknown-linux-musleabihf}: export CC = ${CC_armv7-unknown-linux-musleabihf}
+${VECTOR_BINARY_armv7-unknown-linux-musleabihf}: export CXX = ${CXX_armv7-unknown-linux-musleabihf}
+${VECTOR_BINARY_armv7-unknown-linux-musleabihf}: export HOST_CXX = musl-g++
+${VECTOR_BINARY_armv7-unknown-linux-musleabihf}: export HOST_CC = musl-gcc
+${VECTOR_BINARY_armv7-unknown-linux-musleabihf}: ${MUSL_CROSS_MAKE_armv7-unknown-linux_musl} rust-target-armv7-unknown-linux_musleabihf
 	${MAYBE_ENVIRONMENT_EXEC} \
 		cargo +nightly build --no-default-features --features default-musl --target armv7-unknown-linux-musleabihf
 
 
-build-aarch64-unknown-linux-musl: export CC=${CC_aarch64-unknown-linux-musl}
-build-aarch64-unknown-linux-musl: export CXX=${CXX_aarch64-unknown-linux-musl}
-build-aarch64-unknown-linux-musl: export HOST_CXX = musl-g++
-build-aarch64-unknown-linux-musl: export HOST_CC = musl-gcc
-build-aarch64-unknown-linux-musl: ## Build static binary in release mode for the aarch64 architecture
+
+build-aarch64-unknown-linux-musl: ${VECTOR_BINARY_aarch64-unknown-linux-musl} ## Build static binary in release mode for the aarch64 architecture
+
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: export CC=${CC_aarch64-unknown-linux-musl}
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: export CXX=${CXX_aarch64-unknown-linux-musl}
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: export HOST_CXX = musl-g++
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: export HOST_CC = musl-gcc
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: ${MUSL_CROSS_MAKE_aarch64-unknown-linux_musl} rust-target-aarch64-unknown-linux_musleabihf
 	${MAYBE_ENVIRONMENT_EXEC} \
 		cargo +nightly build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
 
@@ -613,3 +651,7 @@ target/wasm32-wasi/.obtained:
 	@mkdir -p target/wasm32-wasi
 	@touch target/wasm32-wasi/.obtained
 
+.PHONY: rust-target-%
+rust-target-%: override ARCH = $(@:rust-target-%=%)
+rust-target-%:
+	@rustup target add ${ARCH}

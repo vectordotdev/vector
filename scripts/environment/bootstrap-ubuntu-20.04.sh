@@ -37,7 +37,7 @@ apt install --yes \
     gnupg2
 
 # Stupid, right? Sadly it works.
-ln -s "/usr/bin/g++" "/usr/bin/musl-g++"
+ln -s "/usr/bin/g++" "/usr/bin/musl-g++" || true
 
 # We use Grease for parts of release.
 curl -LO https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz
