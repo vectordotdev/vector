@@ -656,6 +656,10 @@ is required too, see Vector [docs](https://vector.dev) for more details.
 > process - see https://github.com/kubernetes/minikube/issues/8799.
 > Use version `1.11.0` for now.
 
+> Note: `minikube` has troubles running on ZFS systems. If you're using ZFS, we
+> suggest using a cloud cluster or [`minik8s`](https://microk8s.io/) with local
+> registry.
+
 ##### Running the E2E tests
 
 To run the E2E tests, use the following command:
