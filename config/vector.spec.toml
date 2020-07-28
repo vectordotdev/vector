@@ -875,7 +875,6 @@ data_dir = "/home/user/vector/"
   # * default: 102400
   # * type: uint
   # * unit: bytes
-  # * relevant when mode = "tcp" or mode = "unix"
   max_length = 102400
 
   # The type of socket to use.

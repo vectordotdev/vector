@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-// TODO: add back when serde-rs/serde#1358 is addressed
+// TODO: add back when https://github.com/serde-rs/serde/issues/1358 is addressed
 // #[serde(deny_unknown_fields)]
 pub struct SocketConfig {
     #[serde(flatten)]
@@ -94,7 +94,13 @@ impl SourceConfig for SocketConfig {
                     .host_key
                     .clone()
                     .unwrap_or_else(|| event::log_schema().host_key().clone());
-                Ok(udp::udp(config.address, host_key, shutdown, out))
+                Ok(udp::udp(
+                    config.address,
+                    config.max_length,
+                    host_key,
+                    shutdown,
+                    out,
+                ))
             }
             #[cfg(unix)]
             Mode::Unix(config) => {

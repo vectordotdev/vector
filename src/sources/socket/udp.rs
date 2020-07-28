@@ -19,13 +19,20 @@ use tokio_util::codec::Decoder;
 #[serde(deny_unknown_fields)]
 pub struct UdpConfig {
     pub address: SocketAddr,
+    #[serde(default = "default_max_length")]
+    pub max_length: usize,
     pub host_key: Option<Atom>,
+}
+
+fn default_max_length() -> usize {
+    bytesize::kib(100u64) as usize
 }
 
 impl UdpConfig {
     pub fn new(address: SocketAddr) -> Self {
         Self {
             address,
+            max_length: default_max_length(),
             host_key: None,
         }
     }
@@ -33,6 +40,7 @@ impl UdpConfig {
 
 pub fn udp(
     address: SocketAddr,
+    max_length: usize,
     host_key: Atom,
     shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
@@ -47,10 +55,6 @@ pub fn udp(
             info!(message = "listening.", %address);
 
             let mut shutdown = shutdown.compat();
-
-            // TODO: need to be changed to max_length from config
-            // Issue: https://github.com/timberio/vector/issues/3117
-            let max_length = 100 * 1024;
             let mut buf = BytesMut::with_capacity(max_length);
             loop {
                 buf.resize(max_length, 0);
