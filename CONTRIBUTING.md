@@ -678,6 +678,9 @@ You can also pass additional parameters to adjust the behavior of the test:
   a registry to run tests.
   When `USE_MINIKUBE_CACHE=true` is set, we provide a default value for the
   `CONTAINER_IMAGE_REPO` so it can be omitted.
+  Can be set to `auto` (default) to automatically detect whether to use
+  `minikube cache` or not, based on the current `kubectl` context. To opt-out,
+  set `USE_MINIKUBE_CACHE=false`.
 
 * `CONTAINER_IMAGE=<your name>/vector-test:tag` - completely skip the step
   of building the Vector docker image, and use the specified image instead.
