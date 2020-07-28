@@ -25,7 +25,7 @@ apt install --yes \
     libsasl2-dev \
     gnupg2
 
-wget https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz
+curl -LO https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz
 tar -xvf grease-1.0.1-linux-amd64.tar.gz
 cp grease/bin/grease /usr/bin/grease
 
