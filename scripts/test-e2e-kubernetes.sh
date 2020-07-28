@@ -16,13 +16,29 @@ random-string() {
   echo
 }
 
+# Detect if current kubectl context is `minikube`.
+is_kubectl_context_minikube() {
+  [[ "$(kubectl config current-context || true)" == "minikube" ]]
+}
+
 # Whether to use `minikube cache` to pass image to the k8s cluster.
 # After we build vector docker image, instead of pushing to the remote repo,
 # we'll be using `minikube cache` to make image available to the cluster.
 # This effectively eliminates the requirement to have a docker registry, but
 # it requires that we run against minikube cluster.
 is_minikube_cache_enabled() {
-  [[ "${USE_MINIKUBE_CACHE:-"false"}" == "true" ]]
+  local MODE="${USE_MINIKUBE_CACHE:-"auto"}"
+  if [[ "$MODE" == "auto" ]]; then
+    if is_kubectl_context_minikube; then
+      echo "Note: detected minikube kubectl context, using minikube cache" >&2
+      return 0
+    else
+      echo "Note: detected non-minikube kubectl context, docker repo is required" >&2
+      return 1
+    fi
+  else
+    [[ "$MODE" == "true" ]]
+  fi
 }
 
 # Build a docker image if it wasn't provided.
