@@ -43,7 +43,7 @@ tracing-limit = { path = "lib/tracing-limit" }
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
 tokio01 = { package = "tokio", version = "0.1.22", features = ["io", "tcp", "rt-full", "experimental-tracing", "sync"], default-features = false }
-tokio = { version = "0.2.13", features = ["blocking", "fs", "sync", "macros", "test-util", "rt-core", "io-std"] }
+tokio = { version = "0.2.13", features = ["blocking", "fs", "sync", "macros", "test-util", "rt-core", "io-std", "uds"] }
 tokio-openssl03 = { package = "tokio-openssl", version = "0.3.0" }
 tokio-openssl = "0.4.0"
 tokio-retry = "0.2.0"
@@ -261,13 +261,13 @@ sources-journald = []
 sources-kafka = []
 sources-logplex = ["warp", "sources-tls"]
 sources-prometheus = []
-sources-socket = ["bytesize", "listenfd", "tokio/uds", "tokio-util/udp", "sources-tls"]
+sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls"]
 sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
 sources-statsd = ["tokio-util/udp"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["sources-socket", "syslog_loose"]
-sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
-sources-vector = ["sources-socket"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "syslog_loose"]
+sources-tls = []
+sources-vector = ["listenfd" ,"sources-tls"]
 sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-json_parser", "transforms-regex_parser"]
 
 # Transforms
@@ -370,7 +370,7 @@ sinks-datadog = []
 sinks-elasticsearch = ["base64", "bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt", "uuid"]
-sinks-honeycomb = ["sinks-http"]
+sinks-honeycomb = ["bytesize"]
 sinks-http = ["bytesize"]
 sinks-humio_logs = ["sinks-splunk_hec"]
 sinks-influxdb = ["bytesize"]
@@ -380,8 +380,8 @@ sinks-loki = ["bytesize"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-prometheus = []
 sinks-sematext_logs = ["sinks-elasticsearch"]
-sinks-socket = ["tokio/uds"]
-sinks-papertrail = ["sinks-socket"]
+sinks-socket = []
+sinks-papertrail = []
 sinks-splunk_hec = ["bytesize"]
 sinks-statsd = ["tokio-util/udp"]
 sinks-vector = []
