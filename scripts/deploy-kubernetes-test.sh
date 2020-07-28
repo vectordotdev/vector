@@ -8,7 +8,7 @@ set -euo pipefail
 #   Deploys Vector into Kubernetes for testing purposes.
 #   Uses the same installation method our users would use.
 #
-#   This script impements cli interface required by the kubernetes integration
+#   This script implements cli interface required by the kubernetes E2E
 #   tests.
 #
 # USAGE
