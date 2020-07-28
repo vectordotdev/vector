@@ -1,5 +1,3 @@
-#![cfg(feature = "sources-journald")]
-
 use super::InternalEvent;
 use metrics::counter;
 

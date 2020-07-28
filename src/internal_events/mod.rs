@@ -3,6 +3,7 @@ mod aws_kinesis_streams;
 mod blackhole;
 mod elasticsearch;
 mod file;
+#[cfg(feature = "sources-journald")]
 mod journald;
 mod json;
 #[cfg(feature = "sources-kubernetes-logs")]
@@ -28,6 +29,7 @@ pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
+#[cfg(feature = "sources-journald")]
 pub(crate) use self::journald::*;
 pub use self::json::*;
 #[cfg(feature = "sources-kubernetes-logs")]
