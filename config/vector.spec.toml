@@ -3453,6 +3453,14 @@ require('custom_module')
   #
 
   [sinks.aws_kinesis_firehose.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * optional
+    # * default: 4000000
+    # * type: uint
+    # * unit: bytes
+    max_bytes = 4000000
+
     # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional
@@ -3683,6 +3691,14 @@ require('custom_module')
   #
 
   [sinks.aws_kinesis_streams.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * optional
+    # * default: 5000000
+    # * type: uint
+    # * unit: bytes
+    max_bytes = 5000000
+
     # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional
@@ -8216,6 +8232,14 @@ require('custom_module')
   #
 
   [sinks.loki.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * optional
+    # * default: 102400
+    # * type: uint
+    # * unit: bytes
+    max_bytes = 102400
+
     # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional
