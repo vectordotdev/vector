@@ -767,7 +767,9 @@ impl<'a> Response for &'a str {}
 mod tests {
     use super::*;
     use crate::buffers::Acker;
-    use crate::sinks::util::{buffer::partition::Partition, BatchSettings, VecBuffer};
+    use crate::sinks::util::{
+        buffer::partition::Partition, BatchSettings, EncodedLength, VecBuffer,
+    };
     use crate::test_util::runtime;
     use bytes::Bytes;
     use futures01::{future, Sink};
@@ -778,6 +780,12 @@ mod tests {
     use tokio01_test::clock::MockClock;
 
     const TIMEOUT: Duration = Duration::from_secs(10);
+
+    impl EncodedLength for usize {
+        fn encoded_length(&self) -> usize {
+            22
+        }
+    }
 
     #[test]
     fn batch_sink_acking_sequential() {
@@ -1252,6 +1260,12 @@ mod tests {
     enum Partitions {
         A,
         B,
+    }
+
+    impl EncodedLength for Partitions {
+        fn encoded_length(&self) -> usize {
+            10 // Dummy value
+        }
     }
 
     impl Partition<Bytes> for Partitions {
