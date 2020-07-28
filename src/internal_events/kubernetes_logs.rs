@@ -1,5 +1,6 @@
 use super::InternalEvent;
 use crate::Event;
+use bytes::Bytes;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -46,6 +47,28 @@ impl InternalEvent for KubernetesLogsEventAnnotationFailed<'_> {
     fn emit_metrics(&self) {
         counter!(
             "k8s_event_annotation_failures", 1,
+            "component_kind" => "source",
+            "component_type" => "kubernetes_logs",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct KubernetesLogsMessageParseFailed<'a> {
+    pub message: &'a Bytes,
+}
+
+impl InternalEvent for KubernetesLogsMessageParseFailed<'_> {
+    fn emit_logs(&self) {
+        warn!(
+            message = "failed to parse message as json object",
+            value = %String::from_utf8_lossy(self.message),
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "k8s_message_parse_failures", 1,
             "component_kind" => "source",
             "component_type" => "kubernetes_logs",
         );

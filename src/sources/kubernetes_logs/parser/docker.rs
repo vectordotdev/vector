@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event, LogEvent, Value},
+    internal_events::KubernetesLogsMessageParseFailed,
     transforms::Transform,
 };
 use chrono::{DateTime, Utc};
@@ -42,7 +43,10 @@ fn parse_json(log: &mut LogEvent) -> Option<()> {
             }
             Some(())
         }
-        Ok(_) | Err(_) => None,
+        Ok(_) | Err(_) => {
+            emit!(KubernetesLogsMessageParseFailed { message: &to_parse });
+            None
+        }
     }
 }
 
