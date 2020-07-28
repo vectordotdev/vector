@@ -1,6 +1,7 @@
 use crate::{
     event,
     event::{Event, LogEvent, Value},
+    internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
@@ -350,7 +351,7 @@ where
                 let mut record = match decode_record(&text, self.remap_priority) {
                     Ok(record) => record,
                     Err(error) => {
-                        error!(message = "Invalid record from journald, discarding", %error, %text);
+                        emit!(JournaldInvalidRecord { error, text });
                         continue;
                     }
                 };
@@ -364,6 +365,10 @@ where
                 if filter_unit(unit, &self.include_units, &self.exclude_units) {
                     continue;
                 }
+
+                emit!(JournaldEventReceived {
+                    byte_size: text.len()
+                });
 
                 match channel.send(record).wait() {
                     Ok(_) => {}
