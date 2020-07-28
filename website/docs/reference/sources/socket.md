@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-28"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` source ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs `log` events."
@@ -53,7 +53,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 [sources.my_source_id]
   type = "socket" # required
   address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
-  max_length = 102400 # optional, default, bytes, relevant when mode = "tcp" or mode = "unix"
+  max_length = 102400 # optional, default, bytes
   mode = "tcp" # required
 ```
 
@@ -65,7 +65,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
   # General
   type = "socket" # required
   address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
-  max_length = 102400 # optional, default, bytes, relevant when mode = "tcp" or mode = "unix"
+  max_length = 102400 # optional, default, bytes
   mode = "tcp" # required
   shutdown_timeout_secs = 30 # optional, default, seconds, relevant when mode = "tcp"
 
@@ -88,6 +88,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 [sources.my_source_id]
   type = "socket" # required
   address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
+  max_length = 102400 # optional, default, bytes
   mode = "udp" # required
 ```
 
@@ -99,6 +100,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
   # General
   type = "socket" # required
   address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
+  max_length = 102400 # optional, default, bytes
   mode = "udp" # required
 
   # Context
@@ -111,7 +113,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 ```toml title="vector.toml"
 [sources.my_source_id]
   type = "socket" # required
-  max_length = 102400 # optional, default, bytes, relevant when mode = "tcp" or mode = "unix"
+  max_length = 102400 # optional, default, bytes
   mode = "unix" # required
   path = "/path/to/socket" # required, required when mode = "unix"
 ```
@@ -123,7 +125,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 [sources.my_source_id]
   # General
   type = "socket" # required
-  max_length = 102400 # optional, default, bytes, relevant when mode = "tcp" or mode = "unix"
+  max_length = 102400 # optional, default, bytes
   mode = "unix" # required
   path = "/path/to/socket" # required, required when mode = "unix"
 
@@ -190,10 +192,10 @@ option][docs.reference.global-options#host_key].
   defaultValue={102400}
   enumValues={null}
   examples={[102400]}
-  groups={["tcp","unix"]}
+  groups={["tcp","udp","unix"]}
   name={"max_length"}
   path={null}
-  relevantWhen={{"mode":["tcp","unix"]}}
+  relevantWhen={null}
   required={false}
   templateable={false}
   type={"uint"}
