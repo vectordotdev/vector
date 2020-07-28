@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-28"
 title: Field Path Notation
 description: "Vector's field path notation allows you to reference field values with a simple string syntax."
 ---
@@ -7,7 +7,7 @@ description: "Vector's field path notation allows you to reference field values 
 Throughout Vector's configuration you'll notice that certain options take field
 paths as values, such as the
 [`rename_fields` transform][docs.transforms.rename_fields]. In order to
-reference nested or array values, you can use Vector's field path notation.
+referenxe nested, or array, values you can use Vector's field path notation.
 This notation is not anything special, it simply uses `.` and `[<index>]` to
 access nested and array values, respectively.
 
