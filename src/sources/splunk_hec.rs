@@ -768,8 +768,7 @@ mod tests {
         test_util::trace_init();
         let (sender, recv) = mpsc::channel(CHANNEL_CAPACITY);
         let address = test_util::next_addr();
-        let address2 = address.clone();
-        rt.spawn(async move {
+        rt.spawn_std(async move {
             SplunkConfig {
                 address,
                 token,
@@ -782,6 +781,7 @@ mod tests {
                 sender,
             )
             .await
+            .unwrap()
             .compat()
             .await
             .unwrap()

@@ -233,7 +233,6 @@ mod tests {
         test_util::trace_init();
         let (sender, recv) = mpsc::channel(100);
         let address = test_util::next_addr();
-        let address2 = address.clone();
         rt.spawn_std(async move {
             SimpleHttpConfig {
                 address,
@@ -253,7 +252,7 @@ mod tests {
             .await
             .unwrap();
         });
-        (recv, address2)
+        (recv, address)
     }
 
     async fn send(address: SocketAddr, body: &str) -> u16 {
