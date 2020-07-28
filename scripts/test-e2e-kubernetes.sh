@@ -84,6 +84,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
     CONTAINER_IMAGE="$CONTAINER_IMAGE_REPO:$VERSION_TAG-debug"
 
     # Build docker image.
+    scripts/skaffold-dockerignore.sh
     docker build --tag "$CONTAINER_IMAGE" -f skaffold/docker/Dockerfile target/debug
   else
     # Package a .deb file to build a docker container, unless skipped.
