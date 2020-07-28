@@ -31,7 +31,7 @@ write_to_description = "[Amazon Web Service's Kinesis Data Firehose][urls.aws_ki
 
 <%= render("_partials/fields/_component_options.toml", type: "sink", name: "aws_kinesis_firehose") %>
 
-<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.aws_kinesis_firehose.options", common: false, max_bytes: nil, max_events: 500, timeout_secs: 1) %>
+<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.aws_kinesis_firehose.options", common: false, max_bytes: 4000000, max_events: 500, timeout_secs: 1) %>
 
 <%= render(
   "_partials/fields/_buffer_options.toml",

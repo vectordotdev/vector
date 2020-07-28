@@ -9,7 +9,7 @@ use crate::{
         rusoto,
         service2::TowerRequestConfig,
         sink::Response,
-        BatchConfig, BatchSettings, Compression, VecBuffer,
+        BatchConfig, BatchSettings, Compression, EncodedLength, VecBuffer,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -137,6 +137,7 @@ impl KinesisService {
         let client = Arc::new(client);
 
         let batch = BatchSettings::default()
+            .bytes(5_000_000)
             .events(500)
             .timeout(1)
             .parse_config(config.batch)?;
@@ -191,6 +192,20 @@ impl fmt::Debug for KinesisService {
         f.debug_struct("KinesisService")
             .field("config", &self.config)
             .finish()
+    }
+}
+
+impl EncodedLength for PutRecordsRequestEntry {
+    fn encoded_length(&self) -> usize {
+        // data is base64 encoded
+        (self.data.len() + 2) / 3 * 4
+            + self
+                .explicit_hash_key
+                .as_ref()
+                .map(|s| s.len())
+                .unwrap_or_default()
+            + self.partition_key.len()
+            + 10
     }
 }
 

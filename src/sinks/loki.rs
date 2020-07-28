@@ -16,10 +16,11 @@ use crate::{
     event::{self, Event, Value},
     runtime::FutureExt,
     sinks::util::{
+        buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, UriSerde, VecBuffer,
+        BatchConfig, BatchSettings, UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -28,10 +29,7 @@ use crate::{
 use derivative::Derivative;
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::collections::HashMap;
-
-type Labels = Vec<(String, String)>;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -81,6 +79,7 @@ impl SinkConfig for LokiConfig {
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = BatchSettings::default()
+            .bytes(102_400)
             .events(100_000)
             .timeout(1)
             .parse_config(self.batch)?;
@@ -89,7 +88,7 @@ impl SinkConfig for LokiConfig {
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            VecBuffer::new(batch_settings.size),
+            LokiBuffer::new(batch_settings.size),
             request_settings,
             batch_settings.timeout,
             client.clone(),
@@ -113,8 +112,8 @@ impl SinkConfig for LokiConfig {
 
 #[async_trait::async_trait]
 impl HttpSink for LokiConfig {
-    type Input = (Labels, (i64, String));
-    type Output = Vec<(Labels, (i64, String))>;
+    type Input = LokiRecord;
+    type Output = serde_json::Value;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
@@ -134,12 +133,9 @@ impl HttpSink for LokiConfig {
             }
         }
 
-        let ts = if let Some(event::Value::Timestamp(ts)) =
-            event.as_log().get(&event::log_schema().timestamp_key())
-        {
-            ts.timestamp_nanos()
-        } else {
-            chrono::Utc::now().timestamp_nanos()
+        let timestamp = match event.as_log().get(&event::log_schema().timestamp_key()) {
+            Some(event::Value::Timestamp(ts)) => ts.timestamp_nanos(),
+            _ => chrono::Utc::now().timestamp_nanos(),
         };
 
         if self.remove_timestamp {
@@ -166,48 +162,12 @@ impl HttpSink for LokiConfig {
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
-        Some((labels, (ts, event)))
+        let event = LokiEvent { timestamp, event };
+        Some(LokiRecord { labels, event })
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
-        let mut streams: HashMap<Labels, Vec<(i64, String)>> = HashMap::new();
-
-        for (mut labels, event) in events {
-            // We must sort here to ensure it hashes to the same stream
-            // if the label set matches.
-            labels.sort();
-
-            if let Some(stream) = streams.get_mut(&labels) {
-                stream.push(event);
-            } else {
-                streams.insert(labels, vec![event]);
-            }
-        }
-
-        // Construct the json body
-        let mut streams_json: Vec<serde_json::Value> = Vec::new();
-
-        for (stream, mut events) in streams {
-            // Sort by timestamp
-            events.sort_by_key(|e| e.0);
-
-            let stream = stream.into_iter().collect::<HashMap<_, _>>();
-            let events = events
-                .into_iter()
-                // The final json output should be: `[ts, line]`
-                .map(|e| json!([format!("{}", e.0), e.1]))
-                .collect::<Vec<_>>();
-
-            streams_json.push(json!({
-                "stream": stream,
-                "values": events,
-            }));
-        }
-
-        let body = serde_json::to_vec(&json!({
-            "streams": streams_json,
-        }))
-        .unwrap();
+    async fn build_request(&self, json: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+        let body = serde_json::to_vec(&json).unwrap();
 
         let uri = format!("{}loki/api/v1/push", self.endpoint);
 
@@ -264,10 +224,10 @@ mod tests {
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let (mut labels, (_, line)) = config.encode_event(e1).unwrap();
+        let mut record = config.encode_event(e1).unwrap();
 
         // HashMap -> Vec doesn't like keeping ordering
-        labels.sort();
+        record.labels.sort();
 
         // The final event should have timestamps and labels removed
         let expected_line = serde_json::to_string(&serde_json::json!({
@@ -275,11 +235,11 @@ mod tests {
         }))
         .unwrap();
 
-        assert_eq!(line, expected_line);
+        assert_eq!(record.event.event, expected_line);
 
-        assert_eq!(labels[0], ("label1".to_string(), "bar".to_string()));
+        assert_eq!(record.labels[0], ("label1".to_string(), "bar".to_string()));
         assert_eq!(
-            labels[1],
+            record.labels[1],
             ("label2".to_string(), "some-static-label".to_string())
         );
     }
