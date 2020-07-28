@@ -13,11 +13,16 @@ One paragraph description of the change.
 - What pain motivated this change?
 - Do not cover benefits of your change, that should be covered in the "Rationale" section.
 
-## Proposal
+## Internal Proposal
 
-- Describe your change.
+- Describe your change as if you were presenting it to the Vector team.
 - Use lists, examples, and code blocks for efficient reading.
 - Be specific!
+
+## Doc-level Proposal
+
+- Optional. Only do this if your change is public facing.
+- Demonstrate how your change will look in the form of Vector's public docs.
 
 ## Rationale
 
