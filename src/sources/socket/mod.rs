@@ -135,7 +135,8 @@ mod test {
     use crate::shutdown::{ShutdownSignal, SourceShutdownCoordinator};
     use crate::sinks::util::tcp::TcpSink;
     use crate::test_util::{
-        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, wait_for_tcp, CollectN,
+        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, trace_init,
+        wait_for_tcp, CollectN,
     };
     use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
@@ -352,10 +353,12 @@ mod test {
 
     #[test]
     fn tcp_shutdown_infinite_stream() {
+        trace_init();
+
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
-        let (tx, rx) = mpsc::channel(10000);
+        let (tx, rx) = mpsc::channel(10_000);
         let source_name = "tcp_shutdown_infinite_stream";
 
         let addr = next_addr();
@@ -382,7 +385,7 @@ mod test {
             MaybeTlsSettings::Raw(()),
         );
         rt.spawn(
-            futures01::stream::iter_ok::<_, ()>(std::iter::repeat(()))
+            futures01::stream::iter_ok::<_, ()>(std::iter::repeat(()).take(1_000))
                 .map(|_| Bytes::from("test\n"))
                 .map_err(|_| ())
                 .forward(sink)
