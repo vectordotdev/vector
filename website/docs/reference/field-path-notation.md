@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-28"
 title: Field Path Notation
 description: "Vector's field path notation allows you to reference field values with a simple string syntax."
 ---
