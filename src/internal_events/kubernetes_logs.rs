@@ -54,11 +54,11 @@ impl InternalEvent for KubernetesLogsEventAnnotationFailed<'_> {
 }
 
 #[derive(Debug)]
-pub struct KubernetesLogsMessageParseFailed<'a> {
+pub struct KubernetesLogsDockerFormatParseFailed<'a> {
     pub message: &'a Bytes,
 }
 
-impl InternalEvent for KubernetesLogsMessageParseFailed<'_> {
+impl InternalEvent for KubernetesLogsDockerFormatParseFailed<'_> {
     fn emit_logs(&self) {
         warn!(
             message = "failed to parse message as json object",
@@ -68,7 +68,7 @@ impl InternalEvent for KubernetesLogsMessageParseFailed<'_> {
 
     fn emit_metrics(&self) {
         counter!(
-            "k8s_message_parse_failures", 1,
+            "k8s_docker_format_parse_failures", 1,
             "component_kind" => "source",
             "component_type" => "kubernetes_logs",
         );
