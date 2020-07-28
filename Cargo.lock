@@ -5623,7 +5623,7 @@ dependencies = [
 [[package]]
 name = "warp"
 version = "0.2.4"
-source = "git+https://github.com/timberio/warp?branch=serve-incoming-lifetime#0b25bd3c78c90432dc68225d25d737fcbfab63b3"
+source = "git+https://github.com/seanmonstar/warp?rev=6777564d18b04c3d5b616a79907cfa175663c350#6777564d18b04c3d5b616a79907cfa175663c350"
 dependencies = [
  "bytes 0.5.4",
  "futures 0.3.5",

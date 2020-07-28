@@ -457,4 +457,4 @@ required-features = ["transforms-wasm", "transforms-lua"]
 tower-layer = "0.3"
 
 [patch.crates-io]
-warp = { git = "https://github.com/timberio/warp", branch = "serve-incoming-lifetime" }
+warp = { git = "https://github.com/seanmonstar/warp", rev = "6777564d18b04c3d5b616a79907cfa175663c350" }
