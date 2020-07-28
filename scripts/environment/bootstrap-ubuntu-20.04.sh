@@ -23,7 +23,8 @@ apt install --yes \
     ruby-bundler \
     nodejs \
     libsasl2-dev \
-    gnupg2
+    gnupg2 \
+    wget
 
 curl -LO https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz
 tar -xvf grease-1.0.1-linux-amd64.tar.gz
