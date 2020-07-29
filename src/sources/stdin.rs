@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
@@ -126,8 +127,8 @@ where
 
                 for line in stdin.lines() {
                     match line {
-                        Err(e) => {
-                            error!(message = "Unable to read from source.", error = %e);
+                        Err(error) => {
+                            emit!(StdinReadFailed { error });
                             break;
                         }
                         Ok(line) => {
@@ -165,7 +166,12 @@ where
     let fut = receiver
         .take_until(shutdown.compat())
         .map_err(|error| error!("error reading line: {:?}", error))
-        .map_ok(move |line| create_event(line, &host_key, &hostname))
+        .map_ok(move |line| {
+            emit!(StdinEventReceived {
+                byte_size: line.len()
+            });
+            create_event(line, &host_key, &hostname)
+        })
         .forward(
             out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error))
                 .sink_compat(),

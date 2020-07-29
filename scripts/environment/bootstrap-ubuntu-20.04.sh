@@ -26,9 +26,14 @@ apt install --yes \
     gnupg2 \
     wget
 
-curl -LO https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz
-tar -xvf grease-1.0.1-linux-amd64.tar.gz
-cp grease/bin/grease /usr/bin/grease
+TEMP=$(mktemp -d)
+curl \
+    -L https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz \
+    -o "${TEMP}/grease-1.0.1-linux-amd64.tar.gz"
+tar \
+    -xvf "${TEMP}/grease-1.0.1-linux-amd64.tar.gz" \
+    -C "${TEMP}"
+cp "${TEMP}/grease/bin/grease" /usr/bin/grease
 
 # Locales
 locale-gen en_US.UTF-8

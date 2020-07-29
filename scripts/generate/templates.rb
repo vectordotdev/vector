@@ -278,9 +278,9 @@ class Templates
   def highlights(highlights, author: true, colorize: false, group_by: "type", heading_depth: 3, size: nil, tags: true, timeline: true)
     case group_by
     when "type"
-      highlights.sort_by!(&:type)
+      highlights.sort_by!{|h| [h.type, h.title]}
     when "version"
-      highlights.sort_by!(&:date)
+      highlights.sort_by!{|h| [h.date, h.title]}
     else
       raise ArgumentError.new("Invalid group_by value: #{group_by.inspect}")
     end
