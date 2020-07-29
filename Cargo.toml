@@ -222,6 +222,7 @@ typetag = "0.1.6"
 url = "2.2.0"
 uuid = { version = "0.8", features = ["serde", "v4"], optional = true }
 warp = { version = "0.2.5", default-features = false, optional = true }
+redis = { version = "0.20.0", features = ["connection-manager","async-std-comp"], optional = true }
 
 # For WASM
 async-stream = "0.3.0"
@@ -361,6 +362,7 @@ sources-metrics = [
   "sources-prometheus",
   "sources-statsd",
   "sources-vector",
+  "sources-redis",
 ]
 
 sources-apache_metrics = []
@@ -394,6 +396,7 @@ sources-utils-tls = []
 sources-utils-udp = ["socket2"]
 sources-utils-unix = []
 sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls"]
+sources-redis = ["redis"]
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]
@@ -512,7 +515,8 @@ sinks-metrics = [
   "sinks-prometheus",
   "sinks-sematext",
   "sinks-statsd",
-  "sinks-vector"
+  "sinks-vector",
+  "sinks-redis",
 ]
 
 sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
@@ -547,6 +551,7 @@ sinks-splunk_hec = ["bytesize"]
 sinks-statsd = ["sinks-utils-udp", "tokio-util/udp"]
 sinks-utils-udp = ["socket2"]
 sinks-vector = ["sinks-utils-udp"]
+sinks-redis = ["redis"]
 
 # Identifies that the build is a nightly build
 nightly = []
@@ -571,6 +576,7 @@ all-integration-tests = [
   "prometheus-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
+  "redis-integration-tests",
 ]
 
 aws-integration-tests = [
@@ -609,6 +615,7 @@ postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 prometheus-integration-tests = ["bytesize", "sinks-prometheus", "sources-prometheus"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
+redis-integration-tests = ["sources-redis", "sinks-redis"]
 
 disable-resolv-conf = []
 shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]

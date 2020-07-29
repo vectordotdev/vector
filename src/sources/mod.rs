@@ -52,6 +52,9 @@ pub mod syslog;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
 
+#[cfg(feature = "sources-redis")]
+pub mod redis;
+
 mod util;
 
 pub type Source = BoxFuture<'static, Result<(), ()>>;

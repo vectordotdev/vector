@@ -80,6 +80,8 @@ mod process;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
 mod pulsar;
+#[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
+mod redis;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
 #[cfg(feature = "transforms-regex_parser")]
@@ -200,6 +202,8 @@ pub use self::process::*;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 pub(crate) use self::prometheus::*;
 pub use self::pulsar::*;
+#[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
+pub use self::redis::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-regex_parser")]
