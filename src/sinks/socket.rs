@@ -176,17 +176,18 @@ mod test {
     #[test]
     fn tcp_stream_detects_disconnect() {
         use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
-        use futures::{task::noop_waker_ref, StreamExt};
+        use futures::{future, FutureExt, StreamExt};
         use std::{
+            future::Future,
             net::Shutdown,
             pin::Pin,
             sync::{
                 atomic::{AtomicUsize, Ordering},
                 Arc,
             },
-            task::{Context, Poll},
+            task::Poll,
         };
-        use tokio::{io::AsyncRead, net::TcpStream, sync::Mutex};
+        use tokio::{io::AsyncRead, net::TcpStream};
 
         crate::test_util::trace_init();
 
@@ -215,8 +216,8 @@ mod test {
         let conn_counter = Arc::new(AtomicUsize::new(0));
         let conn_counter1 = Arc::clone(&conn_counter);
 
-        let (close_tx, close_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
-        let close_rx = Arc::new(Mutex::new(close_rx));
+        let (close_tx, close_rx) = tokio::sync::oneshot::channel::<()>();
+        let mut close_rx = Some(close_rx.map(|x| x.unwrap()));
 
         let config = Some(TlsConfig {
             enabled: Some(true),
@@ -235,33 +236,33 @@ mod test {
                 .incoming()
                 .take(2)
                 .for_each(|connection| {
-                    let close_rx = Arc::clone(&close_rx);
+                    let mut close_rx = close_rx.take();
 
                     conn_counter1.fetch_add(1, Ordering::SeqCst);
                     let msg_counter1 = Arc::clone(&msg_counter1);
 
-                    async move {
-                        let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
-                        let mut cx = Context::from_waker(&noop_waker_ref());
-                        loop {
-                            if close_rx.lock().await.try_recv().is_ok() {
+                    let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
+                    future::poll_fn(move |cx| loop {
+                        if let Some(fut) = close_rx.as_mut() {
+                            if let Poll::Ready(()) = Pin::new(fut).poll(cx) {
                                 stream.get_ref().unwrap().shutdown(Shutdown::Write).unwrap();
-                                break;
-                            }
-
-                            match Pin::new(&mut stream).poll_read(&mut cx, &mut [0u8; 11]) {
-                                Poll::Pending => {}
-                                Poll::Ready(Ok(n)) => {
-                                    if n == 0 {
-                                        break;
-                                    } else {
-                                        msg_counter1.fetch_add(1, Ordering::SeqCst);
-                                    }
-                                }
-                                Poll::Ready(Err(error)) => panic!("{}", error),
+                                close_rx = None;
                             }
                         }
-                    }
+
+                        return match Pin::new(&mut stream).poll_read(cx, &mut [0u8; 11]) {
+                            Poll::Ready(Ok(n)) => {
+                                if n == 0 {
+                                    Poll::Ready(())
+                                } else {
+                                    msg_counter1.fetch_add(1, Ordering::SeqCst);
+                                    continue;
+                                }
+                            }
+                            Poll::Ready(Err(error)) => panic!("{}", error),
+                            Poll::Pending => Poll::Pending,
+                        };
+                    })
                 })
                 .await;
         });
