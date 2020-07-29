@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-29"
 title: Glossary
 description: "Vector documentation glossary of terms"
 ---
@@ -48,7 +48,7 @@ The gloassary contains common terms and their definitions.
 
 ## Flush
 
-"flush" refers to the act of sending a batched payload to a downstream service. It is a common term used in conjunction with "buffer".
+"Flush" refers to the act of sending a batched payload to a downstream service. It is a common term used in conjunction with "buffer".
 
 ## Github
 
@@ -62,10 +62,6 @@ The gloassary contains common terms and their definitions.
 
 "Log" refers to an individual log event. This is a type of
 [Vector event][docs.data-model.metric].
-
-## Lucio
-
-A sporty Italian that bleeds Rust, is a core member of the Vector team, and does not approve of New York pizza.
 
 ## Metric
 
@@ -151,6 +147,10 @@ reducing cost, etc.
 
 "Vector" is the name of this project.
 
+## Vic
+
+[Vector's mascot][pages.vic].
+
 [docs.configuration]: /docs/setup/configuration/
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
@@ -162,6 +162,7 @@ reducing cost, etc.
 [docs.transforms]: /docs/reference/transforms/
 [guides.index]: /guides
 [pages.index#performance]: /#performance
+[pages.vic]: /vic/
 [urls.rust]: https://www.rust-lang.org/
 [urls.toml]: https://github.com/toml-lang/toml
 [urls.toml_table]: https://github.com/toml-lang/toml#table
