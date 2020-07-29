@@ -3,6 +3,8 @@ mod aws_kinesis_streams;
 mod blackhole;
 mod elasticsearch;
 mod file;
+#[cfg(feature = "sources-journald")]
+mod journald;
 mod json;
 #[cfg(feature = "sources-kubernetes-logs")]
 mod kubernetes_logs;
@@ -12,6 +14,7 @@ mod lua;
 mod prometheus;
 mod regex;
 mod splunk_hec;
+mod stdin;
 mod syslog;
 mod tcp;
 mod udp;
@@ -27,6 +30,8 @@ pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
+#[cfg(feature = "sources-journald")]
+pub(crate) use self::journald::*;
 pub use self::json::*;
 #[cfg(feature = "sources-kubernetes-logs")]
 pub use self::kubernetes_logs::*;
@@ -36,6 +41,7 @@ pub use self::lua::*;
 pub use self::prometheus::*;
 pub use self::regex::*;
 pub use self::splunk_hec::*;
+pub use self::stdin::*;
 pub use self::syslog::*;
 pub use self::tcp::*;
 pub use self::udp::*;
