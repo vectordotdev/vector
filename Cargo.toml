@@ -31,6 +31,7 @@ members = [
   "lib/file-source",
   "lib/tracing-limit",
   "lib/vector-wasm",
+  "lib/k8s-test-framework",
 ]
 
 [dependencies]
@@ -195,6 +196,7 @@ tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
 assert_cmd = "1.0"
 reqwest = { version = "0.10.6", features = ["json"] }
+k8s-test-framework = { version = "0.1", path = "lib/k8s-test-framework" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -431,10 +433,12 @@ kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
-kubernetes-integration-tests = ["sources-kubernetes-logs"]
 
 shutdown-tests = ["sources","sinks-console","sinks-prometheus","sinks-blackhole","unix","rdkafka","transforms-log_to_metric","transforms-lua"]
 disable-resolv-conf = []
+
+# E2E tests
+kubernetes-e2e-tests = ["k8s-openapi"]
 
 [[bench]]
 name = "bench"
@@ -452,6 +456,10 @@ harness = false
 name = "wasm"
 harness = false
 required-features = ["transforms-wasm", "transforms-lua"]
+
+[[test]]
+name = "kubernetes-e2e"
+required-features = ["kubernetes-e2e-tests"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"

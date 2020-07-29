@@ -1888,6 +1888,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "k8s-test-framework"
+version = "0.1.0"
+dependencies = [
+ "k8s-openapi",
+ "once_cell",
+ "serde_json",
+ "tempfile",
+ "tokio 0.2.21",
+]
+
+[[package]]
 name = "kernel32-sys"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5443,6 +5454,7 @@ dependencies = [
  "inventory",
  "jemallocator",
  "k8s-openapi",
+ "k8s-test-framework",
  "lazy_static 1.4.0",
  "leveldb",
  "libc",

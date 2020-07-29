@@ -267,21 +267,49 @@ jobs:
       - run: make slim-builds
       - run: make test-integration-splunk
 
-  test-integration-kubernetes:
-    name: Integration - Linux, Kubernetes, flaky
-    # This is an experimental test. Allow it to fail without failing the whole
-    # workflow, but keep it executing on every build to gather stats.
-    continue-on-error: true
+  test-e2e-kubernetes:
+    name: E2E - K8s ${{ matrix.kubernetes_version }} / ${{ matrix.container_runtime }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        kubernetes:
-          - v1.18.2
-          - v1.17.5
-          - v1.16.9
-          - v1.15.11
-          - v1.14.10
+        minikube_version:
+          - 'v1.11.0' # https://github.com/kubernetes/minikube/issues/8799
+        kubernetes_version:
+          - 'v1.18.6'
+          - 'v1.17.9'
+          - 'v1.16.12' # v1.16.13 is broken, see https://github.com/kubernetes/minikube/issues/8840
+          - 'v1.15.12'
+          - 'v1.14.10'
+        container_runtime:
+          - docker
+          - containerd
+          - crio
       fail-fast: false
     steps:
-      - name: Temporarily off
-        run: "true"
+      - name: Setup Minikube
+        run: |
+          set -xeuo pipefail
+
+          curl -Lo kubectl \
+            'https://storage.googleapis.com/kubernetes-release/release/${{ matrix.kubernetes_version }}/bin/linux/amd64/kubectl'
+          sudo install kubectl /usr/local/bin/
+
+          curl -Lo minikube \
+            'https://storage.googleapis.com/minikube/releases/${{ matrix.minikube_version }}/minikube-linux-amd64'
+          sudo install minikube /usr/local/bin/
+
+          minikube config set profile minikube
+          minikube config set vm-driver docker
+          minikube config set kubernetes-version '${{ matrix.kubernetes_version }}'
+          minikube config set container-runtime '${{ matrix.container_runtime }}'
+          # Start minikube, try again once if fails and print logs if the second
+          # attempt fails too.
+          minikube start || minikube delete && minikube start || minikube logs
+          kubectl cluster-info
+      - name: Checkout
+        uses: actions/checkout@v1
+      - run: USE_CONTAINER=none make slim-builds
+      - run: make test-e2e-kubernetes
+        env:
+          USE_MINIKUBE_CACHE: "true"
+          PACKAGE_DEB_USE_CONTAINER: docker
