@@ -185,16 +185,14 @@ build-x86_64-unknown-linux-gnu: ## Build dynamically linked binary in release mo
 		--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 		$(ENVIRONMENT_UPSTREAM):x86_64-unknown-linux-gnu \
 		cargo build $(if $(findstring true,$(RELEASE)),--release,) --no-default-features --target x86_64-unknown-linux-gnu --features ${DEFAULT_FEATURES}
-	@mkdir -p ./target/x86_64-unknown-linux-gnu/release/
-	@mkdir -p ./target/x86_64-unknown-linux-gnu/debug/
+	@mkdir -p ./target/x86_64-unknown-linux-gnu/$(if $(findstring true,$(RELEASE)),release,debug)/
 	@$(CONTAINER_TOOL) rm -f vector-build-outputs >/dev/null 2>&1 || true
 	@$(CONTAINER_TOOL) run \
 		-d \
 		-v vector-target:/target \
 		--name vector-build-outputs \
 		busybox true
-	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/x86_64-unknown-linux-gnu/release/vector ./target/x86_64-unknown-linux-gnu/release/ >/dev/null 2>&1 || true
-	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/x86_64-unknown-linux-gnu/debug/vector ./target/x86_64-unknown-linux-gnu/debug/ >/dev/null 2>&1 || true
+	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/x86_64-unknown-linux-gnu/$(if $(findstring true,$(RELEASE)),release,debug)/vector ./target/x86_64-unknown-linux-gnu/$(if $(findstring true,$(RELEASE)),release,debug)/ >/dev/null 2>&1 || true
 	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/criterion ./target/criterion >/dev/null 2>&1 || true
 	@$(CONTAINER_TOOL) rm -f vector-build-outputs >/dev/null 2>&1 || true
 
