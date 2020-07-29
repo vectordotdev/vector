@@ -261,6 +261,7 @@ cfg-if = { version = "1.0.0", default-features = false }
 tonic = { version = "0.4", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
 trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
+redis = { version = "0.20.0", features = ["connection-manager","async-std-comp"], optional = true }
 
 # For WASM
 async-stream = "0.3.2"
@@ -569,6 +570,7 @@ sinks-metrics = [
   "sinks-sematext",
   "sinks-statsd",
   "sinks-vector",
+  "sinks-redis",
 ]
 
 sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
@@ -603,6 +605,7 @@ sinks-splunk_hec = ["bytesize"]
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "tonic", "tonic-build", "prost-build"]
+sinks-redis = ["redis"]
 
 # Identifies that the build is a nightly build
 nightly = []
@@ -629,6 +632,7 @@ all-integration-tests = [
   "pulsar-integration-tests",
   "splunk-integration-tests",
   "dnstap-integration-tests",
+  "redis-integration-tests",
 ]
 
 aws-integration-tests = [
@@ -669,6 +673,7 @@ prometheus-integration-tests = ["bytesize", "sinks-prometheus", "sources-prometh
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 dnstap-integration-tests = ["sources-dnstap"]
+redis-integration-tests = ["sinks-redis"]
 
 disable-resolv-conf = []
 shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]

@@ -299,8 +299,13 @@ test-behavior: ## Runs behaviorial test
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
+<<<<<<< HEAD
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
+=======
+test-integration: test-integration-aws  test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
+>>>>>>> 490cc1e33 (add redis sink)
 test-integration: test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-splunk test-integration-dnstap
@@ -317,7 +322,7 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh aws stop
 endif
 
-.PHONY: test-integration-clickhouse
+.PHONY:
 test-integration-clickhouse: ## Runs Clickhouse integration tests
 ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh clickhouse stop
@@ -496,6 +501,7 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh splunk stop
 endif
 
+<<<<<<< HEAD
 .PHONY: test-integration-dnstap
 test-integration-dnstap: ## Runs dnstap integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -505,6 +511,18 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features dnstap-integration-tests --lib ::dnstap:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh dnstap stop
+=======
+.PHONY: test-integration-redis
+test-integration-redis: ## Runs Redis integration tests
+ifeq ($(AUTOSPAWN), true)
+	@scripts/setup_integration_env.sh redis stop
+	@scripts/setup_integration_env.sh redis start
+	sleep 10 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features redis-integration-tests --lib ::redis:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	@scripts/setup_integration_env.sh redis stop
+>>>>>>> 490cc1e33 (add redis sink)
 endif
 
 .PHONY: test-e2e-kubernetes
