@@ -69,7 +69,7 @@ expanding into more specifics.
 
 1. Ensure your change has an issue! Find an
    [existing issue][urls.existing_issues] or [open a new issue][urls.new_issue].
-   * This is where you can get a feel if the change will be accepted or not.
+   - This is where you can get a feel if the change will be accepted or not.
      Changes that are questionable will have a `needs: approval` label.
 2. One approved, [fork the Vector repository][urls.fork_repo] in your own
    Github account.
@@ -214,7 +214,7 @@ make environment CLI_OPTS="--publish 3000:2000"
 
 Now you can use the jobs detailed in **"Bring your own toolbox"** below.
 
-Want to run from outside of the environment? *Clever. Good thinking.* You can run any of the following:
+Want to run from outside of the environment? _Clever. Good thinking._ You can run any of the following:
 
 ```bash
 
@@ -252,11 +252,11 @@ To build Vector on your own host will require a fairly complete development envi
 
 We keep an up to date list of all dependencies used in our CI environment inside our `default.nix` file. Loosely, you'll need the following:
 
-* **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, and `autotools`. (Full list in [`scripts/environment/definition.nix`](./scripts/environment/definition.nix).
-* **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
-* **To build the Website:** Have a working modern Ruby 2.7 and Bundler toolchain available, also `bundle install` in the `scripts/` directory.
-* **To run the Website in Dev:** Have a working `node` environment with `npm`/`yarn`, also run `yarn` from the `website/` directory.
-* **To run `make check-component-features`:** Have `remarshal` installed.
+- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, and `autotools`. (Full list in [`scripts/environment/definition.nix`](./scripts/environment/definition.nix).
+- **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
+- **To build the Website:** Have a working modern Ruby 2.7 and Bundler toolchain available, also `bundle install` in the `scripts/` directory.
+- **To run the Website in Dev:** Have a working `node` environment with `npm`/`yarn`, also run `yarn` from the `website/` directory.
+- **To run `make check-component-features`:** Have `remarshal` installed.
 
 If you find yourself needing to run something (such as `make generate`) inside the Docker environment described above, that's totally fine, they won't collide or hurt each other. In this case, you'd just run `make environment-generate`.
 
@@ -302,16 +302,16 @@ If you run `make` you'll see a full list of all our tasks. Some of these will st
 
 #### Directory Structure
 
-* [`/.meta`](/.meta) - Project metadata used to generate documentation.
-* [`/benches`](/benches) - Internal benchmarks.
-* [`/config`](/config) - Public facing Vector config, included in releases.
-* [`/distribution`](/distribution) - Distribution artifacts for various targets.
-* [`/lib`](/lib) - External libraries that do not depend on `vector` but are used within the project.
-* [`/proto`](/proto) - Protobuf definitions.
-* [`/scripts`](/scripts) - Scripts used to generate docs and maintain the repo.
-* [`/src`](/src) - Vector source.
-* [`/tests`](/tests) - Various high-level test cases.
-* [`/website`](/website) - Website and documentation files.
+- [`/.meta`](/.meta) - Project metadata used to generate documentation.
+- [`/benches`](/benches) - Internal benchmarks.
+- [`/config`](/config) - Public facing Vector config, included in releases.
+- [`/distribution`](/distribution) - Distribution artifacts for various targets.
+- [`/lib`](/lib) - External libraries that do not depend on `vector` but are used within the project.
+- [`/proto`](/proto) - Protobuf definitions.
+- [`/scripts`](/scripts) - Scripts used to generate docs and maintain the repo.
+- [`/src`](/src) - Vector source.
+- [`/tests`](/tests) - Various high-level test cases.
+- [`/website`](/website) - Website and documentation files.
 
 #### Makefile
 
@@ -407,9 +407,9 @@ doing nothing when there is a data dependency like this.
 With all that in mind, here is a simple checklist to go over when writing a new
 health check:
 
-* [ ] Does this check perform different fallible operations from the sink itself?
-* [ ] Does this check have side effects the user would consider undesirable (e.g. data pollution)?
-* [ ] Are there situations where this check would fail but the sink would operate normally?
+- [ ] Does this check perform different fallible operations from the sink itself?
+- [ ] Does this check have side effects the user would consider undesirable (e.g. data pollution)?
+- [ ] Are there situations where this check would fail but the sink would operate normally?
 
 Not all of the answers need to be a hard "no", but we should think about the
 likelihood that any "yes" would lead to false negatives and balance that against
@@ -565,14 +565,14 @@ This flow facilitates building Vector and deploying it into a cluster.
 There are some extra requirements besides what you'd normally need to work on
 Vector:
 
-* `linux` system (create an issue if you want to work with another OS and we'll
+- `linux` system (create an issue if you want to work with another OS and we'll
   help);
-* [`skaffold`](https://skaffold.dev/)
-* [`docker`](https://www.docker.com/)
-* [`kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
-* [`kustomize`](https://kustomize.io/)
-* [`minikube`](https://minikube.sigs.k8s.io/)-powered or other k8s cluster
-* [`cargo watch`](https://github.com/passcod/cargo-watch)
+- [`skaffold`](https://skaffold.dev/)
+- [`docker`](https://www.docker.com/)
+- [`kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
+- [`kustomize`](https://kustomize.io/)
+- [`minikube`](https://minikube.sigs.k8s.io/)-powered or other k8s cluster
+- [`cargo watch`](https://github.com/passcod/cargo-watch)
 
 ##### The dev flow
 
@@ -604,18 +604,18 @@ if it fits you better.
 
 You might need to tweak `skaffold`, here are some hints:
 
-* `skaffold` will try to detect whether a local cluster is used; if a local
+- `skaffold` will try to detect whether a local cluster is used; if a local
   cluster is used, `skaffold` won't push the docker images it builds to a
   registry.
   See [this page](https://skaffold.dev/docs/environment/local-cluster/)
   for how you can troubleshoot and tweak this behavior.
 
-* `skaffold` can rewrite the image name so that you don't try to push a docker
+- `skaffold` can rewrite the image name so that you don't try to push a docker
   image to a repo that you don't have access to.
   See [this page](https://skaffold.dev/docs/environment/image-registries/)
   for more info.
 
-* For the rest of the `skaffold` tweaks you might want to apply check out
+- For the rest of the `skaffold` tweaks you might want to apply check out
   [this page](https://skaffold.dev/docs/environment/).
 
 ##### Going through the dev flow manually
@@ -643,11 +643,11 @@ E2E (end-to-end) tests.
 
 ##### Requirements
 
-* `kubernetes` cluster (`minikube` has special support, but any cluster should
+- `kubernetes` cluster (`minikube` has special support, but any cluster should
   work)
-* `docker`
-* `kubectl`
-* `bash`
+- `docker`
+- `kubectl`
+- `bash`
 
 Vector release artifacts are prepared for E2E tests, so the ability to do that
 is required too, see Vector [docs](https://vector.dev) for more details.
@@ -655,6 +655,8 @@ is required too, see Vector [docs](https://vector.dev) for more details.
 > Note: `minikube` has a bug in the latest versions that affects our test
 > process - see https://github.com/kubernetes/minikube/issues/8799.
 > Use version `1.11.0` for now.
+
+Also:
 
 > Note: `minikube` has troubles running on ZFS systems. If you're using ZFS, we
 > suggest using a cloud cluster or [`minik8s`](https://microk8s.io/) with local
@@ -673,13 +675,13 @@ after the `:`. Replace `<your name>` with your Docker Hub username.
 
 You can also pass additional parameters to adjust the behavior of the test:
 
-* `QUICK_BUILD=true` - use development build and a skaffold image from the dev
+- `QUICK_BUILD=true` - use development build and a skaffold image from the dev
   flow instead of a production docker image. Significantly speeds up the
   preparation process, but doesn't guarantee the correctness in the release
   build. Useful for development of the tests or Vector code to speed up the
   iteration cycles.
 
-* `USE_MINIKUBE_CACHE=true` - instead of pushing the built docker image to the
+- `USE_MINIKUBE_CACHE=true` - instead of pushing the built docker image to the
   registry under the specified name, directly load the image into
   a `minikube`-controlled cluster node.
   Requires you to test against a `minikube` cluster. Eliminates the need to have
@@ -690,17 +692,17 @@ You can also pass additional parameters to adjust the behavior of the test:
   `minikube cache` or not, based on the current `kubectl` context. To opt-out,
   set `USE_MINIKUBE_CACHE=false`.
 
-* `CONTAINER_IMAGE=<your name>/vector-test:tag` - completely skip the step
+- `CONTAINER_IMAGE=<your name>/vector-test:tag` - completely skip the step
   of building the Vector docker image, and use the specified image instead.
   Useful to speed up the iterations speed when you already have a Vector docker
   image you want to test against.
 
-* `SKIP_CONTAINER_IMAGE_PUBLISHING=true` - completely skip the image publishing
+- `SKIP_CONTAINER_IMAGE_PUBLISHING=true` - completely skip the image publishing
   step. Useful when you want to speed up the iteration speed and when you know
   the Vector image you want to test is already available to the cluster you're
   testing against.
 
-* `SCOPE` - pass a filter to the `cargo test` command to filter out the tests,
+- `SCOPE` - pass a filter to the `cargo test` command to filter out the tests,
   effectively equivalent to `cargo test -- $SCOPE`.
 
 Passing additional commands is done like so:
@@ -819,13 +821,13 @@ It's simpler, clearer, and still protects users of Vector. We believe the DCO
 more accurately embodies the principles of open-source. More info can be found
 here:
 
-* [Gitlab's switch to DCO](https://about.gitlab.com/2017/11/01/gitlab-switches-to-dco-license/)
-* [DCO vs CLA](https://opensource.com/article/18/3/cla-vs-dco-whats-difference)
+- [Gitlab's switch to DCO](https://about.gitlab.com/2017/11/01/gitlab-switches-to-dco-license/)
+- [DCO vs CLA](https://opensource.com/article/18/3/cla-vs-dco-whats-difference)
 
 ### If I’m contributing while an employee, do I still need my employer to sign something?
 
 Nope! The DCO confirms that you are entitled to submit the code, which assumes
-that you are authorized to do so.  It treats you like an adult and relies on
+that you are authorized to do so. It treats you like an adult and relies on
 your accurate statement about your rights to submit a contribution.
 
 ### What if I forgot to sign my commits?
@@ -839,7 +841,6 @@ make signoff
 If you prefer to do this manually:
 
 https://stackoverflow.com/questions/13043357/git-sign-off-previous-commits
-
 
 [urls.aws_announcements]: https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&wn-featured-announcements.sort-by=item.additionalFields.numericSort&wn-featured-announcements.sort-order=asc
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
