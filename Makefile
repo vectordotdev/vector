@@ -167,13 +167,13 @@ build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`
 build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
 target/:
-	mkdir -p target
+	@mkdir -p target
 
 target/x86_64-unknown-linux-gnu/:
-	mkdir -p target/${RELEASE_OR_DEBUG}
+	@mkdir -p target/${RELEASE_OR_DEBUG}
 
 target/x86_64-unknown-linux-gnu/${RELEASE_OR_DEBUG}/: target/x86_64-unknown-linux-gnu/
-	mkdir -p target/x86_64-unknown-linux-gnu/${RELEASE_OR_DEBUG}
+	@mkdir -p target/x86_64-unknown-linux-gnu/${RELEASE_OR_DEBUG}
 
 build-x86_64-unknown-linux-gnu: target/${RELEASE_OR_DEBUG}/x86_64-unknown-linux-gnu/vector ## Build dynamically linked binary in release mode for the x86_64 architecture. (Docker only)
 
