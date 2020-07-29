@@ -15,6 +15,8 @@ endif
 
 # Toggle to use release mode builds.
 export RELEASE ?= true
+override RELEASE_OR_DEBUG =  $(if $(findstring true,$(RELEASE)),release,debug)
+override MAYBE_RELEASE_FLAG =  $(if $(findstring true,$(RELEASE)),--release,)
 # Override this with any scopes for testing/benching.
 export SCOPE ?= ""
 # Override to false to disable autospawning services on integration tests.
@@ -164,7 +166,18 @@ build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`
 
 build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
-build-x86_64-unknown-linux-gnu: ## Build dynamically linked binary in release mode for the x86_64 architecture. (Docker only)
+target/:
+	mkdir -p target
+
+target/x86_64-unknown-linux-gnu/:
+	mkdir -p target/${RELEASE_OR_DEBUG}
+
+target/x86_64-unknown-linux-gnu/${RELEASE_OR_DEBUG}/: target/x86_64-unknown-linux-gnu/
+	mkdir -p target/x86_64-unknown-linux-gnu/${RELEASE_OR_DEBUG}
+
+build-x86_64-unknown-linux-gnu: target/${RELEASE_OR_DEBUG}/x86_64-unknown-linux-gnu/vector ## Build dynamically linked binary in release mode for the x86_64 architecture. (Docker only)
+
+target/${RELEASE_OR_DEBUG}/x86_64-unknown-linux-gnu/vector: target/x86_64-unknown-linux-gnu/${RELEASE_OR_DEBUG}/
 	$(CONTAINER_TOOL) buildx build \
 		--platform linux/amd64 \
 		--build-arg BASEIMAGE="centos:7" \
@@ -185,7 +198,6 @@ build-x86_64-unknown-linux-gnu: ## Build dynamically linked binary in release mo
 		--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 		$(ENVIRONMENT_UPSTREAM):x86_64-unknown-linux-gnu \
 		cargo build $(if $(findstring true,$(RELEASE)),--release,) --no-default-features --target x86_64-unknown-linux-gnu --features ${DEFAULT_FEATURES}
-	@mkdir -p ./target/x86_64-unknown-linux-gnu/$(if $(findstring true,$(RELEASE)),release,debug)/
 	@$(CONTAINER_TOOL) rm -f vector-build-outputs >/dev/null 2>&1 || true
 	@$(CONTAINER_TOOL) run \
 		-d \
