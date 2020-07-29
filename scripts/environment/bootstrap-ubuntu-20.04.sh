@@ -17,7 +17,6 @@ apt install --yes \
     shellcheck \
     software-properties-common \
     musl-tools \
-    musl-dev \
     locales \
     apt-transport-https \
     ca-certificates \
@@ -30,9 +29,6 @@ apt install --yes \
     wget \
     tcl-dev \
     cmake \
-    binutils-arm-linux-gnueabihf \
-    gcc-arm-linux-gnueabihf \
-    g++-arm-linux-gnueabihf \
     crossbuild-essential-i386  \
     gnupg2
 
@@ -40,9 +36,15 @@ apt install --yes \
 ln -s "/usr/bin/g++" "/usr/bin/musl-g++" || true
 
 # We use Grease for parts of release.
-curl -LO https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz
-tar -xvf grease-1.0.1-linux-amd64.tar.gz
-cp grease/bin/grease /usr/bin/grease
+TEMP=$(mktemp -d)
+curl \
+    -L https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz \
+    -o "${TEMP}/grease-1.0.1-linux-amd64.tar.gz"
+tar \
+    -xvf "${TEMP}/grease-1.0.1-linux-amd64.tar.gz" \
+    -C "${TEMP}"
+cp "${TEMP}/grease/bin/grease" /usr/bin/grease
+
 
 # Locales
 locale-gen en_US.UTF-8
@@ -66,11 +68,3 @@ apt install --yes yarn docker-ce docker-ce-cli containerd.io
 # Remarshal is particular
 pip3 install remarshal==0.11.2
 
-# Cross toolchains
-mkdir -p /git/richfelker/
-git clone https://github.com/richfelker/musl-cross-make.git /git/richfelker/musl-cross-make
-cd /git/richfelker/musl-cross-make
-export NUM_CPUS=$(awk '/^processor/ { N++} END { print N }' /proc/cpuinfo)
-make install -j${NUM_CPUS} TARGET=x86_64-linux-musl
-make install -j${NUM_CPUS} TARGET=aarch64-linux-musl
-make install -j${NUM_CPUS} TARGET=arm-linux-musleabihf GCC_CONFIG="--with-float=softfp"
