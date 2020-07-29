@@ -14,6 +14,8 @@ mod lua;
 mod prometheus;
 mod regex;
 mod splunk_hec;
+#[cfg(feature = "sources-statsd")]
+mod statsd;
 mod stdin;
 mod syslog;
 mod tcp;
@@ -41,6 +43,8 @@ pub use self::lua::*;
 pub use self::prometheus::*;
 pub use self::regex::*;
 pub use self::splunk_hec::*;
+#[cfg(feature = "sources-statsd")]
+pub use self::statsd::*;
 pub use self::stdin::*;
 pub use self::syslog::*;
 pub use self::tcp::*;

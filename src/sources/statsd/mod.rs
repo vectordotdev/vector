@@ -1,4 +1,9 @@
-use crate::{shutdown::ShutdownSignal, topology::config::GlobalOptions, Event};
+use crate::{
+    internal_events::{StatsdEventReceived, StatsdInvalidRecord},
+    shutdown::ShutdownSignal,
+    topology::config::GlobalOptions,
+    Event,
+};
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     stream, FutureExt, StreamExt, TryFutureExt,
@@ -61,10 +66,18 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: mpsc::Sender<Event>) 
                             let packet = String::from_utf8_lossy(bytes.as_ref());
                             let metrics = packet
                                 .lines()
-                                .map(parse)
-                                .filter_map(|res| res.map_err(|e| error!("{}", e)).ok())
-                                .map(Event::Metric)
-                                .map(Ok)
+                                .filter_map(|line| match parse(line) {
+                                    Ok(metric) => {
+                                        emit!(StatsdEventReceived {
+                                            byte_size: line.len()
+                                        });
+                                        Some(Ok(Event::Metric(metric)))
+                                    }
+                                    Err(error) => {
+                                        emit!(StatsdInvalidRecord { error, text: line });
+                                        None
+                                    }
+                                })
                                 .collect::<Vec<_>>();
                             Some(stream::iter(metrics))
                         }
