@@ -5634,9 +5634,9 @@ dependencies = [
 
 [[package]]
 name = "warp"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e95175b7a927258ecbb816bdada3cc469cb68593e7940b96a60f4af366a9970"
+checksum = "df341dee97c9ae29dfa5e0b0fbbbf620e0d6a36686389bedf83b3daeb8b0d0ac"
 dependencies = [
  "bytes 0.5.4",
  "futures 0.3.5",
@@ -5653,6 +5653,8 @@ dependencies = [
  "serde_urlencoded",
  "tokio 0.2.21",
  "tower-service 0.3.0",
+ "tracing",
+ "tracing-futures 0.2.1",
  "urlencoding",
 ]
 
