@@ -1,7 +1,7 @@
 #! /usr/bin/env bash
 set -e -o verbose
 
-# Rust
+# Rust toolchain
 curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 rustup default "$(cat rust-toolchain)"
 rustup component add rustfmt
@@ -9,7 +9,7 @@ rustup component add clippy
 rustup target add wasm32-wasi
 
 cd scripts
-# Node toolchain
+# Ruby toolchain
 export PATH="${HOME}/.rbenv/bin:${HOME}/.rbenv/shims:${PATH}"
 curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
 eval "$(rbenv init -)"
