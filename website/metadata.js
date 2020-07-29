@@ -45093,7 +45093,7 @@ module.exports = {
       "github": "https://github.com/JeanMertz",
       "id": "jean",
       "keybase": "https://keybase.io/JeanMertz",
-      "name": "Jesse",
+      "name": "Jean",
       "twitter": "https://twitter.com/JeanMertz"
     },
     {

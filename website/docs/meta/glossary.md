@@ -149,7 +149,7 @@ reducing cost, etc.
 
 ## Vic
 
-[Vector's mascot][pages.vic].
+Vector's mascot.
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.data-model.log]: /docs/about/data-model/log/
@@ -162,7 +162,6 @@ reducing cost, etc.
 [docs.transforms]: /docs/reference/transforms/
 [guides.index]: /guides
 [pages.index#performance]: /#performance
-[pages.vic]: /vic/
 [urls.rust]: https://www.rust-lang.org/
 [urls.toml]: https://github.com/toml-lang/toml
 [urls.toml_table]: https://github.com/toml-lang/toml#table
