@@ -1,5 +1,5 @@
 use crate::{
-    internal_events::{StatsdEventReceived, StatsdInvalidRecord},
+    internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     topology::config::GlobalOptions,
     Event,
@@ -49,9 +49,13 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: mpsc::Sender<Event>) 
 
     Box::new(
         async move {
-            let socket = UdpSocket::bind(&addr)
-                .await
-                .expect("failed to bind to udp listener socket");
+            let socket = match UdpSocket::bind(&addr).await {
+                Ok(socket) => socket,
+                Err(error) => {
+                    emit!(StatsdSocketError::bind(error));
+                    return Err(());
+                }
+            };
             info!(
                 message = "listening.",
                 addr = &field::display(addr),
@@ -82,7 +86,7 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: mpsc::Sender<Event>) 
                             Some(stream::iter(metrics))
                         }
                         Err(error) => {
-                            error!("error reading datagram: {:?}", error);
+                            emit!(StatsdSocketError::read(error));
                             None
                         }
                     }

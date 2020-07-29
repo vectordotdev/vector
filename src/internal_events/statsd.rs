@@ -49,3 +49,49 @@ impl InternalEvent for StatsdInvalidRecord<'_> {
         );
     }
 }
+
+#[derive(Debug)]
+enum StatsdSocketErrorType {
+    Bind,
+    Read,
+}
+
+#[derive(Debug)]
+pub struct StatsdSocketError<T> {
+    r#type: StatsdSocketErrorType,
+    pub error: T,
+}
+
+impl<T> StatsdSocketError<T> {
+    pub fn bind(error: T) -> Self {
+        StatsdSocketError {
+            r#type: StatsdSocketErrorType::Bind,
+            error,
+        }
+    }
+
+    pub fn read(error: T) -> Self {
+        StatsdSocketError {
+            r#type: StatsdSocketErrorType::Read,
+            error,
+        }
+    }
+}
+
+impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError<T> {
+    fn emit_logs(&self) {
+        let message = match self.r#type {
+            StatsdSocketErrorType::Bind => "failed to bind to udp listener socket.",
+            StatsdSocketErrorType::Read => "failed to read udp datagram.",
+        };
+        error!(message, error = %self.error);
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "socket_errors", 1,
+            "component_kind" => "source",
+            "component_type" => "statsd",
+        );
+    }
+}
