@@ -8,7 +8,7 @@ set -euo pipefail
 #   Deploys Vector into Kubernetes for testing purposes.
 #   Uses the same installation method our users would use.
 #
-#   This script impements cli interface required by the kubernetes integration
+#   This script implements cli interface required by the kubernetes E2E
 #   tests.
 #
 # USAGE
@@ -55,20 +55,21 @@ up() {
     $VECTOR_TEST_KUBECTL create --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONIFGS_FILE"
   fi
 
-  sed "s|timerio/vector:latest|$CONTAINER_IMAGE|" < "distribution/kubernetes/vector-namespaced.yaml" \
+  sed 's|image: timberio/vector:[^$]*$'"|image: $CONTAINER_IMAGE|" < "distribution/kubernetes/vector-namespaced.yaml" \
     | $VECTOR_TEST_KUBECTL create --namespace "$NAMESPACE" -f -
 }
 
 down() {
-  $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f - < "distribution/kubernetes/vector-namespaced.yaml"
+  # A workaround for `kubectl` from a `snap` package.
+  cat < "distribution/kubernetes/vector-namespaced.yaml" | $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f -
 
   if [[ -n "$CUSTOM_RESOURCE_CONIFGS_FILE" ]]; then
     $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONIFGS_FILE"
   fi
 
-  $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE"
-
   templated-config-global | $VECTOR_TEST_KUBECTL delete -f -
+
+  $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE"
 }
 
 case "$COMMAND" in

@@ -8,3 +8,6 @@ resources:
   - skaffold/manifests/namespace.yaml
   - skaffold/manifests/config.yaml
   - distribution/kubernetes/vector-namespaced.yaml
+
+patchesStrategicMerge:
+  - skaffold/manifests/patches/env.yaml

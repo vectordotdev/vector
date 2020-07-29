@@ -281,9 +281,9 @@ ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
-PACKAGE_DEB_USE_CONTAINER ?= "$(USE_CONTAINER)"
-test-integration-kubernetes: ## Runs Kubernetes integration tests (Sorry, no `ENVIRONMENT=true` support)
-	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" USE_CONTAINER=none $(RUN) test-integration-kubernetes
+PACKAGE_DEB_USE_CONTAINER ?= $(USE_CONTAINER)
+test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
+	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" scripts/test-e2e-kubernetes.sh
 
 test-shutdown: ## Runs shutdown tests
 ifeq ($(AUTOSPAWN), true)
