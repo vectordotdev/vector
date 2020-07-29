@@ -10,10 +10,20 @@ description = "Configures the sink request behavior."
 [<%= namespace %>.request.children.in_flight_limit]
 type = "uint"
 common = true
+<%- if defined?(in_flight_limit) %>
 default = <%= in_flight_limit %>
+<% else %>
+examples = [5]
+<% end %>
 groups = <%= groups.to_toml %>
 unit = "requests"
-description = "The maximum number of in-flight requests allowed at any given time."
+description = """\
+The maximum number of in-flight requests allowed at any given time. \
+<%- if !defined?(in_flight_limit) %>
+If this is not set, this limit will vary continuously based on the \
+timing and contents of responses received from the remote service.\
+<% end %>
+"""
 
 [<%= namespace %>.request.children.rate_limit_duration_secs]
 type = "uint"

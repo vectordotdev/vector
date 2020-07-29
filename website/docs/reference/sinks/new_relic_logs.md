@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-29"
 delivery_guarantee: "at_least_once"
 component_title: "New Relic Logs"
 description: "The Vector `new_relic_logs` sink batches `log` events to New Relic's log service via their log API."
@@ -89,7 +89,7 @@ API][urls.new_relic_log_api].
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # Request
-  request.in_flight_limit = 5 # optional, default, requests
+  request.in_flight_limit = 5 # optional, no default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 100 # optional, default
   request.retry_attempts = 18446744073709551615 # optional, default
@@ -573,7 +573,7 @@ Configures the sink request behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={5}
+  defaultValue={null}
   enumValues={null}
   examples={[5]}
   groups={[]}
@@ -589,7 +589,9 @@ Configures the sink request behavior.
 
 #### in_flight_limit
 
-The maximum number of in-flight requests allowed at any given time.
+The maximum number of in-flight requests allowed at any given time. If this is
+not set, this limit will vary continuously based on the timing and contents of
+responses received from the remote service.
  See [Rate Limits](#rate-limits) for more info.
 
 

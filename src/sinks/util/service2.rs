@@ -58,7 +58,7 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 /// Tower Request based configuration
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub struct TowerRequestConfig {
-    pub in_flight_limit: Option<usize>,        // 5
+    pub in_flight_limit: Option<usize>,        // None == auto
     pub timeout_secs: Option<u64>,             // 60
     pub rate_limit_duration_secs: Option<u64>, // 1
     pub rate_limit_num: Option<u64>,           // 5
@@ -70,10 +70,7 @@ pub struct TowerRequestConfig {
 impl TowerRequestConfig {
     pub fn unwrap_with(&self, defaults: &TowerRequestConfig) -> TowerRequestSettings {
         TowerRequestSettings {
-            in_flight_limit: self
-                .in_flight_limit
-                .or(defaults.in_flight_limit)
-                .unwrap_or(5),
+            in_flight_limit: self.in_flight_limit.or(defaults.in_flight_limit),
             timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
@@ -101,7 +98,7 @@ impl TowerRequestConfig {
 
 #[derive(Debug, Clone)]
 pub struct TowerRequestSettings {
-    pub in_flight_limit: usize,
+    pub in_flight_limit: Option<usize>,
     pub timeout: Duration,
     pub rate_limit_duration: Duration,
     pub rate_limit_num: u64,
@@ -179,7 +176,7 @@ where
         let policy = self.settings.retry_policy(self.retry_logic.clone());
 
         let l = ServiceBuilder::new()
-            .concurrency_limit(self.settings.in_flight_limit)
+            .concurrency_limit(self.settings.in_flight_limit.unwrap_or(5))
             .rate_limit(
                 self.settings.rate_limit_num,
                 self.settings.rate_limit_duration,

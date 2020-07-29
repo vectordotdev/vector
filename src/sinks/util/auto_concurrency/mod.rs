@@ -7,6 +7,8 @@ mod semaphore;
 mod service;
 mod tests;
 
+pub(super) const MAX_CONCURRENCY: usize = 200;
+
 pub(crate) use layer::AutoConcurrencyLimitLayer;
 pub(crate) use service::AutoConcurrencyLimit;
 

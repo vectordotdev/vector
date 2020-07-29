@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-29"
 delivery_guarantee: "at_least_once"
 component_title: "LogDNA"
 description: "The Vector `logdna` sink batches `log` events to LogDna's HTTP Ingestion API."
@@ -83,7 +83,7 @@ The Vector `logdna` sink
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # Request
-  request.in_flight_limit = 5 # optional, default, requests
+  request.in_flight_limit = 5 # optional, no default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 5 # optional, default
   request.retry_attempts = 18446744073709551615 # optional, default
@@ -587,7 +587,7 @@ Configures the sink request behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={5}
+  defaultValue={null}
   enumValues={null}
   examples={[5]}
   groups={[]}
@@ -603,7 +603,9 @@ Configures the sink request behavior.
 
 #### in_flight_limit
 
-The maximum number of in-flight requests allowed at any given time.
+The maximum number of in-flight requests allowed at any given time. If this is
+not set, this limit will vary continuously based on the timing and contents of
+responses received from the remote service.
  See [Rate Limits](#rate-limits) for more info.
 
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-29"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
@@ -103,7 +103,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   key_prefix = "date=%F/" # optional, default
 
   # Request
-  request.in_flight_limit = 5 # optional, default, requests
+  request.in_flight_limit = 25 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 1000 # optional, default
   request.retry_attempts = 18446744073709551615 # optional, default
@@ -745,9 +745,9 @@ Configures the sink request behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={5}
+  defaultValue={25}
   enumValues={null}
-  examples={[5]}
+  examples={[25]}
   groups={[]}
   name={"in_flight_limit"}
   path={"request"}

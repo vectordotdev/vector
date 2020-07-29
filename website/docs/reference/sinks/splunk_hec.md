@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-29"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."
@@ -91,7 +91,7 @@ HTTP Event Collector][urls.splunk_hec].
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # Request
-  request.in_flight_limit = 10 # optional, default, requests
+  request.in_flight_limit = 5 # optional, no default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
   request.rate_limit_num = 10 # optional, default
   request.retry_attempts = 18446744073709551615 # optional, default
@@ -609,9 +609,9 @@ Configures the sink request behavior.
 <Fields filters={false}>
 <Field
   common={true}
-  defaultValue={10}
+  defaultValue={null}
   enumValues={null}
-  examples={[10]}
+  examples={[5]}
   groups={[]}
   name={"in_flight_limit"}
   path={"request"}
@@ -625,7 +625,9 @@ Configures the sink request behavior.
 
 #### in_flight_limit
 
-The maximum number of in-flight requests allowed at any given time.
+The maximum number of in-flight requests allowed at any given time. If this is
+not set, this limit will vary continuously based on the timing and contents of
+responses received from the remote service.
  See [Rate Limits](#rate-limits) for more info.
 
 

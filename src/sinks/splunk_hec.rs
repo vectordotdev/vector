@@ -53,7 +53,6 @@ pub struct HecSinkConfig {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: Some(10),
         rate_limit_num: Some(10),
         ..Default::default()
     };

@@ -32,10 +32,10 @@ enum State {
 
 impl<S, L> AutoConcurrencyLimit<S, L> {
     /// Create a new automated concurrency limiter.
-    pub(crate) fn new(inner: S, logic: L, max: usize) -> Self {
+    pub(crate) fn new(inner: S, logic: L, in_flight_limit: Option<usize>) -> Self {
         AutoConcurrencyLimit {
             inner,
-            controller: Arc::new(Controller::new(max, logic, 1)),
+            controller: Arc::new(Controller::new(in_flight_limit, logic)),
             state: State::Empty,
         }
     }
@@ -160,7 +160,7 @@ mod tests {
 
     impl TestService {
         fn start() -> Self {
-            let layer = AutoConcurrencyLimitLayer::new(10, TestRetryLogic);
+            let layer = AutoConcurrencyLimitLayer::new(Some(10), TestRetryLogic);
             let (service, handle) = mock::spawn_layer(layer);
             let controller = service.get_ref().controller.clone();
             let inner = Arc::clone(&controller.inner);

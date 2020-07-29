@@ -58,7 +58,13 @@ pub(super) struct ControllerStatistics {
 }
 
 impl<L> Controller<L> {
-    pub(super) fn new(max: usize, logic: L, current_limit: usize) -> Self {
+    pub(super) fn new(in_flight_limit: Option<usize>, logic: L) -> Self {
+        // If an in_flight_limit is specified, it becomse both the
+        // current limit and the maximum, effectively bypassing all the
+        // mechanisms. Otherwise, the current limit is set to 1 and the
+        // maximum to MAX_CONCURRENCY.
+        let current_limit = in_flight_limit.unwrap_or(1);
+        let max = in_flight_limit.unwrap_or(super::MAX_CONCURRENCY);
         Self {
             semaphore: Arc::new(ShrinkableSemaphore::new(current_limit)),
             max,

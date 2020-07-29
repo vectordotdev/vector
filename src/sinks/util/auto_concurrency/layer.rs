@@ -6,14 +6,17 @@ use tower03::Layer;
 /// service can handle.
 #[derive(Debug, Clone)]
 pub(crate) struct AutoConcurrencyLimitLayer<L> {
-    max: usize,
+    in_flight_limit: Option<usize>,
     logic: L,
 }
 
 impl<L> AutoConcurrencyLimitLayer<L> {
     /// Create a new concurrency limit layer.
-    pub fn new(max: usize, logic: L) -> Self {
-        AutoConcurrencyLimitLayer { max, logic }
+    pub fn new(in_flight_limit: Option<usize>, logic: L) -> Self {
+        AutoConcurrencyLimitLayer {
+            in_flight_limit,
+            logic,
+        }
     }
 }
 
@@ -21,6 +24,6 @@ impl<S, L: RetryLogic> Layer<S> for AutoConcurrencyLimitLayer<L> {
     type Service = AutoConcurrencyLimit<S, L>;
 
     fn layer(&self, service: S) -> Self::Service {
-        AutoConcurrencyLimit::new(service, self.logic.clone(), self.max)
+        AutoConcurrencyLimit::new(service, self.logic.clone(), self.in_flight_limit)
     }
 }
