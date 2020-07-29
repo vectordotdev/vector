@@ -306,7 +306,7 @@ jobs:
         with:
           name: vector-aarch64.rpm
           path: target/artifacts
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo bash scripts/environment/bootstraps/ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: |
           export VERSION=$(make version)
@@ -377,7 +377,7 @@ jobs:
         with:
           name: vector-aarch64.rpm
           path: target/artifacts
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo bash scripts/environment/ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: |
           export VERSION=$(make version)

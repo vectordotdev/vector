@@ -36,7 +36,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo bash scripts/environment/bootstraps/ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make check-clippy
@@ -52,7 +52,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo bash scripts/environment/bootstraps/ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make check-fmt
@@ -68,7 +68,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo bash scripts/environment/ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make check-generate
@@ -84,7 +84,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo bash scripts/environment/ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make check-markdown
@@ -100,7 +100,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo bash scripts/environment/ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make check-component-features
@@ -116,7 +116,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo bash scripts/environment/ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make check-blog
@@ -132,7 +132,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo bash scripts/environment/ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make check-version
@@ -148,7 +148,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo bash scripts/environment/ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make check-scripts
@@ -164,7 +164,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo bash scripts/environment/ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make check
@@ -180,7 +180,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: bash scripts/environment/bootstrap-macos-10.sh
+      - run: bash scripts/environment/macos-10.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make check

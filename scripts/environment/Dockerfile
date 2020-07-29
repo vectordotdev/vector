@@ -1,4 +1,8 @@
-FROM docker.io/ubuntu:20.04 AS ENVIRONMENT
+ARG BASEIMAGE=docker.io/ubuntu:20.04
+
+FROM ${BASEIMAGE} AS ENVIRONMENT
+ARG BOOTSTRAPPER=scripts/environment/bootstraps/ubuntu-20.04.sh
+
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ='America/New York' \
     PATH=/root/.cargo/bin:/root/.local/bin/:$PATH \
@@ -11,12 +15,13 @@ RUN echo $TZ > /etc/timezone
 
 # Setup the env
 RUN mkdir -p /git/timberio/vector/{scripts,website,scripts/environment}
-ADD scripts/environment/bootstrap-ubuntu-20.04.sh scripts/environment/prepare.sh \
+ADD ${BOOTSTRAPPER} /git/timberio/vector/${BOOTSTRAPPER}
+ADD scripts/environment/prepare.sh \
     /git/timberio/vector/scripts/environment/
 
 # Setup the toolchain
 WORKDIR /git/timberio/vector
-RUN ./scripts/environment/bootstrap-ubuntu-20.04.sh
+RUN ${BOOTSTRAPPER}
 
 ADD scripts/Gemfile scripts/Gemfile.lock \
     /git/timberio/vector/scripts/

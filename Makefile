@@ -13,6 +13,8 @@ else
     export DEFAULT_FEATURES = default
 endif
 
+# Toggle to use release mode builds.
+export RELEASE ?= true
 # Override this with any scopes for testing/benching.
 export SCOPE ?= ""
 # Override to false to disable autospawning services on integration tests.
@@ -39,6 +41,7 @@ export ENVIRONMENT_TTY ?= true
 export WASM_MODULES = $(patsubst tests/data/wasm/%/,%,$(wildcard tests/data/wasm/*/))
 # The same WASM modules, by output path.
 export WASM_MODULE_OUTPUTS = $(patsubst %,/target/wasm32-wasi/%,$(WASM_MODULES))
+export DOCKER_CLI_EXPERIMENTAL=enabled
 
  # Deprecated.
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
@@ -161,16 +164,47 @@ build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`
 
 build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
-build-x86_64-unknown-linux-gnu: ## Build dynamically linked binary in release mode for the x86_64 architecture
-	$(RUN) build-x86_64-unknown-linux-gnu
+build-x86_64-unknown-linux-gnu: ## Build dynamically linked binary in release mode for the x86_64 architecture. (Docker only)
+	$(CONTAINER_TOOL) buildx build \
+		--platform linux/amd64 \
+		--build-arg BASEIMAGE="centos:7" \
+		--build-arg BOOTSTRAPPER="scripts/environment/bootstraps/centos-7.sh" \
+		--file scripts/environment/Dockerfile \
+		--tag $(ENVIRONMENT_UPSTREAM):x86_64-unknown-linux-gnu \
+		.
+	$(CONTAINER_TOOL) run \
+		--name vector-environment \
+		--rm \
+		--init \
+		--interactive \
+		--env INSIDE_ENVIRONMENT=true \
+		--network host \
+		--mount type=bind,source=${PWD},target=/git/timberio/vector \
+		--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+		--mount type=volume,source=vector-target,target=/git/timberio/vector/target \
+		--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
+		$(ENVIRONMENT_UPSTREAM):x86_64-unknown-linux-gnu \
+		cargo build $(if $(findstring true,$(RELEASE)),--release,) --no-default-features --target x86_64-unknown-linux-gnu --features ${DEFAULT_FEATURES}
+	@mkdir -p ./target/x86_64-unknown-linux-gnu/release/
+	@mkdir -p ./target/x86_64-unknown-linux-gnu/debug/
+	@$(CONTAINER_TOOL) rm -f vector-build-outputs >/dev/null 2>&1 || true
+	@$(CONTAINER_TOOL) run \
+		-d \
+		-v vector-target:/target \
+		--name vector-build-outputs \
+		busybox true
+	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/x86_64-unknown-linux-gnu/release/vector ./target/x86_64-unknown-linux-gnu/release/ >/dev/null 2>&1 || true
+	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/x86_64-unknown-linux-gnu/debug/vector ./target/x86_64-unknown-linux-gnu/debug/ >/dev/null 2>&1 || true
+	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/criterion ./target/criterion >/dev/null 2>&1 || true
+	@$(CONTAINER_TOOL) rm -f vector-build-outputs >/dev/null 2>&1 || true
 
-build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture
+build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture. (Docker only)
 	$(RUN) build-x86_64-unknown-linux-musl
 
-build-armv7-unknown-linux-musleabihf: load-qemu-binfmt ## Build static binary in release mode for the armv7 architecture
+build-armv7-unknown-linux-musleabihf: load-qemu-binfmt ## Build static binary in release mode for the armv7 architecture. (Docker only)
 	$(RUN) build-armv7-unknown-linux-musleabihf
 
-build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in release mode for the aarch64 architecture
+build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in release mode for the aarch64 architecture. (Docker only)
 	$(RUN) build-aarch64-unknown-linux-musl
 
 ##@ Testing (Supports `ENVIRONMENT=true`)

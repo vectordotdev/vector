@@ -30,6 +30,6 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo bash scripts/environment/bootstraps/ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make bench
