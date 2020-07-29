@@ -33,17 +33,19 @@ pub struct StatsdInvalidRecord<'a> {
 
 impl InternalEvent for StatsdInvalidRecord<'_> {
     fn emit_logs(&self) {
-        error!(message = "Invalid record from statsd, discarding.", error = %self.error, text = %self.text);
+        error!(message = "invalid record from statsd, discarding.", error = %self.error, text = %self.text);
     }
 
     fn emit_metrics(&self) {
-        counter!("invalid_record", 1,
-                 "component_kind" => "source",
-                 "component_name" => "statsd",
+        counter!(
+            "invalid_record", 1,
+            "component_kind" => "source",
+            "component_name" => "statsd",
         );
-        counter!("invalid_record_bytes", self.text.len() as u64,
-                 "component_kind" => "source",
-                 "component_name" => "statsd",
+        counter!(
+            "invalid_record_bytes", self.text.len() as u64,
+            "component_kind" => "source",
+            "component_name" => "statsd",
         );
     }
 }
