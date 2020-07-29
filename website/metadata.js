@@ -45056,14 +45056,6 @@ module.exports = {
   },
   "team": [
     {
-      "avatar": "https://github.com/a-rodin.png",
-      "bio": "Alexander is a Senior Engineer at <a href=\"https://timber.io\">Timber.io</a> and a member of the <a href=\"/community#team\">core Vector team</a>. He created <a href=\"https://alexanderrodin.com/qstardict\">QStarDict</a>, a dictionary application written in C++.",
-      "github": "https://github.com/a-rodin",
-      "id": "alex",
-      "keybase": "https://keybase.io/arodin",
-      "name": "Alexander"
-    },
-    {
       "avatar": "https://github.com/hoverbear.png",
       "bio": "Ana is the proprietor of <a href=\"https://hoverbear.org/\">Hoverbear Consulting</a>, and <a href=\"https://timber.io\">Timber.io</a> supports her work as a <a href=\"/community#team\">core Vector team</a> member. She is focused on building capacity within the Rust ecosystem and her local community. A frequent speaker, teacher, and mentor, she was a founding organizer of <a href=\"https://rustfest.eu/\">RustFest</a>, <a href=\"https://rustcon.asia/\">RustCon Asia</a>, and <a href=\"https://www.rust-belt-rust.com/\">Rust Belt Rust</a>.\n",
       "github": "https://github.com/hoverbear",
@@ -45097,18 +45089,42 @@ module.exports = {
       "name": "Bruce"
     },
     {
+      "avatar": "https://github.com/JeanMertz.png",
+      "github": "https://github.com/JeanMertz",
+      "id": "jean",
+      "keybase": "https://keybase.io/JeanMertz",
+      "name": "Jesse",
+      "twitter": "https://twitter.com/JeanMertz"
+    },
+    {
+      "avatar": "https://github.com/jszwedko.png",
+      "github": "https://github.com/jszwedko",
+      "id": "jesse",
+      "keybase": "https://keybase.io/jszwedko",
+      "name": "Jesse",
+      "twitter": "https://twitter.com/jszwedko"
+    },
+    {
+      "avatar": "https://github.com/fanatid.png",
+      "github": "https://github.com/fanatid",
+      "id": "kirill",
+      "keybase": "https://keybase.io/fanatid",
+      "name": "Kirill",
+      "twitter": "https://twitter.com/fanatid"
+    },
+    {
       "avatar": "https://github.com/ktff.png",
       "github": "https://github.com/ktff",
       "id": "kruno",
       "name": "Kruno"
     },
     {
-      "avatar": "https://github.com/LucioFranco.png",
-      "github": "https://github.com/LucioFranco",
-      "id": "lucio",
-      "keybase": "https://keybase.io/luciofranco",
-      "name": "Lucio",
-      "twitter": "https://twitter.com/lucio_d_franco"
+      "avatar": "https://github.com/leebenson.png",
+      "github": "https://github.com/leebenson",
+      "id": "lee",
+      "keybase": "https://keybase.io/leebenson",
+      "name": "Lee",
+      "twitter": "https://twitter.com/leebenson"
     },
     {
       "avatar": "https://github.com/lukesteensen.png",
@@ -45128,10 +45144,26 @@ module.exports = {
       "twitter": "https://twitter.com/MOZGIII"
     },
     {
+      "avatar": "https://github.com/sghall.png",
+      "github": "https://github.com/sghall",
+      "id": "steve",
+      "keybase": "https://keybase.io/sghall",
+      "name": "Steve",
+      "twitter": "https://twitter.com/sghall"
+    },
+    {
       "avatar": "https://github.com/vector-vic.png",
       "github": "https://github.com/vector-vic",
       "id": "vic",
       "name": "Vic"
+    },
+    {
+      "avatar": "https://github.com/zsherman.png",
+      "github": "https://github.com/zsherman",
+      "id": "zach",
+      "keybase": "https://keybase.io/zsherman",
+      "name": "Zach",
+      "twitter": "https://twitter.com/zsherman"
     }
   ],
   "transforms": {
