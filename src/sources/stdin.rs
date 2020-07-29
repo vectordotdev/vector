@@ -2,12 +2,14 @@ use crate::{
     event::{self, Event},
     internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
-    stream::StreamExt01,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
-use futures::compat::Compat;
-use futures01::{sync::mpsc, Future, Sink, Stream};
+use futures::{
+    compat::{Future01CompatExt, Sink01CompatExt},
+    FutureExt, StreamExt, TryFutureExt, TryStreamExt,
+};
+use futures01::{sync::mpsc, Sink};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -161,21 +163,21 @@ where
     };
     std::mem::drop(guard);
 
-    Ok(Box::new(
-        Compat::new(receiver)
-            .take_until(shutdown)
-            .map(move |line| {
-                emit!(StdinEventReceived {
-                    byte_size: line.len(),
-                });
-                create_event(line, &host_key, &hostname)
-            })
-            .map_err(|e| error!("error reading line: {:?}", e))
-            .forward(
-                out.sink_map_err(|e| error!(message = "Unable to send event to out.", error = %e)),
-            )
-            .map(|_| info!("finished sending")),
-    ))
+    let fut = receiver
+        .take_until(shutdown.compat())
+        .map_err(|error| error!("error reading line: {:?}", error))
+        .map_ok(move |line| {
+            emit!(StdinEventReceived {
+                byte_size: line.len()
+            });
+            create_event(line, &host_key, &hostname)
+        })
+        .forward(
+            out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error))
+                .sink_compat(),
+        )
+        .inspect(|_| info!("finished sending"));
+    Ok(Box::new(fut.boxed().compat()))
 }
 
 fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event {
@@ -197,8 +199,7 @@ fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event
 mod tests {
     use super::*;
     use crate::{event, test_util::runtime};
-    use futures01::sync::mpsc;
-    use futures01::Async::*;
+    use futures01::{sync::mpsc, Async::*, Stream};
     use std::io::Cursor;
 
     #[test]
