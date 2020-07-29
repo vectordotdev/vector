@@ -2,18 +2,19 @@ use crate::{
     hyper::body_to_bytes,
     internal_events::{PrometheusHttpError, PrometheusParseError, PrometheusRequestCompleted},
     shutdown::ShutdownSignal,
-    stream::StreamExt01,
     topology::config::GlobalOptions,
     Event,
 };
-use futures::{FutureExt, TryFutureExt};
-use futures01::{sync::mpsc, Future, Sink, Stream as Stream01};
+use futures::{
+    compat::{Future01CompatExt, Sink01CompatExt},
+    future, stream, FutureExt, StreamExt, TryFutureExt,
+};
+use futures01::{sync::mpsc, Sink};
 use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::time::{Duration, Instant};
-use tokio01::timer::Interval;
+use std::time::Duration;
 
 pub mod parser;
 
@@ -60,12 +61,9 @@ fn prometheus(
     shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
 ) -> super::Source {
-    let out = out.sink_map_err(|e| error!("error sending metric: {:?}", e));
-
-    let task = Interval::new(Instant::now(), Duration::from_secs(interval))
-        .map_err(|e| error!("timer error: {:?}", e))
-        .take_until(shutdown)
-        .map(move |_| futures01::stream::iter_ok(urls.clone()))
+    let task = tokio::time::interval(Duration::from_secs(interval))
+        .take_until(shutdown.compat())
+        .map(move |_| stream::iter(urls.clone()))
         .flatten()
         .map(move |url| {
             let https = HttpsConnector::new().expect("TLS initialization failed");
@@ -77,32 +75,38 @@ fn prometheus(
 
             client
                 .request(request)
-                .and_then(|response| body_to_bytes(response.into_body()).boxed())
-                .compat()
-                .map(|body| {
-                    emit!(PrometheusRequestCompleted);
+                .and_then(|response| body_to_bytes(response.into_body()))
+                .into_stream()
+                .filter_map(|response| {
+                    future::ready(match response {
+                        Ok(body) => {
+                            emit!(PrometheusRequestCompleted);
 
-                    let packet = String::from_utf8_lossy(&body);
-                    let metrics = parser::parse(&packet)
-                        .map_err(|error| {
-                            emit!(PrometheusParseError { error });
-                        })
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(Event::Metric);
+                            let packet = String::from_utf8_lossy(&body);
+                            let metrics = parser::parse(&packet)
+                                .map_err(|error| {
+                                    emit!(PrometheusParseError { error });
+                                })
+                                .unwrap_or_default();
 
-                    futures01::stream::iter_ok(metrics)
+                            Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                        }
+                        Err(error) => {
+                            emit!(PrometheusHttpError { error });
+                            None
+                        }
+                    })
                 })
-                .flatten_stream()
-                .map_err(|error| {
-                    emit!(PrometheusHttpError { error });
-                })
+                .flatten()
         })
         .flatten()
-        .forward(out)
-        .map(|_| info!("finished sending"));
+        .forward(
+            out.sink_map_err(|e| error!("error sending metric: {:?}", e))
+                .sink_compat(),
+        )
+        .inspect(|_| info!("finished sending"));
 
-    Box::new(task)
+    Box::new(task.boxed().compat())
 }
 
 #[cfg(feature = "sinks-prometheus")]
