@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-30"
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events, allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
@@ -45,7 +45,7 @@ a log field's value with a [Regular Expression][urls.regex].
   inputs = ["my-source-or-transform-id"] # required
   drop_field = true # optional, default
   field = "message" # optional, default
-  patterns = "['^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$']" # required
+  patterns = ["^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$"] # required
 
   # Types
   types.status = "int" # example
@@ -67,7 +67,7 @@ a log field's value with a [Regular Expression][urls.regex].
   drop_field = true # optional, default
   field = "message" # optional, default
   overwrite_target = true # optional, default
-  patterns = "['^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$']" # required
+  patterns = ["^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$"] # required
   target_field = "root_field" # optional, no default
 
   # Types
@@ -157,14 +157,14 @@ target, it will only be overwritten if this is set to `true`.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["['^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$']"]}
+  examples={[["^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$"]]}
   groups={[]}
   name={"patterns"}
   path={null}
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={"string"}
+  type={"[string]"}
   unit={null}
   warnings={[]}
   >

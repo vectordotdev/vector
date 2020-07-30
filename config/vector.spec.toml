@@ -2482,8 +2482,8 @@ require('custom_module')
   # in any of the expressions.
   #
   # * required
-  # * type: string
-  patterns = "['^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$']"
+  # * type: [string]
+  patterns = ["^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$"]
 
   # If this setting is present, the parsed fields will be inserted into the log
   # as a sub-object with this name. If a field with the same name already exists,
