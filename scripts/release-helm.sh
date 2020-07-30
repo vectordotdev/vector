@@ -35,7 +35,7 @@ WORKDIR="target/helm"
 REPO_DIR="$WORKDIR/repo"
 PREVIOUS_MANIFEST="$WORKDIR/previous-manifest.yaml"
 
-cature_stderr() {
+capture_stderr() {
   { OUTPUT=$("$@" 2>&1 1>&3-); } 3>&1
 }
 
@@ -52,7 +52,7 @@ helm package \
 
 # Download previous manifest.
 # If it doesn't exist - ignore the error and continue.
-if ! cature_stderr aws s3 cp "$AWS_REPO_URL/index.yaml" "$PREVIOUS_MANIFEST"; then
+if ! capture_stderr aws s3 cp "$AWS_REPO_URL/index.yaml" "$PREVIOUS_MANIFEST"; then
   EXPECTED="^fatal error:"
   EXPECTED="$EXPECTED An error occurred \(404\) when calling the HeadObject operation:"
   EXPECTED="$EXPECTED Key \".*/index\.yaml\" does not exist$"
