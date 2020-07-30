@@ -72,62 +72,94 @@ impl Transform for Geoip {
             .map(|s| s.to_string_lossy());
         if let Some(ipaddress) = &ipaddress {
             if let Ok(ip) = FromStr::from_str(ipaddress) {
-                if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
-                    if let Some(city_names) = data.city.and_then(|c| c.names) {
-                        if let Some(city_name_en) = city_names.get("en") {
+                if self.dbreader.metadata.database_type == "GeoLite2-ASN" || self.dbreader.metadata.database_type == "GeoIP2-ISP" {
+                    if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::Isp>(ip) {
+                        if let Some(autonomous_system_number) = data.autonomous_system_number {
                             event.as_mut_log().insert(
-                                Atom::from(format!("{}.city_name", target_field)),
-                                Value::from(city_name_en.to_string()),
+                                Atom::from(format!("{}.autonomous_system_number", target_field)),
+                                Value::from(autonomous_system_number as i64),
+                            );
+                        }
+
+                        if let Some(autonomous_system_organization) = data.autonomous_system_organization {
+                            event.as_mut_log().insert(
+                                Atom::from(format!("{}.autonomous_system_organization", target_field)),
+                                Value::from(autonomous_system_organization),
+                            );
+                        }
+
+                        if let Some(isp) = data.isp {
+                            event.as_mut_log().insert(
+                                Atom::from(format!("{}.isp", target_field)),
+                                Value::from(isp),
+                            );
+                        }
+
+                        if let Some(organization) = data.organization {
+                            event.as_mut_log().insert(
+                                Atom::from(format!("{}.organization", target_field)),
+                                Value::from(organization),
                             );
                         }
                     }
+                } else { // Not the ISP/ASP database, assume City
+                    if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
+                        if let Some(city_names) = data.city.and_then(|c| c.names) {
+                            if let Some(city_name_en) = city_names.get("en") {
+                                event.as_mut_log().insert(
+                                    Atom::from(format!("{}.city_name", target_field)),
+                                    Value::from(city_name_en.to_string()),
+                                );
+                            }
+                        }
 
-                    let continent_code = data.continent.and_then(|c| c.code);
-                    if let Some(continent_code) = continent_code {
-                        event.as_mut_log().insert(
-                            Atom::from(format!("{}.continent_code", target_field)),
-                            Value::from(continent_code),
-                        );
-                    }
+                        let continent_code = data.continent.and_then(|c| c.code);
+                        if let Some(continent_code) = continent_code {
+                            event.as_mut_log().insert(
+                                Atom::from(format!("{}.continent_code", target_field)),
+                                Value::from(continent_code),
+                            );
+                        }
 
-                    let iso_code = data.country.and_then(|cy| cy.iso_code);
-                    if let Some(iso_code) = iso_code {
-                        event.as_mut_log().insert(
-                            Atom::from(format!("{}.country_code", target_field)),
-                            Value::from(iso_code),
-                        );
-                    }
+                        let iso_code = data.country.and_then(|cy| cy.iso_code);
+                        if let Some(iso_code) = iso_code {
+                            event.as_mut_log().insert(
+                                Atom::from(format!("{}.country_code", target_field)),
+                                Value::from(iso_code),
+                            );
+                        }
 
-                    let time_zone = data.location.clone().and_then(|loc| loc.time_zone);
-                    if let Some(time_zone) = time_zone {
-                        event.as_mut_log().insert(
-                            Atom::from(format!("{}.timezone", target_field)),
-                            Value::from(time_zone),
-                        );
-                    }
+                        let time_zone = data.location.clone().and_then(|loc| loc.time_zone);
+                        if let Some(time_zone) = time_zone {
+                            event.as_mut_log().insert(
+                                Atom::from(format!("{}.timezone", target_field)),
+                                Value::from(time_zone),
+                            );
+                        }
 
-                    let latitude = data.location.clone().and_then(|loc| loc.latitude);
-                    if let Some(latitude) = latitude {
-                        event.as_mut_log().insert(
-                            Atom::from(format!("{}.latitude", target_field)),
-                            Value::from(latitude.to_string()),
-                        );
-                    }
+                        let latitude = data.location.clone().and_then(|loc| loc.latitude);
+                        if let Some(latitude) = latitude {
+                            event.as_mut_log().insert(
+                                Atom::from(format!("{}.latitude", target_field)),
+                                Value::from(latitude.to_string()),
+                            );
+                        }
 
-                    let longitude = data.location.clone().and_then(|loc| loc.longitude);
-                    if let Some(longitude) = longitude {
-                        event.as_mut_log().insert(
-                            Atom::from(format!("{}.longitude", target_field)),
-                            Value::from(longitude.to_string()),
-                        );
-                    }
+                        let longitude = data.location.clone().and_then(|loc| loc.longitude);
+                        if let Some(longitude) = longitude {
+                            event.as_mut_log().insert(
+                                Atom::from(format!("{}.longitude", target_field)),
+                                Value::from(longitude.to_string()),
+                            );
+                        }
 
-                    let postal_code = data.postal.clone().and_then(|p| p.code);
-                    if let Some(postal_code) = postal_code {
-                        event.as_mut_log().insert(
-                            Atom::from(format!("{}.postal_code", target_field)),
-                            Value::from(postal_code),
-                        );
+                        let postal_code = data.postal.clone().and_then(|p| p.code);
+                        if let Some(postal_code) = postal_code {
+                            event.as_mut_log().insert(
+                                Atom::from(format!("{}.postal_code", target_field)),
+                                Value::from(postal_code),
+                            );
+                        }
                     }
                 }
             } else {
@@ -146,19 +178,39 @@ impl Transform for Geoip {
         // If we have any of the geoip fields missing, we insert
         // empty values so that we know that the transform was executed
         // but the lookup didn't find the result
-        let geoip_fields = [
-            format!("{}.city_name", target_field),
-            format!("{}.country_code", target_field),
-            format!("{}.continent_code", target_field),
-            format!("{}.timezone", target_field),
-            format!("{}.latitude", target_field),
-            format!("{}.longitude", target_field),
-            format!("{}.postal_code", target_field),
-        ];
-        for field in geoip_fields.iter() {
+        if self.dbreader.metadata.database_type == "GeoLite2-ASN" || self.dbreader.metadata.database_type == "GeoIP2-ISP" {
+            let asn_field = format!("{}.autonomous_system_number", target_field);
             let e = event.as_mut_log();
-            if e.get(&Atom::from(field.to_string())).is_none() {
-                e.insert(Atom::from(field.to_string()), Value::from(""));
+            if e.get(&Atom::from(asn_field.to_string())).is_none() {
+                e.insert(Atom::from(asn_field.to_string()), Value::from(0));
+            }
+
+            let geoip_fields = [
+                format!("{}.autonomous_system_organization", target_field),
+                format!("{}.isp", target_field),
+                format!("{}.organization", target_field),
+            ];
+            for field in geoip_fields.iter() {
+                let e = event.as_mut_log();
+                if e.get(&Atom::from(field.to_string())).is_none() {
+                    e.insert(Atom::from(field.to_string()), Value::from(""));
+                }
+            }
+        } else {
+            let geoip_fields = [
+                format!("{}.city_name", target_field),
+                format!("{}.country_code", target_field),
+                format!("{}.continent_code", target_field),
+                format!("{}.timezone", target_field),
+                format!("{}.latitude", target_field),
+                format!("{}.longitude", target_field),
+                format!("{}.postal_code", target_field),
+            ];
+            for field in geoip_fields.iter() {
+                let e = event.as_mut_log();
+                if e.get(&Atom::from(field.to_string())).is_none() {
+                    e.insert(Atom::from(field.to_string()), Value::from(""));
+                }
             }
         }
 
