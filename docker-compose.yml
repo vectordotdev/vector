@@ -57,7 +57,7 @@ services:
       - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
-    user: $USER
+    user: root
     command: scripts/build.sh
 
   package-archive-x86_64-unknown-linux-musl:
