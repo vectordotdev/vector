@@ -190,8 +190,16 @@ impl Transform for Geoip {
             || self.dbreader.metadata.database_type == "GeoIP2-ISP"
         {
             let e = event.as_mut_log();
-            if e.get(&Atom::from(format!("{}.autonomous_system_number", target_field))).is_none() {
-                e.insert(Atom::from(format!("{}.autonomous_system_number", target_field)), Value::from(0));
+            if e.get(&Atom::from(format!(
+                "{}.autonomous_system_number",
+                target_field
+            )))
+            .is_none()
+            {
+                e.insert(
+                    Atom::from(format!("{}.autonomous_system_number", target_field)),
+                    Value::from(0),
+                );
             }
 
             let geoip_fields = [
