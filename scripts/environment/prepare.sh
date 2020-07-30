@@ -10,3 +10,7 @@ cd scripts
 bundle update --bundler
 bundle install
 cd ..
+
+# Python
+pip3 install jsonschema==3.2.0
+pip3 install remarshal==0.11.2
