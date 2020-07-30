@@ -1,0 +1,11 @@
+ruby '~> 2.7.0'
+
+# !!!
+# Please try not to add more dependencies here.
+# We are trying to remove Ruby entirely from this repo.
+# !!!
+
+source 'https://rubygems.org'
+gem 'git', '~> 1.7.0'
+gem 'semantic', '~> 1.6.1'
+gem 'toml-rb', '~> 2.0'
