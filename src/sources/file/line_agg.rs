@@ -488,6 +488,31 @@ mod tests {
     }
 
     #[test]
+    fn two_lines_emit_with_halt_before() {
+        let lines = vec![
+            "merged 1",
+            "merged 2",
+            " splitter 1",
+            "merged 3",
+            "merged 4",
+            " splitter 2",
+        ];
+        let config = Config {
+            start_pattern: Regex::new("").unwrap(),
+            condition_pattern: Regex::new("^\\s").unwrap(),
+            mode: Mode::HaltBefore,
+            timeout: Duration::from_millis(10),
+        };
+        let expected = vec![
+            "merged 1\nmerged 2",
+            " splitter 1",
+            "merged 3\nmerged 4",
+            " splitter 2",
+        ];
+        run_and_assert(&lines, config, &expected);
+    }
+
+    #[test]
     fn legacy() {
         let lines = vec![
             "INFO some usual line",
