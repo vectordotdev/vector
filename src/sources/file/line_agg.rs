@@ -461,7 +461,7 @@ mod tests {
 
     /// https://github.com/timberio/vector/issues/3237
     #[test]
-    fn real_life_use_case_1() {
+    fn two_lines_emit_with_continue_through() {
         let lines = vec![
             r#"no 1"#,
             r#" yes 1"#,
