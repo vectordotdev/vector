@@ -3,13 +3,13 @@ use crate::{
     internal_events::{PrometheusHttpError, PrometheusParseError, PrometheusRequestCompleted},
     shutdown::ShutdownSignal,
     topology::config::GlobalOptions,
-    Event,
+    Event, Pipeline,
 };
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     future, stream, FutureExt, StreamExt, TryFutureExt,
 };
-use futures01::{sync::mpsc, Sink};
+use futures01::Sink;
 use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
@@ -36,7 +36,7 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let mut urls = Vec::new();
         for host in self.hosts.iter() {
@@ -59,7 +59,7 @@ fn prometheus(
     urls: Vec<String>,
     interval: u64,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
 ) -> super::Source {
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown.compat())

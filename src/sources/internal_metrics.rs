@@ -2,7 +2,7 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    Event,
+    Event, Pipeline,
 };
 use chrono::Utc;
 use futures::{
@@ -10,7 +10,7 @@ use futures::{
     future::{FutureExt, TryFutureExt},
     stream::StreamExt,
 };
-use futures01::{sync::mpsc, Future, Sink};
+use futures01::{Future, Sink};
 use metrics_core::Key;
 use metrics_runtime::{Controller, Measurement};
 use serde::{Deserialize, Serialize};
@@ -31,7 +31,7 @@ impl SourceConfig for InternalMetricsConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let fut = run(get_controller()?, out, shutdown).boxed().compat();
         Ok(Box::new(fut))
@@ -55,7 +55,7 @@ fn get_controller() -> crate::Result<Controller> {
 
 async fn run(
     controller: Controller,
-    mut out: mpsc::Sender<Event>,
+    mut out: Pipeline,
     mut shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
     let mut interval = interval(Duration::from_secs(2)).map(|_| ());

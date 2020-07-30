@@ -3,6 +3,7 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
 use bollard::{
     container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
@@ -19,7 +20,6 @@ use futures::{
     sink::SinkExt,
     FutureExt, Stream, StreamExt, TryFutureExt,
 };
-use futures01::sync::mpsc as mpsc01;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
@@ -108,7 +108,7 @@ impl SourceConfig for DockerConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc01::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let source = DockerSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
@@ -245,7 +245,7 @@ struct DockerSource {
 impl DockerSource {
     fn new(
         config: DockerConfig,
-        out: mpsc01::Sender<Event>,
+        out: Pipeline,
         shutdown: ShutdownSignal,
     ) -> crate::Result<DockerSource> {
         // Find out it's own container id, if it's inside a docker container.
@@ -467,7 +467,7 @@ impl DockerSource {
 struct EventStreamBuilder {
     core: Arc<DockerSourceCore>,
     /// Event stream futures send events through this
-    out: mpsc01::Sender<Event>,
+    out: Pipeline,
     /// End through which event stream futures send ContainerLogInfo to main future
     main_send: mpsc::UnboundedSender<ContainerLogInfo>,
     /// Self and event streams will end on this.
