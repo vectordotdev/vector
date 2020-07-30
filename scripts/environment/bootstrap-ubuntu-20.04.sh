@@ -21,7 +21,6 @@ apt install --yes \
     curl \
     gnupg-agent \
     ruby-bundler \
-    nodejs \
     libsasl2-dev \
     gnupg2 \
     wget
@@ -41,10 +40,6 @@ dpkg-reconfigure locales
 
 # Rust
 curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
-
-# Yarn
-curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
-echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
 
 # Docker
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
