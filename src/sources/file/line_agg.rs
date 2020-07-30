@@ -425,6 +425,34 @@ mod tests {
         run_and_assert(&lines, config, &expected);
     }
 
+    /// https://github.com/timberio/vector/issues/3237
+    #[test]
+    fn real_life_use_case_1() {
+        let lines = vec![
+            r#"no 1"#,
+            r#" yes 1"#,
+            r#" yes 2"#,
+            r#"no 2"#,
+            r#" yes 3"#,
+            r#" yes 4"#,
+            r#"no 3"#,
+        ];
+        let config = Config {
+            start_pattern: Regex::new("^\\s").unwrap(),
+            condition_pattern: Regex::new("^\\s").unwrap(),
+            mode: Mode::ContinueThrough,
+            timeout: Duration::from_millis(10),
+        };
+        let expected = vec![
+            r#"no 1"#,
+            " yes 1\n yes 2",
+            r#"no 2"#,
+            " yes 3\n yes 4",
+            r#"no 3"#,
+        ];
+        run_and_assert(&lines, config, &expected);
+    }
+
     #[test]
     fn legacy() {
         let lines = vec![
