@@ -85,7 +85,7 @@ impl SourceConfig for SimpleHttpConfig {
             encoding: self.encoding,
             headers: self.headers.clone(),
         };
-        source.run(self.address, "", &self.tls, out, shutdown).await
+        source.run(self.address, "", &self.tls, out, shutdown)
     }
 
     fn output_type(&self) -> DataType {

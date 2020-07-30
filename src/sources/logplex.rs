@@ -53,9 +53,7 @@ impl SourceConfig for LogplexConfig {
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let source = LogplexSource::default();
-        source
-            .run(self.address, "events", &self.tls, out, shutdown)
-            .await
+        source.run(self.address, "events", &self.tls, out, shutdown)
     }
 
     fn output_type(&self) -> DataType {

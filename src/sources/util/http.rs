@@ -54,7 +54,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         header_map: HeaderMap,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
-    async fn run(
+    fn run(
         self,
         address: SocketAddr,
         path: &'static str,
@@ -115,9 +115,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         info!(message = "building http server", addr = %address);
 
         let tls = MaybeTlsSettings::from_config(tls, true)?;
-        let mut listener = tls.bind(&address).await?;
-
         let fut = async move {
+            let mut listener = tls.bind(&address).await.unwrap();
             let _ = warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
                     listener.incoming(),
