@@ -1,9 +1,6 @@
 use crate::{
     event::{self, Event},
-    internal_events::{
-        KafkaEventFailed, KafkaEventReceived, KafkaKeyExtractionFailed, KafkaOffsetUpdateFailed,
-        KafkaPayloadExtractionFailed,
-    },
+    internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -126,13 +123,9 @@ fn kafka_source(
                                 byte_size: msg.payload_len()
                             });
 
-                            let payload = match msg.payload_view::<[u8]>() {
+                            let payload = match msg.payload() {
                                 None => return Err(()), // skip messages with empty payload
-                                Some(Err(_)) => {
-                                    emit!(KafkaPayloadExtractionFailed);
-                                    return Err(());
-                                }
-                                Some(Ok(payload)) => Bytes::from(payload),
+                                Some(payload) => Bytes::from(payload),
                             };
                             let mut event = Event::new_empty_log();
                             let log = event.as_mut_log();
@@ -151,13 +144,9 @@ fn kafka_source(
                             log.insert(event::log_schema().source_type_key(), "kafka");
 
                             if let Some(key_field) = &key_field {
-                                match msg.key_view::<[u8]>() {
+                                match msg.key() {
                                     None => (),
-                                    Some(Err(_)) => {
-                                        emit!(KafkaKeyExtractionFailed { key_field });
-                                        return Err(());
-                                    }
-                                    Some(Ok(key)) => {
+                                    Some(key) => {
                                         log.insert(key_field.clone(), key);
                                     }
                                 }
