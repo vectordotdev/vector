@@ -893,6 +893,7 @@ mod tests {
     use super::*;
     use crate::runtime::Runtime;
     use crate::test_util::{collect_n, runtime, trace_init};
+    use crate::Pipeline;
     use bollard::{
         container::{
             Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
@@ -901,7 +902,7 @@ mod tests {
         image::{CreateImageOptions, CreateImageResults, ListImagesOptions},
     };
     use futures::{compat::Future01CompatExt, stream::TryStreamExt};
-    use futures01::{Async, Stream as Stream01};
+    use futures01::{sync::mpsc as mpsc01, Async, Stream as Stream01};
 
     /// None if docker is not present on the system
     fn source_with<'a, L: Into<Option<&'a str>>>(
@@ -922,7 +923,7 @@ mod tests {
     /// None if docker is not present on the system
     fn source_with_config(config: DockerConfig, rt: &mut Runtime) -> mpsc01::Receiver<Event> {
         // trace_init();
-        let (sender, recv) = mpsc01::channel(100);
+        let (sender, recv) = Pipeline::new_test();
         rt.spawn(
             config
                 .build(
