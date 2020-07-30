@@ -79,6 +79,11 @@ pub(super) struct LineAgg<T, K> {
     /// Key is usually a filename or other line source identifier.
     buffers: HashMap<K, BytesMut>,
 
+    /// Stashed lines. When line aggreation results in more than one line being
+    /// emitted, we have to stash lines and return them into the stream after
+    /// that before doing any other work.
+    stashed: Option<(Bytes, K)>,
+
     /// Draining queue. We switch to draining mode when we get `None` from
     /// the inner stream. In this mode we stop polling `inner` for new lines
     /// and just flush all the buffered data.
@@ -102,6 +107,7 @@ where
             config,
 
             draining: None,
+            stashed: None,
             buffers: HashMap::new(),
             timeouts: DelayQueue::new(),
             expired: VecDeque::new(),
@@ -120,6 +126,11 @@ where
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
+            // If we have a stashed line, short circut here.
+            if let Some(val) = self.stashed.take() {
+                return Ok(Async::Ready(Some(val)));
+            }
+
             // If we're in draining mode, short circut here.
             if let Some(to_drain) = &mut self.draining {
                 if let Some((line, src)) = to_drain.pop() {
@@ -140,6 +151,20 @@ where
                     // handler gave us something - return it, otherwise continue
                     // with the flow.
                     if let Some(val) = self.handle_line(line, src) {
+                        let val = match val {
+                            // If we have to emit just one line - that's easy,
+                            // we just return it.
+                            (Emit::One(val), src) => (val, src),
+                            // If we have to emit two lines - take the second
+                            // one and stash it, then return the first one.
+                            // This way, the stashed line will be returned
+                            // on the next stream poll.
+                            (Emit::Two(val, to_stash), src) => {
+                                debug_assert!(self.stashed.is_none());
+                                self.stashed = Some((to_stash, src.clone()));
+                                (val, src)
+                            }
+                        };
                         return Ok(Async::Ready(Some(val)));
                     }
                 }
@@ -166,13 +191,22 @@ where
     }
 }
 
+/// Specifies the amount of lines to emit in response to a single input line.
+/// We have to emit either one or two lines.
+enum Emit {
+    /// Emit one line.
+    One(Bytes),
+    /// Emit two lines, in the order they're specified.
+    Two(Bytes, Bytes),
+}
+
 impl<T, K> LineAgg<T, K>
 where
     T: Stream<Item = (Bytes, K), Error = ()>,
     K: Hash + Eq + Clone,
 {
     /// Handle line, if we have something to output - return it.
-    fn handle_line(&mut self, line: Bytes, src: K) -> Option<(Bytes, K)> {
+    fn handle_line(&mut self, line: Bytes, src: K) -> Option<(Emit, K)> {
         // Check if we already have the buffered data for the source.
         match self.buffers.entry(src) {
             Entry::Occupied(mut entry) => {
@@ -186,8 +220,8 @@ where
                             add_next_line(buffered, line);
                             None
                         } else {
-                            let buffered = entry.insert(line.as_ref().into());
-                            Some((buffered.freeze(), entry.key().clone()))
+                            let (src, buffered) = entry.remove_entry();
+                            Some((Emit::Two(buffered.freeze(), line), src))
                         }
                     }
                     // All consecutive lines matching this pattern, plus one
@@ -200,7 +234,7 @@ where
                         } else {
                             let (src, mut buffered) = entry.remove_entry();
                             add_next_line(&mut buffered, line);
-                            Some((buffered.freeze(), src))
+                            Some((Emit::One(buffered.freeze()), src))
                         }
                     }
                     // All consecutive lines not matching this pattern are included
@@ -208,7 +242,7 @@ where
                     Mode::HaltBefore => {
                         if condition_matched {
                             let buffered = entry.insert(line.as_ref().into());
-                            Some((buffered.freeze(), entry.key().clone()))
+                            Some((Emit::One(buffered.freeze()), entry.key().clone()))
                         } else {
                             let buffered = entry.get_mut();
                             add_next_line(buffered, line);
@@ -221,7 +255,7 @@ where
                         if condition_matched {
                             let (src, mut buffered) = entry.remove_entry();
                             add_next_line(&mut buffered, line);
-                            Some((buffered.freeze(), src))
+                            Some((Emit::One(buffered.freeze()), src))
                         } else {
                             let buffered = entry.get_mut();
                             add_next_line(buffered, line);
@@ -241,7 +275,7 @@ where
                     None
                 } else {
                     // It's just a regular line we don't really care about.
-                    Some((line, entry.into_key()))
+                    Some((Emit::One(line), entry.into_key()))
                 }
             }
         }
