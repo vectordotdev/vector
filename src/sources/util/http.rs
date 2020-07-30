@@ -1,6 +1,6 @@
 use crate::{
     event::Event,
-    internal_events::{HTTPBadRequestReceived, HTTPEventsReceived},
+    internal_events::{HTTPBadRequestError, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
 };
@@ -103,7 +103,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 .await
                         }
                         Err(err) => {
-                            emit!(HTTPBadRequestReceived {
+                            emit!(HTTPBadRequestError {
                                 error_code: err.code,
                                 error_message: err.message.as_str(),
                             });

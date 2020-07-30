@@ -29,12 +29,12 @@ impl InternalEvent for HTTPEventsReceived {
 }
 
 #[derive(Debug)]
-pub struct HTTPBadRequestReceived<'a> {
+pub struct HTTPBadRequestError<'a> {
     pub error_code: u16,
     pub error_message: &'a str,
 }
 
-impl<'a> InternalEvent for HTTPBadRequestReceived<'a> {
+impl<'a> InternalEvent for HTTPBadRequestError<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "received bad request.",
