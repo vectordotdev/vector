@@ -241,8 +241,8 @@ where
                     // in the group.
                     Mode::HaltBefore => {
                         if condition_matched {
-                            let buffered = entry.insert(line.as_ref().into());
-                            Some((Emit::One(buffered.freeze()), entry.key().clone()))
+                            let (src, buffered) = entry.remove_entry();
+                            Some((Emit::Two(buffered.freeze(), line), src))
                         } else {
                             let buffered = entry.get_mut();
                             add_next_line(buffered, line);
