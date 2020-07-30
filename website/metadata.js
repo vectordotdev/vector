@@ -45737,7 +45737,7 @@ module.exports = {
     "regex_parser": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  patterns = \"['^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$']\" # required\n  type = \"regex_parser\" # required"
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  patterns = [\"^(?P<timestamp>[\\\\\\\\w\\\\\\\\-:\\\\\\\\+]+) (?P<level>\\\\\\\\w+) (?P<message>.*)$\"] # required\n  type = \"regex_parser\" # required"
       },
       "delivery_guarantee": null,
       "description": null,

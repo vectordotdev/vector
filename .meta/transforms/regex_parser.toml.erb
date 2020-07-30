@@ -39,12 +39,10 @@ as the target, it will only be overwritten if this is set to `true`.\
 """
 
 [transforms.regex_parser.options.patterns]
-type = "string"
+type = "[string]"
 common = true
 examples = [
-"""\
-['^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$']\
-"""
+['^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$']
 ]
 required = true
 description = """\
