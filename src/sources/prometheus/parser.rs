@@ -341,7 +341,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     if v.len() < 2 {
                         return Err(ParserError::Malformed {
                             s: "expected histogram name suffix",
-                            context: String::from(line),
+                            context: line,
                         });
                     }
                     let (name, suffix) = (v[1], v[0]);
@@ -370,7 +370,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             } else {
                                 return Err(ParserError::Malformed {
                                     s: "expected \"le\" tag in histogram bucket",
-                                    context: String::from(line),
+                                    context: line,
                                 });
                             }
                         }
@@ -383,7 +383,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         _ => {
                             return Err(ParserError::Malformed {
                                 s: "unknown histogram name suffix",
-                                context: String::from(line),
+                                context: line,
                             });
                         }
                     }
@@ -449,7 +449,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             } else {
                                 return Err(ParserError::Malformed {
                                     s: "expected \"quantile\" tag in summary bucket",
-                                    context: String::from(line),
+                                    context: line,
                                 });
                             }
                         }
@@ -462,7 +462,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         _ => {
                             return Err(ParserError::Malformed {
                                 s: "unknown summary name suffix",
-                                context: String::from(line),
+                                context: line,
                             });
                         }
                     }
