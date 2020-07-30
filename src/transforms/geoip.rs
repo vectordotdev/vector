@@ -189,10 +189,9 @@ impl Transform for Geoip {
         if self.dbreader.metadata.database_type == "GeoLite2-ASN"
             || self.dbreader.metadata.database_type == "GeoIP2-ISP"
         {
-            let asn_field = format!("{}.autonomous_system_number", target_field);
             let e = event.as_mut_log();
-            if e.get(&Atom::from(asn_field.to_string())).is_none() {
-                e.insert(Atom::from(asn_field.to_string()), Value::from(0));
+            if e.get(&Atom::from(format!("{}.autonomous_system_number", target_field))).is_none() {
+                e.insert(Atom::from(format!("{}.autonomous_system_number", target_field)), Value::from(0));
             }
 
             let geoip_fields = [
