@@ -217,7 +217,6 @@ Now you can use the jobs detailed in **"Bring your own toolbox"** below.
 Want to run from outside of the environment? _Clever. Good thinking._ You can run any of the following:
 
 ```bash
-
 # Validate your code can compile
 make check ENVIRONMENT=true
 # Validate your code actually does compile (in dev mode)
@@ -234,15 +233,11 @@ make test-integration SCOPE="sources::example" AUTOSPAWN=false ENVIRONMENT=true
 make test-integration ENVIRONMENT=true
 # Run your benchmarks
 make bench SCOPE="transforms::example" ENVIRONMENT=true
-# Rebuild Vector's metadata
-make generate ENVIRONMENT=true
-# Serve the website on port 3000
-make website ENVIRONMENT=true
 # Format your code before pushing!
 make fmt ENVIRONMENT=true
 ```
 
-We use explicit environment opt-in as many contributors choose to keep their Rust toolchain local, and use `make generate ENVIRONMENT=true` etc.
+We use explicit environment opt-in as many contributors choose to keep their Rust toolchain local.
 
 #### Bring your own toolbox
 
@@ -258,7 +253,7 @@ We keep an up to date list of all dependencies used in our CI environment inside
 - **To run the Website in Dev:** Have a working `node` environment with `npm`/`yarn`, also run `yarn` from the `website/` directory.
 - **To run `make check-component-features`:** Have `remarshal` installed.
 
-If you find yourself needing to run something (such as `make generate`) inside the Docker environment described above, that's totally fine, they won't collide or hurt each other. In this case, you'd just run `make environment-generate`.
+If you find yourself needing to run something inside the Docker environment described above, that's totally fine, they won't collide or hurt each other. In this case, you'd just run `make environment-generate`.
 
 We're interested in reducing our dependencies if simple options exist. Got an idea? Try it out, we'd to hear of your successes and failures!
 
@@ -287,10 +282,6 @@ make test-integration
 # Run your benchmarks
 make bench scope="transforms::example"
 cargo bench transforms::example
-# Rebuild Vector's metadata
-make generate
-# Serve the website on port 3000
-make website
 # Format your code before pushing!
 make fmt
 cargo fmt
@@ -725,9 +716,17 @@ your feature.
 
 ### Documentation
 
-Documentation is very important to the Vector project. All contributions that
-alter user-facing behvior MUST include documentation changes. Please see
-[DOCUMENTING.md](/DOCUMENTING.md) for more info.
+Documentation is very important to the Vector project! In order to keep things
+simple for contributors, all reference documentation is derived from metadata
+in the [`/.meta` directory](/.meta). If you add a component, change options,
+or otherwise change anything user facing, you should update the relevant files
+in the `/.meta` directory.
+
+To ensure your change is valid, you can run `make check-meta`, which validates
+your changes against the local `/.meta/.schema.json` file.
+
+The actual website and documentation are generated on the
+[`vector-website`](https://github.com/timberio/vector-website) repo.
 
 ### Changelog
 
