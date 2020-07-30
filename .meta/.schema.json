@@ -152,7 +152,7 @@
           "description": "If this option is required."
         },
         "sort": {
-          "type": "int",
+          "type": "integer",
           "description": "Manual sorting option."
         },
         "templateable": {
@@ -220,7 +220,7 @@
       "additionalProperties": false,
       "properties": {
         "docker": {
-          "type": "bool"
+          "type": "boolean"
         }
       }
     },
