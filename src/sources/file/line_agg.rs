@@ -160,6 +160,9 @@ where
                             // This way, the stashed line will be returned
                             // on the next stream poll.
                             (Emit::Two(val, to_stash), src) => {
+                                // Stashed line is always consumed at the start
+                                // of the `poll` loop. If it's non-empty here -
+                                // it's a bug.
                                 debug_assert!(self.stashed.is_none());
                                 self.stashed = Some((to_stash, src.clone()));
                                 (val, src)
