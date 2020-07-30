@@ -25,6 +25,8 @@ apt install --yes \
     gnupg2 \
     wget
 
+# Grease
+# Grease is used for the `make release-github` task.
 TEMP=$(mktemp -d)
 curl \
     -L https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz \
@@ -40,6 +42,9 @@ dpkg-reconfigure locales
 
 # Rust
 curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
+
+# Ruby
+bundle install --gemfile scripts/Gemfile
 
 # Docker
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
