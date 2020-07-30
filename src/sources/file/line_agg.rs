@@ -490,7 +490,10 @@ mod tests {
             .map(|line| (Bytes::from_static(line.as_bytes()), "test.log".to_owned()))
             .collect();
 
-        assert_eq!(actual, expected_mapped);
+        assert_eq!(
+            actual, expected_mapped,
+            "actual on the left, expected on the right",
+        );
     }
 
     fn run_and_assert(lines: &[&'static str], config: Config, expected: &[&'static str]) {
