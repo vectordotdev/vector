@@ -1,4 +1,3 @@
-mod kv_parser;
 
 use crate::Event;
 use snafu::Snafu;
@@ -31,6 +30,8 @@ pub mod geoip;
 pub mod grok_parser;
 #[cfg(feature = "transforms-json_parser")]
 pub mod json_parser;
+#[cfg(feature = "transforms-kv_parser")]
+pub mod kv_parser;
 #[cfg(feature = "transforms-log_to_metric")]
 pub mod log_to_metric;
 #[cfg(feature = "transforms-logfmt_parser")]

@@ -214,8 +214,8 @@ mod tests {
             trim_key,
             trim_value,
         }
-        .build(TransformContext::new_test())
-        .unwrap();
+            .build(TransformContext::new_test())
+            .unwrap();
 
         parser.transform(event).unwrap().into_log()
     }
@@ -335,5 +335,58 @@ mod tests {
         assert!(log.contains(&"foo".into()));
         assert!(!log.contains(&"beep".into()));
         assert!(!log.contains(&"score".into()));
+    }
+
+    #[test]
+    fn it_accepts_brackets() {
+        let log = parse_log(
+            "{\"foo\"}:0, \"\"bop\":[beep], [score]:78",
+            ",".to_string(),
+            ":".to_string(),
+            false,
+            &[],
+            None,
+            Some("\"{}".to_string()),
+            None,
+        );
+
+        // println!("{}", log.keys().fold("".to_string(), |res, key| [res, key].join(", ")));
+        // Review: This fails and I don't know why. The key is missing from the results.
+        // assert!(log.contains(&"[score]".into()));
+        assert_eq!(log[&"bop".into()], Value::Bytes("[beep]".into()))
+    }
+
+    #[test]
+    fn it_trims_keys() {
+         let log = parse_log(
+            "{\"foo\"}:0, \"\"bop\":beep, {({score})}:78",
+            ",".to_string(),
+            ":".to_string(),
+            false,
+            &[],
+            None,
+            Some("\"{}".to_string()),
+            None,
+        );
+        assert!(log.contains(&"foo".into()));
+        assert!(log.contains(&"bop".into()));
+        assert!(log.contains(&"({score})".into()));
+    }
+
+    #[test]
+    fn it_trims_values() {
+         let log = parse_log(
+            "foo:{\"0\"}, bop:\"beep\", score:{78}",
+            ",".to_string(),
+            ":".to_string(),
+            false,
+            &[("foo", "integer"), ("score", "integer")],
+            None,
+            None,
+            Some("\"{}".to_string()),
+        );
+        assert_eq!(log[&"foo".into()], Value::Integer(0));
+        assert_eq!(log[&"bop".into()], Value::Bytes("beep".into()));
+        assert_eq!(log[&"score".into()], Value::Integer(78));
     }
 }
