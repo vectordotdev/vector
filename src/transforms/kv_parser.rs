@@ -86,7 +86,7 @@ fn kv_parser(pair: String, field_split: &String, trim_key: &Option<String>, trim
     if field_split.is_empty() {
         let mut kv_pair = pair.split_whitespace();
         let key = kv_pair.nth(0)?;
-        let value = kv_pair.nth(1)?;
+        let val = kv_pair.nth(1)?;
         let count = kv_pair.count();
 
         if count < 2 {
@@ -96,7 +96,7 @@ fn kv_parser(pair: String, field_split: &String, trim_key: &Option<String>, trim
             return None
         }
 
-        field = [key, value];
+        field = [key, val];
     } else {
         let split_index = pair.find(field_split).unwrap_or(0);
         let (key, val) = pair.split_at(split_index);
