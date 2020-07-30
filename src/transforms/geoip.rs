@@ -231,7 +231,7 @@ mod tests {
     use string_cache::DefaultAtom as Atom;
 
     #[test]
-    fn geoip_lookup_success() {
+    fn geoip_city_lookup_success() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "2.125.160.216", "request_path": "foo/bar"}"#);
         let event = parser.transform(event).unwrap();
@@ -257,7 +257,7 @@ mod tests {
     }
 
     #[test]
-    fn geoip_lookup_partial_results() {
+    fn geoip_city_lookup_partial_results() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "67.43.156.9", "request_path": "foo/bar"}"#);
         let event = parser.transform(event).unwrap();
@@ -283,7 +283,7 @@ mod tests {
     }
 
     #[test]
-    fn geoip_lookup_no_results() {
+    fn geoip_city_lookup_no_results() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#);
         let event = parser.transform(event).unwrap();
@@ -300,6 +300,76 @@ mod tests {
         exp_geoip_attr.insert("latitude", "");
         exp_geoip_attr.insert("longitude", "");
         exp_geoip_attr.insert("postal_code", "");
+
+        for field in exp_geoip_attr.keys() {
+            let k = Atom::from(format!("geo.{}", field).to_string());
+            println!("Looking for {:?}", k);
+            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
+        }
+    }
+
+    #[test]
+    fn geoip_isp_lookup_success() {
+        let mut parser = JsonParser::from(JsonParserConfig::default());
+        let event = Event::from(r#"{"remote_addr": "208.192.1.2", "request_path": "foo/bar"}"#);
+        let event = parser.transform(event).unwrap();
+        let reader = maxminddb::Reader::open_readfile("tests/data/GeoIP2-ISP-Test.mmdb").unwrap();
+
+        let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
+        let new_event = augment.transform(event).unwrap();
+
+        let mut exp_geoip_attr = HashMap::new();
+        exp_geoip_attr.insert("autonomous_system_number", "701");
+        exp_geoip_attr.insert("autonomous_system_organization", "MCI Communications Services, Inc. d/b/a Verizon Business");
+        exp_geoip_attr.insert("isp", "Verizon Business");
+        exp_geoip_attr.insert("organization", "Verizon Business");
+
+        for field in exp_geoip_attr.keys() {
+            let k = Atom::from(format!("geo.{}", field).to_string());
+            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
+        }
+    }
+
+    #[test]
+    fn geoip_isp_lookup_partial_results() {
+        let mut parser = JsonParser::from(JsonParserConfig::default());
+        let event = Event::from(r#"{"remote_addr": "2600:7000::1", "request_path": "foo/bar"}"#);
+        let event = parser.transform(event).unwrap();
+        let reader = maxminddb::Reader::open_readfile("tests/data/GeoLite2-ASN-Test.mmdb").unwrap();
+
+        let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
+        let new_event = augment.transform(event).unwrap();
+
+        let mut exp_geoip_attr = HashMap::new();
+        exp_geoip_attr.insert("autonomous_system_number", "6939");
+        exp_geoip_attr.insert("autonomous_system_organization", "Hurricane Electric, Inc.");
+        exp_geoip_attr.insert("isp", "");
+        exp_geoip_attr.insert("organization", "");
+
+        for field in exp_geoip_attr.keys() {
+            let k = Atom::from(format!("geo.{}", field).to_string());
+            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
+        }
+    }
+
+    #[test]
+    fn geoip_isp_lookup_no_results() {
+        let mut parser = JsonParser::from(JsonParserConfig::default());
+        let event = Event::from(r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#);
+        let event = parser.transform(event).unwrap();
+        let reader = maxminddb::Reader::open_readfile("tests/data/GeoLite2-ASN-Test.mmdb").unwrap();
+
+        let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
+        let new_event = augment.transform(event).unwrap();
+
+        let mut exp_geoip_attr = HashMap::new();
+        exp_geoip_attr.insert("autonomous_system_number", "0");
+        exp_geoip_attr.insert("autonomous_system_organization", "");
+        exp_geoip_attr.insert("isp", "");
+        exp_geoip_attr.insert("organization", "");
 
         for field in exp_geoip_attr.keys() {
             let k = Atom::from(format!("geo.{}", field).to_string());
