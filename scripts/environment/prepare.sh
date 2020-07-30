@@ -10,7 +10,3 @@ cd scripts
 bundle update --bundler
 bundle install
 cd ..
-
-cd website
-yarn install
-cd ..
