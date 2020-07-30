@@ -141,8 +141,8 @@ mod test {
     use crate::shutdown::{ShutdownSignal, SourceShutdownCoordinator};
     use crate::sinks::util::tcp::TcpSink;
     use crate::test_util::{
-        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, trace_init,
-        wait_for_tcp, CollectN,
+        block_on, collect_n, next_addr, random_string, runtime, send_lines, send_lines_tls,
+        trace_init, wait_for_tcp, CollectN,
     };
     use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
@@ -380,7 +380,7 @@ mod test {
         .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
         .unwrap();
         let mut rt = Runtime::with_thread_count(2).unwrap();
-        let source_handle = oneshot::spawn(server, &rt.executor());
+        let source_handle = rt.spawn_handle_std(server.compat());
         wait_for_tcp(addr);
 
         // Spawn future that keeps sending lines to the TCP source forever.
@@ -390,13 +390,23 @@ mod test {
             Resolver,
             MaybeTlsSettings::Raw(()),
         );
+        let message = random_string(512);
+        let message_event = Bytes::from(message.clone() + "\n");
         rt.spawn(
-            futures01::stream::iter_ok::<_, ()>(std::iter::repeat(()).take(1_000))
-                .map(|_| Bytes::from("test\n"))
+            futures01::stream::iter_ok::<_, ()>(std::iter::repeat(()))
+                .map(move |_| message_event.clone())
                 .map_err(|_| ())
                 .forward(sink)
                 .map(|_| ()),
         );
+        // use futures::StreamExt;
+        // rt.spawn_std(async move {
+        //     let _ = stream::repeat(())
+        //         .map(move |_| Ok(message_event.clone()))
+        //         .forward(sink)
+        //         .await
+        //         .unwrap();
+        // });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
         let (_rx, events) = rt.block_on(CollectN::new(rx, 100)).ok().unwrap();
@@ -404,7 +414,7 @@ mod test {
         for event in events {
             assert_eq!(
                 event.as_log()[&event::log_schema().message_key()],
-                "test".into()
+                message.clone().into()
             );
         }
 
@@ -414,7 +424,9 @@ mod test {
         assert_eq!(true, shutdown_success);
 
         // Ensure that the source has actually shut down.
-        rt.block_on(source_handle).unwrap();
+        rt.block_on_std(async move {
+            let _ = source_handle.await.unwrap();
+        })
     }
 
     //////// UDP TESTS ////////
