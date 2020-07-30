@@ -72,7 +72,9 @@ impl Transform for Geoip {
             .map(|s| s.to_string_lossy());
         if let Some(ipaddress) = &ipaddress {
             if let Ok(ip) = FromStr::from_str(ipaddress) {
-                if self.dbreader.metadata.database_type == "GeoLite2-ASN" || self.dbreader.metadata.database_type == "GeoIP2-ISP" {
+                if self.dbreader.metadata.database_type == "GeoLite2-ASN"
+                    || self.dbreader.metadata.database_type == "GeoIP2-ISP"
+                {
                     if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::Isp>(ip) {
                         if let Some(autonomous_system_number) = data.autonomous_system_number {
                             event.as_mut_log().insert(
@@ -81,9 +83,14 @@ impl Transform for Geoip {
                             );
                         }
 
-                        if let Some(autonomous_system_organization) = data.autonomous_system_organization {
+                        if let Some(autonomous_system_organization) =
+                            data.autonomous_system_organization
+                        {
                             event.as_mut_log().insert(
-                                Atom::from(format!("{}.autonomous_system_organization", target_field)),
+                                Atom::from(format!(
+                                    "{}.autonomous_system_organization",
+                                    target_field
+                                )),
                                 Value::from(autonomous_system_organization),
                             );
                         }
@@ -102,7 +109,8 @@ impl Transform for Geoip {
                             );
                         }
                     }
-                } else { // Not the ISP/ASP database, assume City
+                } else {
+                    // Not the ISP/ASP database, assume City
                     if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
                         if let Some(city_names) = data.city.and_then(|c| c.names) {
                             if let Some(city_name_en) = city_names.get("en") {
@@ -178,7 +186,9 @@ impl Transform for Geoip {
         // If we have any of the geoip fields missing, we insert
         // empty values so that we know that the transform was executed
         // but the lookup didn't find the result
-        if self.dbreader.metadata.database_type == "GeoLite2-ASN" || self.dbreader.metadata.database_type == "GeoIP2-ISP" {
+        if self.dbreader.metadata.database_type == "GeoLite2-ASN"
+            || self.dbreader.metadata.database_type == "GeoIP2-ISP"
+        {
             let asn_field = format!("{}.autonomous_system_number", target_field);
             let e = event.as_mut_log();
             if e.get(&Atom::from(asn_field.to_string())).is_none() {
@@ -321,7 +331,10 @@ mod tests {
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("autonomous_system_number", "701");
-        exp_geoip_attr.insert("autonomous_system_organization", "MCI Communications Services, Inc. d/b/a Verizon Business");
+        exp_geoip_attr.insert(
+            "autonomous_system_organization",
+            "MCI Communications Services, Inc. d/b/a Verizon Business",
+        );
         exp_geoip_attr.insert("isp", "Verizon Business");
         exp_geoip_attr.insert("organization", "Verizon Business");
 
