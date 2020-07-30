@@ -463,13 +463,13 @@ mod tests {
     #[test]
     fn two_lines_emit_with_continue_through() {
         let lines = vec![
-            r#"no 1"#,
-            r#" yes 1"#,
-            r#" yes 2"#,
-            r#"no 2"#,
-            r#" yes 3"#,
-            r#" yes 4"#,
-            r#"no 3"#,
+            "not merged 1",
+            " merged 1",
+            " merged 2",
+            "not merged 2",
+            " merged 3",
+            " merged 4",
+            "not merged 3",
         ];
         let config = Config {
             start_pattern: Regex::new("^\\s").unwrap(),
@@ -478,11 +478,11 @@ mod tests {
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            r#"no 1"#,
-            " yes 1\n yes 2",
-            r#"no 2"#,
-            " yes 3\n yes 4",
-            r#"no 3"#,
+            "not merged 1",
+            " merged 1\n merged 2",
+            "not merged 2",
+            " merged 3\n merged 4",
+            "not merged 3",
         ];
         run_and_assert(&lines, config, &expected);
     }
