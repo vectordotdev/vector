@@ -8,7 +8,7 @@ pub struct StatsdEventReceived {
 
 impl InternalEvent for StatsdEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "received line.", byte_size = %self.byte_size);
+        trace!(message = "received packet.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
@@ -33,7 +33,7 @@ pub struct StatsdInvalidRecord<'a> {
 
 impl InternalEvent for StatsdInvalidRecord<'_> {
     fn emit_logs(&self) {
-        error!(message = "invalid record from statsd, discarding.", error = %self.error, text = %self.text);
+        error!(message = "invalid packet from statsd, discarding.", error = %self.error, text = %self.text);
     }
 
     fn emit_metrics(&self) {
