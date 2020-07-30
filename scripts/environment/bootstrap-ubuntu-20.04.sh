@@ -58,4 +58,5 @@ apt update --yes
 apt install --yes yarn docker-ce docker-ce-cli containerd.io
 
 # Remarshal is particular
+pip3 install jsonschema=3.2.0
 pip3 install remarshal==0.11.2
