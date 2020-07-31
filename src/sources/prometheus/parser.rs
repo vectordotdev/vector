@@ -520,6 +520,20 @@ mod test {
     use pretty_assertions::assert_eq;
 
     #[test]
+    fn test_quote() {
+        let exp = r##"# HELP nginx_server_bytes request/response bytes
+            # TYPE nginx_server_bytes counter
+            nginx_server_bytes{direction="  in  ",host="*"} 263719
+            # HELP nginx_server_cache cache counter
+            # TYPE nginx_server_cache counter
+            telemetry_scrape_size_bytes_count{registry="default",content_type="text/plain; version=0.0.4"}
+            "##;
+
+        let res = parse(exp).unwrap();
+        println!("{:?}", res);
+    }
+
+    #[test]
     fn test_counter() {
         let exp = r##"
             # HELP uptime A counter
@@ -1165,6 +1179,131 @@ mod test {
                     },
                 },
             ]),
+        );
+    }
+
+    macro_rules! map {
+        ($($key:expr => $value:expr),+) => {
+            {
+                let mut m = ::std::collections::BTreeMap::new();
+                $(
+                    m.insert($key.into(), $value.into());
+                )+
+                m
+            }
+        };
+    }
+
+    // https://github.com/timberio/vector/issues/3276
+    #[test]
+    fn test_nginx() {
+        let exp = r##"
+            # HELP nginx_server_bytes request/response bytes
+            # TYPE nginx_server_bytes counter
+            nginx_server_bytes{direction="in",host="*"} 263719
+            nginx_server_bytes{direction="in",host="_"} 255061
+            nginx_server_bytes{direction="in",host="nginx-vts-status"} 8658
+            nginx_server_bytes{direction="out",host="*"} 944199
+            nginx_server_bytes{direction="out",host="_"} 360775
+            nginx_server_bytes{direction="out",host="nginx-vts-status"} 583424
+            # HELP nginx_server_cache cache counter
+            # TYPE nginx_server_cache counter
+            nginx_server_cache{host="*",status="bypass"} 0
+            nginx_server_cache{host="*",status="expired"} 0
+            nginx_server_cache{host="*",status="hit"} 0
+            nginx_server_cache{host="*",status="miss"} 0
+            nginx_server_cache{host="*",status="revalidated"} 0
+            nginx_server_cache{host="*",status="scarce"} 0
+            "##;
+
+        assert_eq!(
+            parse(exp),
+            Ok(vec![
+                Metric {
+                    name: "nginx_server_bytes".into(),
+                    timestamp: None,
+                    tags: Some(map! {"direction" => "in", "host" => "*"}),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 263719.0 }
+                },
+                Metric {
+                    name: "nginx_server_bytes".into(),
+                    timestamp: None,
+                    tags: Some(map! {"direction" => "in", "host" => "_"}),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 255061.0 }
+                },
+                Metric {
+                    name: "nginx_server_bytes".into(),
+                    timestamp: None,
+                    tags: Some(map! {"direction" => "in", "host" => "nginx-vts-status"}),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 8658.0 }
+                },
+                Metric {
+                    name: "nginx_server_bytes".into(),
+                    timestamp: None,
+                    tags: Some(map! {"direction" => "out", "host" => "*"}),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 944199.0 }
+                },
+                Metric {
+                    name: "nginx_server_bytes".into(),
+                    timestamp: None,
+                    tags: Some(map! {"direction" => "out", "host" => "_"}),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 360775.0 }
+                },
+                Metric {
+                    name: "nginx_server_bytes".into(),
+                    timestamp: None,
+                    tags: Some(map! {"direction" => "out", "host" => "nginx-vts-status"}),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 583424.0 }
+                },
+                Metric {
+                    name: "nginx_server_cache".into(),
+                    timestamp: None,
+                    tags: Some(map! {"host" => "*", "status" => "bypass"}),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 0.0 }
+                },
+                Metric {
+                    name: "nginx_server_cache".into(),
+                    timestamp: None,
+                    tags: Some(map! {"host" => "*", "status" => "expired"}),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 0.0 }
+                },
+                Metric {
+                    name: "nginx_server_cache".into(),
+                    timestamp: None,
+                    tags: Some(map! {"host" => "*", "status" => "hit"}),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 0.0 }
+                },
+                Metric {
+                    name: "nginx_server_cache".into(),
+                    timestamp: None,
+                    tags: Some(map! {"host" => "*", "status" => "miss"}),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 0.0 }
+                },
+                Metric {
+                    name: "nginx_server_cache".into(),
+                    timestamp: None,
+                    tags: Some(map! {"host" => "*", "status" => "revalidated"}),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 0.0 }
+                },
+                Metric {
+                    name: "nginx_server_cache".into(),
+                    timestamp: None,
+                    tags: Some(map! {"host" => "*", "status" => "scarce"}),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 0.0 }
+                }
+            ])
         );
     }
 }
