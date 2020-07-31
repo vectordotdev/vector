@@ -21,7 +21,7 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
   bench:
-    name: All - Linux, Flaky
+    name: All - Linux
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
