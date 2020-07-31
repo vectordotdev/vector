@@ -147,11 +147,15 @@ mod test {
     use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
     use bytes::Bytes;
+    use futures::{
+        compat::{Future01CompatExt, Sink01CompatExt},
+        StreamExt,
+    };
     #[cfg(unix)]
-    use futures::{compat::Future01CompatExt, stream, SinkExt};
+    use futures::{stream, SinkExt};
     use futures01::{
         sync::{mpsc, oneshot},
-        Future, Stream,
+        Stream,
     };
     #[cfg(unix)]
     use std::path::PathBuf;
@@ -392,21 +396,13 @@ mod test {
         );
         let message = random_string(512);
         let message_event = Bytes::from(message.clone() + "\n");
-        rt.spawn(
-            futures01::stream::iter_ok::<_, ()>(std::iter::repeat(()))
-                .map(move |_| message_event.clone())
-                .map_err(|_| ())
-                .forward(sink)
-                .map(|_| ()),
-        );
-        // use futures::StreamExt;
-        // rt.spawn_std(async move {
-        //     let _ = stream::repeat(())
-        //         .map(move |_| Ok(message_event.clone()))
-        //         .forward(sink)
-        //         .await
-        //         .unwrap();
-        // });
+        rt.spawn_std(async move {
+            let _ = stream::repeat(())
+                .map(move |_| Ok(message_event.clone()))
+                .forward(sink.sink_compat())
+                .await
+                .unwrap();
+        });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
         let (_rx, events) = rt.block_on(CollectN::new(rx, 100)).ok().unwrap();
