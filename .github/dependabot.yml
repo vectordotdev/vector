@@ -4,6 +4,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "saturday"
+      time: "04:00" # UTC
     reviewers:
       - "hoverbear"
     assignees:
