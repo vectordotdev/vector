@@ -43,21 +43,21 @@ RUN apt-get update && apt-get install -y llvm clang lld
 RUN apt-get update && apt-get -y install curl xz-utils
 
 ARG LLVM_VERSION
-RUN curl --proto '=https' --tlsv1.2 -sSfL \
-  https://github.com/llvm/llvm-project/archive/llvmorg-$LLVM_VERSION.tar.gz | \
-  tar xzf -
+ENV SRC_DIR /opt/libs
+RUN mkdir -p /opt/libs
 ENV LLVM_DIR $SRC_DIR/llvm-project-llvmorg-$LLVM_VERSION
 
+WORKDIR SRC_DIR
 ARG MUSL_VERSION
 RUN curl --proto '=https' --tlsv1.2 -sSf \
   https://www.musl-libc.org/releases/musl-$MUSL_VERSION.tar.gz | \
-  tar xzf -
+  tar xz --verbose --directory ${SRC_DIR}/
 ENV MUSL_DIR $SRC_DIR/musl-$MUSL_VERSION
 
 ARG LINUX_HEADERS_VERSION
 RUN curl --proto '=https' --tlsv1.2 -sSf \
   https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-$LINUX_HEADERS_VERSION.tar.xz | \
-  tar xJf -
+  tar xJ --verbose --directory ${SRC_DIR}/
 ENV LINUX_DIR $SRC_DIR/linux-$LINUX_HEADERS_VERSION
 
 # Install build dependencies.
@@ -72,27 +72,15 @@ ARG LIBS_PREFIX
 # Because Clang toolchain is not fully bootstrapped yet (no standard library),
 # it is necessary to use GCC to compile it.
 ARG GNU_TARGET
-RUN apt-get install -y gcc${GNU_TARGET:+-${GNU_TARGET}} g++${GNU_TARGET:+-${GNU_TARGET}}
+ARG CLANG_PREFIX
 WORKDIR $LLVM_DIR/compiler-rt
 ENV CC=${GNU_TARGET:+${GNU_TARGET}-}gcc
 ENV CXX=${GNU_TARGET:+${GNU_TARGET}-}g++
 ENV CFLAGS=""
 ENV CXXFLAGS=""
 ENV LDFLAGS=""
-RUN mkdir build && \
-  cd build && \
-  cmake \
-    -DCMAKE_BUILD_TYPE=release \
-    -DLLVM_CONFIG_PATH=$CLANG_PREFIX/bin/llvm-config \
-    -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE=$TARGET \
-    -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
-    -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
-    -DCOMPILER_RT_BUILD_XRAY=OFF \
-    -DCOMPILER_RT_BUILD_PROFILE=OFF \
-    -DCMAKE_INSTALL_PREFIX=$LIBS_PREFIX \
-    -G Ninja \
-    .. && \
-  cmake --build . --target install
+ADD ./scripts/environment/libraries/clang.sh /scripts/environment/libraries/clang.sh
+RUN /scripts/environment/libraries/clang.sh
 
 # Compile musl.
 WORKDIR $MUSL_DIR
@@ -300,7 +288,7 @@ RUN mkdir -p ~/.cargo
 RUN printf "[build]\ntarget = \"$TARGET\"\n" > ~/.cargo/config
 
 # In case of non-native target, install QEMU-user to enable running `cargo test`
-RUN if [ -n "$GNU_TARGET"]; then apt-get update && apt-get install -y qemu-user; fi
+RUN if [ -n "GNU_TARGET"]; then apt-get update && apt-get install -y qemu-user; fi
 
 # Add dependencies for running tests
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata ca-certificates
