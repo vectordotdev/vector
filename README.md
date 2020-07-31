@@ -7,7 +7,7 @@
 ---
 
 <p align="center">
-  <img src="./website/static/img/readme_diagram.svg" alt="Vector">
+  <img src="https://vector.dev/img/readme_diagram.svg" alt="Vector">
 </p>
 
 
