@@ -6,13 +6,16 @@ on:
       - master
     paths:
       - ".github/workflows/tests.yml"
-      - "lib/*s"
+      - "lib/**"
       - "proto/**"
+      - "scripts/**"
+      - "skaffold/**"
       - "src/**"
       - "tests/**"
       - "Cargo.lock"
       - "Cargo.toml"
       - "docker-compose.yml"
+      - "Makefil"
       - "rust-toolchain"
   pull_request: {}
 
