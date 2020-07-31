@@ -147,13 +147,14 @@ mod test {
     use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
     use bytes::Bytes;
+    #[cfg(unix)]
+    use futures::SinkExt;
     use futures::{
         compat::{Future01CompatExt, Sink01CompatExt},
         StreamExt,
     };
-    #[cfg(unix)]
-    use futures::{stream, SinkExt};
     use futures01::{
+        stream,
         sync::{mpsc, oneshot},
         Stream,
     };
