@@ -4,7 +4,7 @@ use super::{
     task::Task,
     ConfigDiff,
 };
-use crate::{buffers, dns::Resolver, event::Event, shutdown::SourceShutdownCoordinator};
+use crate::{buffers, dns::Resolver, event::Event, shutdown::SourceShutdownCoordinator, Pipeline};
 use futures01::{
     future::{lazy, Either},
     sync::mpsc,
@@ -131,13 +131,14 @@ pub async fn build_pieces(
         .filter(|(name, _)| diff.sources.contains_new(&name))
     {
         let (tx, rx) = mpsc::channel(1000);
+        let pipeline = Pipeline::from_sender(tx);
 
         let typetag = source.source_type();
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
         let server = match source
-            .build_async(&name, &config.global, shutdown_signal, tx)
+            .build_async(&name, &config.global, shutdown_signal, pipeline)
             .await
         {
             Err(error) => {
