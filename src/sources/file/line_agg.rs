@@ -126,9 +126,16 @@ where
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
-            // If we have a stashed line, short circut here.
-            if let Some(val) = self.stashed.take() {
-                return Ok(Async::Ready(Some(val)));
+            // If we have a stashed line, process it before doing anything else.
+            if let Some((line, src)) = self.stashed.take() {
+                // Handle the stashed line. If the handler gave us something -
+                // return it, otherwise restart the loop iteration to start
+                // anew. Handler could've stashed another value, continuing to
+                // the new loop iteration handles that.
+                if let Some(val) = self.handle_line_and_stashing(line, src) {
+                    return Ok(Async::Ready(Some(val)));
+                }
+                continue;
             }
 
             // If we're in draining mode, short circut here.
@@ -150,24 +157,7 @@ where
                     // Handle the incoming line we got from `inner`. If the
                     // handler gave us something - return it, otherwise continue
                     // with the flow.
-                    if let Some(val) = self.handle_line(line, src) {
-                        let val = match val {
-                            // If we have to emit just one line - that's easy,
-                            // we just return it.
-                            (Emit::One(val), src) => (val, src),
-                            // If we have to emit two lines - take the second
-                            // one and stash it, then return the first one.
-                            // This way, the stashed line will be returned
-                            // on the next stream poll.
-                            (Emit::Two(val, to_stash), src) => {
-                                // Stashed line is always consumed at the start
-                                // of the `poll` loop. If it's non-empty here -
-                                // it's a bug.
-                                debug_assert!(self.stashed.is_none());
-                                self.stashed = Some((to_stash, src.clone()));
-                                (val, src)
-                            }
-                        };
+                    if let Some(val) = self.handle_line_and_stashing(line, src) {
                         return Ok(Async::Ready(Some(val)));
                     }
                 }
@@ -282,6 +272,31 @@ where
                 }
             }
         }
+    }
+
+    /// Handle line and do stashing of extra emitted lines.
+    /// Requires that the `stashed` item is empty (i.e. entry is vacant). This
+    /// invariant has to be taken care of by the caller.
+    fn handle_line_and_stashing(&mut self, line: Bytes, src: K) -> Option<(Bytes, K)> {
+        // Stashed line is always consumed at the start of the `poll`
+        // loop before entering this line processing logic. If it's
+        // non-empty here - it's a bug.
+        debug_assert!(self.stashed.is_none());
+        let val = self.handle_line(line, src)?;
+        let val = match val {
+            // If we have to emit just one line - that's easy,
+            // we just return it.
+            (Emit::One(line), src) => (line, src),
+            // If we have to emit two lines - take the second
+            // one and stash it, then return the first one.
+            // This way, the stashed line will be returned
+            // on the next stream poll.
+            (Emit::Two(line, to_stash), src) => {
+                self.stashed = Some((to_stash, src.clone()));
+                (line, src)
+            }
+        };
+        Some(val)
     }
 }
 
@@ -467,13 +482,20 @@ mod tests {
     #[test]
     fn two_lines_emit_with_continue_through() {
         let lines = vec![
-            "not merged 1",
+            "not merged 1", // will NOT be stashed, but passthroughed
             " merged 1",
             " merged 2",
-            "not merged 2",
+            "not merged 2", // will be stashed
             " merged 3",
             " merged 4",
-            "not merged 3",
+            "not merged 3", // will be stashed
+            "not merged 4", // will NOT be stashed, but passthroughed
+            " merged 5",
+            "not merged 5", // will be stashed
+            " merged 6",
+            " merged 7",
+            " merged 8",
+            "not merged 6", // will be stashed
         ];
         let config = Config {
             start_pattern: Regex::new("^\\s").unwrap(),
@@ -487,6 +509,11 @@ mod tests {
             "not merged 2",
             " merged 3\n merged 4",
             "not merged 3",
+            "not merged 4",
+            " merged 5",
+            "not merged 5",
+            " merged 6\n merged 7\n merged 8",
+            "not merged 6",
         ];
         run_and_assert(&lines, config, &expected);
     }
@@ -494,24 +521,33 @@ mod tests {
     #[test]
     fn two_lines_emit_with_halt_before() {
         let lines = vec![
-            "merged 1",
-            "merged 2",
-            " splitter 1",
-            "merged 3",
-            "merged 4",
-            " splitter 2",
+            "part 0.1",
+            "part 0.2",
+            "START msg 1", // will be stashed
+            "part 1.1",
+            "part 1.2",
+            "START msg 2", // will be stashed
+            "START msg 3", // will be stashed
+            "part 3.1",
+            "START msg 4", // will be stashed
+            "part 4.1",
+            "part 4.2",
+            "part 4.3",
+            "START msg 5", // will be stashed
         ];
         let config = Config {
             start_pattern: Regex::new("").unwrap(),
-            condition_pattern: Regex::new("^\\s").unwrap(),
+            condition_pattern: Regex::new("^START ").unwrap(),
             mode: Mode::HaltBefore,
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            "merged 1\nmerged 2",
-            " splitter 1",
-            "merged 3\nmerged 4",
-            " splitter 2",
+            "part 0.1\npart 0.2",
+            "START msg 1\npart 1.1\npart 1.2",
+            "START msg 2",
+            "START msg 3\npart 3.1",
+            "START msg 4\npart 4.1\npart 4.2\npart 4.3",
+            "START msg 5",
         ];
         run_and_assert(&lines, config, &expected);
     }
