@@ -151,10 +151,9 @@ mod test {
     use futures::SinkExt;
     use futures::{
         compat::{Future01CompatExt, Sink01CompatExt},
-        StreamExt,
+        stream, StreamExt,
     };
     use futures01::{
-        stream,
         sync::{mpsc, oneshot},
         Stream,
     };
