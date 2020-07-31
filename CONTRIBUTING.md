@@ -37,12 +37,17 @@ expanding into more specifics.
    1. [Benchmarking](#benchmarking)
    1. [Profiling](#profiling)
    1. [Kubernetes](#kubernetes)
-      1. [Dev flow](#kubernetes-dev-flow)
-      1. [E2E tests](#kubernetes-e2e-tests)
+      1. [Kubernetes Dev Flow](#kubernetes-dev-flow)
+         1. [Requirements](#requirements)
+         1. [The dev flow](#the-dev-flow)
+         1. [Troubleshooting](#troubleshooting)
+         1. [Going through the dev flow manually](#going-through-the-dev-flow-manually)
+      1. [Kubernetes E2E tests](#kubernetes-e2e-tests)
+         1. [Requirements](#requirements-1)
+         1. [Running the E2E tests](#running-the-e2e-tests)
 1. [Humans](#humans)
    1. [Documentation](#documentation)
    1. [Changelog](#changelog)
-   1. [Highlights](#highlights)
       1. [What makes a highlight noteworthy?](#what-makes-a-highlight-noteworthy)
       1. [How is a highlight different from a blog post?](#how-is-a-highlight-different-from-a-blog-post)
 1. [Security](#security)
@@ -249,8 +254,6 @@ We keep an up to date list of all dependencies used in our CI environment inside
 
 - **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, and `autotools`. (Full list in [`scripts/environment/definition.nix`](./scripts/environment/definition.nix).
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
-- **To build the Website:** Have a working modern Ruby 2.7 and Bundler toolchain available, also `bundle install` in the `scripts/` directory.
-- **To run the Website in Dev:** Have a working `node` environment with `npm`/`yarn`, also run `yarn` from the `website/` directory.
 - **To run `make check-component-features`:** Have `remarshal` installed.
 
 If you find yourself needing to run something inside the Docker environment described above, that's totally fine, they won't collide or hurt each other. In this case, you'd just run `make environment-generate`.
@@ -302,7 +305,6 @@ If you run `make` you'll see a full list of all our tasks. Some of these will st
 - [`/scripts`](/scripts) - Scripts used to generate docs and maintain the repo.
 - [`/src`](/src) - Vector source.
 - [`/tests`](/tests) - Various high-level test cases.
-- [`/website`](/website) - Website and documentation files.
 
 #### Makefile
 
@@ -733,31 +735,6 @@ The actual website and documentation are generated on the
 Developers do not need to maintain the [`Changelog`](/CHANGELOG.md). This is
 automatically generated via the `make release` command. This is made possible
 by the use of [conventional commit](#title) titles.
-
-### Highlights
-
-If your change is noteworthy it should be represented as a
-[highlight](/websites/highlights). Highlights are short announcements that make
-your change known to users. They are similar to
-[AWS' announcements][urls.aws_announcements]. The purpose is three-fold:
-
-1. First, like documentation, communicating features to users is very important.
-   This is usually done in the form of release notes and blog posts. This,
-   unfortunately, means releasing Vector requires a considerable amount of
-   effort. Preparing quality release notes at the 11th hour often results in
-   missed opportuniteis and low quality communication. Front loading this work
-   ensures that we announce the feature while it is fresh in our minds,
-   spreads the workload across the team over time, and promotes quality.
-
-2. Second, providing regular updates to Vector users helps to cultivate a
-   community. Highlights serve as a trigger for this communication. This could
-   be automated or manual. Either way, highlights pose the question in an
-   explicit manner.
-
-3. Finally, some Vector users live on the bleeding edge of Vector changes. They
-   [push it to the limit][urls.push_it_to_the_limit] and appreciate real-time
-   updates. This benefits Vector in that we can get users on a new feature,
-   testing the feature before it is released.
 
 #### What makes a highlight noteworthy?
 
