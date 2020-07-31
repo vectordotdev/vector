@@ -174,12 +174,6 @@ mod integration_tests {
         });
     }
 
-    #[derive(Debug)]
-    struct HumioRepository {
-        name: String,
-        default_ingest_token: String,
-    }
-
     /// create a new test config with the given ingest token
     fn config(token: &str) -> super::HumioLogsConfig {
         super::HumioLogsConfig {
@@ -275,6 +269,12 @@ mutation {{
             "did not find event in Humio repository {} with message {}",
             repository_name, message
         );
+    }
+
+    #[derive(Debug)]
+    struct HumioRepository {
+        name: String,
+        default_ingest_token: String,
     }
 
     #[derive(Clone, Deserialize)]
