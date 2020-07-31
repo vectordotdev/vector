@@ -401,6 +401,7 @@ docker = [
   "gcp-integration-tests",
   "gcp-pubsub-integration-tests",
   "gcp-cloud-storage-integration-tests",
+  "humio-integration-tests",
   "influxdb-integration-tests",
   "kafka-integration-tests",
   "loki-integration-tests",
@@ -428,6 +429,7 @@ es-integration-tests = ["sinks-elasticsearch"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
+humio-integration-tests = ["sinks-humio_logs"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
