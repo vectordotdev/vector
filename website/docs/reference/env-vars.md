@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-31"
 title: Environment Variables
 description: "A full list of Vector's supported environment variables and how to use them."
 sidebar_label: Env Vars
@@ -145,6 +145,54 @@ verifying the remote certificate.
 
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Stackdriver Logging API.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["10.96.0.1"]}
+  groups={[]}
+  name={"KUBERNETES_SERVICE_HOST"}
+  path={null}
+  relevantWhen={{"requirements":{"kubernetes_in_cluster":true}}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### KUBERNETES_SERVICE_HOST
+
+An in-cluster Kubernetes API `Service` host. Provided automatically by the
+Kubernetes when running in the cluster.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["443"]}
+  groups={[]}
+  name={"KUBERNETES_SERVICE_PORT"}
+  path={null}
+  relevantWhen={{"requirements":{"kubernetes_in_cluster":true}}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### KUBERNETES_SERVICE_PORT
+
+An in-cluster Kubernetes API `Service` port. Provided automatically by the
+Kubernetes when running in the cluster.
 
 
 

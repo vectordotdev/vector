@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-07-13"
+last_modified_on: "2020-07-31"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
@@ -402,6 +402,7 @@ features one has to pass a comma-separated list of component features.
 | `sources-http` | Enables building of [`http` source][docs.sources.http].  |
 | `sources-journald` | Enables building of [`journald` source][docs.sources.journald].  |
 | `sources-kafka` | Enables building of [`kafka` source][docs.sources.kafka].  Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled.  |
+| `sources-kubernetes_logs` | Enables building of [`kubernetes_logs` source][docs.sources.kubernetes_logs].  |
 | `sources-logplex` | Enables building of [`logplex` source][docs.sources.logplex].  |
 | `sources-prometheus` | Enables building of [`prometheus` source][docs.sources.prometheus].  |
 | `sources-socket` | Enables building of [`socket` source][docs.sources.socket].  |
@@ -516,6 +517,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sources.http]: /docs/reference/sources/http/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources.kafka]: /docs/reference/sources/kafka/
+[docs.sources.kubernetes_logs]: /docs/reference/sources/kubernetes_logs/
 [docs.sources.logplex]: /docs/reference/sources/logplex/
 [docs.sources.prometheus]: /docs/reference/sources/prometheus/
 [docs.sources.socket]: /docs/reference/sources/socket/

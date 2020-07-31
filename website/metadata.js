@@ -176,6 +176,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/kubernetes_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs.md",
+          "series_position": null,
+          "title": "Collect logs from Kubernetes and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/stdin",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin.md",
@@ -1126,6 +1135,222 @@ module.exports = {
           "path": "website/guides/integrate/sources/kafka/vector.md",
           "series_position": null,
           "title": "Send logs from Kafka to another Vector instance"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/influxdb_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/influxdb_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/loki.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/socket.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/file.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kubernetes_logs/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kubernetes_logs/http.md",
+          "series_position": null,
+          "title": "Send logs from Kubernetes to an HTTP endpoint"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -44733,6 +44958,48 @@ module.exports = {
       "status": "beta",
       "through_description": "Kafka",
       "title": "Kafka",
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "kubernetes_logs": {
+      "beta": false,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"kubernetes_logs\" # required"
+      },
+      "delivery_guarantee": "best_effort",
+      "description": "Deploy Vector into your Kubernetes cluster and collect logs from `Pod`s.",
+      "event_types": [
+        "log"
+      ],
+      "features": [
+        "Collect logs from `Pod`s when running in Kubernetes.",
+        "Enrich your logs with `Pod` metadata.",
+        "Exclude logs from collecion via annoting `Pod`s with `vector.dev/exclude: \"true\"`.",
+        "Automatically merge partial messages into one event.",
+        "Checkpoint your position to ensure data is not lost between restarts."
+      ],
+      "function_category": "collect",
+      "id": "kubernetes_logs_source",
+      "logo_path": null,
+      "name": "kubernetes_logs",
+      "noun": "Kubernetes Logs",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "output_types": [
+        "log"
+      ],
+      "service_providers": [
+
+      ],
+      "short_description": "Ingests data through Kubernetes logs from `Pod`s and outputs log events.",
+      "status": "prod-ready",
+      "through_description": "Kubernetes logs from `Pod`s",
+      "title": "Kubernetes Logs",
       "type": "source",
       "unsupported_operating_systems": [
 

@@ -111,6 +111,8 @@ module.exports = {
             
               "reference/sources/kafka",
             
+              "reference/sources/kubernetes_logs",
+            
               "reference/sources/logplex",
             
               "reference/sources/prometheus",

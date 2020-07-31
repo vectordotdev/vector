@@ -271,6 +271,9 @@
 - name: "source: kafka"
   description: Anything `kafka` source realted
   color: ff9ff3
+- name: "source: kubernetes_logs"
+  description: Anything `kubernetes_logs` source realted
+  color: ff9ff3
 - name: "source: logplex"
   description: Anything `logplex` source realted
   color: ff9ff3

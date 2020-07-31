@@ -749,6 +749,72 @@ data_dir = "/home/user/vector/"
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
 
+# Ingests data through Kubernetes logs from `Pod`s and outputs `log` events.
+[sources.kubernetes_logs]
+  #
+  # Annotation fields
+  #
+
+  [sources.kubernetes_logs.annotation_fields]
+    # The field name to annotate `Pod` labels as.
+    #
+    # * optional
+    # * default: "kubernetes.pod_labels"
+    # * type: string
+    pod_labels = "kubernetes.pod_labels"
+
+    # The field name to annotate `Pod` name as.
+    #
+    # * optional
+    # * default: "kubernetes.pod_name"
+    # * type: string
+    pod_name = "kubernetes.pod_name"
+
+    # The field name to annotate `Pod` namespace as.
+    #
+    # * optional
+    # * default: "kubernetes.pod_namespace"
+    # * type: string
+    pod_namespace = "kubernetes.pod_namespace"
+
+    # The field name to annotate `Pod` uid as.
+    #
+    # * optional
+    # * default: "kubernetes.pod_uid"
+    # * type: string
+    pod_uid = "kubernetes.pod_uid"
+
+  #
+  # General
+  #
+
+  # Automatically merge partial messages into a signle event. Partial here is in
+  # respect to messages that were split by the Kubernetes Container Runtime log
+  # driver.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  auto_partial_merge = true
+  auto_partial_merge = false
+
+  # The name of the Kubernetes `Node` this Vector instance runs at. Configured to
+  # use an env var by default, to be evaluated to a value provided by Kubernetes
+  # at `Pod` deploy time.
+  #
+  # * optional
+  # * default: "${VECTOR_SELF_NODE_NAME}"
+  # * type: string
+  self_node_name = "${VECTOR_SELF_NODE_NAME}"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "kubernetes_logs"
+  type = "kubernetes_logs"
+
 # Ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events.
 [sources.logplex]
   #
