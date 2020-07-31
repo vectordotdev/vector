@@ -15,7 +15,7 @@ on:
       - "Cargo.lock"
       - "Cargo.toml"
       - "docker-compose.yml"
-      - "Makefil"
+      - "Makefile"
       - "rust-toolchain"
   pull_request: {}
 
