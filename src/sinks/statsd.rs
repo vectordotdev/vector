@@ -12,7 +12,7 @@ use futures01::{stream, Sink};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs, UdpSocket};
 use std::task::{Context, Poll};
 use tower03::{Service, ServiceBuilder};
 
@@ -20,6 +20,17 @@ use tower03::{Service, ServiceBuilder};
 enum BuildError {
     #[snafu(display("failed to bind to udp listener socket, error = {:?}", source))]
     SocketBindError { source: std::io::Error },
+    #[snafu(display(
+        "failed to parse or resolve address, address = {:?}, error = {:?}",
+        address,
+        source
+    ))]
+    InvalidAddress {
+        address: String,
+        source: std::io::Error,
+    },
+    #[snafu(display("host name not found, address = {:?}", address))]
+    HostnameNotFound { address: String },
 }
 
 pub struct StatsdSvc {
@@ -28,19 +39,30 @@ pub struct StatsdSvc {
 
 pub struct Client {
     socket: UdpSocket,
-    address: SocketAddr,
+    endpoint: SocketAddr,
 }
 
 impl Client {
-    pub fn new(address: SocketAddr) -> crate::Result<Self> {
+    /// `address` can be in any format that [`ToSocketAddr`] supports;
+    /// - `<IPv4>:<port>`
+    /// - `[<IPv6>]:<port>`
+    /// - `<hostname>:<port>`
+    pub fn new(address: String) -> crate::Result<Self> {
+        let endpoint = address
+            .to_socket_addrs()
+            .with_context(|| InvalidAddress {
+                address: address.clone(),
+            })?
+            .next()
+            .ok_or_else(|| BuildError::HostnameNotFound { address })?;
         let from = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
         let socket = UdpSocket::bind(&from).context(SocketBindError)?;
-        Ok(Client { socket, address })
+        Ok(Client { socket, endpoint })
     }
 
     pub fn send(&self, buf: &[u8]) -> usize {
         self.socket
-            .send_to(buf, &self.address)
+            .send_to(buf, &self.endpoint)
             .map_err(|e| error!("error sending datagram: {:?}", e))
             .unwrap_or_default()
     }
@@ -51,13 +73,13 @@ impl Client {
 pub struct StatsdSinkConfig {
     pub namespace: String,
     #[serde(default = "default_address")]
-    pub address: SocketAddr,
+    pub address: String,
     #[serde(default)]
     pub batch: BatchConfig,
 }
 
-pub fn default_address() -> SocketAddr {
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8125)
+pub fn default_address() -> String {
+    "127.0.0.1:8125".to_owned()
 }
 
 inventory::submit! {
@@ -384,5 +406,12 @@ mod test {
                 Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01"),
             );
         });
+    }
+
+    #[test]
+    fn test_parse_address() {
+        assert!(Client::new("127.0.0.1:1234".to_owned()).is_ok());
+        assert!(Client::new("localhost:1234".to_owned()).is_ok());
+        assert!(Client::new("[2a02:6b8:0:1::1]:1234".to_owned()).is_ok());
     }
 }
