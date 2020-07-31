@@ -1,4 +1,3 @@
-
 use crate::Event;
 use snafu::Snafu;
 
