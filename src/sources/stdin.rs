@@ -3,13 +3,14 @@ use crate::{
     internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
 use bytes::Bytes;
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     FutureExt, StreamExt, TryFutureExt, TryStreamExt,
 };
-use futures01::{sync::mpsc, Sink};
+use futures01::Sink;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -58,7 +59,7 @@ impl SourceConfig for StdinConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         stdin_source(io::BufReader::new(io::stdin()), self.clone(), shutdown, out)
     }
@@ -76,7 +77,7 @@ pub fn stdin_source<R>(
     stdin: R,
     config: StdinConfig,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
 ) -> crate::Result<super::Source>
 where
     R: Send + io::BufRead + 'static,
@@ -198,8 +199,8 @@ fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event, test_util::runtime};
-    use futures01::{sync::mpsc, Async::*, Stream};
+    use crate::{event, test_util::runtime, Pipeline};
+    use futures01::{Async::*, Stream};
     use std::io::Cursor;
 
     #[test]
@@ -222,7 +223,7 @@ mod tests {
     #[test]
     fn stdin_decodes_line() {
         crate::test_util::trace_init();
-        let (tx, mut rx) = mpsc::channel(10);
+        let (tx, mut rx) = Pipeline::new_test();
         let config = StdinConfig::default();
         let buf = Cursor::new("hello world\nhello world again");
 

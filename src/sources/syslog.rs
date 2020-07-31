@@ -7,6 +7,7 @@ use crate::{
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
 use bytes05::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
@@ -15,7 +16,7 @@ use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     FutureExt, StreamExt, TryFutureExt,
 };
-use futures01::{sync::mpsc, Sink};
+use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::net::SocketAddr;
@@ -82,7 +83,7 @@ impl SourceConfig for SyslogConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let host_key = self
             .host_key
@@ -254,7 +255,7 @@ pub fn udp(
     _max_length: usize,
     host_key: String,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
 ) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 

@@ -2,13 +2,14 @@ use crate::{
     event::Event,
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
 use futures::{
     compat::Future01CompatExt,
     future::{FutureExt, TryFutureExt},
     stream::StreamExt,
 };
-use futures01::{future::Future, stream::iter_ok, sync::mpsc, Sink};
+use futures01::{future::Future, stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time::interval;
@@ -48,7 +49,7 @@ impl SourceConfig for GeneratorConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         Ok(self.clone().generator(shutdown, out))
     }
@@ -63,19 +64,11 @@ impl SourceConfig for GeneratorConfig {
 }
 
 impl GeneratorConfig {
-    pub(self) fn generator(
-        self,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> super::Source {
+    pub(self) fn generator(self, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
         Box::new(self.inner(shutdown, out).boxed().compat())
     }
 
-    async fn inner(
-        self,
-        mut shutdown: ShutdownSignal,
-        mut out: mpsc::Sender<Event>,
-    ) -> Result<(), ()> {
+    async fn inner(self, mut shutdown: ShutdownSignal, mut out: Pipeline) -> Result<(), ()> {
         let mut batch_interval = self
             .batch_interval
             .map(|i| interval(Duration::from_secs_f64(i)));
@@ -116,12 +109,12 @@ impl GeneratorConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event, shutdown::ShutdownSignal, test_util::runtime};
+    use crate::{event, shutdown::ShutdownSignal, test_util::runtime, Pipeline};
     use futures01::{stream::Stream, sync::mpsc, Async::*};
     use std::time::{Duration, Instant};
 
     fn runit(config: &str) -> mpsc::Receiver<Event> {
-        let (tx, rx) = mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
         let mut rt = runtime();
         let config: GeneratorConfig = toml::from_str(config).unwrap();
         let source = config.generator(ShutdownSignal::noop(), tx);

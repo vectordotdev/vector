@@ -3,11 +3,12 @@ use crate::{
     internal_events::{UdpEventReceived, UdpSocketError},
     shutdown::ShutdownSignal,
     sources::Source,
+    Pipeline,
 };
 use bytes05::BytesMut;
 use codec::BytesDelimitedCodec;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
-use futures01::{sync::mpsc, Sink};
+use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use string_cache::DefaultAtom as Atom;
@@ -43,7 +44,7 @@ pub fn udp(
     max_length: usize,
     host_key: Atom,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
 ) -> Source {
     let mut out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 

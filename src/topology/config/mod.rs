@@ -2,12 +2,11 @@ use crate::{
     buffers::Acker,
     conditions,
     dns::Resolver,
-    event::{self, Event, Metric},
+    event::{self, Metric},
     shutdown::ShutdownSignal,
-    sinks, sources, transforms,
+    sinks, sources, transforms, Pipeline,
 };
 use component::ComponentDescription;
-use futures01::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -130,7 +129,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
         name: &str,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<sources::Source>;
 
     async fn build_async(
@@ -138,7 +137,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
         name: &str,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<sources::Source> {
         self.build(name, globals, shutdown, out)
     }

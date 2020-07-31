@@ -870,7 +870,6 @@ mod source_finished_tests {
     feature = "transforms-json_parser"
 ))]
 mod transient_state_tests {
-    use crate::event::Event;
     use crate::shutdown::ShutdownSignal;
     use crate::sinks::blackhole::BlackholeConfig;
     use crate::sources::stdin::StdinConfig;
@@ -878,9 +877,10 @@ mod transient_state_tests {
     use crate::test_util::runtime;
     use crate::topology::config::{Config, DataType, GlobalOptions, SourceConfig};
     use crate::transforms::json_parser::JsonParserConfig;
+    use crate::Pipeline;
     use crate::{topology, Error};
     use futures::compat::Future01CompatExt;
-    use futures01::{sync::mpsc::Sender, Future};
+    use futures01::Future;
     use serde::{Deserialize, Serialize};
     use stream_cancel::{Trigger, Tripwire};
 
@@ -909,7 +909,7 @@ mod transient_state_tests {
             _name: &str,
             _globals: &GlobalOptions,
             shutdown: ShutdownSignal,
-            out: Sender<Event>,
+            out: Pipeline,
         ) -> Result<Source, Error> {
             let source = shutdown
                 .map(|_| ())

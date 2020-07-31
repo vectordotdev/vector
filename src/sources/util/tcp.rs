@@ -2,14 +2,14 @@ use crate::{
     internal_events::TcpConnectionError,
     shutdown::ShutdownSignal,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
-    Event,
+    Event, Pipeline,
 };
 use bytes05::Bytes;
 use futures::{
     compat::{Compat, Compat01As03, Future01CompatExt, Stream01CompatExt},
     StreamExt, TryStreamExt,
 };
-use futures01::{future, stream, sync::mpsc, Async, Future, Sink, Stream};
+use futures01::{future, stream, Async, Future, Sink, Stream};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{
@@ -78,7 +78,7 @@ pub trait TcpSource: Clone + Send + 'static {
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
         let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 

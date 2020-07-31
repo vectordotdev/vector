@@ -38,6 +38,7 @@ pub mod kafka;
 pub mod kubernetes;
 pub mod list;
 pub mod metrics;
+pub(crate) mod pipeline;
 pub mod region;
 pub mod runtime;
 pub mod serde;
@@ -57,6 +58,7 @@ pub mod unit_test;
 pub mod validate;
 
 pub use event::Event;
+pub use pipeline::Pipeline;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 

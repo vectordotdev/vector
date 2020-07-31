@@ -1,7 +1,7 @@
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
 use futures::compat::Future01CompatExt;
-use futures01::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
+use futures01::{future, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use vector::{
     shutdown::ShutdownSignal,
@@ -12,7 +12,7 @@ use vector::{
         self,
         config::{self, GlobalOptions, SinkContext},
     },
-    Event, {sinks, sources},
+    Event, Pipeline, {sinks, sources},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -187,7 +187,7 @@ impl config::SourceConfig for ErrorSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         _shutdown: ShutdownSignal,
-        _out: mpsc::Sender<Event>,
+        _out: Pipeline,
     ) -> Result<sources::Source, vector::Error> {
         Ok(Box::new(future::err(())))
     }
@@ -254,7 +254,7 @@ impl config::SourceConfig for PanicSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         _shutdown: ShutdownSignal,
-        _out: mpsc::Sender<Event>,
+        _out: Pipeline,
     ) -> Result<sources::Source, vector::Error> {
         Ok(Box::new(future::lazy::<_, future::FutureResult<(), ()>>(
             || panic!(),

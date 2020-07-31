@@ -1,13 +1,13 @@
 use crate::{
     async_read::VecAsyncReadExt, emit, event::Event, internal_events::UnixSocketError,
-    shutdown::ShutdownSignal, sources::Source,
+    shutdown::ShutdownSignal, sources::Source, Pipeline,
 };
 use bytes05::Bytes;
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     future, FutureExt, SinkExt, StreamExt, TryFutureExt,
 };
-use futures01::{sync::mpsc, Sink};
+use futures01::Sink;
 use std::path::PathBuf;
 use tokio::net::{UnixListener, UnixStream};
 use tokio_util::codec::{Decoder, FramedRead};
@@ -24,7 +24,7 @@ pub fn build_unix_source<D, E>(
     decoder: D,
     host_key: String,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
     build_event: impl Fn(&str, Option<Bytes>, &str) -> Option<Event> + Clone + Send + Sync + 'static,
 ) -> Source
 where

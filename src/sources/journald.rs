@@ -4,6 +4,7 @@ use crate::{
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
 use chrono::TimeZone;
 use futures::{
@@ -11,7 +12,7 @@ use futures::{
     executor::block_on,
     future::{select, Either, FutureExt, TryFutureExt},
 };
-use futures01::{future, sync::mpsc, Future, Sink};
+use futures01::{future, Future, Sink};
 use lazy_static::lazy_static;
 use nix::{
     sys::signal::{kill, Signal},
@@ -84,7 +85,7 @@ impl SourceConfig for JournaldConfig {
         name: &str,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
@@ -134,7 +135,7 @@ impl SourceConfig for JournaldConfig {
 impl JournaldConfig {
     fn source<J>(
         &self,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
         shutdown: ShutdownSignal,
         mut checkpointer: Checkpointer,
         include_units: HashSet<String>,
@@ -552,7 +553,10 @@ mod checkpointer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::{block_on, runtime, shutdown_on_idle};
+    use crate::{
+        test_util::{block_on, runtime, shutdown_on_idle},
+        Pipeline,
+    };
     use futures01::stream::Stream;
     use std::io::{self, BufReader, Cursor};
     use std::iter::FromIterator;
@@ -608,7 +612,7 @@ mod tests {
     }
 
     fn run_journal(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
-        let (tx, rx) = futures01::sync::mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
         let tempdir = tempdir().unwrap();
         let mut checkpointer =
