@@ -49,13 +49,10 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: mpsc::Sender<Event>) 
 
     Box::new(
         async move {
-            let socket = match UdpSocket::bind(&addr).await {
-                Ok(socket) => socket,
-                Err(error) => {
-                    emit!(StatsdSocketError::bind(error));
-                    return Err(());
-                }
-            };
+            let socket = UdpSocket::bind(&addr)
+                .map_err(|error| emit!(StatsdSocketError::bind(error)))
+                .await?;
+
             info!(
                 message = "listening.",
                 addr = &field::display(addr),
