@@ -231,6 +231,16 @@ ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
+test-integration-humio: ## Runs Humio integration tests
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-humio
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features humio-integration-tests ::humio:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+endif
+
+
 test-integration-influxdb: ## Runs InfluxDB integration tests
 ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-influxdb
