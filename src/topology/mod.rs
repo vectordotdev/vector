@@ -19,12 +19,14 @@ use crate::topology::{builder::Pieces, task::Task};
 
 use crate::buffers;
 use crate::shutdown::SourceShutdownCoordinator;
-use futures::compat::Future01CompatExt;
-use futures01::{future, sync::mpsc, Future, Stream};
+use futures::{compat::Future01CompatExt, TryFutureExt};
+use futures01::{sync::mpsc, Future, Stream};
 use indexmap::IndexMap;
-use std::collections::{HashMap, HashSet};
-use std::panic::AssertUnwindSafe;
-use std::time::{Duration, Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    panic::AssertUnwindSafe,
+    time::{Duration, Instant},
+};
 use tokio01::timer;
 use tracing_futures::Instrument;
 
@@ -140,7 +142,7 @@ impl RunningTopology {
         for (name, task) in self.tasks.into_iter().chain(self.source_tasks.into_iter()) {
             let task = futures::compat::Compat::new(task)
                 .map(|_result| ())
-                .or_else(|_| future::ok(())) // Consider an errored task to be shutdown
+                .or_else(|_| futures01::future::ok(())) // Consider an errored task to be shutdown
                 .shared();
 
             wait_handles.push(task.clone());
@@ -202,17 +204,15 @@ impl RunningTopology {
             .map_err(|(err, _)| panic!("Timer error: {:?}", err));
 
         // Finishes once all tasks have shutdown.
-        let success = future::join_all(wait_handles)
+        let success = futures01::future::join_all(wait_handles)
             .map(|_| ())
-            .map_err(|_: future::SharedError<()>| ());
+            .map_err(|_: futures01::future::SharedError<()>| ());
 
         // Aggregate future that ends once anything detectes that all tasks have shutdown.
         let shutdown_complete_future =
-            future::select_all::<Vec<Box<dyn Future<Item = (), Error = ()> + Send>>>(vec![
-                Box::new(timeout),
-                Box::new(reporter),
-                Box::new(success),
-            ])
+            futures01::future::select_all::<Vec<Box<dyn Future<Item = (), Error = ()> + Send>>>(
+                vec![Box::new(timeout), Box::new(reporter), Box::new(success)],
+            )
             .map(|_| ())
             .map_err(|_| ());
 
@@ -290,7 +290,7 @@ impl RunningTopology {
     ) -> bool {
         let healthchecks = take_healthchecks(diff, pieces)
             .into_iter()
-            .map(|(_, task)| task);
+            .map(|(_, task)| task.compat());
         let healthchecks = futures01::future::join_all(healthchecks).map(|_| ());
 
         info!("Running healthchecks.");
@@ -356,7 +356,7 @@ impl RunningTopology {
             );
         }
 
-        future::join_all(source_shutdown_complete_futures)
+        futures01::future::join_all(source_shutdown_complete_futures)
             .compat()
             .await
             .unwrap();
@@ -466,7 +466,7 @@ impl RunningTopology {
     fn spawn_sink(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = info_span!("sink", name = %task.name(), r#type = %task.typetag());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
+        let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             drop(previous); // detach and forget
@@ -476,7 +476,7 @@ impl RunningTopology {
     fn spawn_transform(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = info_span!("transform", name = %task.name(), r#type = %task.typetag());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
+        let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             drop(previous); // detach and forget
@@ -486,7 +486,7 @@ impl RunningTopology {
     fn spawn_source(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = info_span!("source", name = %task.name(), r#type = %task.typetag());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
+        let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span.clone());
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             drop(previous); // detach and forget
@@ -496,7 +496,8 @@ impl RunningTopology {
             .takeover_source(name, &mut new_pieces.shutdown_coordinator);
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
-        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(span);
+        let source_task =
+            handle_errors(source_task.compat(), self.abort_tx.clone()).instrument(span);
         self.source_tasks
             .insert(name.to_string(), tokio::spawn(source_task.compat()));
     }
