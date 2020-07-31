@@ -13,41 +13,12 @@
 
 rustPlatform.buildRustPackage rec {
   pname = "vector";
-  version = "<%=
-    require "toml-rb"
-    TomlRB.load_file("#{VECTOR_ROOT}/Cargo.toml")["package"]["version"]
-  %>";
+  version = "0.11.0";
 
-  src = <% if ENV.has_key?("GITHUB_SHA256") %>fetchFromGitHub {
-      owner  = "timberio";
-      repo   = pname;
-      rev    = "refs/tags/v${version}";
-      sha256 = "<%= ENV["GITHUB_SHA256"] %>";
-    }<% else %><%= Dir.getwd %><% end %>;
+  src = /Users/benjohnson/Code/timber/vector-website/scripts;
 
   legacyCargoFetcher = true;
-  cargoSha256 = "<%=
-    # The only offical way to calculate `cargoSha256` is to set it arbitrarily,
-    # run the build, and then extract the correct checksum from the error
-    # message. See
-    # https://nixos.org/nixpkgs/manual/#compiling-rust-applications-with-cargo
-    # for details.
-
-    if ENV.has_key?("CARGO_SHA256")
-      ENV["CARGO_SHA256"]
-    else
-    require 'open3'
-
-      _, output, _ = Open3.capture3({ "CARGO_SHA256" => "1" * 52 }, "#{VECTOR_ROOT}/scripts/verify-nix.sh")
-      expected_sha256 = output
-        .split("\n")
-        .select { |s| s =~ /got:.*sha256:/ }
-        .map { |s| s.split(":")[-1] }
-        .first
-
-      expected_sha256
-    end
-  %>";
+  cargoSha256 = "";
   buildInputs = [ openssl pkgconfig protobuf rdkafka cmake ]
                 ++ stdenv.lib.optional stdenv.isDarwin [ Security libiconv ];
 

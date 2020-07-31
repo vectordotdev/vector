@@ -22,7 +22,7 @@ pub struct PrometheusParseError {
 
 impl InternalEvent for PrometheusParseError {
     fn emit_logs(&self) {
-        error!(message = "parsing error", error = %self.error);
+        error!(message = "parsing error", error = ?self.error);
     }
 
     fn emit_metrics(&self) {

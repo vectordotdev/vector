@@ -56,6 +56,7 @@ fn parse_header(input: &str) -> Result<ParserHeader, ParserError> {
     if tokens.len() != 4 {
         return Err(ParserError::Malformed {
             s: "expected 4 tokens in TYPE string",
+            context: String::from(input),
         });
     }
 
@@ -110,6 +111,7 @@ fn parse_tags(input: &str) -> Result<BTreeMap<String, String>, ParserError> {
             None => {
                 return Err(ParserError::Malformed {
                     s: "expected 2 values separated by '='",
+                    context: String::from(input),
                 });
             }
             Some(equals) => {
@@ -144,6 +146,7 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
         if parts.len() < 2 {
             return Err(ParserError::Malformed {
                 s: "expected at least 2 tokens in data line",
+                context: String::from(input),
             });
         };
 
@@ -165,6 +168,7 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
         if parts.len() < 2 {
             return Err(ParserError::Malformed {
                 s: "expected at least 2 tokens in data line",
+                context: String::from(input),
             });
         };
         let name = parts[0];
@@ -337,6 +341,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     if v.len() < 2 {
                         return Err(ParserError::Malformed {
                             s: "expected histogram name suffix",
+                            context: line,
                         });
                     }
                     let (name, suffix) = (v[1], v[0]);
@@ -365,6 +370,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             } else {
                                 return Err(ParserError::Malformed {
                                     s: "expected \"le\" tag in histogram bucket",
+                                    context: line,
                                 });
                             }
                         }
@@ -377,6 +383,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         _ => {
                             return Err(ParserError::Malformed {
                                 s: "unknown histogram name suffix",
+                                context: line,
                             });
                         }
                     }
@@ -442,6 +449,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             } else {
                                 return Err(ParserError::Malformed {
                                     s: "expected \"quantile\" tag in summary bucket",
+                                    context: line,
                                 });
                             }
                         }
@@ -454,6 +462,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         _ => {
                             return Err(ParserError::Malformed {
                                 s: "unknown summary name suffix",
+                                context: line,
                             });
                         }
                     }
@@ -492,6 +501,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 pub enum ParserError {
     Malformed {
         s: &'static str,
+        context: String,
     },
     UnknownMetricType {
         s: String,

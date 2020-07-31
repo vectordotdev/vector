@@ -6,6 +6,8 @@ mod file;
 #[cfg(all(feature = "sources-journald", feature = "unix"))]
 mod journald;
 mod json;
+#[cfg(feature = "sources-kafka")]
+mod kafka;
 #[cfg(feature = "sources-kubernetes-logs")]
 mod kubernetes_logs;
 #[cfg(feature = "transforms-lua")]
@@ -33,6 +35,8 @@ pub use self::file::*;
 #[cfg(all(feature = "sources-journald", feature = "unix"))]
 pub(crate) use self::journald::*;
 pub use self::json::*;
+#[cfg(feature = "sources-kafka")]
+pub use self::kafka::*;
 #[cfg(feature = "sources-kubernetes-logs")]
 pub use self::kubernetes_logs::*;
 #[cfg(feature = "transforms-lua")]
