@@ -1,6 +1,6 @@
 version: 2
 updates:
-  - package-ecosystem: "rust:cargo"
+  - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "weekly"
