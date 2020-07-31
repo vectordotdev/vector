@@ -1,8 +1,0 @@
-.footerLogoLink {
-  opacity: 0.75;
-  transition: opacity 0.15s ease-in-out;
-}
-
-.footerLogoLink:hover {
-  opacity: 1;
-}
