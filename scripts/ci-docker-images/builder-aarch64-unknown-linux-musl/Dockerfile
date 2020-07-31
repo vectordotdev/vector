@@ -4,7 +4,7 @@ ARG LLVM_VERSION=10.0.0
 # This version can be found in this file:
 # https://github.com/rust-lang/rust/blob/master/src/ci/docker/scripts/musl-toolchain.sh.
 # Exampel: "1.1.22".
-ARG MUSL_VERSION=1.1.22
+ARG MUSL_VERSION=1.1.24
 
 # LLVM target triple for Linux and MUSL. Full list of supported triples
 # can be found here:
@@ -28,7 +28,7 @@ ARG LINUX_HEADERS_VERSION=5.3.10
 
 # Locations for produced tools and libraries.
 ARG RUST_PREFIX=/opt/rust
-ARG CLANG_PREFIX=/usr/
+ARG CLANG_PREFIX=/usr
 ARG LIBS_PREFIX=/opt/libs
 
 # Bulid non-interactively
@@ -112,7 +112,7 @@ RUN cd $MUSL_DIR && \
   --prefix=$LIBS_PREFIX \
   --disable-shared \
   --disable-gcc-wrapper && \
-  make -j$(nproc) install AR=/usr/bin/ar RANLIB=/usr/bin/ranlib
+  make -j$(nproc) install
 
 # Install Linux headers.
 WORKDIR $LINUX_DIR
@@ -203,8 +203,7 @@ ENV MUSL_CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV MUSL_CXXFLAGS="$MUSL_CFLAGS -nostdinc++ -I$LIBS_PREFIX/include/c++/v1"
 
 ENV MUSL_LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -L$LIBS_PREFIX/lib/linux -lc++ -lc++abi -lunwind -l$(basename /opt/libs/lib/linux/libclang_rt.builtins* | tail -c+4 | head -c-3) -lc"
-# ENV MUSL_STARTFILES="$(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtbegin*.o') $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtend*.o')"
-ENV MUSL_STARTFILES="$LIBS_PREFIX/lib/crt1.o $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtbegin*.o') $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtend*.o')"
+ENV MUSL_STARTFILES="$(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtbegin*.o') $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtend*.o')"
 
 RUN mkdir -p $LIBS_PREFIX/bin
 RUN echo \
@@ -296,13 +295,6 @@ ENV LD_x86_64_unknown_linux_gnu=/usr/bin/ld
 ENV AR_x86_64_unknown_linux_gnu=/usr/bin/ar
 
 ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=gnu-cc
-
-# Manually set the correct values for configure checks that libkrb5 won't be
-# able to perform because we're cross-compiling.
-# Borrowed from https://github.com/cockroachdb/cockroach/pull/48187
-ENV krb5_cv_attr_constructor_destructor=yes
-ENV ac_cv_func_regcomp=yes
-ENV ac_cv_printf_positional=yes
 
 # Set up environment variables for Rust bindgen
 # See https://github.com/rust-lang/rust-bindgen/issues/1229#issuecomment-473493753
