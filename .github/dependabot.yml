@@ -6,7 +6,7 @@ updates:
       interval: "weekly"
     reviewers:
       - "hoverbear"
-    assigness:
+    assignees:
       - "hoverbear"
     labels:
       - "domain: deps"
