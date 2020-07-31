@@ -16,7 +16,7 @@
 
      To make changes please edit the template located at:
 
-     README.md.erb
+     vector/v0.10/README.md.erb
 -->
 
 ## What is Vector?
