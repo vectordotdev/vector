@@ -519,18 +519,16 @@ mod test {
     use crate::event::metric::{Metric, MetricKind, MetricValue};
     use pretty_assertions::assert_eq;
 
-    #[test]
-    fn test_quote() {
-        let exp = r##"# HELP nginx_server_bytes request/response bytes
-            # TYPE nginx_server_bytes counter
-            nginx_server_bytes{direction="  in  ",host="*"} 263719
-            # HELP nginx_server_cache cache counter
-            # TYPE nginx_server_cache counter
-            telemetry_scrape_size_bytes_count{registry="default",content_type="text/plain; version=0.0.4"}
-            "##;
-
-        let res = parse(exp).unwrap();
-        println!("{:?}", res);
+    macro_rules! map {
+        ($($key:expr => $value:expr),+) => {
+            {
+                let mut m = ::std::collections::BTreeMap::new();
+                $(
+                    m.insert($key.into(), $value.into());
+                )+
+                m
+            }
+        };
     }
 
     #[test]
@@ -765,6 +763,82 @@ mod test {
                 value: MetricValue::Gauge {
                     value: 1458255915.0
                 },
+            }]),
+        );
+    }
+
+    #[test]
+    fn test_tag_value_contain_bracket() {
+        let exp = r##"
+            # HELP name counter
+            # TYPE name counter
+            name{tag="}"} 0
+            "##;
+        assert_eq!(
+            parse(exp),
+            Ok(vec![Metric {
+                name: "name".into(),
+                timestamp: None,
+                tags: Some(map! {"tag" => "}"}),
+                kind: MetricKind::Absolute,
+                value: MetricValue::Counter { value: 0.0 },
+            }]),
+        );
+    }
+
+    #[test]
+    fn test_parse_tag_value_contain_comma() {
+        let exp = r##"
+            # HELP name counter
+            # TYPE name counter
+            name{tag="a,b"} 0
+            "##;
+        assert_eq!(
+            parse(exp),
+            Ok(vec![Metric {
+                name: "name".into(),
+                timestamp: None,
+                tags: Some(map! {"tag" => "a,b"}),
+                kind: MetricKind::Absolute,
+                value: MetricValue::Counter { value: 0.0 },
+            }]),
+        );
+    }
+
+    #[test]
+    fn test_parse_tag_escaping() {
+        let exp = r##"
+            # HELP name counter
+            # TYPE name counter
+            name{tag="\\n"} 0
+            "##;
+        assert_eq!(
+            parse(exp),
+            Ok(vec![Metric {
+                name: "name".into(),
+                timestamp: None,
+                tags: Some(map! {"tag" => "\\n"}),
+                kind: MetricKind::Absolute,
+                value: MetricValue::Counter { value: 0.0 },
+            }]),
+        );
+    }
+
+    #[test]
+    fn test_parse_tag_dont_trim_value() {
+        let exp = r##"
+            # HELP name counter
+            # TYPE name counter
+            name{tag=" * "} 0
+            "##;
+        assert_eq!(
+            parse(exp),
+            Ok(vec![Metric {
+                name: "name".into(),
+                timestamp: None,
+                tags: Some(map! {"tag" => " * "}),
+                kind: MetricKind::Absolute,
+                value: MetricValue::Counter { value: 0.0 },
             }]),
         );
     }
@@ -1180,18 +1254,6 @@ mod test {
                 },
             ]),
         );
-    }
-
-    macro_rules! map {
-        ($($key:expr => $value:expr),+) => {
-            {
-                let mut m = ::std::collections::BTreeMap::new();
-                $(
-                    m.insert($key.into(), $value.into());
-                )+
-                m
-            }
-        };
     }
 
     // https://github.com/timberio/vector/issues/3276
