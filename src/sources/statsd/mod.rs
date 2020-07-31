@@ -2,13 +2,13 @@ use crate::{
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     topology::config::GlobalOptions,
-    Event,
+    Event, Pipeline,
 };
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     stream, FutureExt, StreamExt, TryFutureExt,
 };
-use futures01::{sync::mpsc, Sink};
+use futures01::Sink;
 use parser::parse;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -30,7 +30,7 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         Ok(statsd(self.address, shutdown, out))
     }
@@ -44,7 +44,7 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
     }
 }
 
-fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: mpsc::Sender<Event>) -> super::Source {
+fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending metric: {:?}", e));
 
     Box::new(

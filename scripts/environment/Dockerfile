@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN echo $TZ > /etc/timezone
 
 # Setup the env
-RUN mkdir -p /git/timberio/vector/{scripts,website,scripts/environment}
+RUN mkdir -p /git/timberio/vector/{scripts,scripts/environment}
 ADD scripts/environment/bootstrap-ubuntu-20.04.sh scripts/environment/prepare.sh \
     /git/timberio/vector/scripts/environment/
 
@@ -20,8 +20,6 @@ RUN ./scripts/environment/bootstrap-ubuntu-20.04.sh
 
 ADD scripts/Gemfile scripts/Gemfile.lock \
     /git/timberio/vector/scripts/
-ADD website/package.json website/yarn.lock \
-    /git/timberio/vector/website/
 ADD rust-toolchain \
     /git/timberio/vector/
 RUN ./scripts/environment/prepare.sh
