@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: "rust:cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "hoverbear"
+    assigness:
+      - "hoverbear"
+    labels:
+      - "domain: deps"
+    commit-message:
+      prefix: "chore(deps)"
