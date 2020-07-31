@@ -27,7 +27,7 @@ class Object
       is_a?(NilClass) ||
       is_a?(Float)
   end
-  
+
   def to_toml(hash_style: :expanded)
     if is_a?(Hash)
       values =

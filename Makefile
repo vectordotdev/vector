@@ -347,8 +347,7 @@ check-style: ## Check that all files are styled properly
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh
 
 check-markdown: ## Check that markdown is styled properly
-	@echo "This requires yarn have been run in the website/ dir!"
-	${MAYBE_ENVIRONMENT_EXEC} ./website/node_modules/.bin/markdownlint .
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-markdown.sh
 
 check-meta: ## Check that all /.meta file are valid
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-meta.sh

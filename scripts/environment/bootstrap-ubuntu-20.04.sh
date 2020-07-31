@@ -20,6 +20,7 @@ apt install --yes \
     ca-certificates \
     curl \
     gnupg-agent \
+    nodejs \
     ruby-bundler \
     libsasl2-dev \
     gnupg2 \

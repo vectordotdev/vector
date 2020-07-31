@@ -6,6 +6,7 @@ ruby '~> 2.7.0'
 # !!!
 
 source 'https://rubygems.org'
-gem 'git', '~> 1.7.0'
-gem 'semantic', '~> 1.6.1'
-gem 'toml-rb', '~> 2.0'
+gem 'git', '~> 1.7.0' # for scipts/check-version.rb
+gem 'mdl', '~> 0.9' # for scripts/check-markdown.sh
+gem 'semantic', '~> 1.6.1' # for scipts/check-version.rb
+gem 'toml-rb', '~> 2.0' # for scipts/check-meta.rb
