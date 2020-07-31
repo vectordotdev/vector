@@ -1,17 +1,4 @@
 [[team]]
-id = "alex"
-avatar = "https://github.com/a-rodin.png"
-github = "https://github.com/a-rodin"
-keybase = "https://keybase.io/arodin"
-name = "Alexander"
-bio = """\
-Alexander is a Senior Engineer at <a href="https://timber.io">Timber.io</a> \
-and a member of the <a href="/community#team">core Vector team</a>. He created \
-<a href="https://alexanderrodin.com/qstardict">QStarDict</a>, a dictionary \
-application written in C++.\
-"""
-
-[[team]]
 id = "ana"
 avatar = "https://github.com/hoverbear.png"
 github = "https://github.com/hoverbear"
@@ -65,18 +52,41 @@ github = "https://github.com/bruceg"
 name = "Bruce"
 
 [[team]]
+id = "jean"
+avatar = "https://github.com/JeanMertz.png"
+github = "https://github.com/JeanMertz"
+keybase = "https://keybase.io/JeanMertz"
+twitter = "https://twitter.com/JeanMertz"
+name = "Jean"
+
+[[team]]
+id = "jesse"
+avatar = "https://github.com/jszwedko.png"
+github = "https://github.com/jszwedko"
+keybase = "https://keybase.io/jszwedko"
+twitter = "https://twitter.com/jszwedko"
+name = "Jesse"
+
+[[team]]
+id = "kirill"
+avatar = "https://github.com/fanatid.png"
+github = "https://github.com/fanatid"
+keybase = "https://keybase.io/fanatid"
+name = "Kirill"
+
+[[team]]
 id = "kruno"
 avatar = "https://github.com/ktff.png"
 github = "https://github.com/ktff"
 name = "Kruno"
 
 [[team]]
-id = "lucio"
-avatar = "https://github.com/LucioFranco.png"
-github = "https://github.com/LucioFranco"
-keybase = "https://keybase.io/luciofranco"
-twitter = "https://twitter.com/lucio_d_franco"
-name = "Lucio"
+id = "lee"
+avatar = "https://github.com/leebenson.png"
+github = "https://github.com/leebenson"
+keybase = "https://keybase.io/leebenson"
+twitter = "https://twitter.com/leebenson"
+name = "Lee"
 
 [[team]]
 id = "luke"
@@ -101,7 +111,23 @@ twitter = "https://twitter.com/MOZGIII"
 name = "Mike"
 
 [[team]]
+id = "steve"
+avatar = "https://github.com/sghall.png"
+github = "https://github.com/sghall"
+keybase = "https://keybase.io/sghall"
+twitter = "https://twitter.com/sghall"
+name = "Steve"
+
+[[team]]
 id = "vic"
 avatar = "https://github.com/vector-vic.png"
 github = "https://github.com/vector-vic"
 name = "Vic"
+
+[[team]]
+id = "zach"
+avatar = "https://github.com/zsherman.png"
+github = "https://github.com/zsherman"
+keybase = "https://keybase.io/zsherman"
+twitter = "https://twitter.com/zsherman"
+name = "Zach"
