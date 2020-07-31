@@ -133,6 +133,7 @@ mod integration_tests {
     use futures01::Sink;
     use serde_json::json;
     use serde_json::Value as JsonValue;
+    use std::collections::HashMap;
 
     // matches humio container address
     const HOST: &str = "http://localhost:8080";
@@ -156,13 +157,19 @@ mod integration_tests {
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
-            assert_eq!(message, entry["message"].as_str().unwrap());
-            assert!(
-                entry.get("@error").is_none(),
-                "Humio encountered an error parsing this message: {}",
+            assert_eq!(
+                message,
                 entry
-                    .get("@error_msg")
-                    .unwrap_or(&json!("no error message"))
+                    .fields
+                    .get("message")
+                    .expect("no message key")
+                    .as_str()
+                    .unwrap()
+            );
+            assert!(
+                entry.error.is_none(),
+                "Humio encountered an error parsing this message: {}",
+                entry.error_msg.unwrap_or("no error message".to_string())
             );
         });
     }
@@ -239,7 +246,7 @@ mutation {{
     }
 
     /// fetch event from the repository that has a matching message value
-    async fn find_entry(repository_name: &str, message: &str) -> serde_json::value::Value {
+    async fn find_entry(repository_name: &str, message: &str) -> HumioLog {
         let client = reqwest::Client::builder().build().unwrap();
 
         // https://docs.humio.com/api/using-the-search-api-with-humio
@@ -258,16 +265,46 @@ mutation {{
                 .await
                 .unwrap();
 
-            let json: JsonValue = res.json().await.unwrap();
+            let logs: Vec<HumioLog> = res.json().await.unwrap();
 
-            let results = json.as_array().unwrap();
-            if !results.is_empty() {
-                return results[0].clone();
+            if !logs.is_empty() {
+                return logs[0].clone();
             }
         }
         panic!(
             "did not find event in Humio repository {} with message {}",
             repository_name, message
         );
+    }
+
+    #[derive(Clone, Deserialize)]
+    struct HumioLog {
+        #[serde(rename = "#repo")]
+        humio_repo: String,
+
+        #[serde(rename = "#type")]
+        humio_type: String,
+
+        #[serde(rename = "@error")]
+        error: Option<bool>,
+
+        #[serde(rename = "@error_msg")]
+        error_msg: Option<String>,
+
+        #[serde(rename = "@rawstring")]
+        rawstring: String,
+
+        #[serde(rename = "@id")]
+        id: String,
+
+        #[serde(rename = "@timestamp")]
+        timestamp_millis: u64,
+
+        #[serde(rename = "@timezone")]
+        timezone: String,
+
+        // fields parsed from ingested log
+        #[serde(flatten)]
+        fields: HashMap<String, JsonValue>,
     }
 }
