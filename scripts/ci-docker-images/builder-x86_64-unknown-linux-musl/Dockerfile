@@ -1,11 +1,11 @@
 # We use compiler-rt, libunwind, and libc++ from LLVM.
-ARG LLVM_VERSION=9.0.1
+ARG LLVM_VERSION=10.0.0
 ARG LLVM_GIT_COMMIT=71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5
 # The version of musl should be the same as the one Rust is compiled with.
 # This version can be found in this file:
 # https://github.com/rust-lang/rust/blob/master/src/ci/docker/scripts/musl-toolchain.sh.
 # Exampel: "1.1.22".
-ARG MUSL_VERSION=1.1.22
+ARG MUSL_VERSION=1.1.24
 
 # LLVM target triple for Linux and MUSL. Full list of supported triples
 # can be found here:
@@ -29,7 +29,7 @@ ARG LINUX_HEADERS_VERSION=5.3.10
 
 # Locations for produced tools and libraries.
 ARG RUST_PREFIX=/opt/rust
-ARG CLANG_PREFIX=/usr/lib/llvm-9
+ARG CLANG_PREFIX=/usr
 ARG LIBS_PREFIX=/opt/libs
 
 # Bulid non-interactively
@@ -41,7 +41,7 @@ FROM ubuntu:20.04 AS libs-builder
 ARG DEBIAN_FRONTEND
 
 ARG CLANG_PREFIX
-RUN apt-get update && apt-get install -y llvm-9 clang-9 lld-9
+RUN apt-get update && apt-get install -y llvm clang lld
 
 # Get all sources at first, so that changes in arguments
 # flags would not redownload them.
@@ -66,7 +66,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf \
 ENV LINUX_DIR $SRC_DIR/linux-$LINUX_HEADERS_VERSION
 
 # Install build dependencies.
-RUN apt-get update && apt-get -y install rsync ninja-build cmake python3-distutils clang-9 llvm-9 lld-9
+RUN apt-get update && apt-get -y install rsync ninja-build cmake python3-distutils clang llvm lld
 
 ARG TARGET
 ARG CLANG_PREFIX
@@ -101,7 +101,7 @@ RUN mkdir build && \
 
 # Compile musl.
 WORKDIR $MUSL_DIR
-ENV CC=clang-9
+ENV CC=clang
 ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include -D_Noreturn="
 ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles"
 ENV CROSS_COMPILE=$CLANG_PREFIX/bin/
@@ -113,12 +113,12 @@ RUN cd $MUSL_DIR && \
   --prefix=$LIBS_PREFIX \
   --disable-shared \
   --disable-gcc-wrapper && \
-  make -j$(nproc) install AR=/usr/bin/ar RANLIB=/usr/bin/ranlib
+  make -j$(nproc) install
 
 # Install Linux headers.
 WORKDIR $LINUX_DIR
 ARG LINUX_TARGET
-ENV CC=clang-9
+ENV CC=clang
 ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles"
 RUN make -j$(nproc) headers_install \
@@ -134,8 +134,8 @@ RUN make -j$(nproc) headers_install \
 
 # libunwind
 WORKDIR $LLVM_DIR/libunwind
-ENV CC=clang-9
-ENV CXX=clang++-9
+ENV CC=clang
+ENV CXX=clang++
 ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV CXXFLAGS="$CFLAGS -nostdinc++ -I$LLVM_DIR/libcxx/include"
 ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc"
@@ -152,8 +152,8 @@ RUN mkdir build && \
 
 # libc++abi
 WORKDIR $LLVM_DIR/libcxxabi
-ENV CC=clang-9
-ENV CXX=clang++-9
+ENV CC=clang
+ENV CXX=clang++
 ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV CXXFLAGS="$CFLAGS -nostdinc++ -I$LLVM_DIR/libcxx/include"
 ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lunwind -lc"
@@ -173,8 +173,8 @@ RUN mkdir build && \
 
 # libc++
 WORKDIR $LLVM_DIR/libcxx
-ENV CC=clang-9
-ENV CXX=clang++-9
+ENV CC=clang
+ENV CXX=clang++
 ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV CXXFLAGS="$CFLAGS -nostdinc++ -I$LIBS_PREFIX/include/c++/v1"
 ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc++abi -lunwind -lc"
@@ -270,7 +270,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
   sh -s -- -y --profile minimal --default-toolchain $(cat /tmp/rust-toolchain) --target $TARGET
 ENV PATH="$RUSTUP_HOME/bin:$CARGO_HOME/bin:$PATH"
 
-RUN apt-get update && apt-get install -y llvm-9 clang-9 lld-9
+RUN apt-get update && apt-get install -y llvm clang lld
 
 ARG LIBS_PREFIX
 COPY --from=libs-builder $LIBS_PREFIX $LIBS_PREFIX
