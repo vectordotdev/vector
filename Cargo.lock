@@ -2151,7 +2151,7 @@ dependencies = [
  "lucet-module",
  "lucet-runtime-macros",
  "memoffset",
- "nix 0.17.0",
+ "nix",
  "num-derive",
  "num-traits",
  "rand 0.7.3",
@@ -2197,7 +2197,7 @@ dependencies = [
  "lucet-runtime-internals",
  "lucet-wasi-generate",
  "lucet-wiggle",
- "nix 0.17.0",
+ "nix",
  "rand 0.6.5",
  "wasi-common",
 ]
@@ -2599,19 +2599,6 @@ name = "new_debug_unreachable"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
-
-[[package]]
-name = "nix"
-version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd0eaf8df8bab402257e0a5c17a254e4cc1f72a93588a1ddfb5d356c801aa7cb"
-dependencies = [
- "bitflags",
- "cc",
- "cfg-if",
- "libc",
- "void",
-]
 
 [[package]]
 name = "nix"
@@ -5348,7 +5335,7 @@ checksum = "e394bc3ecd454f68f04803a7b527b36956413120fa06420dc1329cda49340763"
 dependencies = [
  "bitflags",
  "libc",
- "nix 0.17.0",
+ "nix",
  "thiserror",
  "userfaultfd-sys",
 ]
@@ -5470,7 +5457,7 @@ dependencies = [
  "metrics",
  "metrics-core",
  "metrics-runtime",
- "nix 0.16.1",
+ "nix",
  "nom 5.1.2",
  "notify",
  "num_cpus",
