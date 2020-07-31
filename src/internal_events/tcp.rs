@@ -114,7 +114,7 @@ pub struct TcpEventSent {
 
 impl InternalEvent for TcpEventSent {
     fn emit_logs(&self) {
-        debug!(message = "sending event.", byte_size = %self.byte_size);
+        trace!(message = "sending event.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
@@ -134,7 +134,7 @@ pub struct TcpEventReceived {
 
 impl InternalEvent for TcpEventReceived {
     fn emit_logs(&self) {
-        debug!(message = "sending event.", byte_size = %self.byte_size);
+        trace!(message = "received event.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
