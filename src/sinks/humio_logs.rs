@@ -247,7 +247,8 @@ mutation {{
         let search_url = format!("{}/api/v1/repositories/{}/query", HOST, repository_name);
         let search_query = format!(r#"message="{}""#, message);
 
-        // poll multiple times for event to show up
+        // events are not available to search API immediately
+        // poll up 20 times for event to show up
         for _ in 0..20usize {
             let res = client
                 .post(&search_url)
