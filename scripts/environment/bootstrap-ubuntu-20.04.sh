@@ -21,6 +21,7 @@ apt install --yes \
     curl \
     gnupg-agent \
     nodejs \
+    npm \
     ruby-bundler \
     libsasl2-dev \
     gnupg2 \
