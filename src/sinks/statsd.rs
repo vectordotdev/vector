@@ -20,17 +20,6 @@ use tower03::{Service, ServiceBuilder};
 enum BuildError {
     #[snafu(display("failed to bind to udp listener socket, error = {:?}", source))]
     SocketBindError { source: std::io::Error },
-    #[snafu(display(
-        "failed to parse or resolve address, address = {:?}, error = {:?}",
-        address,
-        source
-    ))]
-    InvalidAddress {
-        address: String,
-        source: std::io::Error,
-    },
-    #[snafu(display("host name not found, address = {:?}", address))]
-    HostnameNotFound { address: String },
 }
 
 pub struct StatsdSvc {
@@ -50,11 +39,9 @@ impl Client {
     pub fn new(address: String) -> crate::Result<Self> {
         let endpoint = address
             .to_socket_addrs()
-            .with_context(|| InvalidAddress {
-                address: address.clone(),
-            })?
+            .context(super::SocketAddressError)?
             .next()
-            .ok_or_else(|| BuildError::HostnameNotFound { address })?;
+            .ok_or_else(|| super::BuildError::DNSFailure { address })?;
         let from = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
         let socket = UdpSocket::bind(&from).context(SocketBindError)?;
         Ok(Client { socket, endpoint })
