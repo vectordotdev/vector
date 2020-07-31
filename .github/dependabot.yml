@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "hoverbear"
+    assignees:
+      - "hoverbear"
+    labels:
+      - "domain: deps"
+    commit-message:
+      prefix: "chore(deps)"

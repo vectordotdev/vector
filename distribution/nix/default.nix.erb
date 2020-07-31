@@ -15,7 +15,7 @@ rustPlatform.buildRustPackage rec {
   pname = "vector";
   version = "<%=
     require "toml-rb"
-    TomlRB.load_file("Cargo.toml")["package"]["version"]
+    TomlRB.load_file("#{VECTOR_ROOT}/Cargo.toml")["package"]["version"]
   %>";
 
   src = <% if ENV.has_key?("GITHUB_SHA256") %>fetchFromGitHub {
@@ -38,7 +38,7 @@ rustPlatform.buildRustPackage rec {
     else
     require 'open3'
 
-      _, output, _ = Open3.capture3({ "CARGO_SHA256" => "1" * 52 }, "./scripts/verify-nix.sh")
+      _, output, _ = Open3.capture3({ "CARGO_SHA256" => "1" * 52 }, "#{VECTOR_ROOT}/scripts/verify-nix.sh")
       expected_sha256 = output
         .split("\n")
         .select { |s| s =~ /got:.*sha256:/ }
