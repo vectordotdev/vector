@@ -3,13 +3,14 @@ use crate::{
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig},
+    Pipeline,
 };
 use async_trait::async_trait;
 use bytes05::{buf::BufExt, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
-use futures01::{sync::mpsc, Async, Future, Sink, Stream};
+use futures01::{Async, Future, Sink, Stream};
 use http::StatusCode;
 use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
@@ -74,7 +75,7 @@ impl SourceConfig for SplunkConfig {
         _name: &str,
         _globals: &GlobalOptions,
         _shutdown: ShutdownSignal,
-        _out: mpsc::Sender<Event>,
+        _out: Pipeline,
     ) -> crate::Result<super::Source> {
         unimplemented!()
     }
@@ -84,7 +85,7 @@ impl SourceConfig for SplunkConfig {
         _: &str,
         _: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let source = SplunkSource::new(self);
 
@@ -146,7 +147,7 @@ impl SplunkSource {
         }
     }
 
-    fn event_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response,)> {
+    fn event_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("event").or(path!("event" / "1.0")))
             .and(self.authorization())
@@ -184,7 +185,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn raw_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response,)> {
+    fn raw_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
             .and(self.authorization())
@@ -219,7 +220,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn health_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response,)> {
+    fn health_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
         let credentials = self.credentials.clone();
         let authorize =
             warp::header::optional("Authorization").and_then(move |token: Option<String>| {
@@ -749,6 +750,7 @@ mod tests {
             Healthcheck, RouterSink,
         },
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
+        Pipeline,
     };
     use chrono::{TimeZone, Utc};
     use futures::compat::Future01CompatExt;
@@ -766,7 +768,7 @@ mod tests {
 
     fn source_with(rt: &mut Runtime, token: Option<String>) -> (mpsc::Receiver<Event>, SocketAddr) {
         test_util::trace_init();
-        let (sender, recv) = mpsc::channel(CHANNEL_CAPACITY);
+        let (sender, recv) = Pipeline::new_test();
         let address = test_util::next_addr();
         rt.spawn_std(async move {
             SplunkConfig {

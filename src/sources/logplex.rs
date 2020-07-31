@@ -4,11 +4,11 @@ use crate::{
     sources::util::{ErrorMessage, HttpSource},
     tls::TlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig},
+    Pipeline,
 };
 use async_trait::async_trait;
 use bytes05::{buf::BufExt, Bytes};
 use chrono::{DateTime, Utc};
-use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::{
     io::{BufRead, BufReader},
@@ -40,7 +40,7 @@ impl SourceConfig for LogplexConfig {
         _name: &str,
         _globals: &GlobalOptions,
         _shutdown: ShutdownSignal,
-        _out: mpsc::Sender<Event>,
+        _out: Pipeline,
     ) -> crate::Result<super::Source> {
         unimplemented!()
     }
@@ -50,7 +50,7 @@ impl SourceConfig for LogplexConfig {
         _: &str,
         _: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let source = LogplexSource::default();
         source.run(self.address, "events", &self.tls, out, shutdown)
@@ -173,6 +173,7 @@ mod tests {
         runtime::Runtime,
         test_util::{self, collect_n, runtime},
         topology::config::{GlobalOptions, SourceConfig},
+        Pipeline,
     };
     use chrono::{DateTime, Utc};
     use futures::compat::Future01CompatExt;
@@ -182,7 +183,7 @@ mod tests {
 
     fn source(rt: &mut Runtime) -> (mpsc::Receiver<Event>, SocketAddr) {
         test_util::trace_init();
-        let (sender, recv) = mpsc::channel(100);
+        let (sender, recv) = Pipeline::new_test();
         let address = test_util::next_addr();
         rt.spawn_std(async move {
             LogplexConfig { address, tls: None }

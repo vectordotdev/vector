@@ -2,10 +2,11 @@ use crate::event::Event;
 use crate::{
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
+    Pipeline,
 };
 use async_trait::async_trait;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
-use futures01::{sync::mpsc, Sink};
+use futures01::Sink;
 use serde::Serialize;
 use std::error::Error;
 use std::fmt;
@@ -59,7 +60,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         address: SocketAddr,
         path: &'static str,
         tls: &Option<TlsConfig>,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
         shutdown: ShutdownSignal,
     ) -> crate::Result<crate::sources::Source> {
         let mut filter: BoxedFilter<()> = warp::post().boxed();
@@ -83,7 +84,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         Ok(events) => {
                             out.send_all(futures01::stream::iter_ok(events))
                                 .compat()
-                                .map_err(move |e: mpsc::SendError<Event>| {
+                                .map_err(move |e: futures01::sync::mpsc::SendError<Event>| {
                                     // can only fail if receiving end disconnected, so we are shuting down,
                                     // probably not gracefully.
                                     error!("Failed to forward events, downstream is closed");
