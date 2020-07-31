@@ -14,8 +14,8 @@ META_PATH="/.meta"
 echo "Validating ${META_PATH}..."
 
 td="$(mktemp -d)"
-scripts/load-meta.rb > $td/meta.json
-errors=$(jsonschema -i meta.json -F "* Message: {error.message}
+scripts/load-meta.rb > "$td/meta.json"
+errors=$(jsonschema -i "$td/meta.json" -F "* Message: {error.message}
   Path: {error.path}
 
 " .meta/.schema.json 2>&1)

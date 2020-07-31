@@ -332,7 +332,7 @@ bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 check: ## Run prerequisite code checks
 	${MAYBE_ENVIRONMENT_EXEC} cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
 
-check-all: check-fmt check-clippy check-style check-markdown check-meta check-blog check-version check-examples check-component-features check-scripts ## Check everything
+check-all: check-fmt check-clippy check-style check-markdown check-meta check-version check-examples check-component-features check-scripts ## Check everything
 
 check-component-features: ## Check that all component features are setup properly
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features.sh
