@@ -134,7 +134,7 @@ pub struct TcpEventReceived {
 
 impl InternalEvent for TcpEventReceived {
     fn emit_logs(&self) {
-        debug!(message = "sending event.", byte_size = %self.byte_size);
+        debug!(message = "received event.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
