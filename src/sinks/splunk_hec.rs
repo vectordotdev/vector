@@ -384,12 +384,11 @@ mod integration_tests {
     // It usually takes ~1 second for the event to show up in search, so poll until
     // we see it.
     async fn find_entry(message: &str) -> serde_json::value::Value {
-        let value = Some(message);
         for _ in 0..20usize {
             match recent_entries(None)
                 .await
                 .into_iter()
-                .find(|entry| entry["message"].as_str() == value)
+                .find(|entry| entry["_raw"].as_str().unwrap_or("").contains(&message))
             {
                 Some(value) => return value,
                 None => std::thread::sleep(std::time::Duration::from_millis(100)),
