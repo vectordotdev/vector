@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -113,18 +114,18 @@ fn kafka_source(
 
                 async move {
                     match message {
-                        Err(e) => {
-                            Err(error!(message = "Error reading message from Kafka", error = ?e))
+                        Err(error) => {
+                            emit!(KafkaEventFailed { error });
+                            Err(())
                         }
                         Ok(msg) => {
-                            let payload = match msg.payload_view::<[u8]>() {
+                            emit!(KafkaEventReceived {
+                                byte_size: msg.payload_len()
+                            });
+
+                            let payload = match msg.payload() {
                                 None => return Err(()), // skip messages with empty payload
-                                Some(Err(e)) => {
-                                    return Err(
-                                        error!(message = "Cannot extract payload", error = ?e),
-                                    )
-                                }
-                                Some(Ok(payload)) => Bytes::from(payload),
+                                Some(payload) => Bytes::from(payload),
                             };
                             let mut event = Event::new_empty_log();
                             let log = event.as_mut_log();
@@ -143,20 +144,18 @@ fn kafka_source(
                             log.insert(event::log_schema().source_type_key(), "kafka");
 
                             if let Some(key_field) = &key_field {
-                                match msg.key_view::<[u8]>() {
+                                match msg.key() {
                                     None => (),
-                                    Some(Err(e)) => {
-                                        return Err(
-                                            error!(message = "Cannot extract key", error = ?e),
-                                        )
-                                    }
-                                    Some(Ok(key)) => {
+                                    Some(key) => {
                                         log.insert(key_field.clone(), key);
                                     }
                                 }
                             }
 
-                            consumer.store_offset(&msg).map_err(|e| error!(message = "Cannot store offset for the message", error = ?e))?;
+                            consumer.store_offset(&msg).map_err(|error| {
+                                emit!(KafkaOffsetUpdateFailed { error });
+                            })?;
+
                             Ok(event)
                         }
                     }
