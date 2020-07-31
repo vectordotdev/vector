@@ -3650,12 +3650,6 @@ require('custom_module')
   # * relevant when region = ""
   endpoint = "127.0.0.0:5000/path/to/service"
 
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-or-transform-id"]
-
   # The log field used as the Kinesis record's partition key value.
   #
   # * optional
@@ -3676,14 +3670,6 @@ require('custom_module')
   # * required
   # * type: string
   stream_name = "my-stream"
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "aws_kinesis_streams"
-  type = "aws_kinesis_streams"
 
   #
   # Batch
