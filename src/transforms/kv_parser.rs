@@ -78,8 +78,12 @@ pub struct KeyValue {
     trim_value: Option<String>,
 }
 
-
-fn kv_parser(pair: String, field_split: &String, trim_key: &Option<String>, trim_value: &Option<String>) -> Option<(Atom, String)> {
+fn kv_parser(
+    pair: String,
+    field_split: &String,
+    trim_key: &Option<String>,
+    trim_value: &Option<String>,
+) -> Option<(Atom, String)> {
     let pair = pair.trim();
     let mut field;
 
@@ -92,8 +96,12 @@ fn kv_parser(pair: String, field_split: &String, trim_key: &Option<String>, trim
         if count < 2 {
             return None;
         } else if count > 2 {
-            error!(message = "KV parser expected 2 values, but got {count}", count=count, rate_limit_secs=30);
-            return None
+            error!(
+                message = "KV parser expected 2 values, but got {count}",
+                count = count,
+                rate_limit_secs = 30
+            );
+            return None;
         }
 
         field = [key, val];
@@ -126,9 +134,14 @@ impl Transform for KeyValue {
         let value = log.get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
-            let pairs = value
-                .split(&self.separator)
-                .filter_map(|pair| kv_parser(pair.to_string(), &self.field_split, &self.trim_key, &self.trim_value));
+            let pairs = value.split(&self.separator).filter_map(|pair| {
+                kv_parser(
+                    pair.to_string(),
+                    &self.field_split,
+                    &self.trim_key,
+                    &self.trim_value,
+                )
+            });
 
             // Handle optional overwriting of the target field
             if let Some(target_field) = &self.target_field {
@@ -169,7 +182,6 @@ impl Transform for KeyValue {
             if self.drop_field {
                 log.remove(&self.field);
             }
-
         } else {
             debug!(
                 message = "Field does not exist.",
@@ -214,8 +226,8 @@ mod tests {
             trim_key,
             trim_value,
         }
-            .build(TransformContext::new_test())
-            .unwrap();
+        .build(TransformContext::new_test())
+        .unwrap();
 
         parser.transform(event).unwrap().into_log()
     }
@@ -358,7 +370,7 @@ mod tests {
 
     #[test]
     fn it_trims_keys() {
-         let log = parse_log(
+        let log = parse_log(
             "{\"foo\"}:0, \"\"bop\":beep, {({score})}:78",
             ",".to_string(),
             ":".to_string(),
@@ -375,7 +387,7 @@ mod tests {
 
     #[test]
     fn it_trims_values() {
-         let log = parse_log(
+        let log = parse_log(
             "foo:{\"0\"}, bop:\"beep\", score:{78}",
             ",".to_string(),
             ":".to_string(),
