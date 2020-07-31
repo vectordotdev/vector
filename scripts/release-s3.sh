@@ -7,7 +7,7 @@ set -euo pipefail
 #
 #   Uploads archives and packages to S3
 
-CHANNEL="${CHANNEL:-"$(scripts/util/release-channel.sh)"}"
+CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
 VERSION="${VERSION:-"$(scripts/version.sh)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 VERIFY_TIMEOUT="${VERIFY_TIMEOUT:-"30"}" # seconds

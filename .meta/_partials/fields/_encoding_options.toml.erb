@@ -11,23 +11,26 @@ Configures the encoding specific sink behavior.\
 """
 
 <%- if encodings.any? -%>
-  [<%= namespace %>.encoding.children.codec]
-  type = "string"
-  common = true
-  <%- if default -%>
-  default = <%= default.to_toml %>
-  <%- else -%>
-  required = true
-  <%- end -%>
-  groups = <%= groups.to_toml %>
-  description = """\
-  The encoding codec used to serialize the events before outputting.\
-  """
+[<%= namespace %>.encoding.children.codec]
+type = "string"
+common = true
+<%- if default -%>
+default = <%= default.to_toml %>
+<%- else -%>
+required = true
+<%- end -%>
+groups = <%= groups.to_toml %>
+description = """\
+The encoding codec used to serialize the events before outputting.\
+"""
 
-  [<%= namespace %>.encoding.children.codec.enum]
-  <%- if encodings.include?("json") -%>json = "Each event is encoded into JSON and the payload is represented as a JSON array."<%- end -%>
-  <%- if encodings.include?("ndjson") -%>ndjson = "Each event is encoded into JSON and the payload is new line delimited."<%- end -%>
-  <%- if encodings.include?("text") -%>text = "Each event is encoded into text via the `message` key and the payload is new line delimited."<%- end -%>
+[<%= namespace %>.encoding.children.codec.enum]
+<%- if encodings.include?("json") -%>json = "Each event is encoded into JSON and the payload is represented as a JSON array."
+<%- end -%>
+<%- if encodings.include?("ndjson") -%>ndjson = "Each event is encoded into JSON and the payload is new line delimited."
+<%- end -%>
+<%- if encodings.include?("text") -%>text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
+<%- end -%>
 <%- end -%>
 
 [<%= namespace %>.encoding.children.only_fields]

@@ -10,7 +10,7 @@ set -euo pipefail
 
 set -x
 
-CHANNEL="${CHANNEL:-"$(scripts/util/release-channel.sh)"}"
+CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
 VERSION="${VERSION:-"$(scripts/version.sh)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 PUSH="${PUSH:-}"

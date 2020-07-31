@@ -10,7 +10,6 @@ require "git"
 require "semantic"
 require "semantic/core_ext"
 require "toml-rb"
-require_relative "setup"
 
 class Semantic::Version
   #
@@ -30,6 +29,8 @@ class Semantic::Version
     end
   end
 end
+
+ROOT_DIR = Dir.pwd
 
 # read version from Cargo.toml
 cargo_toml = TomlRB.load_file("#{ROOT_DIR}/Cargo.toml")

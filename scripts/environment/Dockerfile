@@ -20,8 +20,6 @@ RUN ./scripts/environment/bootstrap-ubuntu-20.04.sh
 
 ADD scripts/Gemfile scripts/Gemfile.lock \
     /git/timberio/vector/scripts/
-ADD website/package.json website/yarn.lock \
-    /git/timberio/vector/website/
 ADD rust-toolchain \
     /git/timberio/vector/
 RUN ./scripts/environment/prepare.sh

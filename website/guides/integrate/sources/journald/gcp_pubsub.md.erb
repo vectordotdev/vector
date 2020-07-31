@@ -1,3 +1,0 @@
-<%- source = metadata.sources.send("journald") -%>
-<%- sink = metadata.sinks.send("gcp_pubsub") -%>
-<%= integration_guide(source: source, sink: sink) %>

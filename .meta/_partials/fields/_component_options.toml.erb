@@ -1,6 +1,6 @@
 <%- groups ||= [] -%>
 <%- if !defined?(healthcheck) -%><%- healthcheck = type == "sink" -%><%- end -%>
-[<%= type.pluralize %>.<%= name %>.options.type]
+[<%= type %>s.<%= name %>.options.type]
 type = "string"
 common = true
 groups = <%= groups.to_toml %>
@@ -11,11 +11,11 @@ to use. The value _must_ be `#{name}`.\
 """
 sort = -2
 
-[<%= type.pluralize %>.<%= name %>.options.type.enum]
+[<%= type %>s.<%= name %>.options.type.enum]
 <%= name %> = "The name of this component"
 
 <%- if type != "source" %>
-[<%= type.pluralize %>.<%= name %>.options.inputs]
+[<%= type %>s.<%= name %>.options.inputs]
 type = "[string]"
 common = true
 examples = [["my-source-or-transform-id"]]
@@ -29,7 +29,7 @@ sort = -1
 <%- end -%>
 
 <%- if healthcheck %>
-[<%= type.pluralize %>.<%= name %>.options.healthcheck]
+[<%= type %>s.<%= name %>.options.healthcheck]
 type = "bool"
 common = true
 default = true

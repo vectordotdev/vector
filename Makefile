@@ -332,7 +332,7 @@ bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 check: ## Run prerequisite code checks
 	${MAYBE_ENVIRONMENT_EXEC} cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
 
-check-all: check-fmt check-clippy check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
+check-all: check-fmt check-clippy check-style check-markdown check-meta check-version check-examples check-component-features check-scripts ## Check everything
 
 check-component-features: ## Check that all component features are setup properly
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features.sh
@@ -347,11 +347,10 @@ check-style: ## Check that all files are styled properly
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh
 
 check-markdown: ## Check that markdown is styled properly
-	@echo "This requires yarn have been run in the website/ dir!"
-	${MAYBE_ENVIRONMENT_EXEC} ./website/node_modules/.bin/markdownlint .
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-markdown.sh
 
-check-generate: ## Check that no files are pending generation
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-generate.sh
+check-meta: ## Check that all /.meta file are valid
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-meta.sh
 
 check-version: ## Check that Vector's version is correct accounting for recent changes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-version.rb
@@ -496,15 +495,6 @@ verify-deb-artifact-on-ubuntu-19-04: package-deb-x86_64 ## Verify the deb packag
 
 verify-nixos:  ## Verify that Vector can be built on NixOS
 	$(RUN) verify-nixos
-
-##@ Website
-
-generate:  ## Generates files across the repo using the data in /.meta
-	${MAYBE_ENVIRONMENT_EXEC} bundle exec --gemfile scripts/Gemfile ./scripts/generate.rb
-
-export ARTICLE ?= true
-sign-blog: ## Sign newly added blog articles using GPG
-	$(RUN) sign-blog
 
 ##@ Utility
 

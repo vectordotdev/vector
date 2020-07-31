@@ -10,7 +10,7 @@ set -euo pipefail
 # ENV VARS
 #
 #   $OVERWRITE      overwrite Vector binary even if it already exists (default "true")
-#   $CHANNEL        the release channel for the build, "nighly" or "stable" (default `scripts/util/release-channel.sh`)
+#   $CHANNEL        the release channel for the build, "nighly" or "stable" (default `scripts/release-channel.sh`)
 #   $FEATURES       a list of Vector features to include when building (default "default")
 #   $NATIVE_BUILD   whether to pass the --target flag when building via cargo (default "true")
 #   $KEEP_SYMBOLS   whether to keep the any debug symbols in the binaries or not (default "true")
@@ -26,7 +26,7 @@ NATIVE_BUILD="${NATIVE_BUILD:-"true"}"
 KEEP_SYMBOLS=${KEEP_SYMBOLS:-"true"}
 TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
 
-CHANNEL=${CHANNEL:-"$(scripts/util/release-channel.sh)"}
+CHANNEL=${CHANNEL:-"$(scripts/release-channel.sh)"}
 if [ "$CHANNEL" == "nightly" ]; then
   FEATURES="$FEATURES nightly"
 fi
